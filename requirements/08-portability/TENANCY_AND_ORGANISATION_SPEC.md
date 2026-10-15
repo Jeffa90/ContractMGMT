@@ -1,6 +1,6 @@
 # Tenancy and Organisation Specification
 
-Resolves CON-07 and GAP-25. Terms are defined in `requirements/02-reference/GLOSSARY.md`. `[CONFIRMED]` principle (Master: "Tenant isolation must use TenantId on owned entities, query filters, service policies, database constraints and cross-tenant tests"), `[PROPOSED]` detail.
+Resolves CON-07 and GAP-25. Terms are defined in `requirements/02-reference/GLOSSARY.md`. `[CONFIRMED]` principle (Master: "Tenant isolation must use TenantId on owned entities, query filters, service policies, database constraints and cross-tenant tests"), `[CONFIRMED]` detail.
 
 ## 1. Model
 
@@ -27,7 +27,7 @@ Switching mode after installation is only supported upward (single organisation,
 
 ## 3. Tenant resolution
 
-- Authenticated requests: tenant comes from the verified identity (issuer + subject membership) or service-principal registration. `[PROPOSED]`
+- Authenticated requests: tenant comes from the verified identity (issuer + subject membership) or service-principal registration. `[CONFIRMED]`
 - Unauthenticated entry points (sign-in page, health, callbacks): tenant resolved from a configured host-name mapping or a per-tenant callback path secret, never from a client-supplied header or query value alone. Unknown hosts get a generic response.
 - A request with an identity valid for tenant A can never be switched to tenant B by changing a header, token claim copied from another system, route value or body field.
 - Background jobs and integration callbacks run inside an **explicit tenant scope** established from the job record; code that reads tenant data without a scope fails closed.
@@ -38,10 +38,11 @@ Database rows (query filters + Row-Level Security + constraints), blob storage k
 
 ## 5. Organisation scope rules
 
-1. Every organisation-scoped row carries `OrganisationId`; policies check membership in addition to the tenant. `[PROPOSED]`
+1. Every organisation-scoped row carries `OrganisationId`; policies check membership in addition to the tenant. `[CONFIRMED]`
 2. Cross-organisation access exists only where a role is granted at tenant level for that permission (for example Auditor at tenant scope). The default for contract roles is organisation scope.
-3. Configuration can be defined at tenant level (defaults) and overridden per organisation; resolution is organisation first, then tenant, then pack default. `[PROPOSED]`
+3. Configuration can be defined at tenant level (defaults) and overridden per organisation; resolution is organisation first, then tenant, then pack default. `[CONFIRMED]`
 4. Suppliers, categories and contracts are organisation-scoped. Sharing suppliers across organisations is a future option.
+5. **Agreement Reference is unique across the tenant** (`(TenantId, AgreementReference)`). Each organisation configures a reference prefix and numbering rule so organisations in one tenant cannot collide; numbers are allocated transactionally and never reused. Organisation remains a mandatory policy and reporting scope on every contract. `[CONFIRMED]` D3
 
 ## 6. Installation-level data
 

@@ -1,6 +1,6 @@
 # Adapter Catalogue
 
-Interfaces are named for the design; exact signatures are decided at implementation and recorded in `docs/ARCHITECTURE.md`. Status values: Disabled, Mock, Configured. `[PROPOSED]` detail unless the interface itself is in Master.
+Interfaces are named for the design; exact signatures are decided at implementation and recorded in `docs/ARCHITECTURE.md`. Status values: Disabled, Mock, Configured. `[CONFIRMED]` detail unless the interface itself is in Master.
 
 | Kind | Interface | Purpose | Default in Demo | Production implementations | If unavailable |
 |---|---|---|---|---|---|
@@ -12,7 +12,7 @@ Interfaces are named for the design; exact signatures are decided at implementat
 | AI | `IAiAssistProvider` | Onboarding proposals, metadata extraction, summaries, schedule drafting, supplier classification `[CONFIRMED]` | Disabled | Provider chosen by tenant | Features hidden; core unaffected |
 | Monitoring | `IMonitoringSink` | Metrics, traces, health, SIEM export of audit | Console/structured log | OpenTelemetry exporter; Application Insights; syslog/SIEM | Local logs only |
 | Identity | OIDC handlers + `IIdentityDirectory` | Sign-in, group claims, optional directory lookup for people pickers | Demo identity | Generic OIDC; Microsoft Entra ID `[CONFIRMED]` | No sign-in; setup only |
-| Malware scan | `IMalwareScanner` | Scan every uploaded and ingested file | Quarantine-and-skip with warning (**Demo only**) | ClamAV service; Microsoft Defender-based service; vendor ICAP | Files stay `Pending`; downloads blocked; Production readiness fails without a scanner or an explicit recorded risk acceptance `[PROPOSED]` |
+| Malware scan | `IMalwareScanner` | Scan every uploaded and ingested file | Quarantine-and-skip with warning (**Demo only**) | ClamAV service; Microsoft Defender-based service; vendor ICAP | Files stay `Pending`; downloads blocked; Production readiness fails without a scanner or an explicit recorded risk acceptance `[CONFIRMED]` |
 | Migration source | `IMigrationSourceConnector` | Read legacy data from SharePoint lists/libraries, source-system exports, future APIs `[CONFIRMED]` | File upload (CSV, XLSX, JSON, ZIP) | SharePoint/Graph connector (future); Medius, Ariba/Icertis-style flat export profiles | File-based import remains |
 | Supplier registry | `ISupplierRegistryProvider` | ABN validation `[CONFIRMED]` | Disabled (format check only) | Public ABN lookup service | Format check only; never blocks |
 | Supplier website | `ISupplierWebsiteProvider` | Retrieve a website description | Disabled | Allowlisted HTTP fetcher with SSRF controls | Field stays manual |

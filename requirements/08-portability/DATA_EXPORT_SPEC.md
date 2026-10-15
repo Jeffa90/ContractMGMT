@@ -1,6 +1,6 @@
 # Data Export Specification
 
-Master: "Support records, documents, metadata, audit evidence and configuration exports subject to permission." This file defines the export types and the round-trip guarantee that proves portability (GAP-15). `[CONFIRMED]` requirement, `[PROPOSED]` detail.
+Master: "Support records, documents, metadata, audit evidence and configuration exports subject to permission." This file defines the export types and the round-trip guarantee that proves portability (GAP-15). `[CONFIRMED]`.
 
 ## 1. Export types
 

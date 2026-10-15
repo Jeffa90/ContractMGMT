@@ -11,24 +11,24 @@ ContractStatus,Effective,Effective,Confirmed,status-transitions.csv
 ContractStatus,VariationInProgress,Variation in Progress,Confirmed,status-transitions.csv
 ContractStatus,Ended,Ended,Confirmed,status-transitions.csv
 ContractStatus,DisposedArchived,Disposed-Archived,Confirmed,status-transitions.csv
-ContractStatus,Withdrawn,Withdrawn,Proposed,status-transitions-supplemental.csv
-LockState,Unlocked,Unlocked,Proposed,WORKFLOW_SPEC.md
+ContractStatus,Withdrawn,Withdrawn,Confirmed,status-transitions-supplemental.csv
+LockState,Unlocked,Unlocked,Confirmed,WORKFLOW_SPEC.md
 LockState,Locked,Locked,Confirmed,contracts.csv (recordLocked)
-LockState,UnlockedEmergency,Temporarily unlocked (emergency),Proposed,WORKFLOW_SPEC.md
+LockState,UnlockedEmergency,Temporarily unlocked (emergency),Confirmed,WORKFLOW_SPEC.md
 ExtensionType,NoExtension,No extension,Confirmed,contracts-import.csv
 ExtensionType,Evergreen,Evergreen,Confirmed,contracts-import.csv
-ExtensionType,FixedExtension,Fixed extension option,Proposed,Medius profile lists extension type; values to be mapped
+ExtensionType,FixedExtension,Fixed extension option,Open,Medius profile lists extension type; values to be mapped
 DocumentType,ExecutedContract,Executed Contract,Confirmed,attachment-manifest.csv
 DocumentType,Schedule,Schedule,Confirmed,attachment-manifest.csv
-DocumentType,VariationDocument,Variation,Proposed,WORKFLOW_SPEC.md
-DocumentType,LegalAdvice,Legal advice,Proposed,WORKFLOW_SPEC.md
-DocumentType,ApprovalEvidence,Approval evidence,Proposed,ESIGNATURE_DOCUSIGN_SPEC.md
-DocumentType,SupportingDocument,Supporting document,Proposed,
-DocumentType,Correspondence,Correspondence,Proposed,
-Classification,Public,Public,Proposed,RETENTION_AND_CLASSIFICATION_SPEC.md
-Classification,Internal,Internal,Proposed,RETENTION_AND_CLASSIFICATION_SPEC.md
-Classification,Confidential,Confidential,Proposed,RETENTION_AND_CLASSIFICATION_SPEC.md
-Classification,Restricted,Restricted,Proposed,RETENTION_AND_CLASSIFICATION_SPEC.md
+DocumentType,VariationDocument,Variation,Confirmed,WORKFLOW_SPEC.md
+DocumentType,LegalAdvice,Legal advice,Confirmed,WORKFLOW_SPEC.md
+DocumentType,ApprovalEvidence,Approval evidence,Confirmed,ESIGNATURE_DOCUSIGN_SPEC.md
+DocumentType,SupportingDocument,Supporting document,Confirmed,
+DocumentType,Correspondence,Correspondence,Confirmed,
+Classification,Public,Public,Open,Default set; final levels Q-06
+Classification,Internal,Internal,Open,Default set; final levels Q-06
+Classification,Confidential,Confidential,Open,Default set; final levels Q-06
+Classification,Restricted,Restricted,Open,Default set; final levels Q-06
 ConfigurationMode,Demo,Demo,Confirmed,Master (wizard stage 2)
 ConfigurationMode,Test,Test,Confirmed,Master (wizard stage 2)
 ConfigurationMode,Production,Production Configuration,Confirmed,Master (wizard stage 2)
@@ -41,7 +41,7 @@ TenancyMode,MultiTenant,Multi-tenant hosting,Confirmed,Master (Product modes)
 DuplicateStrategy,Reject,Reject,Confirmed,MIGRATION_REQUIREMENTS.md
 DuplicateStrategy,SkipExisting,Skip existing,Confirmed,MIGRATION_REQUIREMENTS.md
 DuplicateStrategy,UpdateMapped,Update mapped fields,Confirmed,MIGRATION_REQUIREMENTS.md
-DuplicateStrategy,CreateNewVersion,Create new version (documents only),Proposed,CON-11 / ASM-16
+DuplicateStrategy,CreateNewVersion,Create new version (documents only),Open,CON-11 / ASM-16
 DuplicateStrategy,CreateNewReference,Create new record with generated target reference,Confirmed,MIGRATION_REQUIREMENTS.md
 DuplicateStrategy,ManualReview,Manual review,Confirmed,MIGRATION_REQUIREMENTS.md
 DocumentDuplicateOption,RejectDuplicateHash,Reject duplicate hash,Confirmed,ATTACHMENT_INGESTION.md
@@ -54,16 +54,16 @@ MatchMethod,AgreementReference,Exact AgreementReference in manifest,Confirmed,AT
 MatchMethod,NamingRule,Configured regular expression or naming rule,Confirmed,ATTACHMENT_INGESTION.md
 MatchMethod,FolderName,Exact parent folder name equals agreement reference,Confirmed,ATTACHMENT_INGESTION.md
 MatchMethod,Manual,Manual resolution queue,Confirmed,ATTACHMENT_INGESTION.md
-MigrationBatchStatus,Created,Created,Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,Profiled,Profiled,Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,Validated,Validated (dry run complete),Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,Committing,Committing,Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,Committed,Committed,Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,Reconciled,Reconciled,Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,Accepted,Accepted (final),Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,RolledBack,Rolled back,Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,Compensated,Compensating archival applied,Proposed,MIGRATION_SUPPLEMENT.md
-MigrationBatchStatus,Failed,Failed (resumable),Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Created,Created,Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Profiled,Profiled,Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Validated,Validated (dry run complete),Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Committing,Committing,Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Committed,Committed,Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Reconciled,Reconciled,Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Accepted,Accepted (final),Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,RolledBack,Rolled back,Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Compensated,Compensating archival applied,Confirmed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Failed,Failed (resumable),Confirmed,MIGRATION_SUPPLEMENT.md
 ProviderKind,Documents,Document storage,Confirmed,Master (Architecture)
 ProviderKind,Email,Email,Confirmed,Master (Architecture)
 ProviderKind,Reporting,Reporting,Confirmed,Master (Architecture)
@@ -80,3 +80,27 @@ FunctionalityLabel,Implemented,Implemented,Confirmed,CLAUDE.md
 FunctionalityLabel,Mocked,Mocked,Confirmed,CLAUDE.md
 FunctionalityLabel,Disabled,Disabled,Confirmed,CLAUDE.md
 FunctionalityLabel,Future,Future,Confirmed,CLAUDE.md
+ViewerKind,AllContracts,All Contracts Viewer,Confirmed,DR-2026-10-15 D1
+ViewerKind,Category,Category Viewer,Confirmed,DR-2026-10-15 D1
+ViewerKind,BusinessUnit,Business Unit Viewer,Confirmed,DR-2026-10-15 D1
+ViewerKind,Site,Site Viewer,Confirmed,DR-2026-10-15 D1
+ViewerKind,Restricted,Restricted Viewer,Confirmed,DR-2026-10-15 D1
+ReferencePolicy,KeepSource,Keep source agreement reference if free in the tenant,Confirmed,MIGRATION_SUPPLEMENT.md section 2 (D3)
+ReferencePolicy,GenerateNew,Generate target reference from the organisation numbering rule,Confirmed,MIGRATION_SUPPLEMENT.md section 2 (D3)
+RegisteredDateProvenance,Platform,Stamped by register authorisation,Confirmed,DR-2026-10-15
+RegisteredDateProvenance,Migration,Imported under a legacy-load policy,Confirmed,DR-2026-10-15
+ApprovalSubjectType,Contract,Register authorisation,Confirmed,DR-2026-10-15 D2
+ApprovalSubjectType,Variation,Variation approval,Confirmed,WORKFLOW_SPEC.md
+ApprovalSubjectType,Disposition,Disposition approval,Confirmed,DR-2026-10-15 D1
+Role,SystemAdministrator,System Administrator,Confirmed,DR-2026-10-15 D1
+Role,TenantAdministrator,Tenant Administrator,Confirmed,DR-2026-10-15 D1
+Role,OrganisationAdministrator,Organisation Administrator,Confirmed,DR-2026-10-15 D1
+Role,DivisionSiteAdministrator,Division/Site Administrator,Confirmed,DR-2026-10-15 D1
+Role,BusinessConfigurationAdministrator,Business Configuration Administrator,Confirmed,DR-2026-10-15 D1
+Role,ProcurementAdministrator,Procurement Administrator,Confirmed,DR-2026-10-15 D1
+Role,CategoryOwner,Category Owner,Confirmed,DR-2026-10-15 D1
+Role,Legal,Legal,Confirmed,DR-2026-10-15 D1
+Role,Approver,Approver,Confirmed,DR-2026-10-15 D1
+Role,BackupApprover,Backup Approver,Confirmed,DR-2026-10-15 D1
+Role,Auditor,Auditor,Confirmed,DR-2026-10-15 D1
+Role,Viewer,Viewer,Confirmed,DR-2026-10-15 D1

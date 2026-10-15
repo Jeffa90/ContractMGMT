@@ -1,11 +1,11 @@
 Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
 Supplier,id,Supplier Id,uuid,Yes,Yes,n/a,System primary key
 Supplier,tenantId,Tenant,uuid,Yes,Yes,n/a,Server-set
-Supplier,organisationId,Organisation,uuid,Yes,Yes,n/a,Suppliers are organisation-scoped; sharing across organisations is a future option [PROPOSED]
-Supplier,name,Supplier Name,string,Yes,Yes,n/a,Trading name; migration matches on normalised name when VendorNumber absent [PROPOSED]
+Supplier,organisationId,Organisation,uuid,Yes,Yes,n/a,Suppliers are organisation-scoped; sharing across organisations is a future option [CONFIRMED]
+Supplier,name,Supplier Name,string,Yes,Yes,n/a,Trading name; migration matches on normalised name when VendorNumber absent [CONFIRMED]
 Supplier,legalName,Legal Name,string,No,Yes,n/a,
 Supplier,abn,ABN,string,No,Yes,n/a,Eleven digits; format check always; registry validation only via optional adapter and never blocks manual entry [CONFIRMED]
-Supplier,vendorNumber,Vendor Number,string,No,Yes,n/a,Medius vendor number; unique per (tenantId; organisationId) when present [PROPOSED]
+Supplier,vendorNumber,Vendor Number,string,No,Yes,n/a,Medius vendor number; unique per (tenantId; organisationId) when present [CONFIRMED]
 Supplier,erpSupplierId,ERP Supplier Id,string,No,Yes,n/a,Optional ERP master sync adapter [CONFIRMED]
 Supplier,status,Status,choice,Yes,Yes,n/a,Active or Inactive
 Supplier,website,Website,string,No,Yes,n/a,URL; outbound retrieval only via allowlisted adapter (SSRF controls) [CONFIRMED]

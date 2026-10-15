@@ -2,7 +2,7 @@ Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
 AuditEvent,id,Event Id,uuid,Yes,Yes,n/a,
 AuditEvent,tenantId,Tenant,uuid,Yes,Yes,n/a,Installation-level events use the system tenant id
 AuditEvent,organisationId,Organisation,uuid,No,Yes,n/a,
-AuditEvent,sequence,Sequence,integer,Yes,Yes,n/a,Gap-free per tenant; supports hash chain verification [PROPOSED]
+AuditEvent,sequence,Sequence,integer,Yes,Yes,n/a,Gap-free per tenant; supports hash chain verification [CONFIRMED]
 AuditEvent,occurredUtc,Occurred,datetime,Yes,Yes,n/a,UTC [CONFIRMED]
 AuditEvent,actorType,Actor Type,choice,Yes,Yes,n/a,User; System; Integration; Support [CONFIRMED actor/source]
 AuditEvent,actorId,Actor,string,No,Yes,n/a,
@@ -18,6 +18,6 @@ AuditEvent,configReleaseId,Configuration Release,uuid,No,Yes,n/a,Release in forc
 AuditEvent,reason,Reason,string,No,Yes,n/a,Mandatory for elevated and unlock actions
 AuditEvent,oldValues,Old Values,json,No,Yes,n/a,Only fields whose sensitivity permits; others replaced by a redaction marker [CONFIRMED where safe]
 AuditEvent,newValues,New Values,json,No,Yes,n/a,As above
-AuditEvent,clientAddress,Client Address,string,No,Yes,n/a,Stored per tenant privacy setting (full; truncated; none) [PROPOSED]
-AuditEvent,previousHash,Previous Hash,string,Yes,Yes,n/a,Hash chain [PROPOSED] ADR-0011
+AuditEvent,clientAddress,Client Address,string,No,Yes,n/a,Stored per tenant privacy setting (full; truncated; none) [CONFIRMED]
+AuditEvent,previousHash,Previous Hash,string,Yes,Yes,n/a,Hash chain [CONFIRMED] ADR-0011
 AuditEvent,hash,Hash,string,Yes,Yes,n/a,SHA-256 over canonical event content plus previousHash

@@ -1,10 +1,10 @@
 From,Action,To,Permission,Condition,Basis,Status
-Legal Rework Required,Resubmit to Legal,Awaiting Legal,contracts.submit_legal,Rework addressed,Removes dead end (CON-04),Proposed
-Legal Rework Required,Withdraw,Withdrawn,contracts.edit_owned,ReasonRequired,Removes dead end (CON-04),Proposed
-Draft,Withdraw,Withdrawn,contracts.edit_owned,ReasonRequired,Abandoned drafts need an exit,Proposed
-Initial Creation,Withdraw,Withdrawn,contracts.edit_owned,ReasonRequired; no executed copy exists,Abandoned drafts need an exit,Proposed
-Legal Cleared,Return to Legal,Awaiting Legal,contracts.submit_legal,ControlledFieldChanged,Protects Legal clearance after edits,Proposed
-Out for Signature,Return to drafting,Initial Creation,contracts.edit_owned,SignatureVoidedOrDeclined,Signature failure needs an exit,Proposed
-Variation in Progress,Apply variation,Effective,approvals.action,VariationOutcomeApplied,Completes Variation lifecycle (CON-04),Proposed
-Variation in Progress,Cancel variation,Effective,variations.create,ReasonRequired; VariationOutcomeNotApplied,Completes Variation lifecycle (CON-04),Proposed
-Variation in Progress,Reject variation,Effective,approvals.action,CommentRequired; VariationOutcomeNotApplied,Completes Variation lifecycle (CON-04),Proposed
+Legal Rework Required,Resubmit to Legal,Awaiting Legal,contracts.submit_legal,Rework addressed,Removes dead end (CON-04); approved DR-2026-10-15,Confirmed
+Legal Rework Required,Withdraw,Withdrawn,contracts.edit_owned,ReasonRequired,Removes dead end (CON-04); approved DR-2026-10-15,Confirmed
+Draft,Withdraw,Withdrawn,contracts.edit_owned,ReasonRequired,Abandoned drafts need an exit; awaiting confirmation Q-18,Open
+Initial Creation,Withdraw,Withdrawn,contracts.edit_owned,ReasonRequired; no executed copy exists,Abandoned drafts need an exit; awaiting confirmation Q-18,Open
+Legal Cleared,Return to Legal,Awaiting Legal,contracts.submit_legal,ControlledFieldChanged,Protects Legal clearance after edits; awaiting confirmation Q-18,Open
+Out for Signature,Return to drafting,Initial Creation,contracts.edit_owned,SignatureVoidedOrDeclined,Signature failure needs an exit; awaiting confirmation Q-18,Open
+Variation in Progress,Apply variation,Effective,approvals.action,VariationOutcomeApplied,Completes Variation lifecycle (CON-04); approved DR-2026-10-15,Confirmed
+Variation in Progress,Cancel variation,Effective,variations.create,ReasonRequired; VariationOutcomeNotApplied,Completes Variation lifecycle (CON-04); approved DR-2026-10-15,Confirmed
+Variation in Progress,Reject variation,Effective,approvals.action,CommentRequired; VariationOutcomeNotApplied,Completes Variation lifecycle (CON-04); approved DR-2026-10-15,Confirmed

@@ -1,27 +1,350 @@
 {
   "synthetic": true,
-  "description": "Synthetic users for Demo identity and automated tests. Addresses use the reserved .test domain. No passwords are stored here: the Demo identity generates credentials per installation (requirements/07-integrations/IDENTITY_SPEC.md section 6).",
+  "description": "Synthetic users for Demo identity and automated tests. Addresses use the reserved .test domain. No passwords are stored here: the Demo identity generates credentials per installation. Each role assignment carries role, organisational scope (organisations, businessUnits, sites, categories) and classification ceiling; access is the intersection of all assigned scopes (requirements/05-security/ACCESS_CONTROL_SPEC.md section 2). Classification levels are the default set (Public, Internal, Confidential, Restricted); the final set is open (Q-06).",
   "installationUsers": [
-    { "email": "sysadmin@installation.example.test", "roles": [ { "role": "System Administrator", "scope": "Installation" } ] }
+    {
+      "email": "sysadmin@installation.example.test",
+      "roles": [
+        {
+          "role": "System Administrator",
+          "scopeLevel": "Installation"
+        }
+      ]
+    }
   ],
   "users": [
-    { "email": "tenantadmin@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Tenant Administrator", "scope": "Tenant" } ] },
-    { "email": "orgadmin@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Organisation Administrator", "scope": "Organisation", "organisation": "org-a1" } ] },
-    { "email": "siteadmin@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Division/Site Administrator", "scope": "Site", "organisation": "org-a1", "site": "site-a1-1" } ] },
-    { "email": "bizconfig@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Business Configuration Administrator", "scope": "Organisation", "organisation": "org-a1" } ] },
-    { "email": "procadmin@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Procurement Administrator", "scope": "Organisation", "organisation": "org-a1" } ] },
-    { "email": "catowner.packaging@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Category Owner", "scope": "Organisation", "organisation": "org-a1" } ] },
-    { "email": "catowner.energy@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Category Owner", "scope": "Organisation", "organisation": "org-a1" } ] },
-    { "email": "legal@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Legal", "scope": "Organisation", "organisation": "org-a1" } ] },
-    { "email": "grouphead@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Approver", "scope": "Organisation", "organisation": "org-a1", "approverGroup": "GroupHead" } ] },
-    { "email": "grouphead.backup@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Backup Approver", "scope": "Organisation", "organisation": "org-a1", "approverGroup": "GroupHead" } ] },
-    { "email": "auditor@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Auditor", "scope": "Organisation", "organisation": "org-a1" } ] },
-    { "email": "viewer@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Viewer", "scope": "Organisation", "organisation": "org-a1" } ] },
-    { "email": "viewer.a2@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Viewer", "scope": "Organisation", "organisation": "org-a2" } ], "note": "Same tenant, different organisation: must not read org-a1" },
-    { "email": "tenantadmin@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Tenant Administrator", "scope": "Tenant" } ] },
-    { "email": "procadmin@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Procurement Administrator", "scope": "Organisation", "organisation": "org-b1" } ] },
-    { "email": "catowner@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Category Owner", "scope": "Organisation", "organisation": "org-b1" } ] },
-    { "email": "legal@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Legal", "scope": "Organisation", "organisation": "org-b1" } ] },
-    { "email": "viewer@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Viewer", "scope": "Organisation", "organisation": "org-b1" } ] }
+    {
+      "email": "tenantadmin@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Tenant Administrator",
+          "scopeLevel": "Tenant",
+          "classificationCeiling": "Internal"
+        }
+      ]
+    },
+    {
+      "email": "orgadmin@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Organisation Administrator",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "classificationCeiling": "Internal"
+        }
+      ]
+    },
+    {
+      "email": "siteadmin@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Division/Site Administrator",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "sites": [
+            "site-a1-1"
+          ],
+          "classificationCeiling": "Internal"
+        }
+      ]
+    },
+    {
+      "email": "bizconfig@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Business Configuration Administrator",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "classificationCeiling": "Internal"
+        }
+      ]
+    },
+    {
+      "email": "procadmin@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Procurement Administrator",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
+      "email": "catowner.packaging@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Category Owner",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
+      "email": "catowner.energy@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Category Owner",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
+      "email": "legal@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Legal",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "classificationCeiling": "Restricted"
+        }
+      ]
+    },
+    {
+      "email": "grouphead@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Approver",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "approverGroup": "GroupHeadProcurement",
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
+      "email": "grouphead.backup@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Backup Approver",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "approverGroup": "GroupHeadProcurement",
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
+      "email": "auditor@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Auditor",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
+      "email": "viewer.all@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Viewer",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "viewerKind": "AllContracts",
+          "classificationCeiling": "Internal"
+        }
+      ]
+    },
+    {
+      "email": "viewer.category@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Viewer",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "viewerKind": "Category",
+          "categories": [
+            "PACKAGING"
+          ],
+          "classificationCeiling": "Internal"
+        }
+      ],
+      "note": "Category Viewer: PACKAGING only (parent covers PACKAGING-FLEX)"
+    },
+    {
+      "email": "viewer.bu@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Viewer",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "viewerKind": "BusinessUnit",
+          "businessUnits": [
+            "bu-a1-1"
+          ],
+          "classificationCeiling": "Internal"
+        }
+      ]
+    },
+    {
+      "email": "viewer.site@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Viewer",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "viewerKind": "Site",
+          "sites": [
+            "site-a1-2"
+          ],
+          "classificationCeiling": "Internal"
+        }
+      ],
+      "note": "Site Viewer: site-a1-2 only"
+    },
+    {
+      "email": "viewer.restricted@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Viewer",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "viewerKind": "Restricted",
+          "categories": [
+            "ENERGY-ELEC"
+          ],
+          "sites": [
+            "site-a1-1"
+          ],
+          "classificationCeiling": "Public"
+        }
+      ],
+      "note": "Intersection of scopes: category ENERGY-ELEC AND site-a1-1 AND ceiling Public"
+    },
+    {
+      "email": "viewer.a2@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Viewer",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a2"
+          ],
+          "viewerKind": "AllContracts",
+          "classificationCeiling": "Internal"
+        }
+      ],
+      "note": "Same tenant, different organisation: must not read org-a1"
+    },
+    {
+      "email": "tenantadmin@b.example.test",
+      "tenant": "tenant-b",
+      "roles": [
+        {
+          "role": "Tenant Administrator",
+          "scopeLevel": "Tenant",
+          "classificationCeiling": "Internal"
+        }
+      ]
+    },
+    {
+      "email": "procadmin@b.example.test",
+      "tenant": "tenant-b",
+      "roles": [
+        {
+          "role": "Procurement Administrator",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-b1"
+          ],
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
+      "email": "catowner@b.example.test",
+      "tenant": "tenant-b",
+      "roles": [
+        {
+          "role": "Category Owner",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-b1"
+          ],
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
+      "email": "legal@b.example.test",
+      "tenant": "tenant-b",
+      "roles": [
+        {
+          "role": "Legal",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-b1"
+          ],
+          "classificationCeiling": "Restricted"
+        }
+      ]
+    },
+    {
+      "email": "viewer@b.example.test",
+      "tenant": "tenant-b",
+      "roles": [
+        {
+          "role": "Viewer",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-b1"
+          ],
+          "viewerKind": "AllContracts",
+          "classificationCeiling": "Internal"
+        }
+      ]
+    }
   ]
 }

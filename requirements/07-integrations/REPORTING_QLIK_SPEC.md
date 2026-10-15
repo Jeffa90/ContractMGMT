@@ -1,6 +1,6 @@
 # External Reporting and Qlik Specification
 
-Confirmed: "Full analytics are externally accessible, including Qlik for the JBS pack." Master: Qlik is the external full-reporting destination. The danger is that direct database access bypasses application authorisation and tenant isolation (RISK-12). This file defines safe access (GAP-16). Open point: Q-10. `[PROPOSED]` detail.
+Confirmed: "Full analytics are externally accessible, including Qlik for the JBS pack." Master: Qlik is the external full-reporting destination. The danger is that direct database access bypasses application authorisation and tenant isolation (RISK-12). This file defines safe access (GAP-16). Open point: Q-10. `[OPEN]` detail.
 
 ## 1. Scope split
 
@@ -28,7 +28,7 @@ Rules:
 2. Sensitive and above-clearance data is omitted or masked according to the **principal's** clearance (`RETENTION_AND_CLASSIFICATION_SPEC.md`).
 3. Column names are stable codes; terminology aliases are provided in a separate `FieldCatalogue` dataset (code, alias, type, currency code column).
 4. Dataset schemas are versioned; breaking changes require a new dataset version and an upgrade note. Views are created by migrations, not by hand.
-5. Projections are refreshed by a background job or maintained as indexed views; staleness is reported on the readiness dashboard (target latency is configuration; default 15 minutes) `[PROPOSED]`.
+5. Projections are refreshed by a background job or maintained as indexed views; staleness is reported on the readiness dashboard (target latency is configuration; default 15 minutes) `[CONFIRMED]`.
 6. Reporting reads never take locks that block operational writes (snapshot isolation or replica where available).
 
 ## 4. Security tests

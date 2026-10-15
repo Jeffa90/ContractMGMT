@@ -20,9 +20,9 @@ Pre-implementation review complete: requirements gaps filled, contradictions rec
 |---|---|---|---|---|---|
 | [x] | T0.0 | Repository review; `docs/REPOSITORY_REVIEW.md`, IMPLEMENTATION_PLAN, ARCHITECTURE, DOMAIN_MODEL, SECURITY, THREAT_MODEL, TESTING; new requirement folders `02-reference`, `07-integrations`, `08-portability` and supplements; ADR-0001 to 0014; sample fixtures; repo hygiene files | none | Files exist; link check passed (`docs/DOCUMENT_INDEX.md`) | n/a |
 | [ ] | T0.1 | Environment spike: install `dotnet-sdk-10.0` via apt; restore from NuGet; try starting `dockerd`; try native SQL Server (`mssql-server` from the Microsoft feed); confirm Playwright with `/opt/pw-browsers`; write `docs/ENVIRONMENT.md` with what ran and what did not | none | Report states run / not-run facts; SQL Server option A, B or C chosen and recorded in `docs/TESTING.md` section 3 and ADR-0005 | n/a |
-| [ ] | T0.2 | Owner review of `[PROPOSED]` items: answer or accept defaults for Q-01 to Q-17; decide proposed amendments PA-1 to PA-4 | none | `docs/REPOSITORY_REVIEW.md` updated; authoritative files amended only by their owner | n/a |
+| [x] | T0.2 | Owner decisions: DR-2026-10-15 recorded (D1 to D5, approved amendments, Registered Date exception); Q-01, Q-02, Q-07, Q-16 resolved, Q-03, Q-05, Q-09, Q-14 resolved in part; Q-18 to Q-20 added | none | `docs/REPOSITORY_REVIEW.md` section 9 | n/a |
 | [ ] | T0.3 | ADR acceptance pass: review ADR-0001 to ADR-0014, mark Accepted/Amended/Rejected | T0.1, T0.2 | Each ADR has status and consequences | n/a |
-| [ ] | T0.4 | Skills decision (Q-16): register `skills/` under `.claude/skills/` or keep; replace boilerplate bodies with checklists; add deployment, accessibility and documentation review skills | T0.2 | Skills invocable; each lists requirement files and test IDs | n/a |
+| [x] | T0.4 | Skills decision (Q-16): moved to `.claude/skills/` (single canonical copy), seven rewritten with project-specific checklists, three added | T0.2 | Skills present with substantive bodies; consistency check validates frontmatter | n/a |
 | [ ] | T0.5 | Docs link/consistency checker (script run in CI): relative links, backticked repo paths, CSV well-formedness, permission/role consistency (AUT-010 precursor) | T0.1 | Zero broken links; CSV column counts valid | I |
 
 ## M1 Walking skeleton

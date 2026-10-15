@@ -9,7 +9,7 @@ Status: **plan only. No application code exists.** Task-level tracking is in `TA
 3. **Security spine first.** Tenant isolation, the access evaluator and audit are built before domain features so every later feature inherits them and cannot be written without them (ARC tests enforce this).
 4. **Risk-first spikes.** The environment (no .NET SDK, no container engine running, unverified SQL Server availability) is the largest delivery risk (RISK-01), so M0 resolves it before anything else.
 5. **Honest labelling.** Each capability is labelled *implemented*, *mocked*, *disabled* or *future* in `TASKS.md`. IIS and Azure artefacts are *scaffold, unverified* until run on those platforms.
-6. **No guessing on authority.** `[PROPOSED]` decisions are implemented behind configuration or isolated seams so a different business answer (Q-nn) changes data, not architecture.
+6. **No guessing on authority.** `[OPEN]` items are implemented behind configuration or isolated seams so a different business answer (Q-nn) changes data, not architecture.
 7. **Definition of done per task:** code + tests from the listed IDs passing + docs updated + audit/security considered + `TASKS.md` updated. A task with no passing test is not done.
 
 ## 2. Dependency analysis (why this order)
@@ -59,15 +59,15 @@ flowchart LR
 | 2 | Accept ASM-04 (tenant hard boundary; organisation policy scope) | M0 (high reversal cost) | Proceed; revisit only if owner objects |
 | 3 | SQL Server availability for tests (T0.1 outcome; Q-14) | M0 exit | Option C (`ECP_TEST_SQL`) required if A and B fail |
 | 4 | Q-02 role-permission matrix | M2 start | Proposed matrix implemented as data |
-| 5 | Q-07 agreement reference uniqueness scope | M4b | Per organisation |
+| 5 | Q-07 agreement reference uniqueness scope: **resolved** (D3, tenant-wide); Q-19 exact JBSAUS pattern | M4b | Placeholder numbering rule, configurable |
 | 6 | Q-01 approval semantics | M6 start | ASM-08 |
 | 7 | Q-11 / Q-12 migration scope questions | M5 / M5b | ASM-16; historical slice deferred |
-| 8 | Q-16 skills registration | M0 | Keep and read manually; track T0.5 |
+| 8 | Q-16 skills registration: **resolved** (D5; moved to `.claude/skills/`, rewritten) | M0 | done |
 | 9 | Q-13 volumes | M1 | Budgets in `ARCHITECTURE.md` section 13 |
 
 ## 4. Milestones, scope and exit gates
 
-Exit gates are expressed as test-ID sets from `docs/TESTING.md`. All gates also require: build with warnings-as-errors, `ARC-*` for rules relevant at that point, SBOM/vulnerability/licence scans, an updated `TASKS.md`, an updated `THREAT_MODEL.md` change-log entry, and the relevant skill reviews (`skills/security-review`, `skills/tenant-isolation-review`, `skills/portability-review`).
+Exit gates are expressed as test-ID sets from `docs/TESTING.md`. All gates also require: build with warnings-as-errors, `ARC-*` for rules relevant at that point, SBOM/vulnerability/licence scans, an updated `TASKS.md`, an updated `THREAT_MODEL.md` change-log entry, and the relevant skill reviews (`.claude/skills/security-review`, `.claude/skills/tenant-isolation-review`, `.claude/skills/portability-review`).
 
 ### M0 Decisions and environment
 
@@ -189,7 +189,7 @@ Gate: BRS-001 to BRS-004; UPG-001 to UPG-004; SEC-030, SEC-031; PER-001 to PER-0
 | Question | Gates | Interim behaviour |
 |---|---|---|
 | Q-02 | M2 | Implement the proposed matrix as data; changing it is a data change |
-| Q-07 | M4b | Per organisation |
+| Q-19 | M4b | Configurable prefix + zero-padded sequence; JBS pack uses a JBSAUS prefix |
 | Q-01, Q-03, Q-04, Q-05, Q-09 | M6 | Proposed semantics behind configuration |
 | Q-06, Q-08, Q-10 | M9 | Proposed levels, Indefinite retention, views + API |
 | Q-11, Q-12 | M5 / M5b | ASM-16; historical slice deferred |

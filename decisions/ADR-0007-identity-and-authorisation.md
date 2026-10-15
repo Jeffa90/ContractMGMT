@@ -11,7 +11,7 @@ Master: generic OIDC and Entra, Demo identity, role mapping, delegated administr
 ## Decision details
 - Accounts link by `(issuer, subject)`; invite-only or group-mapped in Production; JIT provisioning off by default.
 - Roles/permissions seeded from `requirements/02-reference/*.csv` as versioned data; role templates are pack data.
-- Evaluator layers: authentication, tenant, organisation, permission, relationship, classification, lifecycle/lock, segregation of duties. Relationship facts via `IRelationshipProvider` (dependency inversion, ADR-0001).
+- Evaluator layers: authentication, tenant, scope intersection (organisation, business unit, site, category), permission, relationship, classification ceiling, lifecycle/lock, segregation of duties. Twelve roles per DR-2026-10-15 D1; Viewer is never global. Relationship facts via `IRelationshipProvider` (dependency inversion, ADR-0001).
 - Delegation bounded by grantor rights; elevation time-boxed and audited; last-admin protection.
 - Role assignments cached ≤ 60 s per tenant+user.
 - Step-up re-authentication for sensitive actions.

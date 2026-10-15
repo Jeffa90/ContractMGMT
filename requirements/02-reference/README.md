@@ -11,13 +11,14 @@ Added by repository review. This folder holds reference material that every othe
 
 ## Status convention
 
-Every statement in files added by repository review is tagged `[CONFIRMED]` or `[PROPOSED]`; in CSV files a `Basis` or `Status` column plays the same role. See `requirements/README.md` for what the tags mean. Proposals are tracked in `docs/REPOSITORY_REVIEW.md` (`ASM-nn`, `Q-nn`) and become `[CONFIRMED]` only when the business owner confirms them.
+Statements in files added by repository review are tagged `[CONFIRMED]` or `[OPEN]`; in CSV files a `Basis` or `Status` column plays the same role (`Confirmed`/`Open`). See `requirements/README.md`. Open items are tracked in `docs/REPOSITORY_REVIEW.md` (`Q-nn`).
 
 ## Reading the role-permission matrix
 
 - `Y` = granted across the user's tenant/organisation scope. `S` = granted only where the catalogue's `ScopeRule` holds (for example an active category assignment). Blank = not granted.
-- Columns `SystemAdministrator` to `Viewer` that appear in `roles-and-permissions.csv` are `[CONFIRMED]` roles. `OrganisationAdministrator` and `DivisionSiteAdministrator` are `[PROPOSED]` columns because Master names these delegated-administration levels but the roles file omits them (GAP-10).
-- The `Basis` column says whether a grant is derivable from a confirmed source or is `PROPOSED` pending Q-02.
+- The 12 columns are the 12 roles confirmed in DR-2026-10-15 D1 (`requirements/05-security/roles-and-permissions.csv`).
+- The `Basis` column cites where each grant comes from: `D1` (the role definitions in the decision record), `A10 baseline` (approved review baseline where D1 is silent), `Master`, or a note that the mode or period is `[OPEN]`.
+- A Viewer's `S` grant means the grant is limited to the assignment's scopes (Viewer kind, organisation, business unit, site, category and classification ceiling). See `ACCESS_CONTROL_SPEC.md` section 2.
 - Administrative roles deliberately do **not** read contract content (least privilege). System Administrator never reads business data; reaching it requires `support.elevate`.
 
 ## Rules for the matrix and catalogue

@@ -1,6 +1,6 @@
 # Domain Model
 
-Status: **design baseline.** Field-level detail lives in `requirements/03-data-dictionary/`; this document gives the aggregates, relationships, invariants and events that code must preserve. Terms: `requirements/02-reference/GLOSSARY.md`. Tags `[CONFIRMED]` / `[PROPOSED]` as in `requirements/README.md`. Invariant IDs (`INV-nn`) are referenced by tests in `docs/TESTING.md`.
+Status: **design baseline.** Field-level detail lives in `requirements/03-data-dictionary/`; this document gives the aggregates, relationships, invariants and events that code must preserve. Terms: `requirements/02-reference/GLOSSARY.md`. Tags `[CONFIRMED]` / `[OPEN]` as in `requirements/README.md`. Invariant IDs (`INV-nn`) are referenced by tests in `docs/TESTING.md`.
 
 ## 1. Conventions
 
@@ -97,11 +97,11 @@ Solid transitions are in `status-transitions.csv` `[CONFIRMED]`; those marked *p
 
 | ID | Invariant | Source |
 |---|---|---|
-| INV-01 | `agreementReference` is unique per `(TenantId, OrganisationId)` | `contracts.csv`; Q-07 |
+| INV-01 | `agreementReference` is unique per tenant: unique constraint `(TenantId, AgreementReference)`; the original source reference is kept separately (`sourceAgreementReference`) and is not unique-constrained; internal references use immutable GUIDs | `contracts.csv`; DR-2026-10-15 D3 |
 | INV-02 | `status` changes only through the workflow engine; no setter is public | CON-03 |
 | INV-03 | A locked contract rejects changes to any field not editable after Effective, regardless of caller | CLAUDE.md |
 | INV-04 | The lock is cleared only by an open `RecordUnlock` (time-boxed, audited) and returns automatically | CLAUDE.md; Master |
-| INV-05 | `registeredDate` and `registeredBy` are set exactly once by `Approve` (or by an authorised legacy load) and never edited | `contracts.csv`; ASM-06 |
+| INV-05 | `registeredDate` and `registeredBy` are set exactly once by `Approve`, or by an authorised legacy migration that retains provenance (`registeredDateProvenance`, `sourceRegisteredValue`, batch and actor audited); after migration acceptance they are not editable | `contracts.csv`; DR-2026-10-15 |
 | INV-06 | `effectiveDate` and `registeredDate` are independent values | `CONFIRMED_DECISIONS.md` |
 | INV-07 | A contract in `VariationInProgress` is locked and has exactly one open Variation | ASM-15 |
 | INV-08 | Variation changes only fields marked `Variation only` (or custom fields flagged editable by Variation) | `contracts.csv` |
@@ -200,7 +200,7 @@ Audit is also written in the same transaction as the change it describes (INV-16
 
 ## 9. Authorisation concepts in the model
 
-- `RoleAssignment(UserId, RoleCode, ScopeType, ScopeId, EffectiveFrom, EffectiveTo, GrantedBy, Reason)`; scope types: Installation, Tenant, Organisation, Division, Site, ApproverGroup.
+- `RoleAssignment(UserId, RoleCode, ViewerKind?, ScopeLevel, OrganisationIds, BusinessUnitIds, SiteIds, DivisionIds, CategoryIds, ClassificationCeiling, ApproverGroupKey?, EffectiveFrom, EffectiveTo, GrantedBy, Reason)` (`requirements/03-data-dictionary/identity.csv`). Access is the **intersection** of the assignment's scopes; scopes of separate assignments are never merged; an assignment without organisational scope is refused (INV-62). Category Owner read is not narrowed by category scope; edit follows active category assignment.
 - `Delegation(DelegatorId, DelegateId, ScopeType, ScopeId, From, To, Reason)` and `Elevation(UserId, Purpose, Reason, From, To, TenantId?)` are modelled as below.
 - The permission and role definitions come from `requirements/02-reference/`; the shipped JBS role templates are pack data.
 
@@ -208,6 +208,8 @@ Audit is also written in the same transaction as the change it describes (INV-16
 |---|---|
 | INV-60 | A delegation or role grant never exceeds the rights the grantor holds, and is limited to the grantor's scope |
 | INV-61 | An elevation has a reason and an expiry, is visible to tenant administrators, and every action under it is audited with the elevation id |
+| INV-62 | A role assignment for an organisation-level role has a non-empty organisational scope and a classification ceiling; Viewer assignments carry a viewer kind; no role grants access outside its assigned scope |
+| INV-63 | A Procurement Administrator cannot approve their own contract submission unless separately assigned an approval role and the approval policy permits; an Approver cannot edit the record being approved; the actual acting individual is recorded on every approval |
 
 ## 10. Value objects
 
@@ -217,7 +219,7 @@ Audit is also written in the same transaction as the change it describes (INV-16
 
 | Question | Where it surfaces | ID |
 |---|---|---|
-| Is `agreementReference` unique per organisation or tenant? | INV-01 | Q-07 |
+| What is the exact JBSAUS-style reference pattern (digits, year token)? | Organisation reference numbering rule | Q-19 |
 | Can a contract have more than one open Variation? | INV-07 | ASM-15 |
 | Do suppliers need to be shared across organisations? | Supplier aggregate | future |
 | Are Legal review rounds a workflow concept or a Contracts aggregate? Currently Contracts-owned data driven by workflow transitions | LegalReview | design review at M6 |

@@ -1,6 +1,6 @@
 # Accessibility and Localisation Specification
 
-Added by repository review (GAP-18). Source requirement: Master "Accessibility/localisation": WCAG 2.2 AA design practices, keyboard access, focus management, screen-reader labels, accessible tables/designers, localisation resources, configurable date/currency/time zone and plain-language help. `[CONFIRMED]` The detail below is `[PROPOSED]`. The platform does not claim certification; it provides design practices and evidence.
+Added by repository review (GAP-18). Source requirement: Master "Accessibility/localisation": WCAG 2.2 AA design practices, keyboard access, focus management, screen-reader labels, accessible tables/designers, localisation resources, configurable date/currency/time zone and plain-language help. `[CONFIRMED]` The detail below is `[CONFIRMED]`. The platform does not claim certification; it provides design practices and evidence.
 
 ## 1. Accessibility requirements
 

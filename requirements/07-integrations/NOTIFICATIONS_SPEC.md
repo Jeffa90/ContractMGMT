@@ -1,6 +1,6 @@
 # Notifications Specification
 
-Master: notifications, reminders and escalations are configurable without code; notification-idempotency tests are required. This file specifies behaviour (GAP-14, GAP-16). `[PROPOSED]` detail.
+Master: notifications, reminders and escalations are configurable without code; notification-idempotency tests are required. This file specifies behaviour (GAP-14, GAP-16). `[CONFIRMED]` detail.
 
 ## 1. Channels
 

@@ -1,11 +1,13 @@
 ﻿Role,Scope,KeyPermissions
-System Administrator,Installation,All technical administration; no automatic secret reveal
-Tenant Administrator,Tenant,Tenant configuration and delegated administration
-Business Configuration Administrator,Organisation,Fields/forms/rules/workflows/lookups/branding
-Procurement Administrator,Organisation,Operational administration and audited unlock
-Category Owner,Assigned categories,Read all; edit assigned categories
-Legal,Organisation,Read all; Legal review actions
-Approver,Assigned approvals,Approval actions
-Backup Approver,Assigned approvals,First-response backup actions
-Auditor,Organisation,Read and evidence export
-Viewer,Organisation,Read only
+System Administrator,Installation,"Technical and installation administration; manages tenants, identity providers, system configuration and integrations; no automatic secret reveal; emergency access reason-based, time-limited and audited"
+Tenant Administrator,Tenant,"Administers organisations in the tenant; tenant-level role mappings, solution packs and tenant settings; cannot bypass contract lifecycle controls except through explicitly granted audited permissions"
+Organisation Administrator,Organisation,"Organisation structure, users, delegated administrators and organisation-level configuration; no automatic approval of contracts or dispositions"
+Division/Site Administrator,Assigned divisions or sites,"Scoped delegated administration of permitted users, taxonomies and configuration; no implicit access outside scope; no implicit approval or force-unlock"
+Business Configuration Administrator,Organisation,"Fields, forms, workflows, rules, approval matrices, lookups, terminology, branding, notification templates and solution-pack configuration; cannot alter live contract records"
+Procurement Administrator,Organisation,Reads and operationally administers all contracts in scope; reassigns category ownership; templates and operational settings; audited force-unlock where explicitly authorised; cannot approve own submission unless separately assigned an approval role and policy permits
+Category Owner,Organisation (read); assigned categories (edit),Also titled Contract Manager. Read all within organisation and classification scope; create contracts; edit assigned categories only; upload and manage documents; submit for Legal review and register authorisation; create Variations and renewals; initiate termination and disposition requests; cannot edit Effective locked contracts; cannot finally approve disposition or delete
+Legal,Organisation,"Read all within scope; structured Legal-review rounds, comments, outcomes and mark-ups; clear or return for rework; no final register authorisation unless also an approver; cannot alter locked commercial metadata outside an authorised workflow"
+Approver,Assigned approvals,"Reads what assigned approvals require; approves or rejects register-authorisation requests and, where the matrix assigns the role, dispositions; cannot silently edit the submitted record"
+Backup Approver,Assigned approvals,Same authority as the primary approver for approvals assigned to the backup role; the acting individual is recorded
+Auditor,Organisation,"Reads records, configuration history and audit evidence within scope; exports approved audit evidence; no operational editing"
+Viewer,"Organisation, business unit, site or category as assigned","Read-only within assigned scopes and classification ceiling; not a global read role; configurable as All Contracts, Category, Business Unit, Site or Restricted Viewer"

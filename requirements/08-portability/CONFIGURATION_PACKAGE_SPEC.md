@@ -1,6 +1,6 @@
 # Configuration Package and Solution Pack Specification
 
-Master: packs and packages are "versioned, dependency-aware, signed/checksummed, previewed and imported with dry run and conflict resolution"; packages include "manifests, compatibility versions, checksums, dependency graphs, identifier remapping, dry run, conflict resolution, rollback and audit" and exclude "secrets, live users and production assignments by default". `requirements/10-solution-packs/SOLUTION_PACK_SPEC.md` and `requirements/13-marketplace/CATALOGUE_SPEC.md` say the same briefly. This file defines the format and trust model (GAP-15). `[CONFIRMED]` requirements, `[PROPOSED]` format.
+Master: packs and packages are "versioned, dependency-aware, signed/checksummed, previewed and imported with dry run and conflict resolution"; packages include "manifests, compatibility versions, checksums, dependency graphs, identifier remapping, dry run, conflict resolution, rollback and audit" and exclude "secrets, live users and production assignments by default". `requirements/10-solution-packs/SOLUTION_PACK_SPEC.md` and `requirements/13-marketplace/CATALOGUE_SPEC.md` say the same briefly. This file defines the format and trust model (GAP-15). `[CONFIRMED]` requirements, `[CONFIRMED]` format.
 
 ## 1. Archive layout (`.ecpkg`, a ZIP)
 
@@ -50,7 +50,7 @@ docs/README.md, docs/CHANGELOG.md
 1. Upload → quarantine → verify structure, checksums, signature, compatibility.
 2. Dependency analysis: required packages and versions present, conflicts between installed packs.
 3. Identifier remapping plan: definitions refer to each other by `code`; internal ids are generated on the target; references resolve to target ids; collisions are listed.
-4. Conflict detection per definition against the target: absent (create), identical (skip), different (conflict).
+4. Conflict detection per definition against the target: absent (create), identical (skip), different (conflict). Packages that carry reference numbering rules or seed records are also checked for **Agreement Reference conflicts**: a prefix or numbering range that overlaps another organisation's rule in the tenant, or a seed `agreementReference` already used in the tenant, is reported in the dry run and must be resolved **before anything is committed** (D3). `[CONFIRMED]`
 5. **Dry run:** produces a report: counts created/updated/skipped/conflicting, validation results, simulation results on sample records, and a human-readable diff. No target change is made.
 6. Conflict resolution per definition: *Keep target*, *Replace with package*, *Keep both with new code*, or (for lookups) *Merge values*. Locally modified definitions are never silently overwritten.
 7. **Apply** creates a **draft** configuration for the target scope, never a published one. It then follows the normal lifecycle (validate, preview, simulate, publish).

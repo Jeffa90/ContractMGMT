@@ -1,6 +1,6 @@
 # Retention, Classification and Legal Hold Specification
 
-Added by repository review (GAP-17, CON-05, CON-13). Tags: `[CONFIRMED]` / `[PROPOSED]`.
+Added by repository review (GAP-17, CON-05, CON-13). Tags: `[CONFIRMED]` / `[CONFIRMED]`.
 
 ## 1. Confirmed position
 
@@ -8,7 +8,7 @@ Added by repository review (GAP-17, CON-05, CON-13). Tags: `[CONFIRMED]` / `[PRO
 - Archive-before-delete. Ordinary users cannot hard-delete legal records. `[CONFIRMED]`
 - Retention policies are configurable by tenant, legal entity and contract type; legal holds; masking and export restrictions; disposition approval; evidence exports. `[CONFIRMED]` (Master: Retention/privacy)
 
-## 2. Classification `[PROPOSED]` levels, `[CONFIRMED]` need
+## 2. Classification `[CONFIRMED]` levels, `[CONFIRMED]` need
 
 | Level | Intended use | Default read | Export |
 |---|---|---|---|
@@ -24,7 +24,7 @@ Levels, names and clearance mapping are configuration (a lookup plus a role-to-c
 - A user's clearance caps what they can see (`ACCESS_CONTROL_SPEC.md` section 3). Masked fields show a marker and are omitted from exports.
 - Lowering a classification is a privileged, audited action; raising is allowed to record owners.
 
-## 3. Retention policy model `[PROPOSED]`
+## 3. Retention policy model `[CONFIRMED]`
 
 A `RetentionPolicy` is a configuration definition (versioned like any other) with: scope (tenant, legal entity, contract type, document type), trigger date (end date, effective date, ended date, last activity), period (or `Indefinite`), action at expiry (`Review`, never automatic delete), approval route, and an optional exclusion for classification. Default policy: **Indefinite**, per the confirmed decision.
 

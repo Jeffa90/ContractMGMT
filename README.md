@@ -9,7 +9,7 @@ A complete requirements, sample-data, migration and prompt pack for Claude Code 
 3. Choose **Add file > Upload files**.
 4. Drag the **contents inside** `enterprise-contract-platform-v2` into the upload area.
 5. Commit to `main`.
-6. Confirm that `CLAUDE.md`, `requirements/`, `prompts/`, `sample-data/`, `migration-samples/`, `skills/` and `docs/` appear at the repository root.
+6. Confirm that `CLAUDE.md`, `requirements/`, `prompts/`, `sample-data/`, `migration-samples/`, `.claude/skills/` and `docs/` appear at the repository root.
 
 Do not upload the ZIP as the only repository file. Claude needs the extracted files.
 

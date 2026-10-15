@@ -1,6 +1,6 @@
 # Portability and No-Code Acceptance Criteria
 
-Turns `requirements/01-authoritative/PORTABILITY_AND_NO_CODE.md` into measurable checks (GAP-14). Each criterion has an automated test (IDs in `docs/TESTING.md` section 9) and is a release gate for the portability review (`skills/portability-review/SKILL.md`). `[PROPOSED]`
+Turns `requirements/01-authoritative/PORTABILITY_AND_NO_CODE.md` into measurable checks (GAP-14). Each criterion has an automated test (IDs in `docs/TESTING.md` section 9) and is a release gate for the portability review (`.claude/skills/portability-review/SKILL.md`). `[CONFIRMED]`
 
 | ID | Criterion | How it is checked |
 |---|---|---|

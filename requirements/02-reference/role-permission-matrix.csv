@@ -1,46 +1,60 @@
 Permission,SystemAdministrator,TenantAdministrator,OrganisationAdministrator,DivisionSiteAdministrator,BusinessConfigurationAdministrator,ProcurementAdministrator,CategoryOwner,Legal,Approver,BackupApprover,Auditor,Viewer,Basis
-contracts.read,,,,,,Y,Y,Y,S,S,Y,Y,Roles CSV (Category Owner/Legal/Auditor/Viewer read); others PROPOSED
-contracts.create,,,,,,Y,S,,,,,,PROPOSED
-contracts.edit_owned,,,,,,,S,,,,,,Roles CSV + CONFIRMED_DECISIONS
-contracts.submit_legal,,,,,,,S,,,,,,status-transitions.csv; holder PROPOSED
-legal.review,,,,,,,,Y,,,,,Roles CSV
-legal.clear,,,,,,,,Y,,,,,Roles CSV
-contracts.submit_approval,,,,,,,S,,,,,,status-transitions.csv; holder PROPOSED
-approvals.action,,,,,,,,,S,S,,,Roles CSV
-variations.create,,,,,,,S,,,,,,status-transitions.csv; holder PROPOSED
-contracts.close,,,,,,Y,S,,,,,,status-transitions.csv; holder PROPOSED
-disposition.approve,,,,,,Y,,,,,,,status-transitions.csv; holder PROPOSED (Q-02)
-contracts.unlock_emergency,,,,,,Y,,,,,,,Roles CSV (Procurement Administrator audited unlock)
-documents.upload,,,,,,Y,S,Y,,,,,PROPOSED
-documents.download,,,,,,Y,Y,Y,S,S,Y,Y,Follows contracts.read
-suppliers.read,,,,,,Y,Y,Y,S,S,Y,Y,Follows contracts.read
-suppliers.manage,,,,,,Y,Y,,,,,,PROPOSED
-categories.manage,,,,,Y,Y,,,,,,,Master (Administration)
-audit.read,,Y,,,,,,,,,Y,,Roles CSV (Auditor)
-audit.export,,,,,,,,,,,Y,,Roles CSV (Auditor evidence export)
-audit.read_system,Y,,,,,,,,,,,,PROPOSED
-config.draft,,Y,Y,S,Y,,,,,,,,Roles CSV (Business Configuration Administrator)
-config.publish,,Y,,,Y,,,,,,,,Roles CSV
-config.rollback,,Y,,,Y,,,,,,,,Roles CSV
-packages.export,,Y,,,Y,,,,,,,,PROPOSED
-packages.import,,Y,,,Y,,,,,,,,PROPOSED (apply also requires config.publish)
-migration.stage,,Y,,,,Y,,,,,,,PROPOSED
-migration.commit,,,,,,Y,,,,,,,PROPOSED
-migration.legacy_load,,,,,,Y,,,,,,,PROPOSED (second-person confirmation)
-migration.rollback,,,,,,Y,,,,,,,PROPOSED
-migration.accept,,,,,,Y,,,,,,,PROPOSED (Q-02)
-users.manage,,Y,Y,S,,,,,,,,,Roles CSV (Tenant Administrator delegated administration)
-roles.delegate,,Y,S,S,,,,,,,,,Roles CSV (Tenant Administrator)
-tenant.configure,,Y,,,,,,,,,,,Roles CSV
-system.configure,Y,,,,,,,,,,,,Roles CSV
-setup.run,Y,,,,,,,,,,,,Master (wizard)
-onboarding.run,,Y,Y,,,,,,,,,,Master
-support.elevate,Y,,,,,,,,,,,,Master (no automatic secret reveal; reason-based access)
-secrets.manage,Y,,,,,,,,,,,,Roles CSV (no automatic secret reveal)
-integrations.manage,,Y,,,Y,,,,,,,,Master (Administration)
-reporting.external,,,,,,Y,,,,,Y,,CONFIRMED_DECISIONS (Qlik); holder PROPOSED
-records.export,,,,,,Y,,,,,Y,,PROPOSED
-retention.manage,,Y,,,,,,,,,,,PROPOSED
-legalhold.manage,,,,,,,,Y,,,,,PROPOSED
-ai.use,,,,,,Y,S,Y,,,,,PROPOSED
-ops.manage,Y,,,,,,,,,,,,Master
+contracts.read,,,,,,Y,Y,Y,S,S,Y,S,D1
+contracts.create,,,,,,Y,S,,,,,,D1 (Category Owner create); A10 baseline (Procurement Administrator)
+contracts.edit_owned,,,,,,,S,,,,,,D1
+contracts.submit_legal,,,,,,,S,,,,,,D1
+legal.review,,,,,,,,Y,,,,,D1
+legal.clear,,,,,,,,Y,,,,,D1
+legal.markup,,,,,,,,Y,,,,,D1
+contracts.submit_approval,,,,,,,S,,,,,,D1
+approvals.action,,,,,,,,,S,S,,,D1
+variations.create,,,,,,,S,,,,,,D1
+renewals.create,,,,,,,S,,,,,,D1
+contracts.close,,,,,,Y,S,,,,,,D1
+disposition.request,,,,,,Y,S,,,,,,D1
+disposition.administer,,,,,,Y,,,,,,,D1
+disposition.approve,,,,,,,,,S,S,,,D1
+contracts.unlock_emergency,,,,,,S,,,,,,,D1
+documents.upload,,,,,,Y,S,Y,,,,,D1
+documents.download,,,,,,Y,Y,Y,S,S,Y,S,Master (authorise every download)
+suppliers.read,,,,,,Y,Y,Y,S,S,Y,S,A10 baseline
+suppliers.manage,,,,,,Y,Y,,,,,,A10 baseline
+categories.manage,,,Y,S,Y,Y,,,,,,,D1
+categories.assign,,,Y,S,,Y,,,,,,,D1
+templates.manage,,,,,Y,Y,,,,,,,D1
+settings.operational,,,,,,Y,,,,,,,D1
+audit.read,,,,,,,,,,,Y,,D1
+audit.read_admin,,Y,S,,,,,,,,,,A10 baseline
+audit.export,,,,,,,,,,,Y,,D1
+audit.read_system,Y,,,,,,,,,,,,A10 baseline
+config.history.read,,Y,Y,,Y,,,,,,Y,,D1
+config.draft,,S,Y,S,Y,,,,,,,,D1
+config.publish,,S,S,,Y,,,,,,,,D1
+config.rollback,,S,S,,Y,,,,,,,,D1
+packages.export,,Y,,,Y,,,,,,,,D1
+packages.import,,Y,,,Y,,,,,,,,D1
+migration.stage,,,,,,Y,,,,,,,A10 baseline
+migration.commit,,,,,,Y,,,,,,,A10 baseline
+migration.legacy_load,,,,,,Y,,,,,,,DR Registered Date exception
+migration.rollback,,,,,,Y,,,,,,,A10 baseline
+migration.accept,,,,,,Y,,,,,,,A10 baseline
+users.manage,,Y,Y,S,,,,,,,,,D1
+roles.delegate,,Y,S,S,,,,,,,,,D1
+rolemappings.manage,,Y,,,,,,,,,,,D1
+organisations.manage,,Y,,,,,,,,,,,D1
+org.structure.manage,,,Y,S,,,,,,,,,D1
+tenants.manage,Y,,,,,,,,,,,,D1
+identity.configure,Y,,,,,,,,,,,,D1
+tenant.configure,,Y,,,,,,,,,,,D1
+system.configure,Y,,,,,,,,,,,,D1
+setup.run,Y,,,,,,,,,,,,Master (wizard stage 18)
+onboarding.run,,Y,Y,,,,,,,,,,A10 baseline
+support.elevate,Y,,,,,,,,,,,,D1
+secrets.manage,Y,,,,,,,,,,,,D1
+integrations.manage,Y,Y,,,,,,,,,,,D1
+reporting.external,,,,,,Y,,,,,Y,,A10 baseline; mode [OPEN]
+records.export,,,,,,Y,,,,,Y,,A10 baseline
+retention.manage,,Y,,,,,,,,,,,A10 baseline; periods [OPEN]
+legalhold.manage,,,,,,,,Y,,,,,A10 baseline
+ai.use,,,,,,Y,S,Y,,,,,A10 baseline
+ops.manage,Y,,,,,,,,,,,,Master (Audit and operations)

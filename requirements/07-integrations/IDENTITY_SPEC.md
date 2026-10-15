@@ -1,6 +1,6 @@
 # Identity Specification
 
-Master: "Generic OpenID Connect and Microsoft Entra ID", local Demo identity, role mapping, delegated administration. This file adds the detail (GAP-16). `[CONFIRMED]` principle, `[PROPOSED]` detail unless tagged.
+Master: "Generic OpenID Connect and Microsoft Entra ID", local Demo identity, role mapping, delegated administration. This file adds the detail (GAP-16). `[CONFIRMED]` unless tagged.
 
 ## 1. Identity modes
 
@@ -29,13 +29,13 @@ Master: "Generic OpenID Connect and Microsoft Entra ID", local Demo identity, ro
 ## 4. Roles at runtime
 
 - Roles are assigned directly or via group mapping, with optional effective dates.
-- Role evaluation happens per request against current assignments (cached for at most 60 seconds, keyed by tenant and user); removal takes effect within that bound. `[PROPOSED]`
+- Role evaluation happens per request against current assignments (cached for at most 60 seconds, keyed by tenant and user); removal takes effect within that bound. `[CONFIRMED]`
 - Break-glass: the first Tenant Administrator and System Administrator accounts are created by the setup wizard; the platform refuses to remove the last holder (ACCESS_CONTROL_SPEC section 5).
 
 ## 5. Service principals
 
 Non-interactive callers (Qlik export, integrations, CI smoke tests) use OAuth client credentials with a tenant-bound principal, scoped permissions, secret rotation support, and no UI login.
 
-## 6. Demo identity details `[PROPOSED]`
+## 6. Demo identity details `[CONFIRMED]`
 
 Synthetic users `*@example.test` for each shipped role in two tenants (used by isolation tests). Credentials are not secret by design, are displayed only in Demo mode, and are generated per installation, never fixed in source. The sign-in page states that Demo identity is for demonstration.

@@ -7,6 +7,7 @@
 | `contracts.csv` | Contract (15 core fields) | Original |
 | `custom-field-types.csv` | Custom field type codes | Original. `CURRENCY` stores amount and ISO 4217 currency code together (CON-16) |
 | `contracts-extended.csv` | Contract (additional core fields) | Fields required by the migration sample, Medius profile, tenancy and concurrency |
+| `identity.csv` | User, RoleAssignment (role, organisational scope, category scope, classification ceiling), ApproverGroup, Delegation, Elevation | Scope model of DR-2026-10-15 D1 |
 | `suppliers.csv` | Supplier | |
 | `categories.csv` | Category, CategoryAssignment | Drives ownership |
 | `org-structure.csv` | Tenant, Organisation, LegalEntity, BusinessUnit, Division, Site | |
@@ -25,12 +26,12 @@
 | `Required` | `Yes`/`No` at the persistence layer |
 | `Core` | `Yes` = strongly typed column; custom fields are never `Core` |
 | `EditableAfterEffective` | `No` = immutable; `Variation only` = changed only by an applied Variation; `Admin unlock only` = changed only through an audited emergency unlock; `System` = written only by the platform; `n/a` = entity is not locked with the contract |
-| `Notes` | Rules, sources, and tags `[CONFIRMED]` or `[PROPOSED]` |
+| `Notes` | Rules, sources, and tags `[CONFIRMED]` or `[OPEN]` |
 
 ## Rules that apply to every tenant-owned entity
 
 1. `tenantId` is required, set server-side from the authenticated context, and never accepted from a client payload. `[CONFIRMED]` (Master: TenantId on owned entities)
-2. `organisationId` is required wherever the entity is organisation-scoped. `[PROPOSED]` ASM-04
+2. `organisationId` is required wherever the entity is organisation-scoped. `[CONFIRMED]` ASM-04
 3. `rowVersion` is the optimistic-concurrency token on every mutable entity. `[CONFIRMED]` (Master: optimistic concurrency)
 4. `createdUtc`, `createdBy`, `updatedUtc`, `updatedBy` are system-written. Timestamps are UTC. `[CONFIRMED]` (CLAUDE.md)
 5. Every migrated row also carries `sourceSystem`, `sourceRecordId` and `migrationBatchId`. `[CONFIRMED]`

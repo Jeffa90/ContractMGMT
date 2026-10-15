@@ -1,12 +1,12 @@
 # Configuration Studio Specification
 
-Master gives one paragraph per designer; this file gives the semantics needed to build and test them (GAP-13, GAP-14, RISK-04). Lifecycle mechanics are in `CONFIGURATION_LIFECYCLE_SPEC.md`. `[CONFIRMED]` capabilities from Master "No-code Configuration Studio"; `[PROPOSED]` detail.
+Master gives one paragraph per designer; this file gives the semantics needed to build and test them (GAP-13, GAP-14, RISK-04). Lifecycle mechanics are in `CONFIGURATION_LIFECYCLE_SPEC.md`. `[CONFIRMED]` capabilities from Master "No-code Configuration Studio"; `[CONFIRMED]` detail.
 
 ## 1. Principles
 
 1. **Closed vocabularies.** Every configurable behaviour is expressed in a finite catalogue of typed operators, actions and functions. There is no free-text expression, script, SQL, JavaScript, regex-with-backtracking, template logic, macro, or custom CSS. `[CONFIRMED]` (CLAUDE.md)
 2. **Data, not schema.** Creating fields, forms, rules, workflows or lookups never creates a database object (no per-field migration). `[CONFIRMED]`
-3. **Stable codes.** Every definition and every state, field, choice and action has an immutable code used by APIs, packages, rules and reports. Labels are localised and aliasable. `[PROPOSED]`
+3. **Stable codes.** Every definition and every state, field, choice and action has an immutable code used by APIs, packages, rules and reports. Labels are localised and aliasable. `[CONFIRMED]`
 4. **Explainable.** Rules, workflows and approvals produce a decision trace that the simulator displays and the audit log can reference.
 5. **Accessible.** Each designer has keyboard-only operation and a structured text outline (see `requirements/06-design/ACCESSIBILITY_AND_LOCALISATION.md` A-08).
 
@@ -59,7 +59,7 @@ A form is a tree: **page → tab → section → field group → field | related
 
 Elements: **states** (code, label, category `Start|Active|Rework|Terminal`, lock behaviour `Unlocked|ContentFrozen|Locked`), **transitions** (code, from, to, permission, guards, required fields, required documents, comment required, notifications, side-effect actions from a fixed catalogue such as `StampRegisteredDate`, `SetLock`, `StartVariation`, `GenerateReminders`), **steps** (review/approval steps with model `Sequential|Parallel|AllResponses|FirstResponse`, approver group, backup, timeout, escalation), **timeouts and escalations**, **rework loops**, and **delegation/backup** windows.
 
-**Publish-time validation** `[PROPOSED]` (workflow checks):
+**Publish-time validation** `[CONFIRMED]` (workflow checks):
 
 1. Exactly one `Start` state; at least one `Terminal` state.
 2. Every state is reachable from `Start`; every non-terminal state has at least one outgoing transition (no dead ends, the CON-04 defect class).
@@ -89,14 +89,14 @@ An approval matrix selects **who must approve** a submission. It does not contai
 
 **Semantics.**
 
-1. **Value ranges are half-open: `[minimum, maximum)`**, with a null maximum meaning unbounded. The sample `demo-approval-matrix.json` uses inclusive upper bounds `99999.99` and a lower bound `100000`; it normalises to `[0, 100000)`, `[100000, 500000)`, `[500000, ∞)`. Validation reports gaps and overlaps among rows that share all other dimension values. `[PROPOSED]`
+1. **Value ranges are half-open: `[minimum, maximum)`**, with a null maximum meaning unbounded. The original sample (renamed `synthetic-generic-value-approval-matrix.json`) used inclusive upper bounds `99999.99` and a lower bound `100000`; it is normalised to `[0, 100000)`, `[100000, 500000)`, `[500000, ∞)`. Validation reports gaps and overlaps among rows that share all other dimension values. `[CONFIRMED]`
 2. **Currency.** No implicit currency conversion. If the contract currency differs from the matrix currency the matrix may include a versioned, effective-dated rate table; otherwise resolution fails closed with "no matching matrix row" and notifies the Procurement Administrator. A silent default is never used.
 3. **Resolution.** Among matching rows the highest priority wins; ties are a validation error at publish. Exceptions apply after the base row. No match means the submission is **blocked with an explanation** (fail closed).
 4. **Models.** `Sequential` completes steps in order; `Parallel` requires all; `FirstResponse` is satisfied by the first valid response from the group or its backup (the Confirmed Decision about backup approvers).
 5. **Segregation of duties.** The submitter cannot act on their own submission (ASM-17, configurable).
 6. **Delegation.** A group member may delegate for a bounded window to another member of the same group or the backup group; delegation is audited and shows on the approval record as "on behalf of".
 7. **Pinning.** The resolved steps and the matrix version are stored with the submission (`ApprovalRecord.matrixVersionId`). Later matrix versions do not change in-flight submissions.
-8. **JBS reference.** Single tier: approver group `GroupHead`, `FirstResponse` with `BackupApprover` as backup. The three-tier AUD sample is a generic simulator fixture.
+8. **JBS reference (D2).** Register authorisation only: approver group `GroupHeadProcurement` (Group Head of Procurement) with the configured backup approver, who has the same authority and whose individual identity is recorded. DocuSign handles Delegation of Authority; the platform does not duplicate it. The generic value-based matrix (`sample-data/synthetic-generic-value-approval-matrix.json`) is a synthetic demonstration of the portable engine and is **not** part of the JBS model unless later configured; no JBS financial approval roles are inferred.
 9. **Simulation.** Input: sample contract attributes. Output: matching row, resolved steps and current group members, with the decision trace.
 
 ## 7. Lookups, taxonomy, terminology, feature flags, branding
@@ -104,6 +104,7 @@ An approval matrix selects **who must approve** a submission. It does not contai
 - **Lookups and taxonomies:** hierarchical (maximum depth 3), values with immutable codes, effective dating, activation instead of deletion, import from CSV/XLSX with dry run.
 - **Terminology:** `(concept code, culture) → singular, plural` aliases. Concept codes are platform-defined (for example `contract`, `supplier`, `category`, `variation`).
 - **Feature flags:** key, description, default, scope (tenant or organisation), dependency list, and risk level. Flags enable modules (LegalReview, Variations, QlikExternalReporting, CriticalNotice, AI assistance). Flags can only enable code that exists; they cannot introduce behaviour.
+- **Reference numbering (organisation setting):** prefix, separator, zero-padded sequence and optional year token; validated for tenant-wide collision at publish and at package import; the JBS pack supplies a JBSAUS-style rule (exact pattern: Q-19).
 - **Branding:** product name, logo (PNG/JPEG; SVG only after sanitisation to a safe subset or rasterisation), colour tokens (checked for AA contrast against text), email header/footer text. **No custom CSS, JavaScript, or HTML.**
 
 ## 8. Notification and document templates
@@ -114,7 +115,7 @@ Notification templates: see `requirements/07-integrations/NOTIFICATIONS_SPEC.md`
 
 Read-only values derived from other fields of the same record using a closed function set: arithmetic on numbers, `concat`, `ifEmpty`, `dateAddDays`, `dateDiffDays`, `format(culture)`, and simple lookups of the record's own references (for example category name). Maximum 30 nodes. No cross-record queries, no loops, no user-defined functions. The value is computed on read and, when `reportable`, materialised into the reporting projection; it is never the source of truth.
 
-## 10. Publish-time validation catalogue `[PROPOSED]`
+## 10. Publish-time validation catalogue `[CONFIRMED]`
 
 | Code | Check |
 |---|---|

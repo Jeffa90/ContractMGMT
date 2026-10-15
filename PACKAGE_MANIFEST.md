@@ -1,7 +1,17 @@
 # Package Manifest
 
-Regenerated during the pre-implementation repository review (2026-10-15) from the actual file tree. Files added since the original package are listed in `docs/DOCUMENT_INDEX.md` under "Added by repository review".
+Regenerated from the actual file tree (last regenerated at the end of the DR-2026-10-15 decision-resolution pass). Files added since the original package are listed in `docs/DOCUMENT_INDEX.md`.
 
+- `.claude/skills/accessibility-review/SKILL.md`
+- `.claude/skills/contract-domain-review/SKILL.md`
+- `.claude/skills/deployment-review/SKILL.md`
+- `.claude/skills/documentation-review/SKILL.md`
+- `.claude/skills/migration-review/SKILL.md`
+- `.claude/skills/no-code-config-review/SKILL.md`
+- `.claude/skills/portability-review/SKILL.md`
+- `.claude/skills/release-readiness/SKILL.md`
+- `.claude/skills/security-review/SKILL.md`
+- `.claude/skills/tenant-isolation-review/SKILL.md`
 - `.env.example`
 - `.gitignore`
 - `CLAUDE.md`
@@ -62,6 +72,7 @@ Regenerated during the pre-implementation repository review (2026-10-15) from th
 - `requirements/03-data-dictionary/contracts.csv`
 - `requirements/03-data-dictionary/custom-field-types.csv`
 - `requirements/03-data-dictionary/documents.csv`
+- `requirements/03-data-dictionary/identity.csv`
 - `requirements/03-data-dictionary/lifecycle-records.csv`
 - `requirements/03-data-dictionary/migration-entities.csv`
 - `requirements/03-data-dictionary/org-structure.csv`
@@ -104,19 +115,12 @@ Regenerated during the pre-implementation repository review (2026-10-15) from th
 - `requirements/12-operations/SETUP_AND_READINESS_SPEC.md`
 - `requirements/13-marketplace/CATALOGUE_SPEC.md`
 - `requirements/README.md`
-- `sample-data/demo-approval-matrix.json`
 - `sample-data/demo-categories-and-assignments.json`
 - `sample-data/demo-custom-fields.json`
 - `sample-data/demo-organisation-structure.json`
 - `sample-data/demo-users-and-roles.json`
 - `sample-data/jbs-procurement-solution-pack.json`
-- `skills/contract-domain-review/SKILL.md`
-- `skills/migration-review/SKILL.md`
-- `skills/no-code-config-review/SKILL.md`
-- `skills/portability-review/SKILL.md`
-- `skills/release-readiness/SKILL.md`
-- `skills/security-review/SKILL.md`
-- `skills/tenant-isolation-review/SKILL.md`
+- `sample-data/synthetic-generic-value-approval-matrix.json`
 - `src/.gitkeep`
 - `templates/demo/.gitkeep`
 - `tests/.gitkeep`

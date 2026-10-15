@@ -9,7 +9,7 @@ MigrationProject,dataOwnerId,Data Owner,person,Yes,Yes,n/a,Recorded at creation 
 MigrationProject,extractionUtc,Extraction Date,datetime,Yes,Yes,n/a,[CONFIRMED]
 MigrationProject,freezeStartUtc,Freeze Start,datetime,No,Yes,n/a,Cutover freeze window [CONFIRMED]
 MigrationProject,freezeEndUtc,Freeze End,datetime,No,Yes,n/a,
-MigrationProject,legacyLoadPolicy,Legacy Load Policy,json,No,Yes,n/a,Allowed states; allow Registered Date import; expiry [PROPOSED] ASM-06
+MigrationProject,legacyLoadPolicy,Legacy Load Policy,json,No,Yes,n/a,Allowed states; allow Registered Date import; expiry [CONFIRMED] ASM-06
 MigrationProject,status,Status,choice,Yes,Yes,n/a,
 MappingProfile,id,Profile Id,uuid,Yes,Yes,n/a,
 MappingProfile,tenantId,Tenant,uuid,Yes,Yes,n/a,
@@ -23,13 +23,13 @@ MappingProfileVersion,lookupMaps,Lookup Maps,json,No,Yes,n/a,Source value to tar
 MigrationBatch,id,Batch Id,uuid,Yes,Yes,n/a,On every imported record; file and audit event [CONFIRMED]
 MigrationBatch,tenantId,Tenant,uuid,Yes,Yes,n/a,
 MigrationBatch,projectId,Project,uuid,Yes,Yes,n/a,
-MigrationBatch,kind,Kind,choice,Yes,Yes,n/a,DryRun; Mock; Final [PROPOSED]
+MigrationBatch,kind,Kind,choice,Yes,Yes,n/a,DryRun; Mock; Final [CONFIRMED]
 MigrationBatch,status,Status,choice,Yes,Yes,System,MigrationBatchStatus lookup
 MigrationBatch,mappingProfileVersionId,Mapping Profile Version,uuid,Yes,Yes,n/a,Captured [CONFIRMED]
 MigrationBatch,configReleaseId,Configuration Release,uuid,Yes,Yes,n/a,Configuration version captured with the batch [CONFIRMED]
 MigrationBatch,duplicateStrategy,Duplicate Strategy,choice,Yes,Yes,n/a,Selected before commit [CONFIRMED]
 MigrationBatch,documentDuplicateOption,Document Duplicate Option,choice,Yes,Yes,n/a,
-MigrationBatch,isLegacyLoad,Legacy Load,boolean,Yes,Yes,n/a,Requires migration.legacy_load [PROPOSED]
+MigrationBatch,isLegacyLoad,Legacy Load,boolean,Yes,Yes,n/a,Requires migration.legacy_load [CONFIRMED]
 MigrationBatch,acceptedBy,Accepted By,person,No,Yes,n/a,Business acceptance recorded [CONFIRMED]
 MigrationBatch,acceptedUtc,Accepted,datetime,No,Yes,n/a,
 SourceFile,id,Source File Id,uuid,Yes,Yes,n/a,
@@ -76,7 +76,7 @@ ProvenanceRecord,batchId,Batch,uuid,Yes,Yes,n/a,
 ProvenanceRecord,targetEntityType,Target Entity Type,string,Yes,Yes,n/a,
 ProvenanceRecord,targetEntityId,Target Entity Id,uuid,Yes,Yes,n/a,
 ProvenanceRecord,action,Action,choice,Yes,Yes,n/a,Created; Updated; Linked
-ProvenanceRecord,beforeImage,Before Image,json,No,Yes,n/a,Required for Updated so rollback can restore [PROPOSED] RISK-08
+ProvenanceRecord,beforeImage,Before Image,json,No,Yes,n/a,Required for Updated so rollback can restore [CONFIRMED] RISK-08
 ProvenanceRecord,sourceSystem,Source System,string,Yes,Yes,n/a,
 ProvenanceRecord,sourceRecordId,Source Record Id,string,Yes,Yes,n/a,
 ProvenanceRecord,sha256,SHA-256,string,No,Yes,n/a,For documents

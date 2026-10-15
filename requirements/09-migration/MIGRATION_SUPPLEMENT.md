@@ -1,6 +1,6 @@
 # Migration Supplement
 
-Added by repository review. This file **adds to** the authoritative migration files; it does not override them. Where a statement here appears to conflict with `MIGRATION_REQUIREMENTS.md`, `ATTACHMENT_INGESTION.md`, `SOURCE_TO_TARGET_MAPPING.md`, `MEDIUS_IMPORT_PROFILE.md` or `CUTOVER_AND_RECONCILIATION.md`, those win and the conflict is a defect to record. It resolves CON-01, CON-08, CON-10, CON-11, CON-12, RISK-08, RISK-20 and GAP-20. Tags: `[CONFIRMED]` traceable to the authoritative files; `[PROPOSED]` detail.
+Added by repository review. This file **adds to** the authoritative migration files; it does not override them. Where a statement here appears to conflict with `MIGRATION_REQUIREMENTS.md`, `ATTACHMENT_INGESTION.md`, `SOURCE_TO_TARGET_MAPPING.md`, `MEDIUS_IMPORT_PROFILE.md` or `CUTOVER_AND_RECONCILIATION.md`, those win and the conflict is a defect to record. It resolves CON-01, CON-08, CON-10, CON-11, CON-12, RISK-08, RISK-20 and GAP-20. Tags: `[CONFIRMED]` traceable to the authoritative files; `[CONFIRMED]` detail.
 
 ## 1. Precedence and scope
 
@@ -10,13 +10,13 @@ Migration is Phase 1 mandatory (`CONFIRMED_DECISIONS.md`). First migration slice
 
 | Entity | Idempotency key | Notes |
 |---|---|---|
-| Contract | `(TenantId, OrganisationId, SourceSystem, SourceRecordId)` | `[CONFIRMED]` core (source system + source record id + target tenant); organisation added `[PROPOSED]` ASM-04. `SourceSystem` comes from the migration project |
+| Contract | `(TenantId, OrganisationId, SourceSystem, SourceRecordId)` | `[CONFIRMED]` core (source system + source record id + target tenant); organisation added `[CONFIRMED]` ASM-04. `SourceSystem` comes from the migration project |
 | Supplier | `(TenantId, OrganisationId, SourceSystem, VendorNumber)`; if no vendor number, normalised name | Normalised name = Unicode NFKC, trim, collapse internal whitespace, case-fold. Matching is exact on the normalised value. More than one candidate is an error (`MIG-E010`) resolved by a human; there is no automatic fuzzy matching |
 | Category / subcategory | `(TenantId, OrganisationId, parent path of normalised names)` | Resolved through the category lookup map or existing taxonomy; unresolved is an error unless the profile enables "create missing categories" |
 | Document | `(TenantId, OrganisationId, SourceSystem, DocumentSourceId)` | Manifest gains two **optional** columns: `DocumentSourceId` and `SourceSystem`. When `DocumentSourceId` is absent it defaults to `SourceRecordId + "/" + normalised RelativePath`. `ParentDocumentSourceId` refers to a `DocumentSourceId` |
 | Document content | `(TenantId, SHA-256)` | De-duplication is **within one tenant only** (ASM-14) |
 
-Uniqueness for `agreementReference` is `(TenantId, OrganisationId, AgreementReference)` (Q-07). Generated references (strategy `CreateNewReference`) take the form `{AgreementReference}-M{BatchSequence}{n}` and are checked for collisions before commit `[PROPOSED]`.
+Uniqueness for `agreementReference` is `(TenantId, AgreementReference)` across the whole tenant (D3). The original reference from the source system is **always** preserved separately in `sourceAgreementReference`. Reference policy per project: `KeepSource` (the source reference becomes `agreementReference` if it is free in the tenant and acceptable to the organisation's numbering rule) or `GenerateNew` (the organisation's numbering rule allocates the target reference); a source reference that collides with another record anywhere in the tenant is `MIG-E006` and is resolved by the duplicate strategy or by generating a new reference. Generated references (strategy `CreateNewReference`) come from the organisation's numbering rule and are checked for collisions before commit. Error messages never disclose records outside the caller's scope. `[CONFIRMED]`
 
 ## 3. Mapping profiles and the transformation catalogue (CON-08)
 
@@ -29,7 +29,7 @@ Uniqueness for `agreementReference` is `(TenantId, OrganisationId, AgreementRefe
 - `entity.field` (for example `supplier.name`, `supplier.vendorNumber`, `category.name`, `subcategory.name`): *find-or-create the related entity by its idempotency key, then set the field*. This makes the sample's `supplier.name` valid.
 - `staging.<name>`: a staging-only value used by matching or validation (for example `staging.documentFolder`) and **not** stored on the contract.
 
-**Safe transformations** `[CONFIRMED]` list from `SOURCE_TO_TARGET_MAPPING.md`, with codes `[PROPOSED]`:
+**Safe transformations** `[CONFIRMED]` list from `SOURCE_TO_TARGET_MAPPING.md`, with codes `[CONFIRMED]`:
 
 | Code | Parameters | Behaviour |
 |---|---|---|
@@ -51,7 +51,7 @@ Uniqueness for `agreementReference` is `(TenantId, OrganisationId, AgreementRefe
 
 ## 4. Staging and dry run
 
-- **Staging** is the `migration` schema plus the quarantine blob area; **target** is everything else except the audit log: domain tables, committed document storage, outbox, notifications, reminders `[PROPOSED]` definition.
+- **Staging** is the `migration` schema plus the quarantine blob area; **target** is everything else except the audit log: domain tables, committed document storage, outbox, notifications, reminders `[CONFIRMED]` definition.
 - A dry run reads sources into staging, runs profiling, mapping, validation and matching, and produces the validation report, match proposals and reconciliation preview. It performs **no writes to target**, sends **no** notifications, emits **no** outbox messages and creates **no** reminders. It does write audit events (type `migration.dryrun.*`) and staging rows. `[CONFIRMED]` ("Dry run performs no target writes")
 - A dry run is repeatable; each run is a `MigrationBatch` of kind `DryRun`. Re-running does not accumulate duplicate staging rows for the same batch.
 
@@ -59,14 +59,14 @@ Uniqueness for `agreementReference` is `(TenantId, OrganisationId, AgreementRefe
 
 States (`reference-lookups.csv` `MigrationBatchStatus`): Created, Profiled, Validated, Committing, Committed, Reconciled, Accepted, plus RolledBack, Compensated, Failed (resumable).
 
-Commit phases, in order: (1) reference data (categories, suppliers), (2) contracts, (3) documents (blob first, then metadata), (4) links and match results, (5) reconciliation. Rules `[PROPOSED]` detail:
+Commit phases, in order: (1) reference data (categories, suppliers), (2) contracts, (3) documents (blob first, then metadata), (4) links and match results, (5) reconciliation. Rules `[CONFIRMED]` detail:
 
 1. Work proceeds in chunks (default 500 rows or files). Each chunk commits in **one transaction together with its checkpoint** (`phase`, `lastCompletedSequence`).
 2. Resume reads the checkpoint and continues. Because every target row carries its idempotency key under a unique index, a replay of a completed chunk is a no-op, so **resume never duplicates records or files**.
 3. A blob write is idempotent (content-addressed within the tenant). A sweeper removes blobs with no metadata row after a grace period; rollback and sweeper never remove a blob referenced by anything outside the batch.
 4. Batch ID is written on every created or updated row, document, audit event and outbox suppression note.
 5. Notifications and workflow side effects are suppressed for imported historical records; reminders are generated after reconciliation if enabled (`WORKFLOW_SPEC.md` section 8).
-6. **Cutover freeze** `[CONFIRMED]`: the project records the freeze window; when `target freeze` is enabled the platform blocks creation of contracts in the affected organisation by non-migration users during the window `[PROPOSED]`.
+6. **Cutover freeze** `[CONFIRMED]`: the project records the freeze window; when `target freeze` is enabled the platform blocks creation of contracts in the affected organisation by non-migration users during the window `[CONFIRMED]`.
 7. The batch captures the mapping profile version and configuration release at creation `[CONFIRMED]`.
 
 ## 6. Rollback and shared reference data (CON-12)
@@ -84,11 +84,11 @@ Algorithm (also shown as a **rollback preview** before execution):
 
 ## 7. Legacy-load policy (CON-01, ASM-06)
 
-Needed because `registeredDate` is normally stamped on authorisation and Effective records are locked, yet `MEDIUS_IMPORT_PROFILE.md` allows "Historical Effective contracts ... imported as locked legacy records". `[PROPOSED]` mechanics:
+Needed because `registeredDate` is normally stamped on authorisation and Effective records are locked, yet `MEDIUS_IMPORT_PROFILE.md` allows "Historical Effective contracts ... imported as locked legacy records". `[CONFIRMED]` mechanics:
 
 - Project setting `legacyLoadPolicy`: allowed target states, whether `registeredDate`/`registeredBy` may be imported, whether existing locked legacy records may be overwritten, and an expiry date after which the policy is inert.
 - Requires permission `migration.legacy_load` **and** second-person confirmation of the commit.
-- Contracts land locked with `isLegacyLoad = true`, the verbatim `sourceStatus`, and source `registeredDate` if permitted (otherwise null, never fabricated). They bypass workflow transitions; no notifications are sent.
+- Contracts land locked with `isLegacyLoad = true`, the verbatim `sourceStatus`, and source `registeredDate` if permitted (otherwise null, never fabricated). An imported Registered Date sets `registeredDateProvenance = Migration` and stores the verbatim source value in `sourceRegisteredValue`; the migration batch id, source record id, source value and the acting migration administrator are written to the audit event. After migration acceptance users cannot ordinarily edit Registered Date. `[CONFIRMED]` (DR-2026-10-15) They bypass workflow transitions; no notifications are sent.
 - A legacy load that would overwrite an Effective locked contract is refused unless the policy explicitly allows it and an audit record states why. `[CONFIRMED]`
 - After go-live the project closes the policy; subsequent loads of Effective-state data are refused.
 
@@ -136,7 +136,7 @@ Stable codes appear in the error workbook and the API. Severity E = error (row r
 - **CSV:** accept and strip a UTF-8 byte order mark (all sample CSVs begin with one); detect UTF-8, UTF-16 and, only with explicit confirmation, Windows-1252; configurable delimiter; RFC 4180 quoting; embedded newlines supported; ragged rows are errors, not silently padded.
 - **XLSX:** read the chosen sheet; formulas are read as cached values; macro-enabled workbooks (`.xlsm`) rejected; hidden sheets and rows are flagged; Excel date serials converted with the workbook's date system; no external links followed. Use a permissively licensed library (RISK-10).
 - **JSON / ZIP package:** schema validated; same archive safety rules as `ATTACHMENT_INGESTION.md`.
-- **Limits** (configurable; defaults `[PROPOSED]` pending Q-13): 250,000 rows per file, 5 GB per archive, 20,000 entries per archive, 500 MB per file, compression ratio 100:1.
+- **Limits** (configurable; defaults `[OPEN]` pending Q-13): 250,000 rows per file, 5 GB per archive, 20,000 entries per archive, 500 MB per file, compression ratio 100:1.
 - **Regular expressions** for the "configured naming rule" matching method use a non-backtracking engine with a timeout (ASM-13).
 - **Streaming:** large archives are processed as streams; extraction never buffers a whole archive in memory.
 - **Matching** follows the order in `ATTACHMENT_INGESTION.md`; each proposal records method and reason; ties are never broken automatically.

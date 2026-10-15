@@ -1,6 +1,6 @@
 # 07 Integrations
 
-Added by repository review (GAP-16). Master requires provider interfaces for documents, email, reporting, e-signature, ERP, AI and monitoring, generic OpenID Connect and Microsoft Entra ID, and outbox/inbox patterns. This folder specifies them. Tags: `[CONFIRMED]` / `[PROPOSED]` as in `requirements/README.md`.
+Added by repository review (GAP-16). Master requires provider interfaces for documents, email, reporting, e-signature, ERP, AI and monitoring, generic OpenID Connect and Microsoft Entra ID, and outbox/inbox patterns. This folder specifies them. Tags: `[CONFIRMED]` / `[CONFIRMED]` as in `requirements/README.md`.
 
 | File | Content |
 |---|---|
@@ -19,7 +19,7 @@ Added by repository review (GAP-16). Master requires provider interfaces for doc
 4. **Secrets by reference.** Configuration stores a secret *reference* (`env:`, `file:`, `keyvault:`, `dpapi:`), never the value. The UI never reveals a stored secret; entry is write-only. Configuration packages exclude secrets. `[CONFIRMED]`
 5. **Reliable.** Outbound effects go through the transactional outbox; inbound callbacks are recorded in the inbox keyed by provider and external id, making replays harmless. Handlers are idempotent. `[CONFIRMED]`
 6. **Bounded.** Every call has timeouts, bounded retries with jittered back-off, a circuit breaker and a dead-letter state visible to administrators. Provider failure never blocks manual operation (for example manual supplier creation, manual executed-copy upload). `[CONFIRMED]`
-7. **Egress-controlled.** Adapters may call only configured, https-only endpoints. Resolved addresses in private, loopback, link-local and metadata ranges are refused unless an administrator explicitly allowlists an on-premises host (SSRF control). Redirects are not followed across hosts. `[PROPOSED]`
+7. **Egress-controlled.** Adapters may call only configured, https-only endpoints. Resolved addresses in private, loopback, link-local and metadata ranges are refused unless an administrator explicitly allowlists an on-premises host (SSRF control). Redirects are not followed across hosts. `[CONFIRMED]`
 8. **Audited and observable.** Each call produces an audit event (without secrets or document bodies) and metrics; each adapter exposes a health check that the readiness dashboard reports.
-9. **Contract-tested.** Every interface has a shared contract test suite that the mock and every real implementation must pass; real providers are exercised only in opt-in integration tests with synthetic data. `[PROPOSED]`
+9. **Contract-tested.** Every interface has a shared contract test suite that the mock and every real implementation must pass; real providers are exercised only in opt-in integration tests with synthetic data. `[CONFIRMED]`
 10. **Data minimisation.** Payloads carry the minimum necessary data; AI and external analytics adapters respect classification and sensitivity (`RETENTION_AND_CLASSIFICATION_SPEC.md` section 6).

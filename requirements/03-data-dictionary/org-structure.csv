@@ -1,5 +1,5 @@
 Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
-Tenant,id,Tenant Id,uuid,Yes,Yes,n/a,Single-organisation installs have exactly one tenant [PROPOSED] ASM-05
+Tenant,id,Tenant Id,uuid,Yes,Yes,n/a,Single-organisation installs have exactly one tenant [CONFIRMED] ASM-05
 Tenant,name,Name,string,Yes,Yes,n/a,
 Tenant,status,Status,choice,Yes,Yes,n/a,Active or Suspended; suspended tenants are read-denied by policy
 Tenant,tenancyMode,Tenancy Mode,choice,Yes,Yes,n/a,TenancyMode lookup [CONFIRMED]
@@ -12,6 +12,8 @@ Organisation,timeZoneId,Time Zone,string,Yes,Yes,n/a,IANA identifier stored; con
 Organisation,cultureCode,Culture,string,Yes,Yes,n/a,Default en-AU for the JBS pack [CONFIRMED]
 Organisation,defaultCurrencyCode,Default Currency,string,Yes,Yes,n/a,ISO 4217; default AUD for the JBS pack [CONFIRMED]
 Organisation,solutionPackKey,Solution Pack,string,No,Yes,n/a,Pack applied at onboarding
+Organisation,referencePrefix,Reference Prefix,string,Yes,Yes,n/a,Prefix of generated Agreement References; chosen to prevent collisions across the tenant (JBS pack uses a JBSAUS-style prefix) [CONFIRMED] D3
+Organisation,referenceNumberingRule,Reference Numbering Rule,json,Yes,Yes,n/a,Pattern tokens (prefix; separator; zero-padded sequence; optional year); allocated transactionally; numbers never reused [CONFIRMED] D3; exact JBS pattern [OPEN] Q-19
 LegalEntity,id,Legal Entity Id,uuid,Yes,Yes,n/a,
 LegalEntity,tenantId,Tenant,uuid,Yes,Yes,n/a,
 LegalEntity,organisationId,Organisation,uuid,Yes,Yes,n/a,
@@ -31,4 +33,4 @@ Site,tenantId,Tenant,uuid,Yes,Yes,n/a,
 Site,organisationId,Organisation,uuid,Yes,Yes,n/a,
 Site,code,Code,string,Yes,Yes,n/a,Stable; unique per organisation
 Site,name,Name,string,Yes,Yes,n/a,
-Site,timeZoneId,Time Zone,string,No,Yes,n/a,Overrides organisation time zone for local reminders when set [PROPOSED]
+Site,timeZoneId,Time Zone,string,No,Yes,n/a,Overrides organisation time zone for local reminders when set [CONFIRMED]

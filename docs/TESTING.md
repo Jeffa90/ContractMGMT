@@ -4,7 +4,7 @@ Status: **strategy and test catalogue; no tests exist yet.** Every ID below is a
 
 ## 1. Principles and gates
 
-1. Tests assert behaviour required by `requirements/`, not the current implementation. A failing test is never "fixed" by editing the requirement (`skills/*`: "Never change requirements merely to match defective implementation").
+1. Tests assert behaviour required by `requirements/`, not the current implementation. A failing test is never "fixed" by editing the requirement (`.claude/skills/*`: "Never change requirements merely to match defective implementation").
 2. Security and isolation tests run on **every build**; they are not optional suites.
 3. Data-driven where a requirement file is the source of truth: the authorisation matrix from `role-permission-matrix.csv` (AUT-001), workflow transitions from `status-transitions*.csv` (WFL-001), field types from `custom-field-types.csv` (NCD-012), reference lookups from `reference-lookups.csv`, migration samples from `migration-samples/`. If a requirement file changes, tests change with it automatically or fail loudly.
 4. Negative tests are first-class: each control has at least one test that proves the bad input is refused.
@@ -43,31 +43,31 @@ Categories (xUnit traits): `Unit`, `Architecture`, `Integration`, `E2E`, `Contra
 | ARC-009 | Domain layer has no infrastructure references; workflow-controlled properties (`status`, lock flags, `registeredDate`) have no public setter |
 | ARC-010 | No JBS or other business-pack names in compiled code (PRT-001) |
 
-## 3. Environment and SQL Server strategy (RISK-01)
+## 3. Environment, SQL Server and reporting policy (RISK-01; decision record D4)
 
-Findings (verified in this session): no .NET SDK; Docker CLI present but daemon not running (`dockerd` binary exists); SQL Server 2025 apt feed for Ubuntu 24.04 and `mcr.microsoft.com` reachable; Chromium and Node present; 4 vCPU, 16 GB RAM.
+Policy confirmed in DR-2026-10-15 D4:
 
-**Rule:** the SQLite and EF in-memory providers are **not** acceptable for tests that claim anything about tenant isolation, Row-Level Security, `rowversion` concurrency, application locks, schemas, audit permissions, migrations or reporting views, because they do not behave like SQL Server. Those tests require real SQL Server.
+1. **Provider-independent tests** (domain, validators, interpreters, parsers, access evaluator logic) need no database and always run.
+2. A **lightweight test provider** (SQLite in-memory with foreign keys enabled) may be used for *limited application tests* (for example filter wiring, service flows). Results from it are labelled **"provider-independent (not SQL Server proof)"** in the report and are **never** counted as evidence of SQL Server behaviour.
+3. **Real SQL Server integration tests** cover migrations, constraints, composite foreign keys, Row-Level Security, `rowversion` concurrency, application locks, audit permissions, reporting views and any other provider-specific behaviour. They are tagged `SqlServer`.
+4. SQL Server tests are skipped **only** when no SQL Server connection is available. The connection comes from the environment variable `ECP_TEST_SQL` (an external or CI SQL Server, or a local disposable one started by `tools/` scripts). A skipped SQL Server test is reported **NOT VERIFIED**, never Passed.
+5. **Report counters.** Every test run prints four counters: **Passed, Failed, Skipped, NOT VERIFIED**. Skipped = deliberately excluded (reason printed). NOT VERIFIED = needs an environment that was unavailable (SQL Server, container engine, IIS, Azure, live provider). A capability whose critical tests are NOT VERIFIED may not be labelled *implemented*; it is labelled *Implemented, not verified*.
+6. Docker, IIS and Azure artefacts that cannot be run in the workspace are labelled **Scaffolded / Not Verified**.
+7. Production architecture is not weakened to suit the sandbox. The lightweight provider is a test and Demo-on-sandbox convenience only; Production refuses it (R-DB-01).
+8. A **CI workflow** (`.github/workflows/ci.yml`) runs the SQL Server suite against a disposable SQL Server container with a generated password, subject to runner availability and repository policy.
 
-Obtaining SQL Server, in order of preference (decided by spike T0.1, result recorded in ADR-0005 and here):
+Environment findings are recorded in `docs/ENVIRONMENT.md` (task T0.1). SQL Server for local runs, in order of preference: (A) container engine (`dockerd`) if it can run; (B) native `mssql-server` installed from the Microsoft package feed in the workspace; (C) external SQL Server via `ECP_TEST_SQL`. The `NotVerified` mechanism is implemented by the `SqlServerFact` and `SqlServerTheory` attributes in the test infrastructure project.
 
-| Option | How | Status |
-|---|---|---|
-| A. Testcontainers / Compose with the Microsoft SQL Server image | Needs a working container engine; try starting `dockerd` in the sandbox | Unverified |
-| B. Native SQL Server installed in the sandbox from `packages.microsoft.com` (`mssql-server`) | `apt` install, run without systemd if necessary | Unverified |
-| C. External SQL Server supplied through `ECP_TEST_SQL` (developer machine, CI service, Azure SQL dev instance) | Connection string via environment; schema-per-run isolation | Always possible; requires the owner |
-
-If none works, unit, architecture and parts of E2E can run, integration and isolation tests are reported **not run**, and no capability depending on them may be labelled *implemented* (it is labelled *unverified*). Decision point recorded at M0 exit.
-
-Planned commands (not runnable until the solution exists; shown so prompts can reference exact commands):
+Planned commands:
 
 ```
 dotnet restore --locked-mode
 dotnet build -c Release -warnaserror
-dotnet test --filter "Category=Unit|Category=Architecture"
-dotnet test --filter "Category=Integration|Category=Isolation|Category=Migration"   # needs SQL Server
-npx playwright test                                                                  # E2E + a11y
-docker compose -f deploy/docker/compose.yml up -d --wait && ./deploy/docker/smoke.sh  # needs container engine
+dotnet test --filter "Category!=SqlServer"                       # provider-independent
+ECP_TEST_SQL="<connection string>" dotnet test                  # includes SQL Server suite
+tools/test-report.sh                                            # prints Passed / Failed / Skipped / NOT VERIFIED
+npx playwright test                                              # E2E + a11y (later milestone)
+docker compose -f deploy/docker/compose.yml up -d --wait         # needs a container engine
 ```
 
 ## 4. Test data and fixtures
@@ -77,7 +77,7 @@ docker compose -f deploy/docker/compose.yml up -d --wait && ./deploy/docker/smok
 | Two tenants, three organisations, sites | `sample-data/demo-organisation-structure.json` |
 | Users and roles (including `viewer.a2`, a same-tenant different-organisation user) | `sample-data/demo-users-and-roles.json` |
 | Categories and assignments (including an ended assignment) | `sample-data/demo-categories-and-assignments.json` |
-| Approval matrix, custom fields | `sample-data/demo-approval-matrix.json`, `demo-custom-fields.json` |
+| Approval matrix, custom fields | `sample-data/synthetic-generic-value-approval-matrix.json`, `demo-custom-fields.json` |
 | Migration sample | `migration-samples/contracts-import.csv`, `attachment-manifest.csv`, `field-mapping-profile.csv` (original) and `field-mapping-profile-complete.csv`, `status-lookup-map.csv`; placeholder attachment files created by the fixture builder per `migration-samples/attachments/README.md` |
 | Generated hostile and scale data | Builders in test code: zip-slip, bomb, macro workbook, polyglot, duplicates, unmatched, bad dates, cross-tenant references, 100k contracts, 25k contracts + 50k files |
 | Clock | `FakeClock` (UTC), organisation time zones from fixtures |
@@ -136,6 +136,10 @@ Two tenants (A, B) and, inside A, two organisations. Each surface has at least a
 | AUT-014 | **IDOR sweep**: every route with an id parameter is enumerated by reflection and exercised with foreign-tenant and foreign-organisation ids |
 | AUT-015 | Every endpoint carries an authorisation requirement (also ARC-008) |
 | AUT-016 | Group-overage or unresolved group claims fail closed |
+| AUT-017 | **Scope intersection:** a record is visible only if its organisation, business unit, site, category and classification all fall inside the assignment's scopes; scopes of separate assignments are never merged; an assignment with no organisational scope is refused |
+| AUT-018 | Viewer kinds: All Contracts, Category, Business Unit, Site and Restricted viewers each see exactly their scope (fixtures `viewer.*@a.example.test`); Viewer is never a global read role |
+| AUT-019 | Category Owner reads all within organisation and classification scope but edits only currently assigned categories; Legal, Approver, Procurement Administrator, administrators and Auditor behave per `role-permission-matrix.csv` (no contract edits by administrators or Legal on locked metadata) |
+| AUT-020 | Procurement Administrator cannot approve their own submission unless separately assigned an approval role and policy permits; Approver cannot edit the submitted record; Backup Approver actions record the actual individual |
 
 ## 7. Migration suite (`Category=Migration`) (Phase 1 mandatory)
 
@@ -146,7 +150,7 @@ Master's nine critical tests are MIG-001 to MIG-009.
 | MIG-001 | **Dry run changes no target data**: snapshot of every non-staging table, blob area, outbox, notifications, reminders identical before and after |
 | MIG-002 | **Batch resume does not duplicate** records or files (kill/resume at each phase boundary and mid-chunk) |
 | MIG-003 | **Manifest matching is deterministic** (same inputs, any order, same proposals; ties never auto-broken) |
-| MIG-004 | Duplicate and source-ID policies: each strategy in `reference-lookups.csv` `DuplicateStrategy` behaves as specified |
+| MIG-004 | Duplicate and source-ID policies: each strategy in `reference-lookups.csv` `DuplicateStrategy` behaves as specified; `agreementReference` collisions are tenant-wide; `sourceAgreementReference` is always preserved |
 | MIG-005 | **Unmatched files remain visible** and are never silently dropped; discard is an audited action |
 | MIG-006 | **Rollback removes only the selected batch's reversible changes**; pre-existing records and other batches untouched |
 | MIG-007 | **Hash and provenance persist** (source id, system, hash, extraction timestamp, source status, batch id, profile version) |
@@ -229,6 +233,8 @@ Master's nine critical tests are MIG-001 to MIG-009.
 | PKG-009 | Three-way pack upgrade preserves local changes |
 | PKG-010 | Apply produces a **draft**, never a published release |
 | PKG-011 | Compatibility metadata respected |
+| PKG-012 | Agreement Reference conflicts (overlapping prefix or range, seed reference already used in the tenant) are detected in the dry run before any commit |
+| REF-001 | Unique `(TenantId, AgreementReference)`: a duplicate in another organisation of the same tenant is refused without disclosing that record; the same reference in another tenant is allowed; numbering allocation is concurrent-safe and never reuses numbers; `sourceAgreementReference` is not unique-constrained |
 | PRT-001 … PRT-015 | As defined in `requirements/08-portability/PORTABILITY_ACCEPTANCE_CRITERIA.md`; PRT-002 uses a second, non-JBS pack |
 
 ## 10. Security regression suite (`Category=Security`)
@@ -378,7 +384,7 @@ Automated axe-core checks plus scripted keyboard tests on every page type; manua
 
 1. Pre-merge gate: restore (locked), build with warnings as errors, Unit + Architecture + Security + Isolation + Migration (needs SQL Server), vulnerable/licence scans, SBOM, OpenAPI diff, link check for docs.
 2. Nightly: E2E + A11y, Performance, Deployment, backup/restore and upgrade smoke.
-3. Milestone exit: the gate in `IMPLEMENTATION_PLAN.md`, plus skill-based reviews (`skills/`), plus updated threat model.
+3. Milestone exit: the gate in `IMPLEMENTATION_PLAN.md`, plus skill-based reviews (`.claude/skills/`), plus updated threat model.
 4. Every run produces a test report listing run / not run / failed by ID. `TASKS.md` references report IDs, not opinions.
 
 ## 16. Traceability to Master "Testing" and the Definition of Done

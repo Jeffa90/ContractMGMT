@@ -1,15 +1,15 @@
 # E-signature and DocuSign Specification
 
-Confirmed: "DocuSign initially handles execution and Delegation of Authority." The Group Head or backup performs final register authorisation after execution. This file defines the contract between the platform and e-signature providers (GAP-16, CON-02). `[PROPOSED]` detail unless tagged; open points are Q-01 and Q-09.
+Confirmed (decision record DR-2026-10-15 D2, resolving Q-01): for the JBS Procurement pack, DocuSign handles Delegation of Authority, routing for execution and signatures. **The platform does not replace or duplicate DocuSign Delegation of Authority.** After execution the signed agreement is uploaded or retrieved through the (future) DocuSign adapter, and the platform performs a separate register-authorisation step by the Group Head of Procurement or the configured backup approver. This file defines the contract between the platform and e-signature providers (GAP-16, CON-02). Status: the DocuSign adapter is **future**; the Mock provider and manual executed-copy upload are the first implementations. Open point: Q-09 (Connect webhooks vs polling, templates).
 
 ## 1. Responsibilities
 
 | Concern | Owner |
 |---|---|
-| Collecting signatures, signing order and Delegation of Authority evidence | DocuSign (initially) `[CONFIRMED]` |
+| Delegation of Authority, signing routing and collecting signatures | DocuSign `[CONFIRMED]`; the platform does not replace or duplicate it |
 | Holding the executed copy and certificate of completion | Platform document store (copied from DocuSign) |
-| Final register authorisation (`Approve`), stamping Registered Date, locking | Platform, by an authenticated approver `[CONFIRMED]` |
-| Who may approve | Platform approval matrix (approver groups) |
+| Final register authorisation (`Approve`), stamping Registered Date, becoming Effective, locking | Platform, by an authenticated approver `[CONFIRMED]`; the acting individual and decision are retained |
+| Who may perform register authorisation (JBS pack) | Approver group `GroupHeadProcurement` (Group Head of Procurement) with the configured backup approver `[CONFIRMED]`. No financial approval tiers are inferred for JBS |
 
 DocuSign completion **never** approves, registers or locks a contract by itself; it satisfies guard `ExecutedCopyExists` only.
 
@@ -45,5 +45,5 @@ Simulates sending, delivery, completion (generating a synthetic executed PDF and
 
 ## 6. Open points
 
-- Q-01: whether the platform approval step replaces, supplements or mirrors DocuSign Delegation of Authority (ASM-08 assumes supplements: DoA evidence is attached; Group Head authorisation is platform-side).
-- Q-09: Connect webhooks vs polling, envelope templates, signer roles and routing, and who may view DoA evidence.
+- Q-01 is resolved (D2): the platform neither replaces nor duplicates DocuSign Delegation of Authority; DoA evidence from DocuSign may be attached as a document but is not re-evaluated by the platform.
+- Q-09 `[OPEN]`: Connect webhooks vs polling, envelope templates, signer roles and routing, and who may view DoA evidence.

@@ -1,0 +1,48 @@
+Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+User,id,User Id,uuid,Yes,Yes,n/a,
+User,tenantId,Tenant,uuid,Yes,Yes,n/a,A person in two tenants has two independent users
+User,issuer,Identity Issuer,string,Yes,Yes,n/a,Accounts link by issuer and subject; never by email alone [CONFIRMED]
+User,subject,Identity Subject,string,Yes,Yes,n/a,
+User,displayName,Display Name,string,Yes,Yes,n/a,
+User,email,Email,string,No,Yes,n/a,Informational; not an identity key
+User,status,Status,choice,Yes,Yes,n/a,Invited; Active; Disabled
+RoleAssignment,id,Assignment Id,uuid,Yes,Yes,n/a,
+RoleAssignment,tenantId,Tenant,uuid,Yes,Yes,n/a,
+RoleAssignment,userId,User,uuid,Yes,Yes,n/a,
+RoleAssignment,roleCode,Role,choice,Yes,Yes,n/a,One of the 12 roles in role-permission-matrix.csv [CONFIRMED]
+RoleAssignment,viewerKind,Viewer Kind,choice,No,Yes,n/a,Required when role is Viewer: AllContracts; Category; BusinessUnit; Site; Restricted [CONFIRMED]
+RoleAssignment,scopeLevel,Scope Level,choice,Yes,Yes,n/a,Installation; Tenant; Organisation [CONFIRMED]
+RoleAssignment,organisationIds,Organisational Scope,json,No,Yes,n/a,Organisation ids; required for any organisation-level role; an assignment without organisational scope is refused [CONFIRMED]
+RoleAssignment,businessUnitIds,Business Unit Scope,json,No,Yes,n/a,Optional narrowing [CONFIRMED]
+RoleAssignment,siteIds,Site Scope,json,No,Yes,n/a,Optional narrowing; Division/Site Administrators are limited to assigned divisions or sites [CONFIRMED]
+RoleAssignment,divisionIds,Division Scope,json,No,Yes,n/a,Used by Division/Site Administrator [CONFIRMED]
+RoleAssignment,categoryIds,Category Scope,json,No,Yes,n/a,Null means all categories; a parent covers its subcategories; does not narrow Category Owner read [CONFIRMED]
+RoleAssignment,classificationCeiling,Classification Ceiling,choice,Yes,Yes,n/a,Highest classification visible to this assignment [CONFIRMED]
+RoleAssignment,approverGroupKey,Approver Group,string,No,Yes,n/a,For Approver and Backup Approver (for example GroupHeadProcurement) [CONFIRMED]
+RoleAssignment,effectiveFromUtc,Effective From,datetime,Yes,Yes,n/a,
+RoleAssignment,effectiveToUtc,Effective To,datetime,No,Yes,n/a,
+RoleAssignment,grantedBy,Granted By,uuid,Yes,Yes,n/a,Never above grantor rights or scope [CONFIRMED]
+RoleAssignment,reason,Reason,string,No,Yes,n/a,
+RoleAssignment,rowVersion,Row Version,string,Yes,Yes,n/a,
+ApproverGroup,id,Approver Group Id,uuid,Yes,Yes,n/a,
+ApproverGroup,tenantId,Tenant,uuid,Yes,Yes,n/a,
+ApproverGroup,organisationId,Organisation,uuid,Yes,Yes,n/a,
+ApproverGroup,key,Key,string,Yes,Yes,n/a,Stable code; JBS pack uses GroupHeadProcurement [CONFIRMED]
+ApproverGroup,backupOfGroupId,Backup Of,uuid,No,Yes,n/a,Backup group for another group
+Delegation,id,Delegation Id,uuid,Yes,Yes,n/a,
+Delegation,tenantId,Tenant,uuid,Yes,Yes,n/a,
+Delegation,delegatorId,Delegator,uuid,Yes,Yes,n/a,
+Delegation,delegateId,Delegate,uuid,Yes,Yes,n/a,
+Delegation,roleCode,Role,choice,Yes,Yes,n/a,Never a role the delegator does not hold
+Delegation,scopeJson,Scope,json,Yes,Yes,n/a,Subset of the delegator's scope
+Delegation,fromUtc,From,datetime,Yes,Yes,n/a,
+Delegation,toUtc,To,datetime,Yes,Yes,n/a,Bounded window
+Delegation,reason,Reason,string,Yes,Yes,n/a,
+Elevation,id,Elevation Id,uuid,Yes,Yes,n/a,
+Elevation,tenantId,Tenant,uuid,No,Yes,n/a,Null only for installation-level elevation
+Elevation,userId,User,uuid,Yes,Yes,n/a,
+Elevation,purpose,Purpose,choice,Yes,Yes,n/a,Support; EmergencyUnlock; Other
+Elevation,reason,Reason,string,Yes,Yes,n/a,Mandatory [CONFIRMED]
+Elevation,fromUtc,From,datetime,Yes,Yes,n/a,
+Elevation,expiresUtc,Expires,datetime,Yes,Yes,n/a,Time-limited [CONFIRMED]
+Elevation,confirmedBy,Confirmed By,uuid,No,Yes,n/a,Second person when policy requires [OPEN] Q-05

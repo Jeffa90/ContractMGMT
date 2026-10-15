@@ -1,6 +1,6 @@
 # Document Index
 
-Start here to find any document. Order of authority for requirements is in `CLAUDE.md`; the tag convention (`[CONFIRMED]` / `[PROPOSED]`) is in `requirements/README.md`.
+Start here to find any document. Order of authority for requirements is in `CLAUDE.md`; the tag convention (`[CONFIRMED]` / `[OPEN]`) is in `requirements/README.md`.
 
 ## Design documents (how the requirements will be met)
 
@@ -18,7 +18,7 @@ Start here to find any document. Order of authority for requirements is in `CLAU
 
 ## Operational documents (original package)
 
-`docs/GITHUB_CLOUD_SETUP.md`, `docs/MIGRATION_RUNBOOK_TEMPLATE.md`, `docs/PRODUCTION_READINESS_CHECKLIST.md`, `SECURITY-NOTICE.md`, `README.md`, `prompts/*`, `skills/*`.
+`docs/GITHUB_CLOUD_SETUP.md`, `docs/MIGRATION_RUNBOOK_TEMPLATE.md`, `docs/PRODUCTION_READINESS_CHECKLIST.md`, `SECURITY-NOTICE.md`, `README.md`, `prompts/*`, `.claude/skills/*`.
 
 ## Requirements map
 

@@ -1,0 +1,25 @@
+{
+  "name": "Synthetic Generic Value-Based Approval Matrix",
+  "purpose": "Demonstrates the portable approval-matrix engine (value ranges, approver groups, simulator). It is synthetic and generic. It is NOT part of the JBS Procurement default approval model and must not be read as JBS financial approval roles.",
+  "synthetic": true,
+  "notPartOfPack": "jbs-procurement",
+  "currency": "AUD",
+  "rangeSemantics": "Half-open [minimum, maximum). A null maximum is unbounded.",
+  "rules": [
+    {
+      "minimum": 0,
+      "maximum": 100000,
+      "approverGroup": "SyntheticTier1"
+    },
+    {
+      "minimum": 100000,
+      "maximum": 500000,
+      "approverGroup": "SyntheticTier2"
+    },
+    {
+      "minimum": 500000,
+      "maximum": null,
+      "approverGroup": "SyntheticTier3"
+    }
+  ]
+}

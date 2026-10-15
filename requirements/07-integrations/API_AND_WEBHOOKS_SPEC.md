@@ -1,6 +1,6 @@
 # API and Webhooks Specification
 
-Master requires tenant-aware APIs, OpenAPI, optimistic concurrency, outbox/inbox patterns and webhooks. This file specifies them (GAP-16). `[PROPOSED]` detail.
+Master requires tenant-aware APIs, OpenAPI, optimistic concurrency, outbox/inbox patterns and webhooks. This file specifies them (GAP-16). `[CONFIRMED]` detail.
 
 ## 1. REST API
 

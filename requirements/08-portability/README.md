@@ -1,6 +1,6 @@
 # 08 Portability
 
-Added by repository review (GAP-01, GAP-13, GAP-14, GAP-15, CON-07). `requirements/01-authoritative/PORTABILITY_AND_NO_CODE.md` states the obligation in one paragraph: the platform moves between businesses through configuration, not source forks, and business administrators configure without code. These files make it testable. Tags: `[CONFIRMED]` / `[PROPOSED]` as in `requirements/README.md`.
+Added by repository review (GAP-01, GAP-13, GAP-14, GAP-15, CON-07). `requirements/01-authoritative/PORTABILITY_AND_NO_CODE.md` states the obligation in one paragraph: the platform moves between businesses through configuration, not source forks, and business administrators configure without code. These files make it testable. Tags: `[CONFIRMED]` / `[CONFIRMED]` as in `requirements/README.md`.
 
 | File | Content |
 |---|---|

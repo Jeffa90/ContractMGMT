@@ -4,14 +4,14 @@ This is the map of the `requirements/` tree and the rules for reading it.
 
 ## Authority
 
-`CLAUDE.md` defines the authority order. In summary: `CLAUDE.md` rules, then `01-authoritative/`, then `09-migration/`, then everything else in this tree, then samples and visual references. Within any file, statements carry one of two tags:
+`CLAUDE.md` defines the authority order. In summary: `CLAUDE.md` rules, then `01-authoritative/`, then `09-migration/`, then everything else in this tree, then samples and visual references. The owner approved the review's proposals in decision record DR-2026-10-15 (`01-authoritative/CONFIRMED_DECISIONS.md`), which is the highest-ranking requirement text after `CLAUDE.md` and supersedes conflicting text elsewhere (including `MASTER_BUILD_INSTRUCTIONS.md`). Within files added by the review, statements carry one of two tags:
 
 | Tag | Meaning | May it be changed? |
 |---|---|---|
-| `[CONFIRMED]` | Traceable to `CLAUDE.md`, `01-authoritative/`, `09-migration/` or a named data file | Only by the owner of the authoritative source |
-| `[PROPOSED]` | Filled a gap or resolved a contradiction. Tracked in `docs/REPOSITORY_REVIEW.md` as `ASM-nn`/`Q-nn` | Yes, by recording the change in the review register; an ADR is needed only if architecture changes |
+| `[CONFIRMED]` | Traceable to `CLAUDE.md`, `01-authoritative/` (including DR-2026-10-15), `09-migration/` or a named data file, or approved as part of the review baseline | Only by the owner of the authoritative source |
+| `[OPEN]` | Depends on a question that has not been answered (`Q-nn` in `docs/REPOSITORY_REVIEW.md`). The stated default is implemented behind configuration so a different answer changes data, not architecture | Yes, when the question is answered |
 
-Files created before this index existed carry no tags; treat their content as `[CONFIRMED]`. Files added by the repository review (marked "Added by repository review" in their first lines) use the tags.
+The earlier tag `[PROPOSED]` has been retired: items it covered are now `[CONFIRMED]` or `[OPEN]`. Files created before the review carry no tags; treat their content as `[CONFIRMED]` unless a decision record says otherwise.
 
 ## Folder map
 
@@ -20,7 +20,7 @@ Files created before this index existed carry no tags; treat their content as `[
 | `01-authoritative/` | Master build, confirmed decisions, portability and no-code, deployment | Original, untouched |
 | `02-reference/` | Status convention, glossary, permission catalogue, role-permission matrix, reference lookups | Added by repository review |
 | `03-data-dictionary/` | Contract dictionary (original) plus extended, supplier, category, organisation, document, lifecycle, audit and migration entities | Original plus additions |
-| `04-workflows/` | Status transitions (original) plus workflow specification, guard vocabulary and proposed supplemental transitions | Original plus additions |
+| `04-workflows/` | Status transitions (original) plus workflow specification, guard vocabulary and supplemental transitions (five confirmed, four open) | Original plus additions |
 | `05-security/` | Roles (original) plus access-control, audit and retention/classification specifications | Original plus additions |
 | `06-design/` | Visual references (original) plus accessibility and localisation specification | Original plus addition |
 | `07-integrations/` | Provider/adapter catalogue and specifications for identity, e-signature, reporting, API/webhooks, notifications | Added by repository review |

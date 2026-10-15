@@ -42,7 +42,7 @@ Trust boundaries: Internet ↔ reverse proxy/host; host ↔ database; host ↔ d
 
 ### 4.1 Access evaluator
 
-A single `IAccessEvaluator.AuthoriseAsync(principal, permission, resource)` is the only way to obtain a decision. It evaluates the layers in `ACCESS_CONTROL_SPEC.md` section 2 and returns an explainable result (allowed/denied, layer, reason code). Controllers/pages declare required permission via attributes or call the evaluator; unannotated endpoints fail an architecture test. List queries are shaped by `IAccessScope` (tenant, organisation set, classification ceiling, category set) so that disallowed rows are never read. Relationship facts come from `IRelationshipProvider` implementations (category assignment, approver assignment) so rights follow **current** assignments.
+A single `IAccessEvaluator.AuthoriseAsync(principal, permission, resource)` is the only way to obtain a decision. It evaluates the layers in `ACCESS_CONTROL_SPEC.md` section 3 (including scope intersection across organisation, business unit, site, category and classification ceiling, section 2) and returns an explainable result (allowed/denied, layer, reason code). Controllers/pages declare required permission via attributes or call the evaluator; unannotated endpoints fail an architecture test. List queries are shaped by `IAccessScope` (tenant, organisation set, classification ceiling, category set) so that disallowed rows are never read. Relationship facts come from `IRelationshipProvider` implementations (category assignment, approver assignment) so rights follow **current** assignments.
 
 ### 4.2 Role model
 
@@ -158,5 +158,5 @@ Production refuses: Demo identity, default credentials, ephemeral storage, expos
 | Threat model review | Each milestone (`THREAT_MODEL.md` change log) |
 | Security regression suite | Every build (`TESTING.md` section 10) |
 | Dependency/SBOM/licence scan | Every build |
-| Skill-based reviews (`skills/security-review`, `tenant-isolation-review`, `portability-review`) | Each milestone exit |
+| Skill-based reviews (`.claude/skills/security-review`, `tenant-isolation-review`, `portability-review`, `deployment-review`) | Each milestone exit |
 | Penetration test, formal security review, accreditation | External governance, before any production use; **not** performed or implied by this project |

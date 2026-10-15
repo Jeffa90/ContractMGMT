@@ -1,0 +1,11 @@
+﻿Role,Scope,KeyPermissions
+System Administrator,Installation,All technical administration; no automatic secret reveal
+Tenant Administrator,Tenant,Tenant configuration and delegated administration
+Business Configuration Administrator,Organisation,Fields/forms/rules/workflows/lookups/branding
+Procurement Administrator,Organisation,Operational administration and audited unlock
+Category Owner,Assigned categories,Read all; edit assigned categories
+Legal,Organisation,Read all; Legal review actions
+Approver,Assigned approvals,Approval actions
+Backup Approver,Assigned approvals,First-response backup actions
+Auditor,Organisation,Read and evidence export
+Viewer,Organisation,Read only

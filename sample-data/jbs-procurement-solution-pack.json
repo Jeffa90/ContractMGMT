@@ -1,0 +1,13 @@
+{
+  "name": "JBS Procurement Reference",
+  "version": "2.0.0",
+  "synthetic": true,
+  "features": [
+    "LegalReview",
+    "Variations",
+    "QlikExternalReporting",
+    "CriticalNotice"
+  ],
+  "ownershipModel": "ReadAllEditAssignedCategory",
+  "approvalModel": "GroupHeadOrBackup"
+}

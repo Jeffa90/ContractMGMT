@@ -1,0 +1,29 @@
+# Build Tasks
+
+- [ ] Architecture, domain model and ADRs
+- [ ] Tenant-safe modular foundation
+- [ ] Docker, IIS and Azure deployment foundations
+- [ ] First-run installation wizard
+- [ ] Organisation onboarding wizard
+- [ ] Identity, roles, delegated administration and server-side policies
+- [ ] Core contract, supplier and document entities
+- [ ] Bulk migration framework and attachment ingestion
+- [ ] Metadata-driven custom fields
+- [ ] No-code forms/pages designer
+- [ ] Safe business-rules designer
+- [ ] Versioned workflow designer and simulator
+- [ ] Approval-matrix designer and simulator
+- [ ] Taxonomy, feature flags, terminology and branding
+- [ ] JBS procurement reference configuration
+- [ ] Legal review, approvals, locking, Variations and renewals
+- [ ] Notifications and escalations
+- [ ] Import/export and configuration packages
+- [ ] Industry solution packs and catalogue
+- [ ] AI-assisted onboarding and document-assistance interfaces
+- [ ] Supplier intelligence interfaces
+- [ ] APIs, webhooks and integration adapters
+- [ ] Retention, classification, legal hold and disposition
+- [ ] Audit Explorer and evidence export
+- [ ] Operations, backup/restore, upgrade and support bundles
+- [ ] Accessibility, localisation, security and portability tests
+- [ ] Business/admin/technical documentation

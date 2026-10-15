@@ -1,0 +1,1 @@
+Continue implementation now. Do not produce another high-level plan. Implement the first incomplete item required by the current vertical slice. Run build, migrations and tests; fix failures; only mark complete when functional code and tests exist.

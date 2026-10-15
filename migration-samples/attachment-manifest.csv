@@ -1,0 +1,4 @@
+﻿SourceRecordId,AgreementReference,RelativePath,FileName,DocumentType,DocumentDate,VersionLabel,IsExecutedCopy,ParentDocumentSourceId,Sha256,Notes
+MED-1001,DEMO-AGR-0001,DEMO-AGR-0001/DEMO-AGR-0001_executed.pdf,DEMO-AGR-0001_executed.pdf,Executed Contract,2024-01-10,1.0,Yes,,,Synthetic placeholder
+MED-1001,DEMO-AGR-0001,DEMO-AGR-0001/DEMO-AGR-0001_schedule.docx,DEMO-AGR-0001_schedule.docx,Schedule,2024-01-05,1.0,No,,,Synthetic placeholder
+MED-1002,DEMO-AGR-0002,DEMO-AGR-0002/DEMO-AGR-0002_executed.pdf,DEMO-AGR-0002_executed.pdf,Executed Contract,2025-06-25,1.0,Yes,,,Synthetic placeholder

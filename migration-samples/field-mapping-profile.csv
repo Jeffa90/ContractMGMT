@@ -1,0 +1,6 @@
+﻿SourceColumn,TargetField,Transformation,DefaultValue,Required,Notes
+AgreementReference,agreementReference,Trim,,Yes,
+ContractTitle,contractTitle,Trim,,Yes,
+SupplierName,supplier.name,Trim,,Yes,Create or map supplier
+StartDate,startDate,ParseDate,,No,Format configured in wizard
+Status,status,LookupMap,,Yes,Map source status to workflow state

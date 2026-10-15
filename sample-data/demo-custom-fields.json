@@ -1,0 +1,16 @@
+[
+  {
+    "key": "insuranceExpiry",
+    "label": "Insurance Expiry",
+    "type": "DATE",
+    "required": false,
+    "section": "Risk and Compliance"
+  },
+  {
+    "key": "indigenousSupplier",
+    "label": "Indigenous Supplier",
+    "type": "BOOLEAN",
+    "required": false,
+    "section": "Supplier"
+  }
+]

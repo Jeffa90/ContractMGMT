@@ -1,0 +1,16 @@
+﻿FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+agreementReference,Agreement Reference,string,Yes,Yes,No,Unique business identifier
+contractTitle,Contract Title,string,Yes,Yes,No,
+description,Description,long text,No,Yes,No,
+sourceSystem,Source System,string,No,Yes,No,Migration provenance
+sourceRecordId,Source Record ID,string,No,Yes,No,Idempotency/provenance
+supplierId,Supplier,lookup,Yes,Yes,No,
+categoryId,Category,lookup,Yes,Yes,No,Drives ownership
+status,Status,choice,Yes,Yes,No,Versioned workflow state
+startDate,Start Date,date,No,Yes,No,
+effectiveDate,Effective Date,date,No,Yes,No,
+registeredDate,Registered Date,datetime,No,Yes,No,Stamped on authorisation
+reviewDate,Review Date,date,No,Yes,Variation only,
+endDate,End Date,date,No,Yes,Variation only,Blank for Evergreen
+recordLocked,Record Locked,boolean,Yes,Yes,Admin unlock only,
+migrationBatchId,Migration Batch,uuid,No,Yes,No,Migration traceability

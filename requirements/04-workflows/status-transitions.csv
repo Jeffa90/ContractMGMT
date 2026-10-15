@@ -1,0 +1,14 @@
+﻿From,Action,To,Permission,Condition
+Draft,Submit for Legal,Awaiting Legal,contracts.submit_legal,Legal required
+Draft,Proceed without Legal,Initial Creation,contracts.edit_owned,Legal not required
+Awaiting Legal,Begin review,In Legal Review,legal.review,
+In Legal Review,Return for rework,Legal Rework Required,legal.review,Comment required
+In Legal Review,Clear,Legal Cleared,legal.clear,
+Legal Cleared,Register initial,Initial Creation,contracts.edit_owned,
+Initial Creation,Send for signature,Out for Signature,contracts.edit_owned,Final document exists
+Out for Signature,Submit approval,Awaiting Approval,contracts.submit_approval,Executed copy exists
+Awaiting Approval,Approve,Effective,approvals.action,Authorised approver
+Awaiting Approval,Reject,Initial Creation,approvals.action,Comment required
+Effective,Create variation,Variation in Progress,variations.create,Parent remains locked
+Effective,End,Ended,contracts.close,Authorised
+Ended,Archive,Disposed-Archived,disposition.approve,Retention checks

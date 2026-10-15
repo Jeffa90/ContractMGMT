@@ -1,0 +1,18 @@
+﻿Code,DisplayName,StorageKind
+TEXT,Text,String
+LONG_TEXT,Long text,String
+INTEGER,Integer,Integer
+DECIMAL,Decimal,Decimal
+CURRENCY,Currency,Decimal
+PERCENTAGE,Percentage,Decimal
+DATE,Date,Date
+DATETIME,Date and time,DateTime
+BOOLEAN,Yes/No,Boolean
+SINGLE_CHOICE,Single choice,String
+MULTI_CHOICE,Multi choice,StringArray
+LOOKUP,Lookup,Guid
+PERSON,Person,Identity
+EMAIL,Email,String
+URL,URL,String
+FILE_REFERENCE,File reference,Guid
+CALCULATED_DISPLAY,Calculated display,Derived

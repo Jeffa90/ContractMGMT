@@ -1,0 +1,30 @@
+Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+Contract,id,Contract Id,uuid,Yes,Yes,No,System primary key [CONFIRMED]
+Contract,tenantId,Tenant,uuid,Yes,Yes,No,Isolation boundary; server-set [CONFIRMED]
+Contract,organisationId,Organisation,uuid,Yes,Yes,No,Policy scope inside tenant; agreementReference unique per (tenantId; organisationId) [PROPOSED] ASM-04 / Q-07
+Contract,legalEntityId,Legal Entity,lookup,No,Yes,Variation only,Party to the contract [PROPOSED]
+Contract,businessUnitId,Business Unit,lookup,No,Yes,Variation only,Medius profile: business unit [CONFIRMED]
+Contract,siteId,Site / Plant,lookup,No,Yes,Variation only,Medius profile: plant [CONFIRMED]
+Contract,ownerUserId,Contract Owner,person,No,Yes,Admin unlock only,Medius profile: owner. Edit rights still follow active category assignment; this is a named contact [PROPOSED]
+Contract,agreementType,Agreement Type,lookup,No,Yes,No,Medius profile: agreement type; drives workflow and approval matrix selection [CONFIRMED]
+Contract,subcategoryId,Subcategory,lookup,No,Yes,No,Child of categoryId; sample import Subcategory column [CONFIRMED]
+Contract,currencyCode,Currency,string,No,Yes,Variation only,ISO 4217 three-letter code; required when estimatedValue present [CONFIRMED]
+Contract,estimatedValue,Estimated Value,decimal,No,Yes,Variation only,Decimal 19;4; non-negative; sample import EstimatedValue [CONFIRMED]
+Contract,extensionType,Extension Type,choice,No,Yes,Variation only,ExtensionType lookup; Evergreen implies blank endDate [CONFIRMED]
+Contract,noticePeriodDays,Notice Period (days),integer,No,Yes,Variation only,Medius profile: notice period; input to Critical Notice reminders [CONFIRMED]
+Contract,legalReviewRequired,Legal Review Required,boolean,Yes,Yes,No,Sample import LegalReviewRequired; default set by rules; drives Draft transition [CONFIRMED]
+Contract,classification,Classification,choice,Yes,Yes,Admin unlock only,Classification lookup; default Internal [PROPOSED]
+Contract,sapOutlineAgreementNumber,SAP Outline Agreement Number,string,No,Yes,No,Medius profile [CONFIRMED]
+Contract,sourceStatus,Source Status,string,No,Yes,No,Verbatim source status retained for provenance [CONFIRMED]
+Contract,sourceExtractedUtc,Source Extraction Timestamp,datetime,No,Yes,No,Medius profile: preserve extraction timestamp [CONFIRMED]
+Contract,isLegacyLoad,Legacy Load,boolean,Yes,Yes,No,True when imported Effective-or-later under a legacy-load policy; default false [PROPOSED] ASM-06
+Contract,registeredBy,Registered By,person,No,Yes,No,Authoriser stamped with registeredDate; null for legacy loads without source value [PROPOSED]
+Contract,lockedUtc,Locked At,datetime,No,Yes,System,Set when recordLocked becomes true [PROPOSED]
+Contract,activeUnlockId,Active Unlock,uuid,No,Yes,System,Points to open RecordUnlock; null when locked normally [PROPOSED]
+Contract,workflowVersionId,Workflow Version,uuid,Yes,Yes,System,Workflow definition version pinned at creation [PROPOSED] ASM / RISK-06
+Contract,configReleaseId,Configuration Release,uuid,Yes,Yes,System,Release in force at creation (forms and fields resolve from current release; workflow and approvals from pinned versions) [PROPOSED]
+Contract,createdUtc,Created,datetime,Yes,Yes,System,UTC [CONFIRMED]
+Contract,createdBy,Created By,person,Yes,Yes,System,
+Contract,updatedUtc,Updated,datetime,Yes,Yes,System,UTC
+Contract,updatedBy,Updated By,person,Yes,Yes,System,
+Contract,rowVersion,Row Version,string,Yes,Yes,System,Optimistic concurrency token [CONFIRMED]

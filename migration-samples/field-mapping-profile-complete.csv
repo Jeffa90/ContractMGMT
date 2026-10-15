@@ -1,0 +1,19 @@
+SourceColumn,TargetField,Transformation,DefaultValue,Required,LookupMapKey,Validation,Notes
+SourceRecordId,sourceRecordId,Trim,,Yes,,MaxLength=100,Idempotency key part
+AgreementReference,agreementReference,Trim,,Yes,,MaxLength=100,Unique per tenant and organisation
+ContractTitle,contractTitle,Trim,,Yes,,MaxLength=500,
+SupplierName,supplier.name,Trim,,Yes,,MaxLength=300,Find or create supplier
+VendorNumber,supplier.vendorNumber,Trim,,No,,MaxLength=50,Preferred supplier match key
+Category,category.name,Trim,,Yes,category,,Resolved through the category lookup map or existing taxonomy
+Subcategory,subcategory.name,Trim,,No,category,,Child of Category
+Status,status,LookupMap,,Yes,status,,Map source status to workflow state; unmapped is an error
+StartDate,startDate,ParseDate,,No,,Format=yyyy-MM-dd,Format configured in wizard
+EffectiveDate,effectiveDate,ParseDate,,No,,Format=yyyy-MM-dd,
+RegisteredDate,registeredDate,ParseDateTime,,No,,Format=yyyy-MM-dd;TimeZone=organisation,Honoured only under a legacy-load policy
+ReviewDate,reviewDate,ParseDate,,No,,Format=yyyy-MM-dd,
+EndDate,endDate,ParseDate,,No,,Format=yyyy-MM-dd,Blank for Evergreen
+Currency,currencyCode,Upper,AUD,No,,Length=3,ISO 4217
+EstimatedValue,estimatedValue,ParseDecimal,,No,,Min=0,
+ExtensionType,extensionType,LookupMap,NoExtension,No,extensionType,,
+LegalReviewRequired,legalReviewRequired,MapBoolean,,Yes,,True=Yes;Y;TRUE;1|False=No;N;FALSE;0,
+DocumentFolder,staging.documentFolder,Trim,,No,,,Used by folder-name attachment matching only; not stored on the contract

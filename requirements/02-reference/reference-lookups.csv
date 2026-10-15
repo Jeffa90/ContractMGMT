@@ -1,0 +1,82 @@
+LookupCode,Value,DisplayName,Status,Source
+ContractStatus,Draft,Draft,Confirmed,status-transitions.csv
+ContractStatus,AwaitingLegal,Awaiting Legal,Confirmed,status-transitions.csv
+ContractStatus,InLegalReview,In Legal Review,Confirmed,status-transitions.csv
+ContractStatus,LegalReworkRequired,Legal Rework Required,Confirmed,status-transitions.csv
+ContractStatus,LegalCleared,Legal Cleared,Confirmed,status-transitions.csv
+ContractStatus,InitialCreation,Initial Creation,Confirmed,status-transitions.csv
+ContractStatus,OutForSignature,Out for Signature,Confirmed,status-transitions.csv
+ContractStatus,AwaitingApproval,Awaiting Approval,Confirmed,status-transitions.csv
+ContractStatus,Effective,Effective,Confirmed,status-transitions.csv
+ContractStatus,VariationInProgress,Variation in Progress,Confirmed,status-transitions.csv
+ContractStatus,Ended,Ended,Confirmed,status-transitions.csv
+ContractStatus,DisposedArchived,Disposed-Archived,Confirmed,status-transitions.csv
+ContractStatus,Withdrawn,Withdrawn,Proposed,status-transitions-supplemental.csv
+LockState,Unlocked,Unlocked,Proposed,WORKFLOW_SPEC.md
+LockState,Locked,Locked,Confirmed,contracts.csv (recordLocked)
+LockState,UnlockedEmergency,Temporarily unlocked (emergency),Proposed,WORKFLOW_SPEC.md
+ExtensionType,NoExtension,No extension,Confirmed,contracts-import.csv
+ExtensionType,Evergreen,Evergreen,Confirmed,contracts-import.csv
+ExtensionType,FixedExtension,Fixed extension option,Proposed,Medius profile lists extension type; values to be mapped
+DocumentType,ExecutedContract,Executed Contract,Confirmed,attachment-manifest.csv
+DocumentType,Schedule,Schedule,Confirmed,attachment-manifest.csv
+DocumentType,VariationDocument,Variation,Proposed,WORKFLOW_SPEC.md
+DocumentType,LegalAdvice,Legal advice,Proposed,WORKFLOW_SPEC.md
+DocumentType,ApprovalEvidence,Approval evidence,Proposed,ESIGNATURE_DOCUSIGN_SPEC.md
+DocumentType,SupportingDocument,Supporting document,Proposed,
+DocumentType,Correspondence,Correspondence,Proposed,
+Classification,Public,Public,Proposed,RETENTION_AND_CLASSIFICATION_SPEC.md
+Classification,Internal,Internal,Proposed,RETENTION_AND_CLASSIFICATION_SPEC.md
+Classification,Confidential,Confidential,Proposed,RETENTION_AND_CLASSIFICATION_SPEC.md
+Classification,Restricted,Restricted,Proposed,RETENTION_AND_CLASSIFICATION_SPEC.md
+ConfigurationMode,Demo,Demo,Confirmed,Master (wizard stage 2)
+ConfigurationMode,Test,Test,Confirmed,Master (wizard stage 2)
+ConfigurationMode,Production,Production Configuration,Confirmed,Master (wizard stage 2)
+DeploymentModel,Docker,Docker and Docker Compose,Confirmed,DEPLOYMENT_REQUIREMENTS.md
+DeploymentModel,IIS,Windows Server / IIS,Confirmed,DEPLOYMENT_REQUIREMENTS.md
+DeploymentModel,Azure,Microsoft Azure,Confirmed,DEPLOYMENT_REQUIREMENTS.md
+TenancyMode,SingleOrganisation,Single organisation,Confirmed,Master (Product modes)
+TenancyMode,MultiOrganisation,Multiple organisations in one installation,Confirmed,Master (Product modes)
+TenancyMode,MultiTenant,Multi-tenant hosting,Confirmed,Master (Product modes)
+DuplicateStrategy,Reject,Reject,Confirmed,MIGRATION_REQUIREMENTS.md
+DuplicateStrategy,SkipExisting,Skip existing,Confirmed,MIGRATION_REQUIREMENTS.md
+DuplicateStrategy,UpdateMapped,Update mapped fields,Confirmed,MIGRATION_REQUIREMENTS.md
+DuplicateStrategy,CreateNewVersion,Create new version (documents only),Proposed,CON-11 / ASM-16
+DuplicateStrategy,CreateNewReference,Create new record with generated target reference,Confirmed,MIGRATION_REQUIREMENTS.md
+DuplicateStrategy,ManualReview,Manual review,Confirmed,MIGRATION_REQUIREMENTS.md
+DocumentDuplicateOption,RejectDuplicateHash,Reject duplicate hash,Confirmed,ATTACHMENT_INGESTION.md
+DocumentDuplicateOption,LinkExisting,Link existing content,Confirmed,ATTACHMENT_INGESTION.md
+DocumentDuplicateOption,AddVersion,Add new document version,Confirmed,ATTACHMENT_INGESTION.md
+DocumentDuplicateOption,KeepSeparateWarn,Keep as separate document with warning,Confirmed,ATTACHMENT_INGESTION.md
+DocumentDuplicateOption,ManualReview,Manual review,Confirmed,ATTACHMENT_INGESTION.md
+MatchMethod,SourceRecordId,Explicit SourceRecordId in manifest,Confirmed,ATTACHMENT_INGESTION.md
+MatchMethod,AgreementReference,Exact AgreementReference in manifest,Confirmed,ATTACHMENT_INGESTION.md
+MatchMethod,NamingRule,Configured regular expression or naming rule,Confirmed,ATTACHMENT_INGESTION.md
+MatchMethod,FolderName,Exact parent folder name equals agreement reference,Confirmed,ATTACHMENT_INGESTION.md
+MatchMethod,Manual,Manual resolution queue,Confirmed,ATTACHMENT_INGESTION.md
+MigrationBatchStatus,Created,Created,Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Profiled,Profiled,Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Validated,Validated (dry run complete),Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Committing,Committing,Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Committed,Committed,Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Reconciled,Reconciled,Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Accepted,Accepted (final),Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,RolledBack,Rolled back,Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Compensated,Compensating archival applied,Proposed,MIGRATION_SUPPLEMENT.md
+MigrationBatchStatus,Failed,Failed (resumable),Proposed,MIGRATION_SUPPLEMENT.md
+ProviderKind,Documents,Document storage,Confirmed,Master (Architecture)
+ProviderKind,Email,Email,Confirmed,Master (Architecture)
+ProviderKind,Reporting,Reporting,Confirmed,Master (Architecture)
+ProviderKind,ESignature,E-signature,Confirmed,Master (Architecture)
+ProviderKind,Erp,ERP,Confirmed,Master (Architecture)
+ProviderKind,Ai,AI,Confirmed,Master (Architecture)
+ProviderKind,Monitoring,Monitoring,Confirmed,Master (Architecture)
+ProviderKind,Identity,Identity,Confirmed,Master (Architecture - Generic OIDC and Entra)
+ProviderKind,MalwareScan,Malware scanning,Confirmed,Master (Migration - extension point)
+IntegrationStatus,Disabled,Disabled,Confirmed,Master (wizard stage 11)
+IntegrationStatus,Mock,Mock,Confirmed,Master (wizard stage 11)
+IntegrationStatus,Configured,Configured,Confirmed,Master (wizard stage 11)
+FunctionalityLabel,Implemented,Implemented,Confirmed,CLAUDE.md
+FunctionalityLabel,Mocked,Mocked,Confirmed,CLAUDE.md
+FunctionalityLabel,Disabled,Disabled,Confirmed,CLAUDE.md
+FunctionalityLabel,Future,Future,Confirmed,CLAUDE.md

@@ -1,0 +1,33 @@
+Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+Document,id,Document Id,uuid,Yes,Yes,n/a,
+Document,tenantId,Tenant,uuid,Yes,Yes,n/a,Server-set; also forms the storage key prefix
+Document,organisationId,Organisation,uuid,Yes,Yes,n/a,
+Document,contractId,Contract,uuid,No,Yes,n/a,Null only while in a restricted staging area awaiting resolution [CONFIRMED]
+Document,documentTypeCode,Document Type,lookup,Yes,Yes,n/a,DocumentType lookup (configurable)
+Document,title,Title,string,Yes,Yes,n/a,
+Document,classification,Classification,choice,Yes,Yes,n/a,Inherits from the contract unless raised [PROPOSED]
+Document,isExecutedCopy,Executed Copy,boolean,Yes,Yes,n/a,Required true before Send-for-signature outcome can be submitted for approval (guard ExecutedCopyExists)
+Document,currentVersionId,Current Version,uuid,No,Yes,System,
+Document,status,Status,choice,Yes,Yes,System,Active; Quarantined; Archived; Discarded (audited) [PROPOSED]
+Document,documentSourceId,Document Source Id,string,No,Yes,n/a,Migration idempotency; defaults to SourceRecordId + '/' + RelativePath (CON-10)
+Document,sourceSystem,Source System,string,No,Yes,n/a,Provenance
+Document,migrationBatchId,Migration Batch,uuid,No,Yes,n/a,
+Document,rowVersion,Row Version,string,Yes,Yes,n/a,
+DocumentVersion,id,Version Id,uuid,Yes,Yes,n/a,Immutable once written
+DocumentVersion,tenantId,Tenant,uuid,Yes,Yes,n/a,
+DocumentVersion,documentId,Document,uuid,Yes,Yes,n/a,
+DocumentVersion,versionNumber,Version Number,integer,Yes,Yes,n/a,Monotonic per document
+DocumentVersion,versionLabel,Version Label,string,No,Yes,n/a,Manifest VersionLabel
+DocumentVersion,fileName,File Name,string,Yes,Yes,n/a,Display only; sanitised; never used to build a path [CONFIRMED]
+DocumentVersion,mimeType,MIME Type,string,Yes,Yes,n/a,Detected from content signature; declared type is advisory [CONFIRMED]
+DocumentVersion,sizeBytes,Size,integer,Yes,Yes,n/a,
+DocumentVersion,sha256,SHA-256,string,Yes,Yes,n/a,Always computed by the platform; manifest value only cross-checked [CONFIRMED]
+DocumentVersion,storageProvider,Storage Provider,string,Yes,Yes,n/a,Provider key
+DocumentVersion,storageKey,Storage Key,string,Yes,Yes,n/a,Opaque; begins with the tenant prefix; never exposed publicly [CONFIRMED]
+DocumentVersion,scanStatus,Scan Status,choice,Yes,Yes,System,Pending; Clean; Infected; Skipped; Error. Downloads blocked unless Clean or Skipped by explicit tenant policy [PROPOSED]
+DocumentVersion,scanProvider,Scan Provider,string,No,Yes,System,
+DocumentVersion,scannedUtc,Scanned,datetime,No,Yes,System,
+DocumentVersion,documentDate,Document Date,date,No,Yes,n/a,Manifest DocumentDate
+DocumentVersion,parentVersionId,Parent Version,uuid,No,Yes,n/a,Previous version or ParentDocumentSourceId target
+DocumentVersion,uploadedBy,Uploaded By,person,Yes,Yes,System,
+DocumentVersion,uploadedUtc,Uploaded,datetime,Yes,Yes,System,

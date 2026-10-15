@@ -1,0 +1,21 @@
+Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+Supplier,id,Supplier Id,uuid,Yes,Yes,n/a,System primary key
+Supplier,tenantId,Tenant,uuid,Yes,Yes,n/a,Server-set
+Supplier,organisationId,Organisation,uuid,Yes,Yes,n/a,Suppliers are organisation-scoped; sharing across organisations is a future option [PROPOSED]
+Supplier,name,Supplier Name,string,Yes,Yes,n/a,Trading name; migration matches on normalised name when VendorNumber absent [PROPOSED]
+Supplier,legalName,Legal Name,string,No,Yes,n/a,
+Supplier,abn,ABN,string,No,Yes,n/a,Eleven digits; format check always; registry validation only via optional adapter and never blocks manual entry [CONFIRMED]
+Supplier,vendorNumber,Vendor Number,string,No,Yes,n/a,Medius vendor number; unique per (tenantId; organisationId) when present [PROPOSED]
+Supplier,erpSupplierId,ERP Supplier Id,string,No,Yes,n/a,Optional ERP master sync adapter [CONFIRMED]
+Supplier,status,Status,choice,Yes,Yes,n/a,Active or Inactive
+Supplier,website,Website,string,No,Yes,n/a,URL; outbound retrieval only via allowlisted adapter (SSRF controls) [CONFIRMED]
+Supplier,description,Description,long text,No,Yes,n/a,May be AI-drafted only as a reviewed proposal [CONFIRMED]
+Supplier,riskRating,Risk Rating,choice,No,Yes,n/a,Optional risk adapter output [CONFIRMED]
+Supplier,sourceSystem,Source System,string,No,Yes,n/a,Provenance
+Supplier,sourceRecordId,Source Record Id,string,No,Yes,n/a,Provenance
+Supplier,migrationBatchId,Migration Batch,uuid,No,Yes,n/a,Batch that created the supplier; subject to reference-count rollback rule (CON-12)
+Supplier,createdUtc,Created,datetime,Yes,Yes,n/a,UTC
+Supplier,createdBy,Created By,person,Yes,Yes,n/a,
+Supplier,updatedUtc,Updated,datetime,Yes,Yes,n/a,UTC
+Supplier,updatedBy,Updated By,person,Yes,Yes,n/a,
+Supplier,rowVersion,Row Version,string,Yes,Yes,n/a,Optimistic concurrency token

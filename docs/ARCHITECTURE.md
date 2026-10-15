@@ -1,0 +1,303 @@
+# Architecture
+
+Status: **design baseline, nothing implemented yet.** Every choice here is either traceable to `requirements/` or recorded as an assumption (`ASM-nn`) in `docs/REPOSITORY_REVIEW.md` and as a *Proposed* ADR in `decisions/`. Changing architecture after implementation starts requires an ADR (`prompts/02-RESUME-PROMPT.md`).
+
+Related documents: `docs/DOMAIN_MODEL.md`, `docs/SECURITY.md`, `docs/THREAT_MODEL.md`, `docs/TESTING.md`, `docs/IMPLEMENTATION_PLAN.md`.
+
+## 1. Goals and drivers
+
+| Driver | Source | Architectural consequence |
+|---|---|---|
+| Portable: business change by configuration, not source forks | `PORTABILITY_AND_NO_CODE.md` | Metadata-driven fields, forms, rules, workflows, approvals; business names exist only in packs (ASM-19); portability tests PRT-001 to PRT-015 |
+| No arbitrary code in configuration | `CLAUDE.md` | Closed-vocabulary interpreters only; no scripting engines |
+| Tenant, organisation, role, ownership, classification, lifecycle and lock rules enforced server-side | `CLAUDE.md` | One access evaluator; query filters plus Row-Level Security; domain-layer lock enforcement |
+| Three deployment models with identical behaviour | `DEPLOYMENT_REQUIREMENTS.md` | Host abstractions for storage, secrets, key ring, scheduling; one codebase and one schema |
+| Migration is Phase 1 mandatory | `CONFIRMED_DECISIONS.md` | Migration is a first-class module built before the designers |
+| Audit, immutability, evidence | Master | Append-only hash-chained audit committed in the same transaction as changes |
+| Supportable by a small team | Master ("supportable modular monolith") | One deployable, one database, strong module boundaries enforced by tests |
+
+## 2. Constraints discovered (see `REPOSITORY_REVIEW.md` section 1)
+
+- The build environment has no .NET SDK, no running Docker daemon and no Windows/IIS/Azure. First task T0.1 installs the SDK from the Ubuntu archive and tests whether a container engine or a native SQL Server is usable.
+- Consequence for the plan: IIS and Azure artefacts are produced and statically validated but labelled *scaffold, unverified* until run on those platforms (`CLAUDE.md` labelling rule).
+
+## 3. Technology baseline (ASM-01, ASM-02, ASM-03)
+
+| Concern | Choice | Notes / ADR |
+|---|---|---|
+| Runtime | .NET 10 LTS, ASP.NET Core, C# | .NET 8 leaves support November 2026 |
+| Data | EF Core with SQL Server provider; SQL Server 2022+ and Azure SQL; `datetime2` UTC instants; `rowversion` concurrency | ADR-0006 |
+| UI | Server-rendered Razor Pages, antiforgery, strict CSP with nonces, small TypeScript islands for designers; no client-side `eval` | ADR-0013 |
+| API | Versioned JSON API under `/api/v1`, OpenAPI generated and diff-checked in CI | `API_AND_WEBHOOKS_SPEC.md` |
+| Background work | Hosted services plus transactional outbox/inbox; SQL application locks for singletons | ADR-0010 |
+| Identity | OpenID Connect (generic and Entra), cookie session for UI, bearer for API; Demo identity in non-production only | ADR-0007 |
+| Documents | `IDocumentStorageProvider`; local filesystem first, Azure Blob adapter | ADR-0012 |
+| Serialisation of configuration | Canonical JSON with JSON Schema per definition kind | ADR-0008 |
+| Spreadsheet/Archive libraries | Permissively licensed Open XML based libraries; `System.IO.Compression` with hardened wrappers | ADR-0014, RISK-10 |
+| Testing | xUnit, Testcontainers or native SQL Server, Playwright with axe-core, NetArchTest-style architecture tests | `docs/TESTING.md` |
+| Packaging | Container image (non-root), framework-dependent IIS publish, Bicep for Azure | ADR-0005 |
+
+## 4. Module architecture (modular monolith)
+
+One deployable process hosts all modules. A module owns its tables (own schema), its domain model and its public contract. Other modules use only the public contract (interfaces, DTOs, integration events). Architecture tests fail the build if a module references another module's internals, if the dependency graph has a cycle, or if domain code references infrastructure (ADR-0001).
+
+```mermaid
+flowchart TB
+  subgraph Host["Ecp.Host (composition root: Razor Pages UI, API, hosted services; roles web | worker | all)"]
+  end
+  Host --> Setup
+  Host --> Studio["Configuration Studio UI"]
+  subgraph Platform
+    Tenancy
+    Identity
+    Audit
+    Configuration["Configuration (definitions, releases, packages)"]
+    Rules
+    Workflow["Workflow and Approvals runtime"]
+    Notifications
+    Integrations["Integrations (adapters, outbox, inbox)"]
+    Operations["Operations (health, readiness, backup, support)"]
+    Retention
+    Reporting
+  end
+  subgraph Business
+    Contracts["Contracts (suppliers, categories, contracts, variations, legal review)"]
+    Documents
+    Migration
+    SolutionPacks["SolutionPacks (loader and catalogue)"]
+  end
+  Contracts --> Workflow --> Rules --> Configuration
+  Contracts --> Documents
+  Contracts --> Identity
+  Migration --> Contracts
+  Migration --> Documents
+  Migration --> Configuration
+  SolutionPacks --> Configuration
+  Notifications --> Integrations
+  Notifications -. consumes integration events .-> Workflow
+  Reporting --> Contracts
+  Retention --> Contracts
+  Retention --> Documents
+  Setup --> Tenancy
+  Setup --> Identity
+  Setup --> SolutionPacks
+  Setup --> Operations
+  Contracts --> Audit
+  Contracts --> Tenancy
+  Identity --> Tenancy
+```
+
+**Dependency rule** (enforced by tests). Tiers, lowest first: (0) SharedKernel; (1) Tenancy; (2) Identity, Audit; (3) Configuration; (4) Rules; (5) Workflow; (6) Contracts, Documents, Integrations; (7) Notifications, Migration, Reporting, Retention; (8) SolutionPacks, Operations; (9) Setup; (10) Host. A module may depend only on lower tiers, plus the specific same-tier edges drawn in the diagram (for example Contracts to Documents, Notifications to Integrations). Upward needs are met by **dependency inversion** and **events**, never by a reference:
+
+- The access evaluator (Identity, tier 2) needs relationship facts such as "active category assignment" and "assigned approver". Identity defines `IRelationshipProvider`; Contracts and Workflow implement it and register it at composition time.
+- Workflow does not call Notifications. It writes integration events through the outbox; Notifications consumes them.
+- Audit is written through `IAuditWriter` (tier 2) by every module in the same transaction.
+
+### Module responsibilities
+
+| Module | Owns | Public contract (examples) |
+|---|---|---|
+| SharedKernel | Result types, ids, clock (`IClock`), `ITenantContext`, error codes, canonical JSON, hashing | Types only; no I/O |
+| Tenancy | Tenant, Organisation, LegalEntity, Division, BusinessUnit, Site | `ITenantDirectory`, tenant resolution |
+| Identity | Users, memberships, role assignments, group mapping, delegation, elevation, access evaluator (relationship facts supplied through `IRelationshipProvider`) | `IAccessEvaluator`, `ICurrentUser`, `IRelationshipProvider` |
+| Audit | Audit events, hash chain, evidence export | `IAuditWriter`, `IAuditQuery` |
+| Configuration | Definitions, versions, releases, drafts, validation, simulation harness, packages | `IConfigurationReader` (published release snapshot), `IConfigurationAuthoring`, `IPackageImporter` |
+| Rules | Condition/action interpreter, field-value evaluator, calculated display | `IRuleEngine`, `IExpressionEvaluator` |
+| Workflow | Workflow instances, transitions, guards, approval matrix resolver, legal-review rounds, reminders | `IWorkflowEngine`, `IApprovalResolver` |
+| Contracts | Supplier, Category and assignments, Contract, Variation, RecordUnlock | `IContractService`, `IContractQuery` |
+| Documents | Document, versions, storage, scan status, download authorisation | `IDocumentService`, `IDocumentStorageProvider` |
+| Migration | Projects, profiles, batches, staging, matching, commit, rollback, reconciliation | `IMigrationService`; consumes Contracts/Documents public contracts only |
+| Notifications | Templates (consumer), recipients, dedupe, in-app inbox | `INotificationService` |
+| Integrations | Adapters, outbox, inbox, webhook endpoints, egress guard | Provider interfaces from `ADAPTER_CATALOGUE.md` |
+| Retention | Policies, legal holds, disposition | `IRetentionService` |
+| Reporting | Projections and curated views, export endpoints | `IReportingService` |
+| SolutionPacks | Pack loader/catalogue, shipped Blank and JBS packs as data | `ISolutionPackCatalogue` |
+| Setup | Wizard state, bootstrap store, readiness checks, onboarding wizard | `ISetupState`, `IReadinessCheck` |
+| Operations | Health, maintenance mode, backup/restore tooling, support bundle, upgrade pre-flight | `IOperationsService` |
+
+### Solution layout (planned, no code yet)
+
+```
+src/Ecp.sln
+src/Ecp.SharedKernel/
+src/Modules/<Module>/            one project per module (+ <Module>.Tests under tests/)
+src/Ecp.Host/                    web UI, API, hosted services, composition root
+templates/packs/blank/           shipped packs as data
+templates/packs/jbs-procurement/
+templates/demo/                  demo data packages, document templates
+deploy/docker/  deploy/iis/  deploy/azure/
+tests/<Module>.Tests/  tests/Ecp.Architecture.Tests/  tests/Ecp.E2E.Tests/
+```
+
+## 5. Configuration (metadata) architecture
+
+```mermaid
+flowchart LR
+  Admin[Business administrator] --> Studio
+  Studio --> Draft[(Draft definitions)]
+  Draft --> Validate --> Preview --> Simulate --> Publish
+  Publish --> Release[(Immutable Configuration Release)]
+  Release --> Cache[Tenant-keyed release cache]
+  Cache --> Runtime["Field/Form renderers · Rules · Workflow · Approvals · Notifications"]
+  Package[.ecpkg pack/package] -->|import as draft| Draft
+```
+
+- **Definitions** are canonical JSON documents of a fixed set of kinds (`CONFIGURATION_LIFECYCLE_SPEC.md` section 1), each validated against a JSON Schema and the Studio closed vocabularies. They are versioned, immutable once published, grouped into **releases**.
+- **Runtime** reads a *release snapshot* (immutable, cached per tenant and release id). Publishing a release atomically switches the pointer and emits a cache-invalidation message; nothing mutates a snapshot.
+- **Workflow and approval versions are pinned** on instances (RISK-06). The rules engine records the release id it used.
+- **Custom field values** are stored as typed rows (ADR-0009): one row per entity/field with typed columns (`string`, `decimal`+currency, `date`, `datetime`, `bool`, `guid`) and child rows for multi-choice. Static composite indexes `(TenantId, FieldDefinitionId, <typed value>)` serve search for every field; no DDL is ever issued when fields change. Reporting projections flatten values by view or job.
+- **Interpreters, not compilers.** Rules, calculated-display fields and templates are evaluated by small purpose-built interpreters over typed ASTs with node, depth and time limits. No Roslyn, Jint, Liquid, Scriban or expression-tree compilation of administrator input.
+- **Packs are data.** JBS names, states, roles-to-permission defaults, approval tiers and terminology exist only under `templates/packs/` (PRT-001).
+- **Draft collaboration:** drafts carry the base release id and a row version; publish performs a three-way check and requires rebase when the base changed (RISK-19).
+
+## 6. Tenant-isolation architecture (ASM-04; RISK-02; ADR-0003)
+
+Defence in depth; each layer is independently tested so that one failure cannot expose data.
+
+| Layer | Mechanism |
+|---|---|
+| Identity | Tenant derived from the authenticated principal or validated host mapping; never from client input (`TENANCY_AND_ORGANISATION_SPEC.md` section 3) |
+| Request/Job scope | `ITenantContext` is set by middleware (requests) or by the job runner from the job record. Data access without a scope throws. No ambient/thread-static state: the context flows through DI scope |
+| ORM | A base `TenantDbContext` applies a global query filter on `TenantId` to every tenant-owned entity (discovered by marker interface; a test fails when an entity lacks the marker or filter). `IgnoreQueryFilters` is banned by analyzer except in an allowlisted installation-level service |
+| Database | **Row-Level Security** with a predicate on `TenantId` using `SESSION_CONTEXT('TenantId')`, set by a connection interceptor on every open and cleared on return to the pool. Foreign keys include `TenantId` in composite keys so a child cannot reference a parent from another tenant. Unique indexes include `TenantId` |
+| Raw SQL | Only through a wrapper that requires a scope and parameters; reviewed list of allowed raw queries |
+| Cache | Cache keys are constructed by a helper that always prefixes tenant id; a test asserts no cache key lacks a tenant segment |
+| Files | Storage key prefix `t/{tenantId}/…`; the provider rejects keys outside the current prefix; no listing across prefixes |
+| Jobs/outbox | Messages carry `TenantId`; the dispatcher opens a scope per message |
+| Search/reports | Same filters; reporting views are filtered by RLS and per-tenant principals (`REPORTING_QLIK_SPEC.md`) |
+| Logs/traces | Tenant id is a structured field; support bundles are per tenant |
+| Tests | Cross-tenant matrix across records, documents, jobs, caches, reports, imports and exports (`docs/TESTING.md` section 5) |
+
+Organisation scope is enforced by the access evaluator and by optional organisation filters on organisation-owned entities (not a security boundary by itself).
+
+## 7. Data architecture
+
+- One database. **Schema per module** (for example `contracts`, `documents`, `migration`, `config`, `audit`, `identity`, `reporting`, `setup`). **One DbContext per module**, one ordered migration runner, one migration history. A module's tables are only written through its services; cross-module reads use public query interfaces or the `reporting` views (ADR-0006).
+- **Primary keys** are sequential GUIDs generated in the application (index-friendly, safe to expose only after authorisation; never the sole access control).
+- **Concurrency:** `rowversion` on mutable aggregates; API surfaces ETag / `If-Match`.
+- **Time:** instants as `datetime2(7)` UTC via `IClock`; date-only as `date` in the organisation time zone (ASM-12).
+- **Money:** `decimal(19,4)` plus ISO 4217 code; never summed across currencies.
+- **Audit:** `audit.Event` append-only, hash-chained per tenant, written in the same transaction as the change; the runtime DB principal has INSERT and SELECT only (ADR-0011).
+- **Outbox/Inbox:** `integration.Outbox`, `integration.Inbox` in the same database for atomic enqueue.
+- **Migrations:** forward-only, idempotent scripts generated by EF, applied by the runner at start-up for Demo/Test and by explicit pre-flight in Production; each upgrade has a pre-flight check and a documented rollback path (backup restore).
+- **Indexes and size:** static indexes; audit partitioned monthly (plan, not initial); document metadata separate from blobs.
+
+## 8. Deployment architecture (ADR-0005; RISK-13)
+
+Same binaries, same schema, same wizard. Host differences are isolated in a small `HostEnvironment` abstraction: secret provider, storage provider, key-ring store, scheduler role and path conventions.
+
+```mermaid
+flowchart LR
+  subgraph Docker["Docker Compose (primary / demo)"]
+    web1[ecp-web all roles] --- sql1[(SQL Server)]
+    web1 --- vol[(volumes: documents, keyring)]
+    web1 -.optional.- clam[ClamAV]
+    web1 -.optional.- mail[Mail capture]
+  end
+  subgraph IIS["Windows Server / IIS"]
+    iisapp[ASP.NET Core in-process, app pool: no managed code, always running] --- sql2[(SQL Server)]
+    iisapp --- fs[(File store with ACLs)]
+    iisapp --- dp[(Key ring in protected directory)]
+  end
+  subgraph Azure["Azure"]
+    app[App Service / Container Apps] --- azsql[(Azure SQL)]
+    app --- blob[(Blob Storage)]
+    app --- kv[(Key Vault)]
+    app --- ai[(Application Insights)]
+    worker[Worker role instance] --- azsql
+  end
+```
+
+| Concern | Docker | IIS | Azure |
+|---|---|---|---|
+| Database | SQL Server container (Developer for demo; licensing note in install guide) or external | SQL Server | Azure SQL |
+| Documents | Named volume (local provider) | Directory with least-privilege ACL | Blob container, private, managed identity |
+| Secrets | Docker secrets / environment | DPAPI-protected file or env | Key Vault references |
+| Key ring | Persisted volume | Protected directory (machine-scoped) | Blob with Key Vault wrapping |
+| Jobs | Same process (`all`) or separate `worker` container | Same process; app pool set to stay alive; no overlapping lease | Separate worker role; SQL application lock lease prevents double processing |
+| Scale | Single instance supported; multiple instances behind a proxy with worker lease | Single instance supported | Multiple web instances plus one leased worker |
+| TLS | Reverse proxy / Kestrel cert | IIS binding | App Service managed certificate |
+| Verification here | Compose file linted; run if a container engine is available (T0.1) | Publish output and `web.config` validated statically; *scaffold, unverified* | Bicep built if tooling allowed; *scaffold, unverified* |
+
+All images use a non-root user, include ICU and time-zone data (L-06), run read-only root filesystem where possible, and are built from a pinned base image digest. Health endpoints: `/health/live`, `/health/ready`, `/health/startup`.
+
+## 9. Background processing and integrations (ADR-0010)
+
+- **Outbox** rows are written in the same transaction as the change. A dispatcher claims batches using `UPDLOCK, READPAST`, sends via the adapter with retries and jitter, marks processed, and dead-letters after the limit. Consumers are idempotent by `dedupeKey`.
+- **Inbox** rows are inserted with a unique `(provider, externalEventId)` key; a duplicate insert means "already seen".
+- **Scheduled jobs:** reminders, unlock expiry, projection refresh, outbox dispatch, orphan-blob sweeper, audit verification, export expiry. Each job takes a named `sp_getapplock` lease, runs within an explicit tenant scope per unit of work, and is resumable.
+- **Egress guard:** all outbound HTTP uses one `HttpClient` factory with SSRF protections (`ADAPTER_CATALOGUE.md`, README rule 7).
+
+## 10. Migration architecture (ADR-0004; `MIGRATION_SUPPLEMENT.md`)
+
+```mermaid
+flowchart LR
+  Src[CSV/XLSX/JSON/ZIP] --> Intake[Intake & profiling<br/>streaming, hash, limits]
+  Intake --> Stage[(migration schema:<br/>StagingRow, StagedFile)]
+  Stage --> Map[Mapping profile version<br/>safe transformations]
+  Map --> Val[Validation & matching<br/>deterministic order]
+  Val --> Report[Dry-run report, unmatched queue]
+  Report -->|approved| Commit[Chunked commit<br/>tx = chunk + checkpoint]
+  Commit --> Target[(Domain tables, blobs)]
+  Commit --> Prov[(Provenance + before-images)]
+  Commit --> Recon[Reconciliation]
+  Recon --> Accept[Business acceptance]
+  Prov --> Rollback[Rollback preview & execution]
+```
+
+- The migration module calls Contracts and Documents **only through their public contracts**, so all domain rules (validation, lock, audit) apply to imported data. Legacy-load exceptions are explicit parameters of those contracts, not backdoors (`MIGRATION_SUPPLEMENT.md` section 7).
+- Staging is physically separate; a dry run cannot write to target by construction (the dry-run service has no reference to the commit writers; a test verifies zero target diffs).
+- Resume and idempotency come from unique idempotency keys plus per-chunk checkpoints.
+
+## 11. Document storage (ADR-0012)
+
+`IDocumentStorageProvider` operations: `PutAsync(key, stream)`, `OpenReadAsync(key)`, `DeleteAsync(key)`, `ExistsAsync(key)`, `GetPropertiesAsync(key)`. Keys are `t/{tenant}/{sha256-prefix}/{sha256}` (content-addressed within a tenant, enabling "link existing content"). Every upload streams through: size limit, signature sniffing, hash, quarantine write, scan, then promote to the committed prefix with `scanStatus`. Downloads are authorised per request by the access evaluator (record visibility, classification, scan status) and streamed with `Content-Disposition` from sanitised names; there are no public URLs. A reference-count table governs deletion.
+
+## 12. Cross-cutting concerns
+
+| Concern | Approach |
+|---|---|
+| Errors | RFC 9457 problem details; stable error codes; no internals leaked; correlation id in every response |
+| Logging | Structured; tenant, correlation, actor; secret and PII redaction filter; no request bodies by default |
+| Observability | OpenTelemetry-compatible metrics/traces; health checks per adapter; SIEM export of audit via sink |
+| Localisation | Resource files, `en-AU` default, ICU in images, terminology aliases from configuration (L-01 to L-08) |
+| Accessibility | WCAG 2.2 AA practices, axe in CI, keyboard-first designers (A-01 to A-12) |
+| Validation | Server-side only is authoritative; shared rules from the same definitions drive client hints |
+| Feature flags | Configuration definitions; cannot add behaviour that code lacks |
+| Rate limiting | Built-in limiter, per principal and IP; stricter on setup, auth, import/export |
+
+## 13. Quality attribute targets (initial, adjust with Q-13)
+
+| Attribute | Target |
+|---|---|
+| Correctness | Domain and security rules covered by automated tests before a task is ticked |
+| Performance | Contract list/search p95 < 500 ms at 100k contracts and 50 custom fields; migration commit of 25k contracts and 50k documents in a single resumable run; measured by TESTING PER-xxx |
+| Availability | Single instance with restartable jobs; RPO/RTO placeholders configurable (`OPERATIONS_SPEC.md`) |
+| Security | `docs/SECURITY.md`; threat model reviewed each milestone |
+| Maintainability | Module boundaries enforced; ADRs; no module > agreed size without review |
+| Portability | PRT-001 to PRT-015 gates |
+
+## 14. Functionality status labels
+
+`CLAUDE.md` requires labelling each capability as **implemented**, **mocked**, **disabled** or **future**. The label for every capability is tracked in `TASKS.md` (column *Status*) and shown in the readiness report for integrations. Nothing is *implemented* until code and tests exist.
+
+## 15. ADR index
+
+| ADR | Topic | State |
+|---|---|---|
+| 0001 | Modular monolith | Proposed |
+| 0002 | Metadata extensibility | Proposed |
+| 0003 | Tenant isolation | Proposed |
+| 0004 | Migration staging | Proposed |
+| 0005 | Deployment models | Proposed |
+| 0006 | Database layout: schema and DbContext per module | Proposed |
+| 0007 | Identity and authorisation model | Proposed |
+| 0008 | Configuration versioning and releases | Proposed |
+| 0009 | Custom-field value storage and reporting projections | Proposed |
+| 0010 | Background processing, outbox and inbox | Proposed |
+| 0011 | Audit immutability | Proposed |
+| 0012 | Document storage and content addressing | Proposed |
+| 0013 | UI technology and API style | Proposed |
+| 0014 | Supply chain: dependencies, SBOM, licences, pack signing | Proposed |
+
+ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.

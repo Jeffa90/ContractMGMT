@@ -1,0 +1,21 @@
+GuardCode,Description,Evaluation,Used By,Basis
+LegalRequired,The contract requires Legal review (contracts.legalReviewRequired is true or a rule requires Legal),Boolean on contract after rules run,Draft to Awaiting Legal,status-transitions.csv "Legal required"
+LegalNotRequired,Legal review is not required,Negation of LegalRequired,Draft to Initial Creation,status-transitions.csv "Legal not required"
+CommentRequired,A non-empty comment or summary is supplied,Request payload,Return for rework; Reject; Withdraw,status-transitions.csv "Comment required"
+FinalDocumentExists,A document of an allowed final type exists and has a clean or permitted scan status,Document query,Send for signature,status-transitions.csv "Final document exists"
+ExecutedCopyExists,A document flagged isExecutedCopy exists with a clean or permitted scan status,Document query,Submit approval; Approve,status-transitions.csv "Executed copy exists"
+AuthorisedApprover,Actor is an assigned approver (or active backup) for the pinned approval matrix step,Approval matrix resolution at the pinned version,Approve; Reject,status-transitions.csv "Authorised approver"
+SubmitterNotApprover,Actor did not submit this approval,Compare actor with submission audit,Approve; Reject,PROPOSED (ASM-17)
+ParentRemainsLocked,The parent record stays locked while a Variation is open,Invariant enforced by the engine,Create variation,status-transitions.csv "Parent remains locked"
+NoOtherOpenVariation,No other Variation is open for the contract,Variation query,Create variation,PROPOSED (ASM-15)
+Authorised,Actor holds the permission and scope for the transition,Access evaluator,End,status-transitions.csv "Authorised"
+RetentionChecksPass,Retention policy allows archive and no legal hold exists,Retention policy evaluation,Archive,status-transitions.csv "Retention checks"
+NoLegalHold,No active legal hold applies,Legal hold query,Archive; Dispose,Master (legal holds)
+ReasonRequired,A non-empty reason is supplied,Request payload,Withdraw; Cancel variation; Emergency unlock,PROPOSED
+ControlledFieldChanged,A field marked controlled for Legal was changed after clearance,Change tracking since Legal Cleared,Return to Legal,PROPOSED
+VariationOutcomeApplied,The Variation reached outcome Applied,Variation record,Apply variation,PROPOSED
+VariationOutcomeNotApplied,The Variation reached outcome Rejected or Cancelled,Variation record,Cancel variation,PROPOSED
+SignatureVoidedOrDeclined,The e-signature provider reported a declined or voided envelope (verified via inbox),Inbox message with verified signature,Return to drafting,PROPOSED
+RequiredFieldsPresent,All fields marked required for the target state in the published configuration are present,Published form and field definitions,Any transition configured to require fields,Master (Workflow designer: required fields)
+RequiredDocumentsPresent,All document types required for the target state are present,Published workflow definition,Any transition configured to require documents,Master (Workflow designer: required documents)
+ClassificationClearance,Actor's clearance covers the record's classification,Access evaluator,All read and write actions,Master (classification rules)

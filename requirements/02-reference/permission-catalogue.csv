@@ -1,0 +1,46 @@
+Code,Description,ScopeRule,Sensitivity,Basis
+contracts.read,Read contract records,Tenant+organisation scope and classification clearance,Business,Roles CSV (read all) / PROPOSED scope
+contracts.create,Create a contract in Draft,Organisation scope; category owners only in assigned active categories,Business,PROPOSED
+contracts.edit_owned,Edit a contract in an assigned active category,Active category assignment AND record not locked AND state permits edit,Business,status-transitions.csv
+contracts.submit_legal,Submit a contract for Legal review,Active category assignment,Business,status-transitions.csv
+legal.review,Begin and conduct a Legal review round and return for rework,Organisation scope,Business,status-transitions.csv
+legal.clear,Clear a contract at the end of Legal review,Organisation scope,Business,status-transitions.csv
+contracts.submit_approval,Submit an executed contract for final approval,Active category assignment AND executed copy exists,Business,status-transitions.csv
+approvals.action,Approve or reject at a final approval step,Assigned approver or active backup; submitter excluded (ASM-17),High,status-transitions.csv
+variations.create,Start a Variation on an Effective contract,Active category assignment,Business,status-transitions.csv
+contracts.close,End an Effective contract,Active category assignment or Procurement Administrator,Business,status-transitions.csv
+disposition.approve,Approve archive/disposition after retention checks,Organisation scope,High,status-transitions.csv
+contracts.unlock_emergency,Open a time-boxed audited unlock on a locked record,Organisation scope; mandatory reason and expiry,Critical,CLAUDE.md / PROPOSED holder
+documents.upload,Upload a document or new document version,Active category assignment for Category Owner; organisation scope otherwise,Business,PROPOSED
+documents.download,Download a document,Same visibility as the parent record plus document classification,Business,Master (authorise every download)
+suppliers.read,Read supplier records,Tenant+organisation scope,Business,PROPOSED
+suppliers.manage,Create and edit suppliers,Organisation scope,Business,PROPOSED
+categories.manage,Manage taxonomy and category assignments,Organisation scope,Business,Master (Administration)
+audit.read,Read audit events for the tenant,Tenant scope; redacted per field sensitivity,High,Master (Audit Explorer)
+audit.export,Export evidence with hashes,Tenant scope,High,Master (evidence export)
+audit.read_system,Read technical/system logs without business data,Installation scope,High,PROPOSED
+config.draft,Create and edit configuration drafts and run previews/simulations,Organisation scope; Division/Site administrators limited to their scope,Business,Master (Configuration Studio)
+config.publish,Publish a validated configuration release,Organisation scope,High,Master
+config.rollback,Publish an earlier configuration version as a new version,Organisation scope,High,Master
+packages.export,Export configuration packages,Organisation scope; secrets and live users excluded,High,Master (Import/export)
+packages.import,Dry-run and apply configuration packages (apply also requires config.publish),Organisation scope,Critical,Master (Import/export)
+migration.stage,Create migration projects; upload; profile; map; dry-run,Organisation scope,Business,MIGRATION_REQUIREMENTS.md
+migration.commit,Commit a migration batch,Organisation scope,High,MIGRATION_REQUIREMENTS.md
+migration.legacy_load,Commit Effective and Registered Date legacy records under a legacy-load policy,Organisation scope; second-person confirmation,Critical,PROPOSED (ASM-06)
+migration.rollback,Roll back a batch before acceptance or run compensating archival,Organisation scope,High,MIGRATION_REQUIREMENTS.md
+migration.accept,Record business acceptance and finalise a batch,Organisation scope,High,MIGRATION_REQUIREMENTS.md
+users.manage,Invite users and map identity groups,Tenant; Division/Site administrators limited to scope,High,Master (onboarding)
+roles.delegate,Assign roles and delegated administration up to the grantor's own level,Never above the grantor's own rights,Critical,Master (Delegated administration)
+tenant.configure,Configure tenant-level settings,Tenant scope,High,Master
+system.configure,Configure installation-level technical settings,Installation scope,Critical,Master
+setup.run,Run or amend the installation wizard (re-authentication required),Installation scope,Critical,Master (wizard stage 18)
+onboarding.run,Run the organisation onboarding wizard,Tenant or organisation scope,High,Master
+support.elevate,Open reason-based time-limited support access to tenant data,Installation scope; tenant visible; fully audited,Critical,Master (Delegated administration)
+secrets.manage,Set integration secrets (write-only; never revealed),Installation scope,Critical,Master (no automatic secret reveal)
+integrations.manage,Configure non-secret integration settings,Tenant or organisation scope,High,Master (Administration)
+reporting.external,Use external reporting access (Qlik views or export),Tenant scope; read-only curated views,High,CONFIRMED_DECISIONS.md
+records.export,Export records and documents,Subject to classification export restrictions,High,Master (Import/export)
+retention.manage,Manage retention policies,Tenant scope,High,Master (Retention/privacy)
+legalhold.manage,Place and release legal holds,Organisation scope,High,Master (Retention/privacy)
+ai.use,Use AI assistance on records the user can already read,Same visibility as the user; output is reviewable proposal only,Business,Master (AI assistance)
+ops.manage,"Backup/restore tasks, maintenance mode, support bundles and upgrade pre-flight",Installation scope,Critical,Master (Audit and operations)

@@ -1,0 +1,23 @@
+Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+Category,id,Category Id,uuid,Yes,Yes,n/a,System primary key
+Category,tenantId,Tenant,uuid,Yes,Yes,n/a,Server-set
+Category,organisationId,Organisation,uuid,Yes,Yes,n/a,Taxonomies are organisation-scoped [PROPOSED]
+Category,parentCategoryId,Parent Category,lookup,No,Yes,n/a,Null for top-level; a subcategory has a parent. Maximum depth 3 [PROPOSED]
+Category,code,Code,string,Yes,Yes,n/a,Stable code unique per (tenantId; organisationId); never reused [PROPOSED]
+Category,name,Name,string,Yes,Yes,n/a,Display text; localisable through terminology
+Category,isActive,Active,boolean,Yes,Yes,n/a,Inactive categories cannot receive new contracts; existing contracts keep them [PROPOSED]
+Category,sourceSystem,Source System,string,No,Yes,n/a,Provenance
+Category,sourceRecordId,Source Record Id,string,No,Yes,n/a,Provenance
+Category,migrationBatchId,Migration Batch,uuid,No,Yes,n/a,Subject to reference-count rollback rule (CON-12)
+Category,rowVersion,Row Version,string,Yes,Yes,n/a,Optimistic concurrency token
+CategoryAssignment,id,Assignment Id,uuid,Yes,Yes,n/a,System primary key
+CategoryAssignment,tenantId,Tenant,uuid,Yes,Yes,n/a,Server-set
+CategoryAssignment,organisationId,Organisation,uuid,Yes,Yes,n/a,
+CategoryAssignment,categoryId,Category,lookup,Yes,Yes,n/a,Assignment of a parent category covers its subcategories [PROPOSED]
+CategoryAssignment,userId,Assigned User,person,Yes,Yes,n/a,Group assignment via identity group mapping is resolved to users at evaluation time [PROPOSED]
+CategoryAssignment,effectiveFromUtc,Effective From,datetime,Yes,Yes,n/a,Ownership follows the active assignment [CONFIRMED]
+CategoryAssignment,effectiveToUtc,Effective To,datetime,No,Yes,n/a,Null = open-ended
+CategoryAssignment,isPrimary,Primary Owner,boolean,Yes,Yes,n/a,At most one active primary per category; used for notifications [PROPOSED]
+CategoryAssignment,assignedBy,Assigned By,person,Yes,Yes,n/a,Audited
+CategoryAssignment,reason,Reason,string,No,Yes,n/a,Required when ending an assignment early [PROPOSED]
+CategoryAssignment,rowVersion,Row Version,string,Yes,Yes,n/a,Optimistic concurrency token

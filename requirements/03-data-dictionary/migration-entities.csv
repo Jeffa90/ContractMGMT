@@ -1,0 +1,88 @@
+Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+MigrationProject,id,Project Id,uuid,Yes,Yes,n/a,
+MigrationProject,tenantId,Tenant,uuid,Yes,Yes,n/a,Cross-tenant references are rejected [CONFIRMED]
+MigrationProject,organisationId,Organisation,uuid,Yes,Yes,n/a,
+MigrationProject,name,Name,string,Yes,Yes,n/a,
+MigrationProject,sourceSystem,Source System,string,Yes,Yes,n/a,For example Medius
+MigrationProject,sourceSystemVersion,Source System Version,string,No,Yes,n/a,Mapping profiles are per source system and version [CONFIRMED]
+MigrationProject,dataOwnerId,Data Owner,person,Yes,Yes,n/a,Recorded at creation [CONFIRMED]
+MigrationProject,extractionUtc,Extraction Date,datetime,Yes,Yes,n/a,[CONFIRMED]
+MigrationProject,freezeStartUtc,Freeze Start,datetime,No,Yes,n/a,Cutover freeze window [CONFIRMED]
+MigrationProject,freezeEndUtc,Freeze End,datetime,No,Yes,n/a,
+MigrationProject,legacyLoadPolicy,Legacy Load Policy,json,No,Yes,n/a,Allowed states; allow Registered Date import; expiry [PROPOSED] ASM-06
+MigrationProject,status,Status,choice,Yes,Yes,n/a,
+MappingProfile,id,Profile Id,uuid,Yes,Yes,n/a,
+MappingProfile,tenantId,Tenant,uuid,Yes,Yes,n/a,
+MappingProfile,name,Name,string,Yes,Yes,n/a,
+MappingProfile,sourceSystem,Source System,string,Yes,Yes,n/a,
+MappingProfileVersion,id,Profile Version Id,uuid,Yes,Yes,n/a,Immutable once used by a batch
+MappingProfileVersion,profileId,Profile,uuid,Yes,Yes,n/a,
+MappingProfileVersion,versionNumber,Version,integer,Yes,Yes,n/a,
+MappingProfileVersion,fieldMappings,Field Mappings,json,Yes,Yes,n/a,Rows of SourceColumn; TargetField; Transformation; DefaultValue; LookupMapKey; Required; Validation; Notes [CONFIRMED]
+MappingProfileVersion,lookupMaps,Lookup Maps,json,No,Yes,n/a,Source value to target code per lookup
+MigrationBatch,id,Batch Id,uuid,Yes,Yes,n/a,On every imported record; file and audit event [CONFIRMED]
+MigrationBatch,tenantId,Tenant,uuid,Yes,Yes,n/a,
+MigrationBatch,projectId,Project,uuid,Yes,Yes,n/a,
+MigrationBatch,kind,Kind,choice,Yes,Yes,n/a,DryRun; Mock; Final [PROPOSED]
+MigrationBatch,status,Status,choice,Yes,Yes,System,MigrationBatchStatus lookup
+MigrationBatch,mappingProfileVersionId,Mapping Profile Version,uuid,Yes,Yes,n/a,Captured [CONFIRMED]
+MigrationBatch,configReleaseId,Configuration Release,uuid,Yes,Yes,n/a,Configuration version captured with the batch [CONFIRMED]
+MigrationBatch,duplicateStrategy,Duplicate Strategy,choice,Yes,Yes,n/a,Selected before commit [CONFIRMED]
+MigrationBatch,documentDuplicateOption,Document Duplicate Option,choice,Yes,Yes,n/a,
+MigrationBatch,isLegacyLoad,Legacy Load,boolean,Yes,Yes,n/a,Requires migration.legacy_load [PROPOSED]
+MigrationBatch,acceptedBy,Accepted By,person,No,Yes,n/a,Business acceptance recorded [CONFIRMED]
+MigrationBatch,acceptedUtc,Accepted,datetime,No,Yes,n/a,
+SourceFile,id,Source File Id,uuid,Yes,Yes,n/a,
+SourceFile,batchId,Batch,uuid,Yes,Yes,n/a,
+SourceFile,fileName,File Name,string,Yes,Yes,n/a,
+SourceFile,sha256,SHA-256,string,Yes,Yes,n/a,Hash recorded for the runbook [CONFIRMED]
+SourceFile,rowCount,Row Count,integer,No,Yes,n/a,
+StagingRow,id,Staging Row Id,uuid,Yes,Yes,n/a,
+StagingRow,batchId,Batch,uuid,Yes,Yes,n/a,
+StagingRow,rowNumber,Row Number,integer,Yes,Yes,n/a,
+StagingRow,rawValues,Raw Values,json,Yes,Yes,n/a,Source values retained [CONFIRMED]
+StagingRow,mappedValues,Mapped Values,json,No,Yes,n/a,Output of transformations; preview of before and after [CONFIRMED]
+StagingRow,rowHash,Row Hash,string,Yes,Yes,n/a,Detects source change between mock cycles
+StagingRow,idempotencyKey,Idempotency Key,string,Yes,Yes,n/a,Hash of tenantId + organisationId + sourceSystem + sourceRecordId
+StagingRow,outcome,Outcome,choice,Yes,Yes,System,Pending; Accepted; Rejected; Skipped; Created; Updated
+StagingMessage,id,Message Id,uuid,Yes,Yes,n/a,
+StagingMessage,stagingRowId,Staging Row,uuid,Yes,Yes,n/a,
+StagingMessage,severity,Severity,choice,Yes,Yes,n/a,Error or Warning
+StagingMessage,code,Code,string,Yes,Yes,n/a,Stable catalogue code (MIGRATION_SUPPLEMENT.md section 8)
+StagingMessage,message,Message,string,Yes,Yes,n/a,No secrets or other tenants' data
+AttachmentManifestEntry,id,Entry Id,uuid,Yes,Yes,n/a,
+AttachmentManifestEntry,batchId,Batch,uuid,Yes,Yes,n/a,
+AttachmentManifestEntry,columns,Manifest Columns,json,Yes,Yes,n/a,All manifest columns as supplied
+StagedFile,id,Staged File Id,uuid,Yes,Yes,n/a,
+StagedFile,batchId,Batch,uuid,Yes,Yes,n/a,
+StagedFile,relativePath,Relative Path,string,Yes,Yes,n/a,Normalised; traversal rejected [CONFIRMED]
+StagedFile,sha256,SHA-256,string,Yes,Yes,n/a,
+StagedFile,sizeBytes,Size,integer,Yes,Yes,n/a,
+StagedFile,state,State,choice,Yes,Yes,System,Staged; Matched; Unmatched; Invalid; Duplicate; Imported; Failed; Discarded
+StagedFile,quarantineKey,Quarantine Key,string,Yes,Yes,n/a,Restricted staging area until resolved [CONFIRMED]
+MatchProposal,id,Proposal Id,uuid,Yes,Yes,n/a,
+MatchProposal,stagedFileId,Staged File,uuid,Yes,Yes,n/a,
+MatchProposal,contractStagingRowId,Contract Staging Row,uuid,No,Yes,n/a,
+MatchProposal,method,Match Method,choice,Yes,Yes,n/a,MatchMethod lookup; shown to the user with the reason [CONFIRMED]
+MatchProposal,reason,Reason,string,Yes,Yes,n/a,
+MatchProposal,confirmedBy,Confirmed By,person,No,Yes,n/a,Required for Manual method; probabilistic matching is never automatic [CONFIRMED]
+Checkpoint,id,Checkpoint Id,uuid,Yes,Yes,n/a,
+Checkpoint,batchId,Batch,uuid,Yes,Yes,n/a,
+Checkpoint,phase,Phase,string,Yes,Yes,n/a,Rows; Suppliers; Contracts; Documents; Reconcile
+Checkpoint,lastCompletedSequence,Last Completed Sequence,integer,Yes,Yes,n/a,Resume point [CONFIRMED]
+ProvenanceRecord,id,Provenance Id,uuid,Yes,Yes,n/a,
+ProvenanceRecord,tenantId,Tenant,uuid,Yes,Yes,n/a,
+ProvenanceRecord,batchId,Batch,uuid,Yes,Yes,n/a,
+ProvenanceRecord,targetEntityType,Target Entity Type,string,Yes,Yes,n/a,
+ProvenanceRecord,targetEntityId,Target Entity Id,uuid,Yes,Yes,n/a,
+ProvenanceRecord,action,Action,choice,Yes,Yes,n/a,Created; Updated; Linked
+ProvenanceRecord,beforeImage,Before Image,json,No,Yes,n/a,Required for Updated so rollback can restore [PROPOSED] RISK-08
+ProvenanceRecord,sourceSystem,Source System,string,Yes,Yes,n/a,
+ProvenanceRecord,sourceRecordId,Source Record Id,string,Yes,Yes,n/a,
+ProvenanceRecord,sha256,SHA-256,string,No,Yes,n/a,For documents
+ReconciliationReport,id,Report Id,uuid,Yes,Yes,n/a,
+ReconciliationReport,batchId,Batch,uuid,Yes,Yes,n/a,
+ReconciliationReport,totals,Totals,json,Yes,Yes,n/a,Source rows; accepted; rejected; skipped; created; updated; file counts [CONFIRMED]
+ReconciliationReport,distributions,Distributions,json,No,Yes,n/a,Status and category distributions; financial totals
+ReconciliationReport,balanced,Balanced,boolean,Yes,Yes,System,True only when totals balance or exceptions are approved [CONFIRMED]
+ReconciliationReport,approvedExceptions,Approved Exceptions,json,No,Yes,n/a,

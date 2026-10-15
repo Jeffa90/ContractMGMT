@@ -1,0 +1,58 @@
+Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+LegalReviewRound,id,Round Id,uuid,Yes,Yes,n/a,
+LegalReviewRound,tenantId,Tenant,uuid,Yes,Yes,n/a,
+LegalReviewRound,contractId,Contract,uuid,Yes,Yes,n/a,
+LegalReviewRound,roundNumber,Round Number,integer,Yes,Yes,n/a,1-based; one open round per contract [PROPOSED]
+LegalReviewRound,openedBy,Opened By,person,Yes,Yes,n/a,Legal reviewer who begins review
+LegalReviewRound,openedUtc,Opened,datetime,Yes,Yes,n/a,
+LegalReviewRound,closedUtc,Closed,datetime,No,Yes,n/a,Closed rounds are immutable
+LegalReviewRound,outcome,Outcome,choice,No,Yes,n/a,Cleared or ReturnedForRework
+LegalReviewRound,summary,Summary,long text,No,Yes,n/a,Required for ReturnedForRework (guard CommentRequired)
+LegalComment,id,Comment Id,uuid,Yes,Yes,n/a,
+LegalComment,tenantId,Tenant,uuid,Yes,Yes,n/a,
+LegalComment,roundId,Round,uuid,Yes,Yes,n/a,
+LegalComment,authorId,Author,person,Yes,Yes,n/a,
+LegalComment,body,Body,long text,Yes,Yes,n/a,Plain text; encoded on output [CONFIRMED]
+LegalComment,visibility,Visibility,choice,Yes,Yes,n/a,Legal-only or Shared with owner; default Shared [PROPOSED]
+LegalComment,createdUtc,Created,datetime,Yes,Yes,n/a,Comments are append-only
+ApprovalRecord,id,Approval Record Id,uuid,Yes,Yes,n/a,
+ApprovalRecord,tenantId,Tenant,uuid,Yes,Yes,n/a,
+ApprovalRecord,subjectType,Subject Type,choice,Yes,Yes,n/a,Contract or Variation
+ApprovalRecord,subjectId,Subject,uuid,Yes,Yes,n/a,
+ApprovalRecord,stepKey,Step,string,Yes,Yes,n/a,Step key in the pinned approval matrix version
+ApprovalRecord,approverGroupKey,Approver Group,string,Yes,Yes,n/a,Matrix approver group (for example GroupHead) [PROPOSED] ASM-08
+ApprovalRecord,actorId,Actor,person,Yes,Yes,n/a,Authenticated platform user; never taken from an e-signature callback body
+ApprovalRecord,onBehalfOfId,On Behalf Of,person,No,Yes,n/a,Set when a backup approver acts
+ApprovalRecord,decision,Decision,choice,Yes,Yes,n/a,Approved or Rejected
+ApprovalRecord,comment,Comment,long text,No,Yes,n/a,Required when Rejected (guard CommentRequired)
+ApprovalRecord,decidedUtc,Decided,datetime,Yes,Yes,n/a,
+ApprovalRecord,matrixVersionId,Matrix Version,uuid,Yes,Yes,n/a,Pinned
+ApprovalRecord,evidenceDocumentId,Evidence,uuid,No,Yes,n/a,E-signature certificate or DoA evidence document
+ApprovalRecord,legacySource,Legacy Source,string,No,Yes,n/a,Set for migrated historical approvals (read-only)
+Variation,id,Variation Id,uuid,Yes,Yes,n/a,
+Variation,tenantId,Tenant,uuid,Yes,Yes,n/a,
+Variation,contractId,Contract,uuid,Yes,Yes,n/a,Parent remains locked while open [CONFIRMED]
+Variation,variationNumber,Variation Number,integer,Yes,Yes,n/a,Per contract
+Variation,status,Status,choice,Yes,Yes,System,Governed by the variation workflow definition [PROPOSED]
+Variation,description,Description,long text,Yes,Yes,n/a,
+Variation,proposedChanges,Proposed Changes,json,Yes,Yes,n/a,Typed set of field changes validated against the Variation-editable fields [PROPOSED]
+Variation,requestedBy,Requested By,person,Yes,Yes,n/a,
+Variation,openedUtc,Opened,datetime,Yes,Yes,n/a,
+Variation,closedUtc,Closed,datetime,No,Yes,n/a,
+Variation,outcome,Outcome,choice,No,Yes,n/a,Applied; Rejected; Cancelled
+RecordUnlock,id,Unlock Id,uuid,Yes,Yes,n/a,
+RecordUnlock,tenantId,Tenant,uuid,Yes,Yes,n/a,
+RecordUnlock,contractId,Contract,uuid,Yes,Yes,n/a,
+RecordUnlock,reason,Reason,long text,Yes,Yes,n/a,Mandatory [CONFIRMED]
+RecordUnlock,grantedBy,Granted By,person,Yes,Yes,n/a,
+RecordUnlock,confirmedBy,Confirmed By,person,No,Yes,n/a,Second person; required by default in Production [PROPOSED] Q-05
+RecordUnlock,grantedUtc,Granted,datetime,Yes,Yes,n/a,
+RecordUnlock,expiresUtc,Expires,datetime,Yes,Yes,n/a,Time-limited; maximum configurable [CONFIRMED]
+RecordUnlock,relockedUtc,Relocked,datetime,No,Yes,n/a,Set by expiry job or early close
+ReminderSchedule,id,Reminder Id,uuid,Yes,Yes,n/a,
+ReminderSchedule,tenantId,Tenant,uuid,Yes,Yes,n/a,
+ReminderSchedule,contractId,Contract,uuid,Yes,Yes,n/a,
+ReminderSchedule,kind,Kind,choice,Yes,Yes,n/a,Evergreen; CriticalNotice; Review; EndDate [PROPOSED] Q-04
+ReminderSchedule,dueUtc,Due,datetime,Yes,Yes,n/a,Computed from date-only fields in the organisation time zone
+ReminderSchedule,state,State,choice,Yes,Yes,n/a,Pending; Sent; Acknowledged; Escalated; Cancelled
+ReminderSchedule,dedupeKey,Dedupe Key,string,Yes,Yes,n/a,Notification idempotency (contract + kind + offset)

@@ -1,0 +1,27 @@
+{
+  "synthetic": true,
+  "description": "Synthetic users for Demo identity and automated tests. Addresses use the reserved .test domain. No passwords are stored here: the Demo identity generates credentials per installation (requirements/07-integrations/IDENTITY_SPEC.md section 6).",
+  "installationUsers": [
+    { "email": "sysadmin@installation.example.test", "roles": [ { "role": "System Administrator", "scope": "Installation" } ] }
+  ],
+  "users": [
+    { "email": "tenantadmin@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Tenant Administrator", "scope": "Tenant" } ] },
+    { "email": "orgadmin@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Organisation Administrator", "scope": "Organisation", "organisation": "org-a1" } ] },
+    { "email": "siteadmin@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Division/Site Administrator", "scope": "Site", "organisation": "org-a1", "site": "site-a1-1" } ] },
+    { "email": "bizconfig@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Business Configuration Administrator", "scope": "Organisation", "organisation": "org-a1" } ] },
+    { "email": "procadmin@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Procurement Administrator", "scope": "Organisation", "organisation": "org-a1" } ] },
+    { "email": "catowner.packaging@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Category Owner", "scope": "Organisation", "organisation": "org-a1" } ] },
+    { "email": "catowner.energy@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Category Owner", "scope": "Organisation", "organisation": "org-a1" } ] },
+    { "email": "legal@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Legal", "scope": "Organisation", "organisation": "org-a1" } ] },
+    { "email": "grouphead@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Approver", "scope": "Organisation", "organisation": "org-a1", "approverGroup": "GroupHead" } ] },
+    { "email": "grouphead.backup@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Backup Approver", "scope": "Organisation", "organisation": "org-a1", "approverGroup": "GroupHead" } ] },
+    { "email": "auditor@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Auditor", "scope": "Organisation", "organisation": "org-a1" } ] },
+    { "email": "viewer@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Viewer", "scope": "Organisation", "organisation": "org-a1" } ] },
+    { "email": "viewer.a2@a.example.test", "tenant": "tenant-a", "roles": [ { "role": "Viewer", "scope": "Organisation", "organisation": "org-a2" } ], "note": "Same tenant, different organisation: must not read org-a1" },
+    { "email": "tenantadmin@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Tenant Administrator", "scope": "Tenant" } ] },
+    { "email": "procadmin@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Procurement Administrator", "scope": "Organisation", "organisation": "org-b1" } ] },
+    { "email": "catowner@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Category Owner", "scope": "Organisation", "organisation": "org-b1" } ] },
+    { "email": "legal@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Legal", "scope": "Organisation", "organisation": "org-b1" } ] },
+    { "email": "viewer@b.example.test", "tenant": "tenant-b", "roles": [ { "role": "Viewer", "scope": "Organisation", "organisation": "org-b1" } ] }
+  ]
+}

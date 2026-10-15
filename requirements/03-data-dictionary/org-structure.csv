@@ -1,0 +1,34 @@
+Entity,FieldName,DisplayName,Type,Required,Core,EditableAfterEffective,Notes
+Tenant,id,Tenant Id,uuid,Yes,Yes,n/a,Single-organisation installs have exactly one tenant [PROPOSED] ASM-05
+Tenant,name,Name,string,Yes,Yes,n/a,
+Tenant,status,Status,choice,Yes,Yes,n/a,Active or Suspended; suspended tenants are read-denied by policy
+Tenant,tenancyMode,Tenancy Mode,choice,Yes,Yes,n/a,TenancyMode lookup [CONFIRMED]
+Tenant,configurationMode,Configuration Mode,choice,Yes,Yes,n/a,Demo; Test; Production [CONFIRMED]
+Tenant,dataResidencyNote,Data Residency Note,string,No,Yes,n/a,Informational only; no compliance claim [CONFIRMED]
+Organisation,id,Organisation Id,uuid,Yes,Yes,n/a,
+Organisation,tenantId,Tenant,uuid,Yes,Yes,n/a,
+Organisation,name,Name,string,Yes,Yes,n/a,
+Organisation,timeZoneId,Time Zone,string,Yes,Yes,n/a,IANA identifier stored; converted for Windows where required [CONFIRMED]
+Organisation,cultureCode,Culture,string,Yes,Yes,n/a,Default en-AU for the JBS pack [CONFIRMED]
+Organisation,defaultCurrencyCode,Default Currency,string,Yes,Yes,n/a,ISO 4217; default AUD for the JBS pack [CONFIRMED]
+Organisation,solutionPackKey,Solution Pack,string,No,Yes,n/a,Pack applied at onboarding
+LegalEntity,id,Legal Entity Id,uuid,Yes,Yes,n/a,
+LegalEntity,tenantId,Tenant,uuid,Yes,Yes,n/a,
+LegalEntity,organisationId,Organisation,uuid,Yes,Yes,n/a,
+LegalEntity,name,Name,string,Yes,Yes,n/a,
+LegalEntity,registrationNumber,Registration Number,string,No,Yes,n/a,ABN or ACN or equivalent
+BusinessUnit,id,Business Unit Id,uuid,Yes,Yes,n/a,
+BusinessUnit,tenantId,Tenant,uuid,Yes,Yes,n/a,
+BusinessUnit,organisationId,Organisation,uuid,Yes,Yes,n/a,
+BusinessUnit,divisionId,Division,lookup,No,Yes,n/a,Scope for delegated administration [CONFIRMED]
+BusinessUnit,name,Name,string,Yes,Yes,n/a,
+Division,id,Division Id,uuid,Yes,Yes,n/a,
+Division,tenantId,Tenant,uuid,Yes,Yes,n/a,
+Division,organisationId,Organisation,uuid,Yes,Yes,n/a,
+Division,name,Name,string,Yes,Yes,n/a,
+Site,id,Site Id,uuid,Yes,Yes,n/a,
+Site,tenantId,Tenant,uuid,Yes,Yes,n/a,
+Site,organisationId,Organisation,uuid,Yes,Yes,n/a,
+Site,code,Code,string,Yes,Yes,n/a,Stable; unique per organisation
+Site,name,Name,string,Yes,Yes,n/a,
+Site,timeZoneId,Time Zone,string,No,Yes,n/a,Overrides organisation time zone for local reminders when set [PROPOSED]

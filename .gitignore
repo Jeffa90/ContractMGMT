@@ -1,0 +1,76 @@
+# Secrets and local environment: never commit (SECURITY-NOTICE.md)
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.pem
+*.snk
+secrets/
+*.secret
+*.secrets.json
+appsettings.*.local.json
+appsettings.Local.json
+bootstrap.json
+**/bootstrap-store/
+**/keyring/
+**/DataProtection-Keys/
+
+# Runtime data: documents, databases, backups, exports, support bundles
+data/
+App_Data/
+*.mdf
+*.ldf
+*.ndf
+*.bak
+*.bacpac
+*.ecpkg.local
+exports/
+support-bundles/
+quarantine/
+migration-work/
+
+# .NET build output
+[Bb]in/
+[Oo]bj/
+publish/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.nupkg
+*.snupkg
+.vs/
+*.rsuser
+
+# Test and coverage output
+TestResults/
+coverage/
+*.trx
+*.coverage
+playwright-report/
+test-results/
+blob-report/
+
+# Node (TypeScript islands, Playwright)
+node_modules/
+npm-debug.log*
+dist/
+.cache/
+
+# IDE and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+Thumbs.db
+
+# Generated documents and scratch
+*.log
+tmp/
+.scratch/
+
+# Claude Code local settings (keep project .claude/skills and settings.json if added)
+.claude/settings.local.json

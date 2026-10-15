@@ -1,0 +1,11 @@
+LookupMapKey,SourceValue,TargetCode,Notes
+status,Effective,Effective,Historical Effective contracts load as locked legacy records under a legacy-load policy
+status,Expired,Ended,Synthetic mapping for tests
+status,Terminated,Ended,Synthetic mapping for tests
+status,Draft,Draft,In-flight items are normally not migrated (MIGRATION_SUPPLEMENT.md section 10)
+extensionType,NoExtension,NoExtension,
+extensionType,Evergreen,Evergreen,
+category,Packaging,PACKAGING,Top-level category code in the demo taxonomy
+category,Flexible Packaging,PACKAGING-FLEX,Subcategory of Packaging
+category,Energy,ENERGY,Top-level category code in the demo taxonomy
+category,Electricity,ENERGY-ELEC,Subcategory of Energy

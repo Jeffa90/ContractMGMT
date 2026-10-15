@@ -1,0 +1,75 @@
+{
+  "synthetic": true,
+  "description": "Two unrelated demo tenants for tenant-isolation and portability tests. All names are fictitious.",
+  "tenants": [
+    {
+      "key": "tenant-a",
+      "name": "Demo Tenant A",
+      "tenancyMode": "MultiOrganisation",
+      "organisations": [
+        {
+          "key": "org-a1",
+          "name": "Demo Procurement Group",
+          "timeZoneId": "Australia/Melbourne",
+          "cultureCode": "en-AU",
+          "defaultCurrencyCode": "AUD",
+          "solutionPackKey": "jbs-procurement",
+          "legalEntities": [
+            { "key": "le-a1-1", "name": "Demo Foods Pty Ltd" },
+            { "key": "le-a1-2", "name": "Demo Logistics Pty Ltd" }
+          ],
+          "divisions": [
+            { "key": "div-a1-1", "name": "Operations" }
+          ],
+          "businessUnits": [
+            { "key": "bu-a1-1", "name": "Packaging Operations", "divisionKey": "div-a1-1" },
+            { "key": "bu-a1-2", "name": "Energy and Utilities", "divisionKey": "div-a1-1" }
+          ],
+          "sites": [
+            { "key": "site-a1-1", "code": "SITE-MEL", "name": "Demo Melbourne Plant", "timeZoneId": "Australia/Melbourne" },
+            { "key": "site-a1-2", "code": "SITE-PER", "name": "Demo Perth Depot", "timeZoneId": "Australia/Perth" }
+          ]
+        },
+        {
+          "key": "org-a2",
+          "name": "Demo Facilities Organisation",
+          "timeZoneId": "Australia/Sydney",
+          "cultureCode": "en-AU",
+          "defaultCurrencyCode": "AUD",
+          "solutionPackKey": "blank",
+          "legalEntities": [
+            { "key": "le-a2-1", "name": "Demo Facilities Pty Ltd" }
+          ],
+          "divisions": [],
+          "businessUnits": [],
+          "sites": [
+            { "key": "site-a2-1", "code": "SITE-SYD", "name": "Demo Sydney Office" }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "tenant-b",
+      "name": "Demo Tenant B",
+      "tenancyMode": "SingleOrganisation",
+      "organisations": [
+        {
+          "key": "org-b1",
+          "name": "Isolation Test Organisation",
+          "timeZoneId": "Pacific/Auckland",
+          "cultureCode": "en-NZ",
+          "defaultCurrencyCode": "NZD",
+          "solutionPackKey": "blank",
+          "legalEntities": [
+            { "key": "le-b1-1", "name": "Isolation Test Ltd" }
+          ],
+          "divisions": [],
+          "businessUnits": [],
+          "sites": [
+            { "key": "site-b1-1", "code": "SITE-AKL", "name": "Demo Auckland Office" }
+          ]
+        }
+      ]
+    }
+  ]
+}

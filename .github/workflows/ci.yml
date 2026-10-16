@@ -87,33 +87,15 @@ jobs:
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category!=Performance" --logger "trx" --results-directory TestResults
       - name: Performance baseline and query plans (SQL Server)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx" --results-directory TestResults
-      - name: Baseline for comparison on this runner (PER-002; temporary)
-        if: always()
-        run: |
-          set -uo pipefail
-          # Two earlier commits are rebuilt and measured on this same runner: the one before PER-002 and the one with only the first change.
-          for c in b5adb83527f42e18e745eb242f084a2f218e3428 0241c8402aa465efcbd106dce6d04c32a830ef48; do
-            git fetch --depth=1 origin "$c"
-            git worktree add "../ecp-base-${c:0:7}" FETCH_HEAD
-            (cd "../ecp-base-${c:0:7}" \
-              && dotnet restore src/Ecp.sln --locked-mode \
-              && dotnet build src/Ecp.sln -c Release --no-restore \
-              && dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx;LogFileName=base-perf.trx" --results-directory "../base-results-${c:0:7}") || true
-          done
-        continue-on-error: true
-      - name: Print performance baseline and plan report
+      - name: Print performance baseline and plan report (SQL Server)
         if: always()
         run: |
           echo "runner: $(uname -sr) cpus=$(nproc) mem=$(free -m | awk '/Mem:/{print $2}')MB"
-          echo "== SUMMARY (after, this commit): user, median ms, p95 ms, operation"
+          echo "== SUMMARY: user, median ms, p95 ms, operation"
           jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' artifacts/performance/sqlserver.json || true
-          echo "== SUMMARY (change 1 only, commit 0241c84 on this runner): user, median ms, p95 ms, operation"
-          jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' ../ecp-base-0241c84/artifacts/performance/sqlserver.json || echo "no comparison run"
-          echo "== SUMMARY (before, commit b5adb83 on this runner): user, median ms, p95 ms, operation"
-          jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' ../ecp-base-b5adb83/artifacts/performance/sqlserver.json || echo "no comparison run"
-          echo "== FULL (after)"
+          echo "== FULL"
           cat artifacts/performance/sqlserver.json || echo "no baseline file written"
-          echo "== PLANS (after)"
+          echo "== PLANS"
           cat artifacts/performance/plans-sqlserver.txt || echo "no plan report written"
       - name: Honest result summary
         if: always()

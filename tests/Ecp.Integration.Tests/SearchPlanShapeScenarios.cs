@@ -72,13 +72,12 @@ internal static class SearchPlanShapeScenarios
         Assert.Contains(page.Rows, r => r.Title == "Shape 3");
         var search = statements.Where(x => x.Contains("ContractCustomValue", StringComparison.Ordinal)).ToList();
         Assert.NotEmpty(search);
-        const int tokens = 2;                       // "note 3"
         foreach (var x in search.Where(x => x.Contains("COUNT(", StringComparison.OrdinalIgnoreCase) || x.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)))
         {
-            // The contracts table is read once for the page of contracts, and once more per text word that also searches a configured field (the set of rows that match in the row itself). Before PER-002 each
-            // configured-field condition, each word and the sort also read it for the access test, and the match ran once per contract: seven reads for this query.
+            // The contracts table is read once for the page of contracts, plus once for the access test of the text-search values that need a state limit. Before PER-002 each configured-field condition, each text
+            // word and the sort also read it for the access test, and this query read it seven times.
             var reads = TableReads(x, "Contract");
-            Assert.True(reads <= 1 + tokens, $"The search reads the Contract table {reads} times (at most {1 + tokens} expected); a per-condition access subquery came back:\n{x}");
+            Assert.True(reads <= 2, $"The search reads the Contract table {reads} times (at most 2 expected); a per-condition access subquery came back:\n{x}");
         }
     }
 

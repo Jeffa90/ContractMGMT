@@ -218,19 +218,18 @@ internal sealed partial class RegisterQueryEngine(
                    select new Row { C = c, S = s, G = g };
 
         // Free text: every word must match somewhere readable (reference, title, supplier, vendor number, ABN, SAP number, or a searchable configured field the caller may see).
-        // Without a searchable configured field the match is a plain predicate on the row. With one it is "id in (ids that match in the row, ids that match in a configured field)": the two sets are
-        // uncorrelated, so the database reads each once and joins once. Written as "row match OR id in (configured match)" it ran the configured match once for every contract (docs/PERFORMANCE_REVIEW.md).
-        var unfiltered = rows;
-        static IQueryable<Row> RowMatch(IQueryable<Row> q, string t, string upper)
-            => q.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
-                || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)));
+        // Kept as "row match OR id in (configured match)". Rewriting it as "id in (row matches UNION ALL configured matches)" cut logical reads of the count but was slower in elapsed time on the same
+        // SQL Server runner (text search 417 ms against 450 ms; core text search 87 ms against 168 ms), because SQL Server split the union back into two probes and the page lost its early stop. It was tried and
+        // reverted (docs/PERFORMANCE_REVIEW.md, section 6.1); do not repeat it without a same-runner measurement.
         foreach (var token in (q.Text ?? "").Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries).Take(MaxTokens))
         {
             var t = token.Trim(); var upper = t.ToUpperInvariant();
             var custom = SearchableMatches(set, catalogue, t, vis);
-            if (custom is null) { rows = RowMatch(rows, t, upper); continue; }
-            var matching = RowMatch(unfiltered, t, upper).Select(r => r.C.Id).Concat(custom);
-            rows = rows.Where(r => matching.Contains(r.C.Id));
+            rows = custom is null
+                ? rows.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
+                    || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)))
+                : rows.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
+                    || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)) || custom.Contains(r.C.Id));
         }
 
         var total = await rows.CountAsync(ct);

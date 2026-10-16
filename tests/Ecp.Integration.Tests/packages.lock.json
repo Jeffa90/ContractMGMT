@@ -424,6 +424,19 @@
           "Ecp.Tenancy": "[1.0.0, )"
         }
       },
+      "ecp.lifecycle": {
+        "type": "Project",
+        "dependencies": {
+          "Ecp.Audit": "[1.0.0, )",
+          "Ecp.Configuration": "[1.0.0, )",
+          "Ecp.Contracts": "[1.0.0, )",
+          "Ecp.Documents": "[1.0.0, )",
+          "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Persistence": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.Tenancy": "[1.0.0, )"
+        }
+      },
       "ecp.operations": {
         "type": "Project",
         "dependencies": {
@@ -480,6 +493,7 @@
           "Ecp.DataMigration": "[1.0.0, )",
           "Ecp.Documents": "[1.0.0, )",
           "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Lifecycle": "[1.0.0, )",
           "Ecp.Operations": "[1.0.0, )",
           "Ecp.Persistence": "[1.0.0, )",
           "Ecp.Setup": "[1.0.0, )",

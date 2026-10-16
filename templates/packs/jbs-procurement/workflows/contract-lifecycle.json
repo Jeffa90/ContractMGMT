@@ -1,0 +1,674 @@
+{
+ "schemaVersion": 1,
+ "workflow": "contract-lifecycle",
+ "subject": "Contract",
+ "description": "Reference contract lifecycle of the JBS Procurement pack. Data, not code: every state, transition, guard and permission here is editable configuration.",
+ "settings": {
+  "documents": {
+   "executedCopyType": "ExecutedContract",
+   "finalTypes": [
+    "FinalAgreement"
+   ],
+   "legalMarkupType": "LegalMarkup",
+   "approvalEvidenceType": "ApprovalEvidence"
+  },
+  "approval": {
+   "approverGroupKey": "GroupHeadProcurement",
+   "requireExecutedCopy": true
+  },
+  "legal": {
+   "reworkReasonRequired": true
+  },
+  "unlock": {
+   "defaultMinutes": 60,
+   "maxMinutes": 240,
+   "requireSecondPerson": false
+  },
+  "renewal": {
+   "successorInitialState": "Draft",
+   "copyFields": [
+    "description",
+    "currencyCode",
+    "estimatedValue",
+    "extensionType",
+    "noticePeriodDays",
+    "criticalNotice",
+    "reminderLeadDays",
+    "legalReviewRequired"
+   ],
+   "copyDocumentTypes": [
+    "Schedule"
+   ],
+   "startDateRule": "DayAfterPredecessorEnd"
+  },
+  "variation": {
+   "workflow": "variation"
+  }
+ },
+ "states": [
+  {
+   "code": "Draft",
+   "display": "Draft",
+   "role": "initial",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open",
+   "initial": true
+  },
+  {
+   "code": "AwaitingLegal",
+   "display": "Awaiting Legal",
+   "role": "legalQueue",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "InLegalReview",
+   "display": "In Legal Review",
+   "role": "legalReview",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "LegalOnly"
+  },
+  {
+   "code": "LegalReworkRequired",
+   "display": "Legal Rework Required",
+   "role": "legalRework",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "LegalCleared",
+   "display": "Legal Cleared",
+   "role": "legalCleared",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "InitialCreation",
+   "display": "Initial Creation",
+   "role": "drafting",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "OutForSignature",
+   "display": "Out for Signature",
+   "role": "signature",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "Closed"
+  },
+  {
+   "code": "AwaitingApproval",
+   "display": "Awaiting Approval",
+   "role": "approval",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "Closed"
+  },
+  {
+   "code": "Effective",
+   "display": "Effective",
+   "role": "effective",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "Effective: changes need an authorised Variation or an audited emergency unlock"
+  },
+  {
+   "code": "VariationInProgress",
+   "display": "Variation in Progress",
+   "role": "variation",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "A Variation is open on this agreement"
+  },
+  {
+   "code": "RenewalInProgress",
+   "display": "Renewal in Progress",
+   "role": "renewal",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "A renewal is in progress; the agreement is unchanged"
+  },
+  {
+   "code": "Suspended",
+   "display": "Suspended",
+   "role": "suspended",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "Suspended"
+  },
+  {
+   "code": "Terminated",
+   "display": "Terminated",
+   "role": "terminated",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "Terminated"
+  },
+  {
+   "code": "Ended",
+   "display": "Ended",
+   "role": "ended",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "Ended"
+  },
+  {
+   "code": "FlaggedForDisposition",
+   "display": "Flagged for Disposition",
+   "role": "flagged",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "Flagged for disposition"
+  },
+  {
+   "code": "DisposedArchived",
+   "display": "Disposed-Archived",
+   "role": "archived",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "Archived under retention",
+   "terminal": true
+  },
+  {
+   "code": "Withdrawn",
+   "display": "Withdrawn",
+   "role": "withdrawn",
+   "locked": true,
+   "freezeContent": false,
+   "documentPolicy": "Closed",
+   "lockReason": "Withdrawn before it became effective",
+   "terminal": true
+  }
+ ],
+ "transitions": [
+  {
+   "code": "SubmitForLegal",
+   "display": "Submit for Legal",
+   "from": [
+    "Draft"
+   ],
+   "to": "AwaitingLegal",
+   "permission": "contracts.submit_legal",
+   "role": "submitLegal",
+   "guards": [
+    "LegalRequired",
+    "RequiredFieldsPresent"
+   ]
+  },
+  {
+   "code": "ProceedWithoutLegal",
+   "display": "Proceed without Legal",
+   "from": [
+    "Draft"
+   ],
+   "to": "InitialCreation",
+   "permission": "contracts.edit_owned",
+   "role": "plain",
+   "guards": [
+    "LegalNotRequired"
+   ]
+  },
+  {
+   "code": "RecallFromLegal",
+   "display": "Recall from Legal",
+   "from": [
+    "AwaitingLegal"
+   ],
+   "to": "Draft",
+   "permission": "contracts.submit_legal",
+   "role": "recallLegal",
+   "reasonRequired": true,
+   "description": "The owner takes the contract back before Legal has started. The Legal round is withdrawn and kept."
+  },
+  {
+   "code": "BeginLegalReview",
+   "display": "Begin review",
+   "from": [
+    "AwaitingLegal"
+   ],
+   "to": "InLegalReview",
+   "permission": "legal.review",
+   "role": "beginLegal"
+  },
+  {
+   "code": "ReturnForRework",
+   "display": "Return for rework",
+   "from": [
+    "InLegalReview"
+   ],
+   "to": "LegalReworkRequired",
+   "permission": "legal.review",
+   "role": "returnLegal",
+   "guards": [
+    "CommentRequired"
+   ],
+   "commentRequired": true
+  },
+  {
+   "code": "ClearLegal",
+   "display": "Clear",
+   "from": [
+    "InLegalReview"
+   ],
+   "to": "LegalCleared",
+   "permission": "legal.clear",
+   "role": "clearLegal"
+  },
+  {
+   "code": "ResubmitToLegal",
+   "display": "Resubmit to Legal",
+   "from": [
+    "LegalReworkRequired"
+   ],
+   "to": "AwaitingLegal",
+   "permission": "contracts.submit_legal",
+   "role": "resubmitLegal"
+  },
+  {
+   "code": "WithdrawFromRework",
+   "display": "Withdraw",
+   "from": [
+    "LegalReworkRequired"
+   ],
+   "to": "Withdrawn",
+   "permission": "contracts.edit_owned",
+   "role": "withdraw",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "RegisterInitial",
+   "display": "Register initial",
+   "from": [
+    "LegalCleared"
+   ],
+   "to": "InitialCreation",
+   "permission": "contracts.edit_owned",
+   "role": "plain"
+  },
+  {
+   "code": "ReturnToLegal",
+   "display": "Return to Legal",
+   "from": [
+    "LegalCleared"
+   ],
+   "to": "AwaitingLegal",
+   "permission": "contracts.submit_legal",
+   "role": "returnToLegal",
+   "guards": [
+    "ControlledFieldChanged"
+   ]
+  },
+  {
+   "code": "WithdrawDraft",
+   "display": "Withdraw",
+   "from": [
+    "Draft"
+   ],
+   "to": "Withdrawn",
+   "permission": "contracts.edit_owned",
+   "role": "withdraw",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "WithdrawInitial",
+   "display": "Withdraw",
+   "from": [
+    "InitialCreation"
+   ],
+   "to": "Withdrawn",
+   "permission": "contracts.edit_owned",
+   "role": "withdraw",
+   "guards": [
+    "ReasonRequired",
+    "NoExecutedCopy"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "SendForSignature",
+   "display": "Send for signature",
+   "from": [
+    "InitialCreation"
+   ],
+   "to": "OutForSignature",
+   "permission": "contracts.edit_owned",
+   "role": "sendSignature",
+   "guards": [
+    "FinalDocumentExists"
+   ]
+  },
+  {
+   "code": "SubmitApproval",
+   "display": "Submit approval",
+   "from": [
+    "OutForSignature"
+   ],
+   "to": "AwaitingApproval",
+   "permission": "contracts.submit_approval",
+   "role": "submitRegister",
+   "guards": [
+    "ExecutedCopyExists"
+   ]
+  },
+  {
+   "code": "ReturnToDrafting",
+   "display": "Return to drafting",
+   "from": [
+    "OutForSignature"
+   ],
+   "to": "InitialCreation",
+   "permission": "contracts.edit_owned",
+   "role": "returnToDrafting",
+   "guards": [
+    "SignatureVoidedOrDeclined"
+   ]
+  },
+  {
+   "code": "Approve",
+   "display": "Approve",
+   "from": [
+    "AwaitingApproval"
+   ],
+   "to": "Effective",
+   "permission": "approvals.action",
+   "role": "approve",
+   "guards": [
+    "ExecutedCopyExists",
+    "AuthorisedApprover",
+    "SubmitterNotApprover"
+   ]
+  },
+  {
+   "code": "Reject",
+   "display": "Reject",
+   "from": [
+    "AwaitingApproval"
+   ],
+   "to": "InitialCreation",
+   "permission": "approvals.action",
+   "role": "reject",
+   "guards": [
+    "CommentRequired",
+    "AuthorisedApprover",
+    "SubmitterNotApprover"
+   ],
+   "commentRequired": true
+  },
+  {
+   "code": "CreateVariation",
+   "display": "Create variation",
+   "from": [
+    "Effective"
+   ],
+   "to": "VariationInProgress",
+   "permission": "variations.create",
+   "role": "openVariation",
+   "guards": [
+    "ParentRemainsLocked",
+    "NoOtherOpenVariation"
+   ]
+  },
+  {
+   "code": "ApplyVariation",
+   "display": "Apply variation",
+   "from": [
+    "VariationInProgress"
+   ],
+   "to": "Effective",
+   "permission": "approvals.action",
+   "role": "applyVariation",
+   "guards": [
+    "VariationOutcomeApplied"
+   ]
+  },
+  {
+   "code": "CancelVariation",
+   "display": "Cancel variation",
+   "from": [
+    "VariationInProgress"
+   ],
+   "to": "Effective",
+   "permission": "variations.create",
+   "role": "cancelVariation",
+   "guards": [
+    "ReasonRequired",
+    "VariationOutcomeNotApplied"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "RejectVariation",
+   "display": "Reject variation",
+   "from": [
+    "VariationInProgress"
+   ],
+   "to": "Effective",
+   "permission": "approvals.action",
+   "role": "rejectVariation",
+   "guards": [
+    "CommentRequired",
+    "VariationOutcomeNotApplied"
+   ],
+   "commentRequired": true
+  },
+  {
+   "code": "StartRenewal",
+   "display": "Start renewal",
+   "from": [
+    "Effective"
+   ],
+   "to": "RenewalInProgress",
+   "permission": "renewals.create",
+   "role": "startRenewal",
+   "guards": [
+    "NoOpenRenewal",
+    "NoOtherOpenVariation"
+   ]
+  },
+  {
+   "code": "CompleteRenewal",
+   "display": "Complete renewal",
+   "from": [
+    "RenewalInProgress"
+   ],
+   "to": "Effective",
+   "permission": "renewals.create",
+   "role": "completeRenewal",
+   "guards": [
+    "RenewalSuccessorEffective"
+   ]
+  },
+  {
+   "code": "CancelRenewal",
+   "display": "Cancel renewal",
+   "from": [
+    "RenewalInProgress"
+   ],
+   "to": "Effective",
+   "permission": "renewals.create",
+   "role": "cancelRenewal",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "Suspend",
+   "display": "Suspend",
+   "from": [
+    "Effective"
+   ],
+   "to": "Suspended",
+   "permission": "contracts.suspend",
+   "role": "plain",
+   "guards": [
+    "ReasonRequired",
+    "NoOtherOpenVariation"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "Reinstate",
+   "display": "Reinstate",
+   "from": [
+    "Suspended"
+   ],
+   "to": "Effective",
+   "permission": "contracts.suspend",
+   "role": "plain",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "End",
+   "display": "End",
+   "from": [
+    "Effective"
+   ],
+   "to": "Ended",
+   "permission": "contracts.close",
+   "role": "plain",
+   "guards": [
+    "Authorised",
+    "NoOtherOpenVariation"
+   ]
+  },
+  {
+   "code": "Terminate",
+   "display": "Terminate",
+   "from": [
+    "Effective"
+   ],
+   "to": "Terminated",
+   "permission": "contracts.close",
+   "role": "plain",
+   "guards": [
+    "ReasonRequired",
+    "NoOtherOpenVariation"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "TerminateSuspended",
+   "display": "Terminate",
+   "from": [
+    "Suspended"
+   ],
+   "to": "Terminated",
+   "permission": "contracts.close",
+   "role": "plain",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "FlagEnded",
+   "display": "Flag for disposition",
+   "from": [
+    "Ended"
+   ],
+   "to": "FlaggedForDisposition",
+   "permission": "disposition.request",
+   "role": "flag",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "FlagTerminated",
+   "display": "Flag for disposition",
+   "from": [
+    "Terminated"
+   ],
+   "to": "FlaggedForDisposition",
+   "permission": "disposition.request",
+   "role": "flag",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "DeclineDisposition",
+   "display": "Decline disposition",
+   "from": [
+    "FlaggedForDisposition"
+   ],
+   "to": "Ended",
+   "permission": "disposition.approve",
+   "role": "plain",
+   "guards": [
+    "CommentRequired"
+   ],
+   "commentRequired": true
+  },
+  {
+   "code": "Archive",
+   "display": "Archive",
+   "from": [
+    "Ended"
+   ],
+   "to": "DisposedArchived",
+   "permission": "disposition.approve",
+   "role": "archive",
+   "guards": [
+    "RetentionChecksPass",
+    "NoLegalHold"
+   ]
+  },
+  {
+   "code": "ArchiveTerminated",
+   "display": "Archive",
+   "from": [
+    "Terminated"
+   ],
+   "to": "DisposedArchived",
+   "permission": "disposition.approve",
+   "role": "archive",
+   "guards": [
+    "RetentionChecksPass",
+    "NoLegalHold"
+   ]
+  },
+  {
+   "code": "ArchiveFlagged",
+   "display": "Archive",
+   "from": [
+    "FlaggedForDisposition"
+   ],
+   "to": "DisposedArchived",
+   "permission": "disposition.approve",
+   "role": "archive",
+   "guards": [
+    "RetentionChecksPass",
+    "NoLegalHold",
+    "SubmitterNotApprover"
+   ]
+  }
+ ]
+}

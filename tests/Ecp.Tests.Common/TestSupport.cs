@@ -5,6 +5,7 @@ using Ecp.Contracts;
 using Ecp.Documents;
 using Ecp.Documents.Storage;
 using Ecp.DataMigration;
+using Ecp.Lifecycle;
 using Ecp.Operations;
 using Ecp.Persistence;
 using Ecp.Setup;
@@ -145,6 +146,7 @@ public sealed class TestApp : IAsyncDisposable
         services.AddContractsModule(o => o.InitialStatusCode = "Draft");
         services.AddDocumentsModule(_ => { }, new LocalFileSystemOptions { RootPath = Path.Combine(root, "documents") });
         services.AddMigrationModule();
+        services.AddLifecycleModule(o => o.Mode = setupMode);
         services.AddOperationsModule(root);
         services.AddSetupModule(new SetupEnvironment(setupMode, root, DemoIdentityEnabled: false, DemoSeedEnabled: false, ConnectionFromSecretReference: false,
             provider.ToString(), "test", AllowRemoteSetup: false));

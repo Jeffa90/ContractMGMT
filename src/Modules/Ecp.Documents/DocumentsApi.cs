@@ -28,6 +28,9 @@ public sealed record AddDocumentRequest(
 
 public sealed record AddVersionRequest(Guid DocumentId, string FileName, string MimeType, Stream Content, string? VersionLabel = null, DateOnly? DocumentDate = null);
 
+/// <summary>Copies the current version of a document to another contract (a renewal's successor). The copy is a new document with its own history; it is never marked as an executed copy.</summary>
+public sealed record CopyDocumentRequest(Guid SourceDocumentId, Guid TargetContractId, Guid OrganisationId, string Classification);
+
 public sealed record DocumentVersionDto(Guid DocumentId, Guid VersionId, int VersionNumber, string FileName, long SizeBytes, string Sha256, ScanStatus ScanStatus, bool Downloadable);
 
 public interface IDocumentService
@@ -36,6 +39,9 @@ public interface IDocumentService
 
     /// <summary>Adds a version to an active document (for example a revised mark-up). Earlier versions are kept unchanged; the new version is scanned like any upload. No authorisation here: the owning module decides.</summary>
     Task<DocumentVersionDto> AddVersionAsync(AddVersionRequest request, CancellationToken ct = default);
+
+    /// <summary>Copies the current version of an active, downloadable document to another contract as a new document. No authorisation here: the owning module decides what may be copied.</summary>
+    Task<DocumentVersionDto> CopyAsync(CopyDocumentRequest request, CancellationToken ct = default);
 
     /// <summary>Opens content only if the version is downloadable. Record-level access checks are added by the access evaluator (M2).</summary>
     Task<Stream?> OpenDownloadAsync(Guid documentId, CancellationToken ct = default);
@@ -108,6 +114,26 @@ internal sealed class DocumentService(
                 NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { version.VersionNumber, version.FileName, version.Sha256, version.SizeBytes })));
             return new DocumentVersionDto(document.Id, version.Id, version.VersionNumber, version.FileName, version.SizeBytes, version.Sha256, version.ScanStatus, version.IsDownloadable(options.Value.AllowSkippedScan));
         }, ct);
+    }
+
+    public async Task<DocumentVersionDto> CopyAsync(CopyDocumentRequest r, CancellationToken ct = default)
+    {
+        var tenantId = tenant.RequireTenantId();
+        var source = await (from d in db.Documents.AsNoTracking()
+                            join v in db.Versions.AsNoTracking() on d.CurrentVersionId equals v.Id
+                            where d.Id == r.SourceDocumentId && d.Status == DocumentStatus.Active
+                            select new { Document = d, Version = v }).FirstOrDefaultAsync(ct) ?? throw new DomainException("document_not_found", "The document was not found.");
+        if (!source.Version.IsDownloadable(options.Value.AllowSkippedScan)) throw new DomainException("document_not_copyable", "Only a document that has passed its scan can be copied.");
+        await using var content = await storage.OpenReadAsync(tenantId, source.Version.StorageKey, ct);
+        var copy = await AddAsync(new AddDocumentRequest(r.OrganisationId, r.TargetContractId, source.Document.DocumentTypeCode, source.Document.Title, source.Version.FileName, source.Version.MimeType, content,
+            r.Classification, false, source.Version.VersionLabel, source.Version.DocumentDate), ct);
+        await uow.ExecuteAsync(c =>
+        {
+            audit.Record(new AuditEntry("document.copied", nameof(Document), copy.DocumentId.ToString(), OrganisationId: r.OrganisationId, Classification: r.Classification,
+                NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { sourceDocumentId = r.SourceDocumentId, copy.Sha256 })));
+            return Task.CompletedTask;
+        }, ct);
+        return copy;
     }
 
     public async Task<Stream?> OpenDownloadAsync(Guid documentId, CancellationToken ct = default)

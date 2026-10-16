@@ -25,6 +25,16 @@ public interface IContractCreationPolicy
     Task<ContractCreationSetup> ResolveAsync(Guid organisationId, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Tells the contract access rules which contracts have a register-authorisation request waiting, and for which approver group. An Approver or Backup Approver can read a contract only while one is
+/// waiting for their group; the lifecycle module supplies the facts, so the rule stays in the access evaluator and the facts stay with their owner.
+/// </summary>
+public interface IPendingApprovalSource
+{
+    /// <summary>Contract id to the approver groups with a request waiting on it (a Variation's request counts for its parent contract). Null asks for all.</summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlySet<string>>> PendingAsync(IReadOnlyCollection<Guid>? contractIds, CancellationToken ct = default);
+}
+
 /// <summary>A contract's dates and reminder attributes, for the reminder scan.</summary>
 public sealed record ReminderCandidate(Guid ContractId, Guid OrganisationId, string AgreementReference, string Title, string Status, string Classification, Guid CategoryId,
     DateOnly? ReviewDate, DateOnly? EndDate, string? ExtensionType, int? NoticePeriodDays, bool CriticalNotice, int? ReminderLeadDays, bool IsArchived);
@@ -56,6 +66,11 @@ public interface IContractLifecyclePort
     /// <summary>Applies named changes through a controlled path (an applied Variation, or an emergency unlock) and returns what changed, before and after. The audit event carries <paramref name="authorityId"/>.</summary>
     Task<IReadOnlyList<FieldChange>> ApplyControlledChangesAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, IReadOnlyCollection<string> allowed, string actor,
         string authorityKind, Guid authorityId, string? reason, CancellationToken ct = default);
+
+    /// <summary>Checks named changes against the same rules without saving anything, and returns what would change. Used to validate and preview a Variation's proposed changes.</summary>
+    Task<IReadOnlyList<FieldChange>> PreviewControlledChangesAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, IReadOnlyCollection<string> allowed, CancellationToken ct = default);
+    /// <summary>The current values of the named fields, as text, for a before/after comparison.</summary>
+    Task<IReadOnlyDictionary<string, string?>> CurrentValuesAsync(Guid contractId, IReadOnlyCollection<string> fields, CancellationToken ct = default);
 
     Task SetReminderSettingsAsync(Guid contractId, int? leadDays, int? noticePeriodDays, bool criticalNotice, string actor, CancellationToken ct = default);
     /// <summary>Creates the successor Draft of a renewal and links both ways. Returns the new contract id. Nothing of the predecessor's history is copied.</summary>
@@ -173,6 +188,21 @@ internal sealed class ContractLifecyclePort(
                 OldValuesJson: AuditJson.Of(applied.ToDictionary(f => f.Field, f => f.Before)), NewValuesJson: AuditJson.Of(new { authority = authorityKind, authorityId, changes = applied.ToDictionary(f => f.Field, f => f.After) })));
             return applied;
         }, ct);
+
+    public async Task<IReadOnlyList<FieldChange>> PreviewControlledChangesAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, IReadOnlyCollection<string> allowed, CancellationToken ct = default)
+    {
+        // An untracked copy takes the change, so the rules run exactly as they would on apply but nothing is stored.
+        var copy = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+        try { return copy.ApplyControlledFields(changes, allowed, "preview", clock.UtcNow); }
+        catch (FormatException) { throw new DomainException("invalid_value", "One of the values is not in a recognised format."); }
+        catch (OverflowException) { throw new DomainException("invalid_value", "One of the values is out of range."); }
+    }
+
+    public async Task<IReadOnlyDictionary<string, string?>> CurrentValuesAsync(Guid contractId, IReadOnlyCollection<string> fields, CancellationToken ct = default)
+    {
+        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+        return c.CaptureFields(fields);
+    }
 
     public Task SetReminderSettingsAsync(Guid contractId, int? leadDays, int? noticePeriodDays, bool criticalNotice, string actor, CancellationToken ct = default)
         => uow.ExecuteAsync(async c =>

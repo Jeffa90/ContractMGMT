@@ -63,6 +63,13 @@ public interface IConfigurationBootstrap
     Task<ReleaseDto> DraftValidatePublishAsync(string kind, Guid organisationId, string contentJson, string publishedBy, string note, CancellationToken ct = default);
 }
 
+/// <summary>Trusted reads of published releases for modules that run on configuration (the lifecycle engine pins contracts to a release). No per-user authorisation; not reachable from request input.</summary>
+public interface IConfigurationReleases
+{
+    Task<ReleaseDto?> FindAsync(Guid releaseId, CancellationToken ct = default);
+    Task<ReleaseDto?> LatestAsync(string kind, Guid organisationId, CancellationToken ct = default);
+}
+
 public sealed class ConfigurationOptions
 {
     /// <summary>Second-person publish: the publisher must differ from the last editor of the draft (tenant setting; on by default in Production).</summary>
@@ -71,7 +78,7 @@ public sealed class ConfigurationOptions
 
 internal sealed class ConfigurationService(
     ConfigurationDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IAccessService access, CurrentUser currentUser,
-    IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor) : IConfigurationService, IConfigurationBootstrap
+    IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor) : IConfigurationService, IConfigurationBootstrap, IConfigurationReleases
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -218,6 +225,14 @@ internal sealed class ConfigurationService(
         return r is null ? null : ToDto(r);
     }
 
+    public async Task<ReleaseDto?> FindAsync(Guid releaseId, CancellationToken ct = default)
+    {
+        var r = await db.Releases.AsNoTracking().FirstOrDefaultAsync(x => x.Id == releaseId, ct);
+        return r is null ? null : ToDto(r);
+    }
+
+    public Task<ReleaseDto?> LatestAsync(string kind, Guid organisationId, CancellationToken ct = default) => LatestReleaseAsync(kind, organisationId, ct);
+
     public async Task<ReleaseDto?> LatestReleaseOfAnyKindAsync(Guid organisationId, CancellationToken ct = default)
     {
         var r = await db.Releases.AsNoTracking().Where(x => x.OrganisationId == organisationId || x.OrganisationId == Guid.Empty)
@@ -330,6 +345,7 @@ public static class ConfigurationModule
         services.AddScoped<ConfigurationService>();
         services.AddScoped<IConfigurationService>(sp => sp.GetRequiredService<ConfigurationService>());
         services.AddScoped<IConfigurationBootstrap>(sp => sp.GetRequiredService<ConfigurationService>());
+        services.AddScoped<IConfigurationReleases>(sp => sp.GetRequiredService<ConfigurationService>());
         services.AddScoped<IConfigurationKind, ClassificationPolicyKind>();
         services.AddSingleton<ISolutionPackCatalogue, EmbeddedPackCatalogue>();
         services.AddScoped<IConfigurationKind, SolutionPackKind>();

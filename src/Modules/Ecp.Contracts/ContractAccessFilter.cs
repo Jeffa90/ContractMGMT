@@ -12,7 +12,8 @@ public static class ContractAccessFilter
     public sealed record Context(
         IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> DescendantsOf,      // category id -> itself and all descendants
         IReadOnlySet<Guid> OwnedCategoryIds,                               // categories (not expanded) the user currently owns
-        IReadOnlyDictionary<Guid, Guid?> DivisionOfBusinessUnit);          // business unit id -> division id
+        IReadOnlyDictionary<Guid, Guid?> DivisionOfBusinessUnit,           // business unit id -> division id
+        IReadOnlyDictionary<string, IReadOnlyList<Guid>>? PendingByGroup = null); // approver group -> contracts with a request waiting for it
 
     public static Expression<Func<Contract, bool>> Build(IReadOnlyList<AccessGrant> grants, Context ctx)
     {
@@ -27,10 +28,17 @@ public static class ContractAccessFilter
 
     private static Expression<Func<Contract, bool>> ForGrant(AccessGrant g, Context ctx)
     {
-        if (g.Relationship is GrantRelationship.AssignedApproval or GrantRelationship.PolicyAuthorised or GrantRelationship.TenantLevelDefinition)
-            return c => false; // not listable: relationship facts for these do not exist as list-able data yet
+        if (g.Relationship is GrantRelationship.PolicyAuthorised or GrantRelationship.TenantLevelDefinition)
+            return c => false; // not listable: relationship facts for these do not exist as list-able data
 
         Expression<Func<Contract, bool>> result = c => true;
+        if (g.Relationship == GrantRelationship.AssignedApproval)
+        {
+            // Only the contracts with a request waiting for this assignment's approver group.
+            var waiting = g.ApproverGroupKey is not null && ctx.PendingByGroup?.TryGetValue(g.ApproverGroupKey, out var ids) == true ? ids.ToArray() : [];
+            if (waiting.Length == 0) return c => false;
+            result = c => waiting.Contains(c.Id);
+        }
         var classes = g.AllowedClassifications.ToArray();
         result = And(result, c => classes.Contains(c.Classification));
 

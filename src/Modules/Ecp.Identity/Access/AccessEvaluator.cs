@@ -171,7 +171,7 @@ public sealed class AccessEvaluator(PermissionMatrix matrix)
             grants.Add(new AccessGrant(
                 a.Id, a.RoleCode, scope.Level == ScopeLevel.Organisation ? scope.OrganisationIds : null,
                 scope.BusinessUnitIds, scope.DivisionIds, scope.SiteIds, categoriesIgnored ? null : scope.CategoryIds,
-                scale.AtOrBelow(scope.ClassificationCeiling).Where(l => !scale.IsPrivileged(l) || MayReadPrivileged(a)).ToList(), cell == Grant.Scoped ? RelationshipOf(a.RoleCode) : GrantRelationship.None));
+                scale.AtOrBelow(scope.ClassificationCeiling).Where(l => !scale.IsPrivileged(l) || MayReadPrivileged(a)).ToList(), cell == Grant.Scoped ? RelationshipOf(a.RoleCode) : GrantRelationship.None, a.ApproverGroupKey));
         }
         return grants;
     }

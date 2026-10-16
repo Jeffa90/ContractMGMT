@@ -1,0 +1,369 @@
+{
+ "schemaVersion": 1,
+ "workflow": "variation",
+ "subject": "Variation",
+ "description": "Reference Variation workflow of the JBS Procurement pack. Its outcome (Applied, Rejected or Cancelled) returns the parent agreement to its prior state.",
+ "settings": {
+  "documents": {
+   "executedCopyType": "ExecutedContract",
+   "finalTypes": [
+    "VariationDocument"
+   ],
+   "legalMarkupType": "LegalMarkup",
+   "approvalEvidenceType": "ApprovalEvidence"
+  },
+  "approval": {
+   "approverGroupKey": "GroupHeadProcurement",
+   "requireExecutedCopy": true
+  },
+  "legal": {
+   "reworkReasonRequired": true
+  },
+  "variation": {
+   "legalReview": "Optional",
+   "changeableFields": [
+    "currencyCode",
+    "estimatedValue",
+    "extensionType",
+    "noticePeriodDays",
+    "criticalNotice",
+    "reviewDate",
+    "endDate",
+    "businessUnitId",
+    "siteId"
+   ]
+  }
+ },
+ "states": [
+  {
+   "code": "Draft",
+   "display": "Draft",
+   "role": "initial",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open",
+   "initial": true
+  },
+  {
+   "code": "AwaitingLegal",
+   "display": "Awaiting Legal",
+   "role": "legalQueue",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "InLegalReview",
+   "display": "In Legal Review",
+   "role": "legalReview",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "LegalReworkRequired",
+   "display": "Legal Rework Required",
+   "role": "legalRework",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "LegalCleared",
+   "display": "Legal Cleared",
+   "role": "legalCleared",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "Prepared",
+   "display": "Prepared",
+   "role": "drafting",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "OutForSignature",
+   "display": "Out for Signature",
+   "role": "signature",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "AwaitingApproval",
+   "display": "Awaiting Approval",
+   "role": "approval",
+   "locked": false,
+   "freezeContent": true,
+   "documentPolicy": "Open"
+  },
+  {
+   "code": "Applied",
+   "display": "Applied",
+   "role": "applied",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open",
+   "terminal": true
+  },
+  {
+   "code": "Rejected",
+   "display": "Rejected",
+   "role": "rejected",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open",
+   "terminal": true
+  },
+  {
+   "code": "Cancelled",
+   "display": "Cancelled",
+   "role": "cancelled",
+   "locked": false,
+   "freezeContent": false,
+   "documentPolicy": "Open",
+   "terminal": true
+  }
+ ],
+ "transitions": [
+  {
+   "code": "SubmitForLegal",
+   "display": "Submit for Legal",
+   "from": [
+    "Draft"
+   ],
+   "to": "AwaitingLegal",
+   "permission": "variations.create",
+   "role": "submitLegal",
+   "guards": [
+    "LegalRequired",
+    "RequiredFieldsPresent"
+   ]
+  },
+  {
+   "code": "ProceedWithoutLegal",
+   "display": "Prepare for signature",
+   "from": [
+    "Draft"
+   ],
+   "to": "Prepared",
+   "permission": "variations.create",
+   "role": "plain",
+   "guards": [
+    "LegalNotRequired",
+    "RequiredFieldsPresent"
+   ]
+  },
+  {
+   "code": "RecallFromLegal",
+   "display": "Recall from Legal",
+   "from": [
+    "AwaitingLegal"
+   ],
+   "to": "Draft",
+   "permission": "variations.create",
+   "role": "recallLegal",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "BeginLegalReview",
+   "display": "Begin review",
+   "from": [
+    "AwaitingLegal"
+   ],
+   "to": "InLegalReview",
+   "permission": "legal.review",
+   "role": "beginLegal"
+  },
+  {
+   "code": "ReturnForRework",
+   "display": "Return for rework",
+   "from": [
+    "InLegalReview"
+   ],
+   "to": "LegalReworkRequired",
+   "permission": "legal.review",
+   "role": "returnLegal",
+   "guards": [
+    "CommentRequired"
+   ],
+   "commentRequired": true
+  },
+  {
+   "code": "ClearLegal",
+   "display": "Clear",
+   "from": [
+    "InLegalReview"
+   ],
+   "to": "LegalCleared",
+   "permission": "legal.clear",
+   "role": "clearLegal"
+  },
+  {
+   "code": "ResubmitToLegal",
+   "display": "Resubmit to Legal",
+   "from": [
+    "LegalReworkRequired"
+   ],
+   "to": "AwaitingLegal",
+   "permission": "variations.create",
+   "role": "resubmitLegal"
+  },
+  {
+   "code": "PrepareAfterLegal",
+   "display": "Prepare for signature",
+   "from": [
+    "LegalCleared"
+   ],
+   "to": "Prepared",
+   "permission": "variations.create",
+   "role": "plain"
+  },
+  {
+   "code": "SendForSignature",
+   "display": "Send for signature",
+   "from": [
+    "Prepared"
+   ],
+   "to": "OutForSignature",
+   "permission": "variations.create",
+   "role": "sendSignature",
+   "guards": [
+    "FinalDocumentExists"
+   ]
+  },
+  {
+   "code": "SubmitApproval",
+   "display": "Submit approval",
+   "from": [
+    "OutForSignature"
+   ],
+   "to": "AwaitingApproval",
+   "permission": "variations.create",
+   "role": "submitRegister",
+   "guards": [
+    "ExecutedCopyExists"
+   ]
+  },
+  {
+   "code": "ReturnToDrafting",
+   "display": "Return to drafting",
+   "from": [
+    "OutForSignature"
+   ],
+   "to": "Prepared",
+   "permission": "variations.create",
+   "role": "returnToDrafting",
+   "guards": [
+    "SignatureVoidedOrDeclined"
+   ]
+  },
+  {
+   "code": "Approve",
+   "display": "Approve and apply",
+   "from": [
+    "AwaitingApproval"
+   ],
+   "to": "Applied",
+   "permission": "approvals.action",
+   "role": "approve",
+   "guards": [
+    "ExecutedCopyExists",
+    "AuthorisedApprover",
+    "SubmitterNotApprover"
+   ]
+  },
+  {
+   "code": "Reject",
+   "display": "Reject",
+   "from": [
+    "AwaitingApproval"
+   ],
+   "to": "Rejected",
+   "permission": "approvals.action",
+   "role": "reject",
+   "guards": [
+    "CommentRequired",
+    "AuthorisedApprover",
+    "SubmitterNotApprover"
+   ],
+   "commentRequired": true
+  },
+  {
+   "code": "CancelDraft",
+   "display": "Cancel",
+   "from": [
+    "Draft"
+   ],
+   "to": "Cancelled",
+   "permission": "variations.create",
+   "role": "cancel",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "CancelLegalRework",
+   "display": "Cancel",
+   "from": [
+    "LegalReworkRequired"
+   ],
+   "to": "Cancelled",
+   "permission": "variations.create",
+   "role": "cancel",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "CancelPrepared",
+   "display": "Cancel",
+   "from": [
+    "Prepared"
+   ],
+   "to": "Cancelled",
+   "permission": "variations.create",
+   "role": "cancel",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "CancelLegalCleared",
+   "display": "Cancel",
+   "from": [
+    "LegalCleared"
+   ],
+   "to": "Cancelled",
+   "permission": "variations.create",
+   "role": "cancel",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  },
+  {
+   "code": "CancelSignature",
+   "display": "Cancel",
+   "from": [
+    "OutForSignature"
+   ],
+   "to": "Cancelled",
+   "permission": "variations.create",
+   "role": "cancel",
+   "guards": [
+    "ReasonRequired"
+   ],
+   "reasonRequired": true
+  }
+ ]
+}

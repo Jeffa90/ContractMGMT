@@ -1,0 +1,104 @@
+using System.Text;
+using Ecp.Contracts;
+using Ecp.Documents;
+using Ecp.Identity;
+using Ecp.Identity.Access;
+using Ecp.Identity.Domain;
+using Ecp.Lifecycle;
+using Ecp.Lifecycle.Domain;
+using Ecp.SharedKernel;
+using Ecp.Tests.Common;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+namespace Ecp.Integration.Tests;
+
+/// <summary>The standard access world plus the people the lifecycle needs: two Legal reviewers, the register-authorisation approver and a backup, and helpers to take a contract through its workflow.</summary>
+internal sealed class LifecycleWorld
+{
+    public const string ApproverGroup = "GroupHeadProcurement";
+    public AccessWorld W { get; }
+    public TestApp App { get; }
+    private int _n;
+
+    private LifecycleWorld(AccessWorld w, TestApp app) { W = w; App = app; }
+
+    public static async Task<LifecycleWorld> CreateAsync(TestApp app)
+    {
+        var w = await AccessWorld.CreateAsync(app, "TenantL" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant());
+        var lw = new LifecycleWorld(w, app);
+        await lw.UserAsync("legalA", RoleCodes.Legal, null, "Restricted");
+        await lw.UserAsync("legalB", RoleCodes.Legal, null, "Restricted");
+        await lw.UserAsync("groupHead", RoleCodes.Approver, ApproverGroup, "Confidential");
+        await lw.UserAsync("backupHead", RoleCodes.BackupApprover, ApproverGroup, "Confidential");
+        await lw.UserAsync("otherApprover", RoleCodes.Approver, "SomeOtherGroup", "Confidential");
+        return lw;
+    }
+
+    public async Task<Guid> UserAsync(string key, string role, string? group, string ceiling, bool privileged = false)
+    {
+        await using var s = W.AsScopeless();
+        var id = await s.Get<IUserService>().CreateActiveTrustedAsync(key, key + "@" + W.TenantId.ToString("N")[..8] + ".example.test", "demo", "https://demo.example.test", key + "|" + W.TenantId, "test");
+        await s.Get<IRoleAssignmentService>().GrantTrustedAsync(new GrantRequest(id, role, null, ScopeSet.ForOrganisations([W.Org1], ceiling), group, EffectiveFromUtc: W.Now.AddDays(-5), ExplicitHighCeiling: true, PrivilegedAccess: privileged),
+            AssignmentSource.Demo, "test");
+        W.Users[key] = id;
+        return id;
+    }
+
+    public static MemoryStream Bytes(string text = "synthetic document") => new(Encoding.UTF8.GetBytes(text));
+
+    /// <summary>A new draft contract created by the Packaging owner through the secured path (so it is pinned to the workflow in force).</summary>
+    public async Task<Guid> NewDraftAsync(string classification = "Internal", bool legal = true, string? title = null)
+    {
+        var n = Interlocked.Increment(ref _n);
+        return await W.AsAsync("ownerPackaging", s => s.Get<ISecuredContractService>().CreateDraftAsync(
+            new CreateContractRequest(W.Org1, $"LC-{W.TenantId.ToString("N")[..5].ToUpperInvariant()}-{n:000}", title ?? $"Lifecycle {n}", W.Sup1, W.CatPackaging, Classification: classification, LegalReviewRequired: legal,
+                CurrencyCode: "AUD", EstimatedValue: 1000m, EndDate: DateOnly.FromDateTime(W.Now.AddDays(300)))));
+    }
+
+    public Task<string> StatusAsync(Guid contractId) => W.AsScopeless().Run(async s => (await s.Get<IContractLifecyclePort>().FindAsync(contractId))!.Status);
+
+    public Task<ContractFacts> FactsAsync(Guid contractId) => W.AsScopeless().Run(async s => (await s.Get<IContractLifecyclePort>().FindAsync(contractId))!);
+
+    public Task<T> As<T>(string user, Func<TenantScope, Task<T>> work) => W.AsAsync(user, work);
+    public Task As(string user, Func<TenantScope, Task> work) => W.AsAsync(user, work);
+
+    public async Task AddDocumentAsync(Guid contractId, string type, string title, string user = "ownerPackaging")
+        => await As(user, s => s.Get<ISecuredContractDocuments>().AddAsync(new AddContractDocumentRequest(contractId, type, title, title + ".pdf", "application/pdf", Bytes(title))));
+
+    /// <summary>Takes a contract from Draft to Awaiting Approval, with Legal review first when it requires it.</summary>
+    public async Task<Guid> ToAwaitingApprovalAsync(Guid contractId, bool legal = true)
+    {
+        if (legal)
+        {
+            await As("ownerPackaging", s => s.Get<ILegalReviewService>().SubmitAsync(new SubmitLegalRequest(SubjectKinds.Contract, contractId, "Please review")));
+            var review = await As("ownerPackaging", s => s.Get<ILegalReviewService>().FindForSubjectAsync(SubjectKinds.Contract, contractId));
+            await As("legalA", s => s.Get<ILegalReviewService>().BeginAsync(review!.ReviewId));
+            await As("legalA", s => s.Get<ILegalReviewService>().ClearAsync(review!.ReviewId, "Acceptable"));
+            await As("ownerPackaging", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(contractId, "RegisterInitial")));
+        }
+        else await As("ownerPackaging", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(contractId, "ProceedWithoutLegal")));
+        await AddDocumentAsync(contractId, "FinalAgreement", "Final agreement");
+        await As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, contractId, "manual"));
+        await As("ownerPackaging", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, contractId, "executed.pdf", "application/pdf", Bytes("executed"))));
+        return await As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, contractId, "Executed copy attached"));
+    }
+
+    /// <summary>Takes a contract all the way to Effective.</summary>
+    public async Task<Guid> ToEffectiveAsync(bool legal = true, string classification = "Internal")
+    {
+        var id = await NewDraftAsync(classification, legal);
+        var request = await ToAwaitingApprovalAsync(id, legal);
+        await As("groupHead", s => s.Get<IRegisterAuthorisationService>().ApproveAsync(request, "Approved"));
+        return id;
+    }
+}
+
+internal static class ScopeExtensions
+{
+    /// <summary>Runs work in a scope and disposes it.</summary>
+    public static async Task<T> Run<T>(this TenantScope scope, Func<TenantScope, Task<T>> work)
+    {
+        await using (scope) return await work(scope);
+    }
+}

@@ -83,7 +83,8 @@ public sealed record AccessGrant(
     IReadOnlyList<Guid> BusinessUnitIds, IReadOnlyList<Guid> DivisionIds, IReadOnlyList<Guid> SiteIds,
     IReadOnlyList<Guid>? CategoryIds,           // null = all categories (or category scope ignored for this permission)
     IReadOnlyList<string> AllowedClassifications,
-    GrantRelationship Relationship);
+    GrantRelationship Relationship,
+    string? ApproverGroupKey = null);
 
 /// <summary>Extra condition a grant carries for list queries.</summary>
 public enum GrantRelationship
@@ -92,7 +93,7 @@ public enum GrantRelationship
     None,
     /// <summary>Only records in categories the user is currently assigned (edit-type permissions of Category Owner).</summary>
     ActiveCategoryOwnership,
-    /// <summary>Only records with a pending approval for the assignment's approver group; none exist until approvals are built, so nothing is listed.</summary>
+    /// <summary>Only records with a pending approval for the assignment's approver group. The owning module supplies which records those are; with none pending, nothing is listed.</summary>
     AssignedApproval,
     /// <summary>Granted only where organisation policy has authorised it; not listable.</summary>
     PolicyAuthorised,

@@ -126,7 +126,7 @@ public interface ICategoryAdministration
 }
 
 /// <summary>Loads the reference facts (category tree, ownership, structure) the access layer needs for contracts.</summary>
-internal sealed class ContractAccessContext(ContractsDbContext db, IOrganisationStructureService structure, IClock clock)
+internal sealed class ContractAccessContext(ContractsDbContext db, IOrganisationStructureService structure, IClock clock, IEnumerable<IPendingApprovalSource> pendingSources)
 {
     public async Task<(Dictionary<Guid, Guid?> Parents, Dictionary<Guid, IReadOnlyList<Guid>> Descendants, Dictionary<Guid, IReadOnlyList<Guid>> Ancestry)> CategoryTreeAsync(CancellationToken ct)
     {
@@ -152,7 +152,15 @@ internal sealed class ContractAccessContext(ContractsDbContext db, IOrganisation
         var divisionOf = new Dictionary<Guid, Guid?>();
         foreach (var org in await structure.ListOrganisationsAsync(ct))
             foreach (var bu in (await structure.GetAsync(org.Id, ct)).BusinessUnits) divisionOf[bu.Id] = bu.DivisionId;
-        return new ContractAccessFilter.Context(descendants, owned, divisionOf);
+        var pendingByGroup = new Dictionary<string, List<Guid>>(StringComparer.Ordinal);
+        foreach (var source in pendingSources) // sequential: all module contexts share one connection
+            foreach (var (contractId, groups) in await source.PendingAsync(null, ct))
+                foreach (var group in groups)
+                {
+                    if (!pendingByGroup.TryGetValue(group, out var list)) pendingByGroup[group] = list = [];
+                    list.Add(contractId);
+                }
+        return new ContractAccessFilter.Context(descendants, owned, divisionOf, pendingByGroup.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<Guid>)kv.Value.Distinct().ToList()));
     }
 
     public async Task<ResourceDescriptor> DescribeAsync(Contract c, CancellationToken ct)
@@ -164,8 +172,12 @@ internal sealed class ContractAccessContext(ContractsDbContext db, IOrganisation
             .Where(a => a.IsActiveAt(now)).Select(a => a.UserId).ToHashSet();
         Guid? division = null;
         if (c.BusinessUnitId is { } bu) division = (await structure.GetAsync(c.OrganisationId, ct)).DivisionOfBusinessUnit(bu);
+        // An approver reaches a contract only while a request is waiting for their group.
+        HashSet<string>? waiting = null;
+        foreach (var source in pendingSources)
+            foreach (var groups in (await source.PendingAsync([c.Id], ct)).Values) (waiting ??= new HashSet<string>(StringComparer.Ordinal)).UnionWith(groups);
         return new ResourceDescriptor("Contract", c.TenantId, c.OrganisationId, c.BusinessUnitId, division, c.SiteId, c.CategoryId, path, c.Classification,
-            c.RecordLocked, owners, Id: c.Id.ToString());
+            c.RecordLocked, owners, PendingApprovalGroupKeys: waiting, Id: c.Id.ToString());
     }
 }
 

@@ -20,6 +20,7 @@
     <ProjectReference Include="../../src/Modules/Ecp.Contracts/Ecp.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.Documents/Ecp.Documents.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.DataMigration/Ecp.DataMigration.csproj" />
+    <ProjectReference Include="../../src/Modules/Ecp.Lifecycle/Ecp.Lifecycle.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.Operations/Ecp.Operations.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.Setup/Ecp.Setup.csproj" />
   </ItemGroup>

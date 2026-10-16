@@ -1,0 +1,107 @@
+using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
+using System.Reflection;
+using Ecp.Configuration;
+using Ecp.Identity.Access;
+using Ecp.SharedKernel;
+using Microsoft.Extensions.Options;
+
+namespace Ecp.Lifecycle.Definitions;
+
+public sealed class LifecycleOptions
+{
+    /// <summary>The solution pack whose reference workflow definitions are installed for an organisation that has published none yet. They are a starting point, edited like any configuration.</summary>
+    public string DefaultPackId { get; set; } = "jbs-procurement";
+    /// <summary>Installation mode. Mock providers and simulated signing events are refused in Production.</summary>
+    public EcpMode Mode { get; set; } = EcpMode.Production;
+    /// <summary>How recently the person must have signed in to force-unlock a record.</summary>
+    public TimeSpan ReauthenticationWindow { get; set; } = TimeSpan.FromMinutes(10);
+}
+
+/// <summary>A workflow definition as it was published, with the reference a contract is pinned to.</summary>
+public sealed record ResolvedDefinition(WorkflowDefinition Definition, string WorkflowRef, Guid ReleaseId, int ReleaseNumber, string Kind);
+
+public static class WorkflowKinds
+{
+    public const string ContractLifecycle = "WorkflowContractLifecycle";
+    public const string Variation = "WorkflowVariation";
+
+    public static string ExpectedSubject(string kind) => kind == Variation ? "Variation" : "Contract";
+    public static string ResourceName(string packId, string kind) => $"Ecp.Workflow.{packId}.{(kind == Variation ? "variation" : "contract-lifecycle")}.json";
+}
+
+/// <summary>Configuration kind for a workflow definition: gives it draft, validate, preview, publish, version history, rollback and audit like any other configuration.</summary>
+internal sealed class WorkflowDefinitionKind(string kind) : IConfigurationKind
+{
+    public string Kind => kind;
+
+    public Task<ValidationReport> ValidateAsync(Guid organisationId, string contentJson, CancellationToken ct)
+    {
+        var (definition, messages) = WorkflowDefinitionParser.Parse(contentJson);
+        if (definition is not null) messages.AddRange(WorkflowDefinitionParser.Validate(definition, WorkflowKinds.ExpectedSubject(kind), PermissionMatrix.Instance));
+        return Task.FromResult(new ValidationReport(messages));
+    }
+
+    // A published definition takes effect for contracts created from now on and for contracts not yet pinned; a contract already pinned keeps the release it started under.
+    public Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;
+}
+
+public interface IWorkflowDefinitions
+{
+    /// <summary>The definition a contract (or Variation) is pinned to. When it has none yet, the latest published release is used.</summary>
+    Task<ResolvedDefinition> ResolveAsync(string kind, Guid organisationId, Guid? pinnedReleaseId, CancellationToken ct = default);
+    /// <summary>The latest published release; the pack's reference definition is installed first if the organisation has published none.</summary>
+    Task<ResolvedDefinition> CurrentAsync(string kind, Guid organisationId, CancellationToken ct = default);
+}
+
+internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, IOptions<LifecycleOptions> options) : IWorkflowDefinitions
+{
+    // A published release is immutable, so parsing it once per release id is safe for the life of the process.
+    private static readonly ConcurrentDictionary<Guid, WorkflowDefinition> Parsed = new();
+
+    public async Task<ResolvedDefinition> ResolveAsync(string kind, Guid organisationId, Guid? pinnedReleaseId, CancellationToken ct = default)
+    {
+        if (pinnedReleaseId is { } id)
+        {
+            var pinned = await releases.FindAsync(id, ct);
+            if (pinned is not null && pinned.Kind == kind) return ToResolved(pinned);
+        }
+        return await CurrentAsync(kind, organisationId, ct);
+    }
+
+    public async Task<ResolvedDefinition> CurrentAsync(string kind, Guid organisationId, CancellationToken ct = default)
+    {
+        var latest = await releases.LatestAsync(kind, organisationId, ct);
+        if (latest is null)
+        {
+            var json = ReadPackDefinition(options.Value.DefaultPackId, kind);
+            try { latest = await bootstrap.DraftValidatePublishAsync(kind, organisationId, json, "system", $"Installed the {options.Value.DefaultPackId} reference definition", ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Another request may have installed it first (the release number is unique); use theirs. Anything else is a real failure.
+                latest = await releases.LatestAsync(kind, organisationId, ct);
+                if (latest is null) ExceptionDispatchInfo.Capture(ex).Throw();
+            }
+        }
+        return ToResolved(latest!);
+    }
+
+    private static ResolvedDefinition ToResolved(ReleaseDto release)
+    {
+        var definition = Parsed.GetOrAdd(release.Id, _ =>
+        {
+            var (parsed, messages) = WorkflowDefinitionParser.Parse(release.ContentJson);
+            return parsed ?? throw new DomainException("workflow_unreadable", "The published workflow definition could not be read: " + string.Join("; ", messages.Select(m => m.Message)));
+        });
+        return new ResolvedDefinition(definition, $"{definition.Workflow}@{release.Number}", release.Id, release.Number, release.Kind);
+    }
+
+    internal static string ReadPackDefinition(string packId, string kind)
+    {
+        var name = WorkflowKinds.ResourceName(packId, kind);
+        using var stream = typeof(WorkflowDefinitionStore).Assembly.GetManifestResourceStream(name)
+            ?? throw new DomainException("workflow_pack_missing", $"The solution pack '{packId}' does not carry a {(kind == WorkflowKinds.Variation ? "Variation" : "contract lifecycle")} workflow definition.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+}

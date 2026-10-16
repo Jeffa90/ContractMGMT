@@ -16,7 +16,7 @@ public static class OnboardingHelp
         new("structure", "Organisation structure", "The legal entities, divisions, business units and sites that scope people's access and appear on contracts.",
             ["One line per item: the type, a short key you will use in other steps, and a name.", "A business unit may name its division in parentKey. A site may name an IANA time zone such as Australia/Brisbane.",
              "Keys are letters, digits, '.', '_' and '-', up to 40 characters. They are not case sensitive.", "Items are never deleted. Removing a line in a later release ends only what onboarding itself created."],
-            OnboardingCsv.StructureHeader, "LegalEntity,JBS-AUS,Example Holdings Pty Ltd,,,\nDivision,OPS,Operations,,,\nBusinessUnit,PKG,Packaging,OPS,,\nSite,BNE,Brisbane,,Australia/Brisbane,"),
+            OnboardingCsv.StructureHeader, "LegalEntity,LE-1,Example Holdings Pty Ltd,,,\nDivision,OPS,Operations,,,\nBusinessUnit,PKG,Packaging,OPS,,\nSite,BNE,Brisbane,,Australia/Brisbane,"),
         new("categories", "Categories (taxonomy)", "The category tree contracts are filed under. A parent covers its sub-categories for access.",
             ["Import a whole tree at once: paste or upload as text, one category per line.", "A category's parent must be on another line (or already exist). Nesting is limited to six levels."],
             OnboardingCsv.CategoryHeader, "PACKAGING,Packaging,\nPACKAGING-FLEX,Flexible packaging,PACKAGING\nENERGY,Energy,"),

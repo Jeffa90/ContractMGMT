@@ -38,6 +38,47 @@ else if (r.Decision is { } d)
     </section>
 }
 
+@if (r.Plan is { } plan)
+{
+    <section class="card" aria-labelledby="plan-h">
+        <h2 id="plan-h">@L["Approval steps"]</h2>
+        <p>@L["This request is approved through the approval matrix"] <code>@plan.MatrixCode</code> (@plan.MatrixName, @L["release"] @plan.Release, @L["resolved for"] @plan.EffectiveDate.ToString("yyyy-MM-dd")). <span class="badge @(plan.Status == "Approved" ? "ok" : plan.Status == "Rejected" ? "" : "warn")">@plan.Status</span>
+            <span class="hint">@L["The steps and people were fixed when it was submitted; later changes to the matrix do not alter it."]</span></p>
+        @if (plan.YourPart is { } part) { <p class="flash" role="status">@L["Your part"]: <strong>@part</strong></p> }
+        else if (r.Status == Ecp.Lifecycle.Domain.ApprovalStatus.Pending && plan.YourPartNote is { } note) { <p class="hint">@note</p> }
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Approval steps"]</caption>
+            <thead><tr><th scope="col">@L["Stage"]</th><th scope="col">@L["Step"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Group"]</th><th scope="col">@L["How they respond"]</th><th scope="col">@L["Who can respond"]</th><th scope="col">@L["Responses"]</th><th scope="col">@L["Still waiting on"]</th></tr></thead>
+            <tbody>
+            @foreach (var st in plan.Steps.OrderBy(x => x.Stage))
+            {
+                <tr><td>@st.Stage</td><th scope="row">@st.Display</th><td><span class="badge @(st.Status == "Satisfied" ? "ok" : st.Status == "Open" ? "warn" : "")">@st.Status</span></td><td>@st.ApproverGroup@(st.BackupGroup is { } bg ? $" + {bg}" : "")</td>
+                    <td>@(st.Mode == "AllRequired" ? L["Every named approver"] : L["First response wins"])</td>
+                    <td><ul class="plain">@foreach (var a in st.Approvers) { <li>@a.Name <span class="badge">@a.Role</span>@if (a.OnBehalfOfName is { } ob) { <span class="hint"> @L["for"] @ob</span> }</li> }</ul></td>
+                    <td><ul class="plain">@foreach (var rs in st.Responses) { <li>@(rs.Approved ? L["Approved"] : L["Rejected"]) @L["by"] @rs.Name@(rs.OnBehalfOfName is { } rob ? $" ({L["for"]} {rob})" : "") @rs.RespondedUtc.ToString("yyyy-MM-dd HH:mm") UTC@(rs.Comment is { Length: > 0 } c ? ": " + c : "")</li> }</ul></td>
+                    <td>@(st.Outstanding.Count == 0 ? "-" : string.Join(", ", st.Outstanding))</td></tr>
+            }
+            </tbody>
+        </table></div>
+        @if (plan.Explanations is { } explanations && plan.Trace is { } trace)
+        {
+            <details>
+                <summary>@L["Why these people, and how the plan was reached (for matrix administrators)"]</summary>
+                <div class="table-wrap"><table>
+                    <caption class="visually-hidden">@L["Why each person was included or left out"]</caption>
+                    <thead><tr><th scope="col">@L["Step"]</th><th scope="col">@L["Person"]</th><th scope="col">@L["Decision"]</th><th scope="col">@L["Why"]</th></tr></thead>
+                    <tbody>@foreach (var e in explanations) { <tr><td>@e.StepDisplay</td><th scope="row">@e.Name</th><td>@(e.Included ? L["Included"] : L["Left out"])</td><td>@e.Summary @foreach (var why in e.Reasons) { <div>@why</div> }</td></tr> }</tbody>
+                </table></div>
+                <div class="table-wrap"><table>
+                    <caption class="visually-hidden">@L["Resolution trace"]</caption>
+                    <thead><tr><th scope="col">#</th><th scope="col">@L["Stage"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["What happened"]</th></tr></thead>
+                    <tbody>@foreach (var t in trace) { <tr><td>@t.Sequence</td><td>@t.Stage</td><td>@t.Outcome</td><td>@t.Message</td></tr> }</tbody>
+                </table></div>
+            </details>
+        }
+    </section>
+}
+
 <section class="card" aria-labelledby="snap-h">
     <h2 id="snap-h">@L["What was submitted"]</h2>
     <p class="hint">@L["This is a frozen record of what the approver relied on at submission. It does not change afterwards."] @if (!r.SnapshotIntact) { <strong class="error">@L["The stored snapshot does not match its checksum."]</strong> }</p>
@@ -70,11 +111,14 @@ else if (r.Decision is { } d)
     else { <p class="hint">@L["The executed copy is not available to you."]</p> }
 </section>
 
-<section aria-labelledby="who-h">
-    <h2 id="who-h">@L["Who can decide"]</h2>
-    <ul class="plain">@foreach (var e in r.Eligible) { <li>@e.DisplayName <span class="badge">@(e.IsBackup ? L["Backup"] : L["Primary"])</span></li> }</ul>
-    <p class="hint">@L["A backup approver is notified together with the primary approver. The first response stands."]</p>
-</section>
+@if (r.Plan is null)
+{
+    <section aria-labelledby="who-h">
+        <h2 id="who-h">@L["Who can decide"]</h2>
+        <ul class="plain">@foreach (var e in r.Eligible) { <li>@e.DisplayName <span class="badge">@(e.IsBackup ? L["Backup"] : L["Primary"])</span></li> }</ul>
+        <p class="hint">@L["A backup approver is notified together with the primary approver. The first response stands."]</p>
+    </section>
+}
 
 <section aria-labelledby="hist-h">
     <h2 id="hist-h">@L["Decision history for this agreement"]</h2>

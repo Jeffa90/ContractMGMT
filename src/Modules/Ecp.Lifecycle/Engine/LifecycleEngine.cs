@@ -60,7 +60,7 @@ internal sealed class LifecycleEngine(
     {
         var descriptor = await contracts.DescribeAsync(s.ContractId, ct);
         if (pending is { Status: ApprovalStatus.Pending })
-            descriptor = descriptor with { PendingApprovalGroupKeys = new HashSet<string>([pending.ApproverGroupKey]), SubmittedByUserId = pending.SubmittedByUserId };
+            descriptor = descriptor with { PendingApprovalGroupKeys = new HashSet<string>(pending.PendingGroups), SubmittedByUserId = pending.SubmittedByUserId };
         return descriptor;
     }
 

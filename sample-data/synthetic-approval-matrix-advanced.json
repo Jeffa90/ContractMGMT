@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "matrices": [
+    {
+      "code": "synthetic-advanced",
+      "name": "Synthetic advanced approval matrix",
+      "description": "SYNTHETIC demonstration of every part of the portable approval engine: value ranges, a currency rate table, categories with subcategories, classification, sequential and parallel steps, first-response and all-required steps, backup groups, exceptions that add or replace steps, and effective dates. Not part of the JBS Procurement default model.",
+      "currency": "AUD",
+      "rates": [
+        { "currency": "USD", "rate": 1.5, "effectiveFrom": "2026-01-01", "effectiveTo": "2026-12-31" },
+        { "currency": "USD", "rate": 1.6, "effectiveFrom": "2027-01-01" }
+      ],
+      "rows": [
+        {
+          "code": "small", "description": "Under 100,000: one approver, first response wins", "priority": 100,
+          "when": { "valueMin": 0, "valueMax": 100000 },
+          "steps": [ { "key": "manager", "display": "Manager", "approverGroup": "SyntheticManagers", "backupGroup": "SyntheticManagerBackups", "mode": "FirstResponse" } ]
+        },
+        {
+          "code": "medium", "description": "100,000 up to but not including 1,000,000: manager then director", "priority": 100, "flow": "Sequential",
+          "when": { "valueMin": 100000, "valueMax": 1000000 },
+          "steps": [
+            { "key": "manager", "display": "Manager", "approverGroup": "SyntheticManagers", "mode": "FirstResponse" },
+            { "key": "director", "display": "Director", "approverGroup": "SyntheticDirectors", "mode": "FirstResponse", "timeoutDays": 5, "escalateTo": "SyntheticExecutives" }
+          ]
+        },
+        {
+          "code": "large", "description": "1,000,000 and above: finance and legal together, every named approver must respond", "priority": 100, "flow": "Parallel",
+          "when": { "valueMin": 1000000 },
+          "steps": [
+            { "key": "finance", "display": "Finance", "approverGroup": "SyntheticFinance", "mode": "AllRequired" },
+            { "key": "legal", "display": "Legal", "approverGroup": "SyntheticLegalApprovers", "mode": "FirstResponse" }
+          ]
+        },
+        {
+          "code": "energy-extra", "kind": "Exception", "effect": "AddSteps", "description": "Anything in Energy needs a sustainability sign-off after the usual approvals", "priority": 200,
+          "when": { "categories": [ "ENERGY" ], "includeSubcategories": true },
+          "steps": [ { "key": "sustainability", "display": "Sustainability", "approverGroup": "SyntheticSustainability", "mode": "FirstResponse" } ]
+        },
+        {
+          "code": "restricted-only", "kind": "Exception", "effect": "ReplaceSteps", "description": "Restricted records go straight to the executive group", "priority": 300,
+          "when": { "classifications": [ "Restricted" ] },
+          "steps": [ { "key": "executive", "display": "Executive", "approverGroup": "SyntheticExecutives", "mode": "FirstResponse" } ]
+        }
+      ]
+    }
+  ]
+}

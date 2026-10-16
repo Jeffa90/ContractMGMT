@@ -84,7 +84,7 @@ public sealed class SqlServerBehaviourTests(SqlServerFixture fx)
         await runner.RunAsync(); // second run: nothing to do
         var status = await runner.GetStatusAsync();
         Assert.True(status.IsCurrent);
-        Assert.Equal(10, status.Applied.Count);
+        Assert.Equal(11, status.Applied.Count);
         await using var c = await OpenAsync();
         var schemas = new HashSet<string>();
         await using (var cmd = c.CreateCommand())
@@ -93,7 +93,7 @@ public sealed class SqlServerBehaviourTests(SqlServerFixture fx)
             await using var r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync()) schemas.Add(r.GetString(0));
         }
-        foreach (var expected in new[] { "audit", "tenancy", "identity", "configuration", "contracts", "documents", "migration", "lifecycle", "notifications", "setup" }) Assert.Contains(expected, schemas);
+        foreach (var expected in new[] { "audit", "tenancy", "identity", "configuration", "contracts", "documents", "migration", "lifecycle", "notifications", "approvals", "setup" }) Assert.Contains(expected, schemas);
     }
 
     [SqlServerFact]

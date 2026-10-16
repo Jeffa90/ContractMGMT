@@ -340,7 +340,31 @@ public sealed class ApprovalRequest : ITenantOwned
     public string? DecisionComment { get; private set; }
     public DateTime? DecidedUtc { get; private set; }
     public Guid? EvidenceDocumentId { get; private set; }
+    /// <summary>The approval matrix the workflow named, when it names one. Null for the reference model (one approver group, no plan).</summary>
+    public string? MatrixCode { get; private set; }
+    public int? MatrixRelease { get; private set; }
+    /// <summary>The resolved plan (steps, stages and people) as JSON, stored once and never changed: later matrix versions do not alter an in-flight submission.</summary>
+    public string? PlanJson { get; private set; }
+    public string? PlanSha256 { get; private set; }
+    /// <summary>The approver groups that currently have something to decide (the groups of the open steps), comma separated; null means the single <see cref="ApproverGroupKey"/>.</summary>
+    public string? ActiveGroupKeys { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
+
+    public bool HasPlan => PlanJson is not null;
+    public IReadOnlyList<string> PendingGroups => ActiveGroupKeys is { Length: > 0 } g ? g.Split(',', StringSplitOptions.RemoveEmptyEntries) : [ApproverGroupKey];
+
+    public void AttachPlan(string matrixCode, int? release, string planJson, string planSha256, IEnumerable<string> activeGroups)
+    {
+        if (Status != ApprovalStatus.Pending || PlanJson is not null) throw new DomainException("plan_fixed", "The plan of a submission is set once, when it is submitted.");
+        MatrixCode = Guard.NotBlank(matrixCode, "Matrix", 50); MatrixRelease = release; PlanJson = Guard.NotBlank(planJson, "Plan", 1_000_000); PlanSha256 = Guard.NotBlank(planSha256, "Plan checksum", 64);
+        SetActiveGroups(activeGroups);
+    }
+
+    public void SetActiveGroups(IEnumerable<string> groups)
+    {
+        var list = groups.Where(g => !string.IsNullOrWhiteSpace(g)).Distinct(StringComparer.Ordinal).ToList();
+        ActiveGroupKeys = list.Count == 0 ? null : Guard.NotBlank(string.Join(",", list), "Active groups", 1000);
+    }
 
     public static ApprovalRequest Submit(Guid tenantId, Guid organisationId, string subjectKind, Guid subjectId, Guid contractId, string groupKey, Guid submittedBy, string submittedByName,
         Guid? executedDocumentId, string? executedSha256, string snapshotJson, string snapshotSha256, string eligibleJson, DateTime nowUtc) => new()
@@ -366,6 +390,40 @@ public sealed class ApprovalRequest : ITenantOwned
     {
         if (Status != ApprovalStatus.Pending) throw new DomainException("already_decided", "This request has already been decided.");
         Status = ApprovalStatus.Withdrawn; DecidedUtc = nowUtc;
+    }
+}
+
+/// <summary>
+/// One response to one step of a plan-based approval: who responded, in which capacity (their own seat, a backup, or a delegate for someone), and whether they approved. Recorded in order, never changed.
+/// The request is decided as a whole when the plan is satisfied (approved) or when anyone with a say on an open step rejects it.
+/// </summary>
+public sealed class ApprovalStepResponse : ITenantOwned
+{
+    private ApprovalStepResponse() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid RequestId { get; private set; }
+    public int Sequence { get; private set; }
+    public string StepKey { get; private set; } = "";
+    public Guid UserId { get; private set; }
+    public string UserName { get; private set; } = "";
+    public string Role { get; private set; } = "";
+    public Guid? OnBehalfOfUserId { get; private set; }
+    public string? OnBehalfOfName { get; private set; }
+    public bool Approved { get; private set; }
+    public string? Comment { get; private set; }
+    public DateTime RespondedUtc { get; private set; }
+
+    public static ApprovalStepResponse Record(Guid tenantId, Guid requestId, int sequence, string stepKey, Guid userId, string userName, string role, Guid? onBehalfOf, string? onBehalfOfName, bool approved,
+        string? comment, DateTime nowUtc)
+    {
+        if (!approved && string.IsNullOrWhiteSpace(comment)) throw new DomainException("comment_required", "A rejection needs a comment.");
+        return new ApprovalStepResponse
+        {
+            Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), RequestId = requestId, Sequence = sequence, StepKey = Guard.NotBlank(stepKey, "Step", 120), UserId = userId,
+            UserName = Guard.NotBlank(userName, "Responder", 200), Role = Guard.NotBlank(role, "Role", 20), OnBehalfOfUserId = onBehalfOf, OnBehalfOfName = Guard.OptionalBounded(onBehalfOfName, "On behalf of", 200),
+            Approved = approved, Comment = Guard.OptionalBounded(comment, "Comment", 4000), RespondedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+        };
     }
 }
 

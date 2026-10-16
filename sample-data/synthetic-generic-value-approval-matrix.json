@@ -1,25 +1,28 @@
 {
-  "name": "Synthetic Generic Value-Based Approval Matrix",
-  "purpose": "Demonstrates the portable approval-matrix engine (value ranges, approver groups, simulator). It is synthetic and generic. It is NOT part of the JBS Procurement default approval model and must not be read as JBS financial approval roles.",
-  "synthetic": true,
-  "notPartOfPack": "jbs-procurement",
-  "currency": "AUD",
-  "rangeSemantics": "Half-open [minimum, maximum). A null maximum is unbounded.",
-  "rules": [
+  "schemaVersion": 1,
+  "matrices": [
     {
-      "minimum": 0,
-      "maximum": 100000,
-      "approverGroup": "SyntheticTier1"
-    },
-    {
-      "minimum": 100000,
-      "maximum": 500000,
-      "approverGroup": "SyntheticTier2"
-    },
-    {
-      "minimum": 500000,
-      "maximum": null,
-      "approverGroup": "SyntheticTier3"
+      "code": "synthetic-value",
+      "name": "Synthetic generic value-based approval matrix",
+      "description": "SYNTHETIC demonstration of the portable approval engine (value ranges and approver groups). It is NOT part of the JBS Procurement default approval model and must not be read as JBS financial approval roles. Ranges are half-open: the minimum is included and the maximum is excluded.",
+      "currency": "AUD",
+      "rows": [
+        {
+          "code": "tier-1", "description": "Under 100,000", "priority": 100,
+          "when": { "valueMin": 0, "valueMax": 100000 },
+          "steps": [ { "key": "approve", "display": "Tier 1 approval", "approverGroup": "SyntheticTier1" } ]
+        },
+        {
+          "code": "tier-2", "description": "100,000 up to but not including 500,000", "priority": 100,
+          "when": { "valueMin": 100000, "valueMax": 500000 },
+          "steps": [ { "key": "approve", "display": "Tier 2 approval", "approverGroup": "SyntheticTier2" } ]
+        },
+        {
+          "code": "tier-3", "description": "500,000 and above", "priority": 100,
+          "when": { "valueMin": 500000 },
+          "steps": [ { "key": "approve", "display": "Tier 3 approval", "approverGroup": "SyntheticTier3" } ]
+        }
+      ]
     }
   ]
 }

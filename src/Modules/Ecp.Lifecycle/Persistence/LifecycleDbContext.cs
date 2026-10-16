@@ -14,6 +14,7 @@ public sealed class LifecycleDbContext(DbContextOptions<LifecycleDbContext> opti
     public DbSet<LegalEvent> LegalEvents => Set<LegalEvent>();
     public DbSet<ExecutionRecord> Executions => Set<ExecutionRecord>();
     public DbSet<ApprovalRequest> Approvals => Set<ApprovalRequest>();
+    public DbSet<ApprovalStepResponse> StepResponses => Set<ApprovalStepResponse>();
     public DbSet<RecordUnlock> Unlocks => Set<RecordUnlock>();
     public DbSet<Variation> Variations => Set<Variation>();
     public DbSet<Renewal> Renewals => Set<Renewal>();
@@ -147,10 +148,32 @@ public sealed class LifecycleDbContext(DbContextOptions<LifecycleDbContext> opti
             e.Property(x => x.DecidedAsRole).HasMaxLength(50);
             e.Property(x => x.OnBehalfOfName).HasMaxLength(200);
             e.Property(x => x.DecisionComment).HasMaxLength(4000);
+            e.Property(x => x.MatrixCode).HasMaxLength(50);
+            e.Property(x => x.PlanSha256).HasMaxLength(64);
+            e.Property(x => x.ActiveGroupKeys).HasMaxLength(1000);
+            e.Ignore(x => x.HasPlan);
+            e.Ignore(x => x.PendingGroups);
+            e.HasAlternateKey(x => new { x.TenantId, x.Id });
             e.HasIndex(x => new { x.TenantId, x.Status, x.SubmittedUtc });
             e.HasIndex(x => new { x.TenantId, x.ContractId, x.SubmittedUtc });
             // One request waiting per subject at a time: a second submission while one is pending cannot be stored.
             e.HasIndex(x => new { x.TenantId, x.SubjectKind, x.SubjectId }).IsUnique().HasFilter("[Status] = 'Pending'");
+        });
+
+        mb.Entity<ApprovalStepResponse>(e =>
+        {
+            e.ToTable("ApprovalStepResponse");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.StepKey).HasMaxLength(120).IsRequired();
+            e.Property(x => x.UserName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Role).HasMaxLength(20).IsRequired();
+            e.Property(x => x.OnBehalfOfName).HasMaxLength(200);
+            e.Property(x => x.Comment).HasMaxLength(4000);
+            e.HasIndex(x => new { x.TenantId, x.RequestId, x.Sequence }).IsUnique();
+            // A person responds once to a step of a request (an approval or a rejection).
+            e.HasIndex(x => new { x.TenantId, x.RequestId, x.StepKey, x.UserId }).IsUnique();
+            e.HasOne<ApprovalRequest>().WithMany().HasForeignKey(x => new { x.TenantId, x.RequestId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         });
 
         mb.Entity<RecordUnlock>(e =>

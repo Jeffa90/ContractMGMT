@@ -1,3 +1,4 @@
+using Ecp.Approvals;
 using Ecp.Contracts;
 using Ecp.Lifecycle.Definitions;
 using Ecp.Lifecycle.Domain;
@@ -62,9 +63,10 @@ public static class LifecycleModule
     {
         services.AddOptions<LifecycleOptions>();
         if (configure is not null) services.Configure(configure);
+        services.AddApprovalsModule();
         services.AddModuleDbContext<LifecycleDbContext>(Name, Tier, Schema);
-        services.AddScoped<Ecp.Configuration.IConfigurationKind>(_ => new WorkflowDefinitionKind(WorkflowKinds.ContractLifecycle));
-        services.AddScoped<Ecp.Configuration.IConfigurationKind>(_ => new WorkflowDefinitionKind(WorkflowKinds.Variation));
+        services.AddScoped<Ecp.Configuration.IConfigurationKind>(sp => new WorkflowDefinitionKind(WorkflowKinds.ContractLifecycle, sp.GetRequiredService<IApprovalMatrixStore>()));
+        services.AddScoped<Ecp.Configuration.IConfigurationKind>(sp => new WorkflowDefinitionKind(WorkflowKinds.Variation, sp.GetRequiredService<IApprovalMatrixStore>()));
         services.AddScoped<IWorkflowDefinitions, WorkflowDefinitionStore>();
         services.TryAddScoped<IDispositionChecks, NoDispositionBlocks>();
         services.AddScoped<GuardEvaluator>();
@@ -78,6 +80,11 @@ public static class LifecycleModule
         services.AddScoped<ILegalReviewService>(sp => sp.GetRequiredService<LegalReviewService>());
         services.AddScoped<VisibleContracts>();
         services.AddScoped<IExecutionService, ExecutionService>();
+        services.AddScoped<ApprovalFactsBuilder>();
+        services.AddScoped<IApprovalSimulationInputs, ApprovalSimulationInputs>();
+        services.AddScoped<LifecycleMatrixReferences>();
+        services.AddScoped<IApprovalReferenceData>(sp => sp.GetRequiredService<LifecycleMatrixReferences>());
+        services.AddScoped<IApprovalMatrixReferences>(sp => sp.GetRequiredService<LifecycleMatrixReferences>());
         services.AddScoped<IRegisterAuthorisationService, RegisterAuthorisationService>();
         services.AddScoped<IPendingApprovalSource, PendingApprovalSource>();
         services.AddScoped<IRecordUnlockService, RecordUnlockService>();

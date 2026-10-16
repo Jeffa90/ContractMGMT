@@ -31,15 +31,25 @@ public static class WorkflowKinds
 }
 
 /// <summary>Configuration kind for a workflow definition: gives it draft, validate, preview, publish, version history, rollback and audit like any other configuration.</summary>
-internal sealed class WorkflowDefinitionKind(string kind) : IConfigurationKind
+internal sealed class WorkflowDefinitionKind(string kind, Ecp.Approvals.IApprovalMatrixStore? matrices = null) : IConfigurationKind
 {
     public string Kind => kind;
 
-    public Task<ValidationReport> ValidateAsync(Guid organisationId, string contentJson, CancellationToken ct)
+    public async Task<ValidationReport> ValidateAsync(Guid organisationId, string contentJson, CancellationToken ct)
     {
         var (definition, messages) = WorkflowDefinitionParser.Parse(contentJson);
-        if (definition is not null) messages.AddRange(WorkflowDefinitionParser.Validate(definition, WorkflowKinds.ExpectedSubject(kind), PermissionMatrix.Instance));
-        return Task.FromResult(new ValidationReport(messages));
+        if (definition is not null)
+        {
+            messages.AddRange(WorkflowDefinitionParser.Validate(definition, WorkflowKinds.ExpectedSubject(kind), PermissionMatrix.Instance));
+            // A workflow that names an approval matrix is only safe to publish when that matrix is already published and in force: otherwise every submission would be blocked.
+            if (definition.Settings.Approval.Matrix is { } code && matrices is not null)
+            {
+                var published = await matrices.TryLoadPublishedAsync(organisationId, ct);
+                if (published is null) messages.Add(new ValidationMessage(ValidationSeverity.Error, "$.settings.approval.matrix", "matrix_missing", $"The workflow names the approval matrix '{code}', but no approval matrix has been published for this organisation. Publish the matrix first."));
+                else if (published.Set.Find(code) is null) messages.Add(new ValidationMessage(ValidationSeverity.Error, "$.settings.approval.matrix", "matrix_missing", $"The workflow names the approval matrix '{code}', which is not in the published approval matrix document. Publish it first or correct the code."));
+            }
+        }
+        return new ValidationReport(messages);
     }
 
     // A published definition takes effect for contracts created from now on and for contracts not yet pinned; a contract already pinned keeps the release it started under.

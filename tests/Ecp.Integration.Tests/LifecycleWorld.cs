@@ -50,12 +50,12 @@ internal sealed class LifecycleWorld
 
     /// <summary>A new draft contract created by the Packaging owner through the secured path (so it is pinned to the workflow in force).</summary>
     public async Task<Guid> NewDraftAsync(string classification = "Internal", bool legal = true, string? title = null, DateOnly? end = null, DateOnly? review = null, string? extension = null, int? lead = null,
-        int? notice = null, bool critical = false, string owner = "ownerPackaging", Guid? category = null)
+        int? notice = null, bool critical = false, string owner = "ownerPackaging", Guid? category = null, decimal value = 1000m)
     {
         var n = Interlocked.Increment(ref _n);
         var id = await W.AsAsync(owner, s => s.Get<ISecuredContractService>().CreateDraftAsync(
             new CreateContractRequest(W.Org1, $"LC-{W.TenantId.ToString("N")[..5].ToUpperInvariant()}-{n:000}", title ?? $"Lifecycle {n}", W.Sup1, category ?? W.CatPackaging, Classification: classification, LegalReviewRequired: legal,
-                CurrencyCode: "AUD", EstimatedValue: 1000m, ExtensionType: extension, ReviewDate: review, EndDate: end ?? DateOnly.FromDateTime(W.Now.AddDays(300)))));
+                CurrencyCode: "AUD", EstimatedValue: value, ExtensionType: extension, ReviewDate: review, EndDate: end ?? DateOnly.FromDateTime(W.Now.AddDays(300)))));
         if (lead is not null || notice is not null || critical)
             await W.AsAsync(owner, s => s.Get<ISecuredContractService>().UpdateReminderSettingsAsync(id, lead, notice, critical));
         return id;

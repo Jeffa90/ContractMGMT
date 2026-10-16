@@ -1,0 +1,56 @@
+@page "/Admin/Approvals/History"
+@model Ecp.Host.Pages.Admin.Approvals.HistoryModel
+@{ ViewData["Title"] = L["Approval matrix history"].Value; }
+<h1>@L["Approval matrix history and audit"]</h1>
+<p class="lede">@L["Every published version of the matrix is kept, with who published it and what changed row by row. Delegations, simulations and blocked submissions are recorded too. History is never edited."]</p>
+<nav class="tabs" aria-label="@L["Approval matrix pages"]">
+    <a href="/Admin/Approvals?organisationId=@Model.OrganisationId">@L["Matrices"]</a>
+    <a href="/Admin/Approvals/Simulate?organisationId=@Model.OrganisationId">@L["Simulator"]</a>
+    <a href="/Admin/Approvals/Delegations?organisationId=@Model.OrganisationId">@L["Delegations"]</a>
+    <a href="/Admin/Approvals/History?organisationId=@Model.OrganisationId" aria-current="page">@L["History and audit"]</a>
+</nav>
+<form method="get" class="card">
+    <div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <div class="field"><label for="show">@L["Show"]</label><select id="show" name="show">@foreach (var f in Ecp.Host.Pages.Admin.Approvals.HistoryModel.Filters) { <option value="@f.Key" selected="@(f.Key == Model.Show)">@L[f.Title]</option> }</select></div>
+    <button type="submit" class="secondary">@L["Apply"]</button>
+</form>
+
+<h2>@L["Releases"]</h2>
+@if (Model.ReleasesDenied is { } denied) { <p class="hint">@denied</p> }
+else
+{
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Releases"]</caption>
+        <thead><tr><th scope="col">@L["Release"]</th><th scope="col">@L["Published (UTC)"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Note"]</th><th scope="col">@L["Checksum"]</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Releases)
+        {
+            <tr><th scope="row">@r.Number @if (r.RollbackOfNumber is { } rb) { <span class="hint">(@L["republishes"] @rb)</span> }</th><td>@r.PublishedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@r.PublishedBy</td><td>@r.Note</td><td><code>@r.ContentHash[..Math.Min(12, r.ContentHash.Length)]</code></td></tr>
+        }
+        @if (Model.Releases.Count == 0) { <tr><td colspan="5">@L["Nothing has been published."]</td></tr> }
+        </tbody>
+    </table></div>
+    <p class="hint">@L["To go back to an earlier release, use \"Publish again\" on the configuration page; the earlier content becomes a new release and nothing is rewritten."] <a href="/Admin/Configuration?kind=ApprovalMatrix&organisationId=@Model.OrganisationId">@L["Open the configuration page"]</a></p>
+}
+
+<h2>@L["Audit events"]</h2>
+@if (Model.EventsDenied is { } d2) { <p class="hint">@d2</p> }
+else
+{
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Audit events"]</caption>
+        <thead><tr><th scope="col">@L["When (UTC)"]</th><th scope="col">@L["Action"]</th><th scope="col">@L["Who"]</th><th scope="col">@L["About"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Reason or summary"]</th></tr></thead>
+        <tbody>
+        @foreach (var e in Model.Events.Items)
+        {
+            <tr><td>@e.OccurredUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><th scope="row">@e.Action</th><td>@e.ActorId</td><td>@e.EntityType <code>@e.EntityId</code></td><td>@e.Outcome</td><td>@e.Reason</td></tr>
+        }
+        @if (Model.Events.Items.Count == 0) { <tr><td colspan="6">@L["No events."]</td></tr> }
+        </tbody>
+    </table></div>
+    @if (Model.Events.Total > Model.Events.PageSize)
+    {
+        <p>@if (Model.Events.Page > 1) { <a href="/Admin/Approvals/History?organisationId=@Model.OrganisationId&show=@Model.Show&pageNumber=@(Model.Events.Page - 1)">&larr; @L["Newer"]</a> }
+           @if (Model.Events.Page * Model.Events.PageSize < Model.Events.Total) { <a href="/Admin/Approvals/History?organisationId=@Model.OrganisationId&show=@Model.Show&pageNumber=@(Model.Events.Page + 1)">@L["Older"] &rarr;</a> }</p>
+    }
+}

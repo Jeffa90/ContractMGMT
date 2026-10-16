@@ -106,6 +106,7 @@ flowchart TB
 | Workflow (planned name; the lifecycle slice delivers its engine as the Lifecycle module below; an approval-matrix resolver remains Future) | Workflow instances, transitions, guards, approval matrix resolver | `IWorkflowEngine`, `IApprovalResolver` |
 | Contracts | Supplier, Category and assignments, Contract, Variation, RecordUnlock | `IContractService`, `IContractQuery` |
 | Documents | Document, versions, storage, scan status, download authorisation | `IDocumentService`, `IDocumentStorageProvider` |
+| Approvals (tier 6; implemented) | Approval matrices (a Configuration kind), the resolver and trace, plan evaluation (sequential, parallel, first response, all required), approval delegations with cycle protection, the simulator | `IApprovalMatrixStore`, `IApprovalResolver`, `IApprovalSimulator`, `IApprovalDelegations`, `IApprovalSimulationInputs`, `IApprovalFactContributor`; knows nothing of contracts or workflow states |
 | Lifecycle (tier 7; implemented) | Workflow definitions (Configuration kinds `WorkflowContractLifecycle`, `WorkflowVariation`), the transition engine and guard evaluator, status history, Legal review (rounds, comments, attachments, events), execution records and the e-signature boundary, register-authorisation requests with immutable snapshots, emergency unlocks, Variations, renewals, the lifecycle outbox | `ILifecycleService`, `ILegalReviewService`, `IExecutionService`, `IRegisterAuthorisationService`, `IRecordUnlockService`, `IVariationService`, `IRenewalService`, `ILifecycleOutbox`, `IWorkflowDefinitions`; reaches contract state only through `IContractLifecyclePort` |
 | Migration | Projects, profiles, batches, staging, matching, commit, rollback, reconciliation | `IMigrationService`; consumes Contracts/Documents public contracts only |
 | Notifications (tier 9; implemented) | Notification policy (a Configuration kind), recipient resolution, rendering, notifications and deliveries with attempts, reminder windows and tracking, in-app inbox, email providers, job runs, ten dashboards | `INotificationInbox`, `INotificationAdmin`, `IReminderScanner`, `INotificationDispatcher`, `IDeliveryRunner`, `INotificationJobs`, `IReminderSettings`, `IDashboardService` |
@@ -249,6 +250,21 @@ flowchart LR
 * Notifications are produced by a dispatcher that reads the outbox (parked after ten failed attempts) and a cursor over the audit stream, never by the lifecycle code, so a notification failure cannot fail a transition.
 * The host timer calls `INotificationJobs.RunAllAsync` for each active tenant (dispatch, email delivery, reminder scan, unlock expiry) and records each run; the same service backs the administration page. The work is idempotent, so running it on two instances or twice is safe.
 * Concurrency was verified on SQL Server (exactly one of two simultaneous approvals wins). A multi-instance lease for the timer is Future (ADR-0010 describes it; today every instance runs the idempotent jobs).
+
+### 9.2 Approval matrix architecture (as implemented; ADR-0022, `docs/APPROVAL_MATRIX.md`)
+
+```mermaid
+flowchart LR
+  Admin["Admin pages: matrices, simulator, delegations, history"] --> Approvals
+  Lifecycle["Lifecycle: register authorisation (opt-in: settings.approval.matrix)"] --> Approvals["Approvals module (tier 6): resolver, plan evaluation, delegations, simulator"]
+  Approvals --> Config["Configuration: ApprovalMatrix kind (draft, validate, publish, rollback)"]
+  Approvals --> Access["Identity: group members, access evaluator (scope, classification, lifecycle of assignments)"]
+  Approvals --> Audit[("Audit: published, simulated, blocked, delegated")]
+  Lifecycle --> Plan[("ApprovalRequest.PlanJson + ApprovalStepResponse")]
+```
+
+* One resolver serves both the simulator and a real submission. The plan, trace and explanations are stored with the request, so a later publication never changes an in-flight approval; who may respond is re-checked against the group and delegations as they are now.
+* Without `settings.approval.matrix` the lifecycle runs the reference model (one approver group, first response wins) exactly as before.
 
 ## 10. Migration architecture (ADR-0004; `MIGRATION_SUPPLEMENT.md`)
 

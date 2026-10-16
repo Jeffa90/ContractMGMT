@@ -59,6 +59,8 @@ public interface IAccessDirectory
     Task<AccessSubject?> LoadSubjectAsync(Guid userId, CancellationToken ct = default);
     /// <summary>People currently holding an Approver or Backup Approver assignment for the approver group.</summary>
     Task<IReadOnlyList<ApproverInfo>> ApproversAsync(string approverGroupKey, CancellationToken ct = default);
+    /// <summary>People who hold (or, for a future date, will hold) an Approver or Backup Approver assignment for the group at the given instant, so a rule can be tried on a date other than today.</summary>
+    Task<IReadOnlyList<ApproverInfo>> ApproversAsync(string approverGroupKey, DateTime asOfUtc, CancellationToken ct = default);
     /// <summary>People currently holding the role in the organisation (organisation-level assignments naming it, and tenant-level assignments).</summary>
     Task<IReadOnlyList<Guid>> HoldersOfRoleAsync(string roleCode, Guid organisationId, CancellationToken ct = default);
     Task<string?> DisplayNameAsync(Guid userId, CancellationToken ct = default);
@@ -665,9 +667,11 @@ internal sealed class AccessDirectory(IdentityDbContext db, IClock clock) : IAcc
         return new AccessSubject(user.Id, user.TenantId, user.Status, rows.Select(AccessService.ToView).ToList());
     }
 
-    public async Task<IReadOnlyList<ApproverInfo>> ApproversAsync(string approverGroupKey, CancellationToken ct = default)
+    public Task<IReadOnlyList<ApproverInfo>> ApproversAsync(string approverGroupKey, CancellationToken ct = default) => ApproversAsync(approverGroupKey, clock.UtcNow, ct);
+
+    public async Task<IReadOnlyList<ApproverInfo>> ApproversAsync(string approverGroupKey, DateTime asOfUtc, CancellationToken ct = default)
     {
-        var now = clock.UtcNow;
+        var now = asOfUtc;
         var rows = await (from a in db.RoleAssignments.AsNoTracking()
                           join u in db.Users.AsNoTracking() on new { a.TenantId, Id = a.UserId } equals new { u.TenantId, u.Id }
                           where a.ApproverGroupKey == approverGroupKey && (a.RoleCode == RoleCodes.Approver || a.RoleCode == RoleCodes.BackupApprover) && u.Status == UserStatus.Active

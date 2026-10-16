@@ -1,0 +1,68 @@
+@page "/Admin/Approvals"
+@model Ecp.Host.Pages.Admin.Approvals.IndexModel
+@using Ecp.Approvals.Definitions
+@using Ecp.Host.Pages.Admin.Approvals
+@{ ViewData["Title"] = L["Approval matrices"].Value; }
+<h1>@L["Approval matrices"]</h1>
+<p class="lede">@L["A matrix decides who must approve a submission: it matches the submission against its rows (value, category, classification and so on), picks the steps, and names the approver groups. It names groups, never people. Workflows opt in by naming a matrix; a workflow that names none keeps its single approver group."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<nav class="tabs" aria-label="@L["Approval matrix pages"]">
+    <a href="/Admin/Approvals?organisationId=@Model.OrganisationId" aria-current="page">@L["Matrices"]</a>
+    <a href="/Admin/Approvals/Simulate?organisationId=@Model.OrganisationId">@L["Simulator"]</a>
+    <a href="/Admin/Approvals/Delegations?organisationId=@Model.OrganisationId">@L["Delegations"]</a>
+    <a href="/Admin/Approvals/History?organisationId=@Model.OrganisationId">@L["History and audit"]</a>
+    <a href="/Admin/Configuration?kind=ApprovalMatrix&organisationId=@Model.OrganisationId">@L["Edit (draft and publish)"]</a>
+</nav>
+<form method="get" class="card">
+    <div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <button type="submit" class="secondary">@L["Show"]</button>
+</form>
+
+@if (Model.Published is not { } published)
+{
+    <p class="flash warn" role="status">@L["No approval matrix has been published for this organisation. Workflows that name a matrix cannot be published until one is; submissions are not affected otherwise."]</p>
+}
+else
+{
+    <p>@L["In force"]: <strong>@L["release"] @published.ReleaseNumber</strong> <span class="hint">@L["checksum"] <code>@published.ContentHash[..12]</code></span>
+        @if (Model.HasDraft) { <span class="badge warn">@L["A draft is open"]</span> }</p>
+    @if (Model.UsedBy.Count > 0) { <p class="hint">@L["Workflows currently name"]: @string.Join(", ", Model.UsedBy). @L["A matrix a workflow names cannot be removed."]</p> }
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Matrices in force"]</caption>
+        <thead><tr><th scope="col">@L["Code"]</th><th scope="col">@L["Name"]</th><th scope="col">@L["Currency"]</th><th scope="col">@L["Base rows"]</th><th scope="col">@L["Exceptions"]</th><th scope="col">@L["Effective"]</th><th scope="col">@L["Today"]</th></tr></thead>
+        <tbody>
+        @foreach (var m in Model.Summaries)
+        {
+            <tr><th scope="row"><a href="#m-@m.Code">@m.Code</a></th><td>@m.Name</td><td>@m.Currency</td><td>@m.Rows</td><td>@m.Exceptions</td><td>@MatrixText.Window(m.EffectiveFrom, m.EffectiveTo)</td><td>@(m.InForceToday ? L["In force"] : L["Not in force"])</td></tr>
+        }
+        </tbody>
+    </table></div>
+
+    @foreach (var matrix in published.Set.Matrices)
+    {
+        <section class="card" id="m-@matrix.Code" aria-labelledby="h-@matrix.Code">
+            <h2 id="h-@matrix.Code">@matrix.Name <span class="badge">@matrix.Code</span></h2>
+            @if (matrix.Description.Length > 0) { <p>@matrix.Description</p> }
+            <p class="hint">@L["Values are compared in"] <strong>@matrix.Currency</strong>. @L["Value ranges include the lower bound and exclude the upper bound."]
+                @if (matrix.Rates.Count > 0) { <span>@L["Rates"]: @string.Join("; ", matrix.Rates.Select(r => $"{r.Currency} × {r.Rate} ({MatrixText.Window(r.EffectiveFrom, r.EffectiveTo)})"))</span> }
+                else { <span>@L["No rate table: a submission in another currency is blocked, never converted silently."]</span> }</p>
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Rows of"] @matrix.Code</caption>
+                <thead><tr><th scope="col">@L["Row"]</th><th scope="col">@L["Kind"]</th><th scope="col">@L["Priority"]</th><th scope="col">@L["Applies when"]</th><th scope="col">@L["In force"]</th><th scope="col">@L["Steps"]</th></tr></thead>
+                <tbody>
+                @foreach (var row in matrix.Rows.OrderBy(r => r.Kind).ThenByDescending(r => r.Priority))
+                {
+                    <tr>
+                        <th scope="row">@row.Code @if (row.Description.Length > 0) { <div class="hint">@row.Description</div> }</th>
+                        <td>@MatrixText.Effect(row)</td><td>@row.Priority</td>
+                        <td><ul class="plain">@foreach (var c in MatrixText.Conditions(row.When)) { <li>@c</li> }</ul></td>
+                        <td>@MatrixText.Window(row.EffectiveFrom, row.EffectiveTo)</td>
+                        <td><ol class="plain">@foreach (var s in row.Steps) { <li><strong>@s.Display</strong>: @s.ApproverGroup@(s.BackupGroup is { } bg ? $" (backup group {bg})" : "") &middot; @(s.Mode == StepModes.AllRequired ? L["every named approver must respond"] : L["first response wins"]) @if (s.TimeoutDays is { } t) { <span>&middot; @t @L["days"]</span> }</li> }</ol>
+                            <span class="hint">@(row.Flow == RowFlows.Parallel ? L["Steps are open together."] : L["Steps follow one another."])</span></td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </section>
+    }
+}

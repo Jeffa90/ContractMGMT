@@ -8,6 +8,7 @@
     <ProjectReference Include="../Ecp.Configuration/Ecp.Configuration.csproj" />
     <ProjectReference Include="../Ecp.Contracts/Ecp.Contracts.csproj" />
     <ProjectReference Include="../Ecp.Documents/Ecp.Documents.csproj" />
+    <ProjectReference Include="../Ecp.Approvals/Ecp.Approvals.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />

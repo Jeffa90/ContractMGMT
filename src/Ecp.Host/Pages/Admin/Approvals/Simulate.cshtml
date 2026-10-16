@@ -1,0 +1,116 @@
+@page "/Admin/Approvals/Simulate"
+@model Ecp.Host.Pages.Admin.Approvals.SimulateModel
+@using Ecp.Approvals.Domain
+@{ ViewData["Title"] = L["Approval matrix simulator"].Value; }
+<h1>@L["Approval matrix simulator"]</h1>
+<p class="lede">@L["Try a matrix on a sample submission. Nothing is submitted or changed. The result shows which rows matched, the steps and the people, and why each person was included or left out. Each run is recorded in the audit history because it shows who the approvers are."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<nav class="tabs" aria-label="@L["Approval matrix pages"]">
+    <a href="/Admin/Approvals?organisationId=@Model.OrganisationId">@L["Matrices"]</a>
+    <a href="/Admin/Approvals/Simulate?organisationId=@Model.OrganisationId" aria-current="page">@L["Simulator"]</a>
+    <a href="/Admin/Approvals/Delegations?organisationId=@Model.OrganisationId">@L["Delegations"]</a>
+    <a href="/Admin/Approvals/History?organisationId=@Model.OrganisationId">@L["History and audit"]</a>
+</nav>
+
+<form method="get" class="card" aria-label="@L["Choose organisation"]">
+    <div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <button type="submit" class="secondary">@L["Show"]</button>
+</form>
+
+<form method="post" class="card" aria-labelledby="sample-h">
+    <h2 id="sample-h">@L["Sample submission"]</h2>
+    <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+    <fieldset><legend>@L["Which matrix, which version, which day"]</legend>
+        <div class="field"><label for="MatrixCode">@L["Matrix code"]</label>
+            <input id="MatrixCode" name="MatrixCode" list="matrix-codes" maxlength="50" value="@Model.MatrixCode" autocomplete="off" required />
+            <datalist id="matrix-codes">@foreach (var m in Model.Matrices) { <option value="@m.Code">@m.Name</option> }</datalist>
+            <p class="hint">@L["The suggestions are the matrices in force. For a numbered release or your draft, type the code of a matrix in that version."]</p></div>
+        <div class="field"><label for="Source">@L["Version to try"]</label>
+            <select id="Source" name="Source"><option value="published" selected="@(Model.Source == "published")">@L["The release in force"]</option><option value="release" selected="@(Model.Source == "release")">@L["A numbered earlier release"]</option><option value="draft" selected="@(Model.Source == "draft")">@L["My open draft (not published)"]</option></select></div>
+        <div class="field"><label for="ReleaseNumber">@L["Release number (only for an earlier release)"]</label><input id="ReleaseNumber" name="ReleaseNumber" type="number" min="1" value="@Model.ReleaseNumber" /></div>
+        <div class="field"><label for="AsOf">@L["Date to test (leave empty for now)"]</label><input id="AsOf" name="AsOf" type="date" value="@Model.AsOf?.ToString("yyyy-MM-dd")" />
+            <p class="hint">@L["A future date tries rules, rates and approver assignments that have not started yet; a past date tries what was in force then."]</p></div>
+    </fieldset>
+    <fieldset><legend>@L["The submission"]</legend>
+        <div class="field"><label for="Value">@L["Value"]</label><input id="Value" name="Value" type="number" step="0.01" min="0" value="@Model.Value" /></div>
+        <div class="field"><label for="Currency">@L["Currency (three letters)"]</label><input id="Currency" name="Currency" maxlength="3" value="@Model.Currency" /></div>
+        <div class="field"><label for="CategoryId">@L["Category"]</label><select id="CategoryId" name="CategoryId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Code &ndash; @c.Name</option> }</select></div>
+        <div class="field"><label for="BusinessUnitId">@L["Business unit"]</label><select id="BusinessUnitId" name="BusinessUnitId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.BusinessUnits) { <option value="@c.Id" selected="@(c.Id == Model.BusinessUnitId)">@c.Code &ndash; @c.Name</option> }</select></div>
+        <div class="field"><label for="SiteId">@L["Site"]</label><select id="SiteId" name="SiteId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.Sites) { <option value="@c.Id" selected="@(c.Id == Model.SiteId)">@c.Code &ndash; @c.Name</option> }</select></div>
+        <div class="field"><label for="LegalEntityId">@L["Legal entity"]</label><select id="LegalEntityId" name="LegalEntityId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.LegalEntities) { <option value="@c.Id" selected="@(c.Id == Model.LegalEntityId)">@c.Code &ndash; @c.Name</option> }</select></div>
+        <div class="field"><label for="Classification">@L["Classification"]</label><select id="Classification" name="Classification">@foreach (var c in Model.Choices.Classifications) { <option selected="@(c == Model.Classification)">@c</option> }</select></div>
+        <div class="field"><label for="ContractType">@L["Contract type"]</label><input id="ContractType" name="ContractType" maxlength="100" value="@Model.ContractType" /></div>
+        <div class="field"><label for="RiskLevel">@L["Risk level"]</label><input id="RiskLevel" name="RiskLevel" maxlength="100" value="@Model.RiskLevel" /></div>
+        <div class="field"><label for="SupplierType">@L["Supplier type"]</label><input id="SupplierType" name="SupplierType" maxlength="100" value="@Model.SupplierType" /></div>
+        <div class="field"><label for="CustomFields">@L["Custom fields (one per line, code=value)"]</label><textarea id="CustomFields" name="CustomFields" rows="3" maxlength="2000">@Model.CustomFields</textarea></div>
+        @if (Model.People.Count > 0)
+        {
+            <div class="field"><label for="SubmitterId">@L["Submitted by (leave empty for nobody in particular)"]</label><select id="SubmitterId" name="SubmitterId"><option value="">@L["(nobody)"]</option>@foreach (var p in Model.People) { <option value="@p.Id" selected="@(p.Id == Model.SubmitterId)">@p.DisplayName</option> }</select>
+                <p class="hint">@L["The submitter is never one of the approvers."]</p></div>
+        }
+    </fieldset>
+    <div class="actions"><button type="submit">@L["Run the simulation"]</button></div>
+</form>
+
+@if (Model.Result is { } result)
+{
+    var r = result.Resolution;
+    <section class="card" aria-labelledby="res-h">
+        <h2 id="res-h">@L["Result"]</h2>
+        <p role="status"><span class="badge @(r.Resolved ? "ok" : "warn")">@(r.Resolved ? L["Resolved"] : L["Blocked"])</span> @L["Matrix"] <code>@r.MatrixCode</code>, @r.SourceLabel, @L["tested for"] @r.EffectiveDate.ToString("yyyy-MM-dd")
+            @if (result.IsFuture) { <span class="badge">@L["future date"]</span> } @if (result.IsPast) { <span class="badge">@L["past date"]</span> }</p>
+        @foreach (var n in result.Notes) { <p class="flash warn" role="status">@n</p> }
+        @if (!r.Resolved) { <p class="error-summary" role="alert"><strong>@L["Nobody would be asked: the submission is blocked."]</strong> @r.BlockMessage</p> }
+        @if (r.RowCodes.Count > 0) { <p>@L["Rows that applied"]: @string.Join(", ", r.RowCodes)</p> }
+    </section>
+
+    @if (r.Plan is { } plan)
+    {
+        <section aria-labelledby="plan-h">
+            <h2 id="plan-h">@L["Resolved steps"]</h2>
+            <p class="hint">@L["Steps in the same stage are open together; a later stage opens when every step of the earlier stage is settled."]
+                @if (plan.ConvertedValue is { } cv) { <span>@L["Value compared"]: @cv.ToString("#,0.##") @plan.MatrixCurrency.</span> }</p>
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Resolved steps"]</caption>
+                <thead><tr><th scope="col">@L["Stage"]</th><th scope="col">@L["Step"]</th><th scope="col">@L["From row"]</th><th scope="col">@L["Group"]</th><th scope="col">@L["How they respond"]</th><th scope="col">@L["People who can respond"]</th></tr></thead>
+                <tbody>
+                @foreach (var s in plan.Steps.OrderBy(x => x.Stage))
+                {
+                    <tr><td>@(s.Stage + 1)</td><th scope="row">@s.Display</th><td>@s.RowCode</td><td>@s.ApproverGroup@(s.BackupGroup is { } bg ? $" + {bg}" : "")</td>
+                        <td>@(s.Mode == "AllRequired" ? L["Every named approver"] : L["First response wins"])@(s.TimeoutDays is { } t ? $" · {t} days" : "")</td>
+                        <td><ul class="plain">@foreach (var a in s.Approvers) { <li>@a.Name <span class="badge">@a.Role</span>@if (a.OnBehalfOfName is { } ob) { <span class="hint"> @L["for"] @ob</span> }</li> }</ul></td></tr>
+                }
+                </tbody>
+            </table></div>
+        </section>
+    }
+
+    <section aria-labelledby="why-h">
+        <h2 id="why-h">@L["Why each person is in or out"]</h2>
+        @if (r.Explanations.Count == 0) { <p class="hint">@L["No approver was considered."]</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Why each person is in or out"]</caption>
+                <thead><tr><th scope="col">@L["Step"]</th><th scope="col">@L["Person"]</th><th scope="col">@L["Capacity"]</th><th scope="col">@L["Decision"]</th><th scope="col">@L["Why"]</th></tr></thead>
+                <tbody>
+                @foreach (var e in r.Explanations)
+                {
+                    <tr><td>@e.StepDisplay</td><th scope="row">@e.Name</th><td>@e.Role@(e.OnBehalfOfName is { } o ? $" for {o}" : "")</td><td><span class="badge @(e.Included ? "ok" : "warn")">@(e.Included ? L["Included"] : L["Left out"])</span></td>
+                        <td>@e.Summary @if (e.Reasons.Count > 0) { <ul class="plain">@foreach (var why in e.Reasons) { <li>@why</li> }</ul> }</td></tr>
+                }
+                </tbody>
+            </table></div>
+        }
+    </section>
+
+    <section aria-labelledby="trace-h">
+        <h2 id="trace-h">@L["Resolution trace"]</h2>
+        <p class="hint">@L["Every decision in the order it was taken."]</p>
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Resolution trace"]</caption>
+            <thead><tr><th scope="col">#</th><th scope="col">@L["Stage"]</th><th scope="col">@L["Item"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["What happened"]</th></tr></thead>
+            <tbody>@foreach (var t in r.Trace) { <tr><td>@t.Sequence</td><td>@t.Stage</td><td><code>@t.Code</code></td><td>@t.Outcome</td><td>@t.Message</td></tr> }</tbody>
+        </table></div>
+    </section>
+}

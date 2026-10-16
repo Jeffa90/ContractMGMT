@@ -36,7 +36,7 @@ internal sealed class AuditBrowser(IAuditEventSource eventSource, IAccessService
 {
     /// <summary>Action prefixes that describe administration rather than business data.</summary>
     internal static readonly string[] AdministrativePrefixes =
-        ["role.", "user.", "rolemapping.", "identityprovider.", "structure.", "organisation.", "tenant.", "config.", "category.ownership", "setup.", "onboarding.", "authorisation."];
+        ["role.", "user.", "rolemapping.", "identityprovider.", "structure.", "organisation.", "tenant.", "config.", "category.ownership", "setup.", "onboarding.", "authorisation.", "approval.matrix.", "approval.delegation.", "approval.simulated"];
 
     public async Task<PagedResult<AuditEventDto>> QueryAsync(AuditFilter f, CancellationToken ct = default)
     {
@@ -76,7 +76,8 @@ internal sealed class AuditBrowser(IAuditEventSource eventSource, IAccessService
             || (hasAdmin
                 && (e.Action.StartsWith("role.") || e.Action.StartsWith("user.") || e.Action.StartsWith("rolemapping.") || e.Action.StartsWith("identityprovider.")
                     || e.Action.StartsWith("structure.") || e.Action.StartsWith("organisation.") || e.Action.StartsWith("tenant.") || e.Action.StartsWith("config.")
-                    || e.Action.StartsWith("category.ownership") || e.Action.StartsWith("setup.") || e.Action.StartsWith("onboarding.") || e.Action.StartsWith("authorisation."))
+                    || e.Action.StartsWith("category.ownership") || e.Action.StartsWith("setup.") || e.Action.StartsWith("onboarding.") || e.Action.StartsWith("authorisation.")
+                    || e.Action.StartsWith("approval.matrix.") || e.Action.StartsWith("approval.delegation.") || e.Action.StartsWith("approval.simulated"))
                 && (adminAllOrgs || (e.OrganisationId != null && adminOrgList.Contains(e.OrganisationId.Value)))));
 
         if (!string.IsNullOrWhiteSpace(f.Action)) { var a = f.Action.Trim(); query = query.Where(e => e.Action.StartsWith(a)); }

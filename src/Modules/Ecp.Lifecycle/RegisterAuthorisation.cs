@@ -1,6 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Ecp.Approvals;
+using Ecp.Approvals.Domain;
+using Ecp.Approvals.Resolution;
 using Ecp.Audit;
 using Ecp.Contracts;
 using Ecp.Documents;
@@ -39,7 +42,7 @@ public sealed record ApprovalQueueItem(
 public sealed record ApprovalDetail(
     Guid RequestId, string SubjectKind, Guid SubjectId, Guid ContractId, string AgreementReference, string Title, string? VariationReference, ApprovalStatus Status, string ApproverGroupKey, string SubmittedByName,
     DateTime SubmittedUtc, RegisterSnapshot Snapshot, string SnapshotSha256, bool SnapshotIntact, ExecutedDocumentInfo? ExecutedDocument, IReadOnlyList<EligibleApprover> Eligible, ApprovalDecisionInfo? Decision,
-    IReadOnlyList<ApprovalDecisionInfo> History, bool CanApprove, bool CanReject, string? CannotBecause);
+    IReadOnlyList<ApprovalDecisionInfo> History, bool CanApprove, bool CanReject, string? CannotBecause, PlanView? Plan = null);
 
 /// <summary>
 /// Register authorisation: the Group Head of Procurement (or a configured backup) approves or rejects an executed agreement. Whoever responds first decides; the actor is the signed-in person, never a
@@ -58,10 +61,10 @@ public interface IRegisterAuthorisationService
     Task<IReadOnlyList<EligibleApprover>> EligibleApproversAsync(string approverGroupKey, CancellationToken ct = default);
 }
 
-internal sealed class RegisterAuthorisationService(
+internal sealed partial class RegisterAuthorisationService(
     LifecycleDbContext db, LifecycleEngine engine, IAuditWriter audit, ITenantContext tenant, IClock clock, CurrentUser currentUser, IAccessService access, IAccessDirectory directory,
     IContractLifecyclePort port, ISecuredContractService contracts, ISecuredContractDocuments secureDocuments, IDocumentQuery documentQuery, IVariationOutcomes variationOutcomes, LifecycleEvents events,
-    VisibleContracts visible) : IRegisterAuthorisationService
+    VisibleContracts visible, IApprovalResolver approvalResolver, ApprovalFactsBuilder factsBuilder, IUnitOfWork uow) : IRegisterAuthorisationService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -78,11 +81,35 @@ internal sealed class RegisterAuthorisationService(
             ?? throw new DomainException("invalid_transition", $"This {subject.Noun} cannot be submitted for register authorisation while it is {resolved.Definition.DisplayOf(subject.Status)}.");
         var group = resolved.Definition.Settings.Approval.ApproverGroupKey;
         var me = currentUser.UserId ?? throw new ForbiddenException("A signed-in person is required.");
-        var eligible = await EligibleApproversAsync(group, ct);
-        if (eligible.Count == 0)
-            throw new DomainException("no_approver", "No approver is assigned to the register-authorisation group. An administrator must assign the approver and a backup before this can be submitted.");
-        if (eligible.All(e => e.UserId == me))
-            throw new DomainException("no_independent_approver", "You are the only person who could approve this, and nobody can approve their own submission. Another approver or a backup must be assigned.");
+        IReadOnlyList<EligibleApprover> eligible;
+        ApprovalResolution? resolution = null;
+        if (resolved.Definition.Settings.Approval.Matrix is { } matrixCode)
+        {
+            // A workflow that names an approval matrix gets its steps and people from the matrix. If nobody can approve, the submission is blocked with the reasons (fail closed); nothing is defaulted.
+            var facts = await factsBuilder.BuildAsync(subject, ct);
+            resolution = await approvalResolver.ResolveAsync(new ResolutionRequest(subject.OrganisationId, matrixCode, facts, await engine.DescribeAsync(subject, null, ct), me, clock.UtcNow, MatrixSource.Published), ct);
+            if (!resolution.Resolved)
+            {
+                await uow.ExecuteAsync(c =>
+                {
+                    audit.Record(new AuditEntry("approval.resolution_blocked", nameof(ApprovalRequest), subjectId.ToString(), AuditOutcome.Denied, subject.OrganisationId, Reason: resolution.BlockMessage, Classification: subject.Classification,
+                        NewValuesJson: AuditJson.Of(new { subjectKind, matrix = matrixCode, release = resolution.ReleaseNumber, code = resolution.BlockCode })));
+                    return Task.CompletedTask;
+                }, ct);
+                throw new DomainException("approval_blocked", resolution.BlockMessage!);
+            }
+            var first = resolution.Plan!.Steps.Where(x => x.Stage == resolution.Plan.Steps.Min(y => y.Stage)).ToList();
+            group = first[0].ApproverGroup;
+            eligible = first.SelectMany(x => x.Approvers).GroupBy(a => a.UserId).Select(g => g.First()).Select(a => new EligibleApprover(a.UserId, a.Name, a.Role, a.Role != ParticipantRoles.Primary)).ToList();
+        }
+        else
+        {
+            eligible = await EligibleApproversAsync(group, ct);
+            if (eligible.Count == 0)
+                throw new DomainException("no_approver", "No approver is assigned to the register-authorisation group. An administrator must assign the approver and a backup before this can be submitted.");
+            if (eligible.All(e => e.UserId == me))
+                throw new DomainException("no_independent_approver", "You are the only person who could approve this, and nobody can approve their own submission. Another approver or a backup must be assigned.");
+        }
         Guid id = Guid.Empty;
         await engine.ExecuteAsync(new TransitionCommand(subjectKind, subjectId, transition.Code, note, null, subject.Status, clientRequestId, AllowManaged: true), async (scope, c) =>
         {
@@ -92,12 +119,26 @@ internal sealed class RegisterAuthorisationService(
             var name = await directory.DisplayNameAsync(me, c) ?? engine.ActorLabel;
             var request = ApprovalRequest.Submit(tenant.RequireTenantId(), scope.Subject.OrganisationId, subjectKind, subjectId, scope.Subject.ContractId, group, me, name, snapshot.ExecutedDocumentId,
                 snapshot.ExecutedSha256, json, sha, JsonSerializer.Serialize(eligible, Json), scope.NowUtc);
+            string? planSha = null;
+            if (resolution is not null)
+            {
+                var stored = JsonSerializer.Serialize(new StoredPlan(resolution.Plan!, resolution.Trace, resolution.Explanations), Json);
+                planSha = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stored))).ToLowerInvariant();
+                var state = ApprovalPlans.Evaluate(resolution.Plan!, []);
+                request.AttachPlan(resolution.Plan!.MatrixCode, resolution.Plan.ReleaseNumber, stored, planSha, state.ActiveGroupKeys);
+            }
             db.Approvals.Add(request);
             await engine.SaveAsync(c);
             id = request.Id;
-            events.Raise(LifecycleEventTypes.ApprovalSubmitted, scope.Subject, new { requestId = request.Id, group, submitterUserId = me });
+            foreach (var g in request.PendingGroups) events.Raise(LifecycleEventTypes.ApprovalSubmitted, scope.Subject, new { requestId = request.Id, group = g, submitterUserId = me });
             audit.Record(new AuditEntry("approval.submitted", nameof(ApprovalRequest), request.Id.ToString(), OrganisationId: scope.Subject.OrganisationId, Reason: note, Classification: scope.Subject.Classification,
-                NewValuesJson: AuditJson.Of(new { subjectKind, subjectId, group, snapshotSha256 = sha, executedDocumentId = snapshot.ExecutedDocumentId, eligible = eligible.Select(e => new { e.UserId, e.RoleCode }) })));
+                NewValuesJson: resolution is null
+                    ? AuditJson.Of(new { subjectKind, subjectId, group, snapshotSha256 = sha, executedDocumentId = snapshot.ExecutedDocumentId, eligible = eligible.Select(e => new { e.UserId, e.RoleCode }) })
+                    : AuditJson.Of(new
+                    {
+                        subjectKind, subjectId, group, snapshotSha256 = sha, executedDocumentId = snapshot.ExecutedDocumentId, eligible = eligible.Select(e => new { e.UserId, e.RoleCode }),
+                        matrix = resolution.MatrixCode, release = resolution.ReleaseNumber, planSha256 = planSha, rows = resolution.RowCodes, steps = resolution.Plan!.Steps.Select(x => new { x.Key, x.Stage, x.Mode, x.ApproverGroup })
+                    })));
             await db.SaveChangesAsync(c);
         }, ct);
         return id;
@@ -137,7 +178,7 @@ internal sealed class RegisterAuthorisationService(
     // ---- reading --------------------------------------------------------------------------------------------------------------------------------
 
     private ResourceDescriptor Approving(ResourceDescriptor d, ApprovalRequest r)
-        => d with { PendingApprovalGroupKeys = new HashSet<string>([r.ApproverGroupKey]), SubmittedByUserId = r.SubmittedByUserId };
+        => d with { PendingApprovalGroupKeys = new HashSet<string>(r.PendingGroups), SubmittedByUserId = r.SubmittedByUserId };
 
     public async Task<PagedResult<ApprovalQueueItem>> PendingAsync(bool onlyActionable = true, int page = 1, int pageSize = 25, CancellationToken ct = default)
     {
@@ -216,8 +257,14 @@ internal sealed class RegisterAuthorisationService(
             else { canApprove = true; canReject = true; }
         }
         var title = snapshot.VariationReference is null ? snapshot.Title : $"{snapshot.VariationReference}: {snapshot.Title}";
+        PlanView? planView = null;
+        if (request.HasPlan)
+        {
+            planView = await BuildPlanViewAsync(request, descriptor, ct);
+            if (request.Status == ApprovalStatus.Pending && canApprove && planView.YourPart is null) { canApprove = false; canReject = false; why = planView.YourPartNote ?? "It is not your turn to respond."; }
+        }
         return new ApprovalDetail(request.Id, request.SubjectKind, request.SubjectId, request.ContractId, snapshot.AgreementReference, title, snapshot.VariationReference, request.Status, request.ApproverGroupKey,
-            request.SubmittedByName, request.SubmittedUtc, snapshot, request.SnapshotSha256, intact, doc, current.Count > 0 ? current : eligible, decision, history, canApprove, canReject, why);
+            request.SubmittedByName, request.SubmittedUtc, snapshot, request.SnapshotSha256, intact, doc, current.Count > 0 ? current : eligible, decision, history, canApprove, canReject, why, planView);
     }
 
     private static ApprovalDecisionInfo ToInfo(ApprovalRequest r)
@@ -254,6 +301,8 @@ internal sealed class RegisterAuthorisationService(
             if (!string.IsNullOrWhiteSpace(clientRequestId) && await db.History.AnyAsync(h => h.SubjectId == request.SubjectId && h.ClientRequestId == clientRequestId, ct)) return;
             throw AlreadyDecided(request);
         }
+        // A request made under an approval matrix is decided step by step; the reference model below is unchanged.
+        if (request.HasPlan) { await DecideWithPlanAsync(request, approve, comment, clientRequestId, ct); return; }
         var subject = await engine.LoadSubjectAsync(request.SubjectKind, request.SubjectId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var role = approve ? "approve" : "reject";
@@ -310,7 +359,9 @@ internal sealed class PendingApprovalSource(LifecycleDbContext db, IWorkflowDefi
         var ids = contractIds is { Count: > 0 } ? contractIds.ToArray() : null;
         var query = db.Approvals.AsNoTracking().Where(a => a.Status == ApprovalStatus.Pending);
         if (ids is not null) query = query.Where(a => ids.Contains(a.ContractId));
-        var rows = (await query.Select(a => new { a.ContractId, a.ApproverGroupKey }).ToListAsync(ct)).Select(r => (r.ContractId, Group: r.ApproverGroupKey)).ToList();
+        // A plan-based request is waiting on the groups of its open steps; the reference model on its single approver group.
+        var rows = (await query.Select(a => new { a.ContractId, a.ApproverGroupKey, a.ActiveGroupKeys }).ToListAsync(ct))
+            .SelectMany(r => (string.IsNullOrEmpty(r.ActiveGroupKeys) ? new[] { r.ApproverGroupKey } : r.ActiveGroupKeys.Split(',', StringSplitOptions.RemoveEmptyEntries)).Select(g => (r.ContractId, Group: g))).ToList();
 
         // Contracts whose latest step landed in a state with the 'flagged' role are waiting for the disposition decision of the workflow's approver group.
         var flaggedByGroup = new Dictionary<string, List<string>>(StringComparer.Ordinal);

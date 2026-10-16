@@ -53,7 +53,8 @@ public sealed record TransitionDefinition(
 }
 
 public sealed record DocumentSettings(string ExecutedCopyType, IReadOnlyList<string> FinalTypes, string LegalMarkupType, string ApprovalEvidenceType, IReadOnlyList<string>? UploadTypes = null);
-public sealed record ApprovalSettings(string ApproverGroupKey, bool RequireExecutedCopy);
+/// <summary>The approval step of a workflow. Without a <see cref="Matrix"/> the single <see cref="ApproverGroupKey"/> decides (the reference model); with one, the named approval matrix resolves the steps for each submission.</summary>
+public sealed record ApprovalSettings(string ApproverGroupKey, bool RequireExecutedCopy, string? Matrix = null);
 public sealed record LegalSettings(bool ReworkReasonRequired);
 public sealed record UnlockSettings(int DefaultMinutes, int MaxMinutes, bool RequireSecondPerson, bool Enabled = true);
 public sealed record RenewalSettings(string SuccessorInitialState, IReadOnlyList<string> CopyFields, IReadOnlyList<string> CopyDocumentTypes, string StartDateRule);
@@ -116,7 +117,7 @@ public static class WorkflowDefinitionParser
     }
 
     private sealed class RawDocuments { public string? ExecutedCopyType { get; set; } public List<string>? FinalTypes { get; set; } public string? LegalMarkupType { get; set; } public string? ApprovalEvidenceType { get; set; } public List<string>? UploadTypes { get; set; } }
-    private sealed class RawApproval { public string? ApproverGroupKey { get; set; } public bool RequireExecutedCopy { get; set; } = true; }
+    private sealed class RawApproval { public string? ApproverGroupKey { get; set; } public bool RequireExecutedCopy { get; set; } = true; public string? Matrix { get; set; } }
     private sealed class RawLegal { public bool ReworkReasonRequired { get; set; } = true; }
     private sealed class RawUnlock { public int DefaultMinutes { get; set; } = 60; public int MaxMinutes { get; set; } = 240; public bool RequireSecondPerson { get; set; } public bool Enabled { get; set; } = true; }
     private sealed class RawRenewal { public string? SuccessorInitialState { get; set; } public List<string>? CopyFields { get; set; } public List<string>? CopyDocumentTypes { get; set; } public string? StartDateRule { get; set; } }
@@ -152,7 +153,7 @@ public static class WorkflowDefinitionParser
         var docs = raw.Settings?.Documents;
         var settings = new WorkflowSettings(
             new DocumentSettings(docs?.ExecutedCopyType ?? "", docs?.FinalTypes ?? [], docs?.LegalMarkupType ?? "", docs?.ApprovalEvidenceType ?? "", docs?.UploadTypes),
-            new ApprovalSettings(raw.Settings?.Approval?.ApproverGroupKey ?? "", raw.Settings?.Approval?.RequireExecutedCopy ?? true),
+            new ApprovalSettings(raw.Settings?.Approval?.ApproverGroupKey ?? "", raw.Settings?.Approval?.RequireExecutedCopy ?? true, string.IsNullOrWhiteSpace(raw.Settings?.Approval?.Matrix) ? null : raw.Settings!.Approval!.Matrix!.Trim()),
             new LegalSettings(raw.Settings?.Legal?.ReworkReasonRequired ?? true),
             new UnlockSettings(raw.Settings?.Unlock?.DefaultMinutes ?? 60, raw.Settings?.Unlock?.MaxMinutes ?? 240, raw.Settings?.Unlock?.RequireSecondPerson ?? false, raw.Settings?.Unlock?.Enabled ?? true),
             new RenewalSettings(raw.Settings?.Renewal?.SuccessorInitialState ?? "", raw.Settings?.Renewal?.CopyFields ?? [], raw.Settings?.Renewal?.CopyDocumentTypes ?? [], raw.Settings?.Renewal?.StartDateRule ?? "None"),
@@ -246,6 +247,8 @@ public static class WorkflowDefinitionParser
         }
         if (string.IsNullOrWhiteSpace(doc.LegalMarkupType)) m.Add(Error("$.settings.documents.legalMarkupType", "document_type", "Name the document type used for Legal mark-ups."));
         if (string.IsNullOrWhiteSpace(d.Settings.Approval.ApproverGroupKey)) m.Add(Error("$.settings.approval.approverGroupKey", "approver_group", "Name the approver group that gives register authorisation."));
+        if (d.Settings.Approval.Matrix is { } matrixCode && !System.Text.RegularExpressions.Regex.IsMatch(matrixCode, "^[a-z0-9][a-z0-9-]{0,49}$", System.Text.RegularExpressions.RegexOptions.NonBacktracking))
+            m.Add(Error("$.settings.approval.matrix", "approval_matrix", "The approval matrix is named by its code: lower-case letters, digits and hyphens (up to 50)."));
         var unlock = d.Settings.Unlock;
         if (unlock.MaxMinutes is < 5 or > 1440) m.Add(Error("$.settings.unlock.maxMinutes", "unlock_max", "The longest unlock must be between 5 minutes and 24 hours."));
         if (unlock.DefaultMinutes < 5 || unlock.DefaultMinutes > unlock.MaxMinutes) m.Add(Error("$.settings.unlock.defaultMinutes", "unlock_default", "The default unlock must be at least 5 minutes and no more than the longest unlock."));

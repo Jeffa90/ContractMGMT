@@ -28,6 +28,10 @@ namespace Ecp.Lifecycle.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ActiveGroupKeys")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("ApproverGroupKey")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -68,6 +72,13 @@ namespace Ecp.Lifecycle.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<string>("MatrixCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("MatrixRelease")
+                        .HasColumnType("int");
+
                     b.Property<string>("OnBehalfOfName")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -77,6 +88,13 @@ namespace Ecp.Lifecycle.Persistence.Migrations
 
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PlanJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PlanSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -131,6 +149,66 @@ namespace Ecp.Lifecycle.Persistence.Migrations
                         .HasFilter("[Status] = 'Pending'");
 
                     b.ToTable("ApprovalRequest", "lifecycle");
+                });
+
+            modelBuilder.Entity("Ecp.Lifecycle.Domain.ApprovalStepResponse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Approved")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("OnBehalfOfName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("OnBehalfOfUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("RespondedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StepKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RequestId", "Sequence")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "RequestId", "StepKey", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ApprovalStepResponse", "lifecycle");
                 });
 
             modelBuilder.Entity("Ecp.Lifecycle.Domain.ExecutionRecord", b =>
@@ -998,6 +1076,16 @@ namespace Ecp.Lifecycle.Persistence.Migrations
                     b.HasIndex("TenantId", "IsOpen", "UpdatedUtc");
 
                     b.ToTable("Variation", "lifecycle");
+                });
+
+            modelBuilder.Entity("Ecp.Lifecycle.Domain.ApprovalStepResponse", b =>
+                {
+                    b.HasOne("Ecp.Lifecycle.Domain.ApprovalRequest", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RequestId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Ecp.Lifecycle.Domain.LegalAttachment", b =>

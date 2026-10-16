@@ -1,0 +1,88 @@
+@page "/Admin/Approvals/Delegations"
+@model Ecp.Host.Pages.Admin.Approvals.DelegationsModel
+@{ ViewData["Title"] = L["Approval delegations"].Value; }
+<h1>@L["Approval delegations"]</h1>
+<p class="lede">@L["Hand your approval authority to another member of your group while you are away. It lasts at most 90 days, is recorded and audited, shows as 'on behalf of' on whatever the person approves, and cannot be passed on again. A circle of delegations is refused."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.OrganisationId is not null)
+{
+<nav class="tabs" aria-label="@L["Approval matrix pages"]">
+    <a href="/Admin/Approvals?organisationId=@Model.OrganisationId">@L["Matrices"]</a>
+    <a href="/Admin/Approvals/Simulate?organisationId=@Model.OrganisationId">@L["Simulator"]</a>
+    <a href="/Admin/Approvals/Delegations?organisationId=@Model.OrganisationId" aria-current="page">@L["Delegations"]</a>
+    <a href="/Admin/Approvals/History?organisationId=@Model.OrganisationId">@L["History and audit"]</a>
+</nav>
+}
+
+@if (Model.CanDelegate)
+{
+    <section class="card" aria-labelledby="new-h">
+        <h2 id="new-h">@L["Delegate my authority"]</h2>
+        <form method="get" aria-label="@L["Find the people in my group"]">
+            <input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+            <div class="field"><label for="g">@L["My approver group"]</label><input id="g" name="groupKey" value="@Model.GroupKey" maxlength="100" /></div>
+            <button type="submit" class="secondary">@L["Show who is in the group"]</button>
+        </form>
+        @if (Model.Members.Count > 0)
+        {
+            <form method="post" asp-page-handler="Create">
+                <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="GroupKey" value="@Model.GroupKey" />
+                <div class="field"><label for="ToUserId">@L["Delegate to"]</label><select id="ToUserId" name="ToUserId" required><option value="">@L["Choose a colleague"]</option>@foreach (var m in Model.Members) { <option value="@m.UserId">@m.DisplayName</option> }</select></div>
+                <div class="field"><label for="FromDate">@L["From"]</label><input id="FromDate" name="FromDate" type="date" required /></div>
+                <div class="field"><label for="ToDate">@L["Until (this day is included)"]</label><input id="ToDate" name="ToDate" type="date" required /></div>
+                <div class="field"><label for="Reason">@L["Reason"]</label><input id="Reason" name="Reason" maxlength="500" required /></div>
+                <div class="actions"><button type="submit">@L["Delegate"]</button></div>
+            </form>
+        }
+        else if (!string.IsNullOrWhiteSpace(Model.GroupKey)) { <p class="hint">@L["You are not a member of that group, or nobody else is."]</p> }
+    </section>
+
+    <section aria-labelledby="mine-h">
+        <h2 id="mine-h">@L["Delegations I gave or received"]</h2>
+        @if (Model.Mine.Count == 0) { <p class="hint">@L["None."]</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Delegations I gave or received"]</caption>
+                <thead><tr><th scope="col">@L["Group"]</th><th scope="col">@L["From"]</th><th scope="col">@L["To"]</th><th scope="col">@L["Period (UTC)"]</th><th scope="col">@L["Reason"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+                <tbody>
+                @foreach (var d in Model.Mine)
+                {
+                    <tr><th scope="row">@d.GroupKey</th><td>@d.FromName</td><td>@d.ToName</td><td>@d.ValidFromUtc.ToString("yyyy-MM-dd HH:mm") &ndash; @d.ValidToUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@d.Reason</td>
+                        <td>@(d.RevokedUtc is not null ? L["Ended"] : d.IsActive ? L["In force"] : d.ValidFromUtc > DateTime.UtcNow ? L["Not started"] : L["Finished"])</td>
+                        <td>@if (d.FromUserId == Model.Me && d.RevokedUtc is null && d.ValidToUtc > DateTime.UtcNow)
+                            {
+                                <form method="post" asp-page-handler="End"><input type="hidden" name="id" value="@d.Id" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+                                    <input name="EndReason" type="text" required maxlength="300" placeholder="@L["Why"]" aria-label="@L["Reason for ending"]" /><button type="submit" class="secondary">@L["End it"]</button></form>
+                            }</td></tr>
+                }
+                </tbody>
+            </table></div>
+        }
+    </section>
+}
+
+@if (Model.All is { } all)
+{
+    <section aria-labelledby="all-h">
+        <h2 id="all-h">@L["All delegations in this organisation"]</h2>
+        <form method="get" class="card"><div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div><button type="submit" class="secondary">@L["Show"]</button></form>
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["All delegations in this organisation"]</caption>
+            <thead><tr><th scope="col">@L["Group"]</th><th scope="col">@L["From"]</th><th scope="col">@L["To"]</th><th scope="col">@L["Period (UTC)"]</th><th scope="col">@L["Reason"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+            <tbody>
+            @foreach (var d in all.Items)
+            {
+                <tr><th scope="row">@d.GroupKey</th><td>@d.FromName</td><td>@d.ToName</td><td>@d.ValidFromUtc.ToString("yyyy-MM-dd HH:mm") &ndash; @d.ValidToUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@d.Reason</td>
+                    <td>@(d.RevokedUtc is not null ? $"{L["Ended"]} ({d.RevokedBy}: {d.RevokeReason})" : d.IsActive ? L["In force"] : d.ValidFromUtc > DateTime.UtcNow ? L["Not started"] : L["Finished"])</td>
+                    <td>@if (Model.CanAdminister && d.RevokedUtc is null && d.ValidToUtc > DateTime.UtcNow)
+                        {
+                            <form method="post" asp-page-handler="End"><input type="hidden" name="id" value="@d.Id" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+                                <input name="EndReason" type="text" required maxlength="300" placeholder="@L["Why"]" aria-label="@L["Reason for ending"]" /><button type="submit" class="secondary">@L["End it"]</button></form>
+                        }</td></tr>
+            }
+            @if (all.Items.Count == 0) { <tr><td colspan="7">@L["None."]</td></tr> }
+            </tbody>
+        </table></div>
+    </section>
+}

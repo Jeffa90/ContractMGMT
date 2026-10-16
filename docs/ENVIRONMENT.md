@@ -34,6 +34,17 @@ dotnet test src/Ecp.sln                    # provider-independent + SQL Server s
 
 Without a SQL Server connection, `dotnet test --filter "Category!=SqlServer"` runs the provider-independent suites; `tools/test-report.sh` prints the four counters (Passed, Failed, Skipped, NOT VERIFIED).
 
+## Running the application and first-run setup
+
+```
+dotnet Ecp.Host.dll                      # Demo (seeded, complete installation)
+Ecp__DemoSeed=false dotnet Ecp.Host.dll # an unconfigured installation: browsers are sent to /Setup
+dotnet Ecp.Host.dll setup-token          # prints a one-time setup token (24 h); run on the server
+dotnet Ecp.Host.dll migrate              # applies migrations (Production does this explicitly)
+```
+
+`Ecp:Setup:AllowRemote=true` lets callers that are not on the server open `/Setup` (the token is still required); it is `false` by default and is needed when the wizard is reached through a published container port. See `docs/SETUP_AND_ONBOARDING.md`.
+
 ## Known limitations
 
 - No bridge networking in the nested daemon: use `--network host` and distinct ports.

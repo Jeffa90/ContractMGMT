@@ -26,7 +26,7 @@ internal sealed class DemoDataApplier(DemoSeeder seeder) : IDemoDataApplier
 /// Incomplete: browsers are redirected to /Setup; the API answers 503 with a problem document; health, static files and the setup pages stay reachable.
 /// Complete: every /Setup path is a 404 (the signed-in administrator's /Admin/Setup is a different, authorised page).
 /// </summary>
-public sealed class SetupGateMiddleware(RequestDelegate next)
+public sealed class SetupGateMiddleware(RequestDelegate next, SetupEnvironment env)
 {
     public const string SetupPath = "/Setup";
     public const string SessionCookie = "ecp.setup";
@@ -35,11 +35,26 @@ public sealed class SetupGateMiddleware(RequestDelegate next)
     {
         var path = context.Request.Path;
         var isSetup = path.StartsWithSegments(SetupPath, StringComparison.OrdinalIgnoreCase);
-        var complete = await setup.IsCompleteAsync(context.RequestAborted);
+        bool complete;
+        try { complete = await setup.IsCompleteAsync(context.RequestAborted); }
+        catch (InvalidOperationException)
+        {
+            // The setup state cannot be read (damaged, or its key ring is gone). Nothing is guessed: liveness stays up, everything else is closed.
+            if (path.StartsWithSegments("/health/live")) { await next(context); return; }
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            await context.Response.WriteAsync("The installation state could not be read. See the application log and docs/SETUP_AND_ONBOARDING.md.");
+            return;
+        }
         if (complete)
         {
             if (isSetup) { context.Response.StatusCode = StatusCodes.Status404NotFound; return; }
             await next(context);
+            return;
+        }
+        // Setup is invisible (404) to anyone who is not on the server itself, unless remote setup was explicitly allowed in host configuration.
+        if (isSetup && !env.AllowRemoteSetup && context.Connection.RemoteIpAddress is { } remote && !System.Net.IPAddress.IsLoopback(remote))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
         if (isSetup || path.StartsWithSegments("/health") || path.StartsWithSegments("/css") || path.StartsWithSegments("/js") || path == "/favicon.ico"

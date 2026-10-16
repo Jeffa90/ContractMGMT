@@ -67,3 +67,7 @@ Not verified (cannot be, before code exists): that the proposed test IDs pass, t
 ## M1 additions (2026-10-16)
 
 `docs/ENVIRONMENT.md` (M0 report), `deploy/README.md` and `deploy/STATUS.md` (artefact verification log), source and test trees as listed in `PACKAGE_MANIFEST.md`. Naming note: the module namespace `Ecp.Migration` (bulk data migration) collides with the EF Core base class `Microsoft.EntityFrameworkCore.Migrations.Migration`; generated EF migrations therefore use the fully qualified base class (`tools/add-migration.sh` applies this). Consider renaming the namespace to `Ecp.DataMigration` before M6 (recorded, reversible).
+
+## Added in the secure application and setup slice (2026-10-16)
+
+`docs/SETUP_AND_ONBOARDING.md` (first-run wizard, setup protection, organisation onboarding; ASM-20 to ASM-24), `docs/ACCESS_AND_IDENTITY.md` (identity providers, scopes, the Viewer model, a finding about Tenant Administrator configuration rights), `docs/SUPPLY_CHAIN.md` (FND-07), `decisions/ADR-0015-datamigration-module-name.md`, `decisions/ADR-0016-setup-state-and-first-run-protection.md`, `decisions/ADR-0017-onboarding-as-a-configuration-kind.md`, `deploy/docker/verify-image.sh`, `templates/packs/` (Blank and reference pack as embedded data).

@@ -35,6 +35,7 @@ public static class OnboardingValidator
     {
         var m = new List<ValidationMessage>();
         void Error(string path, string code, string message) => m.Add(new(ValidationSeverity.Error, path, code, message));
+        int ErrorCount() => m.Count(x => x.Severity == ValidationSeverity.Error);
         void Warn(string path, string code, string message) => m.Add(new(ValidationSeverity.Warning, path, code, message));
 
         if (d.SchemaVersion != OnboardingDocument.CurrentSchema) Error("$.schemaVersion", "schema_version", $"Schema version {d.SchemaVersion} is not supported; use {OnboardingDocument.CurrentSchema}.");
@@ -107,10 +108,11 @@ public static class OnboardingValidator
         var viewerKeys = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < d.ViewerScopes.Count; i++)
         {
-            var v = d.ViewerScopes[i]; var path = $"$.viewerScopes[{i}]";
+            var v = d.ViewerScopes[i]; var path = $"$.viewerScopes[{i}]"; var before = ErrorCount();
             RequireUser(path + ".email", v.Email);
             CheckNarrowing(path, v.ViewerKind, v.CategoryCodes, v.BusinessUnitKeys, v.SiteKeys, allCategories, allBusinessUnits, allSites);
             CheckCeiling(path + ".ceiling", v.Ceiling);
+            if (ErrorCount() == before) DomainCheck(path, RoleCodes.Viewer, v.ViewerKind, v.CategoryCodes, v.BusinessUnitKeys, v.SiteKeys, v.Ceiling);
             if (!viewerKeys.Add(Canonical.Viewer(v))) Error(path, "duplicate", "This viewer scope is listed twice.");
         }
 
@@ -118,7 +120,7 @@ public static class OnboardingValidator
         var mappingKeys = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < d.GroupMappings.Count; i++)
         {
-            var g = d.GroupMappings[i]; var path = $"$.groupMappings[{i}]";
+            var g = d.GroupMappings[i]; var path = $"$.groupMappings[{i}]"; var before = ErrorCount();
             if (string.IsNullOrWhiteSpace(g.ProviderKey)) Error(path + ".providerKey", "required", "The identity provider key is required.");
             else if (!facts.ProviderKeys.Contains(g.ProviderKey.Trim())) Warn(path + ".providerKey", "provider_unknown", $"Identity provider '{g.ProviderKey}' is not configured yet; the mapping has no effect until it is.");
             if (string.IsNullOrWhiteSpace(g.GroupKey) || g.GroupKey.Length > 200) Error(path + ".groupKey", "required", "The group (its id or name as the provider sends it) is required, up to 200 characters.");
@@ -138,6 +140,7 @@ public static class OnboardingValidator
                     Error(path + ".sites", "site_required", "A Division/Site Administrator mapping must name at least one site.");
             }
             CheckCeiling(path + ".ceiling", g.Ceiling);
+            if (ErrorCount() == before) DomainCheck(path, g.RoleCode ?? "", g.ViewerKind, g.CategoryCodes, g.BusinessUnitKeys, g.SiteKeys, g.Ceiling);
             if (!mappingKeys.Add(Canonical.Mapping(g))) Error(path, "duplicate", "This group mapping is listed twice.");
             if (g.RoleCode is RoleCodes.ProcurementAdministrator or RoleCodes.DivisionSiteAdministrator)
                 Warn(path + ".role", "privileged_mapping", $"Everyone in group '{g.GroupKey}' becomes a {g.RoleCode}. Confirm the group's membership is controlled.");
@@ -157,6 +160,18 @@ public static class OnboardingValidator
                 if (string.IsNullOrWhiteSpace(e.Name) || e.Name.Length > 200) Error($"{path}[{i}].name", "name", "A name is 1 to 200 characters.");
             }
             return set;
+        }
+
+        // The identity module's own assignment rules are the final word (for example a Restricted Viewer's ceiling may not exceed Confidential without an explicit
+        // decision, which onboarding cannot make). Run them on stand-in identifiers so the draft fails here rather than at publication.
+        void DomainCheck(string path, string role, ViewerKind? kind, IReadOnlyList<string> cats, IReadOnlyList<string> bus, IReadOnlyList<string> siteKeys, string ceiling)
+        {
+            try
+            {
+                var scope = OnboardingScopes.For(Guid.NewGuid(), ceiling, cats, bus, siteKeys, k => OnboardingSimulator.Synthetic("category", k), k => OnboardingSimulator.Synthetic("bu", k), k => OnboardingSimulator.Synthetic("site", k));
+                AssignmentRules.Validate(role, kind, scope, null, facts.Scale);
+            }
+            catch (DomainException ex) { Error(path, ex.Code, ex.Message); }
         }
 
         void RequireUser(string path, string? email)

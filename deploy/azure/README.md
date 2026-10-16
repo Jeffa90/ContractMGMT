@@ -9,4 +9,6 @@ Design intent (all revisable by configuration, none of it hard-coded in the prod
 - Migrations run as a deliberate release step (`dotnet Ecp.Host.dll migrate`) under a migration identity; the runtime identity has no schema rights.
 - `Ecp__Mode=Production`: the application refuses demo identity, demo seed, SQLite and inline secrets.
 
+First-run setup: open an SSH session to the app (`az webapp ssh`), run `dotnet Ecp.Host.dll setup-token`, and set the app setting `Ecp__Setup__AllowRemote=true` **only while setup runs** (requests reach the app through the platform front end, not from loopback), then remove it. The data directory must be on persistent storage (App Service `/home`) so the setup state survives restarts. Not Verified on Azure.
+
 Not covered yet (future): private networking, Front Door/WAF, backup/restore drills, blob storage provider for documents (the local file provider is not suitable for scaled-out instances), pipelines.

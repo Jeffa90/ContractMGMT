@@ -112,7 +112,7 @@ flowchart TB
 | Retention | Policies, legal holds, disposition | `IRetentionService` |
 | Reporting | Projections and curated views, export endpoints | `IReportingService` |
 | SolutionPacks | Pack loader/catalogue, shipped Blank and JBS packs as data | `ISolutionPackCatalogue` |
-| Setup | Wizard state, bootstrap store, readiness checks, onboarding wizard | `ISetupState`, `IReadinessCheck` |
+| Setup (tier 9; implemented) | Wizard state (protected bootstrap file mirrored to `setup.SetupRecord`), 14 idempotent stages, setup readiness checks, sanitised report, organisation onboarding (the `OrganisationOnboarding` configuration kind, ledger `setup.OnboardingItem`, CSV import, synthetic preview) | `ISetupService`, `IOnboardingService` |
 | Operations | Health, maintenance mode, backup/restore tooling, support bundle, upgrade pre-flight | `IOperationsService` |
 
 ### Solution layout (planned, no code yet)
@@ -299,5 +299,8 @@ flowchart LR
 | 0012 | Document storage and content addressing | Proposed |
 | 0013 | UI technology and API style | Proposed |
 | 0014 | Supply chain: dependencies, SBOM, licences, pack signing | Proposed |
+| 0015 | Bulk-migration module name (`Ecp.DataMigration`) | Proposed |
+| 0016 | Setup state and first-run protection | Proposed |
+| 0017 | Organisation onboarding as a configuration kind with a provenance ledger | Proposed |
 
 ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.

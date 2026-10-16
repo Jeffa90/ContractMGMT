@@ -38,7 +38,10 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
             // No inline script or style anywhere: the policy needs no 'unsafe-inline'/'unsafe-eval'.
             h["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
             var path = context.Request.Path;
-            if (path.StartsWithSegments("/api") || path.StartsWithSegments("/health"))
+            // Setup, re-authentication and onboarding pages show configuration state and must not be kept by browsers or proxies.
+            if (path.StartsWithSegments("/api") || path.StartsWithSegments("/health") || path.StartsWithSegments("/Setup", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWithSegments("/Admin/Setup", StringComparison.OrdinalIgnoreCase) || path.StartsWithSegments("/Reauth", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWithSegments("/Onboarding", StringComparison.OrdinalIgnoreCase))
                 h["Cache-Control"] = "no-store";
             return Task.CompletedTask;
         });

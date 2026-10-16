@@ -56,6 +56,7 @@ for p in md:
         if t in ('.json','.md','.csv','n/a') or t.startswith(('/var/run','packages.microsoft.com','/v2/','../../etc','DEMO-AGR')): continue
         if t.startswith(('http', '/api', '/health', '/setup', 'api/', 'assets/', 'definitions/', 'seed/', 'docs/README', 'docs/CHANGELOG', 'manifest.json', 'signature.json', 'checksums')): continue
         if t.startswith(('t/', 'a/', 'x')) : continue
+        if t.startswith('/'): continue   # a URL route (for example /Setup), never a repository path
         if re.match(r'^(contracts|documents|audit|migration|config|identity|integration|notify|retention|reporting|setup|tenancy)\.', t): continue
         if any(t.startswith(x) or x in t for x in PLANNED): continue
         cands = [t, os.path.join(base, t)]
@@ -180,6 +181,25 @@ for x in sorted(listed):
         if not os.path.isdir(x): bad(f'manifest lists missing directory: {x}')
     elif '/' in x and '*' not in x and x not in actual and not any(x.startswith(g) for g in dirs) and not x.startswith(('bin','obj')):
         bad(f'manifest lists missing file: {x}')
+
+# 5b. Docker build inputs: every file a project embeds from outside src/ must be copied by the Dockerfile and not excluded by .dockerignore
+import glob as _glob, posixpath as _pp
+dockerfile = open('deploy/docker/Dockerfile', encoding='utf-8').read() if os.path.exists('deploy/docker/Dockerfile') else ''
+dockerignore = [l.strip() for l in open('.dockerignore', encoding='utf-8')] if os.path.exists('.dockerignore') else []
+copied = [m.group(1).rstrip('/') for m in re.finditer(r'^COPY\s+(?!--)(\S+)\s', dockerfile, re.M)]
+for proj in _glob.glob('src/**/*.csproj', recursive=True):
+    for inc in re.findall(r'<EmbeddedResource\s+Include="([^"]+)"', open(proj, encoding='utf-8').read()):
+        target = _pp.normpath(_pp.join(_pp.dirname(proj.replace(os.sep, '/')), inc))
+        if target.startswith('src/'): continue
+        if not any(target == c or target.startswith(c + '/') for c in copied): bad(f'Dockerfile does not COPY embedded resource {target} (needed by {proj})')
+        excluded = False
+        for rule in dockerignore:
+            if not rule or rule.startswith('#'): continue
+            neg = rule.startswith('!'); pat = rule.lstrip('!').rstrip('/')
+            import fnmatch
+            if fnmatch.fnmatch(target, pat) or any(fnmatch.fnmatch('/'.join(target.split('/')[:i]), pat) for i in range(1, len(target.split('/')) + 1)):
+                excluded = not neg
+        if excluded: bad(f'.dockerignore excludes embedded resource {target} (needed by {proj})')
 
 # 6. Mermaid diagrams
 import subprocess, tempfile

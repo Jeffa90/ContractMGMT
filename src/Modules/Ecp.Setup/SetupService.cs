@@ -211,7 +211,10 @@ internal sealed class SetupService(ISetupStore store, SetupEnvironment env, IEnu
             await using (var scope = scopes.CreateAsyncScope())
             {
                 var actorContext = scope.ServiceProvider.GetRequiredService<ActorContext>();
-                actorContext.Type = ActorType.System; actorContext.ActorId = "setup:" + actor.Label; actorContext.Source = "Setup";
+                // A signed-in administrator amending a step is recorded as that user; the setup session before installation is recorded as the system acting for setup.
+                actorContext.Type = actor.UserId is null ? ActorType.System : ActorType.User;
+                actorContext.ActorId = actor.UserId?.ToString() ?? "setup:" + actor.Label;
+                actorContext.Source = "Setup";
                 try { result = await stage.ExecuteAsync(new StageContext(doc, record, values, actor, env, scope.ServiceProvider, ct) { RunChecks = c => RunChecksAsync(doc, c) }); }
                 catch (DomainException ex) { result = StageResult.Fail(ex.Message); }
                 catch (Exception ex) when (ex is not OperationCanceledException)

@@ -135,3 +135,13 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `deploy/README.md`, `deploy/STATUS.md`, `deploy/docker/` (Dockerfile, compose.yml, compose.production.yml, smoke.sh), `deploy/iis/` (web.config, README.md), `deploy/azure/` (main.bicep, README.md)
 - `.github/workflows/ci.yml`
 - `docs/ENVIRONMENT.md`
+
+## Foundation, identity, configuration, setup and onboarding slice (2026-10-16; source listed by directory)
+
+- `src/Modules/Ecp.Identity/`, `src/Modules/Ecp.Configuration/`, `src/Modules/Ecp.Setup/` (each with `packages.lock.json`; the Setup project also holds the onboarding wizard)
+- `templates/packs/` (Blank and reference solution packs, embedded as data), `sample-data/demo-contracts.json`
+- `.config/dotnet-tools.json` (pinned local tools: EF, CycloneDX, nuget-license)
+- `tools/check-licences.py`, `tools/licence-policy.json`, `tools/patch-migration-rls.py`, `tools/supply-chain.sh`, `tools/tests/`
+- `deploy/docker/verify-image.sh`
+- `docs/SETUP_AND_ONBOARDING.md`, `docs/ACCESS_AND_IDENTITY.md`, `docs/SUPPLY_CHAIN.md`
+- `decisions/ADR-0015-datamigration-module-name.md`, `decisions/ADR-0016-setup-state-and-first-run-protection.md`, `decisions/ADR-0017-onboarding-as-a-configuration-kind.md`

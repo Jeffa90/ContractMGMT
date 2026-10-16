@@ -4,7 +4,7 @@ Labels follow `CLAUDE.md`: **Implemented**, **Scaffolded / Not Verified**, **Ver
 
 | Artefact | Path | Status | Evidence / gap |
 |---|---|---|---|
-| Container image | `deploy/docker/Dockerfile` | Runtime stage Verified; SDK build stage Not Verified in the workspace | `deploy/STATUS.md` |
+| Container image | `deploy/docker/Dockerfile` | Runtime stage Verified (re-run 2026-10-16 with the setup behaviours); SDK build stage Not Verified in the workspace (proxy CA) | `deploy/STATUS.md` |
 | Local compose (Demo) | `deploy/docker/compose.yml` | Scaffolded / Not Verified | Not run with the compose plugin in the workspace |
 | Production-shaped compose | `deploy/docker/compose.production.yml` | Scaffolded / Not Verified | Needs a SQL Server and secret file |
 | IIS / Windows Server | `deploy/iis/` | Scaffolded / Not Verified | No Windows/IIS available |

@@ -82,14 +82,14 @@ Transitions are the only way to change status. A transition is authorised, guard
 
 ## 6. Setup and bootstrap security
 
-Implements `SETUP_AND_READINESS_SPEC.md` section 1 (RISK-05):
+Implements `SETUP_AND_READINESS_SPEC.md` section 1 (RISK-05). Built and tested; details in `docs/SETUP_AND_ONBOARDING.md` and `decisions/ADR-0016-setup-state-and-first-run-protection.md`.
 
-1. First start generates a 256-bit setup token, prints it once to the host console/log, stores its hash in the bootstrap store; `/setup` without it returns 404.
-2. Loopback-only by default; a host-level setting can allow a network range; the wizard cannot widen it.
-3. One setup session at a time; every stage action is audited under the installation scope.
-4. In Production the wizard accepts no secret values; it validates references. Production start-up refuses default credentials, development identity, ephemeral storage and exposed secrets (R-ID-01, R-SEC-01, R-SEC-02, R-ST-01).
-5. On completion the setup routes are unregistered, the token is invalidated, and further changes require step-up re-authentication by a holder of `setup.run`.
-6. The bootstrap store holds references and state only; its file permissions are restricted to the service account; its contents are never returned by any endpoint or included in support bundles.
+1. The setup token (256 bits, 24 hours, single use) is issued by `Ecp.Host setup-token` and printed to that terminal once; only its hash is stored and it is never logged (ASM-20). It is exchanged for **one** session (60 minutes sliding, hash only stored, HttpOnly, SameSite=Strict, path `/Setup`). Five wrong tokens lock entry for five minutes; the token form is rate limited and antiforgery protected.
+2. **Loopback only**: callers that are not on the server get `404` for every `/Setup` path unless `Ecp:Setup:AllowRemote` is set in host configuration; the wizard cannot widen it.
+3. State is held in a Data-Protection-protected bootstrap file from the first start, mirrored to the database (RLS, installation scope) when it exists; an unreadable file stops setup rather than restarting it. Every step is audited; secrets are never stored: Production accepts only secret **references**, a literal is refused, and the sanitised report omits even the references.
+4. Production start-up refuses default credentials, development identity, Demo data, the lightweight database, inline connection strings and ephemeral storage (R-ID-01, R-SEC-01, R-SEC-02, R-ST-01, R-DEMO-01); the wizard's `mode` step re-applies the guard and the readiness step blocks completion on any violation.
+5. On completion every `/Setup` path is `404`, the token and session are cleared, and changes need a signed-in installation administrator (`setup.run`) with a **recent authentication** (10 minutes; `/Reauth` asks the provider to authenticate again with `prompt=login`). Only selected steps can be reopened, and each change is audited.
+6. The bootstrap file and report hold state only; neither is returned by any endpoint other than the sanitised report, and neither belongs in support bundles.
 
 ## 7. Input handling, uploads and injection
 

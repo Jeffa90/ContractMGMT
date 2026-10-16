@@ -92,7 +92,10 @@ public sealed class SetupHostTests
         Assert.Contains("setup_required", await api.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/info")).StatusCode);
-        var page = await client.GetStringAsync("/Setup");
+        var setupResponse = await client.GetAsync("/Setup");
+        Assert.Equal("no-store", setupResponse.Headers.CacheControl?.ToString());
+        Assert.Contains("frame-ancestors 'none'", string.Join(' ', setupResponse.Headers.GetValues("Content-Security-Policy")));
+        var page = await setupResponse.Content.ReadAsStringAsync();
         Assert.Contains("Setup token", page);
         Assert.DoesNotContain("First Administrator", page);
     }
@@ -300,12 +303,14 @@ public sealed class SetupHostTests
         var stdout = await process.StandardOutput.ReadToEndAsync();
         await process.WaitForExitAsync();
         Assert.True(process.ExitCode == 0, await process.StandardError.ReadToEndAsync());
-        var token = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Last();
+        // the token is the only line shaped like one (host log lines may also reach standard output)
+        var token = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Single(l => System.Text.RegularExpressions.Regex.IsMatch(l, "^[A-Za-z0-9_-]{43}$"));
         Assert.True(token.Length >= 43);
 
         using var app = DemoApp.Start(s => { foreach (var (k, v) in Uninstalled(dir)) s[k] = v; });
         using var client = app.NewClient();
-        Assert.Equal(HttpStatusCode.Redirect, (await OpenSessionAsync(client, token)).StatusCode);
+        var opened = await OpenSessionAsync(client, token);
+        Assert.True(opened.StatusCode == HttpStatusCode.Redirect, "Opening setup with the command's token failed: " + System.Text.RegularExpressions.Regex.Match(await opened.Content.ReadAsStringAsync(), "<p>([^<]{10,200})</p>").Value);
         // and the token is not found in the state file in the clear
         Assert.DoesNotContain(token, await File.ReadAllTextAsync(Path.Combine(dir, "bootstrap", "setup.state")));
     }
@@ -317,6 +322,32 @@ public sealed class SetupHostTests
         using var client = app.NewClient();
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/Setup")).StatusCode);
         Assert.True(await app.Factory.Services.GetRequiredService<ISetupService>().IsCompleteAsync());
+    }
+
+    private sealed class FromAddress(string address) : Microsoft.AspNetCore.Hosting.IStartupFilter
+    {
+        public Action<Microsoft.AspNetCore.Builder.IApplicationBuilder> Configure(Action<Microsoft.AspNetCore.Builder.IApplicationBuilder> next) => app =>
+        {
+            Microsoft.AspNetCore.Builder.UseExtensions.Use(app, (Microsoft.AspNetCore.Http.HttpContext context, Func<Task> n) => { context.Connection.RemoteIpAddress = IPAddress.Parse(address); return n(); });
+            next(app);
+        };
+    }
+
+    [Fact]
+    public async Task Setup_pages_do_not_exist_for_callers_off_the_server_unless_remote_setup_is_allowed()
+    {
+        using var closed = DemoApp.Start(s => { foreach (var (k, v) in Uninstalled(NewDir())) s[k] = v; },
+            services => services.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter>(new FromAddress("203.0.113.9")));
+        using var remote = closed.NewClient();
+        Assert.Equal(HttpStatusCode.NotFound, (await remote.GetAsync("/Setup")).StatusCode);                      // not even the token form is shown
+        Assert.Equal(HttpStatusCode.NotFound, (await remote.GetAsync("/Setup/Report")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await remote.GetAsync("/")).StatusCode);                           // the application itself is still gated
+        Assert.Equal(HttpStatusCode.OK, (await remote.GetAsync("/health/live")).StatusCode);
+
+        using var allowed = DemoApp.Start(s => { foreach (var (k, v) in Uninstalled(NewDir())) s[k] = v; s["Ecp:Setup:AllowRemote"] = "true"; },
+            services => services.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter>(new FromAddress("203.0.113.9")));
+        using var remoteAllowed = allowed.NewClient();
+        Assert.Equal(HttpStatusCode.OK, (await remoteAllowed.GetAsync("/Setup")).StatusCode);
     }
 
     [Fact]

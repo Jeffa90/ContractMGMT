@@ -163,6 +163,20 @@ public class OnboardingValidatorTests
     }
 
     [Fact]
+    public void The_identity_modules_assignment_rules_are_applied_so_a_draft_cannot_pass_validation_and_fail_at_publication()
+    {
+        // A Restricted Viewer's ceiling may not exceed Confidential without an explicit decision, which onboarding cannot make.
+        var viewer = OnboardingDocument.Empty with { Categories = [new("P", "P")], ViewerScopes = [new("v@example.invalid", ViewerKind.Restricted, ["P"], ["PKG"], [], "Restricted")] };
+        var withUnit = viewer with { Structure = new StructureSection([], [], [new("PKG", "Packaging")], []) };
+        Assert.True(Has(Run(withUnit, "v@example.invalid"), "ceiling_too_high"));
+        var ok = withUnit with { ViewerScopes = [withUnit.ViewerScopes[0] with { Ceiling = "Confidential" }] };
+        Assert.True(Run(ok, "v@example.invalid").IsValid);
+        var mapped = OnboardingDocument.Empty with { Structure = new StructureSection([], [], [new("PKG", "Packaging")], [new("BNE", "Brisbane")]),
+            GroupMappings = [new("corp-sso", "grp", RoleCodes.Viewer, ViewerKind.Restricted, [], ["PKG"], ["BNE"], "Restricted")] };
+        Assert.True(Has(Run(mapped), "ceiling_too_high"));
+    }
+
+    [Fact]
     public void The_highest_classification_ceiling_is_flagged_for_attention()
     {
         var d = OnboardingDocument.Empty with { ViewerScopes = [new("v@example.invalid", ViewerKind.AllContracts, [], [], [], "Restricted")] };

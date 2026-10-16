@@ -7,5 +7,6 @@
 .env.*
 tests/
 docs/
-requirements/
+requirements/*
+!requirements/02-reference/
 **/TestResults/

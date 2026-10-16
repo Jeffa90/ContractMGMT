@@ -8,6 +8,7 @@
 4. Store the SQL connection string in a file outside the web root (`D:\EcpSecrets\sql-connection.txt`, NTFS permissions limited to the pool identity). `web.config` carries only the *reference* (`file:`), never the value (SEC-030).
 5. Create the database login/role for runtime (least privilege; see `docs/ENVIRONMENT.md` and the migration role notes), then run the migration deliberately: `dotnet Ecp.Host.dll migrate` under a separate migration identity. Production never auto-migrates.
 6. Bind HTTPS with a certificate from your store; redirect HTTP; HSTS is applied by the application in Production.
-7. Verify `/health/live`, `/health/startup`, `/health/ready` (detail is hidden from anonymous callers in Production).
+7. First-run setup: on the server run `dotnet Ecp.Host.dll setup-token` (with the same environment/secret references as the site) and open `http://localhost/Setup` **from the server** (the wizard answers `404` to anyone else); follow `docs/SETUP_AND_ONBOARDING.md`. Setup state is kept in the bootstrap folder of the data directory; the pool identity needs modify rights there.
+8. Verify `/health/live`, `/health/startup`, `/health/ready` (detail is hidden from anonymous callers in Production).
 
 The application refuses to start in Production with SQLite, inline connection strings, demo identity or demo seed (ProductionGuard R-* checks).

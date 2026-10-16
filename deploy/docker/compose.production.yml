@@ -14,6 +14,9 @@ services:
       Database__Provider: SqlServer
       Database__ConnectionStringRef: "file:/run/secrets/ecp-sql"
       Database__AutoMigrate: "false"   # run `dotnet Ecp.Host.dll migrate` as a deliberate release step
+      # First-run setup: the wizard answers 404 to callers that are not on the server. Through a published port, set this to "true" only while
+      # you run setup (docker exec ecp dotnet Ecp.Host.dll setup-token), then remove it. The one-time token is still required.
+      # Ecp__Setup__AllowRemote: "true"
     secrets:
       - ecp-sql
     volumes:

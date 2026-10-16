@@ -115,6 +115,72 @@ internal sealed class LifecycleWorld
         await As("groupHead", s => s.Get<IRegisterAuthorisationService>().ApproveAsync(request, "Approved"));
         return id;
     }
+
+    public async Task<Guid> ToStateAsync(string state)
+    {
+        switch (state)
+        {
+            case "Effective": return await ToEffectiveInOrderAsync();
+            case "Draft": return await NewDraftAsync();
+        }
+        var id = await NewDraftAsync(legal: state is "AwaitingLegal" or "InLegalReview" or "LegalReworkRequired" or "LegalCleared");
+        Guid review = Guid.Empty;
+        async Task<Guid> Review() => (await As("ownerPackaging", s => s.Get<ILegalReviewService>().FindForSubjectAsync(SubjectKinds.Contract, id)))!.ReviewId;
+        if (state is "AwaitingLegal" or "InLegalReview" or "LegalReworkRequired" or "LegalCleared")
+        {
+            await As("ownerPackaging", s => s.Get<ILegalReviewService>().SubmitAsync(new SubmitLegalRequest(SubjectKinds.Contract, id, "review")));
+            if (state == "AwaitingLegal") return id;
+            review = await Review();
+            await As("legalA", s => s.Get<ILegalReviewService>().BeginAsync(review));
+            if (state == "InLegalReview") return id;
+            if (state == "LegalReworkRequired") { await As("legalA", s => s.Get<ILegalReviewService>().ReturnForReworkAsync(review, "rework")); return id; }
+            await As("legalA", s => s.Get<ILegalReviewService>().ClearAsync(review, null));
+            return id;
+        }
+        await As("ownerPackaging", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "ProceedWithoutLegal")));
+        if (state == "InitialCreation" || state == "Withdrawn")
+        {
+            if (state == "Withdrawn") await As("ownerPackaging", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "WithdrawInitial", null, "no longer needed")));
+            return id;
+        }
+        await AddDocumentAsync(id, "FinalAgreement", "Final agreement");
+        await As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "manual"));
+        if (state == "OutForSignature") return id;
+        await As("ownerPackaging", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, id, "executed.pdf", "application/pdf", Bytes("executed"))));
+        var request = await As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, id, "go"));
+        if (state == "AwaitingApproval") return id;
+        await As("groupHead", s => s.Get<IRegisterAuthorisationService>().ApproveAsync(request, "ok"));
+        switch (state)
+        {
+            case "VariationInProgress": await As("ownerPackaging", s => s.Get<IVariationService>().CreateAsync(id, SimpleVariation())); break;
+            case "RenewalInProgress": await As("ownerPackaging", s => s.Get<IRenewalService>().StartAsync(id, null)); break;
+            case "Suspended": await As("procAdmin", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "Suspend", null, "dispute under review"))); break;
+            case "Ended": case "FlaggedForDisposition": case "DisposedArchived":
+                await As("procAdmin", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "End")));
+                if (state != "Ended") await As("procAdmin", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "FlagEnded", null, "retention period over")));
+                if (state == "DisposedArchived") await As("groupHead", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "ArchiveFlagged")));
+                break;
+            case "Terminated": await As("procAdmin", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "Terminate", null, "breach"))); break;
+            default: throw new ArgumentException("Unknown state " + state);
+        }
+        return id;
+    }
+
+    public static VariationInput SimpleVariation(string? end = null, string? value = "2500", bool legal = false)
+        => new("Extend and reprice", "Extension agreed with the supplier", "Commercial renegotiation", null, legal, 1500m, "AUD", null,
+            new Dictionary<string, string?> { ["estimatedValue"] = value, ["endDate"] = end ?? "2031-06-30" });
+
+    /// <summary>Takes a Variation from Draft to waiting for register authorisation (no Legal step).</summary>
+    public async Task<(Guid VariationId, Guid RequestId)> VariationToApprovalAsync(Guid contractId, VariationInput? input = null)
+    {
+        var variation = await As("ownerPackaging", s => s.Get<IVariationService>().CreateAsync(contractId, input ?? SimpleVariation()));
+        await As("ownerPackaging", s => s.Get<IVariationService>().TransitionAsync(variation, "ProceedWithoutLegal", null));
+        await As("ownerPackaging", s => s.Get<IVariationService>().AddDocumentAsync(new AddVariationDocumentRequest(variation, "Final", "Deed of variation", "deed.pdf", "application/pdf", Bytes("deed"))));
+        await As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Variation, variation, "manual"));
+        await As("ownerPackaging", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Variation, variation, "signed.pdf", "application/pdf", Bytes("signed"))));
+        var request = await As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Variation, variation, "go"));
+        return (variation, request);
+    }
 }
 
 internal static class ScopeExtensions

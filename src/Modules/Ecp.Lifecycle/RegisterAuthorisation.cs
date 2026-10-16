@@ -299,14 +299,36 @@ internal sealed class RegisterAuthorisationService(
     }
 }
 
-/// <summary>Lets the contract access rules see which contracts have a request waiting, so the assigned approver and backups can open them (and only while a request is waiting).</summary>
-internal sealed class PendingApprovalSource(LifecycleDbContext db) : IPendingApprovalSource
+/// <summary>
+/// Lets the contract access rules see which contracts the approver group has something to decide on: a register-authorisation request waiting, or a contract flagged for disposition. Approvers reach a
+/// contract only while one of those holds.
+/// </summary>
+internal sealed class PendingApprovalSource(LifecycleDbContext db, IWorkflowDefinitions definitions, Ecp.Tenancy.IOrganisationStructureService structure) : IPendingApprovalSource
 {
     public async Task<IReadOnlyDictionary<Guid, IReadOnlySet<string>>> PendingAsync(IReadOnlyCollection<Guid>? contractIds, CancellationToken ct = default)
     {
+        var ids = contractIds is { Count: > 0 } ? contractIds.ToArray() : null;
         var query = db.Approvals.AsNoTracking().Where(a => a.Status == ApprovalStatus.Pending);
-        if (contractIds is { Count: > 0 }) { var ids = contractIds.ToArray(); query = query.Where(a => ids.Contains(a.ContractId)); }
-        var rows = await query.Select(a => new { a.ContractId, a.ApproverGroupKey }).ToListAsync(ct);
-        return rows.GroupBy(r => r.ContractId).ToDictionary(g => g.Key, g => (IReadOnlySet<string>)g.Select(r => r.ApproverGroupKey).ToHashSet(StringComparer.Ordinal));
+        if (ids is not null) query = query.Where(a => ids.Contains(a.ContractId));
+        var rows = (await query.Select(a => new { a.ContractId, a.ApproverGroupKey }).ToListAsync(ct)).Select(r => (r.ContractId, Group: r.ApproverGroupKey)).ToList();
+
+        // Contracts whose latest step landed in a state with the 'flagged' role are waiting for the disposition decision of the workflow's approver group.
+        var flaggedByGroup = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var org in await structure.ListOrganisationsAsync(ct))
+        {
+            var def = (await definitions.CurrentAsync(WorkflowKinds.ContractLifecycle, org.Id, ct)).Definition;
+            var group = def.Settings.Approval.ApproverGroupKey;
+            if (!flaggedByGroup.TryGetValue(group, out var list)) flaggedByGroup[group] = list = [];
+            list.AddRange(def.States.Where(s => s.Role == "flagged").Select(s => s.Code));
+        }
+        foreach (var (group, codes) in flaggedByGroup.Where(g => g.Value.Count > 0))
+        {
+            var codeArray = codes.Distinct().ToArray();
+            var latest = db.History.AsNoTracking().Where(h => h.SubjectKind == SubjectKinds.Contract && codeArray.Contains(h.ToStatus)
+                && !db.History.Any(h2 => h2.ContractId == h.ContractId && h2.SubjectKind == SubjectKinds.Contract && h2.Sequence > h.Sequence));
+            if (ids is not null) latest = latest.Where(h => ids.Contains(h.ContractId));
+            rows.AddRange((await latest.Select(h => h.ContractId).ToListAsync(ct)).Select(c => (c, group)));
+        }
+        return rows.GroupBy(r => r.ContractId).ToDictionary(g => g.Key, g => (IReadOnlySet<string>)g.Select(r => r.Group).ToHashSet(StringComparer.Ordinal));
     }
 }

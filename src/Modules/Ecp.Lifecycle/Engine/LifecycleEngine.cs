@@ -67,6 +67,18 @@ internal sealed class LifecycleEngine(
     /// <summary>Reading a record is what lets a person see its steps, history and reviews; outside their scope or classification it is a 404.</summary>
     public Task RequireReadAsync(ResourceDescriptor descriptor, CancellationToken ct) => access.RequireAsync("contracts.read", descriptor, ct);
 
+    /// <summary>
+    /// A disposition decision belongs to the approver group named in the workflow, and cannot be taken by the person who flagged the contract. The facts the evaluator needs for that are added here for
+    /// the transition's permission; the rule itself stays in the access evaluator.
+    /// </summary>
+    public async Task<ResourceDescriptor> ForPermissionAsync(ResourceDescriptor descriptor, SubjectView s, ResolvedDefinition def, string permission, CancellationToken ct)
+    {
+        if (permission != "disposition.approve" || s.IsVariation) return descriptor;
+        var flagged = def.Definition.States.Where(x => x.Role == "flagged").Select(x => x.Code).ToArray();
+        var flagger = await db.History.AsNoTracking().Where(h => h.SubjectId == s.Id && flagged.Contains(h.ToStatus)).OrderByDescending(h => h.Sequence).Select(h => h.ActorUserId).FirstOrDefaultAsync(ct);
+        return descriptor with { PendingApprovalGroupKeys = new HashSet<string>([def.Definition.Settings.Approval.ApproverGroupKey]), SubmittedByUserId = flagger };
+    }
+
     public async Task<ApprovalRequest?> PendingApprovalAsync(string kind, Guid subjectId, CancellationToken ct)
         => await db.Approvals.AsNoTracking().FirstOrDefaultAsync(a => a.SubjectKind == kind && a.SubjectId == subjectId && a.Status == ApprovalStatus.Pending, ct);
 
@@ -78,7 +90,7 @@ internal sealed class LifecycleEngine(
         foreach (var t in def.Definition.From(s.Status))
         {
             string? blocked = null;
-            var permitted = await access.CheckSilentAsync(t.Permission, descriptor, ct);
+            var permitted = await access.CheckSilentAsync(t.Permission, await ForPermissionAsync(descriptor, s, def, t.Permission, ct), ct);
             if (!permitted.Allowed) blocked = permitted.Deny == DenyKind.NotFound ? "You do not have access to this record." : "You do not have permission to take this step.";
             else
             {
@@ -102,7 +114,7 @@ internal sealed class LifecycleEngine(
         // Who may take the step is decided first, and a person with no access to the record learns nothing about it (404).
         var pending = cmd.Approval ?? await PendingApprovalAsync(subject.Kind, subject.Id, ct);
         var descriptor = await DescribeAsync(subject, pending, ct);
-        await access.RequireAsync(transition.Permission, descriptor, ct);
+        await access.RequireAsync(transition.Permission, await ForPermissionAsync(descriptor, subject, resolved, transition.Permission, ct), ct);
 
         // A repeat of a step the caller already took (same client request id) returns the first outcome and writes nothing.
         if (!string.IsNullOrWhiteSpace(cmd.ClientRequestId))

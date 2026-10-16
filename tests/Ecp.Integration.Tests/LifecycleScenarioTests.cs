@@ -18,6 +18,18 @@ public sealed class LifecycleScenarioTests_Sqlite
     [Fact] public Task Reminder_acknowledgement() => ProviderRunner.SqliteAsync(NotificationScenarios.A_reminder_is_acknowledged_by_a_current_owner_and_the_dashboard_follows, LifecycleScenarios.Scanner);
     [Fact] public Task Failed_email_retry_and_dead_letter() => ProviderRunner.SqliteAsync(NotificationScenarios.Failed_email_is_retried_with_a_back_off_then_dead_lettered_where_administrators_can_see_and_retry_it, LifecycleScenarios.Scanner);
     [Fact] public Task Lost_access_redacts_the_inbox() => ProviderRunner.SqliteAsync(NotificationScenarios.A_person_who_loses_access_to_a_record_sees_nothing_about_it_in_their_inbox, LifecycleScenarios.Scanner);
+    [Fact] public Task Every_state_offers_its_transitions_and_refuses_the_rest() => ProviderRunner.SqliteAsync(LifecycleScenarios2.Every_state_offers_exactly_its_transitions_and_every_other_step_is_refused, LifecycleScenarios.Scanner);
+    [Fact] public Task Plain_steps_keep_the_contract_locked_with_a_history() => ProviderRunner.SqliteAsync(LifecycleScenarios2.Plain_steps_after_effectiveness_move_the_contract_and_keep_it_locked_with_a_history, LifecycleScenarios.Scanner);
+    [Fact] public Task Register_authorisation_rules() => ProviderRunner.SqliteAsync(LifecycleScenarios2.Register_authorisation_rules_self_approval_backup_rejection_and_registered_date, LifecycleScenarios.Scanner);
+    [Fact] public Task Legal_rounds_kept_and_privileged_review_hidden() => ProviderRunner.SqliteAsync(LifecycleScenarios2.Legal_rounds_are_kept_and_a_privileged_review_is_invisible_to_those_without_the_grant, LifecycleScenarios.Scanner);
+    [Fact] public Task Force_unlock_rules_and_audit() => ProviderRunner.SqliteAsync(LifecycleScenarios3.A_force_unlock_needs_permission_recent_sign_in_reason_and_a_time_limit_and_is_fully_audited, LifecycleScenarios.Scanner);
+    [Fact] public Task Variation_applied_with_before_and_after() => ProviderRunner.SqliteAsync(LifecycleScenarios3.A_Variation_changes_an_effective_contract_only_when_approved_and_keeps_before_and_after, LifecycleScenarios.Scanner);
+    [Fact] public Task Variation_cancel_and_reject_leave_parent() => ProviderRunner.SqliteAsync(LifecycleScenarios3.Cancelling_or_rejecting_a_Variation_leaves_the_parent_exactly_as_it_was, LifecycleScenarios.Scanner);
+    [Fact] public Task Variation_with_Legal_rounds() => ProviderRunner.SqliteAsync(LifecycleScenarios3.A_Variation_that_needs_Legal_goes_through_Legal_rounds_before_it_can_be_signed, LifecycleScenarios.Scanner);
+    [Fact] public Task Renewal_links_and_copy_rules() => ProviderRunner.SqliteAsync(LifecycleScenarios3.A_renewal_copies_only_what_is_configured_links_both_ways_and_never_alters_the_predecessor, LifecycleScenarios.Scanner);
+    [Fact] public Task Renewal_cancel() => ProviderRunner.SqliteAsync(LifecycleScenarios3.Cancelling_a_renewal_withdraws_the_draft_successor_and_restores_the_predecessor, LifecycleScenarios.Scanner);
+    [Fact] public Task Cross_tenant_lifecycle_attempts() => ProviderRunner.SqliteAsync(LifecycleScenarios3.Another_tenants_records_do_not_exist_for_any_lifecycle_call, LifecycleScenarios.Scanner);
+    [Fact] public Task Pinned_workflows() => ProviderRunner.SqliteAsync(LifecycleScenarios3.A_published_workflow_applies_to_new_contracts_while_existing_ones_stay_pinned_and_an_invalid_one_is_refused, LifecycleScenarios.Scanner);
 }
 
 [Trait("Category", "Lifecycle")]
@@ -36,4 +48,18 @@ public sealed class LifecycleScenarioTests_SqlServer
     [SqlServerFact] public Task Reminder_acknowledgement() => ProviderRunner.SqlServerAsync(NotificationScenarios.A_reminder_is_acknowledged_by_a_current_owner_and_the_dashboard_follows, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Failed_email_retry_and_dead_letter() => ProviderRunner.SqlServerAsync(NotificationScenarios.Failed_email_is_retried_with_a_back_off_then_dead_lettered_where_administrators_can_see_and_retry_it, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Lost_access_redacts_the_inbox() => ProviderRunner.SqlServerAsync(NotificationScenarios.A_person_who_loses_access_to_a_record_sees_nothing_about_it_in_their_inbox, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Every_state_offers_its_transitions_and_refuses_the_rest() => ProviderRunner.SqlServerAsync(LifecycleScenarios2.Every_state_offers_exactly_its_transitions_and_every_other_step_is_refused, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Plain_steps_keep_the_contract_locked_with_a_history() => ProviderRunner.SqlServerAsync(LifecycleScenarios2.Plain_steps_after_effectiveness_move_the_contract_and_keep_it_locked_with_a_history, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Register_authorisation_rules() => ProviderRunner.SqlServerAsync(LifecycleScenarios2.Register_authorisation_rules_self_approval_backup_rejection_and_registered_date, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Legal_rounds_kept_and_privileged_review_hidden() => ProviderRunner.SqlServerAsync(LifecycleScenarios2.Legal_rounds_are_kept_and_a_privileged_review_is_invisible_to_those_without_the_grant, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Two_decisions_at_once_produce_one() => ProviderRunner.SqlServerAsync(LifecycleScenarios2.Two_people_deciding_at_once_produce_one_decision_and_one_registration, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task The_same_step_twice_happens_once() => ProviderRunner.SqlServerAsync(LifecycleScenarios2.The_same_step_taken_twice_at_once_happens_once, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Force_unlock_rules_and_audit() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.A_force_unlock_needs_permission_recent_sign_in_reason_and_a_time_limit_and_is_fully_audited, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Variation_applied_with_before_and_after() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.A_Variation_changes_an_effective_contract_only_when_approved_and_keeps_before_and_after, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Variation_cancel_and_reject_leave_parent() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.Cancelling_or_rejecting_a_Variation_leaves_the_parent_exactly_as_it_was, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Variation_with_Legal_rounds() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.A_Variation_that_needs_Legal_goes_through_Legal_rounds_before_it_can_be_signed, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Renewal_links_and_copy_rules() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.A_renewal_copies_only_what_is_configured_links_both_ways_and_never_alters_the_predecessor, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Renewal_cancel() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.Cancelling_a_renewal_withdraws_the_draft_successor_and_restores_the_predecessor, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Cross_tenant_lifecycle_attempts() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.Another_tenants_records_do_not_exist_for_any_lifecycle_call, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Pinned_workflows() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.A_published_workflow_applies_to_new_contracts_while_existing_ones_stay_pinned_and_an_invalid_one_is_refused, LifecycleScenarios.Scanner);
 }

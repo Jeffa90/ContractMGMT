@@ -108,6 +108,10 @@ Implements `SETUP_AND_READINESS_SPEC.md` section 1 (RISK-05). Built and tested; 
 | Log injection | Structured logging; values never concatenated into format strings; newline stripping |
 | Open redirects | Local paths only |
 
+### 7.1 Migration inputs (implemented 2026-10-16)
+
+Source files are untrusted. CSV, XLSX and ZIP are read by in-repository code with explicit limits (rows, columns, cell size, entries, total size, compression ratio); XML is read with DTD processing prohibited; `.xlsm` is refused; archive entries with traversal, absolute, drive, UNC, reserved-device or symbolic-link paths, duplicate names, disallowed extensions or mismatching signatures are marked invalid per entry and never extracted to disk; every file goes to the malware scanner hook (mock outside Production, files held in Production because no real adapter exists); the attachment naming rule is the only pattern and runs on the non-backtracking engine with a timeout; exports neutralise formula text. Migration permissions are held by Procurement Administrators only, evaluated against the stored project's organisation; a legacy load needs a second person. See `docs/MIGRATION.md` section 9.
+
 ## 8. Audit (ADR-0011)
 
 - Table `audit.Event`: INSERT and SELECT only for the runtime principal; a separate maintenance principal (not used by the app) performs partition archive.

@@ -46,6 +46,10 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `docs/THREAT_MODEL.md`
 - `migration-samples/attachment-manifest.csv`
 - `migration-samples/attachments/README.md`
+- `migration-samples/attachments/DEMO-AGR-0001/DEMO-AGR-0001_executed.pdf`
+- `migration-samples/attachments/DEMO-AGR-0001/DEMO-AGR-0001_schedule.docx`
+- `migration-samples/attachments/DEMO-AGR-0002/DEMO-AGR-0002_executed.pdf`
+- `migration-samples/sample-attachments.zip`
 - `migration-samples/contracts-import.csv`
 - `migration-samples/field-mapping-profile-complete.csv`
 - `migration-samples/field-mapping-profile.csv`
@@ -131,7 +135,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Ecp.sln`, `src/Ecp.SharedKernel/`, `src/Ecp.Persistence/`, `src/Ecp.Host/`
 - `src/Modules/Ecp.Audit/`, `src/Modules/Ecp.Tenancy/`, `src/Modules/Ecp.Contracts/`, `src/Modules/Ecp.Documents/`, `src/Modules/Ecp.DataMigration/`, `src/Modules/Ecp.Operations/` (each with `packages.lock.json`; the bulk-migration module is `Ecp.DataMigration`, ADR-0015)
 - `tests/Ecp.Tests.Common/`, `tests/Ecp.UnitTests/`, `tests/Ecp.Integration.Tests/`, `tests/Ecp.Architecture.Tests/`, `tests/Ecp.Api.Tests/`
-- `tools/add-migration.sh`, `tools/check-repo.py`, `tools/dev-sandbox.sh`, `tools/docker-runtime-smoke.sh`, `tools/sqlserver-up.sh`, `tools/test-report.sh`
+- `tools/add-migration.sh`, `tools/check-repo.py`, `tools/generate-migration-sample-attachments.py`, `tools/migration-demo.py`, `tools/dev-sandbox.sh`, `tools/docker-runtime-smoke.sh`, `tools/sqlserver-up.sh`, `tools/test-report.sh`
 - `deploy/README.md`, `deploy/STATUS.md`, `deploy/docker/` (Dockerfile, compose.yml, compose.production.yml, smoke.sh), `deploy/iis/` (web.config, README.md), `deploy/azure/` (main.bicep, README.md)
 - `.github/workflows/ci.yml`
 - `docs/ENVIRONMENT.md`
@@ -143,5 +147,5 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `.config/dotnet-tools.json` (pinned local tools: EF, CycloneDX, nuget-license)
 - `tools/check-licences.py`, `tools/licence-policy.json`, `tools/patch-migration-rls.py`, `tools/supply-chain.sh`, `tools/tests/`
 - `deploy/docker/verify-image.sh`
-- `docs/SETUP_AND_ONBOARDING.md`, `docs/ACCESS_AND_IDENTITY.md`, `docs/SUPPLY_CHAIN.md`
-- `decisions/ADR-0015-datamigration-module-name.md`, `decisions/ADR-0016-setup-state-and-first-run-protection.md`, `decisions/ADR-0017-onboarding-as-a-configuration-kind.md`
+- `docs/SETUP_AND_ONBOARDING.md`, `docs/ACCESS_AND_IDENTITY.md`, `docs/SUPPLY_CHAIN.md`, `docs/MIGRATION.md`
+- `decisions/ADR-0015-datamigration-module-name.md`, `decisions/ADR-0016-setup-state-and-first-run-protection.md`, `decisions/ADR-0017-onboarding-as-a-configuration-kind.md`, `decisions/ADR-0018-migration-slice-design.md`

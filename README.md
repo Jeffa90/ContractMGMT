@@ -28,4 +28,4 @@ dotnet run --project src/Ecp.Host                 # seeded synthetic Demo (SQLit
 Ecp__DemoSeed=false dotnet run --project src/Ecp.Host   # unconfigured installation: run `dotnet src/Ecp.Host/bin/.../Ecp.Host.dll setup-token`, then open /Setup
 ```
 
-First-run setup and organisation onboarding: `docs/SETUP_AND_ONBOARDING.md`. Identity and access: `docs/ACCESS_AND_IDENTITY.md`. Build status, test counts and what is and is not verified: `TASKS.md`, `docs/TESTING.md`, `deploy/STATUS.md`. Nothing here declares production approval.
+Data migration (sign in as `procadmin@a.example.test` and open *Data migration*; the synthetic samples are in `migration-samples/`, a scripted end-to-end run is `python3 -I tools/migration-demo.py`): `docs/MIGRATION.md`. First-run setup and organisation onboarding: `docs/SETUP_AND_ONBOARDING.md`. Identity and access: `docs/ACCESS_AND_IDENTITY.md`. Build status, test counts and what is and is not verified: `TASKS.md`, `docs/TESTING.md`, `deploy/STATUS.md`. Nothing here declares production approval.

@@ -169,6 +169,10 @@ for u in users['users']:
         if ro['role']=='Viewer' and not ro.get('viewerKind'): bad(f"viewer without kind {u['email']}")
         if ro['scopeLevel']=='Organisation' and not ro.get('organisations'): bad(f"org role without org scope {u['email']}")
         if 'classificationCeiling' not in ro and ro['scopeLevel']!='Installation': bad(f"no ceiling {u['email']}")
+# migration sample attachments are generated deterministically; the committed files must equal the generator's output
+import subprocess as _sp
+_r = _sp.run([sys.executable, '-I', 'tools/generate-migration-sample-attachments.py', '--check'], capture_output=True, text=True)
+if _r.returncode != 0: bad('migration sample attachments differ from the generator output: ' + _r.stdout.strip().replace(chr(10), '; '))
 # manifest
 listed = set(re.findall(r'`([^`]+)`', open('PACKAGE_MANIFEST.md').read()))
 actual = {p for p in files}

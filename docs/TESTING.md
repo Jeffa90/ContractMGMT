@@ -64,6 +64,8 @@ Result after the secure application and setup slice (2026-10-16, Release, warnin
 
 Added in that slice: identity and access (`AccessEvaluatorTests`, `IdentityRulesTests`, `OidcSignInTests`, `ViewerScopeTests`, `ClassificationOverrideTests`, `UiAccessTests`, `AntiforgeryTests`, `AccessScenarioTests_*`), localisation (`LocaleFormatterTests`, `TimeZoneTests`, `LocalisationApiTests`), supply chain (`tools/tests`), setup (`SetupScenarios` 13 per provider; `SetupHostTests` 10: gate, token, session cookie flags, antiforgery, end-to-end wizard, restart midway and after completion, step-up reopening, the `setup-token` command in a separate process, remote callers; `SetupStageTests` 11 including Production refusals), onboarding (`OnboardingScenarios` 7 per provider plus a service-graph cycle guard, `OnboardingHostTests` 4, `OnboardingCsvTests`, `OnboardingValidatorTests`, `OnboardingSimulatorTests`).
 
+Result after the migration slice (2026-10-16, Release, warnings as errors, `dotnet restore --locked-mode` clean): **with** a real SQL Server 2022 Developer container (`ECP_TEST_SQL`): **546 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** (297 unit, 13 architecture, 174 integration of which 86 run against SQL Server, 62 API). **Without** `ECP_TEST_SQL`: **460 Passed, 0 Failed, 0 Skipped, 86 NOT VERIFIED** (the SQL Server copies of the integration scenarios; never counted as Passed). The migration scenarios (22) run on both providers; the migration unit tests, the 22 service scenarios per provider and the real-page flow (`MigrationUiTests`, SQLite) are in section 7.1. A scripted run over HTTP against the real host (`tools/migration-demo.py`) is recorded in `docs/MIGRATION.md` section 12.1.
+
 Commands (implemented in M1; `dotnet test` without `ECP_TEST_SQL` reports the SQL Server tests as NOT VERIFIED):
 
 ```
@@ -180,6 +182,33 @@ Master's nine critical tests are MIG-001 to MIG-009.
 | MIG-025 | Document duplicate options (reject hash, link existing, add version, keep separate with warning, manual review) |
 | MIG-026 | Cutover freeze window recorded; target freeze blocks non-migration contract creation when enabled |
 | MIG-027 | Legal/approval/Variation historical slice (when Q-12 is answered): read-only, no fabricated rounds, in-flight items reported not recreated |
+
+### 7.1 Implementation status of the migration suite (2026-10-16)
+
+Implemented and passing on SQLite (lightweight; not SQL Server proof) and on a disposable SQL Server 2022 container (integration scenarios, `tests/Ecp.Integration.Tests/MigrationScenarios*.cs`); unit tests (`tests/Ecp.UnitTests/Migration*.cs`); the whole flow through the real pages (`tests/Ecp.Api.Tests/MigrationUiTests.cs`); and a scripted run over HTTP against the real host (`tools/migration-demo.py`). Without `ECP_TEST_SQL` the SQL Server copies are skipped and reported **NOT VERIFIED**.
+
+| ID | Where it is covered |
+|---|---|
+| MIG-001 | `A_dry_run_writes_nothing_to_the_target` (snapshot of records, change stamps, counters, blob area); outbox, notifications and reminders do not exist yet |
+| MIG-002, MIG-017 | `A_stopped_commit_resumes_without_losing_or_duplicating_anything` (eight kill and failure points) |
+| MIG-003 | unit: `The_same_inputs_in_any_order_give_exactly_the_same_proposals`, `Ties_are_never_broken_automatically...` |
+| MIG-004, MIG-024 | `Each_duplicate_strategy_behaves_as_specified`, `The_reference_policy_can_generate_every_target_reference...`, `Re_running_a_file_is_idempotent...` |
+| MIG-005 | `Unmatched_files_wait_in_a_queue_until_a_person_resolves_or_discards_them` |
+| MIG-006, MIG-016 | `Rollback_removes_only_the_selected_batch...`, `A_record_that_has_moved_on_is_archived_not_deleted` |
+| MIG-007 | `The_sample_contracts_manifest_and_archive_load_end_to_end` (ledger, hash, source identity, batch id on audit) |
+| MIG-008 | `Another_tenant_and_people_without_the_permission_cannot_see_or_run_a_migration` |
+| MIG-009 | `Error_and_reconciliation_totals_equal_the_processed_input...` |
+| MIG-010, MIG-011, MIG-012, MIG-013 | unit format tests; `Unsafe_archive_entries_and_infected_files_never_reach_the_target`; `Spreadsheet_and_UTF16_sources_load_exactly_like_CSV` |
+| MIG-014, MIG-020 | `The_mapping_preview_shows_original_and_transformed_values...`; unit mapping tests |
+| MIG-015 | `A_legacy_load_needs_a_policy_a_second_person_and_exactly_what_was_validated`, `The_source_registered_date...` |
+| MIG-018 | `The_sample_contracts_manifest_and_archive_load_end_to_end`; UI and scripted runs use the committed sample ZIP |
+| MIG-019 | unit: `A_naming_rule_runs_on_the_safe_engine...`; `Attachments_match_in_a_fixed_order...` |
+| MIG-021 | unit and integration: formula-neutralised CSV and workbook |
+| MIG-022 | `After_acceptance_rollback_is_refused_and_compensating_archival_keeps_everything` |
+| MIG-023 | `A_batch_keeps_the_profile_version_it_was_created_with` |
+| MIG-025 | unit: `Each_duplicate_option_behaves_as_specified`, `Content_already_in_the_target...` |
+| MIG-026 | `The_cutover_freeze_stops_people_creating_contracts_but_not_the_migration` |
+| MIG-027 | not built (MGR-12, Future) |
 
 ## 8. Workflow, approval and lifecycle suite
 

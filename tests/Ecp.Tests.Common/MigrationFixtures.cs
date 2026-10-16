@@ -15,14 +15,15 @@ public static class MigrationSamples
     public static byte[] FieldMappings => Bytes("field-mapping-profile-complete.csv");
     public static byte[] StatusLookups => Bytes("status-lookup-map.csv");
 
-    /// <summary>The attachment ZIP built from the fixture builder: the three manifest files plus the manifest itself at the root, as the sample README describes.</summary>
+    /// <summary>The committed sample ZIP (migration-samples/sample-attachments.zip): the manifest at the root plus the three synthetic placeholder files it lists.</summary>
     public static byte[] AttachmentZip(bool includeManifest = true)
     {
+        if (includeManifest) return Bytes("sample-attachments.zip");
+        // The same files without the manifest, for runs that upload the manifest on its own.
         var zip = new ZipBuilder();
-        if (includeManifest) zip.Add("attachment-manifest.csv", ManifestCsv);
-        zip.Add("DEMO-AGR-0001/DEMO-AGR-0001_executed.pdf", Placeholders.Pdf("DEMO-AGR-0001 executed"));
-        zip.Add("DEMO-AGR-0001/DEMO-AGR-0001_schedule.docx", Placeholders.Docx("DEMO-AGR-0001 schedule"));
-        zip.Add("DEMO-AGR-0002/DEMO-AGR-0002_executed.pdf", Placeholders.Pdf("DEMO-AGR-0002 executed"));
+        var root = Path.Combine(Directory, "attachments");
+        foreach (var file in System.IO.Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Where(f => !f.EndsWith("README.md", StringComparison.Ordinal)).OrderBy(f => f, StringComparer.Ordinal))
+            zip.Add(Path.GetRelativePath(root, file).Replace('\\', '/'), File.ReadAllBytes(file));
         return zip.Build();
     }
 }

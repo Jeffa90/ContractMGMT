@@ -249,6 +249,8 @@ flowchart LR
 - Staging is physically separate; a dry run cannot write to target by construction (the dry-run service has no reference to the commit writers; a test verifies zero target diffs).
 - Resume and idempotency come from unique idempotency keys plus per-chunk checkpoints.
 
+**Implementation (2026-10-16, ADR-0018).** The slice is built as `Ecp.DataMigration`: staging and ledger tables in the `migration` schema (13 tables, RLS), the services `IMigrationProjects`, `IMappingProfiles`, `IMigrationBatches`, `IMigrationIntake`, `IMigrationValidation`, `IMigrationCommit`, `IMigrationRollback`, hand-written CSV, XLSX and ZIP readers, and pages under `/Migration`. Contracts and Documents expose migration ports (`IContractMigrationPort`, `IDocumentMigrationPort`) that the commit and rollback use inside the migration's unit of work. Details: `docs/MIGRATION.md`.
+
 ## 11. Document storage (ADR-0012)
 
 `IDocumentStorageProvider` operations: `PutAsync(key, stream)`, `OpenReadAsync(key)`, `DeleteAsync(key)`, `ExistsAsync(key)`, `GetPropertiesAsync(key)`. Keys are `t/{tenant}/{sha256-prefix}/{sha256}` (content-addressed within a tenant, enabling "link existing content"). Every upload streams through: size limit, signature sniffing, hash, quarantine write, scan, then promote to the committed prefix with `scanStatus`. Downloads are authorised per request by the access evaluator (record visibility, classification, scan status) and streamed with `Content-Disposition` from sanitised names; there are no public URLs. A reference-count table governs deletion.
@@ -302,5 +304,6 @@ flowchart LR
 | 0015 | Bulk-migration module name (`Ecp.DataMigration`) | Proposed |
 | 0016 | Setup state and first-run protection | Proposed |
 | 0017 | Organisation onboarding as a configuration kind with a provenance ledger | Proposed |
+| 0018 | Migration slice design: staging, provenance ledger, resumable commit, provenance-driven rollback | Proposed |
 
 ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.

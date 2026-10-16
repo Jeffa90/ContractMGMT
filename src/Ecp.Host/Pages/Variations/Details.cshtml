@@ -11,6 +11,7 @@
 
 @if (Model.Editing)
 {
+    ViewData["Labels"] = v.FieldLabels ?? new Dictionary<string, string>();
     <form method="post" asp-page-handler="Save">
         <partial name="_VariationFields" model="(Model.Form, v.ChangeableFields, Model.Current, Model.Proposed)" />
         <div class="actions"><button type="submit">@L["Save"]</button> <a class="button secondary" href="/Variations/Details/@s.Id">@L["Cancel"]</a></div>

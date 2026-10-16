@@ -14,10 +14,11 @@
     <p class="hint">@L["Tick each field to change and give its new value. Only the fields listed can be changed by a Variation; nothing changes until the Variation is approved and applied."]</p>
     @foreach (var f in Model.Fields)
     {
+        var label = (ViewData["Labels"] as IReadOnlyDictionary<string, string>)?.GetValueOrDefault(f) ?? f;
         var ticked = Model.Proposed.ContainsKey(f);
         <div class="field">
-            <label><input type="checkbox" name="Change_@f" value="true" checked="@ticked" /> @f</label>
-            <input name="Value_@f" type="text" value="@(ticked ? Model.Proposed[f] : "")" aria-label="@L["New value for"] @f" />
+            <label><input type="checkbox" name="Change_@f" value="true" checked="@ticked" /> @label</label>
+            <input name="Value_@f" type="text" value="@(ticked ? Model.Proposed[f] : "")" aria-label="@L["New value for"] @label" />
             <span class="hint">@L["Now"]: @(Model.Current.GetValueOrDefault(f) ?? "-")</span>
         </div>
     }

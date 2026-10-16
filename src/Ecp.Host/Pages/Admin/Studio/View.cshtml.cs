@@ -9,7 +9,7 @@ namespace Ecp.Host.Pages.Admin.Studio;
 
 /// <summary>Create or change one shared view: columns, filters, sort, page size and formats, with a trial run before it is saved.</summary>
 [Authorize(Policy = "perm:config.draft")]
-public sealed class ViewModel(IOrganisationStructureService organisations, IAccessService access, IContractViewStudio studio, IContractRegister register) : StudioPage(organisations, access)
+public sealed class ViewModel(IOrganisationStructureService organisations, IAccessService access, IContractViewStudio studio) : StudioPage(organisations, access)
 {
     [BindProperty(SupportsGet = true)] public string? Key { get; set; }
     [BindProperty] public string ViewKey { get; set; } = "";
@@ -50,7 +50,7 @@ public sealed class ViewModel(IOrganisationStructureService organisations, IAcce
     {
         var org = await ResolveOrganisationAsync(ct) ?? throw new Ecp.SharedKernel.ResourceNotFoundException();
         State = await studio.LoadAsync(org, false, ct);
-        Catalogue = await register.CatalogueAsync(org, ct);
+        Catalogue = await studio.CatalogueAsync(org, ct);
     }
 
     private ViewDefinition? Build()
@@ -76,6 +76,7 @@ public sealed class ViewModel(IOrganisationStructureService organisations, IAcce
         {
             try { Trial = await studio.PreviewAsync(OrganisationId!.Value, def, ct); }
             catch (RegisterQueryException ex) { foreach (var issue in ex.Issues) ModelState.AddModelError(string.Empty, issue.Message); }
+            catch (Ecp.SharedKernel.ForbiddenException) { ModelState.AddModelError(string.Empty, "Your role cannot open the contract register, so a trial run is not available. The view is still checked when you validate the draft."); }
         }
         return Page();
     });

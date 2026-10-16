@@ -26,7 +26,8 @@ public sealed record VariationDocumentItem(Guid DocumentId, string Title, string
 
 public sealed record VariationDetail(
     VariationListItem Summary, string? Description, string Reason, bool LegalReviewRequired, string? ImpactNote, string? OutcomeReason, string ParentStatusBefore, bool ParentChangedSinceDrafted,
-    IReadOnlyList<FieldComparison> Comparison, IReadOnlyList<VariationDocumentItem> Documents, IReadOnlyList<AvailableTransition> Steps, bool CanEdit, bool CanAddDocuments, IReadOnlyList<string> ChangeableFields);
+    IReadOnlyList<FieldComparison> Comparison, IReadOnlyList<VariationDocumentItem> Documents, IReadOnlyList<AvailableTransition> Steps, bool CanEdit, bool CanAddDocuments, IReadOnlyList<string> ChangeableFields,
+    IReadOnlyDictionary<string, string>? FieldLabels = null);
 
 public sealed record AddVariationDocumentRequest(Guid VariationId, string Role, string Title, string FileName, string MimeType, Stream Content, string? Classification = null);
 
@@ -47,6 +48,8 @@ public interface IVariationService
     Task CancelAsync(Guid variationId, string reason, CancellationToken ct = default);
     /// <summary>The fields a Variation may change and the longest the form needs: from the Variation workflow in force.</summary>
     Task<IReadOnlyList<string>> ChangeableFieldsAsync(Guid contractId, CancellationToken ct = default);
+    /// <summary>The configured fields (not core fields) the signed-in person may propose to change: those the workflow allows, that apply to the contract now, and that they may see.</summary>
+    Task<IReadOnlyList<Ecp.Metadata.FieldDefinition>> ChangeableCustomFieldsAsync(Guid contractId, CancellationToken ct = default);
 }
 
 /// <summary>Completes a Variation from the approval path (approved or rejected), inside the approval's transaction.</summary>
@@ -59,7 +62,7 @@ internal interface IVariationOutcomes
 internal sealed class VariationService(
     LifecycleDbContext db, LifecycleEngine engine, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IAccessService access, IContractLifecyclePort port,
     IWorkflowDefinitions definitions, ISecuredContractService contracts, ISecuredContractDocuments secureDocuments, IDocumentService documentService,
-    LifecycleEvents events, VisibleContracts visible, LegalReviewService legalReviews) : IVariationService, IVariationOutcomes
+    LifecycleEvents events, VisibleContracts visible, LegalReviewService legalReviews, IContractCustomFields customFieldForms) : IVariationService, IVariationOutcomes
 {
     private static readonly Dictionary<string, string> Labels = new()
     {
@@ -76,14 +79,30 @@ internal sealed class VariationService(
         return (await definitions.CurrentAsync(WorkflowKinds.Variation, facts.OrganisationId, ct)).Definition.Settings.Variation.ChangeableFields;
     }
 
+    public async Task<IReadOnlyList<Ecp.Metadata.FieldDefinition>> ChangeableCustomFieldsAsync(Guid contractId, CancellationToken ct = default)
+    {
+        var allowed = await ChangeableFieldsAsync(contractId, ct);
+        return (await customFieldForms.ProposableAsync(contractId, ct)).Where(d => AllowsCustom(allowed, d.Key)).ToList();
+    }
+
+    private static bool AllowsCustom(IReadOnlyCollection<string> allowed, string key)
+        => allowed.Contains("cf." + key, StringComparer.OrdinalIgnoreCase) || allowed.Contains("cf.*", StringComparer.Ordinal);
+
     // ---- create and edit ------------------------------------------------------------------------------------------------------------------------
 
     private async Task<(string ProposedJson, string BeforeJson)> ValidateAsync(Guid contractId, VariationInput input, WorkflowDefinition variationDef, CancellationToken ct)
     {
         var allowed = variationDef.Settings.Variation.ChangeableFields;
         if (input.ProposedChanges.Count == 0) throw new DomainException("changes_required", "Name at least one change the Variation proposes.");
-        var outside = input.ProposedChanges.Keys.Where(k => !allowed.Contains(k)).ToList();
+        var outside = input.ProposedChanges.Keys.Where(k => !allowed.Contains(k) && !(k.StartsWith("cf.", StringComparison.Ordinal) && AllowsCustom(allowed, k[3..]))).ToList();
         if (outside.Count > 0) throw new DomainException("field_not_changeable", $"A Variation cannot change: {string.Join(", ", outside)}.");
+        // A configured field is also judged by what this person may see and propose: a restricted or role-limited field cannot be changed by someone who cannot see it.
+        if (input.ProposedChanges.Keys.Any(k => k.StartsWith("cf.", StringComparison.Ordinal)))
+        {
+            var mine = (await customFieldForms.ProposableAsync(contractId, ct)).Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var refused = input.ProposedChanges.Keys.Where(k => k.StartsWith("cf.", StringComparison.Ordinal) && !mine.Contains(k[3..])).ToList();
+            if (refused.Count > 0) throw new DomainException("field_not_changeable", $"A Variation cannot change: {string.Join(", ", refused)}.");
+        }
         // The proposed values are checked against the same rules that will apply them, so an invalid Variation is refused when it is drafted rather than when it is approved.
         await port.PreviewControlledChangesAsync(contractId, input.ProposedChanges, allowed, ct);
         var before = await port.CurrentValuesAsync(contractId, input.ProposedChanges.Keys.ToList(), ct);
@@ -193,15 +212,22 @@ internal sealed class VariationService(
         var before = JsonSerializer.Deserialize<Dictionary<string, string?>>(v.BeforeJson) ?? [];
         var current = await port.CurrentValuesAsync(v.ContractId, proposed.Keys.ToList(), ct);
         var rows = new List<FieldComparison>();
+        // A configured field is shown only to people who may see it on the contract; for anyone else the row says only that a restricted detail changes, never its name or values.
+        var visibleCustom = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (proposed.Keys.Any(k => k.StartsWith("cf.", StringComparison.Ordinal)))
+            foreach (var e in (await customFieldForms.ForContractAsync(v.ContractId, ct: ct)).Fields) visibleCustom[e.Definition.Key] = e.Definition.Label;
+        string Label(string field) => !field.StartsWith("cf.", StringComparison.Ordinal) ? LabelOf(field) : visibleCustom.TryGetValue(field[3..], out var l) ? l : "Restricted detail";
+        bool Shown(string field) => !field.StartsWith("cf.", StringComparison.Ordinal) || visibleCustom.ContainsKey(field[3..]);
+        string? Cur(string field) => Shown(field) ? current.GetValueOrDefault(field) : null;
         if (v.Outcome == VariationOutcome.Applied && v.AppliedBeforeJson is not null)
         {
             // What was actually in force and what replaced it, preserved at the moment of application.
             var ab = JsonSerializer.Deserialize<Dictionary<string, string?>>(v.AppliedBeforeJson) ?? [];
             var aa = JsonSerializer.Deserialize<Dictionary<string, string?>>(v.AppliedAfterJson ?? "{}") ?? [];
-            foreach (var field in proposed.Keys) rows.Add(new FieldComparison(field, LabelOf(field), ab.GetValueOrDefault(field), aa.GetValueOrDefault(field), current.GetValueOrDefault(field), ab.GetValueOrDefault(field) != aa.GetValueOrDefault(field)));
+            foreach (var field in proposed.Keys) rows.Add(Shown(field) ? new FieldComparison(field, Label(field), ab.GetValueOrDefault(field), aa.GetValueOrDefault(field), Cur(field), ab.GetValueOrDefault(field) != aa.GetValueOrDefault(field)) : new FieldComparison("cf.restricted", Label(field), null, null, null, true));
         }
         else
-            foreach (var field in proposed.Keys) rows.Add(new FieldComparison(field, LabelOf(field), before.GetValueOrDefault(field), proposed[field], current.GetValueOrDefault(field), before.GetValueOrDefault(field) != proposed[field]));
+            foreach (var field in proposed.Keys) rows.Add(Shown(field) ? new FieldComparison(field, Label(field), before.GetValueOrDefault(field), proposed[field], Cur(field), before.GetValueOrDefault(field) != proposed[field]) : new FieldComparison("cf.restricted", Label(field), null, null, null, true));
         var changedSince = v.IsOpen && before.Any(kv => current.GetValueOrDefault(kv.Key) != kv.Value);
 
         var docs = new List<VariationDocumentItem>();
@@ -216,8 +242,11 @@ internal sealed class VariationService(
         var parent = await contracts.GetAsync(v.ContractId, ct);
         var summary = new VariationListItem(v.Id, v.ContractId, parent.AgreementReference, parent.Title, parent.SupplierName, parent.CategoryName, v.Reference, v.Title, v.Status, resolved.Definition.DisplayOf(v.Status), v.IsOpen, v.Outcome,
             v.ProposedDate, v.FinancialImpactAmount, v.FinancialImpactCurrency, v.CreatedBy, v.CreatedUtc, v.UpdatedUtc, v.CompletedUtc);
+        // The workflow names the core fields; the configured fields offered are those this person may see and the workflow allows.
+        var custom = mayEdit ? await ChangeableCustomFieldsAsync(v.ContractId, ct) : [];
+        var changeable = resolved.Definition.Settings.Variation.ChangeableFields.Where(f => !f.StartsWith("cf.", StringComparison.Ordinal)).Concat(custom.Select(d => "cf." + d.Key)).ToList();
         return new VariationDetail(summary, v.Description, v.Reason, v.LegalReviewRequired, v.FinancialImpactNote, v.OutcomeReason, v.ParentStatusBefore, changedSince, rows, docs, steps, mayEdit, mayDocs,
-            resolved.Definition.Settings.Variation.ChangeableFields);
+            changeable, custom.ToDictionary(d => "cf." + d.Key, d => d.Label));
     }
 
     private static readonly string[] DocumentRoles = ["initial", "legalRework", "legalCleared", "drafting"];

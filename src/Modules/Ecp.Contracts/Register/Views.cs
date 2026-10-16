@@ -170,13 +170,11 @@ internal sealed class ContractListViewKind(IServiceProvider services, IAuditWrit
         if (set is null) return new ValidationReport(messages);
         if (set.SchemaVersion != 1) messages.Add(new(ValidationSeverity.Error, "$.schemaVersion", "schema_version", "The schema version must be 1."));
         if (set.Views.Count > ViewParser.MaxViews) messages.Add(new(ValidationSeverity.Error, "$.views", "too_many", $"At most {ViewParser.MaxViews} shared views are allowed."));
+        // A shared view is a definition, not data: it is checked against every field the organisation defines, by someone with the right to configure. Each person who opens it still sees only what their own access allows.
         var register = services.GetRequiredService<IContractRegister>();
-        var catalogue = await register.CatalogueAsync(organisationId, ct);
-        var access = services.GetRequiredService<IAccessService>();
-        var scale = await access.ClassificationScaleAsync(ct);
-        var readable = new List<string>();
-        foreach (var level in scale.Levels)
-            if ((await access.GrantsAsync("contracts.read", ct)).Any(g => (g.OrganisationIds is null || g.OrganisationIds.Contains(organisationId)) && g.AllowedClassifications.Contains(level))) readable.Add(level);
+        var catalogue = await register.DefinitionCatalogueAsync(organisationId, ct);
+        var scale = await services.GetRequiredService<IAccessService>().ClassificationScaleAsync(ct);
+        var readable = scale.Levels.ToList();
         var sets = services.GetServices<IContractSetProvider>().Select(s => s.Key).ToHashSet(StringComparer.Ordinal);
         var system = SystemViews.Load();
         var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

@@ -89,6 +89,8 @@ public interface IContractCustomFieldWriter
     Task<IReadOnlyList<FieldChange>> PreviewAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, CancellationToken ct = default);
     /// <summary>Applies them inside the caller's unit of work; the audit event carries the authority (for example the Variation).</summary>
     Task<IReadOnlyList<FieldChange>> ApplyAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, string actor, string authorityKind, Guid authorityId, string? reason, CancellationToken ct = default);
+    /// <summary>The stored value of the named fields as text (several values joined with "; "). A field with no value is absent. No access rules: the caller has authorised the actor.</summary>
+    Task<IReadOnlyDictionary<string, string?>> CurrentAsync(Guid contractId, IReadOnlyCollection<string> keys, CancellationToken ct = default);
     /// <summary>Writes values for a contract being created or loaded (no role, state or lock rules; required is not enforced).</summary>
     Task WriteNewAsync(Guid contractId, CustomFieldInput input, string actor, CancellationToken ct = default);
 }
@@ -446,6 +448,18 @@ internal sealed class ContractCustomFieldService(
         bool Can(FieldDefinition d) => !d.IsCalculated && FieldRules.IsCurrent(d, today) && FieldRules.AppliesToType(d, c.ContractType);
         var plan = await PlanAsync(set, stored, input, Can, enforceRequired: false, applyDefaults: false, ct, contractId);
         return (c, set, plan);
+    }
+
+    public async Task<IReadOnlyDictionary<string, string?>> CurrentAsync(Guid contractId, IReadOnlyCollection<string> keys, CancellationToken ct = default)
+    {
+        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct);
+        var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        if (c is null) return result;
+        var set = await catalogue.PublishedAsync(c.OrganisationId, ct);
+        var stored = await StoredAsync(contractId, set, ct);
+        foreach (var key in keys)
+            if (set.Find(key) is { } d) result[d.Key] = stored.TryGetValue(d.Key, out var values) && values.Count > 0 ? string.Join("; ", ValueCodec.ToRaw(d, values)) : null;
+        return result;
     }
 
     public async Task<IReadOnlyList<FieldChange>> PreviewAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, CancellationToken ct = default)

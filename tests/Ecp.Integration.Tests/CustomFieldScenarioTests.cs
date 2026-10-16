@@ -14,6 +14,7 @@ public sealed class CustomFieldScenarioTests_Sqlite
     [Fact] public Task Versions_and_retirement() => ProviderRunner.SqliteAsync(CustomFieldScenarios.Definitions_are_versioned_retired_never_deleted_and_the_values_they_hold_are_protected, LifecycleScenarios.Scanner);
     [Fact] public Task Tenant_isolation_and_cache() => ProviderRunner.SqliteAsync(CustomFieldScenarios.Definitions_and_values_belong_to_one_tenant_and_the_published_cache_never_crosses_or_goes_stale, LifecycleScenarios.Scanner);
     [Fact] public Task Failed_publish() => ProviderRunner.SqliteAsync(CustomFieldScenarios.A_failed_publish_leaves_the_published_definitions_and_the_cache_unchanged, LifecycleScenarios.Scanner);
+    [Fact] public Task Variation_changes_configured_fields() => ProviderRunner.SqliteAsync(VariationFieldScenarios.A_Variation_changes_configured_fields_only_the_person_may_see_and_only_when_approved, LifecycleScenarios.Scanner);
 }
 
 [Trait("Category", "CustomFields")]
@@ -28,6 +29,7 @@ public sealed class CustomFieldScenarioTests_SqlServer
     [SqlServerFact] public Task Versions_and_retirement() => ProviderRunner.SqlServerAsync(CustomFieldScenarios.Definitions_are_versioned_retired_never_deleted_and_the_values_they_hold_are_protected, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Tenant_isolation_and_cache() => ProviderRunner.SqlServerAsync(CustomFieldScenarios.Definitions_and_values_belong_to_one_tenant_and_the_published_cache_never_crosses_or_goes_stale, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Failed_publish() => ProviderRunner.SqlServerAsync(CustomFieldScenarios.A_failed_publish_leaves_the_published_definitions_and_the_cache_unchanged, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Variation_changes_configured_fields() => ProviderRunner.SqlServerAsync(VariationFieldScenarios.A_Variation_changes_configured_fields_only_the_person_may_see_and_only_when_approved, LifecycleScenarios.Scanner);
 }
 
 [Trait("Category", "Studio")]
@@ -56,4 +58,42 @@ public sealed class RegisterScenarioTests_SqlServer
 {
     [SqlServerFact] public Task Typed_search() => ProviderRunner.SqlServerAsync(RegisterScenarios.Typed_search_filters_sorts_and_pages_correctly_over_core_fields, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Scope_and_hidden_fields() => ProviderRunner.SqlServerAsync(RegisterScenarios.The_register_only_ever_returns_what_the_person_may_read_and_hidden_fields_cannot_be_used_to_find_anything, LifecycleScenarios.Scanner);
+}
+
+
+[Trait("Category", "ApprovalFacts")]
+public sealed class ApprovalFactScenarioTests_Sqlite
+{
+    [Fact] public Task Live_and_simulated_facts_agree() => ProviderRunner.SqliteAsync(ApprovalFactScenarios.A_live_submission_and_a_simulation_from_the_same_contract_choose_the_same_steps, LifecycleScenarios.Scanner);
+    [Fact] public Task Only_usable_fields_feed_a_matrix() => ProviderRunner.SqliteAsync(ApprovalFactScenarios.A_matrix_cannot_use_a_field_that_is_not_marked_usable_in_approvals, LifecycleScenarios.Scanner);
+}
+
+[Trait("Category", "ApprovalFacts")]
+[Trait("Category", "SqlServer")]
+public sealed class ApprovalFactScenarioTests_SqlServer
+{
+    [SqlServerFact] public Task Live_and_simulated_facts_agree() => ProviderRunner.SqlServerAsync(ApprovalFactScenarios.A_live_submission_and_a_simulation_from_the_same_contract_choose_the_same_steps, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Only_usable_fields_feed_a_matrix() => ProviderRunner.SqlServerAsync(ApprovalFactScenarios.A_matrix_cannot_use_a_field_that_is_not_marked_usable_in_approvals, LifecycleScenarios.Scanner);
+}
+
+
+[Trait("Category", "Register")]
+public sealed class RegisterViewScenarioTests_Sqlite
+{
+    [Fact] public Task Shipped_views() => ProviderRunner.SqliteAsync(RegisterViewScenarios.The_eleven_shipped_views_run_and_select_what_their_names_promise, LifecycleScenarios.Scanner);
+    [Fact] public Task Personal_views() => ProviderRunner.SqliteAsync(RegisterViewScenarios.Personal_views_are_private_validated_and_safe_to_save_and_delete, LifecycleScenarios.Scanner);
+    [Fact] public Task Shared_views() => ProviderRunner.SqliteAsync(RegisterViewScenarios.Shared_views_are_published_through_configuration_and_each_viewer_still_sees_only_their_own_access, LifecycleScenarios.Scanner);
+    [Fact] public Task Exports() => ProviderRunner.SqliteAsync(RegisterViewScenarios.An_export_carries_the_same_columns_and_filters_and_only_what_the_person_may_export, LifecycleScenarios.Scanner);
+    [Fact] public Task Reporting_schema() => ProviderRunner.SqliteAsync(RegisterViewScenarios.The_reporting_schema_is_stable_and_follows_what_the_person_may_export, LifecycleScenarios.Scanner);
+}
+
+[Trait("Category", "Register")]
+[Trait("Category", "SqlServer")]
+public sealed class RegisterViewScenarioTests_SqlServer
+{
+    [SqlServerFact] public Task Shipped_views() => ProviderRunner.SqlServerAsync(RegisterViewScenarios.The_eleven_shipped_views_run_and_select_what_their_names_promise, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Personal_views() => ProviderRunner.SqlServerAsync(RegisterViewScenarios.Personal_views_are_private_validated_and_safe_to_save_and_delete, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Shared_views() => ProviderRunner.SqlServerAsync(RegisterViewScenarios.Shared_views_are_published_through_configuration_and_each_viewer_still_sees_only_their_own_access, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Exports() => ProviderRunner.SqlServerAsync(RegisterViewScenarios.An_export_carries_the_same_columns_and_filters_and_only_what_the_person_may_export, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Reporting_schema() => ProviderRunner.SqlServerAsync(RegisterViewScenarios.The_reporting_schema_is_stable_and_follows_what_the_person_may_export, LifecycleScenarios.Scanner);
 }

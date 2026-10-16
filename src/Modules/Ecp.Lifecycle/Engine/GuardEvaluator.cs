@@ -19,7 +19,7 @@ internal sealed record GuardContext(SubjectView Subject, ResolvedDefinition Reso
 /// Evaluates the guards a transition names. The guard vocabulary is closed: each code means one fixed check implemented here, so a definition can combine guards but never invent a check.
 /// A guard answers in plain words when it fails.
 /// </summary>
-internal sealed class GuardEvaluator(LifecycleDbContext db, IDocumentQuery documents, IContractLifecyclePort port, IDispositionChecks disposition)
+internal sealed class GuardEvaluator(LifecycleDbContext db, IDocumentQuery documents, IContractLifecyclePort port, IDispositionChecks disposition, IContractCustomFieldWriter customFields)
 {
     /// <summary>Guards whose answer depends on what the caller supplies with the request (a comment or reason). They do not make a step unavailable; the form asks for the input.</summary>
     private static readonly HashSet<string> InputGuards = new(StringComparer.Ordinal) { "CommentRequired", "ReasonRequired", "VariationOutcomeApplied", "VariationOutcomeNotApplied", "RenewalSuccessorEffective" };
@@ -123,6 +123,14 @@ internal sealed class GuardEvaluator(LifecycleDbContext db, IDocumentQuery docum
                 "endDate" => c.EndDate.HasValue,
                 "extensionType" => !string.IsNullOrWhiteSpace(c.ExtensionType),
                 "noticePeriodDays" => c.NoticePeriodDays.HasValue,
+                "noticePeriodValue" => c.NoticePeriodValue.HasValue,
+                "contractType" => !string.IsNullOrWhiteSpace(c.ContractType),
+                "agreementType" => !string.IsNullOrWhiteSpace(c.AgreementType),
+                "riskLevel" => !string.IsNullOrWhiteSpace(c.RiskLevel),
+                "functionCode" => !string.IsNullOrWhiteSpace(c.FunctionCode),
+                "legalEntity" => c.LegalEntityId.HasValue,
+                "sapOutlineAgreementNumber" => !string.IsNullOrWhiteSpace(c.SapOutlineAgreementNumber),
+                _ when field.StartsWith("cf.", StringComparison.Ordinal) => (await customFields.CurrentAsync(c.Id, [field[3..]], ct)).GetValueOrDefault(field[3..]) is { Length: > 0 },
                 _ => true
             };
             if (!present) missing.Add(field);

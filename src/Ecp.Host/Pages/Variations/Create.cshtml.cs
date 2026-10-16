@@ -6,21 +6,26 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ecp.Host.Pages.Variations;
 
 [Authorize(Policy = "perm:contracts.read")]
-public sealed class CreateModel(IVariationService variations, ISecuredContractService contracts) : EcpPageModel
+public sealed class CreateModel(IVariationService variations, ISecuredContractService contracts, IContractCustomFields customFields) : EcpPageModel
 {
     [BindProperty(SupportsGet = true)] public Guid ContractId { get; set; }
     [BindProperty] public VariationForm Form { get; set; } = new();
     public ContractDetails Contract { get; private set; } = null!;
     public IReadOnlyList<string> Fields { get; private set; } = [];
     public IReadOnlyDictionary<string, string?> Current { get; private set; } = new Dictionary<string, string?>();
+    public IReadOnlyDictionary<string, string> Labels { get; private set; } = new Dictionary<string, string>();
 
     public Task<IActionResult> OnGetAsync(CancellationToken ct) => RunAsync(async () => { await LoadAsync(ct); return Page(); });
 
     private async Task LoadAsync(CancellationToken ct)
     {
         Contract = await contracts.GetAsync(ContractId, ct);
-        Fields = await variations.ChangeableFieldsAsync(ContractId, ct);
-        Current = new Dictionary<string, string?>
+        // The workflow names the core fields a Variation may change; the configured fields it may change are added, limited to those this person can see.
+        var custom = await variations.ChangeableCustomFieldsAsync(ContractId, ct);
+        Fields = (await variations.ChangeableFieldsAsync(ContractId, ct)).Where(f => !f.StartsWith("cf.", StringComparison.Ordinal)).Concat(custom.Select(d => "cf." + d.Key)).ToList();
+        Labels = custom.ToDictionary(d => "cf." + d.Key, d => d.Label);
+        var shown = (await customFields.ForContractAsync(ContractId, ct: ct)).Fields.ToDictionary(e => "cf." + e.Definition.Key, e => (string?)e.Raw.FirstOrDefault());
+        Current = new Dictionary<string, string?>(shown)
         {
             ["currencyCode"] = Contract.CurrencyCode, ["estimatedValue"] = Contract.EstimatedValue?.ToString(System.Globalization.CultureInfo.InvariantCulture), ["extensionType"] = Contract.ExtensionType,
             ["noticePeriodDays"] = Contract.Reminders?.NoticePeriodDays?.ToString(), ["criticalNotice"] = (Contract.Reminders?.CriticalNotice ?? false) ? "true" : "false",

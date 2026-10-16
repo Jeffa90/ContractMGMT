@@ -26,6 +26,8 @@ public interface IContractRegister
 {
     /// <summary>The fields the signed-in person can show, filter and sort on (core fields, and the configured fields of the organisation they may see). With several organisations in reach and none chosen, only core fields.</summary>
     Task<RegisterCatalogue> CatalogueAsync(Guid? organisationId = null, CancellationToken ct = default);
+    /// <summary>Every field an organisation's shared views may name, for someone authoring them (<c>config.draft</c> in the organisation). It describes definitions, not data: each person who opens a shared view still sees only the columns and rows their own access allows.</summary>
+    Task<RegisterCatalogue> DefinitionCatalogueAsync(Guid organisationId, CancellationToken ct = default);
     Task<RegisterPage> SearchAsync(ContractQuery query, CancellationToken ct = default);
     /// <summary>The same search for an export: also limited to what the person may export (<c>records.export</c>) and, for configured fields, to those marked reportable.</summary>
     Task<RegisterPage> SearchForExportAsync(ContractQuery query, CancellationToken ct = default);
@@ -60,7 +62,7 @@ internal sealed partial class RegisterQueryEngine(
 
     public async Task<RegisterCatalogue> CatalogueAsync(Guid? organisationId = null, CancellationToken ct = default)
     {
-        var (_, orgs) = await ReachAsync(ct);
+        var (grants, orgs) = await ReachAsync(ct);
         var notes = new List<string>();
         Guid? org = organisationId is { } o && orgs.Contains(o) ? o : organisationId is null && orgs.Count == 1 ? orgs[0] : null;
         var fields = CoreFields.All.Select(f => new RegisterField(f.Key, f.Label, f.Type, false, f.Sortable, f.Filterable, f.Key is "agreementReference" or "contractTitle" or "supplier" or "supplierVendorNumber" or "supplierAbn" or "sapOutlineAgreementNumber", f.Group, Displayable: f.Key != "legalReviewStatus")).ToList();
@@ -70,12 +72,24 @@ internal sealed partial class RegisterQueryEngine(
             var set = await customCatalogue.PublishedAsync(id, ct);
             release = set.ReleaseNumber;
             var roles = await RolesAsync(id, ct);
+            // A field held above every level the person may read in this organisation is not offered at all, so its name and existence are not revealed.
+            var readable = grants.Where(g => g.OrganisationIds is null || g.OrganisationIds.Contains(id)).SelectMany(g => g.AllowedClassifications).ToHashSet(StringComparer.Ordinal);
             foreach (var d in set.Fields)
-                if (d.VisibleToRoles.Count == 0 || d.VisibleToRoles.Any(roles.Contains))
+                if ((d.VisibleToRoles.Count == 0 || d.VisibleToRoles.Any(roles.Contains)) && readable.Contains(d.Classification))
                     fields.Add(new RegisterField(d.Key, d.Label, d.Type, true, d.Sortable && !d.IsCalculated, d.Filterable && !d.IsCalculated, d.Searchable, set.Sections.FirstOrDefault(s => s.Key == d.Section)?.Label ?? "Additional details", d.IsRetired, d.Section, Displayable: !d.IsCalculated, Reportable: d.Reportable));
         }
         else if (orgs.Count > 1) notes.Add("Choose an organisation to use its additional fields.");
         return new RegisterCatalogue(fields, org, release, notes);
+    }
+
+    public async Task<RegisterCatalogue> DefinitionCatalogueAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        if (!(await access.GrantsAsync("config.draft", ct)).Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(organisationId))) throw new ResourceNotFoundException();
+        var fields = CoreFields.All.Select(f => new RegisterField(f.Key, f.Label, f.Type, false, f.Sortable, f.Filterable, f.Key is "agreementReference" or "contractTitle" or "supplier" or "supplierVendorNumber" or "supplierAbn" or "sapOutlineAgreementNumber", f.Group, Displayable: f.Key != "legalReviewStatus")).ToList();
+        var set = await customCatalogue.PublishedAsync(organisationId, ct);
+        foreach (var d in set.Fields)
+            fields.Add(new RegisterField(d.Key, d.Label, d.Type, true, d.Sortable && !d.IsCalculated, d.Filterable && !d.IsCalculated, d.Searchable, set.Sections.FirstOrDefault(s => s.Key == d.Section)?.Label ?? "Additional details", d.IsRetired, d.Section, Displayable: !d.IsCalculated, Reportable: d.Reportable));
+        return new RegisterCatalogue(fields, organisationId, set.ReleaseNumber, []);
     }
 
     // ---- validation of a query -------------------------------------------------------------------------------------------------------------------------

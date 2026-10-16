@@ -40,7 +40,11 @@ public static class WorkflowVocabulary
     ];
 
     public static readonly IReadOnlyList<string> RequiredFieldNames =
-        ["title", "description", "supplier", "category", "currencyCode", "estimatedValue", "startDate", "effectiveDate", "reviewDate", "endDate", "extensionType", "noticePeriodDays"];
+        ["title", "description", "supplier", "category", "currencyCode", "estimatedValue", "startDate", "effectiveDate", "reviewDate", "endDate", "extensionType", "noticePeriodDays",
+         "contractType", "agreementType", "riskLevel", "functionCode", "legalEntity", "sapOutlineAgreementNumber", "noticePeriodValue"];
+
+    /// <summary>A configured field is named <c>cf.</c> plus its key wherever the workflow refers to it (a required field, or a field a Variation may change). <c>cf.*</c> in a Variation's changeable fields means any configured field.</summary>
+    public static bool IsConfiguredFieldName(string name) => System.Text.RegularExpressions.Regex.IsMatch(name, @"^cf\.([a-z][a-z0-9_]{1,62}|\*)$", System.Text.RegularExpressions.RegexOptions.NonBacktracking);
 }
 
 public sealed record StateDefinition(string Code, string Display, string? Role, bool Locked, bool FreezeContent, string DocumentPolicy, string? LockReason, bool Terminal, bool Initial);
@@ -210,7 +214,7 @@ public static class WorkflowDefinitionParser
             if (!matrix.IsKnown(t.Permission)) m.Add(Error(path + ".permission", "transition_permission", $"Permission '{t.Permission}' is not in the permission catalogue."));
             if (!WorkflowVocabulary.TransitionRoles.Contains(t.Role)) m.Add(Error(path + ".role", "transition_role", $"Transition role '{t.Role}' is not recognised."));
             foreach (var g in t.Guards) if (!WorkflowVocabulary.Guards.Contains(g)) m.Add(Error(path + ".guards", "guard_unknown", $"Guard '{g}' is not in the guard vocabulary."));
-            foreach (var f in t.RequiredFields) if (!WorkflowVocabulary.RequiredFieldNames.Contains(f)) m.Add(Error(path + ".requiredFields", "field_unknown", $"Field '{f}' cannot be required."));
+            foreach (var f in t.RequiredFields) if (!WorkflowVocabulary.RequiredFieldNames.Contains(f) && !(WorkflowVocabulary.IsConfiguredFieldName(f) && f != "cf.*")) m.Add(Error(path + ".requiredFields", "field_unknown", $"Field '{f}' cannot be required."));
             if (t.To is { Length: > 0 } to && d.State(to) is { } target && t.From.Any(f => d.State(f) is { Locked: true }) && !target.Locked)
                 m.Add(Error(path, "unlocks", $"Transition '{t.Code}' would move a locked record to the unlocked state '{target.Display}'. A transition cannot unlock a record."));
             if (t.Role is "approve" or "applyVariation" && d.State(t.To) is { } approved && d.Subject == "Contract" && !approved.Locked)
@@ -270,7 +274,7 @@ public static class WorkflowDefinitionParser
         }
         else
         {
-            foreach (var f in d.Settings.Variation.ChangeableFields) if (!Ecp.Contracts.Domain.Contract.Editable.VariationFields.Contains(f)) m.Add(Error("$.settings.variation.changeableFields", "variation_field", $"Field '{f}' cannot be changed by a Variation. Allowed: {string.Join(", ", Ecp.Contracts.Domain.Contract.Editable.VariationFields)}."));
+            foreach (var f in d.Settings.Variation.ChangeableFields) if (!Ecp.Contracts.Domain.Contract.Editable.VariationFields.Contains(f) && !WorkflowVocabulary.IsConfiguredFieldName(f)) m.Add(Error("$.settings.variation.changeableFields", "variation_field", $"Field '{f}' cannot be changed by a Variation. Allowed: {string.Join(", ", Ecp.Contracts.Domain.Contract.Editable.VariationFields)}."));
             if (d.Settings.Variation.ChangeableFields.Count == 0) m.Add(Error("$.settings.variation.changeableFields", "variation_field", "Name at least one field a Variation may change."));
             if (d.Settings.Variation.LegalReview is not ("None" or "Optional" or "Required")) m.Add(Error("$.settings.variation.legalReview", "variation_legal", "The Variation Legal review setting must be None, Optional or Required."));
             if (!d.WithRole("approve").Any()) m.Add(Error("$.transitions", "role_missing", "A Variation workflow needs an approving transition."));

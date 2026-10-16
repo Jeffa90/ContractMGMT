@@ -87,8 +87,27 @@ public interface IContractLifecyclePort
 }
 
 internal sealed class ContractLifecyclePort(
-    ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, ITenantContext tenant, ContractAccessContext context, ReferenceAllocator allocator, Ecp.Identity.IClassificationScaleProvider scales) : IContractLifecyclePort
+    ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, ITenantContext tenant, ContractAccessContext context, ReferenceAllocator allocator, Ecp.Identity.IClassificationScaleProvider scales,
+    IContractCustomFieldWriter customFields) : IContractLifecyclePort
 {
+    /// <summary>A configured field is named <c>cf.</c> plus its key wherever it travels with the core fields (a Variation's proposed changes, comparisons, audit).</summary>
+    public const string CustomPrefix = "cf.";
+
+    /// <summary>Splits named changes into core and configured fields. A configured field must be allowed by name (<c>cf.key</c>) or by <c>cf.*</c>.</summary>
+    private static (Dictionary<string, string?> Core, Dictionary<string, string?> Custom) Split(IReadOnlyDictionary<string, string?> changes, IReadOnlyCollection<string> allowed)
+    {
+        var core = new Dictionary<string, string?>(StringComparer.Ordinal); var custom = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, value) in changes)
+        {
+            if (!name.StartsWith(CustomPrefix, StringComparison.Ordinal)) { core[name] = value; continue; }
+            if (!allowed.Contains(name, StringComparer.OrdinalIgnoreCase) && !allowed.Contains(CustomPrefix + "*", StringComparer.Ordinal)) throw new DomainException("field_not_changeable", $"'{name}' cannot be changed this way.");
+            custom[name[CustomPrefix.Length..]] = value;
+        }
+        return (core, custom);
+    }
+
+    private static IReadOnlyList<FieldChange> Prefixed(IEnumerable<FieldChange> changes) => changes.Select(f => f with { Field = CustomPrefix + f.Field }).ToList();
+
     private static ContractFacts ToFacts(Contract c, string? supplierType = null) => new(c.Id, c.TenantId, c.OrganisationId, c.AgreementReference, c.ContractTitle, c.Status, c.RecordLocked, c.ContentFrozen, c.DocumentPolicy,
         c.Classification, c.SupplierId, c.CategoryId, c.BusinessUnitId, c.SiteId, c.LegalReviewRequired, c.CurrencyCode, c.EstimatedValue, c.ExtensionType, c.StartDate, c.EffectiveDate,
         c.ReviewDate, c.EndDate, c.NoticePeriodDays, c.CriticalNotice, c.ReminderLeadDays, c.RegisteredDateUtc, c.RegisteredBy, c.WorkflowRef, c.ConfigReleaseId, c.ActiveUnlockId,
@@ -187,31 +206,50 @@ internal sealed class ContractLifecyclePort(
         string authorityKind, Guid authorityId, string? reason, CancellationToken ct = default)
         => uow.ExecuteAsync<IReadOnlyList<FieldChange>>(async c =>
         {
-            var contract = await LoadTrackedAsync(contractId, c);
-            var before = contract.Classification;
-            var scale = await scales.GetAsync(c);
-            var applied = contract.ApplyControlledFields(changes, allowed, actor, clock.UtcNow);
-            await SaveAsync(db, c);
-            // The event is classified at the higher of the old and new level, so a change away from a restricted level is never visible to people who could not see the record before it.
-            audit.Record(new AuditEntry("contract.fields_changed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, ElevationId: authorityKind == "unlock" ? authorityId : null,
-                Classification: scale.Rank(contract.Classification) >= scale.Rank(before) ? contract.Classification : before,
-                OldValuesJson: AuditJson.Of(applied.ToDictionary(f => f.Field, f => f.Before)), NewValuesJson: AuditJson.Of(new { authority = authorityKind, authorityId, changes = applied.ToDictionary(f => f.Field, f => f.After) })));
+            var (coreChanges, customChanges) = Split(changes, allowed);
+            var applied = new List<FieldChange>();
+            if (coreChanges.Count > 0)
+            {
+                var contract = await LoadTrackedAsync(contractId, c);
+                var before = contract.Classification;
+                var scale = await scales.GetAsync(c);
+                var core = contract.ApplyControlledFields(coreChanges, allowed.Where(a => !a.StartsWith(CustomPrefix, StringComparison.Ordinal)).ToList(), actor, clock.UtcNow);
+                await SaveAsync(db, c);
+                // The event is classified at the higher of the old and new level, so a change away from a restricted level is never visible to people who could not see the record before it.
+                audit.Record(new AuditEntry("contract.fields_changed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, ElevationId: authorityKind == "unlock" ? authorityId : null,
+                    Classification: scale.Rank(contract.Classification) >= scale.Rank(before) ? contract.Classification : before,
+                    OldValuesJson: AuditJson.Of(core.ToDictionary(f => f.Field, f => f.Before)), NewValuesJson: AuditJson.Of(new { authority = authorityKind, authorityId, changes = core.ToDictionary(f => f.Field, f => f.After) })));
+                applied.AddRange(core);
+            }
+            // The configured fields are written in the same unit of work, with their own audit event at the most sensitive level among the fields changed.
+            if (customChanges.Count > 0) applied.AddRange(Prefixed(await customFields.ApplyAsync(contractId, customChanges, actor, authorityKind, authorityId, reason, c)));
             return applied;
         }, ct);
 
     public async Task<IReadOnlyList<FieldChange>> PreviewControlledChangesAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, IReadOnlyCollection<string> allowed, CancellationToken ct = default)
     {
-        // An untracked copy takes the change, so the rules run exactly as they would on apply but nothing is stored.
-        var copy = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
-        try { return copy.ApplyControlledFields(changes, allowed, "preview", clock.UtcNow); }
-        catch (FormatException) { throw new DomainException("invalid_value", "One of the values is not in a recognised format."); }
-        catch (OverflowException) { throw new DomainException("invalid_value", "One of the values is out of range."); }
+        var (coreChanges, customChanges) = Split(changes, allowed);
+        var result = new List<FieldChange>();
+        if (coreChanges.Count > 0)
+        {
+            // An untracked copy takes the change, so the rules run exactly as they would on apply but nothing is stored.
+            var copy = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+            try { result.AddRange(copy.ApplyControlledFields(coreChanges, allowed.Where(a => !a.StartsWith(CustomPrefix, StringComparison.Ordinal)).ToList(), "preview", clock.UtcNow)); }
+            catch (FormatException) { throw new DomainException("invalid_value", "One of the values is not in a recognised format."); }
+            catch (OverflowException) { throw new DomainException("invalid_value", "One of the values is out of range."); }
+        }
+        if (customChanges.Count > 0) result.AddRange(Prefixed(await customFields.PreviewAsync(contractId, customChanges, ct)));
+        return result;
     }
 
     public async Task<IReadOnlyDictionary<string, string?>> CurrentValuesAsync(Guid contractId, IReadOnlyCollection<string> fields, CancellationToken ct = default)
     {
         var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
-        return c.CaptureFields(fields);
+        var result = new Dictionary<string, string?>(c.CaptureFields(fields.Where(f => !f.StartsWith(CustomPrefix, StringComparison.Ordinal))), StringComparer.Ordinal);
+        var customKeys = fields.Where(f => f.StartsWith(CustomPrefix, StringComparison.Ordinal)).Select(f => f[CustomPrefix.Length..]).ToList();
+        if (customKeys.Count > 0)
+            foreach (var (key, value) in await customFields.CurrentAsync(contractId, customKeys, ct)) result[CustomPrefix + key] = value;
+        return result;
     }
 
     public Task SetReminderSettingsAsync(Guid contractId, int? leadDays, int? noticePeriodDays, bool criticalNotice, string actor, CancellationToken ct = default)

@@ -3,6 +3,7 @@ using Ecp.Configuration;
 using Ecp.Contracts;
 using Ecp.Contracts.Domain;
 using Ecp.Documents;
+using Ecp.Lifecycle;
 using Ecp.Identity;
 using Ecp.Metadata;
 using Ecp.SharedKernel;
@@ -264,4 +265,55 @@ internal static class CustomFieldScenarios
         Assert.Equal(1, set.ReleaseNumber);
         Assert.Equal(["keep"], set.Fields.Select(f => f.Key).ToArray());
     }
+}
+
+internal static class VariationFieldScenarios
+{
+    public static async Task A_Variation_changes_configured_fields_only_the_person_may_see_and_only_when_approved(TestApp app)
+    {
+        var w = await LifecycleWorld.CreateAsync(app);
+        await w.PublishFieldsAsync(Doc(string.Join(",", Field("tier", "SINGLE_CHOICE", Choices), Field("secret", "TEXT", "\"classification\": \"Restricted\""), Field("memo", "TEXT", "\"usableInApprovals\": true"))));
+        var id = await w.ToEffectiveInOrderAsync();
+        await w.W.AsScopeless().Run(async s =>
+        {
+            await s.Get<IContractCustomFieldWriter>().WriteNewAsync(id, new CustomFieldInput { ["tier"] = ["GOLD"], ["secret"] = ["restricted-word"], ["memo"] = ["before"] }, "test");
+            return 0;
+        });
+
+        // The owner is offered the fields they can see; the restricted one is neither offered nor accepted.
+        var offered = await w.As("ownerPackaging", s => s.Get<IVariationService>().ChangeableCustomFieldsAsync(id));
+        Assert.Equal(["memo", "tier"], offered.Select(d => d.Key).Order().ToArray());
+        var bad = await Assert.ThrowsAsync<DomainException>(() => w.As("ownerPackaging", s => s.Get<IVariationService>().CreateAsync(id, Proposal(("cf.secret", "overwrite")))));
+        Assert.Equal("field_not_changeable", bad.Code);
+        await Assert.ThrowsAsync<CustomFieldValidationException>(() => w.As("ownerPackaging", s => s.Get<IVariationService>().CreateAsync(id, Proposal(("cf.tier", "PLATINUM")))));   // not a choice: refused when drafted
+        await Assert.ThrowsAsync<DomainException>(() => w.As("ownerPackaging", s => s.Get<IVariationService>().CreateAsync(id, Proposal(("cf.nosuch", "x")))));
+
+        // A valid proposal leaves the stored values and the locked record alone until it is approved.
+        var (variation, request) = await w.VariationToApprovalAsync(id, Proposal(("cf.tier", "SILVER"), ("cf.memo", "after")));
+        Assert.Equal("GOLD", string.Join("", (await w.FormAsync("ownerPackaging", id)).Entry("tier")!.Raw));
+        var pending = await w.As("ownerPackaging", s => s.Get<IVariationService>().GetAsync(variation));
+        var row = pending.Comparison.Single(c => c.Field == "cf.tier");
+        Assert.Equal(("GOLD", "SILVER"), (row.Before, row.After));
+        Assert.Equal("tier label", row.Label);
+
+        // The approver sees only what an administrator has made usable in approvals; the other configured field is not in the snapshot they read.
+        var snapshot = await w.As("groupHead", s => s.Get<IRegisterAuthorisationService>().GetAsync(request));
+        Assert.Contains("cf.memo", snapshot.Snapshot!.ProposedChanges!.Keys);
+        Assert.DoesNotContain("cf.tier", snapshot.Snapshot.ProposedChanges.Keys);
+
+        w.App.Clock.Advance(TimeSpan.FromHours(1));
+        await w.As("groupHead", s => s.Get<IRegisterAuthorisationService>().ApproveAsync(request, "Approved"));
+        var form = await w.FormAsync("ownerPackaging", id);
+        Assert.Equal("SILVER", string.Join("", form.Entry("tier")!.Raw));
+        Assert.Equal("after", string.Join("", form.Entry("memo")!.Raw));
+        Assert.Equal("restricted-word", string.Join("", (await w.FormAsync("legalA", id)).Entry("secret")!.Raw));       // untouched
+        var done = await w.As("ownerPackaging", s => s.Get<IVariationService>().GetAsync(variation));
+        var applied = done.Comparison.Single(c => c.Field == "cf.tier");
+        Assert.Equal(("GOLD", "SILVER"), (applied.Before, applied.After));
+        var audit = await w.W.AsScopeless().Run(s => s.Get<IAuditEventSource>().Events.Where(e => e.Action == "contract.custom_fields_applied").Select(e => e.NewValuesJson).ToListAsync());
+        Assert.Contains(audit, a => a!.Contains("variation", StringComparison.Ordinal) && a.Contains("SILVER", StringComparison.Ordinal));
+    }
+
+    private static VariationInput Proposal(params (string Key, string Value)[] changes)
+        => new("Change details", "Configured fields", "Because", null, false, null, null, null, changes.ToDictionary(c => c.Key, c => (string?)c.Value));
 }

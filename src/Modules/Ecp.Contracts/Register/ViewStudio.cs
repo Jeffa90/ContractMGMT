@@ -25,6 +25,8 @@ public interface IContractViewStudio
     Task DiscardDraftAsync(Guid organisationId, CancellationToken ct = default);
     /// <summary>Runs a definition as the signed-in administrator would see it (their own access), so a view can be tried before it is published.</summary>
     Task<RegisterPage> PreviewAsync(Guid organisationId, ViewDefinition view, CancellationToken ct = default);
+    /// <summary>The fields a shared view can use in this organisation (all of them, as definitions).</summary>
+    Task<RegisterCatalogue> CatalogueAsync(Guid organisationId, CancellationToken ct = default);
 }
 
 internal sealed class ContractViewStudio(IConfigurationService configuration, IContractViews views, IContractRegister register) : IContractViewStudio
@@ -101,6 +103,8 @@ internal sealed class ContractViewStudio(IConfigurationService configuration, IC
         var (draft, _) = await OpenAsync(organisationId, ct);
         await configuration.DiscardDraftAsync(draft.Id, ct);
     }
+
+    public Task<RegisterCatalogue> CatalogueAsync(Guid organisationId, CancellationToken ct = default) => register.DefinitionCatalogueAsync(organisationId, ct);
 
     public async Task<RegisterPage> PreviewAsync(Guid organisationId, ViewDefinition view, CancellationToken ct = default)
     {

@@ -127,21 +127,20 @@ internal static class RegisterScenarios
         var nobody = await Search(w, "otherApprover", new ContractQuery());                           // an approver sees only what waits on their group
         Assert.Equal(0, nobody.Total);
 
-        // A value above the person's level cannot be used to find a contract, to count it, or to order the others.
+        // A field above the person's level is not offered to them at all: it cannot be used to find a contract, to count it, or to order the others, and the refusal does not say that the field exists.
         var needle = F("secret", "Eq", "needle-in-haystack");
-        Assert.Equal(0, (await Search(w, "ownerPackaging", new ContractQuery(Filters: [needle]))).Total);       // a Confidential ceiling cannot see Restricted values
-        Assert.Equal(0, (await Search(w, "ownerPackaging", new ContractQuery(Text: "needle-in-haystack"))).Total);
-        Assert.Equal(0, (await Search(w, "ownerPackaging", new ContractQuery(Filters: [F("secret", "Contains", "needle")]))).Total);
-        Assert.Equal(0, (await Search(w, "ownerPackaging", new ContractQuery(Filters: [F("secret", "IsNotEmpty")]))).Total);   // not even "has a value"
-        var unsorted = (await Search(w, "ownerPackaging", new ContractQuery())).Rows.Select(r => r.Id).ToArray();
-        var sorted = (await Search(w, "ownerPackaging", new ContractQuery(Sorts: [new SortClause("secret", true)]))).Rows.Select(r => r.Id).ToArray();
-        Assert.Equal(unsorted.Order().ToArray(), sorted.Order().ToArray());
-        Assert.Equal(unsorted, sorted);                                                                         // ordering by a hidden value changes nothing
+        Assert.Equal("field", (await Assert.ThrowsAsync<RegisterQueryException>(() => Search(w, "ownerPackaging", new ContractQuery(Filters: [needle])))).Issues[0].Code);
+        Assert.Equal(0, (await Search(w, "ownerPackaging", new ContractQuery(Text: "needle-in-haystack"))).Total);               // free text never reaches it
+        await Assert.ThrowsAsync<RegisterQueryException>(() => Search(w, "ownerPackaging", new ContractQuery(Filters: [F("secret", "IsNotEmpty")])));
+        await Assert.ThrowsAsync<RegisterQueryException>(() => Search(w, "ownerPackaging", new ContractQuery(Sorts: [new SortClause("secret", true)])));
+        Assert.DoesNotContain("secret", (await Search(w, "ownerPackaging", new ContractQuery(Columns: ["contractTitle", "secret"]))).Columns.Select(c => c.Key));
+        Assert.DoesNotContain("secret", (await w.As("ownerPackaging", s => s.Get<IContractRegister>().CatalogueAsync(w.W.Org1))).Fields.Select(f => f.Key));
         var withSecret = await Search(w, "legalA", new ContractQuery(Filters: [needle], Columns: ["contractTitle", "secret"]));
         Assert.Equal(["Holds a secret"], Titles(withSecret));
         Assert.Equal("needle-in-haystack", withSecret.Rows[0].Cells["secret"]);
         var ownerColumn = await Search(w, "ownerPackaging", new ContractQuery(Columns: ["contractTitle", "secret", "plain"]));
-        Assert.All(ownerColumn.Rows, r => Assert.Null(r.Cells["secret"]));                                      // the cell is blank, not an error
+        Assert.Equal(["contractTitle", "plain"], ownerColumn.Columns.Select(c => c.Key).ToArray());             // the column is left out with a note, not an error
+        Assert.Contains(ownerColumn.Notes, n => n.Contains("secret", StringComparison.Ordinal));
         Assert.Contains(ownerColumn.Rows, r => r.Cells["plain"] == "common");
 
         // A field hidden by role is not in the owner's catalogue at all: filtering on it is refused as unknown, the same answer as for a field that does not exist.

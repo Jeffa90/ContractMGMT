@@ -30,7 +30,12 @@
     "reviewDate",
     "endDate",
     "businessUnitId",
-    "siteId"
+    "siteId",
+    "legalEntityId",
+    "riskLevel",
+    "noticePeriodValue",
+    "noticePeriodUnit",
+    "cf.*"
    ]
   }
  },

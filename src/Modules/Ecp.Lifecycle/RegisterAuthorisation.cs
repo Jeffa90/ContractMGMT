@@ -64,7 +64,7 @@ public interface IRegisterAuthorisationService
 internal sealed partial class RegisterAuthorisationService(
     LifecycleDbContext db, LifecycleEngine engine, IAuditWriter audit, ITenantContext tenant, IClock clock, CurrentUser currentUser, IAccessService access, IAccessDirectory directory,
     IContractLifecyclePort port, ISecuredContractService contracts, ISecuredContractDocuments secureDocuments, IDocumentQuery documentQuery, IVariationOutcomes variationOutcomes, LifecycleEvents events,
-    VisibleContracts visible, IApprovalResolver approvalResolver, ApprovalFactsBuilder factsBuilder, IUnitOfWork uow) : IRegisterAuthorisationService
+    VisibleContracts visible, IApprovalResolver approvalResolver, ApprovalFactsBuilder factsBuilder, IUnitOfWork uow, IContractCustomFieldReader customReader) : IRegisterAuthorisationService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -155,6 +155,12 @@ internal sealed partial class RegisterAuthorisationService(
         if (s.IsVariation)
         {
             proposed = JsonSerializer.Deserialize<Dictionary<string, string?>>(s.Variation!.ProposedChangesJson);
+            // The snapshot is read by approvers, who may not be cleared for every configured field. A configured field appears only when an administrator has made it usable in approvals.
+            if (proposed is not null && proposed.Keys.Any(k => k.StartsWith("cf.", StringComparison.Ordinal)))
+            {
+                var usable = (await customReader.ApprovalFactKeysAsync(s.OrganisationId, c)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                proposed = proposed.Where(kv => !kv.Key.StartsWith("cf.", StringComparison.Ordinal) || usable.Contains(kv.Key[3..])).ToDictionary(kv => kv.Key, kv => kv.Value);
+            }
             current = proposed is null ? null : new Dictionary<string, string?>(await port.CurrentValuesAsync(s.ContractId, proposed.Keys.ToList(), c));
         }
         return new RegisterSnapshot(scope.NowUtc, s.Kind, details.AgreementReference, s.IsVariation ? s.Variation!.Title : details.Title, s.IsVariation ? s.Variation!.Reference : null, s.Status, s.Classification,

@@ -1,0 +1,9 @@
+@page "/Reauth"
+@model Ecp.Host.Pages.ReauthModel
+@{ ViewData["Title"] = L["Confirm it is you"].Value; }
+<h1>@L["Confirm it is you"]</h1>
+<p class="lede">@L["This action needs a recent sign-in. The demonstration identity provider asks you to confirm; a real provider would ask you to sign in again."]</p>
+<form method="post">
+    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+    <button type="submit">@L["Confirm"]</button>
+</form>

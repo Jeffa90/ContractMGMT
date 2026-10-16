@@ -1,6 +1,7 @@
 using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.SharedKernel.Localisation;
+using Ecp.SharedKernel.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -150,6 +151,8 @@ public static class OperationsModule
         services.TryAddSingleton(new LocalisationOptions());
         services.AddScoped<IReadinessCheck, GlobalisationReadinessCheck>();
         services.AddScoped<ReadinessService>();
+        services.AddSingleton<IEmailSenderFactory, EmailSenderFactory>();
+        services.TryAddSingleton<ISecretProvider>(new Ecp.SharedKernel.Secrets.EnvironmentAndFileSecretProvider());
         return services;
     }
 }

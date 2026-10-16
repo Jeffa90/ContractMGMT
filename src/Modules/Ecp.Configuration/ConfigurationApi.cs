@@ -313,6 +313,10 @@ public static class ConfigurationModule
         services.AddScoped<IConfigurationService>(sp => sp.GetRequiredService<ConfigurationService>());
         services.AddScoped<IConfigurationBootstrap>(sp => sp.GetRequiredService<ConfigurationService>());
         services.AddScoped<IConfigurationKind, ClassificationPolicyKind>();
+        services.AddSingleton<ISolutionPackCatalogue, EmbeddedPackCatalogue>();
+        services.AddScoped<IConfigurationKind, SolutionPackKind>();
+        services.AddScoped<IConfigurationKind, BrandingKind>();
+        services.AddScoped<IBrandingProvider, ConfiguredBrandingProvider>();
         // Replace the default scale with the configured one (registered after the Identity module).
         services.AddScoped<IClassificationScaleProvider, ConfiguredClassificationScaleProvider>();
         return services;

@@ -1,0 +1,40 @@
+@page "/Admin/Setup/Step/{id}"
+@model Ecp.Host.Pages.Admin.Setup.StepModel
+@using Ecp.Setup
+@{ ViewData["Title"] = Model.Stage?.Title ?? "Setup"; var st = Model.Stage!; }
+<p><a href="/Admin/Setup">&larr; @L["Installation setup"]</a></p>
+<h1>@st.Title</h1>
+<p class="lede">@st.Summary</p>
+<p class="flash warn" role="note">@L["You are amending a configuration after setup. The change is audited."]</p>
+@if (Model.Result is { } r)
+{
+    if (r.Succeeded)
+    {
+        <div class="flash" role="status"><p>@r.Message</p>@foreach (var d in r.Details) { <p>@d</p> }</div>
+    }
+    else
+    {
+        <div class="error-summary" role="alert" tabindex="-1"><h2>@L["This step was not completed"]</h2><p>@r.Message</p>@foreach (var d in r.Details) { <p>@d</p> }</div>
+    }
+}
+@foreach (var n in st.Notes) { <p class="hint">@n</p> }
+@if (!st.Available)
+{
+    <p class="error" role="alert">@st.UnavailableReason</p>
+}
+else
+{
+    <form method="post">
+        <partial name="_StageForm" model="st" />
+        <div class="actions"><button type="submit">@st.ActionLabel</button></div>
+    </form>
+}
+@if (Model.TestLinks.Count > 0)
+{
+    <ul>
+    @foreach (var l in Model.TestLinks)
+    {
+        <li><a class="button secondary" href="/Account/Challenge?scheme=@Uri.EscapeDataString(l.Scheme)&amp;testProvider=@Uri.EscapeDataString(l.Key)&amp;returnUrl=@Uri.EscapeDataString("/Admin/Setup/Step/" + st.Id)">@L["Test sign-in with"] @l.Name</a></li>
+    }
+    </ul>
+}

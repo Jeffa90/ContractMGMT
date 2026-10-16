@@ -8,6 +8,7 @@ using Ecp.Documents;
 using Ecp.DataMigration;
 using Ecp.Operations;
 using Ecp.Persistence;
+using Ecp.Setup;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Ecp.Tests.Common;
@@ -32,6 +33,7 @@ internal static class Modules
         ("Ecp.Documents", typeof(DocumentsModule).Assembly, 6),
         ("Ecp.DataMigration", typeof(MigrationModule).Assembly, 7),
         ("Ecp.Operations", typeof(OperationsModule).Assembly, 8),
+        ("Ecp.Setup", typeof(SetupModule).Assembly, 9),
         ("Ecp.Host", typeof(Program).Assembly, 10),
     ];
 
@@ -42,7 +44,7 @@ internal static class Modules
         ("Ecp.Contracts", "Ecp.Documents"),
     ];
 
-    public static readonly string[] ModuleNames = ["Audit", "Tenancy", "Identity", "Configuration", "Contracts", "Documents", "DataMigration", "Operations"];
+    public static readonly string[] ModuleNames = ["Audit", "Tenancy", "Identity", "Configuration", "Contracts", "Documents", "DataMigration", "Operations", "Setup"];
 }
 
 [Trait("Category", "Architecture")]

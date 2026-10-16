@@ -20,6 +20,20 @@ public interface IAuditWriter
     void Record(AuditEntry entry);
 }
 
+/// <summary>
+/// Read access to the current tenant's audit events for modules that decide visibility themselves (the audit browser applies the caller's scopes).
+/// The queryable is tenant-filtered by the audit context and read-only (no tracking); it never exposes the context.
+/// </summary>
+public interface IAuditEventSource
+{
+    IQueryable<Ecp.Audit.Domain.AuditEvent> Events { get; }
+}
+
+internal sealed class AuditEventSource(AuditDbContext db) : IAuditEventSource
+{
+    public IQueryable<Ecp.Audit.Domain.AuditEvent> Events => db.Events.AsNoTracking();
+}
+
 internal sealed class AuditBuffer
 {
     private readonly List<AuditEntry> _entries = [];
@@ -99,6 +113,7 @@ public static class AuditModule
         services.AddScoped<IAuditWriter, AuditWriter>();
         services.AddScoped<IBeforeCommitHook, AuditFlusher>();
         services.AddScoped<AuditChainVerifier>();
+        services.AddScoped<IAuditEventSource, AuditEventSource>();
         return services;
     }
 }

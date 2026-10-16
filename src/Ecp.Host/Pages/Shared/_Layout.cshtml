@@ -3,8 +3,11 @@
 @using Ecp.SharedKernel
 @inject IAccessService Access
 @inject EcpHostOptions HostOptions
+@inject Ecp.Host.Setup.BrandingAccessor Brand
 @{
-    var title = ViewData["Title"] as string ?? L["App.Name"].Value;
+    var branding = await Brand.GetAsync();
+    var productName = branding.ProductName == Ecp.Configuration.Branding.Default.ProductName ? L["App.Name"].Value : branding.ProductName;
+    var title = ViewData["Title"] as string ?? productName;
     var path = Context.Request.Path.Value ?? "/";
     var signedIn = User.Identity?.IsAuthenticated == true;
     async Task<bool> Can(params string[] permissions) { foreach (var p in permissions) if (await Access.HoldsAnywhereAsync(p)) return true; return false; }
@@ -28,8 +31,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>@title - @L["App.Name"]</title>
+    <title>@title - @productName</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="/css/branding.css" />
 </head>
 <body>
     <a class="skip-link" href="#main">@L["Skip to main content"]</a>
@@ -38,7 +42,7 @@
         <div class="env-banner" role="status">@L["Demonstration environment"] (@HostOptions.Mode): @L["synthetic data only, not for production use."]</div>
     }
     <header class="site-header">
-        <a class="brand" href="/">@L["App.Name"]</a>
+        <a class="brand" href="/">@productName</a>
         @if (signedIn)
         {
             <nav aria-label="@L["Main"]">
@@ -63,6 +67,6 @@
         }
         @RenderBody()
     </main>
-    <footer class="site-footer">@L["App.Name"] &middot; @L["Production approval is external governance; this build does not declare it."]</footer>
+    <footer class="site-footer">@productName@(string.IsNullOrWhiteSpace(branding.FooterText) ? "" : " · " + branding.FooterText) &middot; @L["Production approval is external governance; this build does not declare it."]</footer>
 </body>
 </html>

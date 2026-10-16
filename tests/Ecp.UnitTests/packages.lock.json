@@ -442,6 +442,20 @@
           "Microsoft.Extensions.Options": "[10.0.12, )"
         }
       },
+      "ecp.setup": {
+        "type": "Project",
+        "dependencies": {
+          "Ecp.Audit": "[1.0.0, )",
+          "Ecp.Configuration": "[1.0.0, )",
+          "Ecp.Contracts": "[1.0.0, )",
+          "Ecp.Documents": "[1.0.0, )",
+          "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Operations": "[1.0.0, )",
+          "Ecp.Persistence": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.Tenancy": "[1.0.0, )"
+        }
+      },
       "ecp.sharedkernel": {
         "type": "Project"
       },
@@ -464,6 +478,7 @@
           "Ecp.Identity": "[1.0.0, )",
           "Ecp.Operations": "[1.0.0, )",
           "Ecp.Persistence": "[1.0.0, )",
+          "Ecp.Setup": "[1.0.0, )",
           "Ecp.SharedKernel": "[1.0.0, )",
           "Ecp.Tenancy": "[1.0.0, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.12, )",

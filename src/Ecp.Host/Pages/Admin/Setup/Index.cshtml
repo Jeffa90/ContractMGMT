@@ -1,0 +1,15 @@
+@page "/Admin/Setup"
+@model Ecp.Host.Pages.Admin.Setup.IndexModel
+@using Ecp.Setup
+@{ ViewData["Title"] = L["Installation setup"].Value; }
+<h1>@L["Installation setup"]</h1>
+<p class="lede">@L["Setup is complete. You can review the report and, after confirming it is really you, reopen individual configuration steps. Reopening is audited."]</p>
+<h2>@L["Steps you can reopen"]</h2>
+<ul>
+@foreach (var s in Model.Snapshot!.Stages.Where(s => s.Available))
+{
+    <li><a href="/Admin/Setup/Step/@s.Id">@s.Title</a></li>
+}
+</ul>
+<partial name="_SetupReport" model="Model.Report" />
+<p><a href="/Admin/Setup?format=json">@L["Download as JSON"]</a></p>

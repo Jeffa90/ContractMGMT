@@ -1,0 +1,51 @@
+@page "/Setup"
+@model Ecp.Host.Pages.Setup.IndexModel
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@using Ecp.Setup
+@{ ViewData["Title"] = L["Installation setup"].Value; }
+<h1>@L["Installation setup"]</h1>
+@if (!Model.HasSession)
+{
+    <p class="lede">@L["This installation is not set up yet. Setup is protected by a one-time token so that only the person who controls the server can configure it."]</p>
+    @if (Model.Message is not null)
+    {
+        <div class="error-summary" role="alert" tabindex="-1"><h2>@L["Setup could not be opened"]</h2><p>@Model.Message</p></div>
+    }
+    <section class="card" aria-labelledby="token-h">
+        <h2 id="token-h">@L["Open setup"]</h2>
+        <p>@L["On the server, run the setup-token command. It prints a token once; paste it here."]</p>
+        <pre>dotnet Ecp.Host.dll setup-token</pre>
+        <p class="hint">@L["Mode"]: @Model.Mode. @L["The token is single use and expires after 24 hours. Only one setup session can be open at a time."]</p>
+        <form method="post" autocomplete="off">
+            <div class="field">
+                <label for="token">@L["Setup token"]</label>
+                <input id="token" name="token" type="password" autocomplete="off" required spellcheck="false" />
+            </div>
+            <button type="submit">@L["Open setup"]</button>
+        </form>
+    </section>
+}
+else
+{
+    var s = Model.Snapshot!;
+    <p class="lede">@L["Work through the steps in order. Your progress is saved after every step, so you can stop and come back; setup resumes where it left off."]</p>
+    <p><progress class="progress" max="@s.TotalStages" value="@s.CompletedStages" aria-label="@L["Setup progress"]">@s.CompletedStages / @s.TotalStages</progress><br />@s.CompletedStages @L["of"] @s.TotalStages @L["steps complete"]</p>
+    <ol class="steps">
+        @foreach (var stage in s.Stages)
+        {
+            <li aria-current="@(stage.Id == s.NextStageId ? "step" : null)">
+                <span class="badge @(stage.Status == StageStatus.Complete ? "ok" : stage.Status == StageStatus.Skipped ? "warn" : "")">@stage.Status</span>
+                @if (stage.Available)
+                {
+                    <a href="/Setup/Step/@stage.Id">@stage.Title</a>
+                }
+                else
+                {
+                    <span>@stage.Title</span> <span class="hint">@stage.UnavailableReason</span>
+                }
+            </li>
+        }
+    </ol>
+    <p><a href="/Setup/Report">@L["View the setup report"]</a></p>
+    <form method="post" asp-page-handler="End"><button class="secondary" type="submit">@L["End this setup session"]</button></form>
+}

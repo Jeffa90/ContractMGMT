@@ -7,6 +7,7 @@ using Ecp.Documents.Storage;
 using Ecp.DataMigration;
 using Ecp.Operations;
 using Ecp.Persistence;
+using Ecp.Setup;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Ecp.Tenancy.Domain;
@@ -17,6 +18,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Ecp.Tests.Common;
+
+/// <summary>Test stand-in for the host's Data Protection based protector: reversible, not secret. Never used outside tests.</summary>
+public sealed class PlainSetupProtector : ISetupProtector
+{
+    public string Protect(string plain) => "test:" + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(plain));
+    public string Unprotect(string protectedText) => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(protectedText["test:".Length..]));
+}
 
 public sealed class FakeClock(DateTime? start = null) : IClock
 {
@@ -73,16 +81,16 @@ public sealed class TestApp : IAsyncDisposable
     public FakeClock Clock { get; }
     public string DocumentRoot => _documentRoot;
 
-    public static async Task<TestApp> CreateSqliteAsync()
+    public static async Task<TestApp> CreateSqliteAsync(EcpMode setupMode = EcpMode.Test)
     {
         var cs = $"Data Source=file:ecp_{Guid.NewGuid():N}?mode=memory&cache=shared";
         var keeper = new SqliteConnection(cs); keeper.Open(); // keeps the shared in-memory database alive
-        var app = Build(DatabaseProvider.Sqlite, cs, keeper, null, null);
+        var app = Build(DatabaseProvider.Sqlite, cs, keeper, null, null, setupMode);
         await app.Services.GetRequiredService<MigrationRunner>().RunAsync();
         return app;
     }
 
-    public static async Task<TestApp> CreateSqlServerAsync(bool migrate = true)
+    public static async Task<TestApp> CreateSqlServerAsync(bool migrate = true, EcpMode setupMode = EcpMode.Test)
     {
         var admin = SqlServerEnvironment.ConnectionString ?? throw new InvalidOperationException(SqlServerEnvironment.NotVerifiedReason);
         var db = "ecp_test_" + Guid.NewGuid().ToString("N");
@@ -94,33 +102,52 @@ public sealed class TestApp : IAsyncDisposable
             await cmd.ExecuteNonQueryAsync();
         }
         var cs = new SqlConnectionStringBuilder(admin) { InitialCatalog = db, ConnectTimeout = 15 }.ConnectionString;
-        var app = Build(DatabaseProvider.SqlServer, cs, null, db, admin);
+        var app = Build(DatabaseProvider.SqlServer, cs, null, db, admin, setupMode);
         if (migrate) await app.Services.GetRequiredService<MigrationRunner>().RunAsync();
         return app;
     }
 
     /// <summary>An application pointed at an arbitrary SQL Server connection string, without migrating (for unreachable-database tests).</summary>
-    public static TestApp ForConnection(string connectionString) => Build(DatabaseProvider.SqlServer, connectionString, null, null, null);
+    public static TestApp ForConnection(string connectionString) => Build(DatabaseProvider.SqlServer, connectionString, null, null, null, EcpMode.Test);
 
-    private static TestApp Build(DatabaseProvider provider, string cs, SqliteConnection? keeper, string? sqlDb, string? admin)
+    private static TestApp Build(DatabaseProvider provider, string cs, SqliteConnection? keeper, string? sqlDb, string? admin, EcpMode setupMode)
     {
         var clock = new FakeClock();
         var root = Path.Combine(Path.GetTempPath(), "ecp-tests-" + Guid.NewGuid().ToString("N"));
+        var sp = BuildServices(provider, cs, clock, root, setupMode);
+        return new TestApp(sp, provider, cs, keeper, sqlDb, admin, clock, root) { SetupMode = setupMode };
+    }
+
+    public EcpMode SetupMode { get; private set; } = EcpMode.Test;
+    private readonly List<ServiceProvider> _restarted = [];
+
+    /// <summary>A second set of services over the same database, data directory and clock: what the application looks like after a process restart (no in-memory state survives).</summary>
+    public ServiceProvider RestartServices()
+    {
+        var sp = BuildServices(Provider, ConnectionString, Clock, _documentRoot, SetupMode);
+        _restarted.Add(sp);
+        return sp;
+    }
+
+    private static ServiceProvider BuildServices(DatabaseProvider provider, string cs, FakeClock clock, string root, EcpMode setupMode)
+    {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IClock>(clock);
         services.AddEcpPersistence(new DatabaseOptions { Provider = provider, ConnectionString = cs });
         services.AddAuditModule();
         services.AddTenancyModule();
-        services.AddIdentityModule(o => o.Mode = EcpMode.Test);
+        services.AddIdentityModule(o => o.Mode = setupMode);
         services.AddConfigurationModule();
         services.AddContractsModule(o => o.InitialStatusCode = "Draft");
         services.AddDocumentsModule(_ => { }, new LocalFileSystemOptions { RootPath = Path.Combine(root, "documents") });
         services.AddMigrationModule();
         services.AddOperationsModule(root);
-        var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
-        var app = new TestApp(sp, provider, cs, keeper, sqlDb, admin, clock, root);
-        return app;
+        services.AddSetupModule(new SetupEnvironment(setupMode, root, DemoIdentityEnabled: false, DemoSeedEnabled: false, ConnectionFromSecretReference: false,
+            provider.ToString(), "test", AllowRemoteSetup: false));
+        services.AddSingleton<ISetupProtector, PlainSetupProtector>();
+        services.AddSingleton(new StartupFacts(setupMode, provider, false, false, false, false, root));
+        return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
     }
 
     /// <summary>Creates a DI scope with the given tenant established.</summary>
@@ -158,6 +185,7 @@ public sealed class TestApp : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        foreach (var extra in _restarted) await extra.DisposeAsync();
         await Services.DisposeAsync();
         _keeper?.Dispose();
         if (_sqlServerDatabase is not null && _adminConnection is not null)

@@ -1,0 +1,37 @@
+@using Ecp.Setup
+@model Ecp.Setup.StageDescriptor
+@foreach (var f in Model.Fields)
+{
+    <div class="@(f.Kind == FieldKind.Checkbox ? "field check" : "field")">
+        @if (f.Kind == FieldKind.Checkbox)
+        {
+            <input id="f-@f.Name" name="@f.Name" type="checkbox" value="true" checked="@(f.Value is "true")" aria-describedby="@(f.Help is null ? null : "h-" + f.Name)" />
+            <label for="f-@f.Name">@f.Label @(f.Required ? "*" : "")</label>
+        }
+        else
+        {
+            <label for="f-@f.Name">@f.Label@(f.Required ? " *" : "")</label>
+            @if (f.Help is not null) { <p class="hint" id="h-@f.Name">@f.Help</p> }
+            @switch (f.Kind)
+            {
+                case FieldKind.Select:
+                    <select id="f-@f.Name" name="@f.Name" required="@f.Required" aria-describedby="@(f.Help is null ? null : "h-" + f.Name)">
+                        @foreach (var o in f.Options ?? [])
+                        {
+                            <option value="@o.Value" selected="@(o.Value == f.Value)">@o.Label</option>
+                        }
+                    </select>
+                    break;
+                case FieldKind.TextArea:
+                    <textarea id="f-@f.Name" name="@f.Name" required="@f.Required" aria-describedby="@(f.Help is null ? null : "h-" + f.Name)">@f.Value</textarea>
+                    break;
+                case FieldKind.Number:
+                    <input id="f-@f.Name" name="@f.Name" type="number" value="@f.Value" required="@f.Required" aria-describedby="@(f.Help is null ? null : "h-" + f.Name)" />
+                    break;
+                default:
+                    <input id="f-@f.Name" name="@f.Name" type="text" value="@f.Value" required="@f.Required" autocomplete="off" spellcheck="false" aria-describedby="@(f.Help is null ? null : "h-" + f.Name)" />
+                    break;
+            }
+        }
+    </div>
+}

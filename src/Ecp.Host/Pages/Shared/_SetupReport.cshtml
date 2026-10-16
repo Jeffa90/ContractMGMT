@@ -1,0 +1,27 @@
+@using Ecp.Setup
+@model Ecp.Setup.SetupReport
+<dl class="facts card">
+    <dt>@L["Generated (UTC)"]</dt><dd>@Model.GeneratedUtc.ToString("yyyy-MM-dd HH:mm:ss")</dd>
+    <dt>@L["Mode"]</dt><dd>@Model.Mode</dd>
+    <dt>@L["Deployment"]</dt><dd>@(Model.Deployment ?? "-")</dd>
+    <dt>@L["Version"]</dt><dd>@Model.Version</dd>
+    <dt>@L["Setup complete"]</dt><dd>@(Model.SetupComplete ? "Yes (" + Model.CompletedUtc?.ToString("yyyy-MM-dd HH:mm") + " UTC)" : "No")</dd>
+    <dt>@L["Solution pack"]</dt><dd>@(Model.SolutionPack ?? "-")</dd>
+    <dt>@L["Administrators"]</dt><dd>@(Model.Administrators.Count == 0 ? "-" : string.Join(", ", Model.Administrators))</dd>
+</dl>
+@foreach (var n in Model.Notes) { <p class="flash warn" role="note">@n</p> }
+<h2>@L["Steps"]</h2>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Setup steps"]</caption>
+    <thead><tr><th scope="col">@L["Step"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Updated (UTC)"]</th></tr></thead>
+    <tbody>@foreach (var s in Model.Stages) { <tr><th scope="row">@s.Title</th><td>@s.Status</td><td>@(s.UpdatedUtc?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td></tr> }</tbody>
+</table></div>
+<h2>@L["Readiness checks"]</h2>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Readiness checks"]</caption>
+    <thead><tr><th scope="col">@L["Check"]</th><th scope="col">@L["Severity"]</th><th scope="col">@L["Result"]</th><th scope="col">@L["Detail"]</th></tr></thead>
+    <tbody>@foreach (var c in Model.Checks) { <tr><th scope="row"><code>@c.Id</code> @c.Description</th><td>@c.Severity</td><td><span class="badge @(c.Status == "Pass" ? "ok" : c.Severity == "Blocking" ? "bad" : "warn")">@c.Status</span></td><td>@c.Message@(c.AcknowledgedBy is null ? "" : $" Acknowledged by {c.AcknowledgedBy}: {c.AcknowledgedReason}")</td></tr> }</tbody>
+</table></div>
+<h2>@L["Integrations"]</h2>
+<dl class="facts card">@foreach (var kv in Model.Integrations) { <dt>@kv.Key</dt><dd>@kv.Value</dd> }</dl>
+<p class="hint">@L["This report contains no secrets, secret references, connection strings or tokens."]</p>

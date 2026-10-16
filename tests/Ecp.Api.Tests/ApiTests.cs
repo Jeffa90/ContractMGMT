@@ -169,11 +169,13 @@ public class DemoHostTests
         var (factory, keeper) = Start();
         using var _ = factory; using var __ = keeper;
         using var client = factory.CreateClient();
-        // Anonymous pages and endpoints: health probes, public info, the sign-in flow and the generic error page. Nothing else.
+        // Anonymous pages and endpoints: health probes, public info, the sign-in flow, the generic error page, the branding stylesheet and the token-gated setup pages. Nothing else.
         string[] anonymousAllowlist =
         [
             "/health/live", "/health/startup", "/health/ready", "/api/v1/info", "/api/v1/openapi.json",
-            "/SignIn", "/SignOut", "/Error", "/Account/Challenge"
+            "/SignIn", "/SignOut", "/Error", "/Account/Challenge", "/css/branding.css",
+            // Setup pages are reachable only through the one-time token (and exist only until installation is complete); see SetupTests.
+            "/Setup", "/Setup/Step/{id}", "/Setup/Report"
         ];
         var endpoints = factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>().ToList();
         Assert.NotEmpty(endpoints);

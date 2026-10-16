@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using Ecp.Audit;
 using Ecp.Audit.Domain;
-using Ecp.Audit.Persistence;
 using Ecp.Identity.Access;
 using Ecp.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +32,7 @@ public interface IAuditBrowser
     Task<AuditEvidence> ExportAsync(AuditFilter filter, CancellationToken ct = default);
 }
 
-internal sealed class AuditBrowser(AuditDbContext db, IAccessService access, Ecp.Persistence.IUnitOfWork uow, IAuditWriter audit, AuditChainVerifier verifier, IClock clock) : IAuditBrowser
+internal sealed class AuditBrowser(IAuditEventSource eventSource, IAccessService access, Ecp.Persistence.IUnitOfWork uow, IAuditWriter audit, AuditChainVerifier verifier, IClock clock) : IAuditBrowser
 {
     /// <summary>Action prefixes that describe administration rather than business data.</summary>
     internal static readonly string[] AdministrativePrefixes =
@@ -59,7 +58,7 @@ internal sealed class AuditBrowser(AuditDbContext db, IAccessService access, Ecp
         var adminGrants = await access.GrantsAsync("audit.read_admin", ct);
         if (readGrants.Count == 0 && adminGrants.Count == 0) throw new ForbiddenException("You cannot read audit events.");
 
-        IQueryable<AuditEvent> query = db.Events.AsNoTracking();
+        IQueryable<AuditEvent> query = eventSource.Events;
         var readOrgs = readGrants.Any(g => g.OrganisationIds is null) ? null : readGrants.SelectMany(g => g.OrganisationIds!).Distinct().ToArray();
         var adminOrgs = adminGrants.Any(g => g.OrganisationIds is null) ? null : adminGrants.SelectMany(g => g.OrganisationIds!).Distinct().ToArray();
         var hasRead = readGrants.Count > 0; var hasAdmin = adminGrants.Count > 0;

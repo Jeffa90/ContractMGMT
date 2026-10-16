@@ -8,9 +8,11 @@ using Ecp.Documents;
 using Ecp.Documents.Storage;
 using Ecp.Host;
 using Ecp.Host.Security;
+using Ecp.Host.Setup;
 using Ecp.Identity;
 using Ecp.Operations;
 using Ecp.Persistence;
+using Ecp.Setup;
 using Ecp.SharedKernel;
 using Ecp.SharedKernel.Localisation;
 using Ecp.SharedKernel.Secrets;
@@ -53,6 +55,14 @@ builder.Services.AddDocumentsModule(o => builder.Configuration.GetSection("Docum
 builder.Services.AddMigrationModule();
 builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
 builder.Services.AddSingleton<DemoSeeder>();
+var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+builder.Services.AddSetupModule(new SetupEnvironment(resolved.Host.Mode, resolved.Host.DataDirectory,
+    DemoIdentityEnabled: resolved.Host.Mode != EcpMode.Production && resolved.Host.DemoTenantResolution, DemoSeedEnabled: resolved.Host.DemoSeed,
+    ConnectionFromSecretReference: resolved.Facts.ConnectionFromSecretReference, DatabaseProvider: resolved.Database.Provider.ToString(), Version: hostVersion,
+    AllowRemoteSetup: builder.Configuration.GetValue("Ecp:Setup:AllowRemote", false)));
+builder.Services.AddSingleton<ISetupProtector, DataProtectionSetupProtector>();
+builder.Services.AddSingleton<IDemoDataApplier, DemoDataApplier>();
+builder.Services.AddScoped<BrandingAccessor>();
 
 // Keys for cookies, antiforgery and temp data live in the data directory (persistent volume) so sessions survive restarts (R-SEC-04).
 var dataProtection = builder.Services.AddDataProtection().SetApplicationName("EnterpriseContractPlatform")
@@ -142,16 +152,36 @@ if (args.Length > 0 && !args[0].StartsWith('-'))
                 Console.WriteLine(result.IsValid ? $"Audit chain valid ({result.EventsChecked} events)." : $"Audit chain BROKEN at sequence {result.FirstBrokenSequence}: {result.Reason}");
                 return result.IsValid ? 0 : 2;
             }
+        case "setup-token":
+            // Issues a single-use token for the setup wizard (24 hours). Printed to this terminal only; it is never written to a log or a file.
+            try
+            {
+                var token = await app.Services.GetRequiredService<ISetupService>().IssueTokenAsync();
+                Console.WriteLine("Setup token (single use, valid for 24 hours, shown once):");
+                Console.WriteLine(token);
+                return 0;
+            }
+            catch (DomainException ex) { Console.Error.WriteLine(ex.Message); return 1; }
         default:
-            Console.Error.WriteLine("Unknown command. Use: migrate | verify-audit <tenant name>");
+            Console.Error.WriteLine("Unknown command. Use: migrate | verify-audit <tenant name> | setup-token");
             return 64;
     }
 }
 
 if (resolved.Database.AutoMigrate && resolved.Host.Mode != EcpMode.Production)
     await app.Services.GetRequiredService<MigrationRunner>().RunAsync();
+var setupService = app.Services.GetRequiredService<ISetupService>();
 if (resolved.Host.DemoSeed && resolved.Host.Mode != EcpMode.Production)
+{
     await app.Services.GetRequiredService<DemoSeeder>().SeedAsync();
+    await setupService.AutoCompleteForDemoAsync("synthetic demonstration data seeded at start-up");
+}
+else
+{
+    await setupService.EnsureInitialisedAsync();
+    if (!await setupService.IsCompleteAsync())
+        app.Logger.LogWarning("Installation is not complete. Run `setup-token` on the server to obtain a one-time token, then open /Setup.");
+}
 try { await app.Services.GetRequiredService<OidcSchemeManager>().ReloadAsync(app.Services); }
 catch (Exception ex) when (ex is not OperationCanceledException)
 {
@@ -169,6 +199,7 @@ app.UseExceptionHandler();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 if (production) app.UseHsts();
 app.UseStaticFiles();
+app.UseMiddleware<SetupGateMiddleware>();
 app.UseRequestLocalization(o =>
 {
     o.SetDefaultCulture(localisation.DefaultCulture).AddSupportedCultures([.. localisation.SupportedCultures]).AddSupportedUICultures([.. localisation.SupportedCultures]);
@@ -183,7 +214,7 @@ app.UseAuthentication();
 app.UseMiddleware<SessionMiddleware>();
 app.UseAuthorization();
 
-var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+var version = hostVersion;
 
 app.MapGet("/health/live", () => Results.Json(new { status = "Live" })).AllowAnonymous();
 app.MapGet("/health/startup", async (MigrationRunner runner) =>
@@ -202,6 +233,13 @@ app.MapGet("/health/ready", async (ReadinessService readiness, EcpHostOptions op
 }).AllowAnonymous();
 app.MapGet("/api/v1/info", (EcpHostOptions options) => Results.Json(new { name = "Enterprise Contract Platform", version, mode = options.Mode.ToString() })).AllowAnonymous();
 if (resolved.Host.Mode != EcpMode.Production) app.MapOpenApi("/api/v1/openapi.json").AllowAnonymous();
+// Accent colour from the published branding, served as a stylesheet because the content security policy forbids inline styles.
+app.MapGet("/css/branding.css", async (BrandingAccessor brand, CancellationToken ct) =>
+{
+    var accent = (await brand.GetAsync(ct)).AccentColour;
+    var safe = System.Text.RegularExpressions.Regex.IsMatch(accent, "^#[0-9a-fA-F]{6}$") ? accent : Ecp.Configuration.Branding.Default.AccentColour;
+    return Results.Text($":root {{ --accent: {safe}; }}\n", "text/css");
+}).AllowAnonymous();
 app.MapRazorPages();
 
 await app.RunAsync();

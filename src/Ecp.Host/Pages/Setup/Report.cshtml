@@ -1,0 +1,8 @@
+@page "/Setup/Report"
+@model Ecp.Host.Pages.Setup.ReportModel
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@{ ViewData["Title"] = L["Setup report"].Value; }
+<p><a href="/Setup">&larr; @L["All steps"]</a></p>
+<h1>@L["Setup report"]</h1>
+<partial name="_SetupReport" model="Model.Report" />
+<p><a href="/Setup/Report?format=json">@L["Download as JSON"]</a></p>

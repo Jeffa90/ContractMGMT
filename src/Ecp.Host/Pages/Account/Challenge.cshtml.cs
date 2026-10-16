@@ -9,11 +9,12 @@ namespace Ecp.Host.Pages.Account;
 [AllowAnonymous]
 public sealed class ChallengeModel(OidcSchemeManager oidc) : EcpPageModel
 {
-    public IActionResult OnGet(string? scheme, string? returnUrl, string? reauth)
+    public IActionResult OnGet(string? scheme, string? returnUrl, string? reauth, string? testProvider)
     {
         if (scheme is null || oidc.Get(scheme) is null) return NotFound();
         var props = new AuthenticationProperties { RedirectUri = IsLocal(returnUrl) ? returnUrl : "/" };
         if (reauth == "1") props.Items["ecp:reauth"] = "1";
+        if (!string.IsNullOrEmpty(testProvider)) props.Items["ecp:test-provider"] = testProvider; // records a successful test sign-in for the provider (setup and administration)
         return Challenge(props, scheme);
     }
 }

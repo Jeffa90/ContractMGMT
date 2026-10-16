@@ -1,0 +1,16 @@
+{
+  "packId": "blank",
+  "name": "Blank (no business defaults)",
+  "version": "1.0.0",
+  "synthetic": true,
+  "publisher": "Platform (built-in)",
+  "description": "Starts with no categories, contract types or reference prefix. Everything is configured by the organisation.",
+  "features": [],
+  "ownershipModel": "ReadAllEditAssignedCategory",
+  "approvalModel": "None",
+  "defaults": {
+    "classification": { "levels": ["Public", "Internal", "Confidential", "Restricted"], "defaultLevel": "Internal" },
+    "contractTypes": [],
+    "categories": []
+  }
+}

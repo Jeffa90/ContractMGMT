@@ -1,0 +1,72 @@
+@page "/Setup/Step/{id}"
+@model Ecp.Host.Pages.Setup.StepModel
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@using Ecp.Setup
+@{ ViewData["Title"] = Model.Stage?.Title ?? "Setup"; var st = Model.Stage!; }
+<p><a href="/Setup">&larr; @L["All steps"]</a></p>
+<h1>@st.Title</h1>
+<p class="lede">@st.Summary</p>
+<p><span class="badge @(st.Status == StageStatus.Complete ? "ok" : "")">@st.Status</span></p>
+@if (Model.Result is { } r)
+{
+    if (r.Succeeded)
+    {
+        <div class="flash" role="status"><p>@r.Message</p>@foreach (var d in r.Details) { <p>@d</p> }</div>
+    }
+    else
+    {
+        <div class="error-summary" role="alert" tabindex="-1"><h2>@L["This step was not completed"]</h2><p>@r.Message</p>@foreach (var d in r.Details) { <p>@d</p> }</div>
+    }
+}
+else if (st.LastMessage is not null && st.Status != StageStatus.NotStarted)
+{
+    <p class="hint">@L["Last result"]: @st.LastMessage</p>
+}
+@foreach (var n in st.Notes) { <p class="hint">@n</p> }
+@if (!st.Available)
+{
+    <p class="error" role="alert">@st.UnavailableReason</p>
+}
+else
+{
+    <form method="post">
+        <partial name="_StageForm" model="st" />
+        @if (Model.Checks.Count > 0)
+        {
+            <div class="table-wrap">
+            <table>
+                <caption>@L["Readiness checks"]</caption>
+                <thead><tr><th scope="col">@L["Check"]</th><th scope="col">@L["Result"]</th><th scope="col">@L["Detail"]</th></tr></thead>
+                <tbody>
+                @foreach (var c in Model.Checks)
+                {
+                    <tr><th scope="row"><code>@c.Id</code> @c.Description</th>
+                        <td><span class="badge @(c.Status == "Pass" ? "ok" : c.Severity == "Blocking" ? "bad" : "warn")">@(c.Status == "Pass" ? "Pass" : c.Severity == "Blocking" ? "Blocking" : "Warning")</span></td>
+                        <td>@c.Message</td></tr>
+                }
+                </tbody>
+            </table>
+            </div>
+        }
+        <div class="actions">
+            <button type="submit">@st.ActionLabel</button>
+        </div>
+    </form>
+    @if (Model.TestLinks.Count > 0)
+    {
+        <section class="card" aria-labelledby="test-h">
+            <h2 id="test-h">@L["Test sign-in"]</h2>
+            <p>@L["A successful test sign-in proves the administrator can get in. It also signs you in as that administrator."]</p>
+            <ul>
+                @foreach (var l in Model.TestLinks)
+                {
+                    <li><a class="button secondary" href="/Account/Challenge?scheme=@Uri.EscapeDataString(l.Scheme)&amp;testProvider=@Uri.EscapeDataString(l.Key)&amp;returnUrl=@Uri.EscapeDataString("/Setup/Step/" + st.Id)">@L["Test sign-in with"] @l.Name</a></li>
+                }
+            </ul>
+        </section>
+    }
+    @if (st.Id == "demo")
+    {
+        <form method="post" asp-page-handler="Skip" asp-route-id="demo"><button class="secondary" type="submit">@L["Skip this step"]</button></form>
+    }
+}

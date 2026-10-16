@@ -8,4 +8,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Built-in solution packs: one canonical copy under templates/packs/. -->
+    <EmbeddedResource Include="../../../templates/packs/blank/pack.json" LogicalName="Ecp.Pack.blank.json" />
+    <EmbeddedResource Include="../../../templates/packs/jbs-procurement/pack.json" LogicalName="Ecp.Pack.jbs-procurement.json" />
+  </ItemGroup>
 </Project>

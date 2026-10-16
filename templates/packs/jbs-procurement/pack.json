@@ -1,0 +1,31 @@
+{
+  "packId": "jbs-procurement",
+  "name": "JBS Procurement Reference",
+  "version": "2.0.0",
+  "synthetic": true,
+  "publisher": "Platform (built-in)",
+  "description": "Reference configuration: read-all/edit-assigned-category ownership, Legal review, register authorisation by the Group Head of Procurement or backup, Australian English. A shipped example of a solution pack, not hard-coded platform behaviour; every value is editable. Contract types and categories are synthetic illustrations.",
+  "features": ["LegalReview", "Variations", "QlikExternalReporting", "CriticalNotice"],
+  "ownershipModel": "ReadAllEditAssignedCategory",
+  "approvalModel": "GroupHeadOrBackup",
+  "defaults": {
+    "culture": "en-AU",
+    "timeZoneId": "Australia/Brisbane",
+    "currencyCode": "AUD",
+    "referencePrefix": "JBSAUS",
+    "classification": { "levels": ["Public", "Internal", "Confidential", "Restricted"], "defaultLevel": "Internal" },
+    "contractTypes": [
+      { "code": "SUPPLY", "name": "Supply Agreement" },
+      { "code": "SERVICES", "name": "Services Agreement" },
+      { "code": "LEASE", "name": "Lease" },
+      { "code": "NDA", "name": "Non-Disclosure Agreement" }
+    ],
+    "categories": [
+      { "code": "PACKAGING", "name": "Packaging" },
+      { "code": "PACKAGING-FLEX", "name": "Flexible Packaging", "parentCode": "PACKAGING" },
+      { "code": "ENERGY", "name": "Energy" },
+      { "code": "ENERGY-ELEC", "name": "Electricity", "parentCode": "ENERGY" },
+      { "code": "LOGISTICS", "name": "Logistics" }
+    ]
+  }
+}

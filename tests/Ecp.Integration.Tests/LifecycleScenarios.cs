@@ -62,4 +62,32 @@ internal static class LifecycleScenarios
         var history = await w.As("ownerPackaging", s => s.Get<ILifecycleService>().HistoryAsync(id));
         Assert.Equal(["SubmitForLegal", "BeginLegalReview", "ClearLegal", "RegisterInitial", "SendForSignature", "SubmitApproval", "Approve"], history.Select(h => h.TransitionCode).ToArray());
     }
+
+    public static async Task A_locked_contract_refuses_every_crafted_step_and_edit_whoever_asks(TestApp app)
+    {
+        var w = await LifecycleWorld.CreateAsync(app);
+        var id = await w.ToEffectiveInOrderAsync();
+        var lifecycle = (Func<TenantScope, ILifecycleService>)(s => s.Get<ILifecycleService>());
+        // Every read the lifecycle page makes works on an Effective record.
+        var steps = await w.As("ownerPackaging", s => lifecycle(s).AvailableAsync(id));
+        Assert.Contains(steps, t => t.Code == "CreateVariation" && t.Allowed);
+        Assert.Equal("Effective", (await w.As("ownerPackaging", s => lifecycle(s).StateAsync(id))).Status);
+        Assert.NotEmpty(await w.As("ownerPackaging", s => lifecycle(s).HistoryAsync(id)));
+        Assert.Empty(await w.As("ownerPackaging", s => s.Get<IVariationService>().ListForContractAsync(id)));
+        Assert.Empty(await w.As("ownerPackaging", s => s.Get<IRenewalService>().ListForContractAsync(id)));
+        // The owner cannot withdraw, approve or invent a step on an Effective record.
+        await Assert.ThrowsAsync<ForbiddenException>(() => w.As("ownerPackaging", s => lifecycle(s).TransitionAsync(new TransitionRequest(id, "WithdrawInitial", "x", "x"))));
+        await Assert.ThrowsAsync<ForbiddenException>(() => w.As("ownerPackaging", s => lifecycle(s).TransitionAsync(new TransitionRequest(id, "Approve", "x"))));
+        var unknown = await Assert.ThrowsAsync<DomainException>(() => w.As("ownerPackaging", s => lifecycle(s).TransitionAsync(new TransitionRequest(id, "SetStatusToDraft"))));
+        Assert.Equal("unknown_transition", unknown.Code);
+        // A step that exists but not from here fails clearly, and the contract is unchanged.
+        var invalid = await Assert.ThrowsAsync<DomainException>(() => w.As("legalA", s => lifecycle(s).TransitionAsync(new TransitionRequest(id, "ClearLegal", "x"))));
+        Assert.Contains("not available", invalid.Message);
+        Assert.Equal("Effective", await w.StatusAsync(id));
+        // Edits to the record's content are refused for the owner and for the administrator alike.
+        await Assert.ThrowsAnyAsync<Exception>(() => w.As("ownerPackaging", s => s.Get<ISecuredContractService>().UpdateDetailsAsync(id, "Renamed", null)));
+        await Assert.ThrowsAnyAsync<Exception>(() => w.As("procAdmin", s => s.Get<ISecuredContractService>().UpdateDetailsAsync(id, "Renamed", null)));
+        Assert.Equal("Effective", await w.StatusAsync(id));
+        Assert.Equal("Lifecycle", (await w.FactsAsync(id)).Title[..9]);
+    }
 }

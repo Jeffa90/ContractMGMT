@@ -25,6 +25,8 @@ DocumentType,LegalAdvice,Legal advice,Confirmed,WORKFLOW_SPEC.md
 DocumentType,ApprovalEvidence,Approval evidence,Confirmed,ESIGNATURE_DOCUSIGN_SPEC.md
 DocumentType,SupportingDocument,Supporting document,Confirmed,
 DocumentType,Correspondence,Correspondence,Confirmed,
+DocumentType,FinalAgreement,Final agreement (for signature),Confirmed,DR-2026-10-16 lifecycle slice
+DocumentType,LegalMarkup,Legal mark-up,Confirmed,DR-2026-10-16 lifecycle slice
 Classification,Public,Public,Open,Default set; final levels Q-06
 Classification,Internal,Internal,Open,Default set; final levels Q-06
 Classification,Confidential,Confidential,Open,Default set; final levels Q-06

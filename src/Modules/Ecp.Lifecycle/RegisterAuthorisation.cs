@@ -192,8 +192,16 @@ internal sealed class RegisterAuthorisationService(
         ExecutedDocumentInfo? doc = null;
         if (request.ExecutedDocumentId is { } docId)
         {
-            var visibleDocs = await secureDocuments.ListAsync(subject.ContractId, ct);
-            if (visibleDocs.FirstOrDefault(d => d.DocumentId == docId) is { } d) doc = new ExecutedDocumentInfo(d.DocumentId, d.Title, d.FileName, d.Sha256, d.CanDownload);
+            try
+            {
+                var visibleDocs = await secureDocuments.ListAsync(subject.ContractId, ct);
+                if (visibleDocs.FirstOrDefault(d => d.DocumentId == docId) is { } d) doc = new ExecutedDocumentInfo(d.DocumentId, d.Title, d.FileName, d.Sha256, d.CanDownload);
+            }
+            catch (Exception ex) when (ex is ForbiddenException or ResourceNotFoundException)
+            {
+                // An approver reaches the record itself only while a request is waiting for their group; afterwards they still see the frozen request, with the document's identity but no download.
+                doc = new ExecutedDocumentInfo(docId, snapshot.ExecutedFileName ?? "Executed copy", snapshot.ExecutedFileName, request.ExecutedDocumentSha256, false);
+            }
         }
 
         var history = await HistoryOfAsync(request.ContractId, ct);

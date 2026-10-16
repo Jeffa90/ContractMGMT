@@ -20,7 +20,8 @@ public sealed record AvailableTransition(string Code, string Display, string ToS
 public sealed record HistoryItem(DateTime OccurredUtc, string FromStatus, string FromDisplay, string ToStatus, string ToDisplay, string TransitionCode, string TransitionDisplay, string Actor, string? Comment, string SubjectKind, string? WorkflowRef);
 
 /// <summary>Where a contract stands in its workflow, for the contract page: the state, the workflow it is pinned to and the states of that workflow in order.</summary>
-public sealed record LifecycleState(string Status, string StatusDisplay, string? StatusRole, string WorkflowRef, int ReleaseNumber, bool IsPinned, bool Locked, bool ContentFrozen, IReadOnlyList<LifecycleStateStep> Path);
+public sealed record LifecycleState(string Status, string StatusDisplay, string? StatusRole, string WorkflowRef, int ReleaseNumber, bool IsPinned, bool Locked, bool ContentFrozen, IReadOnlyList<LifecycleStateStep> Path,
+    IReadOnlyList<string> UploadTypes);
 
 public sealed record LifecycleStateStep(string Code, string Display, bool IsCurrent);
 

@@ -269,6 +269,6 @@ internal sealed class LifecycleService(LifecycleEngine engine, LifecycleDbContex
             foreach (var t in def.From(code)) if (seen.Add(t.To)) queue.Enqueue(t.To);
         }
         return new LifecycleState(subject.Status, current?.Display ?? subject.Status, current?.Role, resolved.WorkflowRef, resolved.ReleaseNumber, subject.WorkflowRef is not null, subject.Contract.RecordLocked, subject.Contract.ContentFrozen,
-            order.Select(c => new LifecycleStateStep(c, def.DisplayOf(c), c == subject.Status)).ToList());
+            order.Select(c => new LifecycleStateStep(c, def.DisplayOf(c), c == subject.Status)).ToList(), def.Settings.Documents.UploadTypes ?? [.. def.Settings.Documents.FinalTypes, "Schedule", "SupportingDocument", "Correspondence"]);
     }
 }

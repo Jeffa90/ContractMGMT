@@ -12,8 +12,9 @@ public sealed class ErrorModel : PageModel
     public string Detail { get; private set; } = "An unexpected error occurred. Nothing was changed by this request.";
     public string? CorrelationId { get; private set; }
 
-    public void OnGet(int? code) => Fill(code);
-    public void OnPost(int? code) => Fill(code);
+    // The status code comes from the query string the re-execution sets, never from a form field of the original request that happens to be called "code".
+    public void OnGet([FromQuery] int? code) => Fill(code);
+    public void OnPost([FromQuery] int? code) => Fill(code);
 
     private void Fill(int? code)
     {

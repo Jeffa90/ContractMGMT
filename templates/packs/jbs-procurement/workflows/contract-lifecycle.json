@@ -10,7 +10,14 @@
     "FinalAgreement"
    ],
    "legalMarkupType": "LegalMarkup",
-   "approvalEvidenceType": "ApprovalEvidence"
+   "approvalEvidenceType": "ApprovalEvidence",
+   "uploadTypes": [
+    "FinalAgreement",
+    "Schedule",
+    "SupportingDocument",
+    "Correspondence",
+    "LegalAdvice"
+   ]
   },
   "approval": {
    "approverGroupKey": "GroupHeadProcurement",

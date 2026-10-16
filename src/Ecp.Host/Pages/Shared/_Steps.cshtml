@@ -55,7 +55,7 @@
                     break;
                 case "cancel":
                     <form method="post" asp-page-handler="Step">
-                        <input type="hidden" name="code" value="@s.Code" />
+                        <input type="hidden" name="step" value="@s.Code" />
                         <div class="field"><label for="c-@s.Code">@L["Reason (required)"]</label><input id="c-@s.Code" name="Comment" type="text" required maxlength="2000" /></div>
                         <button type="submit" class="secondary">@s.Display</button>
                     </form>
@@ -65,7 +65,7 @@
                     break;
                 default:
                     <form method="post" asp-page-handler="Step">
-                        <input type="hidden" name="code" value="@s.Code" />
+                        <input type="hidden" name="step" value="@s.Code" />
                         <input type="hidden" name="ClientRequestId" value="@requestId" />
                         if (s.CommentRequired || s.ReasonRequired)
                         {

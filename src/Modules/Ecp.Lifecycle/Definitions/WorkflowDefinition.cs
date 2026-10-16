@@ -52,7 +52,7 @@ public sealed record TransitionDefinition(
     public bool Managed => WorkflowVocabulary.ManagedRoles.Contains(Role);
 }
 
-public sealed record DocumentSettings(string ExecutedCopyType, IReadOnlyList<string> FinalTypes, string LegalMarkupType, string ApprovalEvidenceType);
+public sealed record DocumentSettings(string ExecutedCopyType, IReadOnlyList<string> FinalTypes, string LegalMarkupType, string ApprovalEvidenceType, IReadOnlyList<string>? UploadTypes = null);
 public sealed record ApprovalSettings(string ApproverGroupKey, bool RequireExecutedCopy);
 public sealed record LegalSettings(bool ReworkReasonRequired);
 public sealed record UnlockSettings(int DefaultMinutes, int MaxMinutes, bool RequireSecondPerson, bool Enabled = true);
@@ -115,7 +115,7 @@ public static class WorkflowDefinitionParser
         public RawVariation? Variation { get; set; }
     }
 
-    private sealed class RawDocuments { public string? ExecutedCopyType { get; set; } public List<string>? FinalTypes { get; set; } public string? LegalMarkupType { get; set; } public string? ApprovalEvidenceType { get; set; } }
+    private sealed class RawDocuments { public string? ExecutedCopyType { get; set; } public List<string>? FinalTypes { get; set; } public string? LegalMarkupType { get; set; } public string? ApprovalEvidenceType { get; set; } public List<string>? UploadTypes { get; set; } }
     private sealed class RawApproval { public string? ApproverGroupKey { get; set; } public bool RequireExecutedCopy { get; set; } = true; }
     private sealed class RawLegal { public bool ReworkReasonRequired { get; set; } = true; }
     private sealed class RawUnlock { public int DefaultMinutes { get; set; } = 60; public int MaxMinutes { get; set; } = 240; public bool RequireSecondPerson { get; set; } public bool Enabled { get; set; } = true; }
@@ -151,7 +151,7 @@ public static class WorkflowDefinitionParser
 
         var docs = raw.Settings?.Documents;
         var settings = new WorkflowSettings(
-            new DocumentSettings(docs?.ExecutedCopyType ?? "", docs?.FinalTypes ?? [], docs?.LegalMarkupType ?? "", docs?.ApprovalEvidenceType ?? ""),
+            new DocumentSettings(docs?.ExecutedCopyType ?? "", docs?.FinalTypes ?? [], docs?.LegalMarkupType ?? "", docs?.ApprovalEvidenceType ?? "", docs?.UploadTypes),
             new ApprovalSettings(raw.Settings?.Approval?.ApproverGroupKey ?? "", raw.Settings?.Approval?.RequireExecutedCopy ?? true),
             new LegalSettings(raw.Settings?.Legal?.ReworkReasonRequired ?? true),
             new UnlockSettings(raw.Settings?.Unlock?.DefaultMinutes ?? 60, raw.Settings?.Unlock?.MaxMinutes ?? 240, raw.Settings?.Unlock?.RequireSecondPerson ?? false, raw.Settings?.Unlock?.Enabled ?? true),
@@ -239,6 +239,11 @@ public static class WorkflowDefinitionParser
         var doc = d.Settings.Documents;
         if (string.IsNullOrWhiteSpace(doc.ExecutedCopyType)) m.Add(Error("$.settings.documents.executedCopyType", "document_type", "Name the document type used for the executed copy."));
         if (doc.FinalTypes.Count == 0) m.Add(Error("$.settings.documents.finalTypes", "document_type", "Name at least one document type that counts as the final document."));
+        if (doc.UploadTypes is { } upload)
+        {
+            if (upload.Any(t => string.IsNullOrWhiteSpace(t) || t.Length > 50)) m.Add(Error("$.settings.documents.uploadTypes", "document_type", "Document types are up to 50 characters."));
+            if (upload.Contains(doc.ExecutedCopyType, StringComparer.Ordinal)) m.Add(Error("$.settings.documents.uploadTypes", "document_type", "The executed-copy type is attached by the signing step, not uploaded directly."));
+        }
         if (string.IsNullOrWhiteSpace(doc.LegalMarkupType)) m.Add(Error("$.settings.documents.legalMarkupType", "document_type", "Name the document type used for Legal mark-ups."));
         if (string.IsNullOrWhiteSpace(d.Settings.Approval.ApproverGroupKey)) m.Add(Error("$.settings.approval.approverGroupKey", "approver_group", "Name the approver group that gives register authorisation."));
         var unlock = d.Settings.Unlock;

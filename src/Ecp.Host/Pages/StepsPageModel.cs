@@ -38,10 +38,10 @@ public abstract class StepsPageModel(ILifecycleService lifecycle, IVariationServ
         return new StepsView(SubjectKind, id, statusDisplay, steps, exec, Execution.Providers(), approval, review, mock);
     }
 
-    public Task<IActionResult> OnPostStepAsync(Guid id, string code, CancellationToken ct) => Step(id, ct, async () =>
+    public Task<IActionResult> OnPostStepAsync(Guid id, string step, CancellationToken ct) => Step(id, ct, async () =>
     {
-        if (SubjectKind == SubjectKinds.Variation) await Variations.TransitionAsync(id, code, Comment, ct);
-        else await Lifecycle.TransitionAsync(new TransitionRequest(id, code, Comment, Comment, null, ClientRequestId), ct);
+        if (SubjectKind == SubjectKinds.Variation) await Variations.TransitionAsync(id, step, Comment, ct);
+        else await Lifecycle.TransitionAsync(new TransitionRequest(id, step, Comment, Comment, null, ClientRequestId), ct);
     }, "Done.");
 
     public Task<IActionResult> OnPostLegalSubmitAsync(Guid id, CancellationToken ct) => Step(id, ct, async () => await Legal.SubmitAsync(new SubmitLegalRequest(SubjectKind, id, Comment, ClientRequestId), ct), "Submitted to Legal.");

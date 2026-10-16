@@ -8,6 +8,7 @@ namespace Ecp.Integration.Tests;
 public sealed class LifecycleScenarioTests_Sqlite
 {
     [Fact] public Task A_contract_goes_from_draft_to_effective() => ProviderRunner.SqliteAsync(LifecycleScenarios.A_contract_goes_from_draft_to_effective_through_every_stage, LifecycleScenarios.Scanner);
+    [Fact] public Task A_locked_contract_refuses_crafted_steps() => ProviderRunner.SqliteAsync(LifecycleScenarios.A_locked_contract_refuses_every_crafted_step_and_edit_whoever_asks, LifecycleScenarios.Scanner);
     [Fact] public Task Workflow_events_notify_once() => ProviderRunner.SqliteAsync(NotificationScenarios.A_workflow_event_tells_the_right_people_once_and_a_second_run_changes_nothing, LifecycleScenarios.Scanner);
     [Fact] public Task Privileged_content_does_not_leak() => ProviderRunner.SqliteAsync(NotificationScenarios.Notification_content_never_leaks_a_classified_record_to_people_who_could_not_open_it, LifecycleScenarios.Scanner);
     [Fact] public Task Restricted_titles_are_withheld() => ProviderRunner.SqliteAsync(NotificationScenarios.A_title_is_withheld_from_the_message_at_the_restricted_level_but_the_reference_remains, LifecycleScenarios.Scanner);
@@ -25,6 +26,7 @@ public sealed class LifecycleScenarioTests_SqlServer
 {
     [SqlServerFact] public Task A_contract_goes_from_draft_to_effective() => ProviderRunner.SqlServerAsync(LifecycleScenarios.A_contract_goes_from_draft_to_effective_through_every_stage, LifecycleScenarios.Scanner);
 
+    [SqlServerFact] public Task A_locked_contract_refuses_crafted_steps() => ProviderRunner.SqlServerAsync(LifecycleScenarios.A_locked_contract_refuses_every_crafted_step_and_edit_whoever_asks, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Workflow_events_notify_once() => ProviderRunner.SqlServerAsync(NotificationScenarios.A_workflow_event_tells_the_right_people_once_and_a_second_run_changes_nothing, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Privileged_content_does_not_leak() => ProviderRunner.SqlServerAsync(NotificationScenarios.Notification_content_never_leaks_a_classified_record_to_people_who_could_not_open_it, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Restricted_titles_are_withheld() => ProviderRunner.SqlServerAsync(NotificationScenarios.A_title_is_withheld_from_the_message_at_the_restricted_level_but_the_reference_remains, LifecycleScenarios.Scanner);

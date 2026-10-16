@@ -46,6 +46,7 @@
 @if (Model.Contract.Description is { Length: > 0 }) { <h2>@L["Description"]</h2><p>@Model.Contract.Description</p> }
 
 <h2 id="documents">@L["Documents"]</h2>
+<p><a href="/Contracts/Documents/@Model.Contract.Id">@L["Add a document or a new version"]</a></p>
 <div class="table-wrap">
 <table>
     <caption class="visually-hidden">@L["Documents"]</caption>

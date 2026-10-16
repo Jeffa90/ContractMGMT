@@ -60,11 +60,13 @@ internal static class ApprovalMatrixScenarios3
         Assert.Contains(runs, r => r.Contains("\"outcome\":\"resolved\"", StringComparison.Ordinal));
 
         // It reveals approvers, so it needs its own permission: the record's owner, a Viewer and the approvers themselves cannot use it.
-        foreach (var user in new[] { "ownerPackaging", "viewerAll", "groupHead", "legalA", "auditor" })
+        foreach (var user in new[] { "ownerPackaging", "viewerAll", "groupHead", "legalA" })
         {
             var denied = await Assert.ThrowsAnyAsync<Exception>(() => w.As(user, s => s.Get<IApprovalSimulator>().SimulateAsync(Req())));
             Assert.True(denied is ForbiddenException or ResourceNotFoundException, $"{user}: {denied.GetType().Name}");
         }
+        // The auditor holds both rights (owner-confirmed allocation); their run is audited like anyone's.
+        Assert.True((await w.As("auditor", s => s.Get<IApprovalSimulator>().SimulateAsync(Req()))).Resolution.Resolved);
         // Reading the matrices is a separate, read-only right that an auditor holds.
         Assert.Single(await w.As("auditor", s => s.Get<IApprovalSimulator>().MatricesAsync(w.W.Org1, MatrixSource.Published)));
         await Assert.ThrowsAnyAsync<Exception>(() => w.As("ownerPackaging", s => s.Get<IApprovalSimulator>().MatricesAsync(w.W.Org1, MatrixSource.Published)));

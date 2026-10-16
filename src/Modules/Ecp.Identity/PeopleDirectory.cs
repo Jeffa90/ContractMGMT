@@ -24,7 +24,12 @@ public interface IPeopleDirectory
 
     /// <summary>People who hold an active Category Owner role covering an organisation (requires <c>categories.assign</c>).</summary>
     Task<IReadOnlyList<PersonItem>> OwnerCandidatesAsync(Guid organisationId, CancellationToken ct = default);
+
+    /// <summary>Names (no email) of the active people who hold any active role covering the organisation, for choosing a person in a form. Needs the caller to hold an active role; at most 500.</summary>
+    Task<IReadOnlyList<PersonName>> ColleaguesAsync(Guid organisationId, CancellationToken ct = default);
 }
+
+public sealed record PersonName(Guid Id, string DisplayName);
 
 /// <summary>Administration of people, authorised by <c>users.manage</c>.</summary>
 public interface IUserAdministration
@@ -84,6 +89,15 @@ internal sealed class PeopleDirectory(IdentityDbContext db, IAccessService acces
             .Where(a => a.IsActiveAt(now) && (a.ScopeLevel == ScopeLevel.Tenant || a.OrganisationIds.Contains(organisationId))).Select(a => a.UserId).Distinct().ToList();
         var users = await db.Users.AsNoTracking().Where(u => owners.Contains(u.Id) && u.Status == UserStatus.Active).OrderBy(u => u.DisplayName).ToListAsync(ct);
         return users.Select(u => new PersonItem(u.Id, u.DisplayName, u.Email, u.Status, [RoleCodes.CategoryOwner])).ToList();
+    }
+
+    public async Task<IReadOnlyList<PersonName>> ColleaguesAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        var subject = await access.GetSubjectAsync(ct);
+        var now = clock.UtcNow;
+        if (subject is null || !subject.Assignments.Any(a => a.IsActiveAt(now))) return [];
+        var ids = (await db.RoleAssignments.AsNoTracking().ToListAsync(ct)).Where(a => a.IsActiveAt(now) && (a.ScopeLevel == ScopeLevel.Tenant || a.OrganisationIds.Contains(organisationId))).Select(a => a.UserId).Distinct().ToList();
+        return await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id) && u.Status == UserStatus.Active).OrderBy(u => u.DisplayName).Take(500).Select(u => new PersonName(u.Id, u.DisplayName)).ToListAsync(ct);
     }
 
     private static PersonItem ToItem(UserProfile u, List<RoleAssignment> assignments, DateTime now)

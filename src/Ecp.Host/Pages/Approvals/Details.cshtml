@@ -63,7 +63,7 @@ else if (r.Decision is { } d)
         @if (plan.Explanations is { } explanations && plan.Trace is { } trace)
         {
             <details>
-                <summary>@L["Why these people, and how the plan was reached (for matrix administrators)"]</summary>
+                <summary>@L["Why these people, and how the plan was reached (for matrix administrators and the approvers assigned to this request)"]</summary>
                 <div class="table-wrap"><table>
                     <caption class="visually-hidden">@L["Why each person was included or left out"]</caption>
                     <thead><tr><th scope="col">@L["Step"]</th><th scope="col">@L["Person"]</th><th scope="col">@L["Decision"]</th><th scope="col">@L["Why"]</th></tr></thead>

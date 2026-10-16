@@ -30,7 +30,13 @@ public sealed record ContractDetails(
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? ReviewDate, DateOnly? EndDate, DateTime? RegisteredDateUtc, string? RegisteredBy,
     bool IsLegacyLoad, DateTime CreatedUtc, string CreatedBy, bool CanEdit,
     ContractProvenanceInfo? Provenance = null, bool IsArchived = false, string? ArchiveReason = null,
-    ContractProtection? Protection = null, ContractReminderInfo? Reminders = null, ContractRenewalInfo? Renewal = null, bool LegalReviewRequired = false, string? ExtensionType = null);
+    ContractProtection? Protection = null, ContractReminderInfo? Reminders = null, ContractRenewalInfo? Renewal = null, bool LegalReviewRequired = false, string? ExtensionType = null,
+    ContractClassifiers? Classifiers = null);
+
+/// <summary>The classifying facts of a contract beyond the basics, as they are stored. The supplier's own ABN, vendor number and type are shown with the contract but belong to the supplier.</summary>
+public sealed record ContractClassifiers(
+    Guid? LegalEntityId, string? ContractType, string? AgreementType, string? RiskLevel, string? FunctionCode, string? SapOutlineAgreementNumber, int? NoticePeriodValue, string? NoticePeriodUnit,
+    string? SupplierType, string? SupplierAbn, string? SupplierVendorNumber);
 
 /// <summary>Why a record cannot be edited, in the words shown on the contract: locked (and by what), content-frozen by its workflow state, or open under an audited emergency unlock.</summary>
 public sealed record ContractProtection(bool IsLocked, string? LockReason, string? LockedBy, DateTime? LockedUtc, bool ContentFrozen, string DocumentPolicy, Guid? ActiveUnlockId, DateTime? UnlockExpiresUtc, string? WorkflowRef);
@@ -45,7 +51,7 @@ public sealed record ContractProvenanceInfo(
     string? SourceSystem, string? SourceRecordId, string? SourceAgreementReference, string? SourceStatus, DateTime? SourceExtractedUtc, Guid? MigrationBatchId,
     string? RegisteredDateProvenance, string? SourceRegisteredValue);
 
-public sealed record SupplierListItem(Guid Id, Guid OrganisationId, string Name, string? VendorNumber, string? Abn, string Status);
+public sealed record SupplierListItem(Guid Id, Guid OrganisationId, string Name, string? VendorNumber, string? Abn, string Status, string? SupplierType = null);
 
 public sealed record CategoryItem(Guid Id, Guid OrganisationId, string Code, string Name, Guid? ParentCategoryId, Guid? DivisionId, bool IsActive, IReadOnlyList<CategoryOwnerItem> Owners);
 public sealed record CategoryOwnerItem(Guid AssignmentId, Guid UserId, bool IsPrimary, DateTime EffectiveFromUtc, DateTime? EffectiveToUtc);
@@ -57,6 +63,11 @@ public interface ISecuredContractService
     Task<ContractDetails> GetAsync(Guid id, CancellationToken ct = default);
     Task<Guid> CreateDraftAsync(CreateContractRequest request, CancellationToken ct = default);
     Task UpdateDetailsAsync(Guid id, string title, string? description, CancellationToken ct = default);
+    /// <summary>
+    /// The owner's edit of the contract's own facts (title, description, type, risk, legal entity, business unit, site, value, dates, notice, ...) by their stable field names.
+    /// Refused unless the caller may edit this record and it is not locked or frozen; a change of scope (business unit, site) must stay inside the caller's own scope. Returns what actually changed.
+    /// </summary>
+    Task<IReadOnlyList<FieldChange>> UpdateFieldsAsync(Guid id, IReadOnlyDictionary<string, string?> changes, CancellationToken ct = default);
     /// <summary>Allocates the next Agreement Reference for the organisation using its prefix and numbering rule (D3).</summary>
     Task<string> PreviewNextReferenceAsync(Guid organisationId, CancellationToken ct = default);
     /// <summary>Descriptor for access simulation and tests: the facts the evaluator sees for a stored contract.</summary>
@@ -184,7 +195,8 @@ internal sealed class ContractAccessContext(ContractsDbContext db, IOrganisation
 internal sealed class SecuredContractService(
     ContractsDbContext db, IAccessService access, ContractAccessContext context, IContractService contracts, IUnitOfWork uow,
     ReferenceAllocator allocator, IOrganisationStructureService structure, ITenantContext tenant, IClock clock, ICutoverFreeze freeze,
-    IAuditWriter audit, Ecp.Documents.IDocumentClassification documentClassification, CurrentUser currentUser, IContractLifecyclePort port) : ISecuredContractService
+    IAuditWriter audit, Ecp.Documents.IDocumentClassification documentClassification, CurrentUser currentUser, IContractLifecyclePort port,
+    IContractCustomFields customFields, IEnumerable<IContractCreationPolicy> creationPolicies) : ISecuredContractService
 {
     private async Task<IQueryable<Contract>> FilteredAsync(ContractFilter f, CancellationToken ct)
     {
@@ -253,7 +265,8 @@ internal sealed class SecuredContractService(
         if (c is null) throw new ResourceNotFoundException(); // absent, or another tenant's (filtered out): the answer is the same 404
         var descriptor = await context.DescribeAsync(c, ct);
         await access.RequireAsync("contracts.read", descriptor, ct);
-        var supplier = await db.Suppliers.AsNoTracking().Where(s => s.Id == c.SupplierId).Select(s => s.Name).FirstOrDefaultAsync(ct) ?? "";
+        var supplierRow = await db.Suppliers.AsNoTracking().Where(s => s.Id == c.SupplierId).Select(s => new { s.Name, s.SupplierType, s.Abn, s.VendorNumber }).FirstOrDefaultAsync(ct);
+        var supplier = supplierRow?.Name ?? "";
         var category = await db.Categories.AsNoTracking().Where(s => s.Id == c.CategoryId).Select(s => s.Name).FirstOrDefaultAsync(ct) ?? "";
         var canEdit = !c.ContentFrozen && (await access.CheckSilentAsync("contracts.edit_owned", descriptor, ct)).Allowed;
         // A renewal link names the other agreement only when the caller could open it themselves.
@@ -270,7 +283,9 @@ internal sealed class SecuredContractService(
             c.IsArchived, c.ArchiveReason,
             new ContractProtection(c.RecordLocked, c.LockReason, c.LockedBy, c.LockedUtc, c.ContentFrozen, c.DocumentPolicy, c.IsUnlockedAt(now) ? c.ActiveUnlockId : null, c.IsUnlockedAt(now) ? c.UnlockExpiresUtc : null, c.WorkflowRef),
             new ContractReminderInfo(c.ReminderLeadDays, c.NoticePeriodDays, c.CriticalNotice),
-            new ContractRenewalInfo(c.PredecessorContractId, Ref(c.PredecessorContractId), c.SuccessorContractId, Ref(c.SuccessorContractId)), c.LegalReviewRequired, c.ExtensionType);
+            new ContractRenewalInfo(c.PredecessorContractId, Ref(c.PredecessorContractId), c.SuccessorContractId, Ref(c.SuccessorContractId)), c.LegalReviewRequired, c.ExtensionType,
+            new ContractClassifiers(c.LegalEntityId, c.ContractType, c.AgreementType, c.RiskLevel, c.FunctionCode, c.SapOutlineAgreementNumber, c.NoticePeriodValue, c.NoticePeriodUnit,
+                supplierRow?.SupplierType, supplierRow?.Abn, supplierRow?.VendorNumber));
     }
 
     public async Task ChangeClassificationAsync(Guid id, string newClassification, string? reason, CancellationToken ct = default)
@@ -370,6 +385,36 @@ internal sealed class SecuredContractService(
         return await context.DescribeAsync(c, ct);
     }
 
+    public async Task<IReadOnlyList<FieldChange>> UpdateFieldsAsync(Guid id, IReadOnlyDictionary<string, string?> changes, CancellationToken ct = default)
+    {
+        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new ResourceNotFoundException();
+        var descriptor = await context.DescribeAsync(c, ct);
+        await access.RequireAsync("contracts.edit_owned", descriptor, ct);
+        var org = await structure.GetAsync(c.OrganisationId, ct);
+        if (changes.TryGetValue("businessUnitId", out var buRaw) && Guid.TryParse(buRaw, out var bu) && org.BusinessUnits.All(b => b.Id != bu)) throw new DomainException("business_unit_not_found", "The business unit was not found in this organisation.");
+        if (changes.TryGetValue("siteId", out var siteRaw) && Guid.TryParse(siteRaw, out var site) && org.Sites.All(x => x.Id != site)) throw new DomainException("site_not_found", "The site was not found in this organisation.");
+        if (changes.TryGetValue("legalEntityId", out var leRaw) && Guid.TryParse(leRaw, out var le) && org.LegalEntities.All(x => x.Id != le)) throw new DomainException("legal_entity_not_found", "The legal entity was not found in this organisation.");
+        // Moving a contract to another business unit or site must not take it out of the caller's own reach.
+        if (changes.ContainsKey("businessUnitId") || changes.ContainsKey("siteId"))
+        {
+            Guid? newBu = changes.TryGetValue("businessUnitId", out var b) ? (Guid.TryParse(b, out var g) ? g : null) : c.BusinessUnitId;
+            Guid? newSite = changes.TryGetValue("siteId", out var st) ? (Guid.TryParse(st, out var g2) ? g2 : null) : c.SiteId;
+            await access.RequireAsync("contracts.edit_owned", descriptor with { BusinessUnitId = newBu, SiteId = newSite, DivisionId = org.DivisionOfBusinessUnit(newBu) }, ct);
+        }
+        var actor = currentUser.UserId?.ToString() ?? "system";
+        return await uow.ExecuteAsync(async cx =>
+        {
+            var tracked = await db.Contracts.FirstAsync(x => x.Id == id, cx);
+            var applied = tracked.EditFields(changes, actor, clock.UtcNow);
+            try { await db.SaveChangesAsync(cx); }
+            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload it and try again."); }
+            if (applied.Count > 0)
+                audit.Record(new AuditEntry("contract.updated", nameof(Contract), id.ToString(), OrganisationId: tracked.OrganisationId, Classification: tracked.Classification,
+                    OldValuesJson: AuditJson.Of(applied.ToDictionary(f => f.Field, f => f.Before)), NewValuesJson: AuditJson.Of(applied.ToDictionary(f => f.Field, f => f.After))));
+            return applied;
+        }, ct);
+    }
+
     public async Task<string> PreviewNextReferenceAsync(Guid organisationId, CancellationToken ct = default)
     {
         // Any user who may create contracts in this organisation may see the next reference; the category-specific check happens on create.
@@ -388,6 +433,7 @@ internal sealed class SecuredContractService(
         if (await freeze.CreationBlockedAsync(r.OrganisationId, ct) is { } frozen) throw new DomainException("cutover_freeze", frozen);
         if (r.BusinessUnitId is { } bu && org.BusinessUnits.All(b => b.Id != bu)) throw new DomainException("business_unit_not_found", "The business unit was not found in this organisation.");
         if (r.SiteId is { } site && org.Sites.All(s => s.Id != site)) throw new DomainException("site_not_found", "The site was not found in this organisation.");
+        if (r.LegalEntityId is { } le && org.LegalEntities.All(l => l.Id != le)) throw new DomainException("legal_entity_not_found", "The legal entity was not found in this organisation.");
         var category = await db.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == r.CategoryId && c.OrganisationId == r.OrganisationId, ct)
             ?? throw new DomainException("category_not_found", "The category was not found.");
 
@@ -399,6 +445,9 @@ internal sealed class SecuredContractService(
         var descriptor = new ResourceDescriptor("Contract", tenantId, r.OrganisationId, r.BusinessUnitId, org.DivisionOfBusinessUnit(r.BusinessUnitId), r.SiteId,
             category.Id, path, r.Classification, false, owners, Id: "new");
         await access.RequireAsync("contracts.create", descriptor, ct);
+        // Configured fields are checked as this person (roles, requiredness, types) before a reference number is used or anything is written.
+        var initialStatus = creationPolicies.FirstOrDefault() is { } policy ? (await policy.ResolveAsync(r.OrganisationId, ct)).InitialStatus : "";
+        await customFields.ValidateForNewAsync(r.OrganisationId, r.ContractType, initialStatus, r.CustomValues is null ? new CustomFieldInput() : CustomFieldInput.From(r.CustomValues), ct);
 
         var reference = r.AgreementReference;
         if (string.IsNullOrWhiteSpace(reference))
@@ -441,7 +490,7 @@ internal sealed class SecuredSupplierService(
         {
             var visible = grants.Any(g => (g.OrganisationIds is null || g.OrganisationIds.Contains(sup.OrganisationId))
                 && (IsOrgWide(g) || supplierIdsWithVisibleContracts.Contains(sup.Id)));
-            if (visible) result.Add(new SupplierListItem(sup.Id, sup.OrganisationId, sup.Name, sup.VendorNumber, sup.Abn, sup.Status));
+            if (visible) result.Add(new SupplierListItem(sup.Id, sup.OrganisationId, sup.Name, sup.VendorNumber, sup.Abn, sup.Status, sup.SupplierType));
         }
         return result;
     }

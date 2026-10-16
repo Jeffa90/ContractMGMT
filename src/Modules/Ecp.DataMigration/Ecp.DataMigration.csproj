@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../../Ecp.SharedKernel/Ecp.SharedKernel.csproj" />
     <ProjectReference Include="../../Ecp.Persistence/Ecp.Persistence.csproj" />
+    <ProjectReference Include="../../Ecp.Formats/Ecp.Formats.csproj" />
     <ProjectReference Include="../Ecp.Audit/Ecp.Audit.csproj" />
     <ProjectReference Include="../Ecp.Tenancy/Ecp.Tenancy.csproj" />
     <ProjectReference Include="../Ecp.Identity/Ecp.Identity.csproj" />

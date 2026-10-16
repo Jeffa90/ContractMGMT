@@ -159,7 +159,7 @@ public class MappingEngineTests
         var d = ProfileFromSamples();
         Assert.Equal(18, d.Fields.Count);
         Assert.Equal(10, d.Lookups.Count);
-        var table = Ecp.DataMigration.Formats.CsvReader.Read(new MemoryStream(MigrationSamples.ContractsCsv));
+        var table = Ecp.Formats.CsvReader.Read(new MemoryStream(MigrationSamples.ContractsCsv));
         foreach (var row in table.Rows)
         {
             var mapped = MappingEngine.MapRow(d, table.ToMap(row), Context);

@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using Ecp.DataMigration.Formats;
+using Ecp.Formats;
 using Ecp.Tests.Common;
 using Xunit;
 

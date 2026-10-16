@@ -233,7 +233,10 @@ internal static class ApprovalMatrixScenarios
 
         // Ending it: the person who gave it can; someone else cannot; an administrator can. An ended delegation no longer appears.
         await Assert.ThrowsAsync<ForbiddenException>(() => w.As("dB", s => s.Get<IApprovalDelegations>().RevokeAsync(first, "not mine")));
-        await w.As("procAdmin", s => s.Get<IApprovalDelegations>().RevokeAsync(first, "Administrator ended it"));
+        // Procurement Administrators hold the administrative right only by explicit assignment, which no default role carries; the Organisation Administrator may end it, and must say why.
+        await Assert.ThrowsAsync<ForbiddenException>(() => w.As("procAdmin", s => s.Get<IApprovalDelegations>().RevokeAsync(first, "Administrator ended it")));
+        await Assert.ThrowsAsync<DomainException>(() => w.As("orgAdmin", s => s.Get<IApprovalDelegations>().RevokeAsync(first, "  ")));
+        await w.As("orgAdmin", s => s.Get<IApprovalDelegations>().RevokeAsync(first, "Administrator ended it"));
         Assert.Equal("delegation_revoked", (await Assert.ThrowsAsync<DomainException>(() => w.As("dA", s => s.Get<IApprovalDelegations>().RevokeAsync(first, "again")))).Code);
         var afterRevoke = await w.ResolveAsync("flow", Facts(), resource, w.W.Users["ownerPackaging"]);
         Assert.DoesNotContain(afterRevoke.Plan!.Steps[0].Approvers, p => p.Role == ParticipantRoles.Delegate && p.OnBehalfOfUserId == a);

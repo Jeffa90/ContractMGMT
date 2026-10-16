@@ -2,6 +2,7 @@ using System.Text.Json;
 using Ecp.Audit;
 using Ecp.Contracts.Domain;
 using Ecp.Contracts.Persistence;
+using Ecp.Metadata;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
@@ -17,15 +18,22 @@ namespace Ecp.Contracts;
 public sealed class ContractsOptions
 {
     public string InitialStatusCode { get; set; } = "";
+    /// <summary>The most rows one export may contain. A bigger result is refused with a message to narrow it or to ask for a large export.</summary>
+    public int ExportRowLimit { get; set; } = 10_000;
+    /// <summary>The most rows a large export (explicit request with a reason, audited) may contain.</summary>
+    public int LargeExportRowLimit { get; set; } = 100_000;
 }
 
 public sealed record CreateCategoryRequest(Guid OrganisationId, string Code, string Name, Guid? ParentCategoryId = null);
-public sealed record CreateSupplierRequest(Guid OrganisationId, string Name, string? Abn = null, string? VendorNumber = null);
+public sealed record CreateSupplierRequest(Guid OrganisationId, string Name, string? Abn = null, string? VendorNumber = null, string? SupplierType = null);
 public sealed record CreateContractRequest(
     Guid OrganisationId, string AgreementReference, string Title, Guid SupplierId, Guid CategoryId, string? Description = null,
     string Classification = Classifications.Internal, string? CurrencyCode = null, decimal? EstimatedValue = null,
     string? ExtensionType = null, bool LegalReviewRequired = false, DateOnly? StartDate = null, DateOnly? EffectiveDate = null,
-    DateOnly? ReviewDate = null, DateOnly? EndDate = null, Guid? BusinessUnitId = null, Guid? SiteId = null);
+    DateOnly? ReviewDate = null, DateOnly? EndDate = null, Guid? BusinessUnitId = null, Guid? SiteId = null,
+    Guid? LegalEntityId = null, string? ContractType = null, string? AgreementType = null, string? RiskLevel = null, string? FunctionCode = null,
+    string? SapOutlineAgreementNumber = null, int? NoticePeriodValue = null, string? NoticePeriodUnit = null, bool CriticalNotice = false,
+    IReadOnlyDictionary<string, string?>? CustomValues = null);
 
 public sealed record ContractDto(
     Guid Id, Guid OrganisationId, string AgreementReference, string Title, string? Description, Guid SupplierId, Guid CategoryId,
@@ -79,7 +87,7 @@ internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IA
         var tenantId = tenant.RequireTenantId();
         if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
             throw new DomainException("organisation_not_found", "The organisation was not found.");
-        var supplier = Supplier.Create(tenantId, r.OrganisationId, r.Name, r.Abn, r.VendorNumber, clock.UtcNow);
+        var supplier = Supplier.Create(tenantId, r.OrganisationId, r.Name, r.Abn, r.VendorNumber, clock.UtcNow, r.SupplierType);
         return await uow.ExecuteAsync(async c =>
         {
             db.Suppliers.Add(supplier);
@@ -95,7 +103,7 @@ internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IA
 
 internal sealed class ContractService(
     ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IActorContext actor, IClock clock,
-    ITenantDirectory tenants, Microsoft.Extensions.Options.IOptions<ContractsOptions> options, IEnumerable<IContractCreationPolicy> policies) : IContractService
+    ITenantDirectory tenants, Microsoft.Extensions.Options.IOptions<ContractsOptions> options, IEnumerable<IContractCreationPolicy> policies, IContractCustomFieldWriter customFields) : IContractService
 {
     public async Task<Guid> CreateDraftAsync(CreateContractRequest r, CancellationToken ct = default)
     {
@@ -112,7 +120,8 @@ internal sealed class ContractService(
         var contract = Contract.CreateDraft(new NewContract(
             tenantId, r.OrganisationId, r.AgreementReference, r.Title, r.SupplierId, r.CategoryId, initial, actor.ActorId ?? "system", clock.UtcNow,
             r.Description, r.Classification, r.CurrencyCode, r.EstimatedValue, r.ExtensionType, r.LegalReviewRequired,
-            r.StartDate, r.EffectiveDate, r.ReviewDate, r.EndDate, r.BusinessUnitId, r.SiteId));
+            r.StartDate, r.EffectiveDate, r.ReviewDate, r.EndDate, r.BusinessUnitId, r.SiteId, r.LegalEntityId, r.ContractType, r.AgreementType, r.RiskLevel, r.FunctionCode,
+            r.SapOutlineAgreementNumber, r.NoticePeriodValue, r.NoticePeriodUnit, r.CriticalNotice));
         if (setup is not null)
         {
             contract.ApplyWorkflowState(setup.InitialStatus, setup.Effects, actor.ActorId ?? "system", clock.UtcNow);
@@ -136,6 +145,8 @@ internal sealed class ContractService(
             { throw new DomainException("agreement_reference_in_use", "That agreement reference is already in use."); }
             audit.Record(new AuditEntry("contract.created", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
                 NewValuesJson: AuditJson.Of(new { contract.AgreementReference, contract.ContractTitle, contract.Status, contract.Classification })));
+            // Configured fields: values given at creation, and the defaults of the fields that have one. They commit with the contract or not at all.
+            await customFields.WriteNewAsync(contract.Id, r.CustomValues is null ? new CustomFieldInput() : CustomFieldInput.From(r.CustomValues), actor.ActorId ?? "system", c);
             return contract.Id;
         }, ct);
     }
@@ -176,6 +187,7 @@ public static class ContractsModule
     public static IServiceCollection AddContractsModule(this IServiceCollection services, Action<ContractsOptions> configure)
     {
         services.Configure(configure);
+        services.AddMetadataModule();
         services.AddModuleDbContext<ContractsDbContext>(Name, Tier, Schema);
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<ISupplierService, SupplierService>();
@@ -191,6 +203,16 @@ public static class ContractsModule
         services.AddScoped<IContractMigrationPort, ContractMigrationPort>();
         services.AddScoped<IContractLifecyclePort, ContractLifecyclePort>();
         services.AddScoped<ICutoverFreeze, NoCutoverFreeze>();
+        services.AddScoped<ContractCustomFieldService>();
+        services.AddScoped<IContractCustomFields>(sp => sp.GetRequiredService<ContractCustomFieldService>());
+        services.AddScoped<IContractCustomFieldWriter>(sp => sp.GetRequiredService<ContractCustomFieldService>());
+        services.AddScoped<IContractCustomFieldReader>(sp => sp.GetRequiredService<ContractCustomFieldService>());
+        services.AddScoped<Ecp.Metadata.ICustomFieldUsage, ContractCustomFieldUsage>();
+        services.AddScoped<Register.RegisterQueryEngine>();
+        services.AddScoped<Register.IContractExports, Register.ContractExportService>();
+        services.AddScoped<Register.IContractViews, Register.ContractViewService>();
+        services.AddScoped<Ecp.Configuration.IConfigurationKind, Register.ContractListViewKind>();
+        services.AddScoped<Register.IContractRegister>(sp => sp.GetRequiredService<Register.RegisterQueryEngine>());
         services.AddScoped<ISecuredContractService, SecuredContractService>();
         services.AddScoped<ISecuredSupplierService, SecuredSupplierService>();
         services.AddScoped<ISecuredCategoryService, SecuredCategoryService>();

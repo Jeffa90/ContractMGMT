@@ -65,6 +65,22 @@ public interface IApprovalMatrixReferences
     Task<IReadOnlyList<string>> ReferencedMatrixCodesAsync(Guid organisationId, CancellationToken ct = default);
 }
 
+/// <summary>
+/// What a matrix may be judged on: the dimensions for which the platform really has a fact on every submission, and the custom field keys an administrator has made available. A matrix that conditions on
+/// anything else is refused at publication, because that row could never match and an approval would quietly route round it.
+/// </summary>
+public sealed record ApprovalFactCatalogue(IReadOnlySet<string> Dimensions, IReadOnlySet<string> CustomKeys)
+{
+    public const string Value = "value", Categories = "categories", ContractTypes = "contractTypes", LegalEntities = "legalEntities", BusinessUnits = "businessUnits", Sites = "sites",
+        Classifications = "classifications", RiskLevels = "riskLevels", SupplierTypes = "supplierTypes";
+}
+
+/// <summary>Implemented by the module that builds the facts of a submission, so what the matrix may condition on is exactly what that module supplies.</summary>
+public interface IApprovalFactSource
+{
+    Task<ApprovalFactCatalogue> CatalogueAsync(Guid organisationId, CancellationToken ct = default);
+}
+
 /// <summary>Lets other modules supply facts the platform does not hold itself (contract type, risk level, supplier type, custom fields). A fact that no contributor supplies stays unknown and never satisfies a condition.</summary>
 public interface IApprovalFactContributor
 {
@@ -157,6 +173,8 @@ public sealed record SimulationSubject(ApprovalFacts Facts, ResourceDescriptor R
 /// <summary>Implemented by the module that knows categories, structure and contracts. Both calls need <c>approvals.simulate</c> in the organisation.</summary>
 public interface IApprovalSimulationInputs
 {
+    /// <summary>The inputs of an existing contract, exactly as a live submission would see it (same fact service), so an administrator can ask "who would approve this one?". Needs <c>approvals.simulate</c> and the right to read the contract.</summary>
+    Task<SimulationInputs> FromContractAsync(Guid contractId, CancellationToken ct = default);
     Task<SimulationChoices> ChoicesAsync(Guid organisationId, CancellationToken ct = default);
     /// <summary>Turns the choices into the facts the matrix is judged on and the descriptor the access layer judges approvers against, from stored reference data (never from request-supplied codes).</summary>
     Task<SimulationSubject> BuildAsync(SimulationInputs inputs, CancellationToken ct = default);

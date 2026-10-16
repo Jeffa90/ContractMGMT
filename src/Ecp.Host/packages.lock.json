@@ -446,8 +446,11 @@
         "type": "Project",
         "dependencies": {
           "Ecp.Audit": "[1.0.0, )",
+          "Ecp.Configuration": "[1.0.0, )",
           "Ecp.Documents": "[1.0.0, )",
+          "Ecp.Formats": "[1.0.0, )",
           "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Metadata": "[1.0.0, )",
           "Ecp.Persistence": "[1.0.0, )",
           "Ecp.SharedKernel": "[1.0.0, )",
           "Ecp.Tenancy": "[1.0.0, )"
@@ -460,6 +463,7 @@
           "Ecp.Configuration": "[1.0.0, )",
           "Ecp.Contracts": "[1.0.0, )",
           "Ecp.Documents": "[1.0.0, )",
+          "Ecp.Formats": "[1.0.0, )",
           "Ecp.Identity": "[1.0.0, )",
           "Ecp.Persistence": "[1.0.0, )",
           "Ecp.SharedKernel": "[1.0.0, )",
@@ -473,6 +477,9 @@
           "Ecp.Persistence": "[1.0.0, )",
           "Ecp.SharedKernel": "[1.0.0, )"
         }
+      },
+      "ecp.formats": {
+        "type": "Project"
       },
       "ecp.identity": {
         "type": "Project",
@@ -492,9 +499,20 @@
           "Ecp.Contracts": "[1.0.0, )",
           "Ecp.Documents": "[1.0.0, )",
           "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Metadata": "[1.0.0, )",
           "Ecp.Persistence": "[1.0.0, )",
           "Ecp.SharedKernel": "[1.0.0, )",
           "Ecp.Tenancy": "[1.0.0, )"
+        }
+      },
+      "ecp.metadata": {
+        "type": "Project",
+        "dependencies": {
+          "Ecp.Audit": "[1.0.0, )",
+          "Ecp.Configuration": "[1.0.0, )",
+          "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Persistence": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.0.0, )"
         }
       },
       "ecp.notifications": {

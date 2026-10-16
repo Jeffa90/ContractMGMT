@@ -24,7 +24,13 @@ public sealed class IndexModel(IApprovalSimulator simulator, IApprovalMatrixStor
         Organisations = await OrganisationChoices.AllowedAsync(organisations, access, ct, "approvals.matrix.read");
         OrganisationId ??= Organisations.FirstOrDefault()?.Id;
         if (OrganisationId is not { } org) return Page();
-        Summaries = await simulator.MatricesAsync(org, MatrixSource.Published, ct);     // checks approvals.matrix.read for this organisation
+        try { Summaries = await simulator.MatricesAsync(org, MatrixSource.Published, ct); }     // checks approvals.matrix.read for this organisation
+        catch (Ecp.SharedKernel.ForbiddenException)
+        {
+            // An approver holds the read right only for the request they are assigned to, so send them to the one thing here they may use.
+            if (await access.HoldsAnywhereAsync("approvals.delegate", ct)) return RedirectToPage("Delegations");
+            throw;
+        }
         Published = await store.TryLoadPublishedAsync(org, ct);
         UsedBy = await references.ReferencedMatrixCodesAsync(org, ct);
         try { HasDraft = await configuration.FindOpenDraftAsync(ApprovalsModule.MatrixKind, org, ct) is not null; } catch (Ecp.SharedKernel.ForbiddenException) { HasDraft = false; }

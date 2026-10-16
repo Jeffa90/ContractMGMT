@@ -1,3 +1,4 @@
+using Ecp.Formats;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
 

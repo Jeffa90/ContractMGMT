@@ -50,7 +50,7 @@ public sealed class ApprovalDelegation : ITenantOwned
     public void Revoke(string by, string reason, DateTime nowUtc)
     {
         if (RevokedUtc is not null) throw new DomainException("delegation_revoked", "That delegation has already been ended.");
-        RevokedUtc = Guard.Utc(nowUtc, nameof(nowUtc)); RevokedBy = Guard.NotBlank(by, "Ended by", 200); RevokeReason = Guard.OptionalBounded(reason, "Reason", 500);
+        RevokedUtc = Guard.Utc(nowUtc, nameof(nowUtc)); RevokedBy = Guard.NotBlank(by, "Ended by", 200); RevokeReason = Guard.NotBlank(reason, "Reason", 500);
     }
 }
 

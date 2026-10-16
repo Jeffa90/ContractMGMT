@@ -20,6 +20,8 @@ public static class PersistenceServiceCollectionExtensions
         services.TryAddScoped<IActorContext>(sp => sp.GetRequiredService<ActorContext>());
         services.TryAddScoped<IScopedConnection, ScopedConnection>();
         services.TryAddScoped<DbContextServices>();
+        services.TryAddScoped<AfterCommitQueue>();
+        services.TryAddScoped<IAfterCommit>(sp => sp.GetRequiredService<AfterCommitQueue>());
         services.TryAddScoped<IUnitOfWork, UnitOfWork>();
         services.TryAddSingleton<KeepScopedConnectionOpenInterceptor>();
         services.TryAddSingleton<TenantSessionContextInterceptor>();

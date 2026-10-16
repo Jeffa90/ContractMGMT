@@ -57,7 +57,8 @@ internal static class ApprovalMatrixScenarios2
         Assert.Equal(["Open", "Waiting"], plan.Steps.Select(s => s.Status).ToArray());
         Assert.Equal("first", plan.YourPart);
         Assert.True(start.CanApprove);
-        Assert.Null(plan.Trace);                                                           // the trace and the reasons are for matrix administrators, not for approvers
+        Assert.NotNull(plan.Trace);                                                        // an assigned approver reads the release and the trace of their own request ...
+        Assert.All(plan.Explanations!, e => Assert.True(e.Included));                      // ... and sees who was included, never why other people were left out
         Assert.Equal(1, plan.Release);
 
         // Out of turn, outside the plan, or the person who submitted it: none of them can respond.

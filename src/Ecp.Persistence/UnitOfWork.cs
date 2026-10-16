@@ -13,6 +13,27 @@ public interface IRollbackHook
 }
 
 /// <summary>
+/// Work that must happen only if the outermost unit of work commits (for example dropping a cache entry for configuration that was just published). Actions run once after the commit, in order,
+/// and are discarded on rollback. An action must not throw into the caller: a failure is swallowed because the commit has already happened.
+/// </summary>
+public interface IAfterCommit
+{
+    void Register(Action action);
+}
+
+public sealed class AfterCommitQueue : IAfterCommit
+{
+    private readonly List<Action> _actions = [];
+    public void Register(Action action) { lock (_actions) _actions.Add(action); }
+    internal void Run()
+    {
+        Action[] actions; lock (_actions) { actions = [.. _actions]; _actions.Clear(); }
+        foreach (var action in actions) { try { action(); } catch { /* the commit has happened; a failed notification cannot undo it */ } }
+    }
+    internal void Discard() { lock (_actions) _actions.Clear(); }
+}
+
+/// <summary>
 /// Executes work in one database transaction across all module contexts in the scope. A business change, its audit
 /// events and its outbox messages therefore commit or roll back together.
 /// </summary>
@@ -22,7 +43,7 @@ public interface IUnitOfWork
     Task ExecuteAsync(Func<CancellationToken, Task> work, CancellationToken ct = default);
 }
 
-public sealed class UnitOfWork(IScopedConnection connection, IEnumerable<IBeforeCommitHook> hooks, IEnumerable<IRollbackHook> rollbackHooks) : IUnitOfWork
+public sealed class UnitOfWork(IScopedConnection connection, IEnumerable<IBeforeCommitHook> hooks, IEnumerable<IRollbackHook> rollbackHooks, AfterCommitQueue afterCommit) : IUnitOfWork
 {
     private int _depth;
 
@@ -36,12 +57,14 @@ public sealed class UnitOfWork(IScopedConnection connection, IEnumerable<IBefore
             var result = await work(ct);
             foreach (var hook in hooks) await hook.BeforeCommitAsync(ct);
             await connection.CommitAsync(ct);
+            afterCommit.Run();
             return result;
         }
         catch
         {
             await connection.RollbackAsync(CancellationToken.None);
             foreach (var hook in rollbackHooks) hook.OnRollback();
+            afterCommit.Discard();
             throw;
         }
         finally { _depth--; }

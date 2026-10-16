@@ -116,6 +116,7 @@ public static class NotificationsModule
         services.AddScoped<INotificationJobs, NotificationJobs>();
         services.AddScoped<IReminderSettings, ReminderSettings>();
         services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<Ecp.Contracts.Register.IContractSetProvider, RemindedUnacknowledgedSet>();
         services.TryAddSingleton<IEmailDeliveryProviderFactory, EmailDeliveryProviderFactory>();
         return services;
     }

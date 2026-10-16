@@ -146,6 +146,10 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("AgreementType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("ArchiveReason")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -177,6 +181,10 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ContractType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -219,11 +227,18 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("FunctionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<bool>("IsArchived")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsLegacyLoad")
                         .HasColumnType("bit");
+
+                    b.Property<Guid?>("LegalEntityId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("LegalReviewRequired")
                         .HasColumnType("bit");
@@ -243,6 +258,13 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int?>("NoticePeriodDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NoticePeriodUnit")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("NoticePeriodValue")
                         .HasColumnType("int");
 
                     b.Property<Guid>("OrganisationId")
@@ -271,11 +293,19 @@ namespace Ecp.Contracts.Persistence.Migrations
                     b.Property<DateOnly?>("ReviewDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("RiskLevel")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<string>("SapOutlineAgreementNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<Guid?>("SiteId")
                         .HasColumnType("uniqueidentifier");
@@ -337,8 +367,6 @@ namespace Ecp.Contracts.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("TenantId", "AgreementReference")
                         .IsUnique();
 
@@ -356,7 +384,17 @@ namespace Ecp.Contracts.Persistence.Migrations
 
                     b.HasIndex("TenantId", "SupplierId");
 
+                    b.HasIndex("TenantId", "OrganisationId", "BusinessUnitId");
+
                     b.HasIndex("TenantId", "OrganisationId", "CategoryId");
+
+                    b.HasIndex("TenantId", "OrganisationId", "ContractType");
+
+                    b.HasIndex("TenantId", "OrganisationId", "LegalEntityId");
+
+                    b.HasIndex("TenantId", "OrganisationId", "RiskLevel");
+
+                    b.HasIndex("TenantId", "OrganisationId", "SiteId");
 
                     b.HasIndex("TenantId", "OrganisationId", "Status");
 
@@ -365,6 +403,103 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasFilter("[SourceRecordId] IS NOT NULL");
 
                     b.ToTable("Contract", "contracts");
+                });
+
+            modelBuilder.Entity("Ecp.Contracts.Domain.ContractCustomValue", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FieldKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("BoolValue")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("DateTimeValue")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly?>("DateValue")
+                        .HasColumnType("date");
+
+                    b.Property<int>("DefinitionRelease")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LongTextValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("MigrationBatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("NumberValue")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RefValue")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceSystem")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceValue")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("TextValue")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("TenantId", "ContractId", "FieldKey", "Ordinal");
+
+                    b.HasIndex("TenantId", "MigrationBatchId")
+                        .HasFilter("[MigrationBatchId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "FieldKey", "BoolValue")
+                        .HasDatabaseName("IX_CustomValue_Bool")
+                        .HasFilter("[BoolValue] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "FieldKey", "DateTimeValue")
+                        .HasDatabaseName("IX_CustomValue_DateTime")
+                        .HasFilter("[DateTimeValue] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "FieldKey", "DateValue")
+                        .HasDatabaseName("IX_CustomValue_Date")
+                        .HasFilter("[DateValue] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "FieldKey", "NumberValue")
+                        .HasDatabaseName("IX_CustomValue_Number")
+                        .HasFilter("[NumberValue] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "FieldKey", "RefValue")
+                        .HasDatabaseName("IX_CustomValue_Ref")
+                        .HasFilter("[RefValue] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "FieldKey", "TextValue")
+                        .HasDatabaseName("IX_CustomValue_Text")
+                        .HasFilter("[TextValue] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "OrganisationId", "FieldKey");
+
+                    b.ToTable("ContractCustomValue", "contracts");
                 });
 
             modelBuilder.Entity("Ecp.Contracts.Domain.ReferenceCounter", b =>
@@ -435,6 +570,10 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("SupplierType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -448,11 +587,53 @@ namespace Ecp.Contracts.Persistence.Migrations
 
                     b.HasIndex("TenantId", "OrganisationId", "NormalisedName");
 
+                    b.HasIndex("TenantId", "OrganisationId", "SupplierType");
+
                     b.HasIndex("TenantId", "OrganisationId", "VendorNumber")
                         .IsUnique()
                         .HasFilter("[VendorNumber] IS NOT NULL");
 
                     b.ToTable("Supplier", "contracts");
+                });
+
+            modelBuilder.Entity("Ecp.Contracts.Register.SavedView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "OwnerUserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("SavedView", "contracts");
                 });
 
             modelBuilder.Entity("Ecp.Contracts.Domain.Category", b =>
@@ -486,6 +667,16 @@ namespace Ecp.Contracts.Persistence.Migrations
                     b.HasOne("Ecp.Contracts.Domain.Supplier", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "SupplierId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Ecp.Contracts.Domain.ContractCustomValue", b =>
+                {
+                    b.HasOne("Ecp.Contracts.Domain.Contract", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ContractId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

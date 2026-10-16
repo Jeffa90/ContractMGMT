@@ -8,6 +8,7 @@ using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Ecp.Configuration;
 
@@ -78,7 +79,7 @@ public sealed class ConfigurationOptions
 
 internal sealed class ConfigurationService(
     ConfigurationDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IAccessService access, CurrentUser currentUser,
-    IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor) : IConfigurationService, IConfigurationBootstrap, IConfigurationReleases
+    IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor, IPublishedConfigurationCache cache, IAfterCommit afterCommit) : IConfigurationService, IConfigurationBootstrap, IConfigurationReleases
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -187,6 +188,10 @@ internal sealed class ConfigurationService(
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("concurrency_conflict", "Another release was published at the same time. Reload and try again."); }
             await kind.ApplyAsync(draft.OrganisationId, draft.ContentJson, previous?.ContentJson, number, release.Id, c);
+            // Drop the remembered release now (so a reader that starts during the commit cannot keep the old one) and again once the commit has happened.
+            var tenantId = tenant.RequireTenantId(); var organisationId = draft.OrganisationId; var kindName = draft.Kind;
+            cache.Invalidate(tenantId, organisationId, kindName);
+            afterCommit.Register(() => cache.Invalidate(tenantId, organisationId, kindName));
             audit.Record(new AuditEntry(rollbackOf is null ? "config.published" : "config.rolled_back", draft.Kind, release.Id.ToString(),
                 OrganisationId: draft.OrganisationId == Guid.Empty ? null : draft.OrganisationId, Reason: note, ConfigReleaseId: release.Id,
                 NewValuesJson: JsonSerializer.Serialize(new { number, hash = release.ContentHash, rollbackOf })));
@@ -231,7 +236,20 @@ internal sealed class ConfigurationService(
         return r is null ? null : ToDto(r);
     }
 
-    public Task<ReleaseDto?> LatestAsync(string kind, Guid organisationId, CancellationToken ct = default) => LatestReleaseAsync(kind, organisationId, ct);
+    /// <summary>The trusted read used by modules that run on configuration: served from the published-release cache, and from the database whenever the cache has nothing or fails.</summary>
+    public async Task<ReleaseDto?> LatestAsync(string kind, Guid organisationId, CancellationToken ct = default)
+    {
+        Guid tenantId = tenant.RequireTenantId(); long generation = 0;
+        try
+        {
+            if (cache.TryGetLatest(tenantId, organisationId, kind, out var cached)) return cached;
+            generation = cache.Generation(tenantId, organisationId, kind);
+        }
+        catch { (cache as PublishedConfigurationCache)?.CountFallback(); return await LatestReleaseAsync(kind, organisationId, ct); }
+        var fresh = await LatestReleaseAsync(kind, organisationId, ct);
+        try { cache.StoreLatest(tenantId, organisationId, kind, fresh, generation); } catch { (cache as PublishedConfigurationCache)?.CountFallback(); }
+        return fresh;
+    }
 
     public async Task<ReleaseDto?> LatestReleaseOfAnyKindAsync(Guid organisationId, CancellationToken ct = default)
     {
@@ -341,6 +359,7 @@ public static class ConfigurationModule
         var options = new ConfigurationOptions();
         configure?.Invoke(options);
         services.AddSingleton(options);
+        services.TryAddSingleton<IPublishedConfigurationCache>(_ => new PublishedConfigurationCache());
         services.AddModuleDbContext<ConfigurationDbContext>(Name, Tier, Schema);
         services.AddScoped<ConfigurationService>();
         services.AddScoped<IConfigurationService>(sp => sp.GetRequiredService<ConfigurationService>());

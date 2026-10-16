@@ -5,6 +5,7 @@ using Ecp.Contracts.Persistence;
 using Ecp.DataMigration;
 using Ecp.DataMigration.Domain;
 using Ecp.DataMigration.Formats;
+using Ecp.Formats;
 using Ecp.DataMigration.Mapping;
 using Ecp.DataMigration.Persistence;
 using Ecp.Documents.Persistence;
@@ -280,7 +281,7 @@ internal static partial class MigrationScenarios
         var rows = FiveRows();
         var header = MigrationWorld.ContractsHeader.Split(',');
         List<IReadOnlyList<object?>> sheet = [header.Cast<object?>().ToList()];
-        foreach (var line in rows) sheet.Add(Ecp.DataMigration.Formats.CsvReader.Read(new MemoryStream(MigrationWorld.Csv(MigrationWorld.ContractsHeader, line))).Rows.Single().Fields.Cast<object?>().ToList());
+        foreach (var line in rows) sheet.Add(Ecp.Formats.CsvReader.Read(new MemoryStream(MigrationWorld.Csv(MigrationWorld.ContractsHeader, line))).Rows.Single().Fields.Cast<object?>().ToList());
         var xlsx = XlsxWriter.Write([new WorksheetData("Contracts", sheet)]);
 
         var viaXlsx = await mw.CreateBatchAsync();

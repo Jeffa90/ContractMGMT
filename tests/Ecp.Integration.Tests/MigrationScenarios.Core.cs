@@ -123,11 +123,11 @@ internal static partial class MigrationScenarios
         // The error report holds one message per problem, the source values of rejected rows, and neutralises formula text (MIG-021).
         var xlsx = await mw.AsAdminAsync(s => s.Get<IMigrationReports>().ExportErrorsAsync(batch, ExportFormat.Xlsx));
         Assert.EndsWith(".xlsx", xlsx.FileName);
-        var sheet = Ecp.DataMigration.Formats.XlsxReader.Read(new MemoryStream(xlsx.Content), sheetName: "Rejected rows");
+        var sheet = Ecp.Formats.XlsxReader.Read(new MemoryStream(xlsx.Content), sheetName: "Rejected rows");
         Assert.Equal(7, sheet.Count);
         Assert.Contains(sheet.Rows, r => r.Fields.Contains("'=HYPERLINK(\"http://evil.example\",\"click\")"));
         Assert.DoesNotContain(sheet.Rows, r => r.Fields.Any(f => f.StartsWith("=")));
-        var messages = Ecp.DataMigration.Formats.XlsxReader.Read(new MemoryStream(xlsx.Content), sheetName: "Messages");
+        var messages = Ecp.Formats.XlsxReader.Read(new MemoryStream(xlsx.Content), sheetName: "Messages");
         Assert.True(messages.Count >= 7); // one per problem found
         var csvReport = await mw.AsAdminAsync(s => s.Get<IMigrationReports>().ExportErrorsAsync(batch, ExportFormat.Csv));
         Assert.DoesNotContain("\n=", Encoding.UTF8.GetString(csvReport.Content));

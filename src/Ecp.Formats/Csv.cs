@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Ecp.DataMigration.Formats;
+namespace Ecp.Formats;
 
 /// <summary>Raised for a source file that cannot be read safely. The code is a stable catalogue code (MIGRATION_SUPPLEMENT section 8).</summary>
 public sealed class SourceFormatException(string code, string message) : Exception(message)

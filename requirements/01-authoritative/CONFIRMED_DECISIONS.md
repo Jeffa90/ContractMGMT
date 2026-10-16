@@ -81,3 +81,14 @@ Project skills live in `.claude/skills/` (one canonical copy) with project-speci
 - In ordinary operation Registered Date is system-stamped by successful register authorisation.
 - During an authorised legacy migration the original Registered Date may be imported. It retains source-system provenance; the migration batch, source record ID, source value and acting migration administrator are audited.
 - After migration acceptance users cannot ordinarily edit Registered Date.
+
+## D6 Approval matrix permissions (DR-2026-10-16, owner instruction)
+
+The least-privilege allocation for the four approval matrix permissions is confirmed. It replaces the provisional allocation made by the WFE-02 implementation, and closes the open item "permissions awaiting owner confirmation".
+
+| Permission | Granted to | Notes |
+|---|---|---|
+| `approvals.matrix.read` | System Administrator, Tenant Administrator, Organisation Administrator, Business Configuration Administrator, Procurement Administrator, Auditor | Approver holds it as a scoped (`S`) right: only the matrix release and the explanation of a request assigned to that approver. Backup Approver is not granted it. |
+| `approvals.simulate` | System Administrator, Tenant Administrator, Organisation Administrator, Business Configuration Administrator, Procurement Administrator, Auditor | Not Category Owners, Viewers or Approvers by default. Every run is audited because it reveals approver identities. |
+| `approvals.delegate` | Approver, Backup Approver | Own authority only, within the existing delegation limits (90 days, group members only, no loops, not transitive). |
+| `approvals.delegate.administer` | System Administrator, Tenant Administrator (tenant scope), Organisation Administrator (organisation scope) | Procurement Administrator holds it only by explicit assignment; no default role grants it. Every administrative delegation action requires a reason and writes an audit event. |

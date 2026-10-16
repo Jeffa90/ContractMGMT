@@ -101,7 +101,9 @@ public sealed class ApprovalMatrixUiTests
         // An approver may manage their own delegations but not read the matrices or run the simulator.
         using var head = await app.SignInAsync("grouphead@a.example.test");
         Assert.Equal(HttpStatusCode.OK, (await head.GetAsync("/Admin/Approvals/Delegations")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await head.GetAsync("/Admin/Approvals")).StatusCode);
+        var landing = await head.GetAsync("/Admin/Approvals");                          // an approver holds matrix.read only for their own requests, so the page sends them to what they may use
+        Assert.Equal(HttpStatusCode.Redirect, landing.StatusCode);
+        Assert.EndsWith("/Admin/Approvals/Delegations", landing.Headers.Location!.ToString());
         Assert.Equal(HttpStatusCode.Forbidden, (await head.GetAsync("/Admin/Approvals/Simulate")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await head.GetAsync("/Admin/Approvals/History")).StatusCode);
 
@@ -211,7 +213,8 @@ public sealed class ApprovalMatrixUiTests
         var approval = $"/Approvals/Details/{requestId}";
         var asHead = await head.GetStringAsync(approval);
         Assert.Contains("Group Head Procurement", asHead);                                 // the step
-        Assert.DoesNotContain("Resolution trace", asHead);                                // the approver is not a matrix reader
+        Assert.Contains("Resolution trace", asHead);                                      // the assigned approver reads the trace of their own request ...
+        Assert.DoesNotContain("Left out", asHead);                                        // ... but not why other people were left out
         var asAdmin = await admin.GetStringAsync(approval);
         Assert.Contains("Resolution trace", asAdmin);
         Assert.Contains("small", asAdmin);                                                 // the row that applied

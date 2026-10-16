@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "views": [
+    { "key": "all-contracts", "name": "All Contracts", "description": "Every agreement you can see.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "category", "status", "classification", "endDate"], "sort": [ { "field": "agreementReference" } ], "filters": [], "pageSize": 25, "statusChips": true },
+    { "key": "my-contracts", "name": "My Contracts", "description": "Agreements in categories you currently own.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "status", "reviewDate", "endDate"], "sort": [ { "field": "endDate" } ], "filters": [ { "field": "owner", "op": "Eq", "values": ["@me"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "awaiting-my-action", "name": "Awaiting My Action", "description": "Reviews, approvals and agreements waiting on you.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "status", "updatedUtc"], "sort": [ { "field": "updatedUtc" } ], "filters": [ { "field": "set", "op": "Is", "values": ["awaitingMyAction"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "awaiting-legal", "name": "Awaiting Legal", "description": "Submitted and waiting for Legal to begin.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "category", "status", "updatedUtc"], "sort": [ { "field": "updatedUtc" } ], "filters": [ { "field": "set", "op": "Is", "values": ["awaitingLegal"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "pending-approval", "name": "Pending Approval", "description": "Executed agreements waiting for register authorisation.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "category", "status", "updatedUtc"], "sort": [ { "field": "updatedUtc" } ], "filters": [ { "field": "set", "op": "Is", "values": ["pendingApproval"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "expiring-soon", "name": "Expiring Soon", "description": "Agreements ending within the next 90 days. Evergreen agreements have no End Date to expire.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "status", "endDate", "noticePeriodValue"], "sort": [ { "field": "endDate" } ],
+      "filters": [ { "field": "endDate", "op": "Between", "values": ["@today", "@today+90"] }, { "field": "status", "op": "In", "values": ["@live"] }, { "field": "evergreen", "op": "Is", "values": ["false"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "reviews-due", "name": "Reviews Due", "description": "Review Date within the next 90 days, or already passed.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "status", "reviewDate"], "sort": [ { "field": "reviewDate" } ],
+      "filters": [ { "field": "reviewDate", "op": "Lte", "values": ["@today+90"] }, { "field": "status", "op": "In", "values": ["@live"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "critical-notice", "name": "Critical Notice", "description": "Agreements flagged Critical Notice, soonest end first.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "status", "endDate", "noticePeriodValue"], "sort": [ { "field": "endDate" } ],
+      "filters": [ { "field": "criticalNotice", "op": "Is", "values": ["true"] }, { "field": "status", "op": "In", "values": ["@live"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "variations-in-progress", "name": "Variations in Progress", "description": "Agreements with an open Variation.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "status", "updatedUtc"], "sort": [ { "field": "updatedUtc", "descending": true } ], "filters": [ { "field": "set", "op": "Is", "values": ["variationsInProgress"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "renewals-in-progress", "name": "Renewals in Progress", "description": "Agreements being renewed.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "status", "endDate"], "sort": [ { "field": "endDate" } ], "filters": [ { "field": "set", "op": "Is", "values": ["renewalsInProgress"] } ], "pageSize": 25, "statusChips": true },
+    { "key": "reminded-unacknowledged", "name": "Reminded but Unacknowledged", "description": "Reminders sent that no owner has acknowledged.",
+      "columns": ["agreementReference", "contractTitle", "supplier", "status", "endDate", "reviewDate"], "sort": [ { "field": "endDate" } ], "filters": [ { "field": "set", "op": "Is", "values": ["remindedUnacknowledged"] } ], "pageSize": 25, "statusChips": true }
+  ]
+}

@@ -65,6 +65,21 @@ public sealed class PermissionMatrixTests
     }
 
     [Fact]
+    public void The_approval_matrix_permissions_follow_the_owner_confirmed_allocation()
+    {
+        var m = PermissionMatrix.Instance;
+        string[] administrators = [RoleCodes.SystemAdministrator, RoleCodes.TenantAdministrator, RoleCodes.OrganisationAdministrator, RoleCodes.BusinessConfigurationAdministrator, RoleCodes.ProcurementAdministrator, RoleCodes.Auditor];
+        foreach (var role in administrators) { Assert.Equal(Grant.Yes, m.Of(role, "approvals.matrix.read")); Assert.Equal(Grant.Yes, m.Of(role, "approvals.simulate")); }
+        Assert.Equal(Grant.Scoped, m.Of(RoleCodes.Approver, "approvals.matrix.read"));        // only the release and explanation of a request assigned to them
+        foreach (var role in new[] { RoleCodes.BackupApprover, RoleCodes.CategoryOwner, RoleCodes.Viewer, RoleCodes.Legal, RoleCodes.DivisionSiteAdministrator })
+        { Assert.Equal(Grant.None, m.Of(role, "approvals.matrix.read")); Assert.Equal(Grant.None, m.Of(role, "approvals.simulate")); }
+        foreach (var role in new[] { RoleCodes.Approver, RoleCodes.BackupApprover }) { Assert.Equal(Grant.Yes, m.Of(role, "approvals.delegate")); Assert.Equal(Grant.None, m.Of(role, "approvals.delegate.administer")); }
+        foreach (var role in RoleCodes.All.Where(r => r != RoleCodes.Approver && r != RoleCodes.BackupApprover)) Assert.Equal(Grant.None, m.Of(role, "approvals.delegate"));
+        foreach (var role in new[] { RoleCodes.SystemAdministrator, RoleCodes.TenantAdministrator, RoleCodes.OrganisationAdministrator }) Assert.Equal(Grant.Yes, m.Of(role, "approvals.delegate.administer"));
+        Assert.Equal(Grant.None, m.Of(RoleCodes.ProcurementAdministrator, "approvals.delegate.administer"));   // only by explicit assignment, which no default role carries
+    }
+
+    [Fact]
     public void Unknown_permissions_are_rejected_rather_than_silently_denied()
         => Assert.Throws<ArgumentException>(() => World.Decide(World.Subject(), "contracts.teleport", World.Contract()));
 }

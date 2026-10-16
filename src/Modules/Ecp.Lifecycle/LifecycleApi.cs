@@ -80,7 +80,18 @@ public static class LifecycleModule
         services.AddScoped<ILegalReviewService>(sp => sp.GetRequiredService<LegalReviewService>());
         services.AddScoped<VisibleContracts>();
         services.AddScoped<IExecutionService, ExecutionService>();
+        services.AddScoped<WorkflowStatusGroups>();
+        services.AddScoped<Ecp.Contracts.Register.IStatusGroupProvider, LiveStatusGroup>();
+        services.AddScoped<Ecp.Metadata.IWorkflowStateSource, WorkflowStates>();
+        services.AddScoped<Ecp.Contracts.Register.IContractSetProvider, AwaitingLegalSet>();
+        services.AddScoped<Ecp.Contracts.Register.IContractSetProvider, LegalReviewStatusSet>();
+        services.AddScoped<Ecp.Contracts.Register.IContractSetProvider, PendingApprovalSet>();
+        services.AddScoped<Ecp.Contracts.Register.IContractSetProvider, VariationsInProgressSet>();
+        services.AddScoped<Ecp.Contracts.Register.IContractSetProvider, RenewalsInProgressSet>();
+        services.AddScoped<Ecp.Contracts.Register.IContractSetProvider, AwaitingMyActionSet>();
+        services.AddScoped<ApprovalFactService>();
         services.AddScoped<ApprovalFactsBuilder>();
+        services.AddScoped<IApprovalFactSource, LifecycleFactSource>();
         services.AddScoped<IApprovalSimulationInputs, ApprovalSimulationInputs>();
         services.AddScoped<LifecycleMatrixReferences>();
         services.AddScoped<IApprovalReferenceData>(sp => sp.GetRequiredService<LifecycleMatrixReferences>());

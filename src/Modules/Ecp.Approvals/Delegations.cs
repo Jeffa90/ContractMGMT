@@ -65,6 +65,7 @@ internal sealed class ApprovalDelegations(
 
     public async Task RevokeAsync(Guid id, string reason, CancellationToken ct = default)
     {
+        reason = Guard.NotBlank(reason, "Reason for ending the delegation", 500);       // every ending is explained, whoever does it
         var d = await db.Delegations.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new ResourceNotFoundException();
         var me = Me;
         if (d.FromUserId != me) await access.RequireAsync("approvals.delegate.administer", ApprovalResources.Matrix(tenant.RequireTenantId(), d.OrganisationId, id.ToString()), ct);

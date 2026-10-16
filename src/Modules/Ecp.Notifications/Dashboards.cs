@@ -156,3 +156,11 @@ internal sealed class DashboardService(
         }
     }
 }
+
+/// <summary>The register's "Reminded but Unacknowledged" list: contracts with a reminder that no owner has acknowledged yet. Ids only; the register applies the caller's access.</summary>
+internal sealed class RemindedUnacknowledgedSet(NotificationsDbContext db) : Ecp.Contracts.Register.IContractSetProvider
+{
+    public string Key => "remindedUnacknowledged";
+    public async Task<IReadOnlySet<Guid>> IdsAsync(string? argument, CancellationToken ct = default)
+        => (await db.Tracking.AsNoTracking().Where(t => t.AcknowledgedUtc == null || t.AcknowledgedUtc < t.LastReminderSentUtc).Select(t => t.ContractId).Take(5000).ToListAsync(ct)).ToHashSet();
+}

@@ -3,7 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Xml;
 
-namespace Ecp.DataMigration.Formats;
+namespace Ecp.Formats;
 
 /// <summary>
 /// Reads the first (or a named) sheet of an .xlsx workbook with no third-party library (RISK-10): only the parts it needs are opened, formulas are read as

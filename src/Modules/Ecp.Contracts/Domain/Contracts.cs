@@ -18,6 +18,12 @@ public static class Classifications
 
 public enum RegisteredDateProvenance { Platform, Migration }
 
+/// <summary>The extension type that means a contract has no End Date to expire (it renews until ended). The reminder rules and the register's Evergreen filter read the same value.</summary>
+public static class ExtensionTypes
+{
+    public const string Evergreen = "Evergreen";
+}
+
 /// <summary>Who may add documents to a contract in its current state (set by the workflow state; see the state definitions in the solution pack).</summary>
 public static class DocumentPolicies
 {
@@ -127,6 +133,8 @@ public sealed partial class Supplier : ITenantOwned
     public string? LegalName { get; private set; }
     public string? Abn { get; private set; }
     public string? VendorNumber { get; private set; }
+    /// <summary>The kind of supplier (a configured code, for example a strategic or a transactional supplier). A fact the approval matrix can use.</summary>
+    public string? SupplierType { get; private set; }
     public string Status { get; private set; } = "Active";
     public string? SourceSystem { get; private set; }
     public string? SourceRecordId { get; private set; }
@@ -134,7 +142,14 @@ public sealed partial class Supplier : ITenantOwned
     public DateTime CreatedUtc { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
 
-    public static Supplier Create(Guid tenantId, Guid organisationId, string name, string? abn, string? vendorNumber, DateTime nowUtc)
+    public void SetSupplierType(string? supplierType)
+    {
+        var v = Guard.OptionalBounded(supplierType, "Supplier type", 100);
+        if (v is not null && v.Any(char.IsControl)) throw new DomainException("invalid_value", "Supplier type must not contain control characters.");
+        SupplierType = v;
+    }
+
+    public static Supplier Create(Guid tenantId, Guid organisationId, string name, string? abn, string? vendorNumber, DateTime nowUtc, string? supplierType = null)
     {
         var cleanName = Guard.NotBlank(name, "Supplier name", 300);
         return new Supplier
@@ -142,8 +157,10 @@ public sealed partial class Supplier : ITenantOwned
             Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
             Name = cleanName, NormalisedName = NormaliseName(cleanName), Abn = NormaliseAbn(abn),
             VendorNumber = Guard.OptionalBounded(vendorNumber, "Vendor number", 50), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
-        };
+        }.WithType(supplierType);
     }
+
+    private Supplier WithType(string? supplierType) { SetSupplierType(supplierType); return this; }
 
     /// <summary>Records that a migration batch created this supplier (INV-41). The source record id is the vendor number, or the normalised name where there is none.</summary>
     public void MarkMigrated(string sourceSystem, string sourceRecordId, Guid batchId)
@@ -191,7 +208,39 @@ public sealed record NewContract(
     string InitialStatusCode, string CreatedBy, DateTime NowUtc, string? Description = null, string Classification = Classifications.Internal,
     string? CurrencyCode = null, decimal? EstimatedValue = null, string? ExtensionType = null, bool LegalReviewRequired = false,
     DateOnly? StartDate = null, DateOnly? EffectiveDate = null, DateOnly? ReviewDate = null, DateOnly? EndDate = null,
-    Guid? BusinessUnitId = null, Guid? SiteId = null);
+    Guid? BusinessUnitId = null, Guid? SiteId = null, Guid? LegalEntityId = null, string? ContractType = null, string? AgreementType = null, string? RiskLevel = null,
+    string? FunctionCode = null, string? SapOutlineAgreementNumber = null, int? NoticePeriodValue = null, string? NoticePeriodUnit = null, bool CriticalNotice = false);
+
+/// <summary>Units a notice period can be given in. The stored value and unit are what the business entered; <see cref="Contract.NoticePeriodDays"/> is derived from them for reminders.</summary>
+public static class NoticePeriods
+{
+    public const string Days = "Days", Weeks = "Weeks", Months = "Months";
+    public static readonly IReadOnlyList<string> Units = [Days, Weeks, Months];
+    public static string? Canonical(string? unit) => Units.FirstOrDefault(u => string.Equals(u, unit?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Both or neither must be given. Returns the canonical unit.</summary>
+    public static (int? Value, string? Unit) Check(int? value, string? unit)
+    {
+        var u = string.IsNullOrWhiteSpace(unit) ? null : Canonical(unit) ?? throw new DomainException("invalid_notice_unit", "The notice period unit must be Days, Weeks or Months.");
+        if (value is null && u is null) return (null, null);
+        if (value is null || u is null) throw new DomainException("invalid_notice", "Give both the notice period and its unit, or neither.");
+        var max = u == Months ? 120 : u == Weeks ? 520 : 3650;
+        if (value < 0 || value > max) throw new DomainException("invalid_notice", $"The notice period must be between 0 and {max} {u.ToLowerInvariant()}.");
+        return (value, u);
+    }
+
+    /// <summary>The notice period in days for reminders. Months count by the calendar back from the End Date when it is known (so "3 months" before 31 December is 92 days), otherwise 30 days a month.</summary>
+    public static int? ToDays(int? value, string? unit, DateOnly? endDate)
+    {
+        if (value is null || unit is null) return null;
+        return unit switch
+        {
+            Days => value,
+            Weeks => value * 7,
+            _ => endDate is { } end ? end.DayNumber - end.AddMonths(-value.Value).DayNumber : value * 30
+        };
+    }
+}
 
 /// <summary>One field's value before and after a controlled change.</summary>
 public sealed record FieldChange(string Field, string? Before, string? After);
@@ -213,6 +262,16 @@ public sealed class Contract : ITenantOwned
     public Guid CategoryId { get; private set; }
     public Guid? BusinessUnitId { get; private set; }
     public Guid? SiteId { get; private set; }
+    /// <summary>The legal entity that is party to the agreement (organisation structure).</summary>
+    public Guid? LegalEntityId { get; private set; }
+    /// <summary>The kind of commercial relationship (for example services, goods or licence). A configured code; it can feed the approval matrix.</summary>
+    public string? ContractType { get; private set; }
+    /// <summary>The form of the document (for example master agreement or statement of work). Drives workflow selection in some packs.</summary>
+    public string? AgreementType { get; private set; }
+    public string? RiskLevel { get; private set; }
+    /// <summary>The business function the agreement serves (a configured code).</summary>
+    public string? FunctionCode { get; private set; }
+    public string? SapOutlineAgreementNumber { get; private set; }
 
     /// <summary>Workflow state code. Changed only through <see cref="ApplyWorkflowState"/> by the workflow engine (INV-02).</summary>
     public string Status { get; private set; } = "";
@@ -239,7 +298,10 @@ public sealed class Contract : ITenantOwned
     public decimal? EstimatedValue { get; private set; }
     public string? ExtensionType { get; private set; }
     public bool LegalReviewRequired { get; private set; }
-    /// <summary>Notice period in days (Critical Notice reminders count back from End Date by this many days).</summary>
+    /// <summary>The notice period as entered, with its unit. Both or neither.</summary>
+    public int? NoticePeriodValue { get; private set; }
+    public string? NoticePeriodUnit { get; private set; }
+    /// <summary>Notice period in days, derived from the value and unit (Critical Notice reminders count back from End Date by this many days). Kept as a column so reminders and filters read one number.</summary>
     public int? NoticePeriodDays { get; private set; }
     /// <summary>The contract carries a notice deadline that must not be missed: its reminders start earlier and are tracked until acknowledged.</summary>
     public bool CriticalNotice { get; private set; }
@@ -279,9 +341,12 @@ public sealed class Contract : ITenantOwned
     {
         /// <summary>"Variation only": changed through an applied Variation.</summary>
         public static readonly IReadOnlyList<string> VariationFields =
-            ["businessUnitId", "siteId", "currencyCode", "estimatedValue", "extensionType", "noticePeriodDays", "criticalNotice", "reviewDate", "endDate"];
+            ["businessUnitId", "siteId", "legalEntityId", "riskLevel", "currencyCode", "estimatedValue", "extensionType", "noticePeriodValue", "noticePeriodUnit", "noticePeriodDays", "criticalNotice", "reviewDate", "endDate"];
         /// <summary>What an audited emergency unlock may name: the Variation fields plus the descriptive fields and classification (the "Admin unlock only" fields).</summary>
-        public static readonly IReadOnlyList<string> UnlockFields = [.. VariationFields, "contractTitle", "description", "classification"];
+        public static readonly IReadOnlyList<string> UnlockFields = [.. VariationFields, "contractTitle", "description", "classification", "contractType", "agreementType", "functionCode", "sapOutlineAgreementNumber"];
+        /// <summary>What an owner may change while the record is still a Draft (not locked or frozen). Identity, supplier, category, status and registration are never here.</summary>
+        public static readonly IReadOnlyList<string> DraftFields =
+            [.. UnlockFields.Where(f => f != "classification"), "legalReviewRequired", "startDate", "effectiveDate"];
     }
 
     public static string NormaliseReference(string? reference)
@@ -347,7 +412,8 @@ public sealed class Contract : ITenantOwned
     public static readonly IReadOnlyList<string> MigratableFields =
     [
         "contractTitle", "description", "status", "supplierId", "categoryId", "currencyCode", "estimatedValue", "extensionType",
-        "legalReviewRequired", "startDate", "effectiveDate", "reviewDate", "endDate"
+        "legalReviewRequired", "startDate", "effectiveDate", "reviewDate", "endDate",
+        "contractType", "agreementType", "riskLevel", "legalEntityId", "functionCode", "sapOutlineAgreementNumber", "businessUnitId", "siteId", "noticePeriodValue", "noticePeriodUnit", "criticalNotice"
     ];
 
     /// <summary>Current values of the named fields as invariant text. This is the before-image stored in the provenance record.</summary>
@@ -367,17 +433,100 @@ public sealed class Contract : ITenantOwned
                 "extensionType" => ExtensionType,
                 "legalReviewRequired" => LegalReviewRequired ? "true" : "false",
                 "noticePeriodDays" => NoticePeriodDays?.ToString(CultureInfo.InvariantCulture),
+                "noticePeriodValue" => NoticePeriodValue?.ToString(CultureInfo.InvariantCulture),
+                "noticePeriodUnit" => NoticePeriodUnit,
                 "criticalNotice" => CriticalNotice ? "true" : "false",
                 "classification" => Classification,
                 "businessUnitId" => BusinessUnitId?.ToString("D"),
                 "siteId" => SiteId?.ToString("D"),
+                "legalEntityId" => LegalEntityId?.ToString("D"),
+                "contractType" => ContractType,
+                "agreementType" => AgreementType,
+                "riskLevel" => RiskLevel,
+                "functionCode" => FunctionCode,
+                "sapOutlineAgreementNumber" => SapOutlineAgreementNumber,
                 "startDate" => StartDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 "effectiveDate" => EffectiveDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 "reviewDate" => ReviewDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 "endDate" => EndDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                _ => throw new DomainException("unknown_field", $"'{name}' is not a field a migration can set.")
+                _ => throw new DomainException("unknown_field", $"'{name}' is not a field that can be captured.")
             };
         return result;
+    }
+
+    /// <summary>The values being assembled while named fields are applied, so every path (migration, Variation, unlock, owner edit) parses and validates identically.</summary>
+    private sealed class Working(Contract c)
+    {
+        public string Title = c.ContractTitle; public string? Description = c.Description; public string Status = c.Status; public Guid Supplier = c.SupplierId; public Guid Category = c.CategoryId;
+        public string? Currency = c.CurrencyCode; public decimal? Value = c.EstimatedValue; public string? Extension = c.ExtensionType; public bool Legal = c.LegalReviewRequired;
+        public DateOnly? Start = c.StartDate, Effective = c.EffectiveDate, Review = c.ReviewDate, End = c.EndDate;
+        public string Classification = c.Classification; public bool Critical = c.CriticalNotice; public Guid? BusinessUnit = c.BusinessUnitId, Site = c.SiteId, LegalEntity = c.LegalEntityId;
+        public string? ContractType = c.ContractType, AgreementType = c.AgreementType, RiskLevel = c.RiskLevel, Function = c.FunctionCode, Sap = c.SapOutlineAgreementNumber, NoticeUnit = c.NoticePeriodUnit;
+        public int? NoticeValue = c.NoticePeriodValue;
+    }
+
+    private static string? Code(string? raw, string name, int max)
+    {
+        var v = Guard.OptionalBounded(raw, name, max);
+        if (v is null) return null;
+        if (v.Any(char.IsControl)) throw new DomainException("invalid_value", $"{name} must not contain control characters.");
+        return v;
+    }
+
+    private static Guid? OptionalGuid(string? raw, string name)
+        => string.IsNullOrWhiteSpace(raw) ? null : Guid.TryParse(raw, out var g) && g != Guid.Empty ? g : throw new DomainException("invalid_value", $"{name} is not a valid reference.");
+
+    private static void SetOne(Working w, string name, string? raw)
+    {
+        switch (name)
+        {
+            case "contractTitle": w.Title = Guard.NotBlank(raw, "Contract title", 500); break;
+            case "description": w.Description = Guard.OptionalBounded(raw, "Description", 4000); break;
+            case "status": w.Status = Guard.NotBlank(raw, "Status", 100); break;
+            case "supplierId": w.Supplier = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Supplier"); break;
+            case "categoryId": w.Category = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Category"); break;
+            case "currencyCode": w.Currency = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim().ToUpperInvariant(); break;
+            case "estimatedValue": w.Value = string.IsNullOrWhiteSpace(raw) ? null : decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var d) ? d : throw new DomainException("invalid_value", "Estimated value is not a number."); break;
+            case "extensionType": w.Extension = Code(raw, "Extension type", 50); break;
+            case "legalReviewRequired": w.Legal = string.Equals(raw, "true", StringComparison.Ordinal); break;
+            case "criticalNotice": w.Critical = string.Equals(raw, "true", StringComparison.Ordinal); break;
+            case "classification": w.Classification = Guard.NotBlank(raw, "Classification", 30); break;
+            case "startDate": w.Start = ParseDate(raw); break;
+            case "effectiveDate": w.Effective = ParseDate(raw); break;
+            case "reviewDate": w.Review = ParseDate(raw); break;
+            case "endDate": w.End = ParseDate(raw); break;
+            case "businessUnitId": w.BusinessUnit = OptionalGuid(raw, "Business unit"); break;
+            case "siteId": w.Site = OptionalGuid(raw, "Site"); break;
+            case "legalEntityId": w.LegalEntity = OptionalGuid(raw, "Legal entity"); break;
+            case "contractType": w.ContractType = Code(raw, "Contract type", 100); break;
+            case "agreementType": w.AgreementType = Code(raw, "Agreement type", 100); break;
+            case "riskLevel": w.RiskLevel = Code(raw, "Risk level", 50); break;
+            case "functionCode": w.Function = Code(raw, "Function", 100); break;
+            case "sapOutlineAgreementNumber": w.Sap = Code(raw, "SAP outline agreement number", 100); break;
+            case "noticePeriodValue": w.NoticeValue = string.IsNullOrWhiteSpace(raw) ? null : int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : throw new DomainException("invalid_notice", "The notice period is not a whole number."); break;
+            case "noticePeriodUnit": w.NoticeUnit = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim(); break;
+            case "noticePeriodDays": // the older single-number form: days
+                w.NoticeValue = string.IsNullOrWhiteSpace(raw) ? null : int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var days) ? days : throw new DomainException("invalid_notice", "The notice period is not a whole number.");
+                w.NoticeUnit = w.NoticeValue is null ? null : NoticePeriods.Days; break;
+            default: throw new DomainException("unknown_field", $"'{name}' is not a field that can be set this way.");
+        }
+    }
+
+    /// <summary>Checks the assembled values together and writes them to the record. Throws before anything is written.</summary>
+    private void Commit(Working w, string actor, DateTime nowUtc, bool changeStatusAndParents)
+    {
+        if (w.Value is < 0) throw new DomainException("invalid_value", "Estimated value must not be negative.");
+        if (w.Currency is not null && !Regex.IsMatch(w.Currency, "^[A-Z]{3}$", RegexOptions.NonBacktracking)) throw new DomainException("invalid_currency", "Currency must be a three-letter ISO 4217 code.");
+        if (w.Value.HasValue && w.Currency is null) throw new DomainException("currency_required", "A currency is required when an estimated value is given.");
+        if (w.Start.HasValue && w.End.HasValue && w.End < w.Start) throw new DomainException("invalid_dates", "End date must not be before the start date.");
+        var (noticeValue, noticeUnit) = NoticePeriods.Check(w.NoticeValue, w.NoticeUnit);
+        ContractTitle = w.Title; Description = w.Description; CurrencyCode = w.Currency; EstimatedValue = w.Value; ExtensionType = w.Extension; LegalReviewRequired = w.Legal;
+        StartDate = w.Start; EffectiveDate = w.Effective; ReviewDate = w.Review; EndDate = w.End; Classification = w.Classification; CriticalNotice = w.Critical;
+        BusinessUnitId = w.BusinessUnit; SiteId = w.Site; LegalEntityId = w.LegalEntity; ContractType = w.ContractType; AgreementType = w.AgreementType; RiskLevel = w.RiskLevel;
+        FunctionCode = w.Function; SapOutlineAgreementNumber = w.Sap;
+        NoticePeriodValue = noticeValue; NoticePeriodUnit = noticeUnit; NoticePeriodDays = NoticePeriods.ToDays(noticeValue, noticeUnit, w.End);
+        if (changeStatusAndParents) { Status = w.Status; SupplierId = w.Supplier; CategoryId = w.Category; }
+        Touch(actor, nowUtc);
     }
 
     /// <summary>
@@ -388,36 +537,13 @@ public sealed class Contract : ITenantOwned
     {
         if (RecordLocked && !lockedOverwriteAuthorised)
             throw new DomainException("record_locked", "This record is locked. A migration may overwrite it only under an explicit legacy-load policy.");
-        var title = ContractTitle; var description = Description; var status = Status; var supplier = SupplierId; var category = CategoryId;
-        var currency = CurrencyCode; var value = EstimatedValue; var extension = ExtensionType; var legal = LegalReviewRequired;
-        var start = StartDate; var effective = EffectiveDate; var review = ReviewDate; var end = EndDate;
+        var w = new Working(this);
         foreach (var (name, raw) in fields)
         {
-            switch (name)
-            {
-                case "contractTitle": title = Guard.NotBlank(raw, "Contract title", 500); break;
-                case "description": description = Guard.OptionalBounded(raw, "Description", 4000); break;
-                case "status": status = Guard.NotBlank(raw, "Status", 100); break;
-                case "supplierId": supplier = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Supplier"); break;
-                case "categoryId": category = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Category"); break;
-                case "currencyCode": currency = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim().ToUpperInvariant(); break;
-                case "estimatedValue": value = string.IsNullOrWhiteSpace(raw) ? null : decimal.Parse(raw, NumberStyles.Number, CultureInfo.InvariantCulture); break;
-                case "extensionType": extension = Guard.OptionalBounded(raw, "Extension type", 50); break;
-                case "legalReviewRequired": legal = string.Equals(raw, "true", StringComparison.Ordinal); break;
-                case "startDate": start = ParseDate(raw); break;
-                case "effectiveDate": effective = ParseDate(raw); break;
-                case "reviewDate": review = ParseDate(raw); break;
-                case "endDate": end = ParseDate(raw); break;
-                default: throw new DomainException("unknown_field", $"'{name}' is not a field a migration can set.");
-            }
+            if (!MigratableFields.Contains(name, StringComparer.Ordinal)) throw new DomainException("unknown_field", $"'{name}' is not a field a migration can set.");
+            SetOne(w, name, raw);
         }
-        if (value is < 0) throw new DomainException("invalid_value", "Estimated value must not be negative.");
-        if (currency is not null && !Regex.IsMatch(currency, "^[A-Z]{3}$", RegexOptions.NonBacktracking)) throw new DomainException("invalid_currency", "Currency must be a three-letter ISO 4217 code.");
-        if (value.HasValue && currency is null) throw new DomainException("currency_required", "A currency is required when an estimated value is given.");
-        if (start.HasValue && end.HasValue && end < start) throw new DomainException("invalid_dates", "End date must not be before the start date.");
-        (ContractTitle, Description, Status, SupplierId, CategoryId, CurrencyCode, EstimatedValue, ExtensionType, LegalReviewRequired, StartDate, EffectiveDate, ReviewDate, EndDate) =
-            (title, description, status, supplier, category, currency, value, extension, legal, start, effective, review, end);
-        Touch(actor, nowUtc);
+        Commit(w, actor, nowUtc, changeStatusAndParents: true);
     }
 
     /// <summary>
@@ -429,38 +555,29 @@ public sealed class Contract : ITenantOwned
         foreach (var name in changes.Keys)
             if (!allowed.Contains(name, StringComparer.Ordinal))
                 throw new DomainException("field_not_changeable", $"'{name}' cannot be changed this way.");
-        var before = CaptureFields(changes.Keys);
-        string? title = ContractTitle, description = Description, currency = CurrencyCode, extension = ExtensionType, classification = Classification;
-        decimal? value = EstimatedValue; int? notice = NoticePeriodDays; var critical = CriticalNotice; var review = ReviewDate; var end = EndDate; var bu = BusinessUnitId; var site = SiteId;
-        foreach (var (name, raw) in changes)
-        {
-            switch (name)
-            {
-                case "contractTitle": title = Guard.NotBlank(raw, "Contract title", 500); break;
-                case "description": description = Guard.OptionalBounded(raw, "Description", 4000); break;
-                case "currencyCode": currency = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim().ToUpperInvariant(); break;
-                case "estimatedValue": value = string.IsNullOrWhiteSpace(raw) ? null : decimal.Parse(raw, NumberStyles.Number, CultureInfo.InvariantCulture); break;
-                case "extensionType": extension = Guard.OptionalBounded(raw, "Extension type", 50); break;
-                case "noticePeriodDays": notice = string.IsNullOrWhiteSpace(raw) ? null : int.Parse(raw, CultureInfo.InvariantCulture); break;
-                case "criticalNotice": critical = string.Equals(raw, "true", StringComparison.Ordinal); break;
-                case "classification": classification = Guard.NotBlank(raw, "Classification", 30); break;
-                case "reviewDate": review = ParseDate(raw); break;
-                case "endDate": end = ParseDate(raw); break;
-                case "businessUnitId": bu = string.IsNullOrWhiteSpace(raw) ? null : Guid.Parse(raw); break;
-                case "siteId": site = string.IsNullOrWhiteSpace(raw) ? null : Guid.Parse(raw); break;
-                default: throw new DomainException("field_not_changeable", $"'{name}' cannot be changed this way.");
-            }
-        }
-        if (value is < 0) throw new DomainException("invalid_value", "Estimated value must not be negative.");
-        if (currency is not null && !Regex.IsMatch(currency, "^[A-Z]{3}$", RegexOptions.NonBacktracking)) throw new DomainException("invalid_currency", "Currency must be a three-letter ISO 4217 code.");
-        if (value.HasValue && currency is null) throw new DomainException("currency_required", "A currency is required when an estimated value is given.");
-        if (notice is < 0) throw new DomainException("invalid_notice", "The notice period must not be negative.");
-        if (StartDate.HasValue && end.HasValue && end < StartDate) throw new DomainException("invalid_dates", "End date must not be before the start date.");
-        (ContractTitle, Description, CurrencyCode, EstimatedValue, ExtensionType, Classification, NoticePeriodDays, CriticalNotice, ReviewDate, EndDate, BusinessUnitId, SiteId) =
-            (title, description, currency, value, extension, classification, notice, critical, review, end, bu, site);
-        Touch(actor, nowUtc);
-        var after = CaptureFields(changes.Keys);
-        return changes.Keys.Where(k => !string.Equals(before[k], after[k], StringComparison.Ordinal)).Select(k => new FieldChange(k, before[k], after[k])).ToList();
+        return Change(changes, actor, nowUtc);
+    }
+
+    /// <summary>The owner's edit of the descriptive and classifying facts of a record that can still be edited (not locked, not frozen). Returns what changed.</summary>
+    public IReadOnlyList<FieldChange> EditFields(IReadOnlyDictionary<string, string?> changes, string actor, DateTime nowUtc)
+    {
+        EnsureEditable(nowUtc);
+        foreach (var name in changes.Keys)
+            if (!Editable.DraftFields.Contains(name, StringComparer.Ordinal))
+                throw new DomainException("field_not_changeable", $"'{name}' cannot be changed here.");
+        return Change(changes, actor, nowUtc);
+    }
+
+    private IReadOnlyList<FieldChange> Change(IReadOnlyDictionary<string, string?> changes, string actor, DateTime nowUtc)
+    {
+        // Notice period and End Date together decide the derived days, so what changed is judged on the named fields plus the derived one.
+        var names = changes.Keys.Concat(changes.Keys.Any(k => k.StartsWith("noticePeriod", StringComparison.Ordinal) || k == "endDate") ? ["noticePeriodDays"] : []).Distinct().ToList();
+        var before = CaptureFields(names);
+        var w = new Working(this);
+        foreach (var (name, raw) in changes) SetOne(w, name, raw);
+        Commit(w, actor, nowUtc, changeStatusAndParents: false);
+        var after = CaptureFields(names);
+        return names.Where(k => !string.Equals(before[k], after[k], StringComparison.Ordinal)).Select(k => new FieldChange(k, before[k], after[k])).ToList();
     }
 
     /// <summary>Sets how many days ahead the contract's owners are reminded. A reminder preference, not contract content, so it can change in any workflow state.</summary>
@@ -477,7 +594,9 @@ public sealed class Contract : ITenantOwned
         EnsureEditable(nowUtc);
         if (leadDays is <= 0 or > 3650) throw new DomainException("invalid_lead", "The reminder lead time must be between 1 and 3650 days.");
         if (noticePeriodDays is < 0 or > 3650) throw new DomainException("invalid_notice", "The notice period must be between 0 and 3650 days.");
-        ReminderLeadDays = leadDays; NoticePeriodDays = noticePeriodDays; CriticalNotice = criticalNotice;
+        ReminderLeadDays = leadDays; CriticalNotice = criticalNotice;
+        // The reminder form gives days; keep the entered value and unit and the derived days consistent with that.
+        NoticePeriodValue = noticePeriodDays; NoticePeriodUnit = noticePeriodDays is null ? null : NoticePeriods.Days; NoticePeriodDays = noticePeriodDays;
         Touch(actor, nowUtc);
     }
 
@@ -522,6 +641,7 @@ public sealed class Contract : ITenantOwned
         if (!Classifications.Default.Contains(n.Classification))
             throw new DomainException("invalid_classification", $"Classification '{n.Classification}' is not recognised.");
 
+        var notice = NoticePeriods.Check(n.NoticePeriodValue, n.NoticePeriodUnit);
         var actor = Guard.NotBlank(n.CreatedBy, "Created by", 200);
         return new Contract
         {
@@ -531,7 +651,11 @@ public sealed class Contract : ITenantOwned
             CategoryId = Guard.NotEmpty(n.CategoryId, nameof(n.CategoryId)), Classification = n.Classification, CurrencyCode = currency,
             EstimatedValue = n.EstimatedValue, ExtensionType = Guard.OptionalBounded(n.ExtensionType, "Extension type", 50),
             LegalReviewRequired = n.LegalReviewRequired, StartDate = n.StartDate, EffectiveDate = n.EffectiveDate, ReviewDate = n.ReviewDate,
-            EndDate = n.EndDate, BusinessUnitId = n.BusinessUnitId, SiteId = n.SiteId, CreatedUtc = Guard.Utc(n.NowUtc, nameof(n.NowUtc)), CreatedBy = actor, UpdatedUtc = n.NowUtc, UpdatedBy = actor
+            EndDate = n.EndDate, BusinessUnitId = n.BusinessUnitId, SiteId = n.SiteId, LegalEntityId = n.LegalEntityId, ContractType = Code(n.ContractType, "Contract type", 100),
+            AgreementType = Code(n.AgreementType, "Agreement type", 100), RiskLevel = Code(n.RiskLevel, "Risk level", 50), FunctionCode = Code(n.FunctionCode, "Function", 100),
+            SapOutlineAgreementNumber = Code(n.SapOutlineAgreementNumber, "SAP outline agreement number", 100), CriticalNotice = n.CriticalNotice,
+            NoticePeriodValue = notice.Value, NoticePeriodUnit = notice.Unit, NoticePeriodDays = NoticePeriods.ToDays(notice.Value, notice.Unit, n.EndDate),
+            CreatedUtc = Guard.Utc(n.NowUtc, nameof(n.NowUtc)), CreatedBy = actor, UpdatedUtc = n.NowUtc, UpdatedBy = actor
         };
     }
 
@@ -600,7 +724,7 @@ public sealed class Contract : ITenantOwned
         var c = Build(n);
         c.Status = Guard.NotBlank(n.InitialStatusCode, "Initial status", 100);
         c.PredecessorContractId = Guard.NotEmpty(predecessorId, nameof(predecessorId));
-        c.NoticePeriodDays = noticePeriodDays; c.CriticalNotice = criticalNotice; c.ReminderLeadDays = reminderLeadDays;
+        c.NoticePeriodValue = noticePeriodDays; c.NoticePeriodUnit = noticePeriodDays is null ? null : NoticePeriods.Days; c.NoticePeriodDays = noticePeriodDays; c.CriticalNotice = criticalNotice; c.ReminderLeadDays = reminderLeadDays;
         return c;
     }
 
@@ -620,6 +744,12 @@ public sealed class Contract : ITenantOwned
 
     /// <summary>The record cannot be edited through the ordinary paths: locked (and not under an open unlock), or its content is frozen by the workflow state.</summary>
     public bool IsProtectedAt(DateTime nowUtc) => (RecordLocked && !IsUnlockedAt(nowUtc)) || ContentFrozen;
+
+    /// <summary>Refuses (with the reason shown to the person) unless the record can be edited through the ordinary paths.</summary>
+    public void EnsureOpenForEdit(DateTime nowUtc) => EnsureEditable(nowUtc);
+
+    /// <summary>Marks the record as changed by someone (custom field values changed): moves the concurrency token so two simultaneous edits cannot both win.</summary>
+    public void RecordChange(string actor, DateTime nowUtc) => Touch(actor, nowUtc);
 
     private void EnsureEditable(DateTime nowUtc)
     {

@@ -15,7 +15,7 @@ namespace Ecp.Approvals.Definitions;
 /// would disappear, and each publication writes an audit event naming what changed row by row.
 /// </summary>
 internal sealed class ApprovalMatrixKind(
-    IClassificationScaleProvider scales, IAccessDirectory directory, IClock clock, IAuditWriter audit, IApprovalReferenceData? reference = null, IApprovalMatrixReferences? references = null) : IConfigurationKind
+    IClassificationScaleProvider scales, IAccessDirectory directory, IClock clock, IAuditWriter audit, IApprovalReferenceData? reference = null, IApprovalMatrixReferences? references = null, IServiceProvider? services = null) : IConfigurationKind
 {
     public string Kind => ApprovalsModule.MatrixKind;
 
@@ -30,6 +30,33 @@ internal sealed class ApprovalMatrixKind(
         foreach (var group in set.Matrices.SelectMany(m => m.Rows).SelectMany(r => r.Steps).Select(s => s.ApproverGroup).Where(g => !string.IsNullOrWhiteSpace(g)).Distinct(StringComparer.Ordinal).Take(100))
             if ((await directory.ApproversAsync(group, clock.UtcNow, ct)).Count == 0)
                 messages.Add(new ValidationMessage(ValidationSeverity.Warning, "$.matrices", "group_empty", $"Nobody currently holds the approver group '{group}'. A submission that reaches a step for it is blocked until someone does."));
+
+        // Only conditions the platform can really judge are allowed: a row on a fact that nothing supplies would never match.
+        // Resolved on use: the fact source reaches the configuration service, which is building this very list of kinds.
+        if (services?.GetService(typeof(IApprovalFactSource)) is IApprovalFactSource facts)
+        {
+            var live = await facts.CatalogueAsync(organisationId, ct);
+            foreach (var m in set.Matrices)
+                foreach (var row in m.Rows)
+                {
+                    var w = row.When; var path = $"$.matrices[{m.Code}].rows[{row.Code}].when";
+                    void Need(bool used, string dimension, string label)
+                    {
+                        if (used && !live.Dimensions.Contains(dimension)) messages.Add(new ValidationMessage(ValidationSeverity.Error, path, "fact_unavailable", $"This platform does not yet supply {label} when an approval is submitted, so a rule on it could never match. Remove the condition."));
+                    }
+                    Need(w.HasValueBounds, ApprovalFactCatalogue.Value, "the value");
+                    Need(w.Categories.Count > 0, ApprovalFactCatalogue.Categories, "the category");
+                    Need(w.ContractTypes.Count > 0, ApprovalFactCatalogue.ContractTypes, "the contract type");
+                    Need(w.LegalEntities.Count > 0, ApprovalFactCatalogue.LegalEntities, "the legal entity");
+                    Need(w.BusinessUnits.Count > 0, ApprovalFactCatalogue.BusinessUnits, "the business unit");
+                    Need(w.Sites.Count > 0, ApprovalFactCatalogue.Sites, "the site");
+                    Need(w.Classifications.Count > 0, ApprovalFactCatalogue.Classifications, "the classification");
+                    Need(w.RiskLevels.Count > 0, ApprovalFactCatalogue.RiskLevels, "the risk level");
+                    Need(w.SupplierTypes.Count > 0, ApprovalFactCatalogue.SupplierTypes, "the supplier type");
+                    foreach (var c in w.Custom)
+                        if (!live.CustomKeys.Contains(c.Field)) messages.Add(new ValidationMessage(ValidationSeverity.Error, path, "fact_unavailable", $"The custom field '{c.Field}' is not available to approvals. Publish it as a field that is marked usable in approvals, or remove the condition."));
+                }
+        }
 
         if (references is not null)
             foreach (var code in await references.ReferencedMatrixCodesAsync(organisationId, ct))

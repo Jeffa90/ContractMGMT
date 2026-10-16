@@ -1,4 +1,5 @@
 using Ecp.Contracts.Domain;
+using Ecp.Contracts.Register;
 using Ecp.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -12,6 +13,8 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<CategoryAssignment> CategoryAssignments => Set<CategoryAssignment>();
     public DbSet<ReferenceCounter> ReferenceCounters => Set<ReferenceCounter>();
+    public DbSet<ContractCustomValue> CustomValues => Set<ContractCustomValue>();
+    public DbSet<SavedView> SavedViews => Set<SavedView>();
     protected override string SchemaName => ContractsModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
@@ -45,6 +48,41 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.HasIndex(x => new { x.TenantId, x.UserId });
         });
 
+        mb.Entity<ContractCustomValue>(e =>
+        {
+            e.ToTable("ContractCustomValue");
+            e.HasKey(x => new { x.TenantId, x.ContractId, x.FieldKey, x.Ordinal });
+            e.Property(x => x.FieldKey).HasMaxLength(64).IsRequired();
+            e.Property(x => x.TextValue).HasMaxLength(450);
+            e.Property(x => x.LongTextValue);
+            e.Property(x => x.NumberValue).HasPrecision(28, 8);
+            e.Property(x => x.UpdatedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.SourceSystem).HasMaxLength(100);
+            e.Property(x => x.SourceValue).HasMaxLength(450);
+            // Composite foreign key including TenantId: a value can never point at another tenant's contract.
+            e.HasOne<Contract>().WithMany().HasForeignKey(x => new { x.TenantId, x.ContractId }).HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+            // One narrow index per typed column: a filter or sort on a field is a seek on (tenant, field, value). Each holds only the rows that use that column.
+            e.HasIndex(x => new { x.TenantId, x.FieldKey, x.TextValue }).HasFilter("[TextValue] IS NOT NULL").HasDatabaseName("IX_CustomValue_Text");
+            e.HasIndex(x => new { x.TenantId, x.FieldKey, x.NumberValue }).HasFilter("[NumberValue] IS NOT NULL").HasDatabaseName("IX_CustomValue_Number");
+            e.HasIndex(x => new { x.TenantId, x.FieldKey, x.DateValue }).HasFilter("[DateValue] IS NOT NULL").HasDatabaseName("IX_CustomValue_Date");
+            e.HasIndex(x => new { x.TenantId, x.FieldKey, x.DateTimeValue }).HasFilter("[DateTimeValue] IS NOT NULL").HasDatabaseName("IX_CustomValue_DateTime");
+            e.HasIndex(x => new { x.TenantId, x.FieldKey, x.BoolValue }).HasFilter("[BoolValue] IS NOT NULL").HasDatabaseName("IX_CustomValue_Bool");
+            e.HasIndex(x => new { x.TenantId, x.FieldKey, x.RefValue }).HasFilter("[RefValue] IS NOT NULL").HasDatabaseName("IX_CustomValue_Ref");
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.FieldKey });
+            e.HasIndex(x => new { x.TenantId, x.MigrationBatchId }).HasFilter("[MigrationBatchId] IS NOT NULL");
+        });
+
+        mb.Entity<SavedView>(e =>
+        {
+            e.ToTable("SavedView");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.DefinitionJson).IsRequired();
+            e.Property(x => x.RowVersion);
+            e.HasIndex(x => new { x.TenantId, x.OwnerUserId, x.Name }).IsUnique();
+        });
+
         mb.Entity<ReferenceCounter>(e =>
         {
             e.ToTable("ReferenceCounter");
@@ -61,6 +99,7 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.Property(x => x.LegalName).HasMaxLength(300);
             e.Property(x => x.Abn).HasMaxLength(11).IsFixedLength();
             e.Property(x => x.VendorNumber).HasMaxLength(50);
+            e.Property(x => x.SupplierType).HasMaxLength(100);
             e.Property(x => x.Status).HasMaxLength(20);
             e.Property(x => x.SourceSystem).HasMaxLength(100);
             e.Property(x => x.SourceRecordId).HasMaxLength(200);
@@ -68,6 +107,7 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.HasAlternateKey(x => new { x.TenantId, x.Id });
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.NormalisedName });
             e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.SupplierType });
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.VendorNumber }).IsUnique().HasFilter("[VendorNumber] IS NOT NULL");
         });
 
@@ -85,6 +125,12 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.Property(x => x.CurrencyCode).HasMaxLength(3).IsFixedLength();
             e.Property(x => x.EstimatedValue).HasPrecision(19, 4);
             e.Property(x => x.ExtensionType).HasMaxLength(50);
+            e.Property(x => x.ContractType).HasMaxLength(100);
+            e.Property(x => x.AgreementType).HasMaxLength(100);
+            e.Property(x => x.RiskLevel).HasMaxLength(50);
+            e.Property(x => x.FunctionCode).HasMaxLength(100);
+            e.Property(x => x.SapOutlineAgreementNumber).HasMaxLength(100);
+            e.Property(x => x.NoticePeriodUnit).HasMaxLength(10);
             e.Property(x => x.RegisteredBy).HasMaxLength(200);
             e.Property(x => x.RegisteredDateProvenance).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.SourceRegisteredValue).HasMaxLength(200);
@@ -100,6 +146,11 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.PredecessorContractId });
             e.HasIndex(x => new { x.TenantId, x.SuccessorContractId });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.ContractType });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.RiskLevel });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.BusinessUnitId });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.SiteId });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.LegalEntityId });
             e.HasIndex(x => new { x.TenantId, x.EndDate });
             e.HasIndex(x => new { x.TenantId, x.ReviewDate });
             e.Property(x => x.CreatedBy).HasMaxLength(200);

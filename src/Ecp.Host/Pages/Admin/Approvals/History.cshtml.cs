@@ -10,7 +10,7 @@ namespace Ecp.Host.Pages.Admin.Approvals;
 
 /// <summary>The history of the approval matrix: every release (who published it, when, a checksum, whether it was a rollback) and the audit events about matrices, delegations, simulations and blocked submissions.</summary>
 [Authorize(Policy = "perm:approvals.matrix.read")]
-public sealed class HistoryModel(IConfigurationService configuration, IAuditBrowser audit, IOrganisationStructureService organisations, IAccessService access) : EcpPageModel
+public sealed class HistoryModel(IConfigurationService configuration, IAuditBrowser audit, IOrganisationStructureService organisations, IAccessService access, IApprovalSimulator simulator) : EcpPageModel
 {
     public static readonly IReadOnlyList<(string Key, string Title, string Prefix)> Filters =
     [
@@ -32,6 +32,7 @@ public sealed class HistoryModel(IConfigurationService configuration, IAuditBrow
         Organisations = await OrganisationChoices.AllowedAsync(organisations, access, ct, "approvals.matrix.read");
         OrganisationId ??= Organisations.FirstOrDefault()?.Id;
         if (OrganisationId is not { } org) return Page();
+        await simulator.MatricesAsync(org, MatrixSource.Published, ct);     // the page is for matrix readers of this organisation; an approver's right is only for their own request
         try { Releases = await configuration.ReleasesAsync(ApprovalsModule.MatrixKind, org, ct); } catch (ForbiddenException) { ReleasesDenied = "You cannot read the version history."; }
         var prefix = Filters.FirstOrDefault(f => f.Key == Show).Prefix ?? "approval.";
         try { Events = await audit.QueryAsync(new AuditFilter(Action: prefix, OrganisationId: org, Page: Math.Max(1, PageNumber), PageSize: 50), ct); }

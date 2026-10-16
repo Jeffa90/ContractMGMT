@@ -25,10 +25,12 @@ internal static class Modules
     [
         ("Ecp.SharedKernel", typeof(Ids).Assembly, 0),
         ("Ecp.Persistence", typeof(TenantDbContext).Assembly, 0),
+        ("Ecp.Formats", typeof(Ecp.Formats.CsvReader).Assembly, 0),
         ("Ecp.Audit", typeof(AuditModule).Assembly, 1),
         ("Ecp.Tenancy", typeof(TenancyModule).Assembly, 2),
         ("Ecp.Identity", typeof(IdentityModule).Assembly, 3),
         ("Ecp.Configuration", typeof(ConfigurationModule).Assembly, 5),
+        ("Ecp.Metadata", typeof(Ecp.Metadata.MetadataModule).Assembly, 5),
         ("Ecp.Contracts", typeof(ContractsModule).Assembly, 6),
         ("Ecp.Documents", typeof(DocumentsModule).Assembly, 6),
         ("Ecp.Approvals", typeof(Ecp.Approvals.ApprovalsModule).Assembly, 6),
@@ -45,9 +47,10 @@ internal static class Modules
     [
         ("Ecp.Persistence", "Ecp.SharedKernel"),
         ("Ecp.Contracts", "Ecp.Documents"),
+        ("Ecp.Metadata", "Ecp.Configuration"),
     ];
 
-    public static readonly string[] ModuleNames = ["Audit", "Tenancy", "Identity", "Configuration", "Contracts", "Documents", "Approvals", "DataMigration", "Lifecycle", "Notifications", "Operations", "Setup"];
+    public static readonly string[] ModuleNames = ["Audit", "Tenancy", "Identity", "Configuration", "Metadata", "Contracts", "Documents", "Approvals", "DataMigration", "Lifecycle", "Notifications", "Operations", "Setup"];
 }
 
 [Trait("Category", "Architecture")]

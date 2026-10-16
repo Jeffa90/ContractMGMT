@@ -135,10 +135,13 @@ internal sealed partial class RegisterAuthorisationService
             if (mine is { } m) part = state.Steps.First(x => x.Step.Key == m.StepKey).Step.Display + (m.Placement.OnBehalfOfName is { } ob ? $" (on behalf of {ob})" : "");
             else note = why ?? (request.SubmittedByUserId == me ? "You submitted this request, so someone else must decide it." : "You are not one of the people who can respond to an open step.");
         }
-        // How the plan was reached, and why people were left out, is for the administrators who maintain the matrix (they hold approvals.matrix.read).
+        // How the plan was reached, and why people were left out, is for the administrators who maintain the matrix (they hold approvals.matrix.read for the organisation).
+        // An approver assigned to an open step holds the same permission only for the request they are assigned to: they see the release, the trace and the people included, never the reasons others were left out.
         IReadOnlyList<TraceEntry>? trace = null; IReadOnlyList<ApproverExplanation>? explanations = null;
         if (descriptor.OrganisationId is { } org && (await access.CheckSilentAsync("approvals.matrix.read", new ResourceDescriptor("ApprovalMatrix", descriptor.TenantId, org, Dimensions: ScopeDimensions.OrganisationOnly), ct)).Allowed)
         { trace = stored.Trace; explanations = stored.Explanations; }
+        else if (request.Status == ApprovalStatus.Pending && (await access.CheckSilentAsync("approvals.matrix.read", descriptor with { PendingApprovalGroupKeys = request.PendingGroups.ToHashSet(StringComparer.Ordinal) }, ct)).Allowed)
+        { trace = stored.Trace; explanations = stored.Explanations.Where(e => e.Included).ToList(); }
         return new PlanView(plan.MatrixCode, plan.MatrixName, plan.ReleaseNumber, plan.EffectiveDate, state.Status.ToString(), state.ActiveStage is { } a ? a + 1 : null, steps, part, note, trace, explanations);
     }
 }

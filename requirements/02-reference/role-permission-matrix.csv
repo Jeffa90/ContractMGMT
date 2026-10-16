@@ -64,7 +64,7 @@ contracts.suspend,,,,,,Y,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction
 legal.respond,,,,,,,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
 notifications.administer,,Y,,,,Y,,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
 reminders.configure,,,,,,Y,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
-approvals.matrix.read,,Y,Y,,Y,Y,,,,,Y,,DR-2026-10-16 approval matrix slice (permission added by the implementation of WFE-02; awaiting owner confirmation)
-approvals.simulate,,Y,Y,,Y,Y,,,,,,,DR-2026-10-16 approval matrix slice (permission added by the implementation of WFE-02; awaiting owner confirmation)
-approvals.delegate,,,,,,,,,Y,Y,,,DR-2026-10-16 approval matrix slice (permission added by the implementation of WFE-02; awaiting owner confirmation)
-approvals.delegate.administer,,Y,,,,Y,,,,,,,DR-2026-10-16 approval matrix slice (permission added by the implementation of WFE-02; awaiting owner confirmation)
+approvals.matrix.read,Y,Y,Y,,Y,Y,,,S,,Y,,DR-2026-10-16 (approval matrix permissions) owner confirmation of the approval matrix permission allocation (Approver: only the release and explanation of a request assigned to them)
+approvals.simulate,Y,Y,Y,,Y,Y,,,,,Y,,DR-2026-10-16 (approval matrix permissions) owner confirmation of the approval matrix permission allocation
+approvals.delegate,,,,,,,,,Y,Y,,,DR-2026-10-16 (approval matrix permissions) owner confirmation of the approval matrix permission allocation (own authority only)
+approvals.delegate.administer,Y,Y,Y,,,,,,,,,,DR-2026-10-16 (approval matrix permissions) owner confirmation of the approval matrix permission allocation (Procurement Administrator only by explicit assignment, which no default grants)

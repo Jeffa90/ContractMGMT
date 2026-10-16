@@ -6,6 +6,12 @@
     <ProjectReference Include="../Ecp.Tenancy/Ecp.Tenancy.csproj" />
     <ProjectReference Include="../Ecp.Identity/Ecp.Identity.csproj" />
     <ProjectReference Include="../Ecp.Documents/Ecp.Documents.csproj" />
+    <ProjectReference Include="../Ecp.Configuration/Ecp.Configuration.csproj" />
+    <ProjectReference Include="../Ecp.Metadata/Ecp.Metadata.csproj" />
+    <ProjectReference Include="../../Ecp.Formats/Ecp.Formats.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Register/system-views.json" LogicalName="Ecp.Contracts.system-views.json" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />

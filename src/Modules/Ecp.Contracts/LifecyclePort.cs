@@ -14,7 +14,9 @@ public sealed record ContractFacts(
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? ReviewDate, DateOnly? EndDate, int? NoticePeriodDays, bool CriticalNotice, int? ReminderLeadDays,
     DateTime? RegisteredDateUtc, string? RegisteredBy, string? WorkflowRef, Guid? ConfigReleaseId, Guid? ActiveUnlockId, DateTime? UnlockExpiresUtc,
     Guid? PredecessorContractId, Guid? SuccessorContractId, bool IsArchived, bool IsLegacyLoad, string CreatedBy, DateTime CreatedUtc, DateTime UpdatedUtc, string? Description,
-    string? LockReason, string? LockedBy, DateTime? LockedUtc);
+    string? LockReason, string? LockedBy, DateTime? LockedUtc,
+    Guid? LegalEntityId = null, string? ContractType = null, string? AgreementType = null, string? RiskLevel = null, string? FunctionCode = null, string? SapOutlineAgreementNumber = null,
+    int? NoticePeriodValue = null, string? NoticePeriodUnit = null, string? SupplierType = null);
 
 /// <summary>What a new contract starts as: its initial state and protection, and the workflow definition it is pinned to. Supplied by the lifecycle module when it is registered.</summary>
 public sealed record ContractCreationSetup(string InitialStatus, StateEffects Effects, string? WorkflowRef, Guid? ConfigReleaseId);
@@ -87,15 +89,18 @@ public interface IContractLifecyclePort
 internal sealed class ContractLifecyclePort(
     ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, ITenantContext tenant, ContractAccessContext context, ReferenceAllocator allocator, Ecp.Identity.IClassificationScaleProvider scales) : IContractLifecyclePort
 {
-    private static ContractFacts ToFacts(Contract c) => new(c.Id, c.TenantId, c.OrganisationId, c.AgreementReference, c.ContractTitle, c.Status, c.RecordLocked, c.ContentFrozen, c.DocumentPolicy,
+    private static ContractFacts ToFacts(Contract c, string? supplierType = null) => new(c.Id, c.TenantId, c.OrganisationId, c.AgreementReference, c.ContractTitle, c.Status, c.RecordLocked, c.ContentFrozen, c.DocumentPolicy,
         c.Classification, c.SupplierId, c.CategoryId, c.BusinessUnitId, c.SiteId, c.LegalReviewRequired, c.CurrencyCode, c.EstimatedValue, c.ExtensionType, c.StartDate, c.EffectiveDate,
         c.ReviewDate, c.EndDate, c.NoticePeriodDays, c.CriticalNotice, c.ReminderLeadDays, c.RegisteredDateUtc, c.RegisteredBy, c.WorkflowRef, c.ConfigReleaseId, c.ActiveUnlockId,
-        c.UnlockExpiresUtc, c.PredecessorContractId, c.SuccessorContractId, c.IsArchived, c.IsLegacyLoad, c.CreatedBy, c.CreatedUtc, c.UpdatedUtc, c.Description, c.LockReason, c.LockedBy, c.LockedUtc);
+        c.UnlockExpiresUtc, c.PredecessorContractId, c.SuccessorContractId, c.IsArchived, c.IsLegacyLoad, c.CreatedBy, c.CreatedUtc, c.UpdatedUtc, c.Description, c.LockReason, c.LockedBy, c.LockedUtc,
+        c.LegalEntityId, c.ContractType, c.AgreementType, c.RiskLevel, c.FunctionCode, c.SapOutlineAgreementNumber, c.NoticePeriodValue, c.NoticePeriodUnit, supplierType);
 
     public async Task<ContractFacts?> FindAsync(Guid contractId, CancellationToken ct = default)
     {
         var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct);
-        return c is null ? null : ToFacts(c);
+        if (c is null) return null;
+        var type = await db.Suppliers.AsNoTracking().Where(x => x.Id == c.SupplierId).Select(x => x.SupplierType).FirstOrDefaultAsync(ct);
+        return ToFacts(c, type);
     }
 
     public async Task<IReadOnlyList<ContractFacts>> FindManyAsync(IReadOnlyCollection<Guid> contractIds, CancellationToken ct = default)
@@ -106,7 +111,10 @@ internal sealed class ContractLifecyclePort(
             var ids = chunk.ToList();
             rows.AddRange(await db.Contracts.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync(ct));
         }
-        return rows.Select(ToFacts).ToList();
+        var supplierIds = rows.Select(r => r.SupplierId).Distinct().ToList();
+        var types = new Dictionary<Guid, string?>();
+        foreach (var chunk in supplierIds.Chunk(500)) { var ids = chunk.ToList(); foreach (var x in await db.Suppliers.AsNoTracking().Where(x => ids.Contains(x.Id)).Select(x => new { x.Id, x.SupplierType }).ToListAsync(ct)) types[x.Id] = x.SupplierType; }
+        return rows.Select(r => ToFacts(r, types.GetValueOrDefault(r.SupplierId))).ToList();
     }
 
     private async Task<Contract> LoadTrackedAsync(Guid id, CancellationToken ct)

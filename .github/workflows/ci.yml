@@ -1,0 +1,91 @@
+# CI for the Enterprise Contract Platform.
+# Status: Scaffolded / Not Verified until it has run on a GitHub runner (subject to runner availability and repository policy).
+# The SQL Server integration suite runs against a disposable SQL Server service container with a generated password;
+# if the service cannot start, the suite is reported NOT VERIFIED (never Passed).
+name: ci
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+jobs:
+  build-and-unit:
+    name: Build, unit, architecture, API and lightweight-provider tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4   # TODO(SEC-060): pin third-party actions to commit SHAs once the repository policy is set
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore (locked)
+        run: dotnet restore src/Ecp.sln --locked-mode
+      - name: Build (warnings are errors; NuGet audit is a gate)
+        run: dotnet build src/Ecp.sln -c Release --no-restore
+      - name: Test (everything that does not need SQL Server)
+        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category!=SqlServer" --logger "trx;LogFileName=non-sql.trx" --results-directory TestResults
+        env:
+          ECP_TEST_SQL: ""
+      - name: Vulnerable package gate
+        run: |
+          dotnet list src/Ecp.sln package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          if grep -q "has the following vulnerable packages" vuln.txt; then echo "Vulnerable packages found"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-non-sql
+          path: TestResults/*.trx
+
+  sqlserver-integration:
+    name: SQL Server integration (migrations, constraints, RLS, provider behaviour)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: build-and-unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Start disposable SQL Server (generated, masked password)
+        id: sql
+        run: |
+          set -euo pipefail
+          PW="Aa1!$(openssl rand -hex 16)"
+          echo "::add-mask::$PW"
+          docker run -d --name ecp-sql -p 14330:1433 -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:2022-latest >/dev/null
+          for i in $(seq 1 60); do
+            if docker exec ecp-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$PW" -Q "SELECT 1" >/dev/null 2>&1; then
+              echo "ECP_TEST_SQL=Server=127.0.0.1,14330;User Id=sa;Password=$PW;TrustServerCertificate=True;Encrypt=True" >> "$GITHUB_ENV"
+              echo "available=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi; sleep 2
+          done
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::SQL Server did not start; SQL Server tests are NOT VERIFIED"
+      - run: dotnet restore src/Ecp.sln --locked-mode
+      - run: dotnet build src/Ecp.sln -c Release --no-restore
+      - name: SQL Server tests
+        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer" --logger "trx;LogFileName=sql.trx" --results-directory TestResults
+      - name: Honest result summary
+        if: always()
+        run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-sql
+          path: TestResults/*.trx
+
+  docker-image:
+    name: Container image build and smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-and-unit
+    steps:
+      - uses: actions/checkout@v4
+      - run: deploy/docker/smoke.sh

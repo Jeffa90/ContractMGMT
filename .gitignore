@@ -74,3 +74,6 @@ tmp/
 
 # Claude Code local settings (keep project .claude/skills and settings.json if added)
 .claude/settings.local.json
+
+# Local developer sandbox state (connection strings, generated passwords)
+.ecp-dev/

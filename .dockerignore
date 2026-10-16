@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/data/
+.git/
+.ecp-dev/
+.env
+.env.*
+tests/
+docs/
+requirements/
+**/TestResults/

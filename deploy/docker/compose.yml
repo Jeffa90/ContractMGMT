@@ -1,0 +1,33 @@
+# Local container run. Status: Scaffolded / Not Verified (see deploy/README.md).
+# Demo (default): SQLite on a named volume, demo identity, synthetic seed. No credentials needed.
+#   docker compose -f deploy/docker/compose.yml up --build
+# Production-shaped: use compose.production.yml (SQL Server, secret references, no demo features).
+services:
+  ecp:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: ecp:local
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      Ecp__Mode: Demo
+      Ecp__DemoTenantResolution: "true"
+      Ecp__DemoSeed: "true"
+      Database__Provider: Sqlite
+      Database__ConnectionString: "Data Source=/var/ecp/ecp-demo.db"
+      Database__AutoMigrate: "true"
+    volumes:
+      - ecp-data:/var/ecp
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /health/live HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q 200 <&3'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+volumes:
+  ecp-data:

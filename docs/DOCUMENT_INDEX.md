@@ -63,3 +63,7 @@ Run after the final edit on 2026-10-15 with a throwaway script (not committed; t
 | 8 Mermaid diagrams render with a real Mermaid parser | Pass |
 
 Not verified (cannot be, before code exists): that the proposed test IDs pass, that the proposed schema is implementable as described, performance budgets, and anything about IIS, Azure or live providers.
+
+## M1 additions (2026-10-16)
+
+`docs/ENVIRONMENT.md` (M0 report), `deploy/README.md` and `deploy/STATUS.md` (artefact verification log), source and test trees as listed in `PACKAGE_MANIFEST.md`. Naming note: the module namespace `Ecp.Migration` (bulk data migration) collides with the EF Core base class `Microsoft.EntityFrameworkCore.Migrations.Migration`; generated EF migrations therefore use the fully qualified base class (`tools/add-migration.sh` applies this). Consider renaming the namespace to `Ecp.DataMigration` before M6 (recorded, reversible).

@@ -1,0 +1,30 @@
+# Production-shaped composition. Status: Scaffolded / Not Verified.
+# SQL Server is expected to be an existing managed instance; the connection string is supplied as a SECRET FILE,
+# never as an inline value. Create ./secrets/ecp-sql.txt (git-ignored) containing the connection string.
+# The platform refuses to start in Production with SQLite, inline connection strings or demo features (ProductionGuard).
+services:
+  ecp:
+    image: ecp:local
+    ports:
+      - "127.0.0.1:8080:8080"   # place a TLS-terminating reverse proxy in front; do not publish plain HTTP externally
+    environment:
+      Ecp__Mode: Production
+      Ecp__DemoTenantResolution: "false"
+      Ecp__DemoSeed: "false"
+      Database__Provider: SqlServer
+      Database__ConnectionStringRef: "file:/run/secrets/ecp-sql"
+      Database__AutoMigrate: "false"   # run `dotnet Ecp.Host.dll migrate` as a deliberate release step
+    secrets:
+      - ecp-sql
+    volumes:
+      - ecp-data:/var/ecp
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+secrets:
+  ecp-sql:
+    file: ./secrets/ecp-sql.txt
+volumes:
+  ecp-data:

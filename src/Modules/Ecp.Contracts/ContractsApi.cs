@@ -1,0 +1,178 @@
+using System.Text.Json;
+using Ecp.Audit;
+using Ecp.Contracts.Domain;
+using Ecp.Contracts.Persistence;
+using Ecp.Persistence;
+using Ecp.SharedKernel;
+using Ecp.Tenancy;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Ecp.Contracts;
+
+/// <summary>
+/// The initial workflow state code for new contracts. It comes from the workflow definition (configuration), not from code,
+/// so no business-pack state names live in compiled code (PRT-001). Until the workflow engine exists it is set in host configuration.
+/// </summary>
+public sealed class ContractsOptions
+{
+    public string InitialStatusCode { get; set; } = "";
+}
+
+public sealed record CreateCategoryRequest(Guid OrganisationId, string Code, string Name, Guid? ParentCategoryId = null);
+public sealed record CreateSupplierRequest(Guid OrganisationId, string Name, string? Abn = null, string? VendorNumber = null);
+public sealed record CreateContractRequest(
+    Guid OrganisationId, string AgreementReference, string Title, Guid SupplierId, Guid CategoryId, string? Description = null,
+    string Classification = Classifications.Internal, string? CurrencyCode = null, decimal? EstimatedValue = null,
+    string? ExtensionType = null, bool LegalReviewRequired = false, DateOnly? StartDate = null, DateOnly? EffectiveDate = null,
+    DateOnly? ReviewDate = null, DateOnly? EndDate = null);
+
+public sealed record ContractDto(
+    Guid Id, Guid OrganisationId, string AgreementReference, string Title, string? Description, Guid SupplierId, Guid CategoryId,
+    string Status, bool RecordLocked, string Classification, DateTime? RegisteredDateUtc, bool IsLegacyLoad);
+
+public interface ICategoryService { Task<Guid> CreateAsync(CreateCategoryRequest request, CancellationToken ct = default); }
+public interface ISupplierService { Task<Guid> CreateAsync(CreateSupplierRequest request, CancellationToken ct = default); }
+
+public interface IContractService
+{
+    Task<Guid> CreateDraftAsync(CreateContractRequest request, CancellationToken ct = default);
+    Task<ContractDto?> GetAsync(Guid id, CancellationToken ct = default);
+    Task UpdateDetailsAsync(Guid id, string title, string? description, CancellationToken ct = default);
+}
+
+internal static class AuditJson
+{
+    public static string Of(object value) => JsonSerializer.Serialize(value);
+}
+
+internal sealed class CategoryService(ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, ITenantDirectory tenants) : ICategoryService
+{
+    public async Task<Guid> CreateAsync(CreateCategoryRequest r, CancellationToken ct = default)
+    {
+        var tenantId = tenant.RequireTenantId();
+        if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
+            throw new DomainException("organisation_not_found", "The organisation was not found.");
+        var category = Category.Create(tenantId, r.OrganisationId, r.Code, r.Name, r.ParentCategoryId);
+        return await uow.ExecuteAsync(async c =>
+        {
+            db.Categories.Add(category);
+            await Save(db, c);
+            audit.Record(new AuditEntry("category.created", nameof(Category), category.Id.ToString(), OrganisationId: category.OrganisationId,
+                NewValuesJson: AuditJson.Of(new { category.Code, category.Name })));
+            return category.Id;
+        }, ct);
+    }
+
+    private static async Task Save(ContractsDbContext db, CancellationToken ct)
+    {
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
+        { throw new DomainException("category_code_in_use", "That category code is already in use."); }
+    }
+}
+
+internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, ITenantDirectory tenants) : ISupplierService
+{
+    public async Task<Guid> CreateAsync(CreateSupplierRequest r, CancellationToken ct = default)
+    {
+        var tenantId = tenant.RequireTenantId();
+        if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
+            throw new DomainException("organisation_not_found", "The organisation was not found.");
+        var supplier = Supplier.Create(tenantId, r.OrganisationId, r.Name, r.Abn, r.VendorNumber, clock.UtcNow);
+        return await uow.ExecuteAsync(async c =>
+        {
+            db.Suppliers.Add(supplier);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
+            { throw new DomainException("vendor_number_in_use", "That vendor number is already in use."); }
+            audit.Record(new AuditEntry("supplier.created", nameof(Supplier), supplier.Id.ToString(), OrganisationId: supplier.OrganisationId,
+                NewValuesJson: AuditJson.Of(new { supplier.Name })));
+            return supplier.Id;
+        }, ct);
+    }
+}
+
+internal sealed class ContractService(
+    ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IActorContext actor, IClock clock,
+    ITenantDirectory tenants, Microsoft.Extensions.Options.IOptions<ContractsOptions> options) : IContractService
+{
+    public async Task<Guid> CreateDraftAsync(CreateContractRequest r, CancellationToken ct = default)
+    {
+        var tenantId = tenant.RequireTenantId();
+        var initial = options.Value.InitialStatusCode;
+        if (string.IsNullOrWhiteSpace(initial))
+            throw new InvalidOperationException("Contracts:InitialStatusCode is not configured (it comes from the workflow definition).");
+        if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
+            throw new DomainException("organisation_not_found", "The organisation was not found.");
+
+        var contract = Contract.CreateDraft(new NewContract(
+            tenantId, r.OrganisationId, r.AgreementReference, r.Title, r.SupplierId, r.CategoryId, initial, actor.ActorId ?? "system", clock.UtcNow,
+            r.Description, r.Classification, r.CurrencyCode, r.EstimatedValue, r.ExtensionType, r.LegalReviewRequired,
+            r.StartDate, r.EffectiveDate, r.ReviewDate, r.EndDate));
+
+        // Tenant-wide uniqueness (D3). The message never says where a colliding reference lives.
+        if (await db.Contracts.AnyAsync(c => c.AgreementReference == contract.AgreementReference, ct))
+            throw new DomainException("agreement_reference_in_use", "That agreement reference is already in use.");
+        // Supplier and category must be visible in this tenant (other tenants' rows are invisible through the filter).
+        if (!await db.Suppliers.AnyAsync(s => s.Id == r.SupplierId && s.OrganisationId == r.OrganisationId, ct))
+            throw new DomainException("supplier_not_found", "The supplier was not found.");
+        if (!await db.Categories.AnyAsync(s => s.Id == r.CategoryId && s.OrganisationId == r.OrganisationId, ct))
+            throw new DomainException("category_not_found", "The category was not found.");
+
+        return await uow.ExecuteAsync(async c =>
+        {
+            db.Contracts.Add(contract);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
+            { throw new DomainException("agreement_reference_in_use", "That agreement reference is already in use."); }
+            audit.Record(new AuditEntry("contract.created", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId,
+                NewValuesJson: AuditJson.Of(new { contract.AgreementReference, contract.ContractTitle, contract.Status, contract.Classification })));
+            return contract.Id;
+        }, ct);
+    }
+
+    public Task<ContractDto?> GetAsync(Guid id, CancellationToken ct = default)
+        => db.Contracts.AsNoTracking().Where(c => c.Id == id).Select(c => new ContractDto(
+            c.Id, c.OrganisationId, c.AgreementReference, c.ContractTitle, c.Description, c.SupplierId, c.CategoryId, c.Status,
+            c.RecordLocked, c.Classification, c.RegisteredDateUtc, c.IsLegacyLoad)).FirstOrDefaultAsync(ct);
+
+    public async Task UpdateDetailsAsync(Guid id, string title, string? description, CancellationToken ct = default)
+    {
+        await uow.ExecuteAsync(async c =>
+        {
+            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == id, c)
+                ?? throw new DomainException("contract_not_found", "The contract was not found.");
+            var old = AuditJson.Of(new { contract.ContractTitle, contract.Description });
+            contract.UpdateDetails(title, description, actor.ActorId ?? "system", clock.UtcNow);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload and try again."); }
+            audit.Record(new AuditEntry("contract.updated", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId,
+                OldValuesJson: old, NewValuesJson: AuditJson.Of(new { contract.ContractTitle, contract.Description })));
+        }, ct);
+    }
+}
+
+internal sealed class ContractDocumentParentValidator(ContractsDbContext db) : Ecp.Documents.IDocumentParentValidator
+{
+    public Task<bool> ParentExistsAsync(Guid contractId, CancellationToken ct = default)
+        => db.Contracts.AsNoTracking().AnyAsync(c => c.Id == contractId, ct);
+}
+
+public static class ContractsModule
+{
+    public const string Name = "Contracts";
+    public const string Schema = "contracts";
+    public const int Tier = 6;
+
+    public static IServiceCollection AddContractsModule(this IServiceCollection services, Action<ContractsOptions> configure)
+    {
+        services.Configure(configure);
+        services.AddModuleDbContext<ContractsDbContext>(Name, Tier, Schema);
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<ISupplierService, SupplierService>();
+        services.AddScoped<IContractService, ContractService>();
+        services.AddScoped<Ecp.Documents.IDocumentParentValidator, ContractDocumentParentValidator>();
+        return services;
+    }
+}

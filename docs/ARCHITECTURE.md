@@ -87,11 +87,11 @@ flowchart TB
   Identity --> Tenancy
 ```
 
-**Dependency rule** (enforced by tests). Tiers, lowest first: (0) SharedKernel; (1) Tenancy; (2) Identity, Audit; (3) Configuration; (4) Rules; (5) Workflow; (6) Contracts, Documents, Integrations; (7) Notifications, Migration, Reporting, Retention; (8) SolutionPacks, Operations; (9) Setup; (10) Host. A module may depend only on lower tiers, plus the specific same-tier edges drawn in the diagram (for example Contracts to Documents, Notifications to Integrations). Upward needs are met by **dependency inversion** and **events**, never by a reference:
+**Dependency rule** (enforced by tests). Tiers, lowest first: (0) SharedKernel, Persistence; (1) Audit; (2) Tenancy, Identity; (3) Configuration; (4) Rules; (5) Workflow; (6) Contracts, Documents, Integrations; (7) Notifications, Migration, Reporting, Retention; (8) SolutionPacks, Operations; (9) Setup; (10) Host. A module may depend only on lower tiers, plus the specific same-tier edges drawn in the diagram (for example Contracts to Documents, Notifications to Integrations). Upward needs are met by **dependency inversion** and **events**, never by a reference:
 
 - The access evaluator (Identity, tier 2) needs relationship facts such as "active category assignment" and "assigned approver". Identity defines `IRelationshipProvider`; Contracts and Workflow implement it and register it at composition time.
 - Workflow does not call Notifications. It writes integration events through the outbox; Notifications consumes them.
-- Audit is written through `IAuditWriter` (tier 2) by every module in the same transaction.
+- Audit is written through `IAuditWriter` (tier 1, which depends only on the SharedKernel and Persistence) by every module in the same transaction.
 
 ### Module responsibilities
 

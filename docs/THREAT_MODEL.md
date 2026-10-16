@@ -147,3 +147,4 @@ At every milestone exit: re-run the abuse cases as automated tests; add threats 
 | Date | Change | By |
 |---|---|---|
 | 2026-10-15 | Initial model created during pre-implementation repository review | Claude Code session |
+| 2026-10-16 | M1 implementation evidence: tenant filters, RLS, composite FKs, append-only audit and Production guard verified on SQL Server 2022 Developer; runtime role needed explicit SELECT on the RLS predicate functions (finding fixed). Setup, upload and OIDC threats remain unmitigated until their milestones | Claude Code session |

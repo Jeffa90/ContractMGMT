@@ -21,10 +21,10 @@ Status: **strategy and test catalogue; no tests exist yet.** Every ID below is a
 | Architecture | Module boundaries, banned APIs, filters, endpoint annotation | `tests/Ecp.Architecture.Tests` | Nothing |
 | Integration | EF mappings, migrations, RLS, concurrency, outbox, audit, storage | `tests/Ecp.Integration.Tests` | Real SQL Server (section 3) |
 | API / authorisation | In-process host (`WebApplicationFactory`) against real SQL Server | `tests/Ecp.Api.Tests` | SQL Server |
-| End-to-end | Browser flows incl. wizards, designers, migration; accessibility | `tests/Ecp.E2E.Tests` (Playwright + axe-core) | SQL Server, Chromium (present at `/opt/pw-browsers`) |
-| Contract | Adapter interface suites run against mocks and real providers | `tests/Ecp.Adapters.ContractTests` | Providers only for opt-in runs |
-| Deployment | Container build/run, static validation of IIS/Azure artefacts | `tests/Ecp.Deployment.Tests` + scripts | Container engine for runtime part |
-| Performance | Scale and budgets | `tests/Ecp.Performance.Tests` | SQL Server, larger data |
+| End-to-end | Browser flows incl. wizards, designers, migration; accessibility | `tests/Ecp.E2E.Tests` (planned, not yet created) (Playwright + axe-core) | SQL Server, Chromium (present at `/opt/pw-browsers`) |
+| Contract | Adapter interface suites run against mocks and real providers | `tests/Ecp.Adapters.ContractTests` (planned, not yet created) | Providers only for opt-in runs |
+| Deployment | Container build/run, static validation of IIS/Azure artefacts | `tests/Ecp.Deployment.Tests` (planned, not yet created) + scripts | Container engine for runtime part |
+| Performance | Scale and budgets | `tests/Ecp.Performance.Tests` (planned, not yet created) | SQL Server, larger data |
 
 Categories (xUnit traits): `Unit`, `Architecture`, `Integration`, `E2E`, `Contract`, `Deployment`, `Performance`, `Security`, `Isolation`, `Migration`, `A11y`. CI target selection by trait.
 
@@ -56,9 +56,11 @@ Policy confirmed in DR-2026-10-15 D4:
 7. Production architecture is not weakened to suit the sandbox. The lightweight provider is a test and Demo-on-sandbox convenience only; Production refuses it (R-DB-01).
 8. A **CI workflow** (`.github/workflows/ci.yml`) runs the SQL Server suite against a disposable SQL Server container with a generated password, subject to runner availability and repository policy.
 
-Environment findings are recorded in `docs/ENVIRONMENT.md` (task T0.1). SQL Server for local runs, in order of preference: (A) container engine (`dockerd`) if it can run; (B) native `mssql-server` installed from the Microsoft package feed in the workspace; (C) external SQL Server via `ECP_TEST_SQL`. The `NotVerified` mechanism is implemented by the `SqlServerFact` and `SqlServerTheory` attributes in the test infrastructure project.
+Environment findings are recorded in `docs/ENVIRONMENT.md` (task T0.1). SQL Server for local runs, in order of preference: (A) container engine (`dockerd`) if it can run; (B) native `mssql-server` installed from the Microsoft package feed in the workspace; (C) external SQL Server via `ECP_TEST_SQL`. Outcome (T0.1): option A worked in the cloud workspace (container engine without bridge networking, `--network host`), so the SQL Server suite ran for real; see `docs/ENVIRONMENT.md`. The test reporter is `tools/test-report.sh` (parses `.trx`; counts a skip whose reason starts with `NOT VERIFIED` separately from Skipped).
 
-Planned commands:
+M1 result (2026-10-16, Release, warnings as errors): with SQL Server available 163 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED (102 unit, 33 integration of which 16 SQL Server, 13 architecture, 15 API). Without `ECP_TEST_SQL`: 147 Passed, 0 Failed, 0 Skipped, 16 NOT VERIFIED. The `NotVerified` mechanism is implemented by the `SqlServerFact` and `SqlServerTheory` attributes in the test infrastructure project.
+
+Commands (implemented in M1; `dotnet test` without `ECP_TEST_SQL` reports the SQL Server tests as NOT VERIFIED):
 
 ```
 dotnet restore --locked-mode

@@ -1,6 +1,6 @@
 # Performance baseline (register, search, views, exports, configuration)
 
-Status: **Measured on SQLite only. SQL Server: NOT VERIFIED.** This page records what was measured and how to measure again. It states **no service-level target**: a baseline is evidence about one machine and one engine, not a promise.
+Status: **Measured on SQLite (workspace) and on SQL Server 2022 (GitHub-hosted runner, CI run 22).** PER-002 (the query-plan review) has **not** been done. This page records what was measured and how to measure again. It states **no service-level target**: a baseline is evidence about one machine and one engine, not a promise.
 
 ## What was measured
 
@@ -37,6 +37,27 @@ The harness is `tests/Ecp.Integration.Tests/PerformanceBaseline.cs` (`Performanc
 
 Single-clause diagnostics (same data): tier filter 49.9 ms, score filter 91.0 ms, renewal-date filter 40.7 ms, sort by score 55.1 ms, sort by a core field 36.5 ms.
 
+## Results (SQL Server 2022, 10,000 contracts, GitHub-hosted runner)
+
+Measured by `PerformanceBaselineTests_SqlServer` in CI [run 22](https://github.com/Jeffa90/ContractMGMT/actions/runs/38915166774) (commit 5d695eb), printed from `artifacts/performance/sqlserver.json`. Environment: Ubuntu 24.04.5 LTS (kernel 6.17 Azure), X64, 4 logical cores, about 16 GB, workstation GC, .NET 10.0.13, **Release** build, SQL Server 2022 Developer in a container on the same runner (127.0.0.1, default settings, no tuning), 15 runs per operation after one unmeasured run, seeding 54.1 s, measured 2026-10-16 14:29 UTC. A shared CI runner is noisy; treat these as one sample, not a distribution.
+
+| Operation | User | Median ms | P95 ms | Rows returned | Total matching |
+|---|---|---:|---:|---:|---:|
+| Register first page (All Contracts, 25 rows) | procurement administrator | 74.5 | 109.4 | 25 | 10,005 |
+| Register first page (All Contracts, 25 rows) | category owner (scoped) | 64.7 | 89.4 | 25 | 10,005 |
+| Register page 40 (offset paging) | procurement administrator | 74.0 | 93.6 | 25 | 10,005 |
+| Filtered search (value range, type, risk, supplier text) | procurement administrator | 356.4 | 420.9 | 25 | 194 |
+| Configured-field filter (tier + score range + date, sorted by score) | procurement administrator | 781.0 | 892.3 | 25 | 204 |
+| Configured-field text search (searchable field) | procurement administrator | **1,719.1** | **1,859.8** | 25 | 463 |
+| Saved view load (personal view, configured columns and filter, 50 rows) | procurement administrator | 220.0 | 241.3 | 50 | 6,667 |
+| Shipped view: Expiring Soon | procurement administrator | 58.0 | 76.8 | 25 | 283 |
+| Contract detail load (details + configured fields) | category owner | 29.3 | 50.3 | n/a | n/a |
+| Export initiation (CSV of a 363-row search) | procurement administrator | 314.5 | 390.8 | 363 | 363 |
+| Configuration resolution, warm cache | system | 0.3 | 0.3 | n/a | n/a |
+| Configuration resolution, cold (after invalidation) | system | 2.7 | 5.2 | n/a | n/a |
+
+Finding: on SQL Server the **configured-field text search (about 1.7 s) and the configured-field filter (about 0.8 s)** are the slowest operations and are 5 to 10 times slower than on SQLite. The text search is a substring match over typed text values and cannot use an index seek. No target has been set, so this page does not call it a failure; it is the first thing to look at in the PER-002 plan review (actual plans, statistics, the filtered indexes, and whether a full-text index or a narrower searchable-field rule is justified). Nothing was tuned for this run.
+
 ## What the measurement found and fixed
 
 The first run showed a **defect**, not a tuning opportunity: a configured-field filter was a correlated lookup per contract, costing O(contracts x matches).
@@ -53,9 +74,9 @@ The filter is now an uncorrelated `ContractId IN (matching values)` subquery (th
 ## What this does and does not show
 
 * It shows that on 10,000 contracts no register operation is slow enough to need caching beyond the published-configuration cache, and that the cost of a configured-field search follows the number of matching values.
-* It does **not** show SQL Server performance. Index choice, the filtered indexes (`WHERE ... IS NOT NULL`), statistics, parameter sniffing and row-level security predicates are SQL Server behaviours that need their own run. Run the harness against the disposable SQL Server (`tools/sqlserver-up.sh`, then `dotnet test --filter "Category=Performance&Category=SqlServer"`) and record the result here next to this one. **Until that is done, SQL Server performance is NOT VERIFIED.**
+* The SQL Server run above is one sample on a shared 4-core runner with an untuned container. It shows the shape on SQL Server but is **not** the PER-002 plan review: execution plans, statistics, parameter sniffing and the row-level security predicate cost have not been inspected. Re-run locally with `tools/sqlserver-up.sh`, then `dotnet test --filter "Category=Performance&Category=SqlServer"`.
 * It does not include HTTP, TLS, rendering or browser time; it does not test concurrency (many users at once), 100,000 contracts, or cold start.
-* The Debug build is slower than Release; the numbers are a floor on confidence, not a ceiling.
+* The SQLite numbers come from a Debug build and the SQL Server numbers from a Release build, so the two tables are not a like-for-like comparison of engines.
 
 ## Index and query strategy (summary)
 

@@ -284,7 +284,7 @@ flowchart LR
 ```
 
 * Definitions are configuration; values are typed rows; a hidden field is absent from every read path; one fact service serves live approvals and the simulator; every configured-field condition is an uncorrelated `IN` subquery.
-* SQL Server proof of the new tables and indexes, and of register performance, is pending (see `TESTING.md` section 8.2 and `PERFORMANCE.md`).
+* SQL Server behaviour of the new tables and indexes is exercised by the 183 `SqlServer` tests on CI (run 22), and a 10,000-contract SQL Server baseline is in `PERFORMANCE.md`. The PER-002 query-plan review is not done (see `TESTING.md` section 8.2).
 
 ## 10. Migration architecture (ADR-0004; `MIGRATION_SUPPLEMENT.md`)
 

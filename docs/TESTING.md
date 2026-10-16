@@ -292,7 +292,7 @@ Not tested by design or not possible here: SMTP and Graph against live services;
 
 ### 8.2 Implementation status of the metadata, search, views, exports, Studio and migration scenarios (CFG-03, DOM-03, STU-01; 2026-10-16)
 
-Each scenario runs on SQLite (lightweight, **not** SQL Server proof) and, through the `SqlServer` wrappers, on a real SQL Server when `ECP_TEST_SQL` is set. **In this workspace the SQL Server wrappers did not run: the container daemon could not be started (the start command was denied), so every `SqlServer` test for this slice is NOT VERIFIED.**
+Each scenario runs on SQLite (lightweight, **not** SQL Server proof) and, through the `SqlServer` wrappers, on a real SQL Server when `ECP_TEST_SQL` is set. **In this workspace the SQL Server wrappers did not run (the container daemon could not be started; the start command was denied), so they are NOT VERIFIED locally. On GitHub-hosted CI (run 21, commit 797aa55, and run 22, commit 5d695eb) the `sqlserver-integration` job ran them against SQL Server 2022: 183 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED.** SQLite results remain lightweight checks, not SQL Server proof.
 
 | Area | Where it is covered |
 |---|---|
@@ -306,9 +306,9 @@ Each scenario runs on SQLite (lightweight, **not** SQL Server proof) and, throug
 | Approval facts: live and simulated parity; only usable fields | `ApprovalFactScenarios` |
 | Migration into configured and core fields: mapping, dry run, explicit choice mapping, retired and unsupported fields, provenance, idempotent rerun, update, rollback | `MigrationCustomFieldScenarios`; unit `The_custom_field_sample_columns_map_…` |
 | Architecture: tiers for Formats and Metadata, same-tier edge, no cross-module persistence, no expression compilation | `ArchitectureTests` |
-| Performance baseline (10,000 contracts) and shape guard | `PerformanceBaselineTests_Sqlite`; `PerformanceBaselineTests_SqlServer` (NOT VERIFIED) |
+| Performance baseline (10,000 contracts) and shape guard | `PerformanceBaselineTests_Sqlite`; `PerformanceBaselineTests_SqlServer` (Passed in CI run 22; numbers in `PERFORMANCE.md`) |
 
-Not covered: browser-level accessibility of the Studio and register pages (ACC-01 remains open); concurrency of two administrators editing one draft beyond the conflict message; keyset paging (not built); SQL Server row-level security and index plans for `ContractCustomValue` and `SavedView`.
+Not covered: browser-level accessibility of the Studio and register pages (ACC-01 remains open); concurrency of two administrators editing one draft beyond the conflict message; keyset paging (not built); SQL Server index plans for `ContractCustomValue` and `SavedView` (PER-002 not done; the SQL Server scenario wrappers did exercise row-level security and composite keys).
 
 ## 9. No-code, packages and portability suite
 
@@ -480,7 +480,7 @@ Automated axe-core checks plus scripted keyboard tests on every page type; manua
 
 | ID | Test |
 |---|---|
-| PER-001 | Contract list/search p95 < 500 ms at 100k contracts. **Partly measured**: a baseline at 10,000 contracts on SQLite is in `PERFORMANCE.md`; 100,000 contracts and SQL Server are NOT VERIFIED |
+| PER-001 | Contract list/search p95 < 500 ms at 100k contracts. **Partly measured**: a baseline at 10,000 contracts on SQLite is in `PERFORMANCE.md`; SQL Server measured at 10,000 contracts in CI (`PERFORMANCE.md`); 100,000 contracts and the plan review are NOT DONE |
 | PER-002 | Search by custom field with 50 fields per entity uses indexes (query plan check). **Not yet verified**: the index design is in `SEARCH_AND_VIEWS.md`; a SQL Server query-plan check has not been run |
 | PER-003 | Migration of 25k contracts and 50k documents completes resumably within budget; memory bounded |
 | PER-004 | Export/report/import under concurrent load stays within rate limits and does not starve interactive users |

@@ -61,7 +61,7 @@ internal sealed class SolutionPackKind(ISolutionPackCatalogue catalogue) : IConf
         return Task.FromResult(new ValidationReport(messages));
     }
 
-    public Task ApplyAsync(Guid organisationId, string contentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;
+    public Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;
 }
 
 public sealed record Branding(string ProductName, string AccentColour, string FooterText, IReadOnlyDictionary<string, string> Terminology)
@@ -129,7 +129,7 @@ internal sealed class BrandingKind : IConfigurationKind
         catch (DomainException ex) { return Task.FromResult(new ValidationReport([new ValidationMessage(ValidationSeverity.Error, "$", ex.Code, ex.Message)])); }
     }
 
-    public Task ApplyAsync(Guid organisationId, string contentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;
+    public Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;
 }
 
 public interface IBrandingProvider

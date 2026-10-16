@@ -166,6 +166,10 @@ public sealed class SetupHostTests
         Assert.Contains("--accent: #14532d", css);
         Assert.Contains("Admin/Users", home);          // tenant administrators manage users
         Assert.DoesNotContain("/Admin/Setup", home);   // but only installation administrators can reopen setup
+        // the initial administrator is also Organisation Administrator of the first organisation, so onboarding can begin straight away
+        Assert.Contains("Organisation onboarding", home);
+        var onboarding = await admin.GetStringAsync("/Onboarding");
+        Assert.Contains("Checklist", onboarding); Assert.Contains("Host Setup Organisation", onboarding);
     }
 
     [Fact]

@@ -1,0 +1,26 @@
+@page "/Onboarding"
+@model Ecp.Host.Pages.Onboarding.IndexModel
+@{ ViewData["Title"] = L["Organisation onboarding"].Value; }
+@if (Model.Blocked) { <partial name="_OnboardingBlocked" /> return; }
+<h1>@L["Organisation onboarding"]</h1>
+<p class="lede">@L["Describe how the organisation is structured, who owns what and who may see what. You work on a draft, check it, preview its effect, and only then publish. Every release is versioned and can be rolled back."]</p>
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="card">
+        <div class="field"><label for="org">@L["Organisation"]</label>
+            <select id="org" name="org">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+        <button type="submit" class="secondary">@L["Switch organisation"]</button>
+    </form>
+}
+<p>@L["Organisation"]: <strong>@Model.OrganisationName</strong>. @(Model.State!.CurrentRelease is { } r ? $"Current release: {r}." : "Nothing has been published yet.")</p>
+<h2>@L["Checklist"]</h2>
+<ol class="steps">
+@foreach (var item in Model.Checklist)
+{
+    <li>
+        <span class="badge @(item.Status is "Entered" or "Chosen" or "Valid" ? "ok" : item.Status == "Needs attention" ? "bad" : "")">@item.Status</span>
+        <a href="/Onboarding/@(item.Id == "review" ? "Review" : "Step/" + item.Id)?org=@Model.OrganisationId">@item.Title</a>
+        <span class="hint">@item.Detail</span>
+    </li>
+}
+</ol>

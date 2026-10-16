@@ -1,0 +1,91 @@
+@page "/Onboarding/Review"
+@model Ecp.Host.Pages.Onboarding.ReviewModel
+@using Ecp.Configuration
+@{ ViewData["Title"] = L["Review, simulate and publish"].Value; var s = Model.State!; }
+@if (Model.Blocked) { <partial name="_OnboardingBlocked" /> return; }
+<p><a href="/Onboarding?org=@Model.OrganisationId">&larr; @L["Checklist"]</a></p>
+<h1>@L["Review, simulate and publish"]</h1>
+<p>@L["Organisation"]: <strong>@Model.OrganisationName</strong>. @(s.CurrentRelease is { } r ? $"Current release: {r}." : "Nothing has been published yet.")</p>
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="error-summary" role="alert" tabindex="-1"><h2>@L["This could not be done"]</h2>@foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors)) { <p>@e.ErrorMessage</p> }</div>
+}
+
+<section class="card" aria-labelledby="val-h">
+    <h2 id="val-h">@L["1. Validate"]</h2>
+    <form method="post" asp-page-handler="Validate"><input type="hidden" name="Org" value="@Model.OrganisationId" /><button type="submit">@L["Validate the draft"]</button></form>
+    @if (s.Validation is null) { <p class="hint">@L["The draft has not been validated since it was last changed."]</p> }
+    else
+    {
+        <p><span class="badge @(s.Validation.IsValid ? "ok" : "bad")">@(s.Validation.IsValid ? L["Valid"] : L["Needs attention"])</span></p>
+        @if (s.Validation.Messages.Count > 0)
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Validation messages"]</caption>
+                <thead><tr><th scope="col">@L["Severity"]</th><th scope="col">@L["Where"]</th><th scope="col">@L["Message"]</th></tr></thead>
+                <tbody>@foreach (var m in s.Validation.Messages) { <tr><td><span class="badge @(m.Severity == ValidationSeverity.Error ? "bad" : "warn")">@m.Severity</span></td><td><code>@m.Path</code></td><td>@m.Message</td></tr> }</tbody>
+            </table></div>
+        }
+    }
+</section>
+
+<section class="card" aria-labelledby="plan-h">
+    <h2 id="plan-h">@L["2. What publishing would do"]</h2>
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Plan"]</caption>
+        <thead><tr><th scope="col">@L["Section"]</th><th scope="col">@L["To create"]</th><th scope="col">@L["Already present"]</th><th scope="col">@L["Dropped from the previous release"]</th></tr></thead>
+        <tbody>@foreach (var p in Model.Plan) { <tr><th scope="row">@p.Section</th><td>@p.ToCreate</td><td>@p.AlreadyPresent</td><td>@p.ToEnd</td></tr> }</tbody>
+    </table></div>
+    <p class="hint">@L["Nothing is deleted. Items dropped from the previous release are ended only if onboarding created them."]</p>
+</section>
+
+<section class="card" aria-labelledby="sim-h">
+    <h2 id="sim-h">@L["3. Who could see what (synthetic preview)"]</h2>
+    @foreach (var n in Model.Preview!.Notes) { <p class="hint">@n</p> }
+    @if (Model.Preview.Rows.Count == 0) { <p>@L["No viewer scopes or group mappings are in the draft, so there is nothing to simulate."]</p> }
+    else
+    {
+        <div class="table-wrap"><table>
+            <caption>@L["Sample of"] @Model.Preview.SampleRecords @L["synthetic records"]</caption>
+            <thead><tr><th scope="col">@L["Who"]</th><th scope="col">@L["Role"]</th><th scope="col">@L["Can open"]</th><th scope="col">@L["Examples that stay hidden"]</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model.Preview.Rows)
+            {
+                <tr><th scope="row">@row.Who</th><td>@row.Role (@row.Note)</td><td>@row.Visible @L["of"] @row.Total</td><td>@(row.HiddenExamples.Count == 0 ? "-" : string.Join("; ", row.HiddenExamples))</td></tr>
+            }
+            </tbody>
+        </table></div>
+    }
+</section>
+
+<section class="card" aria-labelledby="pub-h">
+    <h2 id="pub-h">@L["4. Publish"]</h2>
+    <form method="post" asp-page-handler="Publish">
+        <input type="hidden" name="Org" value="@Model.OrganisationId" />
+        <div class="field"><label for="note">@L["Note for the release history"]</label><input id="note" name="Note" type="text" maxlength="500" /></div>
+        <button type="submit" disabled="@(!s.IsPublishable)">@L["Publish"]</button>
+        @if (!s.IsPublishable) { <p class="hint">@L["Publishing needs a draft that validated without errors and has not been changed since."]</p> }
+    </form>
+    <form method="post" asp-page-handler="Discard"><input type="hidden" name="Org" value="@Model.OrganisationId" /><button type="submit" class="secondary">@L["Discard this draft"]</button></form>
+</section>
+
+<section class="card" aria-labelledby="hist-h">
+    <h2 id="hist-h">@L["Release history and rollback"]</h2>
+    @if (Model.Releases.Count == 0) { <p>@L["No release has been published yet."]</p> }
+    else
+    {
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Releases"]</caption>
+            <thead><tr><th scope="col">@L["Release"]</th><th scope="col">@L["Published (UTC)"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Note"]</th><th scope="col">@L["Items"]</th></tr></thead>
+            <tbody>@foreach (var rel in Model.Releases) { <tr><th scope="row">@rel.Number@(rel.RollbackOf is { } rb ? $" (rollback to {rb})" : "")</th><td>@rel.PublishedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@rel.PublishedBy</td><td>@rel.Note</td><td>@rel.Items</td></tr> }</tbody>
+        </table></div>
+        <form method="post" asp-page-handler="Rollback">
+            <input type="hidden" name="Org" value="@Model.OrganisationId" />
+            <div class="field"><label for="ToRelease">@L["Go back to release"]</label>
+                <select id="ToRelease" name="ToRelease">@foreach (var rel in Model.Releases) { <option value="@rel.Number">@rel.Number</option> }</select></div>
+            <div class="field"><label for="reason">@L["Reason (required)"]</label><input id="reason" name="Reason" type="text" maxlength="500" required /></div>
+            <button type="submit" class="secondary">@L["Roll back"]</button>
+            <p class="hint">@L["This publishes the earlier release's content as a new release and ends only what a later release introduced."]</p>
+        </form>
+    }
+</section>

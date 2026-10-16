@@ -373,6 +373,21 @@ internal sealed class OrganisationStage : SetupStageBase
             c.Doc.OrganisationId = orgId;
             await c.AuditAsync("setup.organisation.created", "Organisation", orgId.Value.ToString());
         }
+        // A Tenant Administrator's configuration rights cover tenant-level definitions only, so the person named as initial administrator also becomes the Organisation
+        // Administrator of this first organisation (a Tenant Administrator could grant themselves that role anyway). This is what lets them run organisation onboarding.
+        if (Guid.TryParse(c.Doc.Get("admin", "userId"), out var adminId))
+        {
+            var assignments = c.Get<IRoleAssignmentService>();
+            var organisationId = c.Doc.OrganisationId!.Value;
+            var held = (await assignments.ListForUserAsync(adminId, includeEnded: false, c.Ct))
+                .Any(a => a.IsActive && a.RoleCode == RoleCodes.OrganisationAdministrator && a.Scope.OrganisationIds.Contains(organisationId));
+            if (!held)
+            {
+                var scale = await c.Get<IClassificationScaleProvider>().GetAsync(c.Ct);
+                await assignments.GrantTrustedAsync(new GrantRequest(adminId, RoleCodes.OrganisationAdministrator, null, ScopeSet.ForOrganisations([organisationId], scale.DefaultLevel),
+                    Reason: "Initial administrator of the first organisation, named during setup"), AssignmentSource.Setup, "setup:" + c.Actor.Label, null, c.Ct);
+            }
+        }
         var configuration = c.Get<IConfigurationService>();
         var latest = await configuration.LatestReleaseAsync("SolutionPack", Guid.Empty, c.Ct);
         if (latest is null || !latest.ContentJson.Contains($"\"{packId}\"", StringComparison.Ordinal))

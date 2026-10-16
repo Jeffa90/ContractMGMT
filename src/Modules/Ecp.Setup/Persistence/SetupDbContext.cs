@@ -32,9 +32,37 @@ public sealed class SetupRecord : ITenantOwned
     }
 }
 
+/// <summary>
+/// Records which items an onboarding release <em>created</em> (as opposed to items that already existed and were merely matched), so rolling back to an earlier
+/// release ends only what onboarding introduced and never touches anything created by other means.
+/// </summary>
+public sealed class OnboardingItem : ITenantOwned
+{
+    private OnboardingItem() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid OrganisationId { get; private set; }
+    public string ItemType { get; private set; } = "";
+    public string ItemKey { get; private set; } = "";
+    public Guid? RefId { get; private set; }
+    public int CreatedRelease { get; private set; }
+    public int? EndedRelease { get; private set; }
+    public DateTime UpdatedUtc { get; private set; }
+    public byte[] RowVersion { get; private set; } = [];
+
+    public static OnboardingItem Create(Guid tenantId, Guid organisationId, string type, string key, Guid? refId, int release, DateTime nowUtc) => new()
+    {
+        Id = Guid.NewGuid(), TenantId = tenantId, OrganisationId = organisationId, ItemType = type, ItemKey = key, RefId = refId, CreatedRelease = release, UpdatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+    };
+
+    public void Reopen(Guid? refId, int release, DateTime nowUtc) { RefId = refId ?? RefId; CreatedRelease = release; EndedRelease = null; UpdatedUtc = nowUtc; }
+    public void End(int release, DateTime nowUtc) { EndedRelease = release; UpdatedUtc = nowUtc; }
+}
+
 public sealed class SetupDbContext(DbContextOptions<SetupDbContext> options, DbContextServices services) : TenantDbContext(options, services)
 {
     public DbSet<SetupRecord> Records => Set<SetupRecord>();
+    public DbSet<OnboardingItem> OnboardingItems => Set<OnboardingItem>();
     protected override string SchemaName => SetupModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
@@ -46,6 +74,16 @@ public sealed class SetupDbContext(DbContextOptions<SetupDbContext> options, DbC
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.StateJson).IsRequired();
             e.Property(x => x.RowVersion);
+        });
+        mb.Entity<OnboardingItem>(e =>
+        {
+            e.ToTable("OnboardingItem");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.ItemType).HasMaxLength(30).IsRequired();
+            e.Property(x => x.ItemKey).HasMaxLength(450).IsRequired();
+            e.Property(x => x.RowVersion);
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.ItemType, x.ItemKey }).IsUnique();
         });
     }
 }

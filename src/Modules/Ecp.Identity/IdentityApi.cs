@@ -90,6 +90,9 @@ public interface IRoleAssignmentService
     /// <summary>Ends an assignment. Subject to delegation and last-administrator protection.</summary>
     Task RevokeAsync(Guid assignmentId, string reason, CancellationToken ct = default);
 
+    /// <summary>Ends an assignment that was created by <paramref name="expectedSource"/> (onboarding rollback). Refuses assignments from any other source and administrator roles. Not reachable from request input.</summary>
+    Task RevokeTrustedAsync(Guid assignmentId, AssignmentSource expectedSource, string reason, CancellationToken ct = default);
+
     Task<IReadOnlyList<AssignmentDto>> ListForUserAsync(Guid userId, bool includeEnded = false, CancellationToken ct = default);
     Task<IReadOnlyList<AssignmentDto>> ListAsync(bool activeOnly = true, CancellationToken ct = default);
 }
@@ -374,6 +377,23 @@ internal sealed class RoleAssignmentService(
             audit.Record(new AuditEntry("role.revoked", nameof(RoleAssignment), assignment.Id.ToString(), Reason: why,
                 OrganisationId: assignment.OrganisationIds.Count == 1 ? assignment.OrganisationIds[0] : null,
                 NewValuesJson: IdentityJson.Of(new { user = assignment.UserId, role = assignment.RoleCode })));
+        }, ct);
+    }
+
+    public async Task RevokeTrustedAsync(Guid assignmentId, AssignmentSource expectedSource, string reason, CancellationToken ct = default)
+    {
+        var why = Guard.NotBlank(reason, "Reason", 1000);
+        await uow.ExecuteAsync(async c =>
+        {
+            var assignment = await db.RoleAssignments.FirstOrDefaultAsync(a => a.Id == assignmentId && a.Source == expectedSource, c);
+            if (assignment is null || !assignment.IsActiveAt(clock.UtcNow)) return;
+            if (assignment.RoleCode is RoleCodes.SystemAdministrator or RoleCodes.TenantAdministrator)
+                throw new DomainException("administrator_revoke_refused", "Administrator roles are never ended by configuration; use user administration.");
+            assignment.End(clock.UtcNow);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("role.revoked", nameof(RoleAssignment), assignment.Id.ToString(), Reason: why,
+                OrganisationId: assignment.OrganisationIds.Count == 1 ? assignment.OrganisationIds[0] : null,
+                NewValuesJson: IdentityJson.Of(new { user = assignment.UserId, role = assignment.RoleCode, source = expectedSource.ToString() })));
         }, ct);
     }
 

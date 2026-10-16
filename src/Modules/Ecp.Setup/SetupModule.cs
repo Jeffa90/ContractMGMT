@@ -1,4 +1,6 @@
+using Ecp.Configuration;
 using Ecp.Persistence;
+using Ecp.Setup.Onboarding;
 using Ecp.Setup.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +18,10 @@ public static class SetupModule
         services.AddModuleDbContext<SetupDbContext>(Name, Tier, Schema);
         services.AddSingleton<ISetupStore, SetupStore>();
         services.AddSingleton<ISetupService, SetupService>();
+        services.AddScoped<OnboardingFactsLoader>();
+        services.AddScoped<OnboardingApplier>();
+        services.AddScoped<IConfigurationKind, OrganisationOnboardingKind>();
+        services.AddScoped<IOnboardingService, OnboardingService>();
         foreach (var stage in Stages.SetupStages.All()) services.AddSingleton(typeof(ISetupStage), stage);
         foreach (var check in Stages.SetupChecks.All()) services.AddSingleton(typeof(ISetupCheck), check);
         return services;

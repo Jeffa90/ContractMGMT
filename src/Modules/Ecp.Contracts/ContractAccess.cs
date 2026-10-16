@@ -86,6 +86,10 @@ public interface ICategoryAdministration
     Task<Guid> UpsertCategoryAsync(Guid organisationId, string code, string name, string? parentCode, CancellationToken ct = default);
     Task<Guid> AssignOwnerTrustedAsync(Guid categoryId, Guid userId, bool isPrimary, DateTime effectiveFromUtc, DateTime? effectiveToUtc, string assignedBy, string? reason, CancellationToken ct = default);
     Task<IReadOnlyList<CategoryItem>> ListAllAsync(CancellationToken ct = default);
+    /// <summary>Deactivates a category (never deletes it; contracts may refer to it).</summary>
+    Task DeactivateCategoryAsync(Guid categoryId, string reason, CancellationToken ct = default);
+    /// <summary>Ends an ownership assignment now.</summary>
+    Task EndOwnerTrustedAsync(Guid assignmentId, string reason, CancellationToken ct = default);
 }
 
 /// <summary>Loads the reference facts (category tree, ownership, structure) the access layer needs for contracts.</summary>
@@ -394,6 +398,30 @@ internal sealed class CategoryAdministration(
             audit.Record(new AuditEntry("category.ownership_assigned", nameof(CategoryAssignment), assignment.Id.ToString(), OrganisationId: category.OrganisationId,
                 Reason: reason, NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { categoryId, userId, isPrimary })));
             return assignment.Id;
+        }, ct);
+    }
+
+    public async Task DeactivateCategoryAsync(Guid categoryId, string reason, CancellationToken ct = default)
+    {
+        await uow.ExecuteAsync(async c =>
+        {
+            var category = await db.Categories.FirstOrDefaultAsync(x => x.Id == categoryId, c) ?? throw new DomainException("category_not_found", "The category was not found.");
+            if (!category.IsActive) return;
+            category.Deactivate();
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("category.deactivated", nameof(Category), categoryId.ToString(), OrganisationId: category.OrganisationId, Reason: reason));
+        }, ct);
+    }
+
+    public async Task EndOwnerTrustedAsync(Guid assignmentId, string reason, CancellationToken ct = default)
+    {
+        await uow.ExecuteAsync(async c =>
+        {
+            var assignment = await db.CategoryAssignments.FirstOrDefaultAsync(x => x.Id == assignmentId, c);
+            if (assignment is null || !assignment.IsActiveAt(clock.UtcNow)) return;
+            assignment.End(clock.UtcNow);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("category.ownership_ended", nameof(CategoryAssignment), assignmentId.ToString(), OrganisationId: assignment.OrganisationId, Reason: reason));
         }, ct);
     }
 

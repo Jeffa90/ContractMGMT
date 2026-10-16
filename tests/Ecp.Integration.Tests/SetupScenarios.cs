@@ -104,6 +104,8 @@ internal static class SetupScenarios
         Assert.NotNull(user); Assert.Equal(UserStatus.Invited, user!.Status);
         var assignments = await scope.Get<IRoleAssignmentService>().ListForUserAsync(user.Id);
         Assert.Contains(assignments, a => a.RoleCode == RoleCodes.TenantAdministrator && a.Source == AssignmentSource.Setup);
+        // ...and Organisation Administrator of the first organisation, so that organisation onboarding can start (tenant administrators hold tenant-level configuration rights only)
+        Assert.Contains(assignments, a => a.RoleCode == RoleCodes.OrganisationAdministrator && a.Scope.OrganisationIds.Contains(org.Id) && a.Source == AssignmentSource.Setup);
 
         // the installation administrator exists in the installation scope
         await using (var system = app.ScopeFor(SystemTenant.Id))

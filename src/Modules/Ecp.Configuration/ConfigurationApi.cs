@@ -34,8 +34,11 @@ public interface IConfigurationKind
 {
     string Kind { get; }
     Task<ValidationReport> ValidateAsync(Guid organisationId, string contentJson, CancellationToken ct);
-    /// <summary>Makes a release effective. Called inside the publishing unit of work, so failure rolls the release back.</summary>
-    Task ApplyAsync(Guid organisationId, string contentJson, int releaseNumber, Guid releaseId, CancellationToken ct);
+    /// <summary>
+    /// Makes a release effective. Called inside the publishing unit of work, so failure rolls the release back.
+    /// <paramref name="previousContentJson"/> is the content of the release that was current before this one (null for the first release), so a kind can end what the previous release introduced.
+    /// </summary>
+    Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct);
 }
 
 public interface IConfigurationService
@@ -166,13 +169,15 @@ internal sealed class ConfigurationService(
         var kind = KindOf(draft.Kind);
         return await uow.ExecuteAsync(async c =>
         {
-            var number = (await db.Releases.Where(r => r.OrganisationId == draft.OrganisationId && r.Kind == draft.Kind).Select(r => (int?)r.Number).MaxAsync(c) ?? 0) + 1;
+            var previous = await db.Releases.AsNoTracking().Where(r => r.OrganisationId == draft.OrganisationId && r.Kind == draft.Kind).OrderByDescending(r => r.Number)
+                .Select(r => new { r.Number, r.ContentJson }).FirstOrDefaultAsync(c);
+            var number = (previous?.Number ?? 0) + 1;
             var release = ConfigurationRelease.Create(draft.TenantId, draft.OrganisationId, draft.Kind, number, draft.ContentJson, draft.Id, rollbackOf, note, publisher, clock.UtcNow);
             db.Releases.Add(release);
             draft.MarkPublished(clock.UtcNow);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("concurrency_conflict", "Another release was published at the same time. Reload and try again."); }
-            await kind.ApplyAsync(draft.OrganisationId, draft.ContentJson, number, release.Id, c);
+            await kind.ApplyAsync(draft.OrganisationId, draft.ContentJson, previous?.ContentJson, number, release.Id, c);
             audit.Record(new AuditEntry(rollbackOf is null ? "config.published" : "config.rolled_back", draft.Kind, release.Id.ToString(),
                 OrganisationId: draft.OrganisationId == Guid.Empty ? null : draft.OrganisationId, Reason: note, ConfigReleaseId: release.Id,
                 NewValuesJson: JsonSerializer.Serialize(new { number, hash = release.ContentHash, rollbackOf })));
@@ -260,7 +265,7 @@ internal sealed class ClassificationPolicyKind : IConfigurationKind
         return Task.FromResult(new ValidationReport(messages));
     }
 
-    public Task ApplyAsync(Guid organisationId, string contentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;
+    public Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;
 }
 
 public sealed record ClassificationPolicyDocument(IReadOnlyList<string> Levels, string DefaultLevel)

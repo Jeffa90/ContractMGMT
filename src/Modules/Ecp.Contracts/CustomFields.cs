@@ -89,6 +89,8 @@ public interface IContractCustomFieldWriter
     Task<IReadOnlyList<FieldChange>> PreviewAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, CancellationToken ct = default);
     /// <summary>Applies them inside the caller's unit of work; the audit event carries the authority (for example the Variation).</summary>
     Task<IReadOnlyList<FieldChange>> ApplyAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, string actor, string authorityKind, Guid authorityId, string? reason, CancellationToken ct = default);
+    /// <summary>Writes migrated values (key to canonical text) with their source: the batch, the source system and the value as the source gave it. Only current fields are accepted; no role or classification rules, because the caller is a trusted migration. The record's last-changed stamp is left alone when <paramref name="touch"/> is false (a record just created).</summary>
+    Task<IReadOnlyList<FieldChange>> ApplyMigratedAsync(Guid contractId, IReadOnlyDictionary<string, string?> values, Guid batchId, string sourceSystem, IReadOnlyDictionary<string, string> sourceValues, string actor, bool touch, CancellationToken ct = default);
     /// <summary>The stored value of the named fields as text (several values joined with "; "). A field with no value is absent. No access rules: the caller has authorised the actor.</summary>
     Task<IReadOnlyDictionary<string, string?>> CurrentAsync(Guid contractId, IReadOnlyCollection<string> keys, CancellationToken ct = default);
     /// <summary>Writes values for a contract being created or loaded (no role, state or lock rules; required is not enforced).</summary>
@@ -390,7 +392,7 @@ internal sealed class ContractCustomFieldService(
     }
 
     private async Task WriteAsync(Contract c, CustomFieldSet set, Plan plan, IEnumerable<string> touchedKeys, string actor, string auditAction, string? authorityKind, Guid? authorityId, string? reason,
-        ClassificationScale scale, CancellationToken ct, Guid? batch = null, string? sourceSystem = null, IReadOnlyDictionary<string, string>? sourceValues = null)
+        ClassificationScale scale, CancellationToken ct, Guid? batch = null, string? sourceSystem = null, IReadOnlyDictionary<string, string>? sourceValues = null, bool touch = true)
     {
         if (plan.Changes.Count == 0) return;
         var now = clock.UtcNow;
@@ -404,13 +406,13 @@ internal sealed class ContractCustomFieldService(
             for (var i = 0; i < values.Count; i++)
                 db.CustomValues.Add(ToRow(c.TenantId, c.OrganisationId, c.Id, d, values[i], i, set.ReleaseNumber, actor, now, batch, sourceSystem, sourceValues?.GetValueOrDefault(key)));
         }
-        c.RecordChange(actor, now);
+        if (touch) c.RecordChange(actor, now);
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { db.ChangeTracker.Clear(); throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload it and try again."); }
         catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { db.ChangeTracker.Clear(); throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload it and try again."); }
         // The event is held at the most sensitive level among the contract and the fields that changed, so the audit trail hides it from anyone who could not read the value.
         var level = changedKeys.Select(k => set.Find(k)!.Classification).Append(c.Classification).OrderByDescending(scale.Rank).First();
-        audit.Record(new AuditEntry(auditAction, nameof(Contract), c.Id.ToString(), OrganisationId: c.OrganisationId, Classification: level, Reason: reason,
+        audit.Record(new AuditEntry(auditAction, nameof(Contract), c.Id.ToString(), OrganisationId: c.OrganisationId, Classification: level, Reason: reason, MigrationBatchId: batch,
             OldValuesJson: AuditJson.Of(plan.Changes.ToDictionary(x => x.Field, x => x.Before)), NewValuesJson: AuditJson.Of(new { fields = plan.Changes.ToDictionary(x => x.Field, x => x.After), release = set.ReleaseNumber, authorityKind, authorityId })));
     }
 
@@ -448,6 +450,19 @@ internal sealed class ContractCustomFieldService(
         bool Can(FieldDefinition d) => !d.IsCalculated && FieldRules.IsCurrent(d, today) && FieldRules.AppliesToType(d, c.ContractType);
         var plan = await PlanAsync(set, stored, input, Can, enforceRequired: false, applyDefaults: false, ct, contractId);
         return (c, set, plan);
+    }
+
+    public async Task<IReadOnlyList<FieldChange>> ApplyMigratedAsync(Guid contractId, IReadOnlyDictionary<string, string?> values, Guid batchId, string sourceSystem, IReadOnlyDictionary<string, string> sourceValues, string actor, bool touch,
+        CancellationToken ct = default)
+    {
+        var scale = await access.ClassificationScaleAsync(ct);
+        return await uow.ExecuteAsync(async cx =>
+        {
+            var (c, set, plan) = await TrustedPlanAsync(contractId, values, tracked: true, cx);
+            if (plan.Errors.Count > 0) throw new CustomFieldValidationException(plan.Errors);
+            await WriteAsync(c, set, plan, values.Keys, actor, "migration.contract.custom_fields", "migration", batchId, null, scale, cx, batchId, sourceSystem, sourceValues, touch);
+            return (IReadOnlyList<FieldChange>)plan.Changes;
+        }, ct);
     }
 
     public async Task<IReadOnlyDictionary<string, string?>> CurrentAsync(Guid contractId, IReadOnlyCollection<string> keys, CancellationToken ct = default)

@@ -39,8 +39,14 @@ public static class MappingCatalogue
     public static readonly IReadOnlyList<string> CoreFields =
     [
         "sourceRecordId", "agreementReference", "contractTitle", "description", "status", "classification", "startDate", "effectiveDate", "registeredDate", "reviewDate", "endDate",
-        "currencyCode", "estimatedValue", "extensionType", "legalReviewRequired"
+        "currencyCode", "estimatedValue", "extensionType", "legalReviewRequired",
+        "contractType", "agreementType", "riskLevel", "functionCode", "sapOutlineAgreementNumber", "noticePeriodValue", "noticePeriodUnit", "criticalNotice"
     ];
+
+    /// <summary>The target of a configured (additional) field: <c>custom.</c> plus its key. Whether the key exists, is current and can be loaded is checked against the organisation's published definitions when a batch is validated.</summary>
+    public const string CustomPrefix = "custom.";
+    public static bool IsCustomTarget(string target) => target.StartsWith(CustomPrefix, StringComparison.Ordinal) && Regex.IsMatch(target, "^custom\\.[a-z][a-z0-9_]{1,62}$", RegexOptions.NonBacktracking);
+    public static string CustomKeyOf(string target) => target[CustomPrefix.Length..];
 
     public static readonly IReadOnlyList<string> EntityFields = ["supplier.name", "supplier.vendorNumber", "category.name", "subcategory.name"];
 
@@ -55,7 +61,7 @@ public static class MappingCatalogue
     public static readonly IReadOnlyList<string> ParameterKeys =
         ["MaxLength", "MinLength", "Length", "Min", "Max", "Format", "TimeZone", "Culture", "True", "False", "Columns", "Separator", "Index", "OnMissing", "Default", "ThousandsSeparator", "DecimalSeparator"];
 
-    public static bool IsKnownTarget(string target) => CoreFields.Contains(target, StringComparer.Ordinal) || EntityFields.Contains(target, StringComparer.Ordinal)
+    public static bool IsKnownTarget(string target) => CoreFields.Contains(target, StringComparer.Ordinal) || EntityFields.Contains(target, StringComparer.Ordinal) || IsCustomTarget(target)
         || (target.StartsWith("staging.", StringComparison.Ordinal) && Regex.IsMatch(target, "^staging\\.[A-Za-z][A-Za-z0-9]{0,40}$", RegexOptions.NonBacktracking));
 }
 
@@ -116,10 +122,10 @@ public static class MappingDefinitionValidator
         {
             var f = d.Fields[i]; var where = $"mapping {i + 1} ({f.SourceColumn} → {f.TargetField})";
             if (string.IsNullOrWhiteSpace(f.SourceColumn)) issues.Add(new(true, where, "The source column is empty."));
-            if (f.TargetField.StartsWith("custom.", StringComparison.Ordinal))
-                issues.Add(new(true, where, "Custom fields are not available in this release (Future). Map the value to a core field or to a staging field."));
+            if (f.TargetField.StartsWith(MappingCatalogue.CustomPrefix, StringComparison.Ordinal) && !MappingCatalogue.IsCustomTarget(f.TargetField))
+                issues.Add(new(true, where, "An additional field is named custom.<key>, where the key is lower-case letters, digits and underscores starting with a letter (for example custom.service_tier)."));
             else if (!MappingCatalogue.IsKnownTarget(f.TargetField))
-                issues.Add(new(true, where, $"'{f.TargetField}' is not a field a migration can set. Core fields are: {string.Join(", ", MappingCatalogue.CoreFields)}; entity fields: {string.Join(", ", MappingCatalogue.EntityFields)}; or staging.<name>."));
+                issues.Add(new(true, where, $"'{f.TargetField}' is not a field a migration can set. Core fields are: {string.Join(", ", MappingCatalogue.CoreFields)}; entity fields: {string.Join(", ", MappingCatalogue.EntityFields)}; custom.<key> for an additional field; or staging.<name>."));
             else if (!seenTargets.Add(f.TargetField)) issues.Add(new(true, where, $"The target field '{f.TargetField}' is mapped more than once."));
 
             var parameters = MappingParameters.Parse(f.Validation);

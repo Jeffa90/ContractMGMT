@@ -198,11 +198,23 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
         var importRegistered = batch.AllowRegisteredDateImport && plan.LockAsLegacy && v.RegisteredUtc is not null;
         var contractId = await contracts.CreateContractAsync(new MigratedContract(batch.OrganisationId, batch.Id, reference, v.SourceReference, v.Title, v.Description, supplierId, categoryId, v.Status,
             plan.LockAsLegacy, ctx.SourceSystem, v.SourceRecordId, sourceStatus, ctx.SourceExtractedUtc, v.Classification, v.Currency, v.Value, v.ExtensionType, v.LegalReview, v.Start, v.Effective, v.Review, v.End,
-            v.RegisteredUtc, sourceRegistered, importRegistered, actor), ct);
+            v.RegisteredUtc, sourceRegistered, importRegistered, actor, v.ContractType, v.AgreementType, v.RiskLevel, v.FunctionCode, v.SapOutlineAgreementNumber, v.NoticePeriodValue, v.NoticePeriodUnit, v.CriticalNotice,
+            plan.CustomValues, SourceValuesOf(plan, l, raw)), ct);
         row.MarkCreated(contractId);
         AddProvenance(provenance, batch, l, nameof(Ecp.Contracts.Domain.Contract), contractId, ProvenanceAction.Created, null, null, v.SourceRecordId, null, row.Id, null, sourceStatus);
         ctx.ExistingBySource[v.SourceRecordId] = new ExistingContractRef(contractId, reference, ctx.SourceSystem, v.SourceRecordId, plan.LockAsLegacy, plan.LockAsLegacy, false, v.Status, batch.Id, k.Clock.UtcNow, k.Clock.UtcNow);
         ctx.ExistingByReference[reference] = ctx.ExistingBySource[v.SourceRecordId];
+    }
+
+    /// <summary>The configured field values as the source file gave them (before any transformation), kept next to the stored value as provenance.</summary>
+    private static IReadOnlyDictionary<string, string>? SourceValuesOf(RowPlan plan, BatchRuntime.Loaded l, Dictionary<string, string> raw)
+    {
+        if (plan.CustomValues is not { Count: > 0 } || plan.CustomSourceValues is null) return plan.CustomSourceValues;
+        var result = new Dictionary<string, string>(plan.CustomSourceValues, StringComparer.OrdinalIgnoreCase);
+        foreach (var m in l.Definition.Fields.Where(f => MappingCatalogue.IsCustomTarget(f.TargetField)))
+            if (raw.TryGetValue(m.SourceColumn, out var original) && !string.IsNullOrWhiteSpace(original) && result.ContainsKey(MappingCatalogue.CustomKeyOf(m.TargetField)))
+                result[MappingCatalogue.CustomKeyOf(m.TargetField)] = original.Trim().Length > 450 ? original.Trim()[..450] : original.Trim();
+        return result;
     }
 
     private async Task UpdateAsync(MigrationBatch batch, BatchRuntime.Loaded l, PlanContext ctx, StagingRow row, RowPlan plan, HashSet<string> provenance, CancellationToken ct)

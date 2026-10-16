@@ -49,7 +49,8 @@ internal sealed class BatchRuntime(MigrationKernel k, IContractMigrationPort con
         var ctx = new PlanContext
         {
             TenantId = k.TenantId, OrganisationId = l.Batch.OrganisationId, SourceSystem = l.Project.SourceSystem, SourceExtractedUtc = l.Project.ExtractionUtc, Project = l.Project, Batch = l.Batch,
-            Definition = l.Definition, InitialStatusCode = contracts.InitialStatusCode, IsKnownClassification = scale.IsKnown, DefaultClassification = scale.DefaultLevel, NowUtc = k.Clock.UtcNow
+            Definition = l.Definition, InitialStatusCode = contracts.InitialStatusCode, IsKnownClassification = scale.IsKnown, DefaultClassification = scale.DefaultLevel, NowUtc = k.Clock.UtcNow,
+            CustomChecker = l.Definition.Fields.Any(f => MappingCatalogue.IsCustomTarget(f.TargetField)) ? await contracts.CustomFieldCheckerAsync(l.Batch.OrganisationId, ct) : null
         };
         var snapshot = await contracts.SnapshotReferenceDataAsync(l.Batch.OrganisationId, ct);
         foreach (var s in snapshot.Suppliers) ctx.Suppliers.Add(new WorkingSupplier(s.Id, s.Name, s.NormalisedName, s.VendorNumber));
@@ -77,7 +78,8 @@ internal sealed class BatchRuntime(MigrationKernel k, IContractMigrationPort con
             ctx.ExistingByReference[c.AgreementReference] = c;
         }
         if (ctx.Batch.DuplicateStrategy is DuplicateStrategy.UpdateMapped or DuplicateStrategy.ManualReview && ctx.ExistingBySource.Count > 0)
-            foreach (var (id, fields) in await contracts.CaptureFieldsManyAsync(ctx.ExistingBySource.Values.Select(e => e.Id).ToList(), Contract.MigratableFields, ct)) ctx.ExistingFields[id] = fields;
+            foreach (var (id, fields) in await contracts.CaptureFieldsManyAsync(ctx.ExistingBySource.Values.Select(e => e.Id).ToList(),
+                [.. Contract.MigratableFields, .. ctx.Definition.Fields.Where(f => MappingCatalogue.IsCustomTarget(f.TargetField)).Select(f => "cf." + MappingCatalogue.CustomKeyOf(f.TargetField))], ct)) ctx.ExistingFields[id] = fields;
     }
 
     public static MappingContext MappingContextFor(Loaded l)
@@ -88,7 +90,7 @@ internal sealed class BatchRuntime(MigrationKernel k, IContractMigrationPort con
     }
 }
 
-internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime runtime, IDocumentMigrationPort documents) : IMigrationValidation
+internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime runtime, IDocumentMigrationPort documents, IContractMigrationPort contracts) : IMigrationValidation
 {
     private const int PageSize = 1000;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -126,6 +128,18 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
         else if (l.Version.Status != ProfileVersionStatus.Published) summary.Blockers.Add("The mapping profile version must be published before it can be used by a batch.");
         else foreach (var issue in MappingDefinitionValidator.Validate(l.Definition).Where(i => i.IsError)) summary.Blockers.Add($"Profile: {issue.Field}: {issue.Message}");
         if (batch.IsLegacyLoad && !project.LegacyLoadAllowedAt(k.Clock.UtcNow)) summary.Blockers.Add("MIG-E012: The legacy-load policy has expired or been closed.");
+        if (l.Version is not null && l.Version.Status == ProfileVersionStatus.Published && l.Definition.Fields.Any(f => MappingCatalogue.IsCustomTarget(f.TargetField)))
+        {
+            // Every additional field the profile loads must exist, be in force and be one a migration can fill, before any row is looked at.
+            var checker = await contracts.CustomFieldCheckerAsync(batch.OrganisationId, ct);
+            foreach (var f in l.Definition.Fields.Where(f => MappingCatalogue.IsCustomTarget(f.TargetField)))
+            {
+                var key = MappingCatalogue.CustomKeyOf(f.TargetField);
+                if (checker.Rule(key) is not { } rule) summary.Blockers.Add($"MIG-E020: {f.TargetField} is not an additional field of this organisation (release {checker.Release} of its field definitions).");
+                else if (rule.IsRetired || !rule.IsCurrent) summary.Blockers.Add($"MIG-E021: {rule.Label} ({f.TargetField}) is retired or not in force, so a migration cannot load into it.");
+                else if (!rule.Supported) summary.Blockers.Add($"MIG-E025: {rule.Label} ({f.TargetField}) cannot be loaded: {rule.UnsupportedReason}.");
+            }
+        }
         if (l.ContractsFile is not null && l.Version is not null)
         {
             var headers = HeadersOf(l.ContractsFile);

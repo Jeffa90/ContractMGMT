@@ -68,7 +68,9 @@ stateDiagram-v2
 * Transformations may be chained with `+`. The catalogue is closed: `Trim`, `NormaliseWhitespace`, `Upper`, `Lower`, `TitleCase`, `ParseDate` (explicit format), `ParseDateTime` (explicit format and time zone), `ParseDecimal`, `ParseInteger`, `MapBoolean`, `Concat`, `Split`, `FixedDefault`, `LookupMap`. A profile that names anything else, or a target field that does not exist, fails validation with a message. Regular expressions are not transformations; the attachment naming rule is the only pattern, and it runs on the non-backtracking engine with a 250 ms timeout.
 * Lookups: a value with no entry is `MIG-E004` when the mapping is required (the lookup key is set and the mapping is a hard `LookupMap`), and is passed through when the lookup is soft (a `LookupMapKey` alongside another transformation, as in the sample category columns).
 * Values are never truncated: a value over its maximum is `MIG-E009`.
-* Custom fields: **Future** (the `staging.*` targets are accepted and retained but not yet loaded into custom-field storage).
+* Additional (custom) fields: **Implemented** for every type except calculated, person and file-reference. Target `custom.<key>` (lower-case letters, digits and underscores, for example `custom.service_tier`). The dry run checks every mapped key against the organisation's published field definitions (release recorded in the message), then every value: type and limits, defined and active choices, one value for a single-valued field, `;` between the values of a multiple-choice field. A source value that is not a code (or label) of the field's choices is **not guessed**: map it with a `LookupMap` transformation and lookup entries, or the row is rejected (`MIG-E022`). A retired field, or one not yet in force, takes no new values (`MIG-E021`, a blocker when the profile maps it). The stored value is the canonical code; the value as the source gave it is kept beside it with the batch id and source system. Reruns are idempotent (an unchanged value is not rewritten); an update keeps a before-image of the configured values under `cf.<key>`, and rolling back an update restores them; rolling back a creating batch removes an untouched record together with its configured values, and archives a record that has had activity since (its values are kept). The `staging.*` targets are still accepted and retained but not loaded.
+* Core fields a profile can now set: `contractType`, `agreementType`, `riskLevel`, `functionCode`, `sapOutlineAgreementNumber`, `noticePeriodValue` and `noticePeriodUnit` (both or neither), `criticalNotice`. Legal entity, business unit and site are not yet mapping targets (**Future**); a contract can be given them afterwards.
+* Sample columns and mapping rows: `migration-samples/contracts-import-custom-fields.csv` and `migration-samples/field-mapping-profile-custom-fields.csv` (with `status-lookup-map.csv` and the `tier` entries shown in the sample profile).
 
 ## 4. Intake formats and limits
 
@@ -145,6 +147,11 @@ Every code the code can produce appears here; `MigrationCatalogueTests` fails th
 | MIG-E013 | Ragged row (more fields than headers) or duplicate column header |
 | MIG-E014 | Mapping or lookup file is missing a required column |
 | MIG-E015 | Value shorter than the minimum or not the exact length the mapping validation requires |
+| MIG-E020 | `custom.<key>` names a field that is not an additional field of this organisation |
+| MIG-E021 | The additional field is retired or not in force, so it takes no new values |
+| MIG-E022 | Value is not a defined (and still offered) choice or lookup member of the field |
+| MIG-E023 | Value breaks the additional field's type or validation (length, range, pattern, date range) |
+| MIG-E025 | The additional field cannot be loaded by a migration (calculated, person or file reference) |
 | MIG-W001 | Value normalised (trimmed, case, whitespace) |
 | MIG-W002 | Default applied, or row skipped because nothing would change |
 | MIG-W003 | End date blank with an open-ended extension type (expected) |
@@ -259,7 +266,7 @@ Recorded in `TASKS.md` (MGR-ASM-*). In short:
 * The supplement's catalogue stopped at `MIG-E012`, `MIG-W004`, `MIG-F016`; the codes above that are new (E013–E015, W005–W009, F017–F019).
 * No outbox, notification or reminder emission exists yet, so migration emits none (**Future**).
 * No real malware scanner (**Disabled**; mock outside Production).
-* Custom fields and JSON/ZIP-package sources are **Future**.
+* JSON/ZIP-package sources are **Future**. Person and file-reference additional fields cannot be matched from a source file and are refused (`MIG-E025`).
 * The UI commits synchronously within the request (resumable); a background worker is **Future**.
 * Rollback preview for categories is indicative: a child is judged on its own when the rollback runs.
 * SQL Server proof depends on the disposable container; when unavailable those tests are **NOT VERIFIED**.

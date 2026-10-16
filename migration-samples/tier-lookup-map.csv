@@ -1,0 +1,3 @@
+LookupMapKey,SourceValue,TargetCode,Notes
+tier,Gold,GOLD,
+tier,Silver Plus,SILVER,"Source wording differs from the choice label; mapped explicitly"

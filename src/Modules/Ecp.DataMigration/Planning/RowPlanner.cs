@@ -32,7 +32,9 @@ internal sealed class WorkingCategory(Guid? id, string code, string name, string
 
 public sealed record ContractValues(
     string SourceRecordId, string SourceReference, string Title, string? Description, string Status, string Classification, DateOnly? Start, DateOnly? Effective, DateOnly? Review,
-    DateOnly? End, DateTime? RegisteredUtc, string? RegisteredSource, string? Currency, decimal? Value, string? ExtensionType, bool LegalReview, string? DocumentFolder);
+    DateOnly? End, DateTime? RegisteredUtc, string? RegisteredSource, string? Currency, decimal? Value, string? ExtensionType, bool LegalReview, string? DocumentFolder,
+    string? ContractType = null, string? AgreementType = null, string? RiskLevel = null, string? FunctionCode = null, string? SapOutlineAgreementNumber = null, int? NoticePeriodValue = null,
+    string? NoticePeriodUnit = null, bool CriticalNotice = false);
 
 /// <summary>What a commit will do for one row, derived from the mapped values and the state of the target. The same plan is computed at validation (to preview) and at commit (to act).</summary>
 internal sealed class RowPlan
@@ -51,6 +53,9 @@ internal sealed class RowPlan
     public bool GenerateReference { get; set; }
     public bool LockAsLegacy { get; set; }
     public IReadOnlyDictionary<string, string?>? UpdateFields { get; set; }
+    /// <summary>Additional field values in their canonical stored text (key to value), and the value as the source gave it, for provenance.</summary>
+    public IReadOnlyDictionary<string, string?>? CustomValues { get; set; }
+    public IReadOnlyDictionary<string, string>? CustomSourceValues { get; set; }
     public string? IdempotencyKey { get; set; }
     public string Summary { get; set; } = "";
     public List<RowMessage> Messages { get; } = [];
@@ -70,6 +75,8 @@ internal sealed class PlanContext
     public required Func<string, bool> IsKnownClassification { get; init; }
     public required string DefaultClassification { get; init; }
     public required DateTime NowUtc { get; init; }
+    /// <summary>Checks additional field values against the published definitions; null when the batch maps none.</summary>
+    public IMigrationCustomChecker? CustomChecker { get; init; }
     public List<WorkingSupplier> Suppliers { get; } = [];
     public List<WorkingCategory> Categories { get; } = [];
     public Dictionary<string, ExistingContractRef> ExistingBySource { get; } = new(StringComparer.Ordinal);
@@ -111,6 +118,8 @@ internal static class RowPlanner
         var v = Typed(mapped, ctx, plan);
         if (v is null || plan.HasErrors) return Reject(plan, "The row has values that could not be understood.");
         plan.Values = v;
+        CheckCustom(mapped, ctx, plan);
+        if (plan.HasErrors) return Reject(plan, "An additional field value could not be accepted.");
         plan.IdempotencyKey = IdempotencyKey(ctx.TenantId, ctx.OrganisationId, ctx.SourceSystem, v.SourceRecordId);
 
         // 1. Duplicate source record in the same file: the first occurrence is kept, later ones are rejected (MIG-E005).
@@ -235,6 +244,19 @@ internal static class RowPlanner
         return plan;
     }
 
+    /// <summary>Additional field values: each mapped <c>custom.key</c> is checked against the published definition (type, limits, defined choices, retired fields); the canonical text is what is stored and compared.</summary>
+    private static void CheckCustom(MappedRow mapped, PlanContext ctx, RowPlan plan)
+    {
+        var raw = mapped.Values.Where(kv => MappingCatalogue.IsCustomTarget(kv.Key)).ToDictionary(kv => MappingCatalogue.CustomKeyOf(kv.Key), kv => (string?)kv.Value, StringComparer.OrdinalIgnoreCase);
+        if (raw.Count == 0) return;
+        if (ctx.CustomChecker is null) { plan.Messages.Add(new(true, "MIG-E020", "custom", "Additional fields cannot be loaded in this run.")); return; }
+        var check = ctx.CustomChecker.Check(raw);
+        foreach (var p in check.Problems) plan.Messages.Add(new(true, p.Code, MappingCatalogue.CustomPrefix + p.Key, p.Message));
+        if (!check.IsValid) return;
+        plan.CustomValues = check.Canonical;
+        plan.CustomSourceValues = raw.Where(kv => check.Canonical.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => (kv.Value ?? "").Length > 450 ? kv.Value![..450] : kv.Value ?? "", StringComparer.OrdinalIgnoreCase);
+    }
+
     private static string Describe(WorkingSupplier? s) => s is null ? "" : s.IsNew ? $"create supplier '{s.Name}'" : $"link supplier '{s.Name}'";
     private static string Describe(WorkingCategory? c) => c is null ? "" : c.IsNew ? $"create category {c.Code}" : $"link category {c.Code}";
 
@@ -257,6 +279,10 @@ internal static class RowPlanner
         Want("contractTitle", "contractTitle", v.Title); Want("description", "description", v.Description); Want("status", "status", v.Status);
         Want("currencyCode", "currencyCode", v.Currency); Want("estimatedValue", "estimatedValue", v.Value?.ToString(CultureInfo.InvariantCulture)); Want("extensionType", "extensionType", v.ExtensionType);
         Want("legalReviewRequired", "legalReviewRequired", v.LegalReview ? "true" : "false");
+        Want("contractType", "contractType", v.ContractType); Want("agreementType", "agreementType", v.AgreementType); Want("riskLevel", "riskLevel", v.RiskLevel); Want("functionCode", "functionCode", v.FunctionCode);
+        Want("sapOutlineAgreementNumber", "sapOutlineAgreementNumber", v.SapOutlineAgreementNumber); Want("noticePeriodValue", "noticePeriodValue", v.NoticePeriodValue?.ToString(CultureInfo.InvariantCulture));
+        Want("noticePeriodUnit", "noticePeriodUnit", v.NoticePeriodUnit); Want("criticalNotice", "criticalNotice", ctx.Definition.Maps("criticalNotice") ? (v.CriticalNotice ? "true" : "false") : null);
+        foreach (var (key, value) in plan.CustomValues ?? new Dictionary<string, string?>()) if (!string.IsNullOrEmpty(value)) wanted["cf." + key] = value;
         Want("startDate", "startDate", v.Start?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)); Want("effectiveDate", "effectiveDate", v.Effective?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         Want("reviewDate", "reviewDate", v.Review?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)); Want("endDate", "endDate", v.End?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         if (plan.Supplier?.Id is { } sid) wanted["supplierId"] = sid.ToString("D");
@@ -335,10 +361,28 @@ internal static class RowPlanner
             if (lr.Equals("true", StringComparison.Ordinal)) legal = true;
             else if (!lr.Equals("false", StringComparison.Ordinal)) plan.Messages.Add(new(true, "MIG-E004", "legalReviewRequired", $"'{lr}' is not yes or no. Use a MapBoolean transformation."));
         }
+        var contractType = Limit(Get("contractType"), "contractType", 100); var agreementType = Limit(Get("agreementType"), "agreementType", 100); var riskLevel = Limit(Get("riskLevel"), "riskLevel", 50);
+        var functionCode = Limit(Get("functionCode"), "functionCode", 100); var sap = Limit(Get("sapOutlineAgreementNumber"), "sapOutlineAgreementNumber", 100);
+        int? noticeValue = null;
+        if (Get("noticePeriodValue") is { } nv)
+        {
+            if (int.TryParse(nv, NumberStyles.None, CultureInfo.InvariantCulture, out var n)) noticeValue = n;
+            else plan.Messages.Add(new(true, "MIG-E003", "noticePeriodValue", $"'{nv}' is not a whole number of days, weeks or months. Use a ParseInteger transformation."));
+        }
+        var noticeUnit = Get("noticePeriodUnit") is { } nu ? NoticePeriods.Canonical(nu) : null;
+        if (Get("noticePeriodUnit") is { } rawUnit && noticeUnit is null) plan.Messages.Add(new(true, "MIG-E004", "noticePeriodUnit", $"'{rawUnit}' is not Days, Weeks or Months."));
+        if ((noticeValue is null) != (noticeUnit is null) && !plan.HasErrors) plan.Messages.Add(new(true, "MIG-E001", "noticePeriodValue", "Give both the notice period and its unit, or neither."));
+        var critical = false;
+        if (Get("criticalNotice") is { } cn)
+        {
+            if (cn.Equals("true", StringComparison.Ordinal)) critical = true;
+            else if (!cn.Equals("false", StringComparison.Ordinal)) plan.Messages.Add(new(true, "MIG-E004", "criticalNotice", $"'{cn}' is not yes or no. Use a MapBoolean transformation."));
+        }
         var start = Date("startDate"); var effective = Date("effectiveDate"); var review = Date("reviewDate"); var end = Date("endDate");
         if (start.HasValue && end.HasValue && end < start) plan.Messages.Add(new(true, "MIG-E002", "endDate", "The End Date is before the Start Date."));
         if (plan.HasErrors) return null;
-        return new ContractValues(id!, reference!, title!, description, status!, classification, start, effective, review, end, registered, Get("registeredDate"), currency, value, extension, legal, Get("staging.documentFolder"));
+        return new ContractValues(id!, reference!, title!, description, status!, classification, start, effective, review, end, registered, Get("registeredDate"), currency, value, extension, legal, Get("staging.documentFolder"),
+            contractType, agreementType, riskLevel, functionCode, sap, noticeValue, noticeUnit, critical);
     }
 
     private static void ResolveSupplier(MappedRow mapped, PlanContext ctx, RowPlan plan)

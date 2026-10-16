@@ -138,9 +138,9 @@ public class MappingEngineTests
         Assert.DoesNotContain(MappingDefinitionValidator.Validate(good), i => i.IsError);
 
         var issues = MappingDefinitionValidator.Validate(new MappingDefinition([
-            Map("A", "custom.region"), Map("B", "unknown.field"), Map("C", "contractTitle", "Eval"), Map("D", "contractTitle"), Map("E", "status", "LookupMap"),
+            Map("A", "custom.Not A Key!"), Map("B", "unknown.field"), Map("C", "contractTitle", "Eval"), Map("D", "contractTitle"), Map("E", "status", "LookupMap"),
             Map("F", "startDate", "ParseDate", rules: "Format=yyyy-MM-dd;Bogus=1")], [new("x", "A", "1", null), new("x", " a ", "2", null)], new ProfileOptions()));
-        string[] expected = ["Custom fields are not available", "is not a field a migration can set", "is not a safe transformation", "mapped more than once", "needs a LookupMapKey", "is not a known parameter",
+        string[] expected = ["An additional field is named custom.<key>", "is not a field a migration can set", "is not a safe transformation", "mapped more than once", "needs a LookupMapKey", "is not a known parameter",
             "must map 'sourceRecordId'", "appears more than once"];
         foreach (var e in expected) Assert.Contains(issues, i => i.IsError && i.Message.Contains(e) || i.IsError && i.Field.Contains(e));
     }
@@ -151,6 +151,25 @@ public class MappingEngineTests
         var lookups = ProfileCsv.ParseLookups(MigrationSamples.Open("status-lookup-map.csv"), out var p2);
         Assert.Empty(p1); Assert.Empty(p2);
         return new MappingDefinition(fields, lookups, new ProfileOptions(false, null, ["Evergreen"]));
+    }
+
+    [Fact] // CFG-03: the shipped additional-field sample columns and mapping rows map cleanly on top of the complete profile, with the explicit choice mapping
+    public void The_custom_field_sample_columns_map_to_additional_and_core_fields_with_an_explicit_choice_mapping()
+    {
+        var baseFields = ProfileCsv.ParseFieldMappings(MigrationSamples.Open("field-mapping-profile-complete.csv"), out _);
+        var extra = ProfileCsv.ParseFieldMappings(MigrationSamples.Open("field-mapping-profile-custom-fields.csv"), out var p1);
+        var lookups = ProfileCsv.ParseLookups(MigrationSamples.Open("tier-lookup-map.csv"), out var p2);
+        Assert.Empty(p1); Assert.Empty(p2);
+        var d = new MappingDefinition([.. baseFields, .. extra], [.. ProfileFromSamples().Lookups, .. lookups], new ProfileOptions(false, null, ["Evergreen"]));
+        Assert.DoesNotContain(MappingDefinitionValidator.Validate(d), i => i.IsError);
+        var table = Ecp.Formats.CsvReader.Read(new MemoryStream(MigrationSamples.Bytes("contracts-import-custom-fields.csv")));
+        var one = MappingEngine.MapRow(d, table.ToMap(table.Rows[0]), Context);
+        Assert.DoesNotContain(one.Messages, m => m.IsError);
+        Assert.Equal(("GOLD", "42", "ALPHA;BETA"), (one.Values["custom.service_tier"], one.Values["custom.score"], one.Values["custom.tags"]));
+        Assert.Equal(("Services", "HIGH", "true", "3", "Months"), (one.Values["contractType"], one.Values["riskLevel"], one.Values["criticalNotice"], one.Values["noticePeriodValue"], one.Values["noticePeriodUnit"]));
+        var two = MappingEngine.MapRow(d, table.ToMap(table.Rows[1]), Context);
+        Assert.Equal("SILVER", two.Values["custom.service_tier"]);                 // the source wording differs from the choice label: mapped explicitly
+        Assert.DoesNotContain("custom.score", two.Values.Keys);                     // blank stays blank
     }
 
     [Fact] // MIG-014 / MIG-018 groundwork: the shipped sample maps cleanly

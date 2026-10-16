@@ -1,0 +1,9 @@
+SourceColumn,TargetField,Transformation,DefaultValue,Required,LookupMapKey,Validation,Notes
+ServiceTier,custom.service_tier,LookupMap,,No,tier,OnMissing=Error,"Explicit mapping from the source wording to the field's choice codes (see tier-lookup-map.csv)"
+Score,custom.score,ParseInteger,,No,,,"A whole number; the field's own minimum and maximum are applied"
+Tags,custom.tags,Trim,,No,,,"Several values for a multiple-choice field are separated by a semicolon"
+ContractType,contractType,Trim,,No,,,
+RiskLevel,riskLevel,Upper,,No,,,
+CriticalNotice,criticalNotice,MapBoolean,,No,,,
+NoticePeriod,noticePeriodValue,ParseInteger,,No,,,
+NoticeUnit,noticePeriodUnit,Trim,,No,,,"Days, Weeks or Months; give both the length and the unit, or neither"

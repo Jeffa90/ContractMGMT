@@ -97,3 +97,23 @@ public sealed class RegisterViewScenarioTests_SqlServer
     [SqlServerFact] public Task Exports() => ProviderRunner.SqlServerAsync(RegisterViewScenarios.An_export_carries_the_same_columns_and_filters_and_only_what_the_person_may_export, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Reporting_schema() => ProviderRunner.SqlServerAsync(RegisterViewScenarios.The_reporting_schema_is_stable_and_follows_what_the_person_may_export, LifecycleScenarios.Scanner);
 }
+
+
+[Trait("Category", "Migration")]
+public sealed class MigrationCustomFieldScenarioTests_Sqlite
+{
+    [Fact] public Task Load_and_report() => ProviderRunner.SqliteAsync(MigrationCustomFieldScenarios.Configured_fields_and_the_new_core_fields_load_with_every_bad_value_reported_and_nothing_guessed, LifecycleScenarios.Scanner);
+    [Fact] public Task Unusable_targets() => ProviderRunner.SqliteAsync(MigrationCustomFieldScenarios.A_profile_that_names_an_unknown_retired_calculated_or_person_field_stops_the_dry_run, LifecycleScenarios.Scanner);
+    [Fact] public Task Rerun_update_rollback() => ProviderRunner.SqliteAsync(MigrationCustomFieldScenarios.A_rerun_is_idempotent_an_update_keeps_a_before_image_and_a_rollback_restores_or_removes, LifecycleScenarios.Scanner);
+    [Fact] public Task Retired_after_loading() => ProviderRunner.SqliteAsync(MigrationCustomFieldScenarios.A_field_retired_after_loading_keeps_its_values_and_refuses_a_changed_load, LifecycleScenarios.Scanner);
+}
+
+[Trait("Category", "Migration")]
+[Trait("Category", "SqlServer")]
+public sealed class MigrationCustomFieldScenarioTests_SqlServer
+{
+    [SqlServerFact] public Task Load_and_report() => ProviderRunner.SqlServerAsync(MigrationCustomFieldScenarios.Configured_fields_and_the_new_core_fields_load_with_every_bad_value_reported_and_nothing_guessed, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Unusable_targets() => ProviderRunner.SqlServerAsync(MigrationCustomFieldScenarios.A_profile_that_names_an_unknown_retired_calculated_or_person_field_stops_the_dry_run, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Rerun_update_rollback() => ProviderRunner.SqlServerAsync(MigrationCustomFieldScenarios.A_rerun_is_idempotent_an_update_keeps_a_before_image_and_a_rollback_restores_or_removes, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Retired_after_loading() => ProviderRunner.SqlServerAsync(MigrationCustomFieldScenarios.A_field_retired_after_loading_keeps_its_values_and_refuses_a_changed_load, LifecycleScenarios.Scanner);
+}

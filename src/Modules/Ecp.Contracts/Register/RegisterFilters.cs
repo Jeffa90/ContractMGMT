@@ -205,6 +205,20 @@ internal sealed partial class RegisterQueryEngine
 
     // ---- configured fields -------------------------------------------------------------------------------------------------------------------------------
 
+    // A configured-field condition is an uncorrelated "contract id in (matching values)" subquery, never one lookup per contract: the database finds the matching values through the field's own index and
+    // joins them once, so the cost follows the number of matching values, not the size of the register times the number of matches.
+    private static IQueryable<Contract> Matching(IQueryable<Contract> cq, IQueryable<ContractCustomValue> values)
+    {
+        var ids = values.Select(v => v.ContractId);
+        return cq.Where(c => ids.Contains(c.Id));
+    }
+
+    private static IQueryable<Contract> NotMatching(IQueryable<Contract> cq, IQueryable<ContractCustomValue> values)
+    {
+        var ids = values.Select(v => v.ContractId);
+        return cq.Where(c => !ids.Contains(c.Id));
+    }
+
     private IQueryable<Contract> ApplyCustom(IQueryable<Contract> cq, CustomFieldSet set, FieldDefinition d, FilterClause f, Func<string, IQueryable<Guid>> idsAt, Func<string, string[]> above, DateOnly today)
     {
         var key = d.Key;
@@ -213,8 +227,8 @@ internal sealed partial class RegisterQueryEngine
         cq = cq.Where(c => higher.Contains(c.Classification) || allowed.Contains(c.Id));
         if (states.Length > 0) cq = cq.Where(c => states.Contains(c.Status));
         var cv = db.CustomValues.AsNoTracking().Where(v => v.FieldKey == key);
-        if (f.Op == FilterOps.IsEmpty) return cq.Where(c => !cv.Any(v => v.ContractId == c.Id));
-        if (f.Op == FilterOps.IsNotEmpty) return cq.Where(c => cv.Any(v => v.ContractId == c.Id));
+        if (f.Op == FilterOps.IsEmpty) return NotMatching(cq, cv);
+        if (f.Op == FilterOps.IsNotEmpty) return Matching(cq, cv);
         switch (FieldTypes.StorageOf(d.Type))
         {
             case StorageKind.Text:
@@ -224,29 +238,30 @@ internal sealed partial class RegisterQueryEngine
                     var one = vals[0]; var oneUpper = one.ToUpperInvariant();
                     return f.Op switch
                     {
-                        FilterOps.Eq => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.TextValue == one)),
-                        FilterOps.NotEq => cq.Where(c => !cv.Any(v => v.ContractId == c.Id && v.TextValue == one)),
-                        FilterOps.Contains => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.TextValue!.ToUpper().Contains(oneUpper))),
-                        FilterOps.StartsWith => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.TextValue!.ToUpper().StartsWith(oneUpper))),
-                        FilterOps.In => cq.Where(c => cv.Any(v => v.ContractId == c.Id && vals.Contains(v.TextValue!))),
+                        FilterOps.Eq => Matching(cq, cv.Where(v => v.TextValue == one)),
+                        FilterOps.NotEq => NotMatching(cq, cv.Where(v => v.TextValue == one)),
+                        FilterOps.Contains => Matching(cq, cv.Where(v => v.TextValue!.ToUpper().Contains(oneUpper))),
+                        FilterOps.StartsWith => Matching(cq, cv.Where(v => v.TextValue!.ToUpper().StartsWith(oneUpper))),
+                        FilterOps.In => Matching(cq, cv.Where(v => vals.Contains(v.TextValue!))),
                         _ => cq
                     };
                 }
             case StorageKind.LongText:
                 {
                     var one = f.Values[0];
-                    return f.Op == FilterOps.Contains ? cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.LongTextValue!.ToUpper().Contains(one.ToUpperInvariant()))) : cq;
+                    var oneUpper = one.ToUpperInvariant();
+                    return f.Op == FilterOps.Contains ? Matching(cq, cv.Where(v => v.LongTextValue!.ToUpper().Contains(oneUpper))) : cq;
                 }
             case StorageKind.Number:
                 {
                     var a = f.Values.Count > 0 ? Dec(f.Values[0]) : 0m; var b = f.Values.Count > 1 ? Dec(f.Values[1]) : 0m;
                     return f.Op switch
                     {
-                        FilterOps.Eq => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.NumberValue == a)),
-                        FilterOps.NotEq => cq.Where(c => !cv.Any(v => v.ContractId == c.Id && v.NumberValue == a)),
-                        FilterOps.Gte => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.NumberValue >= a)),
-                        FilterOps.Lte => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.NumberValue <= a)),
-                        FilterOps.Between => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.NumberValue >= a && v.NumberValue <= b)),
+                        FilterOps.Eq => Matching(cq, cv.Where(v => v.NumberValue == a)),
+                        FilterOps.NotEq => NotMatching(cq, cv.Where(v => v.NumberValue == a)),
+                        FilterOps.Gte => Matching(cq, cv.Where(v => v.NumberValue >= a)),
+                        FilterOps.Lte => Matching(cq, cv.Where(v => v.NumberValue <= a)),
+                        FilterOps.Between => Matching(cq, cv.Where(v => v.NumberValue >= a && v.NumberValue <= b)),
                         _ => cq
                     };
                 }
@@ -255,10 +270,10 @@ internal sealed partial class RegisterQueryEngine
                     var a = f.Values.Count > 0 ? ParseDate(f.Values[0], today) : default; var b = f.Values.Count > 1 ? ParseDate(f.Values[1], today) : default;
                     return f.Op switch
                     {
-                        FilterOps.Eq => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.DateValue == a)),
-                        FilterOps.Gte => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.DateValue >= a)),
-                        FilterOps.Lte => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.DateValue <= a)),
-                        FilterOps.Between => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.DateValue >= a && v.DateValue <= b)),
+                        FilterOps.Eq => Matching(cq, cv.Where(v => v.DateValue == a)),
+                        FilterOps.Gte => Matching(cq, cv.Where(v => v.DateValue >= a)),
+                        FilterOps.Lte => Matching(cq, cv.Where(v => v.DateValue <= a)),
+                        FilterOps.Between => Matching(cq, cv.Where(v => v.DateValue >= a && v.DateValue <= b)),
                         _ => cq
                     };
                 }
@@ -267,26 +282,26 @@ internal sealed partial class RegisterQueryEngine
                     var from = f.Values.Count > 0 ? StartOf(ParseDate(f.Values[0], today)) : default; var next = from.AddDays(1); var to = f.Values.Count > 1 ? StartOf(ParseDate(f.Values[1], today)).AddDays(1) : next;
                     return f.Op switch
                     {
-                        FilterOps.Eq => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.DateTimeValue >= from && v.DateTimeValue < next)),
-                        FilterOps.Gte => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.DateTimeValue >= from)),
-                        FilterOps.Lte => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.DateTimeValue < next)),
-                        FilterOps.Between => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.DateTimeValue >= from && v.DateTimeValue < to)),
+                        FilterOps.Eq => Matching(cq, cv.Where(v => v.DateTimeValue >= from && v.DateTimeValue < next)),
+                        FilterOps.Gte => Matching(cq, cv.Where(v => v.DateTimeValue >= from)),
+                        FilterOps.Lte => Matching(cq, cv.Where(v => v.DateTimeValue < next)),
+                        FilterOps.Between => Matching(cq, cv.Where(v => v.DateTimeValue >= from && v.DateTimeValue < to)),
                         _ => cq
                     };
                 }
             case StorageKind.Bool:
                 {
                     var b = f.Values[0] == "true";
-                    return cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.BoolValue == b));
+                    return Matching(cq, cv.Where(v => v.BoolValue == b));
                 }
             case StorageKind.Ref:
                 {
                     var ids = f.Values.Where(v => Guid.TryParse(v, out _)).Select(Guid.Parse).ToArray(); var one = ids.Length > 0 ? ids[0] : Guid.Empty;
                     return f.Op switch
                     {
-                        FilterOps.Eq => cq.Where(c => cv.Any(v => v.ContractId == c.Id && v.RefValue == one)),
-                        FilterOps.NotEq => cq.Where(c => !cv.Any(v => v.ContractId == c.Id && v.RefValue == one)),
-                        FilterOps.In => cq.Where(c => cv.Any(v => v.ContractId == c.Id && ids.Contains(v.RefValue!.Value))),
+                        FilterOps.Eq => Matching(cq, cv.Where(v => v.RefValue == one)),
+                        FilterOps.NotEq => NotMatching(cq, cv.Where(v => v.RefValue == one)),
+                        FilterOps.In => Matching(cq, cv.Where(v => ids.Contains(v.RefValue!.Value))),
                         _ => cq
                     };
                 }

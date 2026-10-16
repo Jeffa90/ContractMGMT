@@ -2,6 +2,7 @@ using System.Globalization;
 using Ecp.Audit;
 using Ecp.Contracts.Domain;
 using Ecp.Contracts.Persistence;
+using Ecp.Metadata;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
@@ -24,7 +25,10 @@ public sealed record MigratedContract(
     Guid OrganisationId, Guid BatchId, string AgreementReference, string? SourceAgreementReference, string Title, string? Description, Guid SupplierId, Guid CategoryId,
     string StatusCode, bool LockAsLegacy, string SourceSystem, string SourceRecordId, string? SourceStatus, DateTime? SourceExtractedUtc, string Classification,
     string? CurrencyCode, decimal? EstimatedValue, string? ExtensionType, bool LegalReviewRequired, DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? ReviewDate,
-    DateOnly? EndDate, DateTime? RegisteredUtc, string? RegisteredSourceValue, bool ImportRegisteredDate, string ActingAdministrator);
+    DateOnly? EndDate, DateTime? RegisteredUtc, string? RegisteredSourceValue, bool ImportRegisteredDate, string ActingAdministrator,
+    string? ContractType = null, string? AgreementType = null, string? RiskLevel = null, string? FunctionCode = null, string? SapOutlineAgreementNumber = null, int? NoticePeriodValue = null,
+    string? NoticePeriodUnit = null, bool CriticalNotice = false,
+    IReadOnlyDictionary<string, string?>? CustomValues = null, IReadOnlyDictionary<string, string>? CustomSourceValues = null);
 
 public sealed record ContractFieldUpdate(IReadOnlyDictionary<string, string?> Before, DateTime AfterStampUtc);
 
@@ -50,6 +54,8 @@ public interface IContractMigrationPort
     /// <summary>Updates only the named fields and returns their previous values. A locked record needs <paramref name="lockedOverwriteAuthorised"/>.</summary>
     Task<ContractFieldUpdate> UpdateContractFieldsAsync(Guid contractId, Guid batchId, IReadOnlyDictionary<string, string?> fields, bool lockedOverwriteAuthorised,
         string reason, CancellationToken ct = default);
+    /// <summary>Checks configured field values against the organisation's published definitions. Built once for a batch; no database work per row.</summary>
+    Task<IMigrationCustomChecker> CustomFieldCheckerAsync(Guid organisationId, CancellationToken ct = default);
     Task<IReadOnlyDictionary<string, string?>> CaptureFieldsAsync(Guid contractId, IEnumerable<string> fieldNames, CancellationToken ct = default);
     /// <summary>The named fields of many contracts at once (for comparing a source row with what is already in the target).</summary>
     Task<IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, string?>>> CaptureFieldsManyAsync(IReadOnlyCollection<Guid> contractIds, IReadOnlyCollection<string> fieldNames, CancellationToken ct = default);
@@ -70,7 +76,7 @@ public interface IContractMigrationPort
 
 internal sealed class ContractMigrationPort(
     ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IActorContext actor, IClock clock, ITenantContext tenant, ReferenceAllocator allocator,
-    ITenantDirectory tenants, IOptions<ContractsOptions> options) : IContractMigrationPort
+    ITenantDirectory tenants, IOptions<ContractsOptions> options, IContractCustomFieldWriter customFields, ICustomFieldCatalogue fieldCatalogue) : IContractMigrationPort
 {
     public string InitialStatusCode => options.Value.InitialStatusCode;
 
@@ -152,7 +158,9 @@ internal sealed class ContractMigrationPort(
         if (!await db.Categories.AnyAsync(s => s.Id == m.CategoryId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("category_not_found", "The category was not found.");
         var by = actor.ActorId ?? "system";
         var n = new NewContract(tenantId, m.OrganisationId, m.AgreementReference, m.Title, m.SupplierId, m.CategoryId, options.Value.InitialStatusCode, by, clock.UtcNow, m.Description,
-            m.Classification, m.CurrencyCode, m.EstimatedValue, m.ExtensionType, m.LegalReviewRequired, m.StartDate, m.EffectiveDate, m.ReviewDate, m.EndDate);
+            m.Classification, m.CurrencyCode, m.EstimatedValue, m.ExtensionType, m.LegalReviewRequired, m.StartDate, m.EffectiveDate, m.ReviewDate, m.EndDate,
+            ContractType: m.ContractType, AgreementType: m.AgreementType, RiskLevel: m.RiskLevel, FunctionCode: m.FunctionCode, SapOutlineAgreementNumber: m.SapOutlineAgreementNumber,
+            NoticePeriodValue: m.NoticePeriodValue, NoticePeriodUnit: m.NoticePeriodUnit, CriticalNotice: m.CriticalNotice);
         var source = new SourceProvenance(m.SourceSystem, m.SourceRecordId, m.SourceAgreementReference, m.SourceStatus, m.SourceExtractedUtc);
         var contract = m.LockAsLegacy
             ? Contract.CreateLegacyLoad(n, m.StatusCode, source, new LegacyLoadAuthorisation(m.BatchId, m.ActingAdministrator, m.ImportRegisteredDate), m.RegisteredUtc, m.RegisteredSourceValue)
@@ -162,6 +170,9 @@ internal sealed class ContractMigrationPort(
             db.Contracts.Add(contract);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("agreement_reference_in_use", "That agreement reference or source record is already in use."); }
+            // Configured field values are stored with the batch and the value as the source gave it. The record's last-changed stamp is left alone, so an untouched migrated record can still be rolled back by removal.
+            if (m.CustomValues is { Count: > 0 })
+                await customFields.ApplyMigratedAsync(contract.Id, m.CustomValues, m.BatchId, m.SourceSystem, m.CustomSourceValues ?? new Dictionary<string, string>(), by, touch: false, c);
             // The batch id, source record id, source value and acting administrator are on the audit event (decision record, Registered Date exception).
             audit.Record(new AuditEntry(m.LockAsLegacy ? "migration.contract.legacy_loaded" : "migration.contract.created", nameof(Contract), contract.Id.ToString(),
                 OrganisationId: m.OrganisationId, Classification: contract.Classification, MigrationBatchId: m.BatchId,
@@ -175,19 +186,40 @@ internal sealed class ContractMigrationPort(
         return contract.Id;
     }
 
+    private const string CustomPrefix = "cf.";
+
+    public async Task<IMigrationCustomChecker> CustomFieldCheckerAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        await RequireOrganisationAsync(organisationId, ct);
+        return new MigrationCustomChecker(await fieldCatalogue.PublishedAsync(organisationId, ct), DateOnly.FromDateTime(clock.UtcNow));
+    }
+
     public async Task<ContractFieldUpdate> UpdateContractFieldsAsync(Guid contractId, Guid batchId, IReadOnlyDictionary<string, string?> fields, bool lockedOverwriteAuthorised,
         string reason, CancellationToken ct = default)
     {
         return await uow.ExecuteAsync(async c =>
         {
             var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, c) ?? throw new DomainException("contract_not_found", "The contract was not found.");
-            var before = contract.CaptureFields(fields.Keys);
             var by = actor.ActorId ?? "system";
-            contract.ApplyMigratedFields(fields, lockedOverwriteAuthorised, by, clock.UtcNow);
+            // Configured fields travel under the "cf." prefix in the same dictionary, so the before-image a rollback restores covers them too.
+            var core = fields.Where(kv => !kv.Key.StartsWith(CustomPrefix, StringComparison.Ordinal)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+            var custom = fields.Where(kv => kv.Key.StartsWith(CustomPrefix, StringComparison.Ordinal)).ToDictionary(kv => kv.Key[CustomPrefix.Length..], kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+            var before = new Dictionary<string, string?>(contract.CaptureFields(core.Keys), StringComparer.Ordinal);
+            if (core.Count > 0) contract.ApplyMigratedFields(core, lockedOverwriteAuthorised, by, clock.UtcNow);
+            else if (contract.RecordLocked && !lockedOverwriteAuthorised) throw new DomainException("record_locked", "This record is locked. A migration may overwrite it only under an explicit legacy-load policy.");
+            if (custom.Count > 0)
+            {
+                foreach (var (key, value) in await customFields.CurrentAsync(contractId, custom.Keys.ToList(), c)) before[CustomPrefix + key] = value;
+                foreach (var key in custom.Keys) before.TryAdd(CustomPrefix + key, null);
+            }
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload and try again."); }
+            if (custom.Count > 0)
+                await customFields.ApplyMigratedAsync(contractId, custom, batchId, "migration", custom.ToDictionary(kv => kv.Key, kv => kv.Value ?? ""), by, touch: true, c);
+            var after = new Dictionary<string, string?>(contract.CaptureFields(core.Keys), StringComparer.Ordinal);
+            foreach (var (key, value) in custom) after[CustomPrefix + key] = value;
             audit.Record(new AuditEntry("migration.contract.updated", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification, Reason: reason, MigrationBatchId: batchId,
-                OldValuesJson: AuditJson.Of(before), NewValuesJson: AuditJson.Of(contract.CaptureFields(fields.Keys))));
+                OldValuesJson: AuditJson.Of(before), NewValuesJson: AuditJson.Of(after)));
             return new ContractFieldUpdate(before, contract.UpdatedUtc);
         }, ct);
     }
@@ -195,16 +227,34 @@ internal sealed class ContractMigrationPort(
     public async Task<IReadOnlyDictionary<string, string?>> CaptureFieldsAsync(Guid contractId, IEnumerable<string> fieldNames, CancellationToken ct = default)
     {
         var contract = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
-        return contract.CaptureFields(fieldNames);
+        var names = fieldNames.ToList();
+        var result = new Dictionary<string, string?>(contract.CaptureFields(names.Where(n => !n.StartsWith(CustomPrefix, StringComparison.Ordinal))), StringComparer.Ordinal);
+        var custom = names.Where(n => n.StartsWith(CustomPrefix, StringComparison.Ordinal)).Select(n => n[CustomPrefix.Length..]).ToList();
+        if (custom.Count > 0) foreach (var (key, value) in await customFields.CurrentAsync(contractId, custom, ct)) result[CustomPrefix + key] = value;
+        return result;
     }
 
     public async Task<IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, string?>>> CaptureFieldsManyAsync(IReadOnlyCollection<Guid> contractIds, IReadOnlyCollection<string> fieldNames, CancellationToken ct = default)
     {
         var result = new Dictionary<Guid, IReadOnlyDictionary<string, string?>>();
+        var core = fieldNames.Where(n => !n.StartsWith(CustomPrefix, StringComparison.Ordinal)).ToList();
+        var customKeys = fieldNames.Where(n => n.StartsWith(CustomPrefix, StringComparison.Ordinal)).Select(n => n[CustomPrefix.Length..]).ToList();
         foreach (var chunk in contractIds.Distinct().Chunk(400))
         {
             var ids = chunk.ToList();
-            foreach (var c in await db.Contracts.AsNoTracking().Where(x => ids.Contains(x.Id)).ToListAsync(ct)) result[c.Id] = c.CaptureFields(fieldNames);
+            foreach (var c in await db.Contracts.AsNoTracking().Where(x => ids.Contains(x.Id)).ToListAsync(ct)) result[c.Id] = new Dictionary<string, string?>(c.CaptureFields(core), StringComparer.Ordinal);
+            if (customKeys.Count > 0)
+            {
+                // One query per chunk for all configured values; nothing per contract.
+                var rows = await db.CustomValues.AsNoTracking().Where(v => ids.Contains(v.ContractId) && customKeys.Contains(v.FieldKey)).OrderBy(v => v.ContractId).ThenBy(v => v.FieldKey).ThenBy(v => v.Ordinal).ToListAsync(ct);
+                var set = result.Count == 0 ? null : await fieldCatalogue.PublishedAsync(await db.Contracts.AsNoTracking().Where(x => x.Id == ids[0]).Select(x => x.OrganisationId).FirstAsync(ct), ct);
+                foreach (var group in rows.GroupBy(r => (r.ContractId, r.FieldKey)))
+                {
+                    var d = set?.Find(group.Key.FieldKey);
+                    if (d is null || !result.TryGetValue(group.Key.ContractId, out var map)) continue;
+                    ((Dictionary<string, string?>)map)[CustomPrefix + d.Key] = string.Join("; ", ValueCodec.ToRaw(d, group.Select(g => ContractCustomFieldService.ToTyped(g, FieldTypes.StorageOf(d.Type))).ToList()));
+                }
+            }
         }
         return result;
     }
@@ -220,6 +270,7 @@ internal sealed class ContractMigrationPort(
         {
             var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId && x.MigrationBatchId == batchId, c);
             if (contract is null) return; // already gone: rollback is idempotent. A record of another batch is never selected.
+            await db.CustomValues.Where(v => v.ContractId == contractId).ExecuteDeleteAsync(c);       // the configured values this batch loaded go with the record
             db.Contracts.Remove(contract);
             await db.SaveChangesAsync(c);
             audit.Record(new AuditEntry("migration.contract.removed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification, Reason: reason, MigrationBatchId: batchId,

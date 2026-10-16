@@ -149,6 +149,9 @@ public sealed class Document : ITenantOwned
         return version;
     }
 
+    /// <summary>Sets the classification. The caller has authorised the change and checked it against the contract's level.</summary>
+    public void SetClassification(string level) => Classification = Guard.NotBlank(level, "Classification", 30);
+
     /// <summary>Points the document back at an earlier version after a later one was removed by a rollback.</summary>
     public void RewindTo(DocumentVersion previous, int versionCount)
     {

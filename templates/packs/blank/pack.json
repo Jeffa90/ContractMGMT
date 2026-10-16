@@ -9,7 +9,7 @@
   "ownershipModel": "ReadAllEditAssignedCategory",
   "approvalModel": "None",
   "defaults": {
-    "classification": { "levels": ["Public", "Internal", "Confidential", "Restricted"], "defaultLevel": "Internal" },
+    "classification": { "levels": ["Public", "Internal", "Confidential", "Restricted", "Legal Privileged"], "defaultLevel": "Internal", "privilegedLevels": ["Legal Privileged"] },
     "contractTypes": [],
     "categories": []
   }

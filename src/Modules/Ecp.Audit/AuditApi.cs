@@ -12,7 +12,8 @@ public enum AuditOutcome { Success, Denied, Failed }
 public sealed record AuditEntry(
     string Action, string EntityType, string EntityId, AuditOutcome Outcome = AuditOutcome.Success,
     Guid? OrganisationId = null, string? Reason = null, string? OldValuesJson = null, string? NewValuesJson = null,
-    Guid? MigrationBatchId = null, Guid? ConfigReleaseId = null, Guid? ElevationId = null);
+    Guid? MigrationBatchId = null, Guid? ConfigReleaseId = null, Guid? ElevationId = null,
+    string? Classification = null);
 
 /// <summary>Records audit events. Must be called inside <see cref="IUnitOfWork"/>; events commit with the change.</summary>
 public interface IAuditWriter

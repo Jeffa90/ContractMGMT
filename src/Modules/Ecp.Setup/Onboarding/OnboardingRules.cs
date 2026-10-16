@@ -209,8 +209,8 @@ public static class OnboardingValidator
         void CheckCeiling(string path, string? ceiling)
         {
             if (!facts.Scale.IsKnown(ceiling)) Error(path, "invalid_classification", $"Classification ceiling '{ceiling}' is not one of: {string.Join(", ", facts.Scale.Levels)}.");
-            else if (facts.Scale.Levels.Count > 1 && facts.Scale.Rank(ceiling) == facts.Scale.Levels.Count - 1)
-                Warn(path, "top_ceiling", $"The ceiling '{ceiling}' is the highest level: this person can see everything in their scope, including the most sensitive records.");
+            else if (facts.Scale.Levels.Count > 1 && facts.Scale.Rank(ceiling) >= facts.Scale.HighCeilingThreshold)
+                Warn(path, "top_ceiling", $"The ceiling '{ceiling}' is one of the highest levels: this person can see the most sensitive records in their scope. Records at a privileged level also need an explicit grant.");
         }
     }
 }
@@ -266,7 +266,9 @@ public static class OnboardingSimulator
         }
         var sites = d.Structure.Sites.Select(s => OnboardingDocument.Key(s.Key)).Take(MaxSites).Select(s => (string?)s).DefaultIfEmpty(null).ToList();
         var units = d.Structure.BusinessUnits.Select(b => OnboardingDocument.Key(b.Key)).Take(MaxBusinessUnits).Select(b => (string?)b).DefaultIfEmpty(null).ToList();
-        var levels = scale.Levels.Count <= 2 ? scale.Levels : [scale.Levels[0], scale.Levels[^1]];
+        // Samples: the lowest level, the highest ordinary level, and every privileged level (which needs an explicit grant on top of the ceiling).
+        var ordinary = scale.Levels.Where(l => !scale.IsPrivileged(l)).ToList();
+        var levels = ordinary.Count <= 2 ? scale.Levels.ToList() : ordinary.Take(1).Concat(ordinary.Skip(ordinary.Count - 1)).Concat(scale.Levels.Where(scale.IsPrivileged)).ToList();
         var cats = categories.Count == 0 ? new List<string?> { null } : categories.Select(c => (string?)c).ToList();
 
         var samples = new List<(string Label, ResourceDescriptor Resource)>();

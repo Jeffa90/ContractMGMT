@@ -446,6 +446,8 @@ internal sealed class ClassificationStage : SetupStageBase
         [
             new("levels", "Levels, lowest first", FieldKind.TextArea, true, "One level per line, from the least to the most sensitive.", Value: string.Join('\n', d?.Levels ?? ClassificationScale.Default.Levels)),
             new("defaultLevel", "Default level for new records", FieldKind.Text, true, Value: d?.DefaultLevel ?? ClassificationScale.Default.DefaultLevel),
+            new("privilegedLevels", "Privileged levels", FieldKind.TextArea, false, "Levels whose records need an explicit privileged-access grant as well as a high enough ceiling (one per line; leave empty for none).",
+                Value: string.Join('\n', d?.PrivilegedLevels ?? ClassificationScale.Default.PrivilegedLevels)),
         ];
     }
 
@@ -455,14 +457,15 @@ internal sealed class ClassificationStage : SetupStageBase
     public override async Task<StageResult> ExecuteAsync(StageContext c)
     {
         var levels = c.Required("levels", "Levels").Split(['\n', '\r', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        var policy = new ClassificationPolicyDocument(levels, c.Required("defaultLevel", "Default level"));
-        _ = new ClassificationScale(policy.Levels, policy.DefaultLevel); // validates
+        var privileged = (c.Value("privilegedLevels") ?? "").Split(['\n', '\r', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var policy = new ClassificationPolicyDocument(levels, c.Required("defaultLevel", "Default level"), privileged);
+        _ = new ClassificationScale(policy.Levels, policy.DefaultLevel, policy.PrivilegedLevels); // validates
         using var tenantScope = c.UseTenant();
         var latest = await c.Get<IConfigurationService>().LatestReleaseAsync("ClassificationPolicy", Guid.Empty, c.Ct);
-        var unchanged = latest is not null && ClassificationPolicyDocument.Parse(latest.ContentJson) is var cur && cur.Levels.SequenceEqual(policy.Levels) && cur.DefaultLevel == policy.DefaultLevel;
+        var unchanged = latest is not null && ClassificationPolicyDocument.Parse(latest.ContentJson) is var cur && cur.Levels.SequenceEqual(policy.Levels) && cur.DefaultLevel == policy.DefaultLevel && cur.PrivilegedLevels.SequenceEqual(policy.PrivilegedLevels);
         if (!unchanged)
             await c.Get<IConfigurationBootstrap>().DraftValidatePublishAsync("ClassificationPolicy", Guid.Empty, policy.ToJson(), "setup:" + c.Actor.Label, "Set during setup", c.Ct);
-        c.Remember("levels", string.Join('\n', levels)); c.Remember("defaultLevel", policy.DefaultLevel);
+        c.Remember("levels", string.Join('\n', levels)); c.Remember("defaultLevel", policy.DefaultLevel); c.Remember("privilegedLevels", string.Join('\n', privileged));
         return StageResult.Ok(unchanged ? "Classification levels unchanged." : $"{levels.Count} classification levels published.");
     }
 }

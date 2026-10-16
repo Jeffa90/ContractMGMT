@@ -95,21 +95,29 @@ internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IA
 
 internal sealed class ContractService(
     ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IActorContext actor, IClock clock,
-    ITenantDirectory tenants, Microsoft.Extensions.Options.IOptions<ContractsOptions> options) : IContractService
+    ITenantDirectory tenants, Microsoft.Extensions.Options.IOptions<ContractsOptions> options, IEnumerable<IContractCreationPolicy> policies) : IContractService
 {
     public async Task<Guid> CreateDraftAsync(CreateContractRequest r, CancellationToken ct = default)
     {
         var tenantId = tenant.RequireTenantId();
-        var initial = options.Value.InitialStatusCode;
-        if (string.IsNullOrWhiteSpace(initial))
-            throw new InvalidOperationException("Contracts:InitialStatusCode is not configured (it comes from the workflow definition).");
         if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
             throw new DomainException("organisation_not_found", "The organisation was not found.");
+        // The workflow definition decides the initial state and pins the contract to the definition in force; without a lifecycle module the configured code is used.
+        var policy = policies.FirstOrDefault();
+        var setup = policy is null ? null : await policy.ResolveAsync(r.OrganisationId, ct);
+        var initial = setup?.InitialStatus ?? options.Value.InitialStatusCode;
+        if (string.IsNullOrWhiteSpace(initial))
+            throw new InvalidOperationException("Contracts:InitialStatusCode is not configured (it comes from the workflow definition).");
 
         var contract = Contract.CreateDraft(new NewContract(
             tenantId, r.OrganisationId, r.AgreementReference, r.Title, r.SupplierId, r.CategoryId, initial, actor.ActorId ?? "system", clock.UtcNow,
             r.Description, r.Classification, r.CurrencyCode, r.EstimatedValue, r.ExtensionType, r.LegalReviewRequired,
             r.StartDate, r.EffectiveDate, r.ReviewDate, r.EndDate, r.BusinessUnitId, r.SiteId));
+        if (setup is not null)
+        {
+            contract.ApplyWorkflowState(setup.InitialStatus, setup.Effects, actor.ActorId ?? "system", clock.UtcNow);
+            if (setup.WorkflowRef is not null) contract.PinWorkflow(setup.WorkflowRef, setup.ConfigReleaseId);
+        }
 
         // Tenant-wide uniqueness (D3). The message never says where a colliding reference lives.
         if (await db.Contracts.AnyAsync(c => c.AgreementReference == contract.AgreementReference, ct))
@@ -126,7 +134,7 @@ internal sealed class ContractService(
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
             { throw new DomainException("agreement_reference_in_use", "That agreement reference is already in use."); }
-            audit.Record(new AuditEntry("contract.created", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId,
+            audit.Record(new AuditEntry("contract.created", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
                 NewValuesJson: AuditJson.Of(new { contract.AgreementReference, contract.ContractTitle, contract.Status, contract.Classification })));
             return contract.Id;
         }, ct);
@@ -147,7 +155,7 @@ internal sealed class ContractService(
             contract.UpdateDetails(title, description, actor.ActorId ?? "system", clock.UtcNow);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload and try again."); }
-            audit.Record(new AuditEntry("contract.updated", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId,
+            audit.Record(new AuditEntry("contract.updated", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
                 OldValuesJson: old, NewValuesJson: AuditJson.Of(new { contract.ContractTitle, contract.Description })));
         }, ct);
     }
@@ -181,6 +189,7 @@ public static class ContractsModule
         services.AddScoped<ISupplierDirectory, SupplierDirectory>();
         services.AddScoped<IAccessSimulator, AccessSimulator>();
         services.AddScoped<IContractMigrationPort, ContractMigrationPort>();
+        services.AddScoped<IContractLifecyclePort, ContractLifecyclePort>();
         services.AddScoped<ICutoverFreeze, NoCutoverFreeze>();
         services.AddScoped<ISecuredContractService, SecuredContractService>();
         services.AddScoped<ISecuredSupplierService, SecuredSupplierService>();

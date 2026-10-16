@@ -92,7 +92,16 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.Property(x => x.SourceRecordId).HasMaxLength(200);
             e.Property(x => x.SourceStatus).HasMaxLength(200);
             e.Property(x => x.ArchiveReason).HasMaxLength(1000);
+            e.Property(x => x.LockReason).HasMaxLength(200);
+            e.Property(x => x.LockedBy).HasMaxLength(200);
+            e.Property(x => x.DocumentPolicy).HasMaxLength(20).IsRequired().HasDefaultValue(DocumentPolicies.Open);
+            e.Property(x => x.WorkflowRef).HasMaxLength(200);
             e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.PredecessorContractId });
+            e.HasIndex(x => new { x.TenantId, x.SuccessorContractId });
+            e.HasIndex(x => new { x.TenantId, x.EndDate });
+            e.HasIndex(x => new { x.TenantId, x.ReviewDate });
             e.Property(x => x.CreatedBy).HasMaxLength(200);
             e.Property(x => x.UpdatedBy).HasMaxLength(200);
             e.Property(x => x.RowVersion);

@@ -26,20 +26,45 @@ public sealed record AddDocumentRequest(
     Guid OrganisationId, Guid? ContractId, string DocumentTypeCode, string Title, string FileName, string MimeType, Stream Content,
     string Classification, bool IsExecutedCopy = false, string? VersionLabel = null, DateOnly? DocumentDate = null);
 
+public sealed record AddVersionRequest(Guid DocumentId, string FileName, string MimeType, Stream Content, string? VersionLabel = null, DateOnly? DocumentDate = null);
+
 public sealed record DocumentVersionDto(Guid DocumentId, Guid VersionId, int VersionNumber, string FileName, long SizeBytes, string Sha256, ScanStatus ScanStatus, bool Downloadable);
 
 public interface IDocumentService
 {
     Task<DocumentVersionDto> AddAsync(AddDocumentRequest request, CancellationToken ct = default);
 
+    /// <summary>Adds a version to an active document (for example a revised mark-up). Earlier versions are kept unchanged; the new version is scanned like any upload. No authorisation here: the owning module decides.</summary>
+    Task<DocumentVersionDto> AddVersionAsync(AddVersionRequest request, CancellationToken ct = default);
+
     /// <summary>Opens content only if the version is downloadable. Record-level access checks are added by the access evaluator (M2).</summary>
     Task<Stream?> OpenDownloadAsync(Guid documentId, CancellationToken ct = default);
 }
 
+/// <summary>Raises the classification of a contract's documents so none is lower than its contract (a document may be the same or higher, never lower). Trusted: the owning module authorises first.</summary>
+public interface IDocumentClassification
+{
+    /// <summary>Raises every active document of the contract whose classification is one of <paramref name="lowerLevels"/> to <paramref name="level"/>. Returns how many changed.</summary>
+    Task<int> RaiseContractDocumentsAsync(Guid contractId, string level, IReadOnlyCollection<string> lowerLevels, string reason, CancellationToken ct = default);
+    /// <summary>Sets one document's classification (raising or, with authority, lowering) and audits it. The caller has authorised it and checked the contract's level.</summary>
+    Task ChangeDocumentClassificationAsync(Guid documentId, string level, string? reason, CancellationToken ct = default);
+}
+
 internal sealed class DocumentService(
     DocumentsDbContext db, IDocumentStorageProvider storage, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IActorContext actor,
-    IClock clock, IEnumerable<IDocumentParentValidator> parents, Microsoft.Extensions.Options.IOptions<DocumentsOptions> options) : IDocumentService
+    IClock clock, IEnumerable<IDocumentParentValidator> parents, Microsoft.Extensions.Options.IOptions<DocumentsOptions> options, IMalwareScanner scanner) : IDocumentService
 {
+    /// <summary>Scans the stored content; any failure of the scanner is recorded as an error verdict, never as clean.</summary>
+    private async Task<ScanStatus> ScanAsync(string storageKey, CancellationToken ct)
+    {
+        try
+        {
+            await using var read = await storage.OpenReadAsync(tenant.RequireTenantId(), storageKey, ct);
+            return await scanner.ScanAsync(read, ct) switch { ScanVerdict.Clean => ScanStatus.Clean, ScanVerdict.Infected => ScanStatus.Infected, ScanVerdict.Skipped => ScanStatus.Skipped, _ => ScanStatus.Error };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return ScanStatus.Error; }
+    }
+
     public async Task<DocumentVersionDto> AddAsync(AddDocumentRequest r, CancellationToken ct = default)
     {
         var tenantId = tenant.RequireTenantId();
@@ -53,17 +78,36 @@ internal sealed class DocumentService(
 
         var stored = await storage.PutAsync(tenantId, r.Content, options.Value.MaxFileBytes, ct);
         var document = Document.Create(tenantId, r.OrganisationId, r.ContractId, r.DocumentTypeCode, r.Title, r.Classification, r.IsExecutedCopy);
+        var scan = await ScanAsync(stored.StorageKey, ct);
         var version = document.AddVersion(r.FileName, r.MimeType, stored.SizeBytes, stored.Sha256, storage.ProviderKey, stored.StorageKey,
-            r.VersionLabel, r.DocumentDate, actor.ActorId ?? "system", clock.UtcNow);
+            r.VersionLabel, r.DocumentDate, actor.ActorId ?? "system", clock.UtcNow, scan: scan);
         await uow.ExecuteAsync(async c =>
         {
             db.Documents.Add(document);
             db.Versions.Add(version);
             await db.SaveChangesAsync(c);
-            audit.Record(new AuditEntry("document.added", nameof(Document), document.Id.ToString(), OrganisationId: document.OrganisationId,
+            audit.Record(new AuditEntry("document.added", nameof(Document), document.Id.ToString(), OrganisationId: document.OrganisationId, Classification: document.Classification,
                 NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { version.FileName, version.Sha256, version.SizeBytes, document.DocumentTypeCode })));
         }, ct);
-        return new DocumentVersionDto(document.Id, version.Id, version.VersionNumber, version.FileName, version.SizeBytes, version.Sha256, version.ScanStatus, Downloadable: false);
+        return new DocumentVersionDto(document.Id, version.Id, version.VersionNumber, version.FileName, version.SizeBytes, version.Sha256, version.ScanStatus, version.IsDownloadable(options.Value.AllowSkippedScan));
+    }
+
+    public async Task<DocumentVersionDto> AddVersionAsync(AddVersionRequest r, CancellationToken ct = default)
+    {
+        var tenantId = tenant.RequireTenantId();
+        var stored = await storage.PutAsync(tenantId, r.Content, options.Value.MaxFileBytes, ct);
+        var scan = await ScanAsync(stored.StorageKey, ct);
+        return await uow.ExecuteAsync(async c =>
+        {
+            var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == r.DocumentId, c) ?? throw new DomainException("document_not_found", "The document was not found.");
+            var version = document.AddVersion(r.FileName, r.MimeType, stored.SizeBytes, stored.Sha256, storage.ProviderKey, stored.StorageKey, r.VersionLabel, r.DocumentDate, actor.ActorId ?? "system", clock.UtcNow, scan: scan);
+            db.Versions.Add(version);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The document was changed by someone else at the same time. Reload it and try again."); }
+            audit.Record(new AuditEntry("document.version_added", nameof(Document), document.Id.ToString(), OrganisationId: document.OrganisationId, Classification: document.Classification,
+                NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { version.VersionNumber, version.FileName, version.Sha256, version.SizeBytes })));
+            return new DocumentVersionDto(document.Id, version.Id, version.VersionNumber, version.FileName, version.SizeBytes, version.Sha256, version.ScanStatus, version.IsDownloadable(options.Value.AllowSkippedScan));
+        }, ct);
     }
 
     public async Task<Stream?> OpenDownloadAsync(Guid documentId, CancellationToken ct = default)
@@ -76,6 +120,37 @@ internal sealed class DocumentService(
         if (version is null || !version.IsDownloadable(options.Value.AllowSkippedScan)) return null;
         return await storage.OpenReadAsync(tenantId, version.StorageKey, ct);
     }
+}
+
+internal sealed class DocumentClassificationService(DocumentsDbContext db, IUnitOfWork uow, IAuditWriter audit) : IDocumentClassification
+{
+    public Task<int> RaiseContractDocumentsAsync(Guid contractId, string level, IReadOnlyCollection<string> lowerLevels, string reason, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var lower = lowerLevels.ToArray();
+            var docs = await db.Documents.Where(d => d.ContractId == contractId && d.Status != DocumentStatus.Discarded && lower.Contains(d.Classification)).ToListAsync(c);
+            foreach (var d in docs)
+            {
+                var old = d.Classification;
+                d.SetClassification(level);
+                audit.Record(new AuditEntry("document.classification_changed", nameof(Document), d.Id.ToString(), OrganisationId: d.OrganisationId, Reason: reason, Classification: level,
+                    OldValuesJson: System.Text.Json.JsonSerializer.Serialize(new { classification = old }), NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { classification = level })));
+            }
+            await db.SaveChangesAsync(c);
+            return docs.Count;
+        }, ct);
+
+    public Task ChangeDocumentClassificationAsync(Guid documentId, string level, string? reason, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var d = await db.Documents.FirstOrDefaultAsync(x => x.Id == documentId, c) ?? throw new DomainException("document_not_found", "The document was not found.");
+            var old = d.Classification;
+            if (string.Equals(old, level, StringComparison.Ordinal)) return;
+            d.SetClassification(level);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("document.classification_changed", nameof(Document), d.Id.ToString(), OrganisationId: d.OrganisationId, Reason: reason, Classification: level,
+                OldValuesJson: System.Text.Json.JsonSerializer.Serialize(new { classification = old }), NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { classification = level })));
+        }, ct);
 }
 
 public static class DocumentsModule
@@ -93,6 +168,7 @@ public static class DocumentsModule
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IDocumentMigrationPort, DocumentMigrationPort>();
         services.AddScoped<IDocumentQuery, DocumentQuery>();
+        services.AddScoped<IDocumentClassification, DocumentClassificationService>();
         services.TryAddSingleton<IMalwareScanner, DisabledMalwareScanner>();
         return services;
     }

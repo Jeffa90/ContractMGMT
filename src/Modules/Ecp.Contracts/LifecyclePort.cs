@@ -1,0 +1,228 @@
+using Ecp.Audit;
+using Ecp.Contracts.Domain;
+using Ecp.Contracts.Persistence;
+using Ecp.Persistence;
+using Ecp.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+
+namespace Ecp.Contracts;
+
+/// <summary>A contract as the lifecycle engine needs to see it. No authorisation: the caller (the lifecycle module) has already authorised the actor.</summary>
+public sealed record ContractFacts(
+    Guid Id, Guid TenantId, Guid OrganisationId, string AgreementReference, string Title, string Status, bool RecordLocked, bool ContentFrozen, string DocumentPolicy, string Classification,
+    Guid SupplierId, Guid CategoryId, Guid? BusinessUnitId, Guid? SiteId, bool LegalReviewRequired, string? CurrencyCode, decimal? EstimatedValue, string? ExtensionType,
+    DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? ReviewDate, DateOnly? EndDate, int? NoticePeriodDays, bool CriticalNotice, int? ReminderLeadDays,
+    DateTime? RegisteredDateUtc, string? RegisteredBy, string? WorkflowRef, Guid? ConfigReleaseId, Guid? ActiveUnlockId, DateTime? UnlockExpiresUtc,
+    Guid? PredecessorContractId, Guid? SuccessorContractId, bool IsArchived, bool IsLegacyLoad, string CreatedBy, DateTime CreatedUtc, DateTime UpdatedUtc, string? Description,
+    string? LockReason, string? LockedBy, DateTime? LockedUtc);
+
+/// <summary>What a new contract starts as: its initial state and protection, and the workflow definition it is pinned to. Supplied by the lifecycle module when it is registered.</summary>
+public sealed record ContractCreationSetup(string InitialStatus, StateEffects Effects, string? WorkflowRef, Guid? ConfigReleaseId);
+
+/// <summary>Lets the lifecycle module decide the initial state of a new contract and pin it to the workflow in force. Without it, <see cref="ContractsOptions.InitialStatusCode"/> is used.</summary>
+public interface IContractCreationPolicy
+{
+    Task<ContractCreationSetup> ResolveAsync(Guid organisationId, CancellationToken ct = default);
+}
+
+/// <summary>A contract's dates and reminder attributes, for the reminder scan.</summary>
+public sealed record ReminderCandidate(Guid ContractId, Guid OrganisationId, string AgreementReference, string Title, string Status, string Classification, Guid CategoryId,
+    DateOnly? ReviewDate, DateOnly? EndDate, string? ExtensionType, int? NoticePeriodDays, bool CriticalNotice, int? ReminderLeadDays, bool IsArchived);
+
+public sealed record SuccessorSeed(string AgreementReference, string Title, string InitialStatus, StateEffects Effects, string? WorkflowRef, Guid? ConfigReleaseId, string? Description,
+    DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? ReviewDate, DateOnly? EndDate, string? CurrencyCode, decimal? EstimatedValue, string? ExtensionType,
+    int? NoticePeriodDays, bool CriticalNotice, int? ReminderLeadDays, bool LegalReviewRequired);
+
+/// <summary>
+/// The trusted operations the lifecycle engine needs from Contracts. Every write joins the caller's unit of work (so the lifecycle's own records commit atomically with the change),
+/// is concurrency-checked, and records an audit event that carries the record's classification.
+/// </summary>
+public interface IContractLifecyclePort
+{
+    Task<ContractFacts?> FindAsync(Guid contractId, CancellationToken ct = default);
+    Task<IReadOnlyList<ContractFacts>> FindManyAsync(IReadOnlyCollection<Guid> contractIds, CancellationToken ct = default);
+
+    /// <summary>
+    /// Moves the contract from <paramref name="expectedStatus"/> to <paramref name="newStatus"/>. A second writer that read the same state fails with <c>state_changed</c>;
+    /// a concurrent save fails with <c>concurrency_conflict</c>. Entering a locking state locks the record; no transition unlocks it.
+    /// </summary>
+    Task ApplyTransitionAsync(Guid contractId, string expectedStatus, string newStatus, StateEffects effects, string actor, string transitionCode, string? comment, CancellationToken ct = default);
+
+    Task PinWorkflowAsync(Guid contractId, string workflowRef, Guid? configReleaseId, CancellationToken ct = default);
+    Task StampRegistrationAsync(Guid contractId, string registeredBy, CancellationToken ct = default);
+    Task OpenUnlockAsync(Guid contractId, Guid unlockId, DateTime expiresUtc, string actor, CancellationToken ct = default);
+    Task CloseUnlockAsync(Guid contractId, string actor, Guid? unlockId, CancellationToken ct = default);
+
+    /// <summary>Applies named changes through a controlled path (an applied Variation, or an emergency unlock) and returns what changed, before and after. The audit event carries <paramref name="authorityId"/>.</summary>
+    Task<IReadOnlyList<FieldChange>> ApplyControlledChangesAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, IReadOnlyCollection<string> allowed, string actor,
+        string authorityKind, Guid authorityId, string? reason, CancellationToken ct = default);
+
+    Task SetReminderSettingsAsync(Guid contractId, int? leadDays, int? noticePeriodDays, bool criticalNotice, string actor, CancellationToken ct = default);
+    /// <summary>Creates the successor Draft of a renewal and links both ways. Returns the new contract id. Nothing of the predecessor's history is copied.</summary>
+    Task<Guid> CreateSuccessorAsync(Guid predecessorId, SuccessorSeed seed, string actor, CancellationToken ct = default);
+
+    /// <summary>Contracts with a Review Date or End Date, for the reminder scan (archived ones excluded).</summary>
+    Task<IReadOnlyList<ReminderCandidate>> ReminderCandidatesAsync(CancellationToken ct = default);
+    /// <summary>The users who currently own the contract's category (the category and its ancestors), most specific first.</summary>
+    Task<IReadOnlyList<Guid>> CurrentOwnersAsync(Guid contractId, CancellationToken ct = default);
+}
+
+internal sealed class ContractLifecyclePort(
+    ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, ITenantContext tenant, ContractAccessContext context, ReferenceAllocator allocator, Ecp.Identity.IClassificationScaleProvider scales) : IContractLifecyclePort
+{
+    private static ContractFacts ToFacts(Contract c) => new(c.Id, c.TenantId, c.OrganisationId, c.AgreementReference, c.ContractTitle, c.Status, c.RecordLocked, c.ContentFrozen, c.DocumentPolicy,
+        c.Classification, c.SupplierId, c.CategoryId, c.BusinessUnitId, c.SiteId, c.LegalReviewRequired, c.CurrencyCode, c.EstimatedValue, c.ExtensionType, c.StartDate, c.EffectiveDate,
+        c.ReviewDate, c.EndDate, c.NoticePeriodDays, c.CriticalNotice, c.ReminderLeadDays, c.RegisteredDateUtc, c.RegisteredBy, c.WorkflowRef, c.ConfigReleaseId, c.ActiveUnlockId,
+        c.UnlockExpiresUtc, c.PredecessorContractId, c.SuccessorContractId, c.IsArchived, c.IsLegacyLoad, c.CreatedBy, c.CreatedUtc, c.UpdatedUtc, c.Description, c.LockReason, c.LockedBy, c.LockedUtc);
+
+    public async Task<ContractFacts?> FindAsync(Guid contractId, CancellationToken ct = default)
+    {
+        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct);
+        return c is null ? null : ToFacts(c);
+    }
+
+    public async Task<IReadOnlyList<ContractFacts>> FindManyAsync(IReadOnlyCollection<Guid> contractIds, CancellationToken ct = default)
+    {
+        var rows = new List<Contract>();
+        foreach (var chunk in contractIds.Distinct().Chunk(500))
+        {
+            var ids = chunk.ToList();
+            rows.AddRange(await db.Contracts.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync(ct));
+        }
+        return rows.Select(ToFacts).ToList();
+    }
+
+    private async Task<Contract> LoadTrackedAsync(Guid id, CancellationToken ct)
+        => await db.Contracts.FirstOrDefaultAsync(c => c.Id == id, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+
+    private static async Task SaveAsync(ContractsDbContext db, CancellationToken ct)
+    {
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else at the same time. Reload it and try again."); }
+    }
+
+    public Task ApplyTransitionAsync(Guid contractId, string expectedStatus, string newStatus, StateEffects effects, string actor, string transitionCode, string? comment, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var contract = await LoadTrackedAsync(contractId, c);
+            if (!string.Equals(contract.Status, expectedStatus, StringComparison.Ordinal))
+                throw new DomainException("state_changed", "The contract has moved on since you opened it. Reload it to see its current state.");
+            var wasLocked = contract.RecordLocked;
+            contract.ApplyWorkflowState(newStatus, effects, actor, clock.UtcNow);
+            await SaveAsync(db, c);
+            audit.Record(new AuditEntry("contract.transitioned", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Reason: comment, Classification: contract.Classification,
+                OldValuesJson: AuditJson.Of(new { status = expectedStatus }), NewValuesJson: AuditJson.Of(new { status = newStatus, transition = transitionCode, locked = contract.RecordLocked, lockedNow = contract.RecordLocked && !wasLocked, frozen = contract.ContentFrozen })));
+        }, ct);
+
+    public Task PinWorkflowAsync(Guid contractId, string workflowRef, Guid? configReleaseId, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var contract = await LoadTrackedAsync(contractId, c);
+            if (contract.WorkflowRef is not null) return;
+            contract.PinWorkflow(workflowRef, configReleaseId);
+            await SaveAsync(db, c);
+            audit.Record(new AuditEntry("contract.workflow_pinned", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
+                ConfigReleaseId: configReleaseId, NewValuesJson: AuditJson.Of(new { workflowRef })));
+        }, ct);
+
+    public Task StampRegistrationAsync(Guid contractId, string registeredBy, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var contract = await LoadTrackedAsync(contractId, c);
+            contract.StampRegistration(registeredBy, clock.UtcNow);
+            await SaveAsync(db, c);
+            audit.Record(new AuditEntry("contract.registered", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
+                NewValuesJson: AuditJson.Of(new { registeredDateUtc = contract.RegisteredDateUtc, registeredBy })));
+        }, ct);
+
+    public Task OpenUnlockAsync(Guid contractId, Guid unlockId, DateTime expiresUtc, string actor, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var contract = await LoadTrackedAsync(contractId, c);
+            contract.OpenUnlock(unlockId, expiresUtc, actor, clock.UtcNow);
+            await SaveAsync(db, c);
+            audit.Record(new AuditEntry("contract.unlock_opened", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
+                ElevationId: unlockId, NewValuesJson: AuditJson.Of(new { unlockId, expiresUtc })));
+        }, ct);
+
+    public Task CloseUnlockAsync(Guid contractId, string actor, Guid? unlockId, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var contract = await LoadTrackedAsync(contractId, c);
+            if (contract.ActiveUnlockId is null) return;
+            if (unlockId is { } expected && contract.ActiveUnlockId != expected) return;
+            var closed = contract.ActiveUnlockId;
+            contract.CloseUnlock(actor, clock.UtcNow);
+            await SaveAsync(db, c);
+            audit.Record(new AuditEntry("contract.relocked", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
+                ElevationId: closed, NewValuesJson: AuditJson.Of(new { unlockId = closed })));
+        }, ct);
+
+    public Task<IReadOnlyList<FieldChange>> ApplyControlledChangesAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, IReadOnlyCollection<string> allowed, string actor,
+        string authorityKind, Guid authorityId, string? reason, CancellationToken ct = default)
+        => uow.ExecuteAsync<IReadOnlyList<FieldChange>>(async c =>
+        {
+            var contract = await LoadTrackedAsync(contractId, c);
+            var before = contract.Classification;
+            var scale = await scales.GetAsync(c);
+            var applied = contract.ApplyControlledFields(changes, allowed, actor, clock.UtcNow);
+            await SaveAsync(db, c);
+            // The event is classified at the higher of the old and new level, so a change away from a restricted level is never visible to people who could not see the record before it.
+            audit.Record(new AuditEntry("contract.fields_changed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, ElevationId: authorityKind == "unlock" ? authorityId : null,
+                Classification: scale.Rank(contract.Classification) >= scale.Rank(before) ? contract.Classification : before,
+                OldValuesJson: AuditJson.Of(applied.ToDictionary(f => f.Field, f => f.Before)), NewValuesJson: AuditJson.Of(new { authority = authorityKind, authorityId, changes = applied.ToDictionary(f => f.Field, f => f.After) })));
+            return applied;
+        }, ct);
+
+    public Task SetReminderSettingsAsync(Guid contractId, int? leadDays, int? noticePeriodDays, bool criticalNotice, string actor, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var contract = await LoadTrackedAsync(contractId, c);
+            var old = AuditJson.Of(new { contract.ReminderLeadDays, contract.NoticePeriodDays, contract.CriticalNotice });
+            contract.SetReminderSettings(leadDays, noticePeriodDays, criticalNotice, actor, clock.UtcNow);
+            await SaveAsync(db, c);
+            audit.Record(new AuditEntry("contract.reminder_settings_changed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
+                OldValuesJson: old, NewValuesJson: AuditJson.Of(new { leadDays, noticePeriodDays, criticalNotice })));
+        }, ct);
+
+    public Task<Guid> CreateSuccessorAsync(Guid predecessorId, SuccessorSeed seed, string actor, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var predecessor = await LoadTrackedAsync(predecessorId, c);
+            var now = clock.UtcNow;
+            var reference = string.IsNullOrWhiteSpace(seed.AgreementReference) ? await allocator.AllocateAsync(predecessor.OrganisationId, consume: true, c) : seed.AgreementReference;
+            var successor = Contract.CreateSuccessor(new NewContract(
+                tenant.RequireTenantId(), predecessor.OrganisationId, reference, seed.Title, predecessor.SupplierId, predecessor.CategoryId, seed.InitialStatus, actor, now, seed.Description,
+                predecessor.Classification, seed.CurrencyCode, seed.EstimatedValue, seed.ExtensionType, seed.LegalReviewRequired, seed.StartDate, seed.EffectiveDate, seed.ReviewDate, seed.EndDate,
+                predecessor.BusinessUnitId, predecessor.SiteId), predecessorId, seed.NoticePeriodDays, seed.CriticalNotice, seed.ReminderLeadDays);
+            successor.ApplyWorkflowState(seed.InitialStatus, seed.Effects, actor, now);
+            if (seed.WorkflowRef is not null) successor.PinWorkflow(seed.WorkflowRef, seed.ConfigReleaseId);
+            db.Contracts.Add(successor);
+            predecessor.LinkSuccessor(successor.Id, actor, now);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else at the same time. Reload it and try again."); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("agreement_reference_in_use", "That agreement reference is already in use."); }
+            audit.Record(new AuditEntry("contract.created", nameof(Contract), successor.Id.ToString(), OrganisationId: successor.OrganisationId, Classification: successor.Classification,
+                NewValuesJson: AuditJson.Of(new { successor.AgreementReference, successor.ContractTitle, successor.Status, successor.Classification, renewalOf = predecessor.AgreementReference })));
+            audit.Record(new AuditEntry("contract.successor_linked", nameof(Contract), predecessorId.ToString(), OrganisationId: predecessor.OrganisationId, Classification: predecessor.Classification,
+                NewValuesJson: AuditJson.Of(new { successor = successor.AgreementReference })));
+            return successor.Id;
+        }, ct);
+
+    public async Task<IReadOnlyList<ReminderCandidate>> ReminderCandidatesAsync(CancellationToken ct = default)
+        => await db.Contracts.AsNoTracking().Where(c => !c.IsArchived && (c.EndDate != null || c.ReviewDate != null))
+            .Select(c => new ReminderCandidate(c.Id, c.OrganisationId, c.AgreementReference, c.ContractTitle, c.Status, c.Classification, c.CategoryId, c.ReviewDate, c.EndDate, c.ExtensionType,
+                c.NoticePeriodDays, c.CriticalNotice, c.ReminderLeadDays, c.IsArchived)).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Guid>> CurrentOwnersAsync(Guid contractId, CancellationToken ct = default)
+    {
+        var contract = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == contractId, ct);
+        if (contract is null) return [];
+        var (_, _, ancestry) = await context.CategoryTreeAsync(ct);
+        var path = ancestry.TryGetValue(contract.CategoryId, out var p) ? p : [contract.CategoryId];
+        var now = clock.UtcNow;
+        var assignments = (await db.CategoryAssignments.AsNoTracking().Where(a => path.Contains(a.CategoryId)).ToListAsync(ct)).Where(a => a.IsActiveAt(now)).ToList();
+        // The most specific category's owners come first; the primary owner leads within a category.
+        return path.SelectMany(cat => assignments.Where(a => a.CategoryId == cat).OrderByDescending(a => a.IsPrimary).ThenBy(a => a.CreatedUtc).Select(a => a.UserId)).Distinct().ToList();
+    }
+}

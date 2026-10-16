@@ -44,6 +44,10 @@ public sealed class AccessEvaluator(PermissionMatrix matrix)
         if (active.Count == 0)
             return AccessDecision.NotFound(3, "The caller has no active role assignment.");
 
+        // An elevation (support or emergency access) allows only what it names, whatever the underlying assignments would grant.
+        if (!subject.PermitsPermission(permission))
+            return AccessDecision.Forbidden(4, "The active elevation does not include this permission.");
+
         // 3 and 6: scope intersection and classification decide whether the record exists for the caller at all
         var covering = new List<AssignmentView>();
         var sawAboveCeiling = false;
@@ -102,7 +106,15 @@ public sealed class AccessEvaluator(PermissionMatrix matrix)
 
     private enum Coverage { Covered, OutOfScope, AboveCeiling }
 
-    private static Coverage Cover(AssignmentView a, ResourceDescriptor r, string permission, ClassificationScale scale)
+    /// <summary>
+    /// Whether an assignment may see records at a privileged classification level: an explicit grant on the assignment, or a role whose matrix row holds
+    /// <c>records.read_privileged</c>. A role such as Category Owner or Viewer never opens a privileged record, whatever its ceiling.
+    /// </summary>
+    private bool MayReadPrivileged(AssignmentView a) => a.PrivilegedAccess || matrix.Of(a.RoleCode, PrivilegedReadPermission) != Grant.None;
+
+    public const string PrivilegedReadPermission = "records.read_privileged";
+
+    private Coverage Cover(AssignmentView a, ResourceDescriptor r, string permission, ClassificationScale scale)
     {
         var scope = a.Scope;
         if (scope.Level == ScopeLevel.Installation)
@@ -130,8 +142,11 @@ public sealed class AccessEvaluator(PermissionMatrix matrix)
             else if (strict) return Coverage.OutOfScope;
         }
 
-        if (dims.HasFlag(ScopeDimensions.Classification) && !scale.Permits(scope.ClassificationCeiling, r.Classification))
-            return Coverage.AboveCeiling;
+        if (dims.HasFlag(ScopeDimensions.Classification))
+        {
+            if (!scale.Permits(scope.ClassificationCeiling, r.Classification)) return Coverage.AboveCeiling;
+            if (scale.IsPrivileged(r.Classification) && !MayReadPrivileged(a)) return Coverage.AboveCeiling; // reaching the level is not enough: access to it is a separate, explicit grant
+        }
         return Coverage.Covered;
     }
 
@@ -145,7 +160,7 @@ public sealed class AccessEvaluator(PermissionMatrix matrix)
     public IReadOnlyList<AccessGrant> GrantsFor(AccessSubject subject, ClassificationScale scale, DateTime nowUtc, string permission)
     {
         if (!matrix.IsKnown(permission)) throw new ArgumentException($"Unknown permission '{permission}'.", nameof(permission));
-        if (subject.Status != UserStatus.Active) return [];
+        if (subject.Status != UserStatus.Active || !subject.PermitsPermission(permission)) return [];
         var grants = new List<AccessGrant>();
         foreach (var a in subject.Assignments.Where(x => x.IsActiveAt(nowUtc)))
         {
@@ -156,14 +171,14 @@ public sealed class AccessEvaluator(PermissionMatrix matrix)
             grants.Add(new AccessGrant(
                 a.Id, a.RoleCode, scope.Level == ScopeLevel.Organisation ? scope.OrganisationIds : null,
                 scope.BusinessUnitIds, scope.DivisionIds, scope.SiteIds, categoriesIgnored ? null : scope.CategoryIds,
-                scale.AtOrBelow(scope.ClassificationCeiling), cell == Grant.Scoped ? RelationshipOf(a.RoleCode) : GrantRelationship.None));
+                scale.AtOrBelow(scope.ClassificationCeiling).Where(l => !scale.IsPrivileged(l) || MayReadPrivileged(a)).ToList(), cell == Grant.Scoped ? RelationshipOf(a.RoleCode) : GrantRelationship.None));
         }
         return grants;
     }
 
     /// <summary>True when the caller holds the permission through any active assignment (used for navigation and page-level access; resource checks still apply).</summary>
     public bool HoldsAnywhere(AccessSubject subject, DateTime nowUtc, string permission)
-        => subject.Status == UserStatus.Active && matrix.IsKnown(permission)
+        => subject.Status == UserStatus.Active && matrix.IsKnown(permission) && subject.PermitsPermission(permission)
            && subject.Assignments.Any(a => a.IsActiveAt(nowUtc) && matrix.Of(a.RoleCode, permission) != Grant.None);
 }
 
@@ -205,10 +220,14 @@ public static class DelegationPolicy
                 continue;
             }
             if (!g.Scope.Contains(target, scale, categoryAncestry, checkCeiling: !administrative)) continue;
-            if (administrative && g.RoleCode != RoleCodes.TenantAdministrator && scale.Levels.Count > 1 && scale.Rank(target.ClassificationCeiling) == scale.Levels.Count - 1)
-                continue; // only a Tenant Administrator can grant the highest classification ceiling
+            if (administrative && g.RoleCode != RoleCodes.TenantAdministrator && scale.Levels.Count > 1 && scale.Rank(target.ClassificationCeiling) >= scale.HighCeilingThreshold)
+                continue; // only a Tenant Administrator can grant the Restricted ceiling or anything above it
             return null;
         }
         return any ? "The role or scope is above what the caller may grant." : "The caller cannot delegate roles.";
     }
+
+    /// <summary>An explicit privileged-access grant is the Tenant Administrator's alone (it is never delegated further).</summary>
+    public static bool MayGrantPrivilegedAccess(IEnumerable<AssignmentView> grantorAssignments, DateTime nowUtc)
+        => grantorAssignments.Any(a => a.IsActiveAt(nowUtc) && a.RoleCode == RoleCodes.TenantAdministrator);
 }

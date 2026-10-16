@@ -255,10 +255,11 @@ public sealed class LightweightProviderTests : IAsyncLifetime
             var dto = await s.Get<IDocumentService>().AddAsync(new AddDocumentRequest(_orgA, contractId, "Executed Contract", "Executed copy", "../executed.pdf",
                 "application/pdf", new MemoryStream("synthetic placeholder"u8.ToArray()), "Internal", IsExecutedCopy: true));
             docId = dto.DocumentId;
-            Assert.Equal(ScanStatus.Pending, dto.ScanStatus);
+            Assert.Equal(ScanStatus.Skipped, dto.ScanStatus); // an upload is scanned; with no scanner configured the verdict is Skipped, which blocks download unless the tenant allows it
+            Assert.False(dto.Downloadable);
             Assert.Equal("executed.pdf", dto.FileName);
             Assert.Equal(Hashing.Sha256Hex("synthetic placeholder"), dto.Sha256);
-            Assert.Null(await s.Get<IDocumentService>().OpenDownloadAsync(docId)); // pending scan: not downloadable
+            Assert.Null(await s.Get<IDocumentService>().OpenDownloadAsync(docId)); // not scanned clean: not downloadable
 
             var db = s.Get<DocumentsDbContext>();
             var version = await db.Versions.SingleAsync(v => v.DocumentId == docId);

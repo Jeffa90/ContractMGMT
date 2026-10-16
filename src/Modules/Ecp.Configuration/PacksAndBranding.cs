@@ -10,7 +10,7 @@ namespace Ecp.Configuration;
 
 public sealed record PackCategory(string Code, string Name, string? ParentCode = null);
 public sealed record PackContractType(string Code, string Name);
-public sealed record PackClassification(IReadOnlyList<string> Levels, string DefaultLevel);
+public sealed record PackClassification(IReadOnlyList<string> Levels, string DefaultLevel, IReadOnlyList<string>? PrivilegedLevels = null);
 
 public sealed record PackDefaults(string? Culture, string? TimeZoneId, string? CurrencyCode, string? ReferencePrefix, PackClassification Classification,
     IReadOnlyList<PackContractType> ContractTypes, IReadOnlyList<PackCategory> Categories);

@@ -22,8 +22,13 @@ public static class AssignmentRules
     };
 
     /// <summary>Throws when the combination of role, viewer kind, scope and approver group is not allowed.</summary>
-    public static void Validate(string role, ViewerKind? viewerKind, ScopeSet scope, string? approverGroupKey, ClassificationScale scale, bool explicitHighCeiling = false)
+    public static void Validate(string role, ViewerKind? viewerKind, ScopeSet scope, string? approverGroupKey, ClassificationScale scale, bool explicitHighCeiling = false, bool privilegedAccess = false)
     {
+        if (privilegedAccess)
+        {
+            if (scale.PrivilegedLevels.Count == 0) throw new DomainException("no_privileged_level", "The classification scale has no privileged level, so privileged access cannot be granted.");
+            if (RoleCodes.IsAdministrative(role)) throw new DomainException("privileged_not_for_administrators", "Administrative roles never read business data, so privileged access cannot be granted to them.");
+        }
         if (!RoleCodes.IsKnown(role)) throw new DomainException("unknown_role", $"Role '{role}' is not recognised.");
         scope.Validate(scale);
         if (!AllowedLevels[role].Contains(scope.Level))
@@ -89,6 +94,8 @@ public sealed class RoleAssignment : ITenantOwned
     public IReadOnlyList<Guid>? CategoryIds { get; private set; }
     public string ClassificationCeiling { get; private set; } = "";
     public string? ApproverGroupKey { get; private set; }
+    /// <summary>An explicit grant of access to records at a privileged classification level (in addition to a ceiling that reaches it). Granted only by a Tenant Administrator.</summary>
+    public bool PrivilegedAccess { get; private set; }
     public DateTime EffectiveFromUtc { get; private set; }
     public DateTime? EffectiveToUtc { get; private set; }
     public Guid? GrantedBy { get; private set; }
@@ -103,9 +110,9 @@ public sealed class RoleAssignment : ITenantOwned
 
     public static RoleAssignment Create(Guid tenantId, Guid userId, string role, ViewerKind? viewerKind, ScopeSet scope, string? approverGroupKey,
         DateTime effectiveFromUtc, DateTime? effectiveToUtc, Guid? grantedBy, string grantedByLabel, string? reason, AssignmentSource source,
-        Guid? sourceMappingId, ClassificationScale scale, DateTime nowUtc, bool explicitHighCeiling = false)
+        Guid? sourceMappingId, ClassificationScale scale, DateTime nowUtc, bool explicitHighCeiling = false, bool privilegedAccess = false)
     {
-        AssignmentRules.Validate(role, viewerKind, scope, approverGroupKey, scale, explicitHighCeiling);
+        AssignmentRules.Validate(role, viewerKind, scope, approverGroupKey, scale, explicitHighCeiling, privilegedAccess);
         Guard.Utc(effectiveFromUtc, nameof(effectiveFromUtc));
         if (effectiveToUtc.HasValue && Guard.Utc(effectiveToUtc.Value, nameof(effectiveToUtc)) <= effectiveFromUtc)
             throw new DomainException("invalid_dates", "The assignment must end after it starts.");
@@ -114,7 +121,7 @@ public sealed class RoleAssignment : ITenantOwned
             Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), UserId = Guard.NotEmpty(userId, nameof(userId)), RoleCode = role,
             ViewerKind = viewerKind, ScopeLevel = scope.Level, OrganisationIds = scope.OrganisationIds, BusinessUnitIds = scope.BusinessUnitIds,
             DivisionIds = scope.DivisionIds, SiteIds = scope.SiteIds, CategoryIds = scope.CategoryIds, ClassificationCeiling = scope.ClassificationCeiling,
-            ApproverGroupKey = string.IsNullOrWhiteSpace(approverGroupKey) ? null : approverGroupKey.Trim(), EffectiveFromUtc = effectiveFromUtc,
+            ApproverGroupKey = string.IsNullOrWhiteSpace(approverGroupKey) ? null : approverGroupKey.Trim(), PrivilegedAccess = privilegedAccess, EffectiveFromUtc = effectiveFromUtc,
             EffectiveToUtc = effectiveToUtc, GrantedBy = grantedBy, GrantedByLabel = Guard.NotBlank(grantedByLabel, "Granted by", 200),
             Reason = Guard.OptionalBounded(reason, "Reason", 1000), Source = source, SourceMappingId = sourceMappingId, CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
         };

@@ -12,10 +12,26 @@ public static class Classifications
     public const string Internal = "Internal";
     public const string Confidential = "Confidential";
     public const string Restricted = "Restricted";
-    public static readonly IReadOnlyList<string> Default = [Public, Internal, Confidential, Restricted];
+    public const string LegalPrivileged = "Legal Privileged";
+    public static readonly IReadOnlyList<string> Default = [Public, Internal, Confidential, Restricted, LegalPrivileged];
 }
 
 public enum RegisteredDateProvenance { Platform, Migration }
+
+/// <summary>Who may add documents to a contract in its current state (set by the workflow state; see the state definitions in the solution pack).</summary>
+public static class DocumentPolicies
+{
+    public const string Open = "Open";        // the category owner (and administrators) may add documents
+    public const string LegalOnly = "LegalOnly"; // only Legal may add documents (for example during Legal review)
+    public const string Closed = "Closed";    // no document may be added directly; a Variation carries any change
+    public static bool IsKnown(string? p) => p is Open or LegalOnly or Closed;
+}
+
+/// <summary>What entering a workflow state does to the record's protection. Supplied by the workflow definition, never by a caller.</summary>
+public sealed record StateEffects(bool Lock, bool FreezeContent, string DocumentPolicy, string? LockReason)
+{
+    public static readonly StateEffects None = new(false, false, DocumentPolicies.Open, null);
+}
 
 /// <summary>Authorises a legacy load of a record in a state of Effective or later (decision record, Registered Date exception).</summary>
 public sealed record LegacyLoadAuthorisation(Guid MigrationBatchId, string ActingAdministrator, bool AllowRegisteredDateImport);
@@ -177,6 +193,9 @@ public sealed record NewContract(
     DateOnly? StartDate = null, DateOnly? EffectiveDate = null, DateOnly? ReviewDate = null, DateOnly? EndDate = null,
     Guid? BusinessUnitId = null, Guid? SiteId = null);
 
+/// <summary>One field's value before and after a controlled change.</summary>
+public sealed record FieldChange(string Field, string? Before, string? After);
+
 public sealed record SourceProvenance(string SourceSystem, string SourceRecordId, string? SourceAgreementReference, string? SourceStatus, DateTime? SourceExtractedUtc);
 
 public sealed class Contract : ITenantOwned
@@ -199,11 +218,33 @@ public sealed class Contract : ITenantOwned
     public string Status { get; private set; } = "";
     public bool RecordLocked { get; private set; }
     public DateTime? LockedUtc { get; private set; }
+    /// <summary>Why the record is locked, in plain words, shown on the contract (set by the engine; never by a caller).</summary>
+    public string? LockReason { get; private set; }
+    public string? LockedBy { get; private set; }
+    /// <summary>The workflow state freezes the content (Awaiting Legal, Out for Signature, Awaiting Approval...): descriptive edits are refused though the record is not locked.</summary>
+    public bool ContentFrozen { get; private set; }
+    /// <summary>Who may add documents in the current state: <see cref="DocumentPolicies"/>.</summary>
+    public string DocumentPolicy { get; private set; } = DocumentPolicies.Open;
+    /// <summary>The audited emergency unlock that currently lets named fields change on a locked record; null when locked normally.</summary>
+    public Guid? ActiveUnlockId { get; private set; }
+    public DateTime? UnlockExpiresUtc { get; private set; }
+    /// <summary>The workflow definition (and version) this contract is pinned to; a later release never changes an in-flight contract.</summary>
+    public string? WorkflowRef { get; private set; }
+    public Guid? ConfigReleaseId { get; private set; }
+    /// <summary>Renewal links: the agreement this one succeeds, and the agreement that succeeds it.</summary>
+    public Guid? PredecessorContractId { get; private set; }
+    public Guid? SuccessorContractId { get; private set; }
     public string Classification { get; private set; } = Classifications.Internal;
     public string? CurrencyCode { get; private set; }
     public decimal? EstimatedValue { get; private set; }
     public string? ExtensionType { get; private set; }
     public bool LegalReviewRequired { get; private set; }
+    /// <summary>Notice period in days (Critical Notice reminders count back from End Date by this many days).</summary>
+    public int? NoticePeriodDays { get; private set; }
+    /// <summary>The contract carries a notice deadline that must not be missed: its reminders start earlier and are tracked until acknowledged.</summary>
+    public bool CriticalNotice { get; private set; }
+    /// <summary>Per-contract reminder lead time in days; null uses the organisation's default.</summary>
+    public int? ReminderLeadDays { get; private set; }
     public DateOnly? StartDate { get; private set; }
     public DateOnly? EffectiveDate { get; private set; }
     public DateOnly? ReviewDate { get; private set; }
@@ -232,6 +273,16 @@ public sealed class Contract : ITenantOwned
     public DateTime UpdatedUtc { get; private set; }
     public string UpdatedBy { get; private set; } = "";
     public byte[] RowVersion { get; private set; } = [];
+
+    /// <summary>Fields that may change on a locked record, and by what authority (data dictionary, EditableAfterEffective).</summary>
+    public static class Editable
+    {
+        /// <summary>"Variation only": changed through an applied Variation.</summary>
+        public static readonly IReadOnlyList<string> VariationFields =
+            ["businessUnitId", "siteId", "currencyCode", "estimatedValue", "extensionType", "noticePeriodDays", "criticalNotice", "reviewDate", "endDate"];
+        /// <summary>What an audited emergency unlock may name: the Variation fields plus the descriptive fields and classification (the "Admin unlock only" fields).</summary>
+        public static readonly IReadOnlyList<string> UnlockFields = [.. VariationFields, "contractTitle", "description", "classification"];
+    }
 
     public static string NormaliseReference(string? reference)
         => Guard.NotBlank(reference, "Agreement reference", 100).ToUpperInvariant();
@@ -262,6 +313,9 @@ public sealed class Contract : ITenantOwned
         c.SourceExtractedUtc = source.SourceExtractedUtc;
         c.RecordLocked = true;
         c.LockedUtc = n.NowUtc;
+        c.LockedBy = admin;
+        c.LockReason = "Loaded as a legacy record by migration";
+        c.DocumentPolicy = DocumentPolicies.Closed;
         if (authorisation.AllowRegisteredDateImport && sourceRegisteredUtc.HasValue)
         {
             c.RegisteredDateUtc = Guard.Utc(sourceRegisteredUtc.Value, "Registered date");
@@ -312,6 +366,11 @@ public sealed class Contract : ITenantOwned
                 "estimatedValue" => EstimatedValue?.ToString(CultureInfo.InvariantCulture),
                 "extensionType" => ExtensionType,
                 "legalReviewRequired" => LegalReviewRequired ? "true" : "false",
+                "noticePeriodDays" => NoticePeriodDays?.ToString(CultureInfo.InvariantCulture),
+                "criticalNotice" => CriticalNotice ? "true" : "false",
+                "classification" => Classification,
+                "businessUnitId" => BusinessUnitId?.ToString("D"),
+                "siteId" => SiteId?.ToString("D"),
                 "startDate" => StartDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 "effectiveDate" => EffectiveDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 "reviewDate" => ReviewDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
@@ -361,6 +420,72 @@ public sealed class Contract : ITenantOwned
         Touch(actor, nowUtc);
     }
 
+    /// <summary>
+    /// Applies named changes to a record through a controlled path (an applied Variation, or an emergency unlock) and returns the before and after values of what actually changed.
+    /// Only fields in <paramref name="allowed"/> may be named; status, lock, registration and identity fields are never reachable here.
+    /// </summary>
+    public IReadOnlyList<FieldChange> ApplyControlledFields(IReadOnlyDictionary<string, string?> changes, IReadOnlyCollection<string> allowed, string actor, DateTime nowUtc)
+    {
+        foreach (var name in changes.Keys)
+            if (!allowed.Contains(name, StringComparer.Ordinal))
+                throw new DomainException("field_not_changeable", $"'{name}' cannot be changed this way.");
+        var before = CaptureFields(changes.Keys);
+        string? title = ContractTitle, description = Description, currency = CurrencyCode, extension = ExtensionType, classification = Classification;
+        decimal? value = EstimatedValue; int? notice = NoticePeriodDays; var critical = CriticalNotice; var review = ReviewDate; var end = EndDate; var bu = BusinessUnitId; var site = SiteId;
+        foreach (var (name, raw) in changes)
+        {
+            switch (name)
+            {
+                case "contractTitle": title = Guard.NotBlank(raw, "Contract title", 500); break;
+                case "description": description = Guard.OptionalBounded(raw, "Description", 4000); break;
+                case "currencyCode": currency = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim().ToUpperInvariant(); break;
+                case "estimatedValue": value = string.IsNullOrWhiteSpace(raw) ? null : decimal.Parse(raw, NumberStyles.Number, CultureInfo.InvariantCulture); break;
+                case "extensionType": extension = Guard.OptionalBounded(raw, "Extension type", 50); break;
+                case "noticePeriodDays": notice = string.IsNullOrWhiteSpace(raw) ? null : int.Parse(raw, CultureInfo.InvariantCulture); break;
+                case "criticalNotice": critical = string.Equals(raw, "true", StringComparison.Ordinal); break;
+                case "classification": classification = Guard.NotBlank(raw, "Classification", 30); break;
+                case "reviewDate": review = ParseDate(raw); break;
+                case "endDate": end = ParseDate(raw); break;
+                case "businessUnitId": bu = string.IsNullOrWhiteSpace(raw) ? null : Guid.Parse(raw); break;
+                case "siteId": site = string.IsNullOrWhiteSpace(raw) ? null : Guid.Parse(raw); break;
+                default: throw new DomainException("field_not_changeable", $"'{name}' cannot be changed this way.");
+            }
+        }
+        if (value is < 0) throw new DomainException("invalid_value", "Estimated value must not be negative.");
+        if (currency is not null && !Regex.IsMatch(currency, "^[A-Z]{3}$", RegexOptions.NonBacktracking)) throw new DomainException("invalid_currency", "Currency must be a three-letter ISO 4217 code.");
+        if (value.HasValue && currency is null) throw new DomainException("currency_required", "A currency is required when an estimated value is given.");
+        if (notice is < 0) throw new DomainException("invalid_notice", "The notice period must not be negative.");
+        if (StartDate.HasValue && end.HasValue && end < StartDate) throw new DomainException("invalid_dates", "End date must not be before the start date.");
+        (ContractTitle, Description, CurrencyCode, EstimatedValue, ExtensionType, Classification, NoticePeriodDays, CriticalNotice, ReviewDate, EndDate, BusinessUnitId, SiteId) =
+            (title, description, currency, value, extension, classification, notice, critical, review, end, bu, site);
+        Touch(actor, nowUtc);
+        var after = CaptureFields(changes.Keys);
+        return changes.Keys.Where(k => !string.Equals(before[k], after[k], StringComparison.Ordinal)).Select(k => new FieldChange(k, before[k], after[k])).ToList();
+    }
+
+    /// <summary>Sets the reminder attributes the owner maintains on an editable record.</summary>
+    public void SetReminderSettings(int? leadDays, int? noticePeriodDays, bool criticalNotice, string actor, DateTime nowUtc)
+    {
+        EnsureEditable(nowUtc);
+        if (leadDays is <= 0 or > 3650) throw new DomainException("invalid_lead", "The reminder lead time must be between 1 and 3650 days.");
+        if (noticePeriodDays is < 0 or > 3650) throw new DomainException("invalid_notice", "The notice period must be between 0 and 3650 days.");
+        ReminderLeadDays = leadDays; NoticePeriodDays = noticePeriodDays; CriticalNotice = criticalNotice;
+        Touch(actor, nowUtc);
+    }
+
+    /// <summary>
+    /// Changes the classification. Raising is open to the record's editors; lowering is a privileged act the caller has already authorised (reason and permission); on a locked record
+    /// it also needs an open unlock. Returns the previous value.
+    /// </summary>
+    public string SetClassification(string classification, string actor, DateTime nowUtc)
+    {
+        // The lock rule is the service's to apply (a locked record is reclassified only under an open unlock); a workflow state that freezes content does not stop reclassification.
+        var previous = Classification;
+        Classification = Guard.NotBlank(classification, "Classification", 30);
+        Touch(actor, nowUtc);
+        return previous;
+    }
+
     private static DateOnly? ParseDate(string? raw)
         => string.IsNullOrWhiteSpace(raw) ? null : DateOnly.ParseExact(raw, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
@@ -405,7 +530,7 @@ public sealed class Contract : ITenantOwned
     /// <summary>Edits descriptive fields. Refused on a locked record for every caller (INV-03).</summary>
     public void UpdateDetails(string title, string? description, string updatedBy, DateTime nowUtc)
     {
-        EnsureEditable();
+        EnsureEditable(nowUtc);
         ContractTitle = Guard.NotBlank(title, "Contract title", 500);
         Description = Guard.OptionalBounded(description, "Description", 4000);
         Touch(updatedBy, nowUtc);
@@ -413,10 +538,62 @@ public sealed class Contract : ITenantOwned
 
     /// <summary>Called only by the workflow engine. Sets the state code and, when the target state locks, locks the record.</summary>
     public void ApplyWorkflowState(string statusCode, bool locks, string actor, DateTime nowUtc)
+        => ApplyWorkflowState(statusCode, locks ? new StateEffects(true, false, DocumentPolicies.Open, null) : StateEffects.None, actor, nowUtc, keepProtection: !locks);
+
+    /// <summary>
+    /// Enters a workflow state. Entering a locking state locks the record; no transition ever unlocks it (only an applied Variation changes fields, only an audited unlock opens it).
+    /// </summary>
+    public void ApplyWorkflowState(string statusCode, StateEffects effects, string actor, DateTime nowUtc, bool keepProtection = false)
     {
         Status = Guard.NotBlank(statusCode, "Status", 100);
-        if (locks && !RecordLocked) { RecordLocked = true; LockedUtc = nowUtc; }
+        if (!DocumentPolicies.IsKnown(effects.DocumentPolicy)) throw new DomainException("invalid_document_policy", "The state's document policy is not recognised.");
+        if (effects.Lock && !RecordLocked) { RecordLocked = true; LockedUtc = nowUtc; LockedBy = Guard.NotBlank(actor, "Locked by", 200); LockReason = Guard.OptionalBounded(effects.LockReason, "Lock reason", 200); }
+        else if (effects.Lock && RecordLocked && effects.LockReason is not null) LockReason = effects.LockReason;
+        if (!keepProtection) { ContentFrozen = effects.FreezeContent; DocumentPolicy = effects.DocumentPolicy; }
         Touch(actor, nowUtc);
+    }
+
+    /// <summary>Pins the contract to the workflow definition in force when it first needs one.</summary>
+    public void PinWorkflow(string workflowRef, Guid? configReleaseId)
+    {
+        if (WorkflowRef is not null) return;
+        WorkflowRef = Guard.NotBlank(workflowRef, "Workflow reference", 200); ConfigReleaseId = configReleaseId;
+    }
+
+    /// <summary>Opens an audited emergency unlock on a locked record. The unlock service has already authorised it, recorded the reason and chosen the expiry.</summary>
+    public void OpenUnlock(Guid unlockId, DateTime expiresUtc, string actor, DateTime nowUtc)
+    {
+        if (!RecordLocked) throw new DomainException("not_locked", "The record is not locked.");
+        if (ActiveUnlockId is not null && UnlockExpiresUtc > nowUtc) throw new DomainException("already_unlocked", "An unlock is already open on this record.");
+        if (expiresUtc <= nowUtc) throw new DomainException("invalid_expiry", "The unlock must expire in the future.");
+        ActiveUnlockId = unlockId; UnlockExpiresUtc = Guard.Utc(expiresUtc, nameof(expiresUtc));
+        Touch(actor, nowUtc);
+    }
+
+    /// <summary>Closes the unlock: the record is locked normally again. Idempotent.</summary>
+    public void CloseUnlock(string actor, DateTime nowUtc)
+    {
+        if (ActiveUnlockId is null) return;
+        ActiveUnlockId = null; UnlockExpiresUtc = null;
+        Touch(actor, nowUtc);
+    }
+
+    /// <summary>Records the renewal link to the agreement that succeeds this one.</summary>
+    public void LinkSuccessor(Guid successorId, string actor, DateTime nowUtc)
+    {
+        if (SuccessorContractId is { } existing && existing != successorId) throw new DomainException("successor_exists", "This agreement already has a successor.");
+        SuccessorContractId = successorId;
+        Touch(actor, nowUtc);
+    }
+
+    /// <summary>The successor of an Effective agreement: a new Draft that records where it came from. Only configured fields are copied by the caller; audit history is never copied.</summary>
+    public static Contract CreateSuccessor(NewContract n, Guid predecessorId, int? noticePeriodDays, bool criticalNotice, int? reminderLeadDays)
+    {
+        var c = Build(n);
+        c.Status = Guard.NotBlank(n.InitialStatusCode, "Initial status", 100);
+        c.PredecessorContractId = Guard.NotEmpty(predecessorId, nameof(predecessorId));
+        c.NoticePeriodDays = noticePeriodDays; c.CriticalNotice = criticalNotice; c.ReminderLeadDays = reminderLeadDays;
+        return c;
     }
 
     /// <summary>Stamps Registered Date once, on successful register authorisation (INV-05).</summary>
@@ -430,10 +607,19 @@ public sealed class Contract : ITenantOwned
         Touch(registeredBy, nowUtc);
     }
 
-    private void EnsureEditable()
+    /// <summary>True while an emergency unlock is open on a locked record.</summary>
+    public bool IsUnlockedAt(DateTime nowUtc) => RecordLocked && ActiveUnlockId is not null && UnlockExpiresUtc is { } e && nowUtc < e;
+
+    /// <summary>The record cannot be edited through the ordinary paths: locked (and not under an open unlock), or its content is frozen by the workflow state.</summary>
+    public bool IsProtectedAt(DateTime nowUtc) => (RecordLocked && !IsUnlockedAt(nowUtc)) || ContentFrozen;
+
+    private void EnsureEditable(DateTime nowUtc)
     {
+        // An open unlock does not make the ordinary edit path available: it is used only through the unlock service, which names the fields and carries the unlock id into the audit.
         if (RecordLocked)
             throw new DomainException("record_locked", "This record is locked. Changes to an Effective record require an authorised Variation or an audited emergency unlock.");
+        if (ContentFrozen)
+            throw new DomainException("content_frozen", "The contract is in a stage where its content is frozen. It can be edited again if it is returned to its owner.");
     }
 
     private void Touch(string by, DateTime nowUtc) { UpdatedBy = Guard.NotBlank(by, "Updated by", 200); UpdatedUtc = nowUtc; }

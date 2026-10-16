@@ -58,3 +58,8 @@ retention.manage,,Y,,,,,,,,,,,A10 baseline; periods [OPEN]
 legalhold.manage,,,,,,,,Y,,,,,A10 baseline
 ai.use,,,,,,Y,S,Y,,,,,A10 baseline
 ops.manage,Y,,,,,,,,,,,,Master (Audit and operations)
+records.read_privileged,,,,,,,,Y,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
+classification.lower,,,,,,Y,,Y,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
+contracts.suspend,,,,,,Y,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
+legal.respond,,,,,,,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
+notifications.administer,,Y,,,,Y,,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)

@@ -15,6 +15,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
     public DbSet<GroupRoleMapping> GroupMappings => Set<GroupRoleMapping>();
     public DbSet<IdentityProviderRegistration> Providers => Set<IdentityProviderRegistration>();
+    public DbSet<Elevation> Elevations => Set<Elevation>();
     protected override string SchemaName => IdentityModule.Schema;
 
     private static readonly JsonSerializerOptions Json = new();
@@ -69,6 +70,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.ClassificationCeiling).HasMaxLength(50).IsRequired();
             e.Property(x => x.ApproverGroupKey).HasMaxLength(100);
+            e.Property(x => x.PrivilegedAccess).HasDefaultValue(false);
             e.Property(x => x.GrantedByLabel).HasMaxLength(200).IsRequired();
             e.Property(x => x.Reason).HasMaxLength(1000);
             e.Ignore(x => x.Scope);
@@ -81,6 +83,24 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             e.HasOne<UserProfile>().WithMany().HasForeignKey(x => new { x.TenantId, x.UserId }).HasPrincipalKey(u => new { u.TenantId, u.Id }).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.TenantId, x.UserId });
             e.HasIndex(x => new { x.TenantId, x.RoleCode });
+        });
+
+        mb.Entity<Elevation>(e =>
+        {
+            e.ToTable("Elevation");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.InitiatorLabel).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ActingLabel).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.ClassificationCeiling).HasMaxLength(50).IsRequired();
+            e.Property(x => x.PermissionsCsv).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.ConfirmedByLabel).HasMaxLength(200);
+            e.Property(x => x.EndedByLabel).HasMaxLength(200);
+            e.Property(x => x.EndReason).HasMaxLength(1000);
+            e.Property(x => x.RowVersion);
+            e.HasIndex(x => new { x.TenantId, x.RequestedUtc });
         });
 
         mb.Entity<GroupRoleMapping>(e =>

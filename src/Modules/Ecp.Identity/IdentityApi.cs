@@ -20,17 +20,19 @@ public sealed class IdentityOptions
     public EcpMode Mode { get; set; } = EcpMode.Production;
     /// <summary>Unknown identities are refused unless invited. Self-provisioning is not offered.</summary>
     public bool AllowSelfProvisioning { get; set; }
+    /// <summary>An emergency elevation waits for a second installation administrator (on by default in Production; ACCESS_CONTROL_SPEC section 7).</summary>
+    public bool RequireEmergencyConfirmation { get; set; }
 }
 
 public sealed record UserDto(Guid Id, string DisplayName, string Email, UserStatus Status, DateTime? LastSignInUtc);
 
 public sealed record AssignmentDto(
     Guid Id, Guid UserId, string RoleCode, ViewerKind? ViewerKind, ScopeSet Scope, string? ApproverGroupKey, DateTime EffectiveFromUtc,
-    DateTime? EffectiveToUtc, string GrantedByLabel, string? Reason, AssignmentSource Source, bool IsActive);
+    DateTime? EffectiveToUtc, string GrantedByLabel, string? Reason, AssignmentSource Source, bool IsActive, bool PrivilegedAccess = false);
 
 public sealed record GrantRequest(
     Guid UserId, string RoleCode, ViewerKind? ViewerKind, ScopeSet Scope, string? ApproverGroupKey = null, DateTime? EffectiveFromUtc = null,
-    DateTime? EffectiveToUtc = null, string? Reason = null, bool ExplicitHighCeiling = false);
+    DateTime? EffectiveToUtc = null, string? Reason = null, bool ExplicitHighCeiling = false, bool PrivilegedAccess = false);
 
 public sealed record LoginResolution(bool Succeeded, Guid? UserId, string? DenialCode, string? Message)
 {
@@ -46,6 +48,20 @@ public interface IClassificationScaleProvider { Task<ClassificationScale> GetAsy
 internal sealed class DefaultClassificationScaleProvider : IClassificationScaleProvider
 {
     public Task<ClassificationScale> GetAsync(CancellationToken ct = default) => Task.FromResult(ClassificationScale.Default);
+}
+
+public sealed record ApproverInfo(Guid UserId, string DisplayName, string RoleCode, Guid AssignmentId);
+
+/// <summary>Trusted lookups of people by what they hold, for modules that route work (approvals, notifications). Not reachable from request input.</summary>
+public interface IAccessDirectory
+{
+    /// <summary>The access facts of any user of the current tenant (as the evaluator would see them), or null if the user does not exist or is disabled.</summary>
+    Task<AccessSubject?> LoadSubjectAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>People currently holding an Approver or Backup Approver assignment for the approver group.</summary>
+    Task<IReadOnlyList<ApproverInfo>> ApproversAsync(string approverGroupKey, CancellationToken ct = default);
+    /// <summary>People currently holding the role in the organisation (organisation-level assignments naming it, and tenant-level assignments).</summary>
+    Task<IReadOnlyList<Guid>> HoldersOfRoleAsync(string roleCode, Guid organisationId, CancellationToken ct = default);
+    Task<string?> DisplayNameAsync(Guid userId, CancellationToken ct = default);
 }
 
 /// <summary>Optional: lets delegation treat a parent category as covering its subcategories. Implemented by the Contracts module.</summary>
@@ -307,8 +323,12 @@ internal static class LastAdministrator
 
 internal sealed class RoleAssignmentService(
     IdentityDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, CurrentUser currentUser,
-    IClassificationScaleProvider scales, IOrganisationStructureService structure, IServiceProvider services) : IRoleAssignmentService
+    IClassificationScaleProvider scales, IOrganisationStructureService structure, IServiceProvider services, IAccessService access, ElevationContext elevation) : IRoleAssignmentService
 {
+    private async Task<string> ActorLabelAsync(Guid userId, CancellationToken ct)
+        => elevation.Current is { } g && g.UserId == userId ? $"{g.InitiatorLabel} (emergency access)"
+            : await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.DisplayName).FirstAsync(ct);
+
     public Task<Guid> GrantAsync(GrantRequest r, CancellationToken ct = default) => CreateAsync(r, AssignmentSource.Manual, null, null, delegated: true, ct);
 
     public Task<Guid> GrantTrustedAsync(GrantRequest r, AssignmentSource source, string grantedByLabel, Guid? mappingId = null, CancellationToken ct = default)
@@ -331,17 +351,19 @@ internal sealed class RoleAssignmentService(
         {
             grantor = currentUser.UserId ?? throw new ForbiddenException("Only a signed-in user can grant roles.");
             if (grantor == r.UserId) throw new DomainException("self_grant", "You cannot grant a role to yourself.");
-            var subject = await LoadSubjectAsync(grantor.Value, ct) ?? throw new ForbiddenException("The caller is not a known user.");
+            var subject = await access.GetSubjectAsync(ct) ?? throw new ForbiddenException("The caller is not a known user.");
             ClassificationScale effective = scale;
             Func<Guid, IReadOnlyCollection<Guid>>? ancestry = await AncestryFuncAsync(ct);
             var why = DelegationPolicy.WhyNot(AccessEvaluator.Default.Matrix, subject.Assignments, now, r.RoleCode, r.Scope, effective, ancestry);
             if (why is not null) throw new ForbiddenException(why);
-            label = (await db.Users.AsNoTracking().Where(u => u.Id == grantor).Select(u => u.DisplayName).FirstAsync(ct));
+            if (r.PrivilegedAccess && !DelegationPolicy.MayGrantPrivilegedAccess(subject.Assignments, now))
+                throw new ForbiddenException("Only a Tenant Administrator can grant access to records at a privileged classification level.");
+            label = await ActorLabelAsync(grantor.Value, ct);
         }
         else label = trustedLabel!;
 
         var assignment = RoleAssignment.Create(tenantId, r.UserId, r.RoleCode, r.ViewerKind, r.Scope, r.ApproverGroupKey, from, r.EffectiveToUtc,
-            grantor, label, r.Reason, source, mappingId, scale, now, r.ExplicitHighCeiling);
+            grantor, label, r.Reason, source, mappingId, scale, now, r.ExplicitHighCeiling, r.PrivilegedAccess);
 
         return await uow.ExecuteAsync(async c =>
         {
@@ -353,7 +375,7 @@ internal sealed class RoleAssignmentService(
                 {
                     user = r.UserId, role = r.RoleCode, viewerKind = r.ViewerKind?.ToString(), level = r.Scope.Level.ToString(), organisations = r.Scope.OrganisationIds,
                     businessUnits = r.Scope.BusinessUnitIds, divisions = r.Scope.DivisionIds, sites = r.Scope.SiteIds, categories = r.Scope.CategoryIds,
-                    ceiling = r.Scope.ClassificationCeiling, source = source.ToString(), grantedBy = label
+                    ceiling = r.Scope.ClassificationCeiling, privilegedAccess = r.PrivilegedAccess, source = source.ToString(), grantedBy = label
                 })));
             return assignment.Id;
         }, ct);
@@ -367,7 +389,7 @@ internal sealed class RoleAssignmentService(
         await uow.ExecuteAsync(async c =>
         {
             var assignment = await db.RoleAssignments.FirstOrDefaultAsync(a => a.Id == assignmentId, c) ?? throw new ResourceNotFoundException("The assignment was not found.");
-            var subject = await LoadSubjectAsync(actorUser, c) ?? throw new ForbiddenException("The caller is not a known user.");
+            var subject = await access.GetSubjectAsync(c) ?? throw new ForbiddenException("The caller is not a known user.");
             var scale = await scales.GetAsync(c);
             var denied = DelegationPolicy.WhyNot(AccessEvaluator.Default.Matrix, subject.Assignments, now, assignment.RoleCode, assignment.Scope, scale, await AncestryFuncAsync(c));
             if (denied is not null) throw new ForbiddenException(denied);
@@ -426,15 +448,7 @@ internal sealed class RoleAssignmentService(
     }
 
     private static AssignmentDto ToDto(RoleAssignment a, DateTime now) => new(a.Id, a.UserId, a.RoleCode, a.ViewerKind, a.Scope, a.ApproverGroupKey,
-        a.EffectiveFromUtc, a.EffectiveToUtc, a.GrantedByLabel, a.Reason, a.Source, a.IsActiveAt(now));
-
-    private async Task<AccessSubject?> LoadSubjectAsync(Guid userId, CancellationToken ct)
-    {
-        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
-        if (user is null) return null;
-        var rows = await db.RoleAssignments.AsNoTracking().Where(a => a.UserId == userId).ToListAsync(ct);
-        return new AccessSubject(user.Id, user.TenantId, user.Status, rows.Select(AccessService.ToView).ToList());
-    }
+        a.EffectiveFromUtc, a.EffectiveToUtc, a.GrantedByLabel, a.Reason, a.Source, a.IsActiveAt(now), a.PrivilegedAccess);
 
     private async Task<Func<Guid, IReadOnlyCollection<Guid>>?> AncestryFuncAsync(CancellationToken ct)
     {
@@ -538,19 +552,27 @@ internal sealed class ProviderRegistry(IdentityDbContext db, IUnitOfWork uow, IA
 }
 
 internal sealed class AccessService(
-    IdentityDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, CurrentUser currentUser, IClassificationScaleProvider scales, AccessEvaluator evaluator) : IAccessService
+    IdentityDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, CurrentUser currentUser, IClassificationScaleProvider scales, AccessEvaluator evaluator,
+    ElevationContext elevation) : IAccessService
 {
     private AccessSubject? _subject;
     private bool _loaded;
 
     public Guid? CurrentUserId => currentUser.UserId;
 
-    public static AssignmentView ToView(RoleAssignment a) => new(a.Id, a.RoleCode, a.ViewerKind, a.Scope, a.ApproverGroupKey, a.EffectiveFromUtc, a.EffectiveToUtc);
+    public static AssignmentView ToView(RoleAssignment a) => new(a.Id, a.RoleCode, a.ViewerKind, a.Scope, a.ApproverGroupKey, a.EffectiveFromUtc, a.EffectiveToUtc, a.PrivilegedAccess);
 
     public async Task<AccessSubject?> GetSubjectAsync(CancellationToken ct = default)
     {
         if (_loaded) return _subject;
         if (currentUser.UserId is not { } id) { _loaded = true; return null; }
+        if (elevation.Current is { } grant)
+        {
+            // Support or emergency access: the person acts as themselves, with only the permissions the elevation names, in the one tenant it targets (never their own assignments there).
+            _loaded = true;
+            if (grant.ExpiresUtc <= clock.UtcNow || grant.UserId != id) return _subject = null;
+            return _subject = ElevatedSubject(grant);
+        }
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
         if (user is not null)
         {
@@ -560,6 +582,19 @@ internal sealed class AccessService(
         _loaded = true;
         return _subject;
     }
+
+    internal static AccessSubject ElevatedSubject(ElevationGrant grant)
+    {
+        var views = new List<AssignmentView>
+        {
+            new(DeterministicId(grant.ElevationId, 1), RoleCodes.Auditor, null, ScopeSet.Tenant(grant.Ceiling), null, DateTime.MinValue.AddYears(1), grant.ExpiresUtc)
+        };
+        if (grant.Kind == ElevationKind.Emergency)
+            views.Add(new(DeterministicId(grant.ElevationId, 2), RoleCodes.TenantAdministrator, null, ScopeSet.Tenant(grant.Ceiling), null, DateTime.MinValue.AddYears(1), grant.ExpiresUtc));
+        return new AccessSubject(grant.UserId, grant.TenantId, UserStatus.Active, views, grant.ElevationId, grant.Permissions);
+    }
+
+    private static Guid DeterministicId(Guid seed, byte n) { var b = seed.ToByteArray(); b[15] = n; return new Guid(b); }
 
     public Task<ClassificationScale> ClassificationScaleAsync(CancellationToken ct = default) => scales.GetAsync(ct);
 
@@ -620,6 +655,40 @@ internal sealed class AccessService(
     }
 }
 
+internal sealed class AccessDirectory(IdentityDbContext db, IClock clock) : IAccessDirectory
+{
+    public async Task<AccessSubject?> LoadSubjectAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null || user.Status != UserStatus.Active) return null;
+        var rows = await db.RoleAssignments.AsNoTracking().Where(a => a.UserId == userId).ToListAsync(ct);
+        return new AccessSubject(user.Id, user.TenantId, user.Status, rows.Select(AccessService.ToView).ToList());
+    }
+
+    public async Task<IReadOnlyList<ApproverInfo>> ApproversAsync(string approverGroupKey, CancellationToken ct = default)
+    {
+        var now = clock.UtcNow;
+        var rows = await (from a in db.RoleAssignments.AsNoTracking()
+                          join u in db.Users.AsNoTracking() on new { a.TenantId, Id = a.UserId } equals new { u.TenantId, u.Id }
+                          where a.ApproverGroupKey == approverGroupKey && (a.RoleCode == RoleCodes.Approver || a.RoleCode == RoleCodes.BackupApprover) && u.Status == UserStatus.Active
+                          select new { a, u.DisplayName }).ToListAsync(ct);
+        return rows.Where(r => r.a.IsActiveAt(now)).Select(r => new ApproverInfo(r.a.UserId, r.DisplayName, r.a.RoleCode, r.a.Id)).ToList();
+    }
+
+    public async Task<IReadOnlyList<Guid>> HoldersOfRoleAsync(string roleCode, Guid organisationId, CancellationToken ct = default)
+    {
+        var now = clock.UtcNow;
+        var rows = await (from a in db.RoleAssignments.AsNoTracking()
+                          join u in db.Users.AsNoTracking() on new { a.TenantId, Id = a.UserId } equals new { u.TenantId, u.Id }
+                          where a.RoleCode == roleCode && u.Status == UserStatus.Active
+                          select a).ToListAsync(ct);
+        return rows.Where(a => a.IsActiveAt(now) && (a.ScopeLevel == ScopeLevel.Tenant || a.OrganisationIds.Contains(organisationId))).Select(a => a.UserId).Distinct().ToList();
+    }
+
+    public Task<string?> DisplayNameAsync(Guid userId, CancellationToken ct = default)
+        => db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => (string?)u.DisplayName).FirstOrDefaultAsync(ct);
+}
+
 public static class IdentityModule
 {
     public const string Name = "Identity";
@@ -639,7 +708,10 @@ public static class IdentityModule
         services.AddScoped<IRoleAssignmentService, RoleAssignmentService>();
         services.AddScoped<IGroupMappingService, GroupMappingService>();
         services.AddScoped<IProviderRegistry, ProviderRegistry>();
+        services.AddScoped<ElevationContext>();
+        services.AddScoped<IElevationService, ElevationService>();
         services.AddScoped<IAccessService, AccessService>();
+        services.AddScoped<IAccessDirectory, AccessDirectory>();
         services.AddScoped<IAuditBrowser, AuditBrowser>();
         services.AddScoped<IPeopleDirectory, PeopleDirectory>();
         services.AddScoped<IUserAdministration, UserAdministration>();

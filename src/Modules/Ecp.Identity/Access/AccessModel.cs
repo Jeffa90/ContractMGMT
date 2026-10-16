@@ -5,13 +5,20 @@ namespace Ecp.Identity.Access;
 
 /// <summary>A role assignment as the evaluator sees it (no persistence concerns).</summary>
 public sealed record AssignmentView(
-    Guid Id, string RoleCode, ViewerKind? ViewerKind, ScopeSet Scope, string? ApproverGroupKey, DateTime EffectiveFromUtc, DateTime? EffectiveToUtc)
+    Guid Id, string RoleCode, ViewerKind? ViewerKind, ScopeSet Scope, string? ApproverGroupKey, DateTime EffectiveFromUtc, DateTime? EffectiveToUtc, bool PrivilegedAccess = false)
 {
     public bool IsActiveAt(DateTime utc) => EffectiveFromUtc <= utc && (EffectiveToUtc is null || utc < EffectiveToUtc);
 }
 
-/// <summary>The authenticated person and their assignments.</summary>
-public sealed record AccessSubject(Guid UserId, Guid TenantId, UserStatus Status, IReadOnlyList<AssignmentView> Assignments);
+/// <summary>
+/// The authenticated person and their assignments. During a support or emergency elevation (<see cref="ElevationId"/> set) the subject carries only the permissions the elevation allows
+/// (<see cref="PermissionAllowlist"/>); every decision for such a subject is bounded by that list on top of the usual scope intersection.
+/// </summary>
+public sealed record AccessSubject(Guid UserId, Guid TenantId, UserStatus Status, IReadOnlyList<AssignmentView> Assignments,
+    Guid? ElevationId = null, IReadOnlySet<string>? PermissionAllowlist = null)
+{
+    public bool PermitsPermission(string permission) => PermissionAllowlist is null || PermissionAllowlist.Contains(permission);
+}
 
 /// <summary>Which scope dimensions apply to a resource type. A dimension that does not apply to a resource never narrows access to it.</summary>
 [Flags]

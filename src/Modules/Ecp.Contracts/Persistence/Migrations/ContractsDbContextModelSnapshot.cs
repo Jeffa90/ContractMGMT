@@ -138,6 +138,9 @@ namespace Ecp.Contracts.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ActiveUnlockId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("AgreementReference")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -164,6 +167,12 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<Guid?>("ConfigReleaseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("ContentFrozen")
+                        .HasColumnType("bit");
+
                     b.Property<string>("ContractTitle")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -177,6 +186,9 @@ namespace Ecp.Contracts.Persistence.Migrations
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("CriticalNotice")
+                        .HasColumnType("bit");
+
                     b.Property<string>("CurrencyCode")
                         .HasMaxLength(3)
                         .HasColumnType("nchar(3)")
@@ -185,6 +197,13 @@ namespace Ecp.Contracts.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("DocumentPolicy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Open");
 
                     b.Property<DateOnly?>("EffectiveDate")
                         .HasColumnType("date");
@@ -209,13 +228,27 @@ namespace Ecp.Contracts.Persistence.Migrations
                     b.Property<bool>("LegalReviewRequired")
                         .HasColumnType("bit");
 
+                    b.Property<string>("LockReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LockedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTime?>("LockedUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid?>("MigrationBatchId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int?>("NoticePeriodDays")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PredecessorContractId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("RecordLocked")
@@ -231,6 +264,9 @@ namespace Ecp.Contracts.Persistence.Migrations
 
                     b.Property<DateTime?>("RegisteredDateUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<int?>("ReminderLeadDays")
+                        .HasColumnType("int");
 
                     b.Property<DateOnly?>("ReviewDate")
                         .HasColumnType("date");
@@ -275,11 +311,17 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid?>("SuccessorContractId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("SupplierId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UnlockExpiresUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("UpdatedBy")
                         .IsRequired()
@@ -288,6 +330,10 @@ namespace Ecp.Contracts.Persistence.Migrations
 
                     b.Property<DateTime>("UpdatedUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("WorkflowRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
 
@@ -298,11 +344,21 @@ namespace Ecp.Contracts.Persistence.Migrations
 
                     b.HasIndex("TenantId", "CategoryId");
 
+                    b.HasIndex("TenantId", "EndDate");
+
                     b.HasIndex("TenantId", "MigrationBatchId");
+
+                    b.HasIndex("TenantId", "PredecessorContractId");
+
+                    b.HasIndex("TenantId", "ReviewDate");
+
+                    b.HasIndex("TenantId", "SuccessorContractId");
 
                     b.HasIndex("TenantId", "SupplierId");
 
                     b.HasIndex("TenantId", "OrganisationId", "CategoryId");
+
+                    b.HasIndex("TenantId", "OrganisationId", "Status");
 
                     b.HasIndex("TenantId", "OrganisationId", "SourceSystem", "SourceRecordId")
                         .IsUnique()

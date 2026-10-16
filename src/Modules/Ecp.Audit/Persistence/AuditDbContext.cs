@@ -27,6 +27,7 @@ public sealed class AuditDbContext(DbContextOptions<AuditDbContext> options, DbC
             e.Property(x => x.CorrelationId).HasMaxLength(100);
             e.Property(x => x.Source).HasMaxLength(50);
             e.Property(x => x.Reason).HasMaxLength(2000);
+            e.Property(x => x.Classification).HasMaxLength(50);
             e.Property(x => x.PreviousHash).HasMaxLength(64).IsFixedLength();
             e.Property(x => x.Hash).HasMaxLength(64).IsFixedLength();
             e.HasIndex(x => new { x.TenantId, x.Sequence }).IsUnique();

@@ -47,31 +47,52 @@ public sealed class ForbiddenException(string message) : Exception(message);
 /// <summary>The resource does not exist for this caller: absent, in another tenant, or outside the caller's scopes (HTTP 404, no existence oracle).</summary>
 public sealed class ResourceNotFoundException(string message = "The resource was not found.") : Exception(message);
 
-/// <summary>Ordered information-classification levels (lowest first). The default scale is a placeholder until the owner confirms the final set (Q-06); a tenant can configure its own.</summary>
+/// <summary>
+/// Ordered information-classification levels (lowest first). A level may be marked <em>privileged</em>: a record at that level is visible only to a person whose ceiling reaches it
+/// <em>and</em> who holds an explicit privileged-access grant (the permission <c>records.read_privileged</c> or an explicit flag on the assignment). A role alone never opens it.
+/// The default scale ships the five confirmed levels; a tenant can configure its own.
+/// </summary>
 public sealed class ClassificationScale
 {
-    public static readonly ClassificationScale Default = new(["Public", "Internal", "Confidential", "Restricted"], "Internal");
+    public const string LegalPrivilegedLevel = "Legal Privileged";
+
+    public static readonly ClassificationScale Default = new(["Public", "Internal", "Confidential", "Restricted", LegalPrivilegedLevel], "Internal", [LegalPrivilegedLevel]);
 
     private readonly string[] _levels;
+    private readonly HashSet<string> _privileged;
 
-    public ClassificationScale(IEnumerable<string> orderedLevels, string defaultLevel)
+    public ClassificationScale(IEnumerable<string> orderedLevels, string defaultLevel, IEnumerable<string>? privilegedLevels = null)
     {
         _levels = orderedLevels.Select(l => Guard.NotBlank(l, "Classification level", 50)).ToArray();
         if (_levels.Length < 1 || _levels.Distinct(StringComparer.OrdinalIgnoreCase).Count() != _levels.Length)
             throw new DomainException("invalid_classification_scale", "Classification levels must be a non-empty list of distinct names.");
         DefaultLevel = _levels.FirstOrDefault(l => l.Equals(defaultLevel, StringComparison.OrdinalIgnoreCase))
             ?? throw new DomainException("invalid_classification_scale", "The default classification must be one of the levels.");
+        _privileged = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in privilegedLevels ?? [])
+        {
+            var level = _levels.FirstOrDefault(l => l.Equals(p, StringComparison.OrdinalIgnoreCase))
+                ?? throw new DomainException("invalid_classification_scale", $"The privileged level '{p}' is not one of the levels.");
+            _privileged.Add(level);
+        }
     }
 
     public IReadOnlyList<string> Levels => _levels;
     public string DefaultLevel { get; }
+    public IReadOnlyCollection<string> PrivilegedLevels => _privileged;
+
+    /// <summary>True for a level whose records need an explicit privileged-access grant in addition to a sufficient ceiling.</summary>
+    public bool IsPrivileged(string? level) => level is not null && _privileged.Contains(level);
 
     /// <summary>Position of a level (0 = lowest), or -1 when the level is not in the scale. Unknown levels never satisfy a ceiling.</summary>
     public int Rank(string? level) => level is null ? -1 : Array.FindIndex(_levels, l => l.Equals(level, StringComparison.OrdinalIgnoreCase));
 
     public bool IsKnown(string? level) => Rank(level) >= 0;
 
-    /// <summary>True when a record of <paramref name="recordLevel"/> may be seen under <paramref name="ceiling"/>.</summary>
+    /// <summary>The canonical spelling of a level in this scale, or null when it is unknown.</summary>
+    public string? Canonical(string? level) => Rank(level) is var r and >= 0 ? _levels[r] : null;
+
+    /// <summary>True when a record of <paramref name="recordLevel"/> may be seen under <paramref name="ceiling"/> (privileged levels additionally need a grant, decided by the caller).</summary>
     public bool Permits(string? ceiling, string? recordLevel)
     {
         var c = Rank(ceiling); var r = Rank(recordLevel);
@@ -84,4 +105,7 @@ public sealed class ClassificationScale
         var c = Rank(ceiling);
         return c < 0 ? [] : _levels.Take(c + 1).ToArray();
     }
+
+    /// <summary>The ceilings only a Tenant Administrator may grant: the Restricted level and everything above it (falls back to the top level when the scale has no Restricted level).</summary>
+    public int HighCeilingThreshold { get { var r = Rank("Restricted"); return r >= 0 ? r : _levels.Length - 1; } }
 }

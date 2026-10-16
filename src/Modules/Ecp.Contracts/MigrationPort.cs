@@ -164,7 +164,7 @@ internal sealed class ContractMigrationPort(
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("agreement_reference_in_use", "That agreement reference or source record is already in use."); }
             // The batch id, source record id, source value and acting administrator are on the audit event (decision record, Registered Date exception).
             audit.Record(new AuditEntry(m.LockAsLegacy ? "migration.contract.legacy_loaded" : "migration.contract.created", nameof(Contract), contract.Id.ToString(),
-                OrganisationId: m.OrganisationId, MigrationBatchId: m.BatchId,
+                OrganisationId: m.OrganisationId, Classification: contract.Classification, MigrationBatchId: m.BatchId,
                 NewValuesJson: AuditJson.Of(new
                 {
                     contract.AgreementReference, contract.SourceAgreementReference, contract.Status, contract.SourceStatus, contract.SourceSystem, contract.SourceRecordId, contract.IsLegacyLoad,
@@ -186,7 +186,7 @@ internal sealed class ContractMigrationPort(
             contract.ApplyMigratedFields(fields, lockedOverwriteAuthorised, by, clock.UtcNow);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload and try again."); }
-            audit.Record(new AuditEntry("migration.contract.updated", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, MigrationBatchId: batchId,
+            audit.Record(new AuditEntry("migration.contract.updated", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification, Reason: reason, MigrationBatchId: batchId,
                 OldValuesJson: AuditJson.Of(before), NewValuesJson: AuditJson.Of(contract.CaptureFields(fields.Keys))));
             return new ContractFieldUpdate(before, contract.UpdatedUtc);
         }, ct);
@@ -222,7 +222,7 @@ internal sealed class ContractMigrationPort(
             if (contract is null) return; // already gone: rollback is idempotent. A record of another batch is never selected.
             db.Contracts.Remove(contract);
             await db.SaveChangesAsync(c);
-            audit.Record(new AuditEntry("migration.contract.removed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, MigrationBatchId: batchId,
+            audit.Record(new AuditEntry("migration.contract.removed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification, Reason: reason, MigrationBatchId: batchId,
                 OldValuesJson: AuditJson.Of(new { contract.AgreementReference, contract.SourceRecordId, contract.Status })));
         }, ct);
 
@@ -233,7 +233,7 @@ internal sealed class ContractMigrationPort(
             if (contract is null || contract.IsArchived) return;
             contract.Archive(reason, batchId, actor.ActorId ?? "system", clock.UtcNow);
             await db.SaveChangesAsync(c);
-            audit.Record(new AuditEntry("migration.contract.archived", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, MigrationBatchId: batchId));
+            audit.Record(new AuditEntry("migration.contract.archived", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification, Reason: reason, MigrationBatchId: batchId));
         }, ct);
 
     public Task<int> CountContractsOfSupplierAsync(Guid supplierId, IReadOnlyCollection<Guid>? excluding = null, CancellationToken ct = default)

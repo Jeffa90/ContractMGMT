@@ -246,9 +246,9 @@ public class OnboardingSimulatorTests
         var preview = OnboardingSimulator.Run(d, Scale);
         var row = Assert.Single(preview.Rows);
         Assert.True(row.Visible > 0 && row.Visible < row.Total);
-        // 3 categories x 2 sites x 2 classification samples (lowest, highest) = 12; packaging and its child at the lowest level = 2 x 2 sites = 4 visible
-        Assert.Equal(12, row.Total); Assert.Equal(4, row.Visible);
-        Assert.All(row.HiddenExamples, h => Assert.True(h.Contains("ENERGY") || h.Contains("Restricted")));
+        // 3 categories x 2 sites x 3 classification samples (lowest, highest ordinary, privileged) = 18; packaging and its child at the lowest level = 2 x 2 sites = 4 visible
+        Assert.Equal(18, row.Total); Assert.Equal(4, row.Visible);
+        Assert.All(row.HiddenExamples, h => Assert.True(h.Contains("ENERGY") || h.Contains("Restricted") || h.Contains("Privileged")));
     }
 
     [Fact]
@@ -261,8 +261,8 @@ public class OnboardingSimulatorTests
         };
         var rows = OnboardingSimulator.Run(d, Scale).Rows;
         var low = rows.Single(r => r.Who.StartsWith("low")); var high = rows.Single(r => r.Who.StartsWith("high"));
-        Assert.Equal(high.Total, high.Visible);
-        Assert.True(low.Visible < low.Total);                    // the highest-classification sample stays hidden although it is inside the person's scope
+        Assert.Equal(high.Total - 1, high.Visible);              // everything but the privileged sample: a ceiling alone never opens a privileged record
+        Assert.True(low.Visible < high.Visible);                 // the highest ordinary sample stays hidden under a lower ceiling although it is inside the person's scope
     }
 
     [Fact]

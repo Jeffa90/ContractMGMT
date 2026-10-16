@@ -267,7 +267,7 @@ internal sealed class ClassificationPolicyKind : IConfigurationKind
         try
         {
             var policy = ClassificationPolicyDocument.Parse(contentJson);
-            _ = new ClassificationScale(policy.Levels, policy.DefaultLevel);
+            _ = new ClassificationScale(policy.Levels, policy.DefaultLevel, policy.PrivilegedLevels);
             if (policy.Levels.Count < 2) messages.Add(new(ValidationSeverity.Warning, "$.levels", "few_levels", "A single classification level cannot restrict anything."));
         }
         catch (DomainException ex) { messages.Add(new(ValidationSeverity.Error, "$", ex.Code, ex.Message)); }
@@ -277,8 +277,11 @@ internal sealed class ClassificationPolicyKind : IConfigurationKind
     public Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;
 }
 
-public sealed record ClassificationPolicyDocument(IReadOnlyList<string> Levels, string DefaultLevel)
+public sealed record ClassificationPolicyDocument(IReadOnlyList<string> Levels, string DefaultLevel, IReadOnlyList<string>? PrivilegedLevelsOrNull = null)
 {
+    /// <summary>The levels that need an explicit privileged-access grant. A policy that does not say defaults to the Legal Privileged level when it has one.</summary>
+    public IReadOnlyList<string> PrivilegedLevels => PrivilegedLevelsOrNull ?? Levels.Where(l => l.Equals(ClassificationScale.LegalPrivilegedLevel, StringComparison.OrdinalIgnoreCase)).ToList();
+
     public static ClassificationPolicyDocument Parse(string json)
     {
         try
@@ -287,12 +290,13 @@ public sealed record ClassificationPolicyDocument(IReadOnlyList<string> Levels, 
             var root = doc.RootElement;
             var levels = root.TryGetProperty("levels", out var l) && l.ValueKind == JsonValueKind.Array ? l.EnumerateArray().Select(x => x.GetString() ?? "").ToList() : [];
             var def = root.TryGetProperty("defaultLevel", out var d) ? d.GetString() ?? "" : "";
-            return new ClassificationPolicyDocument(levels, def);
+            List<string>? privileged = root.TryGetProperty("privilegedLevels", out var p) && p.ValueKind == JsonValueKind.Array ? p.EnumerateArray().Select(x => x.GetString() ?? "").ToList() : null;
+            return new ClassificationPolicyDocument(levels, def, privileged);
         }
         catch (JsonException) { throw new DomainException("invalid_json", "The classification policy is not valid JSON."); }
     }
 
-    public string ToJson() => JsonSerializer.Serialize(new { levels = Levels, defaultLevel = DefaultLevel });
+    public string ToJson() => JsonSerializer.Serialize(new { levels = Levels, defaultLevel = DefaultLevel, privilegedLevels = PrivilegedLevels });
 }
 
 /// <summary>Reads the tenant's published classification policy; falls back to the placeholder scale until one is published.</summary>
@@ -307,7 +311,7 @@ internal sealed class ConfiguredClassificationScaleProvider(ConfigurationDbConte
             .OrderByDescending(r => r.Number).Select(r => r.ContentJson).FirstOrDefaultAsync(ct);
         if (json is null) return _cached = ClassificationScale.Default;
         var policy = ClassificationPolicyDocument.Parse(json);
-        return _cached = new ClassificationScale(policy.Levels, policy.DefaultLevel);
+        return _cached = new ClassificationScale(policy.Levels, policy.DefaultLevel, policy.PrivilegedLevels);
     }
 }
 

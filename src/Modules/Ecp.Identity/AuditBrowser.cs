@@ -63,6 +63,8 @@ internal sealed class AuditBrowser(IAuditEventSource eventSource, IAccessService
         var adminOrgs = adminGrants.Any(g => g.OrganisationIds is null) ? null : adminGrants.SelectMany(g => g.OrganisationIds!).Distinct().ToArray();
         var hasRead = readGrants.Count > 0; var hasAdmin = adminGrants.Count > 0;
         var readOrgList = readOrgs ?? [];
+        // An event about a classified record is visible only where the caller's grant reaches that classification (privileged levels need their explicit grant). Events that describe no record carry none.
+        var readClasses = readGrants.SelectMany(g => g.AllowedClassifications).Distinct().ToArray();
         var adminOrgList = adminOrgs ?? [];
         var readAllOrgs = readOrgs is null; var adminAllOrgs = adminOrgs is null;
 
@@ -70,7 +72,7 @@ internal sealed class AuditBrowser(IAuditEventSource eventSource, IAccessService
         // OR (audit.read_admin: administrative events of the caller's organisations). The prefix list mirrors AdministrativePrefixes;
         // it is written out so every database provider translates it (a unit test keeps the two in step).
         query = query.Where(e =>
-            (hasRead && (readAllOrgs || (e.OrganisationId != null && readOrgList.Contains(e.OrganisationId.Value))))
+            (hasRead && (readAllOrgs || (e.OrganisationId != null && readOrgList.Contains(e.OrganisationId.Value))) && (e.Classification == null || readClasses.Contains(e.Classification)))
             || (hasAdmin
                 && (e.Action.StartsWith("role.") || e.Action.StartsWith("user.") || e.Action.StartsWith("rolemapping.") || e.Action.StartsWith("identityprovider.")
                     || e.Action.StartsWith("structure.") || e.Action.StartsWith("organisation.") || e.Action.StartsWith("tenant.") || e.Action.StartsWith("config.")

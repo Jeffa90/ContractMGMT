@@ -32,6 +32,8 @@ public sealed class AuditEvent : ITenantOwned
     public string? Reason { get; private set; }
     public string? OldValuesJson { get; private set; }
     public string? NewValuesJson { get; private set; }
+    /// <summary>The classification of the record this event describes, when it describes one. Audit evidence is filtered by it exactly as the record itself is.</summary>
+    public string? Classification { get; private set; }
     public string PreviousHash { get; private set; } = GenesisHash;
     public string Hash { get; private set; } = "";
 
@@ -41,11 +43,11 @@ public sealed class AuditEvent : ITenantOwned
         {
             Id = Ids.New(), TenantId = tenantId, OrganisationId = entry.OrganisationId, Sequence = sequence,
             OccurredUtc = Guard.Utc(occurredUtc, nameof(occurredUtc)), ActorType = actor.Type.ToString(), ActorId = actor.ActorId,
-            ElevationId = entry.ElevationId, Action = Guard.NotBlank(entry.Action, "Action", 200),
+            ElevationId = entry.ElevationId ?? actor.ElevationId, Action = Guard.NotBlank(entry.Action, "Action", 200),
             EntityType = Guard.NotBlank(entry.EntityType, "EntityType", 200), EntityId = Guard.NotBlank(entry.EntityId, "EntityId", 200),
             Outcome = entry.Outcome.ToString(), CorrelationId = actor.CorrelationId, Source = actor.Source,
             MigrationBatchId = entry.MigrationBatchId, ConfigReleaseId = entry.ConfigReleaseId, Reason = entry.Reason,
-            OldValuesJson = entry.OldValuesJson, NewValuesJson = entry.NewValuesJson, PreviousHash = previousHash
+            OldValuesJson = entry.OldValuesJson, NewValuesJson = entry.NewValuesJson, Classification = entry.Classification, PreviousHash = previousHash
         };
         e.Hash = AuditHasher.Compute(e, previousHash);
         return e;
@@ -59,12 +61,14 @@ public static class AuditHasher
     {
         static string F(string? s) => s is null ? "-" : $"{s.Length}:{s}";
         static string G(Guid? g) => F(g?.ToString("N"));
+        // The classification joins the canonical form only when present, so events written before it existed keep the hash they were sealed with.
+        var tail = e.Classification is null ? "" : "|" + F(e.Classification);
         return string.Join('|',
             F(e.TenantId.ToString("N")), F(e.Sequence.ToString(CultureInfo.InvariantCulture)),
             F(e.OccurredUtc.ToString("yyyy-MM-ddTHH:mm:ss.fffffff", CultureInfo.InvariantCulture)),
             F(e.ActorType), F(e.ActorId), G(e.ElevationId), F(e.Action), F(e.EntityType), F(e.EntityId), F(e.Outcome),
             F(e.CorrelationId), F(e.Source), G(e.OrganisationId), G(e.MigrationBatchId), G(e.ConfigReleaseId),
-            F(e.Reason), F(e.OldValuesJson), F(e.NewValuesJson));
+            F(e.Reason), F(e.OldValuesJson), F(e.NewValuesJson)) + tail;
     }
 
     public static string Compute(AuditEvent e, string previousHash) => Hashing.Sha256Hex(Canonical(e) + "|" + previousHash);

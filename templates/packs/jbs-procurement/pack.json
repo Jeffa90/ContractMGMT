@@ -13,7 +13,7 @@
     "timeZoneId": "Australia/Brisbane",
     "currencyCode": "AUD",
     "referencePrefix": "JBSAUS",
-    "classification": { "levels": ["Public", "Internal", "Confidential", "Restricted"], "defaultLevel": "Internal" },
+    "classification": { "levels": ["Public", "Internal", "Confidential", "Restricted", "Legal Privileged"], "defaultLevel": "Internal", "privilegedLevels": ["Legal Privileged"] },
     "contractTypes": [
       { "code": "SUPPLY", "name": "Supply Agreement" },
       { "code": "SERVICES", "name": "Services Agreement" },

@@ -13,16 +13,32 @@ namespace Ecp.Contracts;
 
 public sealed record ContractListItem(
     Guid Id, Guid OrganisationId, string AgreementReference, string Title, string SupplierName, string CategoryName, string Status,
-    string Classification, bool RecordLocked);
+    string Classification, bool RecordLocked, Guid? PredecessorContractId = null, Guid? SuccessorContractId = null, DateOnly? ReviewDate = null, DateOnly? EndDate = null,
+    string? ExtensionType = null, bool CriticalNotice = false, Guid CategoryId = default);
 
-public sealed record ContractFilter(string? Search = null, string? Status = null, Guid? CategoryId = null, Guid? SupplierId = null, int Page = 1, int PageSize = 25);
+/// <summary>
+/// Filters for the register and the operational views. Every one is applied on top of the caller's scopes and classification ceiling, never instead of them.
+/// <see cref="StatusIn"/> takes workflow state codes (the lifecycle module supplies them from the workflow definition).
+/// </summary>
+public sealed record ContractFilter(string? Search = null, string? Status = null, Guid? CategoryId = null, Guid? SupplierId = null, int Page = 1, int PageSize = 25,
+    IReadOnlyList<string>? StatusIn = null, DateOnly? EndsOnOrBefore = null, DateOnly? EndsOnOrAfter = null, DateOnly? ReviewOnOrBefore = null, bool? CriticalNotice = null, bool OwnedByMe = false,
+    bool? HasSuccessor = null, bool? IsRenewal = null, string? Classification = null, IReadOnlyList<string>? ExcludeExtensionTypes = null, IReadOnlyList<Guid>? Ids = null);
 
 public sealed record ContractDetails(
     Guid Id, Guid OrganisationId, string AgreementReference, string Title, string? Description, Guid SupplierId, string SupplierName, Guid CategoryId,
     string CategoryName, Guid? BusinessUnitId, Guid? SiteId, string Status, bool RecordLocked, string Classification, string? CurrencyCode, decimal? EstimatedValue,
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? ReviewDate, DateOnly? EndDate, DateTime? RegisteredDateUtc, string? RegisteredBy,
     bool IsLegacyLoad, DateTime CreatedUtc, string CreatedBy, bool CanEdit,
-    ContractProvenanceInfo? Provenance = null, bool IsArchived = false, string? ArchiveReason = null);
+    ContractProvenanceInfo? Provenance = null, bool IsArchived = false, string? ArchiveReason = null,
+    ContractProtection? Protection = null, ContractReminderInfo? Reminders = null, ContractRenewalInfo? Renewal = null, bool LegalReviewRequired = false, string? ExtensionType = null);
+
+/// <summary>Why a record cannot be edited, in the words shown on the contract: locked (and by what), content-frozen by its workflow state, or open under an audited emergency unlock.</summary>
+public sealed record ContractProtection(bool IsLocked, string? LockReason, string? LockedBy, DateTime? LockedUtc, bool ContentFrozen, string DocumentPolicy, Guid? ActiveUnlockId, DateTime? UnlockExpiresUtc, string? WorkflowRef);
+
+public sealed record ContractReminderInfo(int? LeadDays, int? NoticePeriodDays, bool CriticalNotice);
+
+/// <summary>Renewal links. A reference is shown only when the caller may read the linked agreement.</summary>
+public sealed record ContractRenewalInfo(Guid? PredecessorId, string? PredecessorReference, Guid? SuccessorId, string? SuccessorReference);
 
 /// <summary>Where a migrated record came from: shown on the contract so a user can always trace it back to the source system and the batch that loaded it.</summary>
 public sealed record ContractProvenanceInfo(
@@ -47,6 +63,17 @@ public interface ISecuredContractService
     Task<ResourceDescriptor> DescribeAsync(Guid id, CancellationToken ct = default);
     /// <summary>Counts visible contracts by status (for the home page).</summary>
     Task<IReadOnlyDictionary<string, int>> CountByStatusAsync(CancellationToken ct = default);
+    /// <summary>Counts the contracts a filter matches among those the caller may read (never more than they could list).</summary>
+    Task<int> CountAsync(ContractFilter filter, CancellationToken ct = default);
+    /// <summary>
+    /// Changes the classification. Raising is open to a record's editors (but never above the caller's own access); lowering needs <c>classification.lower</c> and a reason (at least ten characters).
+    /// A locked record can be reclassified only under an open unlock. Documents below the new level are raised with it. Audited with the old and new level.
+    /// </summary>
+    Task ChangeClassificationAsync(Guid id, string newClassification, string? reason, CancellationToken ct = default);
+    /// <summary>Updates the reminder lead time, notice period and Critical Notice flag of an editable record the caller owns.</summary>
+    Task UpdateReminderSettingsAsync(Guid id, int? leadDays, int? noticePeriodDays, bool criticalNotice, CancellationToken ct = default);
+    /// <summary>Exports the contracts the filter matches as CSV: the same scopes and classification as the list, formula text neutralised. Needs <c>records.export</c>; the export is audited.</summary>
+    Task<string> ExportCsvAsync(ContractFilter filter, CancellationToken ct = default);
 }
 
 public interface ISecuredSupplierService
@@ -144,30 +171,56 @@ internal sealed class ContractAccessContext(ContractsDbContext db, IOrganisation
 
 internal sealed class SecuredContractService(
     ContractsDbContext db, IAccessService access, ContractAccessContext context, IContractService contracts, IUnitOfWork uow,
-    ReferenceAllocator allocator, IOrganisationStructureService structure, ITenantContext tenant, IClock clock, ICutoverFreeze freeze) : ISecuredContractService
+    ReferenceAllocator allocator, IOrganisationStructureService structure, ITenantContext tenant, IClock clock, ICutoverFreeze freeze,
+    IAuditWriter audit, Ecp.Documents.IDocumentClassification documentClassification, CurrentUser currentUser, IContractLifecyclePort port) : ISecuredContractService
 {
-    public async Task<PagedResult<ContractListItem>> ListAsync(ContractFilter f, CancellationToken ct = default)
+    private async Task<IQueryable<Contract>> FilteredAsync(ContractFilter f, CancellationToken ct)
     {
         var predicate = await VisiblePredicateAsync(ct);
         var query = db.Contracts.AsNoTracking().Where(predicate).Where(c => !c.IsArchived);
         if (!string.IsNullOrWhiteSpace(f.Status)) query = query.Where(c => c.Status == f.Status);
+        if (f.StatusIn is { Count: > 0 } states) { var set = states.ToArray(); query = query.Where(c => set.Contains(c.Status)); }
+        if (f.Ids is { } ids) { var set = ids.ToArray(); query = query.Where(c => set.Contains(c.Id)); }
         if (f.CategoryId is { } cat) query = query.Where(c => c.CategoryId == cat);
         if (f.SupplierId is { } sup) query = query.Where(c => c.SupplierId == sup);
+        if (!string.IsNullOrWhiteSpace(f.Classification)) { var level = f.Classification.Trim(); query = query.Where(c => c.Classification == level); }
+        if (f.EndsOnOrBefore is { } endBefore) query = query.Where(c => c.EndDate != null && c.EndDate <= endBefore);
+        if (f.EndsOnOrAfter is { } endAfter) query = query.Where(c => c.EndDate != null && c.EndDate >= endAfter);
+        if (f.ReviewOnOrBefore is { } reviewBefore) query = query.Where(c => c.ReviewDate != null && c.ReviewDate <= reviewBefore);
+        if (f.CriticalNotice is { } critical) query = query.Where(c => c.CriticalNotice == critical);
+        if (f.HasSuccessor is { } hasSuccessor) query = hasSuccessor ? query.Where(c => c.SuccessorContractId != null) : query.Where(c => c.SuccessorContractId == null);
+        if (f.IsRenewal is { } isRenewal) query = isRenewal ? query.Where(c => c.PredecessorContractId != null) : query.Where(c => c.PredecessorContractId == null);
+        if (f.ExcludeExtensionTypes is { Count: > 0 } excluded) { var set = excluded.ToArray(); query = query.Where(c => c.ExtensionType == null || !set.Contains(c.ExtensionType)); }
+        if (f.OwnedByMe)
+        {
+            var ctx = await context.ListContextAsync(access.CurrentUserId, ct);
+            var mine = ctx.OwnedCategoryIds.SelectMany(id => ctx.DescendantsOf.TryGetValue(id, out var d) ? d : [id]).Distinct().ToArray();
+            query = query.Where(c => mine.Contains(c.CategoryId));
+        }
         if (!string.IsNullOrWhiteSpace(f.Search))
         {
             var term = f.Search.Trim();
             query = query.Where(c => c.AgreementReference.Contains(term.ToUpper()) || c.ContractTitle.Contains(term));
         }
+        return query;
+    }
+
+    public async Task<PagedResult<ContractListItem>> ListAsync(ContractFilter f, CancellationToken ct = default)
+    {
+        var query = await FilteredAsync(f, ct);
         var total = await query.CountAsync(ct);
         var page = Math.Max(1, f.Page); var size = Math.Clamp(f.PageSize, 1, 200);
         var items = await (from c in query
                            join s in db.Suppliers.AsNoTracking() on new { c.TenantId, Id = c.SupplierId } equals new { s.TenantId, s.Id }
                            join g in db.Categories.AsNoTracking() on new { c.TenantId, Id = c.CategoryId } equals new { g.TenantId, g.Id }
                            orderby c.AgreementReference
-                           select new ContractListItem(c.Id, c.OrganisationId, c.AgreementReference, c.ContractTitle, s.Name, g.Name, c.Status, c.Classification, c.RecordLocked))
+                           select new ContractListItem(c.Id, c.OrganisationId, c.AgreementReference, c.ContractTitle, s.Name, g.Name, c.Status, c.Classification, c.RecordLocked,
+                               c.PredecessorContractId, c.SuccessorContractId, c.ReviewDate, c.EndDate, c.ExtensionType, c.CriticalNotice, c.CategoryId))
             .Skip((page - 1) * size).Take(size).ToListAsync(ct);
         return new PagedResult<ContractListItem>(items, total, page, size);
     }
+
+    public async Task<int> CountAsync(ContractFilter f, CancellationToken ct = default) => await (await FilteredAsync(f, ct)).CountAsync(ct);
 
     public async Task<IReadOnlyDictionary<string, int>> CountByStatusAsync(CancellationToken ct = default)
     {
@@ -190,13 +243,113 @@ internal sealed class SecuredContractService(
         await access.RequireAsync("contracts.read", descriptor, ct);
         var supplier = await db.Suppliers.AsNoTracking().Where(s => s.Id == c.SupplierId).Select(s => s.Name).FirstOrDefaultAsync(ct) ?? "";
         var category = await db.Categories.AsNoTracking().Where(s => s.Id == c.CategoryId).Select(s => s.Name).FirstOrDefaultAsync(ct) ?? "";
-        var canEdit = (await access.CheckSilentAsync("contracts.edit_owned", descriptor, ct)).Allowed;
+        var canEdit = !c.ContentFrozen && (await access.CheckSilentAsync("contracts.edit_owned", descriptor, ct)).Allowed;
+        // A renewal link names the other agreement only when the caller could open it themselves.
+        var linked = new[] { c.PredecessorContractId, c.SuccessorContractId }.Where(x => x.HasValue).Select(x => x!.Value).ToArray();
+        var visibleLinks = linked.Length == 0 ? new Dictionary<Guid, string>()
+            : await db.Contracts.AsNoTracking().Where(await VisiblePredicateAsync(ct)).Where(x => linked.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.AgreementReference, ct);
+        string? Ref(Guid? link) => link is { } l && visibleLinks.TryGetValue(l, out var r) ? r : null;
+        var now = clock.UtcNow;
         return new ContractDetails(c.Id, c.OrganisationId, c.AgreementReference, c.ContractTitle, c.Description, c.SupplierId, supplier, c.CategoryId, category,
             c.BusinessUnitId, c.SiteId, c.Status, c.RecordLocked, c.Classification, c.CurrencyCode, c.EstimatedValue, c.StartDate, c.EffectiveDate, c.ReviewDate,
             c.EndDate, c.RegisteredDateUtc, c.RegisteredBy, c.IsLegacyLoad, c.CreatedUtc, c.CreatedBy, canEdit,
             c.SourceRecordId is null && c.MigrationBatchId is null ? null : new ContractProvenanceInfo(c.SourceSystem, c.SourceRecordId, c.SourceAgreementReference, c.SourceStatus,
                 c.SourceExtractedUtc, c.MigrationBatchId, c.RegisteredDateProvenance?.ToString(), c.SourceRegisteredValue),
-            c.IsArchived, c.ArchiveReason);
+            c.IsArchived, c.ArchiveReason,
+            new ContractProtection(c.RecordLocked, c.LockReason, c.LockedBy, c.LockedUtc, c.ContentFrozen, c.DocumentPolicy, c.IsUnlockedAt(now) ? c.ActiveUnlockId : null, c.IsUnlockedAt(now) ? c.UnlockExpiresUtc : null, c.WorkflowRef),
+            new ContractReminderInfo(c.ReminderLeadDays, c.NoticePeriodDays, c.CriticalNotice),
+            new ContractRenewalInfo(c.PredecessorContractId, Ref(c.PredecessorContractId), c.SuccessorContractId, Ref(c.SuccessorContractId)), c.LegalReviewRequired, c.ExtensionType);
+    }
+
+    public async Task ChangeClassificationAsync(Guid id, string newClassification, string? reason, CancellationToken ct = default)
+    {
+        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new ResourceNotFoundException();
+        var descriptor = await context.DescribeAsync(c, ct);
+        await access.RequireAsync("contracts.read", descriptor, ct); // an unreadable record does not exist for the caller
+        var scale = await access.ClassificationScaleAsync(ct);
+        var target = scale.Canonical(newClassification) ?? throw new DomainException("invalid_classification", $"Classification '{newClassification}' is not recognised.");
+        var current = scale.Canonical(c.Classification) ?? c.Classification;
+        if (string.Equals(target, current, StringComparison.Ordinal)) return;
+        var lowering = scale.Rank(target) < scale.Rank(current);
+
+        // The caller cannot classify a record beyond their own access: they would be hiding it from themselves, or handing out a level they cannot hold.
+        if (!(await access.CheckSilentAsync("contracts.read", descriptor with { Classification = target }, ct)).Allowed)
+            throw new ForbiddenException("You cannot set a classification above your own access.");
+
+        string why = (reason ?? "").Trim();
+        if (lowering)
+        {
+            await access.RequireAsync("classification.lower", descriptor, ct);
+            if (why.Length < 10) throw new DomainException("reason_required", "Lowering a classification needs a reason (at least ten characters).");
+        }
+        else
+        {
+            // Raising is open to those who may edit the record, and to those who may lower classifications (administrators).
+            var edit = await access.CheckSilentAsync("contracts.edit_owned", descriptor, ct);
+            if (!edit.Allowed && !(await access.CheckSilentAsync("classification.lower", descriptor, ct)).Allowed) await access.RequireAsync("contracts.edit_owned", descriptor, ct);
+        }
+        // A locked record is reclassified only under an open unlock ("Admin unlock only"); the unlock service passes through here with its own authority.
+        var now = clock.UtcNow;
+        if (c.RecordLocked && !c.IsUnlockedAt(now)) throw new DomainException("record_locked", "This record is locked. Reclassifying it needs an audited emergency unlock.");
+
+        var actorLabel = currentUser.UserId?.ToString() ?? "system";
+        await uow.ExecuteAsync(async cx =>
+        {
+            var tracked = await db.Contracts.FirstAsync(x => x.Id == id, cx);
+            var previous = tracked.SetClassification(target, actorLabel, now);
+            try { await db.SaveChangesAsync(cx); }
+            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload it and try again."); }
+            // The event is classified at the higher level, so it is as hard to see as the more sensitive of the two states of the record.
+            var eventLevel = scale.Rank(target) >= scale.Rank(previous) ? target : previous;
+            audit.Record(new AuditEntry("contract.classification_changed", nameof(Contract), id.ToString(), OrganisationId: tracked.OrganisationId, Reason: lowering ? why : (why.Length == 0 ? null : why),
+                Classification: eventLevel, OldValuesJson: AuditJson.Of(new { classification = previous }), NewValuesJson: AuditJson.Of(new { classification = target, direction = lowering ? "lowered" : "raised" })));
+            if (!lowering)
+            {
+                var below = scale.Levels.Where(l => scale.Rank(l) < scale.Rank(target)).ToArray();
+                await documentClassification.RaiseContractDocumentsAsync(id, target, below, $"Contract raised to {target}", cx);
+            }
+        }, ct);
+    }
+
+    public async Task UpdateReminderSettingsAsync(Guid id, int? leadDays, int? noticePeriodDays, bool criticalNotice, CancellationToken ct = default)
+    {
+        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new ResourceNotFoundException();
+        var descriptor = await context.DescribeAsync(c, ct);
+        await access.RequireAsync("contracts.read", descriptor, ct);
+        await access.RequireAsync("contracts.edit_owned", descriptor, ct);
+        if (c.ContentFrozen) throw new DomainException("content_frozen", "The contract is in a stage where its content is frozen.");
+        await port.SetReminderSettingsAsync(id, leadDays, noticePeriodDays, criticalNotice, currentUser.UserId?.ToString() ?? "system", ct);
+    }
+
+    public async Task<string> ExportCsvAsync(ContractFilter filter, CancellationToken ct = default)
+    {
+        // Export honours exactly the list's scopes and classification, and additionally needs the export permission within them.
+        var grants = await access.GrantsAsync("records.export", ct);
+        if (grants.Count == 0) throw new ForbiddenException("You cannot export records.");
+        var visible = await FilteredAsync(filter with { Page = 1 }, ct);
+        var exportable = ContractAccessFilter.Build(grants, await context.ListContextAsync(access.CurrentUserId, ct));
+        var rows = await (from c in visible.Where(exportable)
+                          join s in db.Suppliers.AsNoTracking() on new { c.TenantId, Id = c.SupplierId } equals new { s.TenantId, s.Id }
+                          join g in db.Categories.AsNoTracking() on new { c.TenantId, Id = c.CategoryId } equals new { g.TenantId, g.Id }
+                          orderby c.AgreementReference
+                          select new { c.AgreementReference, c.ContractTitle, Supplier = s.Name, Category = g.Name, c.Status, c.Classification, c.CurrencyCode, c.EstimatedValue, c.StartDate, c.EffectiveDate, c.ReviewDate, c.EndDate })
+            .Take(10000).ToListAsync(ct);
+        var sb = new System.Text.StringBuilder();
+        sb.Append("AgreementReference,ContractTitle,Supplier,Category,Status,Classification,Currency,EstimatedValue,StartDate,EffectiveDate,ReviewDate,EndDate\r\n");
+        foreach (var r in rows)
+            sb.Append(string.Join(',', new[] { r.AgreementReference, r.ContractTitle, r.Supplier, r.Category, r.Status, r.Classification, r.CurrencyCode ?? "",
+                r.EstimatedValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "", r.StartDate?.ToString("yyyy-MM-dd") ?? "", r.EffectiveDate?.ToString("yyyy-MM-dd") ?? "",
+                r.ReviewDate?.ToString("yyyy-MM-dd") ?? "", r.EndDate?.ToString("yyyy-MM-dd") ?? "" }.Select(CsvCell))).Append("\r\n");
+        await uow.ExecuteAsync(cx => { audit.Record(new AuditEntry("contracts.exported", "ContractExport", Guid.NewGuid().ToString(), NewValuesJson: AuditJson.Of(new { rows = rows.Count }))); return Task.CompletedTask; }, ct);
+        return sb.ToString();
+    }
+
+    /// <summary>A CSV cell with spreadsheet formula text neutralised (a leading =, +, -, @, tab or carriage return is prefixed) and quoting where needed.</summary>
+    internal static string CsvCell(string value)
+    {
+        var v = value ?? "";
+        if (v.Length > 0 && v[0] is '=' or '+' or '-' or '@' or '\t' or '\r') v = "'" + v;
+        return v.IndexOfAny([',', '"', '\r', '\n']) >= 0 ? "\"" + v.Replace("\"", "\"\"") + "\"" : v;
     }
 
     public async Task<ResourceDescriptor> DescribeAsync(Guid id, CancellationToken ct = default)
@@ -468,7 +621,7 @@ internal sealed class ContractLifecycleService(ContractsDbContext db, IUnitOfWor
             var old = contract.Status;
             contract.ApplyWorkflowState(statusCode, locks, actor.ActorId ?? "system", clock.UtcNow);
             await db.SaveChangesAsync(c);
-            audit.Record(new AuditEntry("contract.state_applied", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId,
+            audit.Record(new AuditEntry("contract.state_applied", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
                 OldValuesJson: AuditJson.Of(new { status = old }), NewValuesJson: AuditJson.Of(new { status = statusCode, locked = contract.RecordLocked })));
         }, ct);
     }

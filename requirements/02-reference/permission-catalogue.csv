@@ -58,3 +58,8 @@ retention.manage,Manage retention policies,"Tenant scope; periods [OPEN] (Q-08),
 legalhold.manage,Place and release legal holds,Organisation scope,High,A10 baseline
 ai.use,Use AI assistance on records the user can already read,Same visibility as the user; output is a reviewable proposal only,Business,A10 baseline
 ops.manage,"Backup/restore tasks, maintenance mode, support bundles and upgrade pre-flight",Installation scope,Critical,Master (Audit and operations)
+records.read_privileged,Read records classified at a privileged level (Legal Privileged),"Held by Legal; may also be granted explicitly to a named assignment by a Tenant Administrator; a sufficient classification ceiling is still required",Critical,DR-2026-10-16 lifecycle slice (owner instruction)
+classification.lower,Lower the classification of a record or document,"Organisation scope; mandatory reason; only within the actor's own ceiling; audited",High,DR-2026-10-16 lifecycle slice (owner instruction)
+contracts.suspend,Suspend and restore an Effective contract,Active category assignment; Procurement Administrator administers,Business,DR-2026-10-16 lifecycle slice (owner instruction)
+legal.respond,Reply to Legal comments and resubmit a contract after rework,Active category assignment,Business,DR-2026-10-16 lifecycle slice (owner instruction)
+notifications.administer,"View notification failures, retries and background-job status; retry a failed notification",Tenant or organisation scope,Business,DR-2026-10-16 lifecycle slice (owner instruction)

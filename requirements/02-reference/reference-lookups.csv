@@ -29,6 +29,7 @@ Classification,Public,Public,Open,Default set; final levels Q-06
 Classification,Internal,Internal,Open,Default set; final levels Q-06
 Classification,Confidential,Confidential,Open,Default set; final levels Q-06
 Classification,Restricted,Restricted,Open,Default set; final levels Q-06
+Classification,Legal Privileged,Legal Privileged,Confirmed,DR-2026-10-16 lifecycle slice; privileged level needing an explicit grant
 ConfigurationMode,Demo,Demo,Confirmed,Master (wizard stage 2)
 ConfigurationMode,Test,Test,Confirmed,Master (wizard stage 2)
 ConfigurationMode,Production,Production Configuration,Confirmed,Master (wizard stage 2)

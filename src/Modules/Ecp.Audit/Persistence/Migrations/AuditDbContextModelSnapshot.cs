@@ -42,6 +42,10 @@ namespace Ecp.Audit.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("Classification")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<Guid?>("ConfigReleaseId")
                         .HasColumnType("uniqueidentifier");
 

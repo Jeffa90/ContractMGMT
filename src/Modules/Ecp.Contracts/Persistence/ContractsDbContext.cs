@@ -67,6 +67,7 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.Property(x => x.RowVersion);
             e.HasAlternateKey(x => new { x.TenantId, x.Id });
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.NormalisedName });
+            e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.VendorNumber }).IsUnique().HasFilter("[VendorNumber] IS NOT NULL");
         });
 
@@ -90,6 +91,8 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.Property(x => x.SourceSystem).HasMaxLength(100);
             e.Property(x => x.SourceRecordId).HasMaxLength(200);
             e.Property(x => x.SourceStatus).HasMaxLength(200);
+            e.Property(x => x.ArchiveReason).HasMaxLength(1000);
+            e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
             e.Property(x => x.CreatedBy).HasMaxLength(200);
             e.Property(x => x.UpdatedBy).HasMaxLength(200);
             e.Property(x => x.RowVersion);

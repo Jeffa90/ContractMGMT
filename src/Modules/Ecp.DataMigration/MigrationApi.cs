@@ -6,6 +6,7 @@ using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Ecp.DataMigration;
 
@@ -28,7 +29,7 @@ internal sealed class MigrationService(MigrationDbContext db, IUnitOfWork uow, I
         // Cross-tenant and cross-organisation references are rejected (INV-48): other tenants' organisations are invisible.
         if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
             throw new DomainException("organisation_not_found", "The organisation was not found.");
-        var project = MigrationProject.Create(tenantId, r.OrganisationId, r.Name, r.SourceSystem, r.SourceSystemVersion, r.DataOwner, r.ExtractionUtc, clock.UtcNow);
+        var project = MigrationProject.Create(tenantId, r.OrganisationId, r.Name, r.SourceSystem, r.SourceSystemVersion, r.DataOwner, r.ExtractionUtc, clock.UtcNow, "system");
         return await uow.ExecuteAsync(async c =>
         {
             db.Projects.Add(project);
@@ -62,16 +63,44 @@ internal sealed class MigrationService(MigrationDbContext db, IUnitOfWork uow, I
             .Select(b => new BatchDto(b.Id, b.ProjectId, b.Kind, b.Status, b.IsLegacyLoad)).FirstOrDefaultAsync(ct);
 }
 
+/// <summary>The cutover freeze (MIGRATION_SUPPLEMENT 5.6): while a project's target freeze is in force, the Contracts module refuses to create contracts for people in that organisation.</summary>
+internal sealed class MigrationCutoverFreeze(MigrationDbContext db, IClock clock) : Ecp.Contracts.ICutoverFreeze
+{
+    public async Task<string?> CreationBlockedAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        var now = clock.UtcNow;
+        var frozen = await db.Projects.AsNoTracking().Where(p => p.OrganisationId == organisationId && p.Status == ProjectStatus.Active && p.TargetFreezeEnabled
+            && p.FreezeStartUtc <= now && now < p.FreezeEndUtc).Select(p => p.FreezeEndUtc).FirstOrDefaultAsync(ct);
+        return frozen is null ? null : $"Contract creation is frozen for this organisation during a migration cutover until {frozen:yyyy-MM-dd HH:mm} UTC.";
+    }
+}
+
 public static class MigrationModule
 {
     public const string Name = "Migration";
     public const string Schema = "migration";
     public const int Tier = 7;
 
-    public static IServiceCollection AddMigrationModule(this IServiceCollection services)
+    public static IServiceCollection AddMigrationModule(this IServiceCollection services, Action<MigrationOptions>? configure = null)
     {
+        services.AddOptions<MigrationOptions>();
+        if (configure is not null) services.Configure(configure);
         services.AddModuleDbContext<MigrationDbContext>(Name, Tier, Schema);
         services.AddScoped<IMigrationService, MigrationService>();
+        services.AddScoped<MigrationKernel>();
+        services.AddScoped<BatchRuntime>();
+        services.AddScoped<MigrationReconciler>();
+        services.TryAddSingleton<IMigrationFaults, NoMigrationFaults>();
+        services.AddScoped<IMigrationProjects, MigrationProjectService>();
+        services.AddScoped<IMappingProfiles, MappingProfileService>();
+        services.AddScoped<IMigrationBatches, MigrationBatchService>();
+        services.AddScoped<IMigrationIntake, MigrationIntakeService>();
+        services.AddScoped<IMigrationValidation, MigrationValidationService>();
+        services.AddScoped<IMigrationCommit, MigrationCommitService>();
+        services.AddScoped<IMigrationRollback, MigrationRollbackService>();
+        services.AddScoped<IMigrationReports, MigrationReportService>();
+        // The real cutover freeze replaces the Contracts module's default (nothing frozen).
+        services.Replace(ServiceDescriptor.Scoped<Ecp.Contracts.ICutoverFreeze, MigrationCutoverFreeze>());
         return services;
     }
 }

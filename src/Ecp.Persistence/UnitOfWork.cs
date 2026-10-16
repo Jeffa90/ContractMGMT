@@ -6,6 +6,12 @@ public interface IBeforeCommitHook
     Task BeforeCommitAsync(CancellationToken ct);
 }
 
+/// <summary>Runs after the outermost unit of work rolls back: discards buffered work (audit events) and tracked entities so none of it can leak into a later transaction.</summary>
+public interface IRollbackHook
+{
+    void OnRollback();
+}
+
 /// <summary>
 /// Executes work in one database transaction across all module contexts in the scope. A business change, its audit
 /// events and its outbox messages therefore commit or roll back together.
@@ -16,7 +22,7 @@ public interface IUnitOfWork
     Task ExecuteAsync(Func<CancellationToken, Task> work, CancellationToken ct = default);
 }
 
-public sealed class UnitOfWork(IScopedConnection connection, IEnumerable<IBeforeCommitHook> hooks) : IUnitOfWork
+public sealed class UnitOfWork(IScopedConnection connection, IEnumerable<IBeforeCommitHook> hooks, IEnumerable<IRollbackHook> rollbackHooks) : IUnitOfWork
 {
     private int _depth;
 
@@ -35,6 +41,7 @@ public sealed class UnitOfWork(IScopedConnection connection, IEnumerable<IBefore
         catch
         {
             await connection.RollbackAsync(CancellationToken.None);
+            foreach (var hook in rollbackHooks) hook.OnRollback();
             throw;
         }
         finally { _depth--; }

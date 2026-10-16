@@ -43,6 +43,13 @@ public static class PersistenceServiceCollectionExtensions
                 sp.GetRequiredService<KeepScopedConnectionOpenInterceptor>(),
                 sp.GetRequiredService<TenantSessionContextInterceptor>());
         });
+        services.AddScoped<IRollbackHook>(sp => new ChangeTrackerReset(() => sp.GetRequiredService<TContext>()));
         return services;
     }
+}
+
+/// <summary>Clears a module context's tracked entities after a rollback, so changes from the failed transaction cannot be saved by the next one.</summary>
+internal sealed class ChangeTrackerReset(Func<DbContext> context) : IRollbackHook
+{
+    public void OnRollback() => context().ChangeTracker.Clear();
 }

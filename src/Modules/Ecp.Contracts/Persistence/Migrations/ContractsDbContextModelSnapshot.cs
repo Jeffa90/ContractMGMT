@@ -143,6 +143,16 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("ArchiveReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("ArchivedByBatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ArchivedUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid?>("BusinessUnitId")
                         .HasColumnType("uniqueidentifier");
 
@@ -189,6 +199,9 @@ namespace Ecp.Contracts.Persistence.Migrations
                     b.Property<string>("ExtensionType")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsLegacyLoad")
                         .HasColumnType("bit");
@@ -285,6 +298,8 @@ namespace Ecp.Contracts.Persistence.Migrations
 
                     b.HasIndex("TenantId", "CategoryId");
 
+                    b.HasIndex("TenantId", "MigrationBatchId");
+
                     b.HasIndex("TenantId", "SupplierId");
 
                     b.HasIndex("TenantId", "OrganisationId", "CategoryId");
@@ -372,6 +387,8 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "MigrationBatchId");
 
                     b.HasIndex("TenantId", "OrganisationId", "NormalisedName");
 

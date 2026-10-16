@@ -81,16 +81,16 @@ public sealed class TestApp : IAsyncDisposable
     public FakeClock Clock { get; }
     public string DocumentRoot => _documentRoot;
 
-    public static async Task<TestApp> CreateSqliteAsync(EcpMode setupMode = EcpMode.Test)
+    public static async Task<TestApp> CreateSqliteAsync(EcpMode setupMode = EcpMode.Test, Action<IServiceCollection>? configure = null)
     {
         var cs = $"Data Source=file:ecp_{Guid.NewGuid():N}?mode=memory&cache=shared";
         var keeper = new SqliteConnection(cs); keeper.Open(); // keeps the shared in-memory database alive
-        var app = Build(DatabaseProvider.Sqlite, cs, keeper, null, null, setupMode);
+        var app = Build(DatabaseProvider.Sqlite, cs, keeper, null, null, setupMode, configure);
         await app.Services.GetRequiredService<MigrationRunner>().RunAsync();
         return app;
     }
 
-    public static async Task<TestApp> CreateSqlServerAsync(bool migrate = true, EcpMode setupMode = EcpMode.Test)
+    public static async Task<TestApp> CreateSqlServerAsync(bool migrate = true, EcpMode setupMode = EcpMode.Test, Action<IServiceCollection>? configure = null)
     {
         var admin = SqlServerEnvironment.ConnectionString ?? throw new InvalidOperationException(SqlServerEnvironment.NotVerifiedReason);
         var db = "ecp_test_" + Guid.NewGuid().ToString("N");
@@ -102,7 +102,7 @@ public sealed class TestApp : IAsyncDisposable
             await cmd.ExecuteNonQueryAsync();
         }
         var cs = new SqlConnectionStringBuilder(admin) { InitialCatalog = db, ConnectTimeout = 15 }.ConnectionString;
-        var app = Build(DatabaseProvider.SqlServer, cs, null, db, admin, setupMode);
+        var app = Build(DatabaseProvider.SqlServer, cs, null, db, admin, setupMode, configure);
         if (migrate) await app.Services.GetRequiredService<MigrationRunner>().RunAsync();
         return app;
     }
@@ -110,13 +110,16 @@ public sealed class TestApp : IAsyncDisposable
     /// <summary>An application pointed at an arbitrary SQL Server connection string, without migrating (for unreachable-database tests).</summary>
     public static TestApp ForConnection(string connectionString) => Build(DatabaseProvider.SqlServer, connectionString, null, null, null, EcpMode.Test);
 
-    private static TestApp Build(DatabaseProvider provider, string cs, SqliteConnection? keeper, string? sqlDb, string? admin, EcpMode setupMode)
+    private static TestApp Build(DatabaseProvider provider, string cs, SqliteConnection? keeper, string? sqlDb, string? admin, EcpMode setupMode, Action<IServiceCollection>? configure = null)
     {
         var clock = new FakeClock();
         var root = Path.Combine(Path.GetTempPath(), "ecp-tests-" + Guid.NewGuid().ToString("N"));
-        var sp = BuildServices(provider, cs, clock, root, setupMode);
-        return new TestApp(sp, provider, cs, keeper, sqlDb, admin, clock, root) { SetupMode = setupMode };
+        var sp = BuildServices(provider, cs, clock, root, setupMode, configure);
+        return new TestApp(sp, provider, cs, keeper, sqlDb, admin, clock, root) { SetupMode = setupMode, Configure = configure };
     }
+
+    /// <summary>Extra registrations applied after the standard composition (a test scanner, fault injection, module options).</summary>
+    public Action<IServiceCollection>? Configure { get; private init; }
 
     public EcpMode SetupMode { get; private set; } = EcpMode.Test;
     private readonly List<ServiceProvider> _restarted = [];
@@ -124,12 +127,12 @@ public sealed class TestApp : IAsyncDisposable
     /// <summary>A second set of services over the same database, data directory and clock: what the application looks like after a process restart (no in-memory state survives).</summary>
     public ServiceProvider RestartServices()
     {
-        var sp = BuildServices(Provider, ConnectionString, Clock, _documentRoot, SetupMode);
+        var sp = BuildServices(Provider, ConnectionString, Clock, _documentRoot, SetupMode, Configure);
         _restarted.Add(sp);
         return sp;
     }
 
-    private static ServiceProvider BuildServices(DatabaseProvider provider, string cs, FakeClock clock, string root, EcpMode setupMode)
+    private static ServiceProvider BuildServices(DatabaseProvider provider, string cs, FakeClock clock, string root, EcpMode setupMode, Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -147,6 +150,7 @@ public sealed class TestApp : IAsyncDisposable
             provider.ToString(), "test", AllowRemoteSetup: false));
         services.AddSingleton<ISetupProtector, PlainSetupProtector>();
         services.AddSingleton(new StartupFacts(setupMode, provider, false, false, false, false, root));
+        configure?.Invoke(services);
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
     }
 

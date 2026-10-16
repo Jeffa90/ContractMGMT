@@ -2,8 +2,12 @@
   <ItemGroup>
     <ProjectReference Include="../../Ecp.SharedKernel/Ecp.SharedKernel.csproj" />
     <ProjectReference Include="../../Ecp.Persistence/Ecp.Persistence.csproj" />
-      <ProjectReference Include="../Ecp.Audit/Ecp.Audit.csproj" />
+    <ProjectReference Include="../Ecp.Audit/Ecp.Audit.csproj" />
     <ProjectReference Include="../Ecp.Tenancy/Ecp.Tenancy.csproj" />
+    <ProjectReference Include="../Ecp.Identity/Ecp.Identity.csproj" />
+    <ProjectReference Include="../Ecp.Configuration/Ecp.Configuration.csproj" />
+    <ProjectReference Include="../Ecp.Contracts/Ecp.Contracts.csproj" />
+    <ProjectReference Include="../Ecp.Documents/Ecp.Documents.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />

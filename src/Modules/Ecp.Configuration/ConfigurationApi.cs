@@ -51,6 +51,8 @@ public interface IConfigurationService
     /// <summary>Publishes an earlier release's content as a new release (history is never rewritten).</summary>
     Task<ReleaseDto> RollbackAsync(string kind, Guid organisationId, int toReleaseNumber, string reason, CancellationToken ct = default);
     Task<ReleaseDto?> LatestReleaseAsync(string kind, Guid organisationId, CancellationToken ct = default);
+    /// <summary>The most recent release of any kind for an organisation (organisation-level and tenant-level), for recording which configuration a long-running operation relied on.</summary>
+    Task<ReleaseDto?> LatestReleaseOfAnyKindAsync(Guid organisationId, CancellationToken ct = default);
     Task<IReadOnlyList<ReleaseDto>> ReleasesAsync(string kind, Guid organisationId, CancellationToken ct = default);
     Task DiscardDraftAsync(Guid draftId, CancellationToken ct = default);
 }
@@ -213,6 +215,13 @@ internal sealed class ConfigurationService(
     public async Task<ReleaseDto?> LatestReleaseAsync(string kind, Guid organisationId, CancellationToken ct = default)
     {
         var r = await db.Releases.AsNoTracking().Where(x => x.OrganisationId == organisationId && x.Kind == kind).OrderByDescending(x => x.Number).FirstOrDefaultAsync(ct);
+        return r is null ? null : ToDto(r);
+    }
+
+    public async Task<ReleaseDto?> LatestReleaseOfAnyKindAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        var r = await db.Releases.AsNoTracking().Where(x => x.OrganisationId == organisationId || x.OrganisationId == Guid.Empty)
+            .OrderByDescending(x => x.PublishedUtc).ThenByDescending(x => x.Number).FirstOrDefaultAsync(ct);
         return r is null ? null : ToDto(r);
     }
 

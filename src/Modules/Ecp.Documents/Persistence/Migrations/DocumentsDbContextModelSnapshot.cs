@@ -28,6 +28,10 @@ namespace Ecp.Documents.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ArchiveReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("Classification")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -55,6 +59,9 @@ namespace Ecp.Documents.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ParentDocumentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<byte[]>("RowVersion")
@@ -87,6 +94,8 @@ namespace Ecp.Documents.Persistence.Migrations
 
                     b.HasIndex("TenantId", "ContractId");
 
+                    b.HasIndex("TenantId", "MigrationBatchId");
+
                     b.HasIndex("TenantId", "OrganisationId", "SourceSystem", "DocumentSourceId")
                         .IsUnique()
                         .HasFilter("[DocumentSourceId] IS NOT NULL");
@@ -109,6 +118,9 @@ namespace Ecp.Documents.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("MigrationBatchId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("MimeType")
                         .IsRequired()
@@ -158,6 +170,8 @@ namespace Ecp.Documents.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "MigrationBatchId");
 
                     b.HasIndex("TenantId", "Sha256");
 

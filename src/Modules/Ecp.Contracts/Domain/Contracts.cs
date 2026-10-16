@@ -47,6 +47,14 @@ public sealed class Category : ITenantOwned
     public void Activate() => IsActive = true;
     public void Rename(string name) => Name = Guard.NotBlank(name, "Category name", 200);
     public void SetDivision(Guid? divisionId) => DivisionId = divisionId;
+
+    /// <summary>Records that a migration batch created this category (INV-41).</summary>
+    public void MarkMigrated(string sourceSystem, string sourceRecordId, Guid batchId)
+    {
+        SourceSystem = Guard.NotBlank(sourceSystem, "Source system", 100);
+        SourceRecordId = Guard.NotBlank(sourceRecordId, "Source record id", 200);
+        MigrationBatchId = Guard.NotEmpty(batchId, nameof(batchId));
+    }
 }
 
 /// <summary>
@@ -119,6 +127,14 @@ public sealed partial class Supplier : ITenantOwned
             Name = cleanName, NormalisedName = NormaliseName(cleanName), Abn = NormaliseAbn(abn),
             VendorNumber = Guard.OptionalBounded(vendorNumber, "Vendor number", 50), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
         };
+    }
+
+    /// <summary>Records that a migration batch created this supplier (INV-41). The source record id is the vendor number, or the normalised name where there is none.</summary>
+    public void MarkMigrated(string sourceSystem, string sourceRecordId, Guid batchId)
+    {
+        SourceSystem = Guard.NotBlank(sourceSystem, "Source system", 100);
+        SourceRecordId = Guard.NotBlank(sourceRecordId, "Source record id", 200);
+        MigrationBatchId = Guard.NotEmpty(batchId, nameof(batchId));
     }
 
     /// <summary>Unicode NFKC, trim, collapse whitespace, case-fold. Exact match on this value is the only automatic supplier match.</summary>
@@ -205,6 +221,12 @@ public sealed class Contract : ITenantOwned
     public Guid? MigrationBatchId { get; private set; }
     public bool IsLegacyLoad { get; private set; }
 
+    /// <summary>Compensating archival (never a delete): an archived record is hidden from lists and counts but stays readable for provenance and audit.</summary>
+    public bool IsArchived { get; private set; }
+    public DateTime? ArchivedUtc { get; private set; }
+    public string? ArchiveReason { get; private set; }
+    public Guid? ArchivedByBatchId { get; private set; }
+
     public DateTime CreatedUtc { get; private set; }
     public string CreatedBy { get; private set; } = "";
     public DateTime UpdatedUtc { get; private set; }
@@ -248,6 +270,106 @@ public sealed class Contract : ITenantOwned
             c.SourceRegisteredValue = Guard.OptionalBounded(sourceRegisteredValue, "Source registered value", 200);
         }
         return c;
+    }
+
+    /// <summary>
+    /// Creates an unlocked record in the initial workflow state from a previous system. It keeps source provenance and the batch id but is not a
+    /// legacy load: it is an ordinary editable record that has simply arrived by migration.
+    /// </summary>
+    public static Contract CreateMigrated(NewContract n, SourceProvenance source, Guid migrationBatchId)
+    {
+        var c = Build(n);
+        c.Status = Guard.NotBlank(n.InitialStatusCode, "Initial status", 100);
+        c.MigrationBatchId = Guard.NotEmpty(migrationBatchId, nameof(migrationBatchId));
+        c.SourceSystem = Guard.NotBlank(source.SourceSystem, "Source system", 100);
+        c.SourceRecordId = Guard.NotBlank(source.SourceRecordId, "Source record id", 200);
+        c.SourceAgreementReference = Guard.OptionalBounded(source.SourceAgreementReference, "Source agreement reference", 200);
+        c.SourceStatus = Guard.OptionalBounded(source.SourceStatus, "Source status", 200);
+        c.SourceExtractedUtc = source.SourceExtractedUtc;
+        return c;
+    }
+
+    /// <summary>The core fields a migration may set on an existing record, by their stable field names.</summary>
+    public static readonly IReadOnlyList<string> MigratableFields =
+    [
+        "contractTitle", "description", "status", "supplierId", "categoryId", "currencyCode", "estimatedValue", "extensionType",
+        "legalReviewRequired", "startDate", "effectiveDate", "reviewDate", "endDate"
+    ];
+
+    /// <summary>Current values of the named fields as invariant text. This is the before-image stored in the provenance record.</summary>
+    public IReadOnlyDictionary<string, string?> CaptureFields(IEnumerable<string> names)
+    {
+        var result = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var name in names)
+            result[name] = name switch
+            {
+                "contractTitle" => ContractTitle,
+                "description" => Description,
+                "status" => Status,
+                "supplierId" => SupplierId.ToString("D"),
+                "categoryId" => CategoryId.ToString("D"),
+                "currencyCode" => CurrencyCode,
+                "estimatedValue" => EstimatedValue?.ToString(CultureInfo.InvariantCulture),
+                "extensionType" => ExtensionType,
+                "legalReviewRequired" => LegalReviewRequired ? "true" : "false",
+                "startDate" => StartDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                "effectiveDate" => EffectiveDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                "reviewDate" => ReviewDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                "endDate" => EndDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                _ => throw new DomainException("unknown_field", $"'{name}' is not a field a migration can set.")
+            };
+        return result;
+    }
+
+    /// <summary>
+    /// Applies only the named fields. Used by an Update-mapped-fields migration and by its rollback (restoring a before-image). A locked record is changed
+    /// only when the caller states that the migration policy authorises it; nothing else about the record changes.
+    /// </summary>
+    public void ApplyMigratedFields(IReadOnlyDictionary<string, string?> fields, bool lockedOverwriteAuthorised, string actor, DateTime nowUtc)
+    {
+        if (RecordLocked && !lockedOverwriteAuthorised)
+            throw new DomainException("record_locked", "This record is locked. A migration may overwrite it only under an explicit legacy-load policy.");
+        var title = ContractTitle; var description = Description; var status = Status; var supplier = SupplierId; var category = CategoryId;
+        var currency = CurrencyCode; var value = EstimatedValue; var extension = ExtensionType; var legal = LegalReviewRequired;
+        var start = StartDate; var effective = EffectiveDate; var review = ReviewDate; var end = EndDate;
+        foreach (var (name, raw) in fields)
+        {
+            switch (name)
+            {
+                case "contractTitle": title = Guard.NotBlank(raw, "Contract title", 500); break;
+                case "description": description = Guard.OptionalBounded(raw, "Description", 4000); break;
+                case "status": status = Guard.NotBlank(raw, "Status", 100); break;
+                case "supplierId": supplier = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Supplier"); break;
+                case "categoryId": category = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Category"); break;
+                case "currencyCode": currency = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim().ToUpperInvariant(); break;
+                case "estimatedValue": value = string.IsNullOrWhiteSpace(raw) ? null : decimal.Parse(raw, NumberStyles.Number, CultureInfo.InvariantCulture); break;
+                case "extensionType": extension = Guard.OptionalBounded(raw, "Extension type", 50); break;
+                case "legalReviewRequired": legal = string.Equals(raw, "true", StringComparison.Ordinal); break;
+                case "startDate": start = ParseDate(raw); break;
+                case "effectiveDate": effective = ParseDate(raw); break;
+                case "reviewDate": review = ParseDate(raw); break;
+                case "endDate": end = ParseDate(raw); break;
+                default: throw new DomainException("unknown_field", $"'{name}' is not a field a migration can set.");
+            }
+        }
+        if (value is < 0) throw new DomainException("invalid_value", "Estimated value must not be negative.");
+        if (currency is not null && !Regex.IsMatch(currency, "^[A-Z]{3}$", RegexOptions.NonBacktracking)) throw new DomainException("invalid_currency", "Currency must be a three-letter ISO 4217 code.");
+        if (value.HasValue && currency is null) throw new DomainException("currency_required", "A currency is required when an estimated value is given.");
+        if (start.HasValue && end.HasValue && end < start) throw new DomainException("invalid_dates", "End date must not be before the start date.");
+        (ContractTitle, Description, Status, SupplierId, CategoryId, CurrencyCode, EstimatedValue, ExtensionType, LegalReviewRequired, StartDate, EffectiveDate, ReviewDate, EndDate) =
+            (title, description, status, supplier, category, currency, value, extension, legal, start, effective, review, end);
+        Touch(actor, nowUtc);
+    }
+
+    private static DateOnly? ParseDate(string? raw)
+        => string.IsNullOrWhiteSpace(raw) ? null : DateOnly.ParseExact(raw, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    /// <summary>Compensating archival of a migrated record. The record stays readable; it leaves lists and counts.</summary>
+    public void Archive(string reason, Guid batchId, string actor, DateTime nowUtc)
+    {
+        if (IsArchived) return;
+        IsArchived = true; ArchivedUtc = Guard.Utc(nowUtc, nameof(nowUtc)); ArchiveReason = Guard.NotBlank(reason, "Archive reason", 1000); ArchivedByBatchId = batchId;
+        Touch(actor, nowUtc);
     }
 
     private static Contract Build(NewContract n)

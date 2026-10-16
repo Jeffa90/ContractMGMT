@@ -180,6 +180,8 @@ public static class ContractsModule
         services.AddScoped<IContractLifecycleService, ContractLifecycleService>();
         services.AddScoped<ISupplierDirectory, SupplierDirectory>();
         services.AddScoped<IAccessSimulator, AccessSimulator>();
+        services.AddScoped<IContractMigrationPort, ContractMigrationPort>();
+        services.AddScoped<ICutoverFreeze, NoCutoverFreeze>();
         services.AddScoped<ISecuredContractService, SecuredContractService>();
         services.AddScoped<ISecuredSupplierService, SecuredSupplierService>();
         services.AddScoped<ISecuredCategoryService, SecuredCategoryService>();

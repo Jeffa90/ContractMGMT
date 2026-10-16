@@ -39,6 +39,13 @@ internal sealed class AuditBuffer
     private readonly List<AuditEntry> _entries = [];
     public void Add(AuditEntry entry) => _entries.Add(entry);
     public List<AuditEntry> Drain() { var copy = _entries.ToList(); _entries.Clear(); return copy; }
+    public void Discard() => _entries.Clear();
+}
+
+/// <summary>Events recorded by a transaction that rolled back never happened, so they are dropped rather than flushed with the next transaction.</summary>
+internal sealed class AuditBufferReset(AuditBuffer buffer) : IRollbackHook
+{
+    public void OnRollback() => buffer.Discard();
 }
 
 internal sealed class AuditWriter(AuditBuffer buffer, IScopedConnection connection) : IAuditWriter
@@ -112,6 +119,7 @@ public static class AuditModule
         services.AddScoped<AuditBuffer>();
         services.AddScoped<IAuditWriter, AuditWriter>();
         services.AddScoped<IBeforeCommitHook, AuditFlusher>();
+        services.AddScoped<IRollbackHook, AuditBufferReset>();
         services.AddScoped<AuditChainVerifier>();
         services.AddScoped<IAuditEventSource, AuditEventSource>();
         return services;

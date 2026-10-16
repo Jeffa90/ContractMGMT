@@ -23,6 +23,8 @@ public sealed class DocumentsDbContext(DbContextOptions<DocumentsDbContext> opti
             e.Property(x => x.Classification).HasMaxLength(30).IsRequired();
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.DocumentSourceId).HasMaxLength(400);
+            e.Property(x => x.ArchiveReason).HasMaxLength(1000);
+            e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
             e.Property(x => x.SourceSystem).HasMaxLength(100);
             e.Property(x => x.RowVersion);
             e.HasAlternateKey(x => new { x.TenantId, x.Id });
@@ -45,6 +47,7 @@ public sealed class DocumentsDbContext(DbContextOptions<DocumentsDbContext> opti
             e.Property(x => x.UploadedBy).HasMaxLength(200);
             e.HasIndex(x => new { x.TenantId, x.DocumentId, x.VersionNumber }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.Sha256 });
+            e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
             e.HasOne<Document>().WithMany().HasForeignKey(x => new { x.TenantId, x.DocumentId })
                 .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         });

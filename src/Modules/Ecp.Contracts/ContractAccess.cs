@@ -21,7 +21,13 @@ public sealed record ContractDetails(
     Guid Id, Guid OrganisationId, string AgreementReference, string Title, string? Description, Guid SupplierId, string SupplierName, Guid CategoryId,
     string CategoryName, Guid? BusinessUnitId, Guid? SiteId, string Status, bool RecordLocked, string Classification, string? CurrencyCode, decimal? EstimatedValue,
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? ReviewDate, DateOnly? EndDate, DateTime? RegisteredDateUtc, string? RegisteredBy,
-    bool IsLegacyLoad, DateTime CreatedUtc, string CreatedBy, bool CanEdit);
+    bool IsLegacyLoad, DateTime CreatedUtc, string CreatedBy, bool CanEdit,
+    ContractProvenanceInfo? Provenance = null, bool IsArchived = false, string? ArchiveReason = null);
+
+/// <summary>Where a migrated record came from: shown on the contract so a user can always trace it back to the source system and the batch that loaded it.</summary>
+public sealed record ContractProvenanceInfo(
+    string? SourceSystem, string? SourceRecordId, string? SourceAgreementReference, string? SourceStatus, DateTime? SourceExtractedUtc, Guid? MigrationBatchId,
+    string? RegisteredDateProvenance, string? SourceRegisteredValue);
 
 public sealed record SupplierListItem(Guid Id, Guid OrganisationId, string Name, string? VendorNumber, string? Abn, string Status);
 
@@ -138,12 +144,12 @@ internal sealed class ContractAccessContext(ContractsDbContext db, IOrganisation
 
 internal sealed class SecuredContractService(
     ContractsDbContext db, IAccessService access, ContractAccessContext context, IContractService contracts, IUnitOfWork uow,
-    ReferenceAllocator allocator, IOrganisationStructureService structure, ITenantContext tenant, IClock clock) : ISecuredContractService
+    ReferenceAllocator allocator, IOrganisationStructureService structure, ITenantContext tenant, IClock clock, ICutoverFreeze freeze) : ISecuredContractService
 {
     public async Task<PagedResult<ContractListItem>> ListAsync(ContractFilter f, CancellationToken ct = default)
     {
         var predicate = await VisiblePredicateAsync(ct);
-        var query = db.Contracts.AsNoTracking().Where(predicate);
+        var query = db.Contracts.AsNoTracking().Where(predicate).Where(c => !c.IsArchived);
         if (!string.IsNullOrWhiteSpace(f.Status)) query = query.Where(c => c.Status == f.Status);
         if (f.CategoryId is { } cat) query = query.Where(c => c.CategoryId == cat);
         if (f.SupplierId is { } sup) query = query.Where(c => c.SupplierId == sup);
@@ -166,7 +172,7 @@ internal sealed class SecuredContractService(
     public async Task<IReadOnlyDictionary<string, int>> CountByStatusAsync(CancellationToken ct = default)
     {
         var predicate = await VisiblePredicateAsync(ct);
-        return await db.Contracts.AsNoTracking().Where(predicate).GroupBy(c => c.Status).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, ct);
+        return await db.Contracts.AsNoTracking().Where(predicate).Where(c => !c.IsArchived).GroupBy(c => c.Status).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, ct);
     }
 
     private async Task<Expression<Func<Contract, bool>>> VisiblePredicateAsync(CancellationToken ct)
@@ -187,7 +193,10 @@ internal sealed class SecuredContractService(
         var canEdit = (await access.CheckSilentAsync("contracts.edit_owned", descriptor, ct)).Allowed;
         return new ContractDetails(c.Id, c.OrganisationId, c.AgreementReference, c.ContractTitle, c.Description, c.SupplierId, supplier, c.CategoryId, category,
             c.BusinessUnitId, c.SiteId, c.Status, c.RecordLocked, c.Classification, c.CurrencyCode, c.EstimatedValue, c.StartDate, c.EffectiveDate, c.ReviewDate,
-            c.EndDate, c.RegisteredDateUtc, c.RegisteredBy, c.IsLegacyLoad, c.CreatedUtc, c.CreatedBy, canEdit);
+            c.EndDate, c.RegisteredDateUtc, c.RegisteredBy, c.IsLegacyLoad, c.CreatedUtc, c.CreatedBy, canEdit,
+            c.SourceRecordId is null && c.MigrationBatchId is null ? null : new ContractProvenanceInfo(c.SourceSystem, c.SourceRecordId, c.SourceAgreementReference, c.SourceStatus,
+                c.SourceExtractedUtc, c.MigrationBatchId, c.RegisteredDateProvenance?.ToString(), c.SourceRegisteredValue),
+            c.IsArchived, c.ArchiveReason);
     }
 
     public async Task<ResourceDescriptor> DescribeAsync(Guid id, CancellationToken ct = default)
@@ -210,6 +219,8 @@ internal sealed class SecuredContractService(
         var scale = await access.ClassificationScaleAsync(ct);
         if (!scale.IsKnown(r.Classification)) throw new DomainException("invalid_classification", $"Classification '{r.Classification}' is not recognised.");
         var org = await structure.GetAsync(r.OrganisationId, ct); // 422 if the organisation is not in this tenant
+        // Cutover freeze (MIGRATION_SUPPLEMENT 5.6): people cannot create contracts in an organisation while its target freeze is in force; migration batches do not come through here.
+        if (await freeze.CreationBlockedAsync(r.OrganisationId, ct) is { } frozen) throw new DomainException("cutover_freeze", frozen);
         if (r.BusinessUnitId is { } bu && org.BusinessUnits.All(b => b.Id != bu)) throw new DomainException("business_unit_not_found", "The business unit was not found in this organisation.");
         if (r.SiteId is { } site && org.Sites.All(s => s.Id != site)) throw new DomainException("site_not_found", "The site was not found in this organisation.");
         var category = await db.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == r.CategoryId && c.OrganisationId == r.OrganisationId, ct)

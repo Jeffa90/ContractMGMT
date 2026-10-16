@@ -79,9 +79,11 @@ public sealed class DocumentVersion : ITenantOwned
     public DateOnly? DocumentDate { get; private set; }
     public string UploadedBy { get; private set; } = "";
     public DateTime UploadedUtc { get; private set; }
+    /// <summary>The migration batch that created this version, if any (INV-41).</summary>
+    public Guid? MigrationBatchId { get; private set; }
 
     internal static DocumentVersion Create(Guid tenantId, Guid documentId, int number, string fileName, string mimeType, long size,
-        string sha256, string provider, string storageKey, string? label, DateOnly? documentDate, string uploadedBy, DateTime nowUtc)
+        string sha256, string provider, string storageKey, string? label, DateOnly? documentDate, string uploadedBy, DateTime nowUtc, Guid? migrationBatchId = null, ScanStatus scan = ScanStatus.Pending)
     {
         if (!Domain.StorageKey.IsValidFor(tenantId, storageKey))
             throw new DomainException("invalid_storage_key", "The storage key does not belong to this tenant.");
@@ -92,7 +94,7 @@ public sealed class DocumentVersion : ITenantOwned
             VersionLabel = Guard.OptionalBounded(label, "Version label", 50), FileName = FileNames.Sanitise(fileName),
             MimeType = Guard.NotBlank(mimeType, "MIME type", 150), SizeBytes = size, Sha256 = sha256,
             StorageProvider = Guard.NotBlank(provider, "Storage provider", 50), StorageKey = storageKey, DocumentDate = documentDate,
-            UploadedBy = Guard.NotBlank(uploadedBy, "Uploaded by", 200), UploadedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+            UploadedBy = Guard.NotBlank(uploadedBy, "Uploaded by", 200), UploadedUtc = Guard.Utc(nowUtc, nameof(nowUtc)), MigrationBatchId = migrationBatchId, ScanStatus = scan
         };
     }
 
@@ -119,10 +121,13 @@ public sealed class Document : ITenantOwned
     public string? DocumentSourceId { get; private set; }
     public string? SourceSystem { get; private set; }
     public Guid? MigrationBatchId { get; private set; }
+    /// <summary>The document this one was derived from in the source system (manifest ParentDocumentSourceId, resolved).</summary>
+    public Guid? ParentDocumentId { get; private set; }
+    public string? ArchiveReason { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
 
     public static Document Create(Guid tenantId, Guid organisationId, Guid? contractId, string documentTypeCode, string title, string classification,
-        bool isExecutedCopy, string? documentSourceId = null, string? sourceSystem = null, Guid? migrationBatchId = null) => new()
+        bool isExecutedCopy, string? documentSourceId = null, string? sourceSystem = null, Guid? migrationBatchId = null, Guid? parentDocumentId = null) => new()
     {
         Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
         ContractId = contractId, DocumentTypeCode = Guard.NotBlank(documentTypeCode, "Document type", 100), Title = Guard.NotBlank(title, "Title", 300),
@@ -130,17 +135,37 @@ public sealed class Document : ITenantOwned
         // A document with no contract waits in restricted staging until resolved (INV-35).
         Status = contractId is null ? DocumentStatus.Quarantined : DocumentStatus.Active,
         DocumentSourceId = Guard.OptionalBounded(documentSourceId, "Document source id", 400), SourceSystem = Guard.OptionalBounded(sourceSystem, "Source system", 100),
-        MigrationBatchId = migrationBatchId
+        MigrationBatchId = migrationBatchId, ParentDocumentId = parentDocumentId
     };
 
     public DocumentVersion AddVersion(string fileName, string mimeType, long size, string sha256, string provider, string storageKey,
-        string? label, DateOnly? documentDate, string uploadedBy, DateTime nowUtc)
+        string? label, DateOnly? documentDate, string uploadedBy, DateTime nowUtc, Guid? migrationBatchId = null, ScanStatus scan = ScanStatus.Pending)
     {
         if (Status is DocumentStatus.Archived or DocumentStatus.Discarded)
             throw new DomainException("document_closed", "Versions cannot be added to an archived or discarded document.");
-        var version = DocumentVersion.Create(TenantId, Id, VersionCount + 1, fileName, mimeType, size, sha256, provider, storageKey, label, documentDate, uploadedBy, nowUtc);
+        var version = DocumentVersion.Create(TenantId, Id, VersionCount + 1, fileName, mimeType, size, sha256, provider, storageKey, label, documentDate, uploadedBy, nowUtc, migrationBatchId, scan);
         VersionCount++;
         CurrentVersionId = version.Id;
         return version;
+    }
+
+    /// <summary>Points the document back at an earlier version after a later one was removed by a rollback.</summary>
+    public void RewindTo(DocumentVersion previous, int versionCount)
+    {
+        CurrentVersionId = previous.Id; VersionCount = versionCount;
+    }
+
+    /// <summary>Compensating archival: the document and its versions are kept, but it is no longer active or downloadable.</summary>
+    public void Archive(string reason)
+    {
+        if (Status == DocumentStatus.Archived) return;
+        Status = DocumentStatus.Archived; ArchiveReason = Guard.NotBlank(reason, "Archive reason", 1000);
+    }
+
+    /// <summary>Releases a quarantined document to its contract once a person has resolved the match (audited by the caller).</summary>
+    public void AttachToContract(Guid contractId)
+    {
+        ContractId = Guard.NotEmpty(contractId, nameof(contractId));
+        if (Status == DocumentStatus.Quarantined) Status = DocumentStatus.Active;
     }
 }

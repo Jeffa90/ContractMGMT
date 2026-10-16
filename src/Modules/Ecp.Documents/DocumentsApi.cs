@@ -6,6 +6,7 @@ using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Ecp.Documents;
 
@@ -90,6 +91,8 @@ public static class DocumentsModule
         services.AddSingleton(storageOptions);
         services.AddSingleton<IDocumentStorageProvider, LocalFileSystemStorageProvider>();
         services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<IDocumentMigrationPort, DocumentMigrationPort>();
+        services.TryAddSingleton<IMalwareScanner, DisabledMalwareScanner>();
         return services;
     }
 }

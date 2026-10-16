@@ -1,0 +1,296 @@
+using System.Globalization;
+using Ecp.Audit;
+using Ecp.Contracts.Domain;
+using Ecp.Contracts.Persistence;
+using Ecp.Persistence;
+using Ecp.SharedKernel;
+using Ecp.Tenancy;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace Ecp.Contracts;
+
+public sealed record SupplierRef(Guid Id, string Name, string NormalisedName, string? VendorNumber, string? SourceSystem, Guid? MigrationBatchId);
+public sealed record CategoryRef(Guid Id, string Code, string Name, string NormalisedName, Guid? ParentCategoryId, bool IsActive);
+public sealed record ReferenceSnapshot(IReadOnlyList<SupplierRef> Suppliers, IReadOnlyList<CategoryRef> Categories);
+
+/// <summary>An existing target contract as a migration needs to see it when deciding between create, update and skip.</summary>
+public sealed record ExistingContractRef(
+    Guid Id, string AgreementReference, string? SourceSystem, string? SourceRecordId, bool RecordLocked, bool IsLegacyLoad, bool IsArchived, string Status,
+    Guid? MigrationBatchId, DateTime CreatedUtc, DateTime UpdatedUtc);
+
+/// <summary>A contract to create from a migration. <see cref="LockAsLegacy"/> creates a locked legacy record under a legacy-load authorisation; otherwise an editable record in the initial state.</summary>
+public sealed record MigratedContract(
+    Guid OrganisationId, Guid BatchId, string AgreementReference, string? SourceAgreementReference, string Title, string? Description, Guid SupplierId, Guid CategoryId,
+    string StatusCode, bool LockAsLegacy, string SourceSystem, string SourceRecordId, string? SourceStatus, DateTime? SourceExtractedUtc, string Classification,
+    string? CurrencyCode, decimal? EstimatedValue, string? ExtensionType, bool LegalReviewRequired, DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? ReviewDate,
+    DateOnly? EndDate, DateTime? RegisteredUtc, string? RegisteredSourceValue, bool ImportRegisteredDate, string ActingAdministrator);
+
+public sealed record ContractFieldUpdate(IReadOnlyDictionary<string, string?> Before, DateTime AfterStampUtc);
+
+public sealed record BatchContractSummary(
+    int Contracts, IReadOnlyDictionary<string, int> ByStatus, IReadOnlyDictionary<string, int> ByCategoryCode, IReadOnlyDictionary<string, decimal> ValueByCurrency);
+
+/// <summary>
+/// The trusted operations a migration needs from the Contracts module. There is no per-user authorisation here: the migration module authorises the
+/// caller (migration.* permissions) before using it, and nothing in request input can reach it directly. Every write records an audit event that carries the batch id.
+/// </summary>
+public interface IContractMigrationPort
+{
+    /// <summary>The workflow state a new editable record starts in (from configuration).</summary>
+    string InitialStatusCode { get; }
+    Task<ReferenceSnapshot> SnapshotReferenceDataAsync(Guid organisationId, CancellationToken ct = default);
+    /// <summary>Contracts that match any of the given source record ids (within the organisation and source system) or agreement references (tenant-wide, normalised).</summary>
+    Task<IReadOnlyList<ExistingContractRef>> FindContractsAsync(Guid organisationId, string sourceSystem, IReadOnlyCollection<string> sourceRecordIds,
+        IReadOnlyCollection<string> agreementReferences, CancellationToken ct = default);
+    Task<string> AllocateReferenceAsync(Guid organisationId, CancellationToken ct = default);
+    Task<Guid> CreateSupplierAsync(Guid organisationId, Guid batchId, string name, string? vendorNumber, string sourceSystem, string sourceRecordId, CancellationToken ct = default);
+    Task<Guid> CreateCategoryAsync(Guid organisationId, Guid batchId, string code, string name, Guid? parentId, string sourceSystem, string sourceRecordId, CancellationToken ct = default);
+    Task<Guid> CreateContractAsync(MigratedContract contract, CancellationToken ct = default);
+    /// <summary>Updates only the named fields and returns their previous values. A locked record needs <paramref name="lockedOverwriteAuthorised"/>.</summary>
+    Task<ContractFieldUpdate> UpdateContractFieldsAsync(Guid contractId, Guid batchId, IReadOnlyDictionary<string, string?> fields, bool lockedOverwriteAuthorised,
+        string reason, CancellationToken ct = default);
+    Task<IReadOnlyDictionary<string, string?>> CaptureFieldsAsync(Guid contractId, IEnumerable<string> fieldNames, CancellationToken ct = default);
+    /// <summary>The named fields of many contracts at once (for comparing a source row with what is already in the target).</summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, string?>>> CaptureFieldsManyAsync(IReadOnlyCollection<Guid> contractIds, IReadOnlyCollection<string> fieldNames, CancellationToken ct = default);
+    Task<ExistingContractRef?> GetContractAsync(Guid contractId, CancellationToken ct = default);
+    Task RemoveContractAsync(Guid contractId, Guid batchId, string reason, CancellationToken ct = default);
+    Task ArchiveContractAsync(Guid contractId, Guid batchId, string reason, CancellationToken ct = default);
+    Task<int> CountContractsOfSupplierAsync(Guid supplierId, CancellationToken ct = default);
+    Task<int> CountContractsOfCategoryAsync(Guid categoryId, CancellationToken ct = default);
+    Task<int> CountChildCategoriesAsync(Guid categoryId, CancellationToken ct = default);
+    Task RemoveSupplierAsync(Guid supplierId, Guid batchId, string reason, CancellationToken ct = default);
+    Task RemoveCategoryAsync(Guid categoryId, Guid batchId, string reason, CancellationToken ct = default);
+    Task<BatchContractSummary> SummariseBatchAsync(Guid batchId, CancellationToken ct = default);
+    /// <summary>Forgets entities the context is tracking, so a long migration does not keep every record it wrote in memory. Call only between committed chunks.</summary>
+    void ReleaseTracked();
+}
+
+internal sealed class ContractMigrationPort(
+    ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IActorContext actor, IClock clock, ITenantContext tenant, ReferenceAllocator allocator,
+    ITenantDirectory tenants, IOptions<ContractsOptions> options) : IContractMigrationPort
+{
+    public string InitialStatusCode => options.Value.InitialStatusCode;
+
+    public async Task<ReferenceSnapshot> SnapshotReferenceDataAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        var suppliers = await db.Suppliers.AsNoTracking().Where(s => s.OrganisationId == organisationId)
+            .Select(s => new SupplierRef(s.Id, s.Name, s.NormalisedName, s.VendorNumber, s.SourceSystem, s.MigrationBatchId)).ToListAsync(ct);
+        var categories = (await db.Categories.AsNoTracking().Where(c => c.OrganisationId == organisationId)
+            .Select(c => new { c.Id, c.Code, c.Name, c.ParentCategoryId, c.IsActive }).ToListAsync(ct))
+            .Select(c => new CategoryRef(c.Id, c.Code, c.Name, Supplier.NormaliseName(c.Name), c.ParentCategoryId, c.IsActive)).ToList();
+        return new ReferenceSnapshot(suppliers, categories);
+    }
+
+    public async Task<IReadOnlyList<ExistingContractRef>> FindContractsAsync(Guid organisationId, string sourceSystem, IReadOnlyCollection<string> sourceRecordIds,
+        IReadOnlyCollection<string> agreementReferences, CancellationToken ct = default)
+    {
+        var found = new Dictionary<Guid, ExistingContractRef>();
+        foreach (var chunk in sourceRecordIds.Distinct().Chunk(400))
+        {
+            var ids = chunk.ToList();
+            var rows = await db.Contracts.AsNoTracking().Where(c => c.OrganisationId == organisationId && c.SourceSystem == sourceSystem && ids.Contains(c.SourceRecordId!))
+                .Select(c => ToRef(c)).ToListAsync(ct);
+            foreach (var r in rows) found[r.Id] = r;
+        }
+        foreach (var chunk in agreementReferences.Select(Contract.NormaliseReference).Distinct().Chunk(400))
+        {
+            var refs = chunk.ToList();
+            var rows = await db.Contracts.AsNoTracking().Where(c => refs.Contains(c.AgreementReference)).Select(c => ToRef(c)).ToListAsync(ct);
+            foreach (var r in rows) found[r.Id] = r;
+        }
+        return found.Values.OrderBy(r => r.AgreementReference, StringComparer.Ordinal).ToList();
+    }
+
+    private static ExistingContractRef ToRef(Contract c) => new(c.Id, c.AgreementReference, c.SourceSystem, c.SourceRecordId, c.RecordLocked, c.IsLegacyLoad, c.IsArchived, c.Status,
+        c.MigrationBatchId, c.CreatedUtc, c.UpdatedUtc);
+
+    public Task<string> AllocateReferenceAsync(Guid organisationId, CancellationToken ct = default) => allocator.AllocateAsync(organisationId, consume: true, ct);
+
+    public async Task<Guid> CreateSupplierAsync(Guid organisationId, Guid batchId, string name, string? vendorNumber, string sourceSystem, string sourceRecordId, CancellationToken ct = default)
+    {
+        await RequireOrganisationAsync(organisationId, ct);
+        var supplier = Supplier.Create(tenant.RequireTenantId(), organisationId, name, null, vendorNumber, clock.UtcNow);
+        supplier.MarkMigrated(sourceSystem, sourceRecordId, batchId);
+        await uow.ExecuteAsync(async c =>
+        {
+            db.Suppliers.Add(supplier);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("vendor_number_in_use", "That vendor number is already in use."); }
+            audit.Record(new AuditEntry("migration.supplier.created", nameof(Supplier), supplier.Id.ToString(), OrganisationId: organisationId, MigrationBatchId: batchId,
+                NewValuesJson: AuditJson.Of(new { supplier.Name, supplier.VendorNumber, sourceSystem, sourceRecordId })));
+        }, ct);
+        return supplier.Id;
+    }
+
+    public async Task<Guid> CreateCategoryAsync(Guid organisationId, Guid batchId, string code, string name, Guid? parentId, string sourceSystem, string sourceRecordId, CancellationToken ct = default)
+    {
+        await RequireOrganisationAsync(organisationId, ct);
+        if (parentId is { } p && !await db.Categories.AnyAsync(x => x.Id == p && x.OrganisationId == organisationId, ct))
+            throw new DomainException("category_not_found", "The parent category was not found.");
+        var category = Category.Create(tenant.RequireTenantId(), organisationId, code, name, parentId);
+        category.MarkMigrated(sourceSystem, sourceRecordId, batchId);
+        await uow.ExecuteAsync(async c =>
+        {
+            db.Categories.Add(category);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("category_code_in_use", "That category code is already in use."); }
+            audit.Record(new AuditEntry("migration.category.created", nameof(Category), category.Id.ToString(), OrganisationId: organisationId, MigrationBatchId: batchId,
+                NewValuesJson: AuditJson.Of(new { category.Code, category.Name, sourceSystem, sourceRecordId })));
+        }, ct);
+        return category.Id;
+    }
+
+    public async Task<Guid> CreateContractAsync(MigratedContract m, CancellationToken ct = default)
+    {
+        var tenantId = tenant.RequireTenantId();
+        await RequireOrganisationAsync(m.OrganisationId, ct);
+        // Supplier and category must belong to this tenant and organisation (other tenants' rows are invisible through the filter): INV-48.
+        if (!await db.Suppliers.AnyAsync(s => s.Id == m.SupplierId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("supplier_not_found", "The supplier was not found.");
+        if (!await db.Categories.AnyAsync(s => s.Id == m.CategoryId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("category_not_found", "The category was not found.");
+        var by = actor.ActorId ?? "system";
+        var n = new NewContract(tenantId, m.OrganisationId, m.AgreementReference, m.Title, m.SupplierId, m.CategoryId, options.Value.InitialStatusCode, by, clock.UtcNow, m.Description,
+            m.Classification, m.CurrencyCode, m.EstimatedValue, m.ExtensionType, m.LegalReviewRequired, m.StartDate, m.EffectiveDate, m.ReviewDate, m.EndDate);
+        var source = new SourceProvenance(m.SourceSystem, m.SourceRecordId, m.SourceAgreementReference, m.SourceStatus, m.SourceExtractedUtc);
+        var contract = m.LockAsLegacy
+            ? Contract.CreateLegacyLoad(n, m.StatusCode, source, new LegacyLoadAuthorisation(m.BatchId, m.ActingAdministrator, m.ImportRegisteredDate), m.RegisteredUtc, m.RegisteredSourceValue)
+            : Contract.CreateMigrated(n, source, m.BatchId);
+        await uow.ExecuteAsync(async c =>
+        {
+            db.Contracts.Add(contract);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("agreement_reference_in_use", "That agreement reference or source record is already in use."); }
+            // The batch id, source record id, source value and acting administrator are on the audit event (decision record, Registered Date exception).
+            audit.Record(new AuditEntry(m.LockAsLegacy ? "migration.contract.legacy_loaded" : "migration.contract.created", nameof(Contract), contract.Id.ToString(),
+                OrganisationId: m.OrganisationId, MigrationBatchId: m.BatchId,
+                NewValuesJson: AuditJson.Of(new
+                {
+                    contract.AgreementReference, contract.SourceAgreementReference, contract.Status, contract.SourceStatus, contract.SourceSystem, contract.SourceRecordId, contract.IsLegacyLoad,
+                    RegisteredImported = contract.RegisteredDateProvenance == RegisteredDateProvenance.Migration, SourceRegisteredValue = contract.SourceRegisteredValue,
+                    ActingAdministrator = m.LockAsLegacy ? m.ActingAdministrator : null
+                })));
+        }, ct);
+        return contract.Id;
+    }
+
+    public async Task<ContractFieldUpdate> UpdateContractFieldsAsync(Guid contractId, Guid batchId, IReadOnlyDictionary<string, string?> fields, bool lockedOverwriteAuthorised,
+        string reason, CancellationToken ct = default)
+    {
+        return await uow.ExecuteAsync(async c =>
+        {
+            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, c) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+            var before = contract.CaptureFields(fields.Keys);
+            var by = actor.ActorId ?? "system";
+            contract.ApplyMigratedFields(fields, lockedOverwriteAuthorised, by, clock.UtcNow);
+            try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else. Reload and try again."); }
+            audit.Record(new AuditEntry("migration.contract.updated", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, MigrationBatchId: batchId,
+                OldValuesJson: AuditJson.Of(before), NewValuesJson: AuditJson.Of(contract.CaptureFields(fields.Keys))));
+            return new ContractFieldUpdate(before, contract.UpdatedUtc);
+        }, ct);
+    }
+
+    public async Task<IReadOnlyDictionary<string, string?>> CaptureFieldsAsync(Guid contractId, IEnumerable<string> fieldNames, CancellationToken ct = default)
+    {
+        var contract = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+        return contract.CaptureFields(fieldNames);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyDictionary<string, string?>>> CaptureFieldsManyAsync(IReadOnlyCollection<Guid> contractIds, IReadOnlyCollection<string> fieldNames, CancellationToken ct = default)
+    {
+        var result = new Dictionary<Guid, IReadOnlyDictionary<string, string?>>();
+        foreach (var chunk in contractIds.Distinct().Chunk(400))
+        {
+            var ids = chunk.ToList();
+            foreach (var c in await db.Contracts.AsNoTracking().Where(x => ids.Contains(x.Id)).ToListAsync(ct)) result[c.Id] = c.CaptureFields(fieldNames);
+        }
+        return result;
+    }
+
+    public async Task<ExistingContractRef?> GetContractAsync(Guid contractId, CancellationToken ct = default)
+    {
+        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct);
+        return c is null ? null : ToRef(c);
+    }
+
+    public async Task RemoveContractAsync(Guid contractId, Guid batchId, string reason, CancellationToken ct = default)
+        => await uow.ExecuteAsync(async c =>
+        {
+            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId && x.MigrationBatchId == batchId, c);
+            if (contract is null) return; // already gone: rollback is idempotent. A record of another batch is never selected.
+            db.Contracts.Remove(contract);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("migration.contract.removed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, MigrationBatchId: batchId,
+                OldValuesJson: AuditJson.Of(new { contract.AgreementReference, contract.SourceRecordId, contract.Status })));
+        }, ct);
+
+    public async Task ArchiveContractAsync(Guid contractId, Guid batchId, string reason, CancellationToken ct = default)
+        => await uow.ExecuteAsync(async c =>
+        {
+            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId && x.MigrationBatchId == batchId, c);
+            if (contract is null || contract.IsArchived) return;
+            contract.Archive(reason, batchId, actor.ActorId ?? "system", clock.UtcNow);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("migration.contract.archived", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Reason: reason, MigrationBatchId: batchId));
+        }, ct);
+
+    public Task<int> CountContractsOfSupplierAsync(Guid supplierId, CancellationToken ct = default) => db.Contracts.AsNoTracking().CountAsync(c => c.SupplierId == supplierId, ct);
+    public Task<int> CountContractsOfCategoryAsync(Guid categoryId, CancellationToken ct = default) => db.Contracts.AsNoTracking().CountAsync(c => c.CategoryId == categoryId, ct);
+    public Task<int> CountChildCategoriesAsync(Guid categoryId, CancellationToken ct = default) => db.Categories.AsNoTracking().CountAsync(c => c.ParentCategoryId == categoryId, ct);
+
+    public async Task RemoveSupplierAsync(Guid supplierId, Guid batchId, string reason, CancellationToken ct = default)
+        => await uow.ExecuteAsync(async c =>
+        {
+            var supplier = await db.Suppliers.FirstOrDefaultAsync(x => x.Id == supplierId && x.MigrationBatchId == batchId, c);
+            if (supplier is null) return;
+            db.Suppliers.Remove(supplier);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("migration.supplier.removed", nameof(Supplier), supplierId.ToString(), OrganisationId: supplier.OrganisationId, Reason: reason, MigrationBatchId: batchId,
+                OldValuesJson: AuditJson.Of(new { supplier.Name, supplier.VendorNumber })));
+        }, ct);
+
+    public async Task RemoveCategoryAsync(Guid categoryId, Guid batchId, string reason, CancellationToken ct = default)
+        => await uow.ExecuteAsync(async c =>
+        {
+            var category = await db.Categories.FirstOrDefaultAsync(x => x.Id == categoryId && x.MigrationBatchId == batchId, c);
+            if (category is null) return;
+            db.Categories.Remove(category);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("migration.category.removed", nameof(Category), categoryId.ToString(), OrganisationId: category.OrganisationId, Reason: reason, MigrationBatchId: batchId,
+                OldValuesJson: AuditJson.Of(new { category.Code, category.Name })));
+        }, ct);
+
+    public async Task<BatchContractSummary> SummariseBatchAsync(Guid batchId, CancellationToken ct = default)
+    {
+        var rows = await (from c in db.Contracts.AsNoTracking()
+                          where c.MigrationBatchId == batchId
+                          join g in db.Categories.AsNoTracking() on new { c.TenantId, Id = c.CategoryId } equals new { g.TenantId, g.Id }
+                          select new { c.Status, g.Code, c.CurrencyCode, c.EstimatedValue }).ToListAsync(ct);
+        var byStatus = rows.GroupBy(r => r.Status).ToDictionary(g => g.Key, g => g.Count());
+        var byCategory = rows.GroupBy(r => r.Code).ToDictionary(g => g.Key, g => g.Count());
+        var value = rows.Where(r => r.CurrencyCode != null && r.EstimatedValue != null).GroupBy(r => r.CurrencyCode!).ToDictionary(g => g.Key, g => g.Sum(r => r.EstimatedValue!.Value));
+        return new BatchContractSummary(rows.Count, byStatus, byCategory, value);
+    }
+
+    public void ReleaseTracked() => db.ChangeTracker.Clear();
+
+    private async Task RequireOrganisationAsync(Guid organisationId, CancellationToken ct)
+    {
+        if (!await tenants.OrganisationExistsAsync(organisationId, ct)) throw new DomainException("organisation_not_found", "The organisation was not found.");
+    }
+}
+
+/// <summary>
+/// Cutover freeze (MIGRATION_SUPPLEMENT section 5.6). The Migration module supplies the real policy; until then nothing is frozen.
+/// Contracts asks before creating a contract for a person: migration itself never goes through this check.
+/// </summary>
+public interface ICutoverFreeze
+{
+    /// <summary>A message when contract creation in the organisation is frozen at this moment, otherwise null.</summary>
+    Task<string?> CreationBlockedAsync(Guid organisationId, CancellationToken ct = default);
+}
+
+internal sealed class NoCutoverFreeze : ICutoverFreeze
+{
+    public Task<string?> CreationBlockedAsync(Guid organisationId, CancellationToken ct = default) => Task.FromResult<string?>(null);
+}

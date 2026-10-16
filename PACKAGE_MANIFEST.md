@@ -224,6 +224,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `docs/CUSTOM_FIELDS.md`
 - `docs/EXPORTS.md`
 - `docs/PERFORMANCE.md`
+- `docs/PORTABILITY_AUDIT.md`
 - `docs/SEARCH_AND_VIEWS.md`
 - `migration-samples/contracts-import-custom-fields.csv`
 - `migration-samples/field-mapping-profile-custom-fields.csv`

@@ -15,7 +15,7 @@ using Xunit;
 namespace Ecp.Integration.Tests;
 
 /// <summary>Scenario bodies for the migration slice, shared by the SQLite and SQL Server runs.</summary>
-internal static class MigrationScenarios
+internal static partial class MigrationScenarios
 {
     public static async Task The_sample_contracts_manifest_and_archive_load_end_to_end(TestApp app)
     {

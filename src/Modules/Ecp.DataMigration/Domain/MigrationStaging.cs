@@ -99,13 +99,15 @@ public sealed class StagingRow : ITenantOwned
 
     /// <summary>Records the dry run's decision. Called again on every validation run: the row is recomputed, never accumulated.</summary>
     public void RecordValidation(string? mappedJson, string? sourceRecordId, string? agreementReference, string? idempotencyKey, RowOutcome outcome, PlannedAction action, Guid? targetContractId,
-        int errors, int warnings, string? planSummary, bool reviewApplicable)
+        int errors, int warnings, string? planSummary, bool? reviewApplicable)
     {
         if (Outcome is RowOutcome.Created or RowOutcome.Updated) throw new DomainException("row_committed", "A committed row cannot be validated again.");
         MappedValuesJson = mappedJson; SourceRecordId = sourceRecordId; AgreementReference = agreementReference; IdempotencyKey = idempotencyKey;
         Outcome = outcome; PlannedAction = action; TargetContractId = targetContractId; ErrorCount = errors; WarningCount = warnings; PlanSummary = Guard.OptionalBounded(planSummary, "Plan", 1000);
         // A decision a person made is kept for as long as the duplicate question still applies to the row.
-        if (reviewApplicable) { if (ReviewDecision == ReviewDecision.None) ReviewDecision = ReviewDecision.Required; }
+        // null: the mapping pass has not decided yet, so a decision already made is left alone for the planning pass.
+        if (reviewApplicable is null) return;
+        if (reviewApplicable.Value) { if (ReviewDecision == ReviewDecision.None) ReviewDecision = ReviewDecision.Required; }
         else ReviewDecision = ReviewDecision.None;
     }
 

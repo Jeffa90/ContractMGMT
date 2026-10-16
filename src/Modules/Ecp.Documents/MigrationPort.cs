@@ -54,7 +54,8 @@ public interface IDocumentMigrationPort
     /// <summary>Removes the versions a batch added to a document it did not create, returning the document to its earlier current version.</summary>
     Task<IReadOnlyList<string>> RemoveBatchVersionsAsync(Guid documentId, Guid batchId, string reason, CancellationToken ct = default);
     Task ArchiveDocumentAsync(Guid documentId, Guid batchId, string reason, CancellationToken ct = default);
-    Task<int> CountDocumentsOfContractAsync(Guid contractId, CancellationToken ct = default);
+    /// <summary>Documents attached to the contract, not counting the ones a rollback preview has already decided to remove.</summary>
+    Task<int> CountDocumentsOfContractAsync(Guid contractId, IReadOnlyCollection<Guid>? excluding = null, CancellationToken ct = default);
     Task<bool> IsBlobReferencedAsync(string storageKey, CancellationToken ct = default);
     Task<BatchDocumentSummary> SummariseBatchAsync(Guid batchId, CancellationToken ct = default);
     /// <summary>Forgets entities the context is tracking (see the Contracts equivalent). Call only between committed chunks.</summary>
@@ -184,7 +185,8 @@ internal sealed class DocumentMigrationPort(
             audit.Record(new AuditEntry("migration.document.archived", nameof(Document), documentId.ToString(), OrganisationId: d.OrganisationId, Reason: reason, MigrationBatchId: batchId));
         }, ct);
 
-    public Task<int> CountDocumentsOfContractAsync(Guid contractId, CancellationToken ct = default) => db.Documents.AsNoTracking().CountAsync(d => d.ContractId == contractId, ct);
+    public Task<int> CountDocumentsOfContractAsync(Guid contractId, IReadOnlyCollection<Guid>? excluding = null, CancellationToken ct = default)
+        => excluding is { Count: > 0 } ? db.Documents.AsNoTracking().CountAsync(d => d.ContractId == contractId && !excluding.Contains(d.Id), ct) : db.Documents.AsNoTracking().CountAsync(d => d.ContractId == contractId, ct);
 
     public Task<bool> IsBlobReferencedAsync(string storageKey, CancellationToken ct = default) => db.Versions.AsNoTracking().AnyAsync(v => v.StorageKey == storageKey, ct);
 

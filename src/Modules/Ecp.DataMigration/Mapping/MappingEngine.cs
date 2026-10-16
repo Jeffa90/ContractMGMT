@@ -74,6 +74,10 @@ public static class MappingEngine
                 }
             }
 
+            // A mapping that names a lookup without the LookupMap transformation uses it as a soft lookup: a listed value is translated, an unlisted one passes through unchanged.
+            if (!failed && value.Length > 0 && !chain.Contains("LookupMap") && !string.IsNullOrWhiteSpace(mapping.LookupMapKey)
+                && lookups.TryGetValue(mapping.LookupMapKey, out var soft) && soft.TryGetValue(value.Trim(), out var translated)) value = translated;
+
             if (!failed && value.Length > 0) failed = !Check(mapping, parameters, value, result);
             if (!failed && value.Length == 0 && mapping.Required)
             {
@@ -83,7 +87,7 @@ public static class MappingEngine
             var transformed = value;
             result.Trace.Add(new MappingTrace(mapping.SourceColumn, mapping.TargetField, original, transformed, !string.Equals(original, transformed, StringComparison.Ordinal), defaultApplied,
                 failed || result.Messages.Count(m => m.IsError) > errorsBefore));
-            if (!failed) result.Values[mapping.TargetField] = value;
+            if (!failed && value.Length > 0) result.Values[mapping.TargetField] = value;
         }
         return result;
     }

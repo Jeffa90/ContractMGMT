@@ -242,14 +242,16 @@ internal static class RowPlanner
     private static RowPlan Skip(RowPlan plan, string summary) { plan.Outcome = RowOutcome.Skipped; plan.Action = PlannedAction.Skip; plan.Summary = summary; return plan; }
     private static RowPlan Review(RowPlan plan, string summary) { plan.Outcome = RowOutcome.Pending; plan.Action = PlannedAction.None; plan.NeedsReview = true; plan.Summary = "Needs a decision: " + summary; return plan; }
 
+    /// <summary>Values are compared as the target stores them: money by amount (1000 equals 1000.00), everything else exactly.</summary>
+    private static bool SameValue(string field, string? current, string? wanted)
+    {
+        if (field == "estimatedValue" && decimal.TryParse(current, NumberStyles.Number, CultureInfo.InvariantCulture, out var a) && decimal.TryParse(wanted, NumberStyles.Number, CultureInfo.InvariantCulture, out var b)) return a == b;
+        return string.Equals(current, wanted, StringComparison.Ordinal);
+    }
+
     private static RowPlan PlanUpdate(RowPlan plan, PlanContext ctx, ExistingContractRef existing)
     {
         var v = plan.Values!;
-        if (existing.RecordLocked && !(ctx.Batch.IsLegacyLoad && ctx.Project.LegacyAllowOverwriteLocked))
-        {
-            plan.Messages.Add(new(true, "MIG-E012", "sourceRecordId", "The existing record is locked. A migration may overwrite it only under a legacy-load policy that explicitly allows it."));
-            return Reject(plan, "Locked record; overwrite not allowed.");
-        }
         var wanted = new Dictionary<string, string?>(StringComparer.Ordinal);
         void Want(string target, string field, string? value) { if (ctx.Definition.Maps(target) && !string.IsNullOrEmpty(value)) wanted[field] = value; }
         Want("contractTitle", "contractTitle", v.Title); Want("description", "description", v.Description); Want("status", "status", v.Status);
@@ -265,13 +267,18 @@ internal static class RowPlanner
         ctx.ExistingFields.TryGetValue(existing.Id, out var current);
         var changed = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (var (field, value) in wanted)
-            if (current is null || !string.Equals(current.GetValueOrDefault(field), value, StringComparison.Ordinal)) changed[field] = value;
+            if (current is null || !SameValue(field, current.GetValueOrDefault(field), value)) changed[field] = value;
         // A planned (not yet created) supplier or category is applied at commit; the change cannot be compared now.
         if (plan.Supplier is { IsNew: true } || plan.Category is { IsNew: true }) { if (plan.Supplier is { IsNew: true }) changed["supplierId"] = null; if (plan.Category is { IsNew: true }) changed["categoryId"] = null; }
         if (changed.Count == 0)
         {
             plan.Messages.Add(new(false, "MIG-W002", "sourceRecordId", "No mapped field differs from the existing record; nothing is updated."));
             return Skip(plan, "Unchanged.");
+        }
+        if (existing.RecordLocked && !(ctx.Batch.IsLegacyLoad && ctx.Project.LegacyAllowOverwriteLocked))
+        {
+            plan.Messages.Add(new(true, "MIG-E012", "sourceRecordId", "The existing record is locked. A migration may overwrite it only under a legacy-load policy that explicitly allows it."));
+            return Reject(plan, "Locked record; overwrite not allowed.");
         }
         plan.UpdateFields = changed; plan.Action = PlannedAction.Update; plan.Outcome = RowOutcome.Accepted;
         plan.Summary = $"Update {existing.AgreementReference}: {string.Join(", ", changed.Keys.OrderBy(k => k, StringComparer.Ordinal))}";

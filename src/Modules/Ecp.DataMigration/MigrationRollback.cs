@@ -34,9 +34,13 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
         try { batch.EnsureCanRollBack(k.Clock.UtcNow); }
         catch (DomainException ex) { return new RollbackPreview(false, ex.Message, []); }
         var tally = new Dictionary<(string, string), (int Count, string Detail)>();
-        foreach (var p in await ActiveAsync(batchId, ct))
+        // Records are considered in the order a rollback acts, so a supplier is previewed as removable once the contracts that would be removed are taken into account.
+        var wouldRemove = new HashSet<Guid>(); var wouldRemoveDocuments = new HashSet<Guid>();
+        foreach (var p in (await ActiveAsync(batchId, ct)).OrderBy(x => Array.IndexOf(EntityOrder, x.TargetEntityType)))
         {
-            var (action, detail) = await DecideAsync(batch, p, apply: false, compensate: false, ct);
+            var (action, detail) = await DecideAsync(batch, p, apply: false, compensate: false, ct, preview: wouldRemove, previewDocuments: wouldRemoveDocuments);
+            if (p.TargetEntityType == "Contract" && action == "Remove") wouldRemove.Add(p.TargetEntityId);
+            if (p.TargetEntityType == "Document" && action == "Remove") wouldRemoveDocuments.Add(p.TargetEntityId);
             var key = (p.TargetEntityType, action);
             tally[key] = (tally.GetValueOrDefault(key).Count + 1, detail);
         }
@@ -116,7 +120,7 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
     /// What to do with one provenance record, and (when <paramref name="apply"/>) doing it. Returns the action and a plain explanation that is stored with the record.
     /// Actions: Remove, Restore, Unlink, Archive, Keep, NotReversible.
     /// </summary>
-    private async Task<(string Action, string Detail)> DecideAsync(MigrationBatch batch, ProvenanceRecord p, bool apply, bool compensate, CancellationToken ct, HashSet<string>? released = null, string? reason = null)
+    private async Task<(string Action, string Detail)> DecideAsync(MigrationBatch batch, ProvenanceRecord p, bool apply, bool compensate, CancellationToken ct, HashSet<string>? released = null, string? reason = null, HashSet<Guid>? preview = null, HashSet<Guid>? previewDocuments = null)
     {
         var why = reason ?? "Rollback";
         switch (p.TargetEntityType)
@@ -162,7 +166,7 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
                 }
                 if (c.MigrationBatchId != batch.Id) return ("NotReversible", "The contract does not belong to this batch.");
                 var untouched = c.UpdatedUtc == c.CreatedUtc;
-                var remainingDocuments = await documents.CountDocumentsOfContractAsync(c.Id, ct);
+                var remainingDocuments = await documents.CountDocumentsOfContractAsync(c.Id, previewDocuments?.ToList(), ct);
                 if (!compensate && untouched && remainingDocuments == 0)
                 {
                     if (apply) await contracts.RemoveContractAsync(c.Id, batch.Id, why, ct);
@@ -176,7 +180,7 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
             {
                 if (p.Action == ProvenanceAction.Linked) return ("Unlink", "Nothing to undo: the batch only linked an existing supplier.");
                 if (compensate) return ("Keep", "Shared reference data is kept after acceptance.");
-                var uses = await contracts.CountContractsOfSupplierAsync(p.TargetEntityId, ct);
+                var uses = await contracts.CountContractsOfSupplierAsync(p.TargetEntityId, preview?.ToList(), ct);
                 if (uses > 0) return ("Keep", $"Kept: {uses} contract(s) still refer to this supplier (it was created by a rolled-back batch).");
                 if (apply) await contracts.RemoveSupplierAsync(p.TargetEntityId, batch.Id, why, ct);
                 return ("Remove", "The supplier was created by this batch and nothing refers to it.");
@@ -185,7 +189,7 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
             {
                 if (p.Action == ProvenanceAction.Linked) return ("Unlink", "Nothing to undo: the batch only linked an existing category.");
                 if (compensate) return ("Keep", "Shared reference data is kept after acceptance.");
-                var uses = await contracts.CountContractsOfCategoryAsync(p.TargetEntityId, ct) + await contracts.CountChildCategoriesAsync(p.TargetEntityId, ct);
+                var uses = await contracts.CountContractsOfCategoryAsync(p.TargetEntityId, preview?.ToList(), ct) + await contracts.CountChildCategoriesAsync(p.TargetEntityId, ct);
                 if (uses > 0) return ("Keep", $"Kept: {uses} contract(s) or subcategories still refer to this category (it was created by a rolled-back batch).");
                 if (apply) await contracts.RemoveCategoryAsync(p.TargetEntityId, batch.Id, why, ct);
                 return ("Remove", "The category was created by this batch and nothing refers to it.");

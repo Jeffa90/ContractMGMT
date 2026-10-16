@@ -277,6 +277,13 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
                         messages.Add(k.Message(batchId, MessagePhase.Commit, MessageSubject.File, f.Id, f.RelativePath, true, "MIG-F015", "The contract this file belongs to was not loaded, so the file stays in the queue."));
                         continue;
                     }
+                    if (f.QuarantineKey is null || !Ecp.Documents.Domain.StorageKey.IsValidFor(k.TenantId, f.QuarantineKey))
+                    {
+                        // Defence in depth: a staged file can only ever point into this tenant's own store.
+                        f.MarkFailed("MIG-F016: the staged content does not belong to this tenant.");
+                        messages.Add(k.Message(batchId, MessagePhase.Commit, MessageSubject.File, f.Id, f.RelativePath, true, "MIG-F016", "The staged content does not belong to this tenant, so the file was not imported."));
+                        continue;
+                    }
                     if (!await storage.ExistsAsync(k.TenantId, f.QuarantineKey!, c))
                     {
                         f.MarkFailed("MIG-F005: the staged content could not be found.");

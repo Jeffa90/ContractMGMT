@@ -184,7 +184,7 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
                     foreach (var m in mapped.Messages) messages.Add(k.Message(batchId, MessagePhase.Validation, MessageSubject.Row, row.Id, $"row {row.RowNumber}", m.IsError, m.Code, m.Text, m.Field));
                     var values = mapped.Values.Count == 0 ? null : JsonSerializer.Serialize(mapped.Values);
                     mapped.Values.TryGetValue("sourceRecordId", out var sid); mapped.Values.TryGetValue("agreementReference", out var aref);
-                    row.RecordValidation(values, sid, aref, null, e > 0 ? RowOutcome.Rejected : RowOutcome.Pending, PlannedAction.None, null, e, w, e > 0 ? "Values could not be mapped." : null, false);
+                    row.RecordValidation(values, sid, aref, null, e > 0 ? RowOutcome.Rejected : RowOutcome.Pending, PlannedAction.None, null, e, w, e > 0 ? "Values could not be mapped." : null, e > 0 ? false : null);
                     if (e == 0 && sid is not null) sourceIds.Add(sid);
                     if (e == 0 && aref is not null) references.Add(aref);
                 }
@@ -378,6 +378,10 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
             f.RecordMatch(FileState.Matched, QueueReason.None, entry?.Id, row.Id, f.MatchedBy, documentSourceId, f.Note);
             docFiles.Add(new DocFile(f.Id, f.RelativePath, f.Sha256!, row.Id, row.TargetContractId, documentSourceId, f.ReleasedFromHold));
         }
+        // MIG-F008: two files of one contract with the same name are allowed, but a person should know.
+        foreach (var group in matched.GroupBy(f => (f.ContractStagingRowId, Name: f.FileName.ToUpperInvariant())).Where(g => g.Count() > 1))
+            foreach (var f in group.OrderBy(x => x.RelativePath, StringComparer.Ordinal).Skip(1))
+                Say(MessageSubject.File, f.Id, f.RelativePath, false, "MIG-F008", $"Another file of this contract is also named '{f.FileName}'.");
         var bySource = docFiles.Count == 0 ? [] : await documents.FindBySourceAsync(l.Batch.OrganisationId, sourceSystem, docFiles.Select(d => d.DocumentSourceId).ToList(), ct);
         var byHash = docFiles.Count == 0 ? [] : await documents.FindByHashAsync(docFiles.Select(d => d.Sha256).ToList(), ct);
         var decisions = DocumentPlanner.Plan(docFiles, l.Batch.DocumentDuplicateOption,

@@ -88,7 +88,7 @@ internal sealed class MigrationWorld
     {
         var summary = await ValidateAsync(batchId);
         if (summary.Blockers.Count > 0) throw new InvalidOperationException("Validation blocked: " + string.Join("; ", summary.Blockers));
-        if (legacy) await AsAdmin2Async(s => { var c = s.Get<IMigrationCommit>().ConfirmLegacyLoadAsync(batchId); return c.ContinueWith(_ => true); });
+        if (legacy) await AsAdmin2Async(s => { var c = s.Get<IMigrationCommit>().ConfirmLegacyLoadAsync(batchId); return c.Done(); });
         return await AsAdminAsync(s => s.Get<IMigrationCommit>().CommitAsync(batchId));
     }
 
@@ -99,6 +99,25 @@ internal sealed class MigrationWorld
         return await read(s);
     }
 
+    private static string Q(string v) => v.Contains(',') || v.Contains('"') || v.Contains('\n') ? "\"" + v.Replace("\"", "\"\"") + "\"" : v;
+
+    /// <summary>One line of the contracts file in the sample layout.</summary>
+    public static string Row(string id, string reference, string title = "Synthetic agreement", string supplier = "Southern Cross Demo Supplies Pty Ltd", string vendor = "900001", string category = "Packaging",
+        string sub = "Flexible Packaging", string status = "Effective", string start = "2024-01-01", string effective = "2024-01-01", string registered = "2024-01-15", string review = "2026-11-30",
+        string end = "2027-12-31", string currency = "AUD", string value = "1000", string ext = "NoExtension", string legal = "Yes", string? folder = null)
+        => string.Join(",", new[] { id, reference, title, supplier, vendor, category, sub, status, start, effective, registered, review, end, currency, value, ext, legal, folder ?? reference }.Select(Q));
+
+    public const string ManifestHeader = "SourceRecordId,AgreementReference,RelativePath,FileName,DocumentType,DocumentDate,VersionLabel,IsExecutedCopy,ParentDocumentSourceId,Sha256,Notes";
+
+    public static string ManifestRow(string id, string reference, string path, string type = "Executed Contract", string date = "2024-01-10", string executed = "Yes", string version = "1.0", string parent = "", string sha = "")
+        => string.Join(",", new[] { id, reference, path, path[(path.LastIndexOf('/') + 1)..], type, date, version, executed, parent, sha, "" }.Select(Q));
+
     public static byte[] Csv(params string[] lines) => [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes(string.Join("\r\n", lines) + "\r\n")];
     public const string ContractsHeader = "SourceRecordId,AgreementReference,ContractTitle,SupplierName,VendorNumber,Category,Subcategory,Status,StartDate,EffectiveDate,RegisteredDate,ReviewDate,EndDate,Currency,EstimatedValue,ExtensionType,LegalReviewRequired,DocumentFolder";
+}
+
+internal static class TaskExtensions
+{
+    /// <summary>Awaits the task so a failure surfaces (ContinueWith would swallow it) and yields a value for helpers that return one.</summary>
+    public static async Task<bool> Done(this Task task) { await task; return true; }
 }

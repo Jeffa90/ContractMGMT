@@ -85,6 +85,11 @@ jobs:
       - run: dotnet build src/Ecp.sln -c Release --no-restore
       - name: SQL Server tests
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer" --logger "trx" --results-directory TestResults
+      - name: Performance baseline (SQL Server)
+        if: always()
+        run: |
+          echo "runner: $(uname -sr) cpus=$(nproc) mem=$(free -m | awk '/Mem:/{print $2}')MB"
+          cat artifacts/performance/sqlserver.json || echo "no baseline file written"
       - name: Honest result summary
         if: always()
         run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"

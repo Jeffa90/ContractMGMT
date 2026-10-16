@@ -101,4 +101,5 @@ jobs:
     needs: build-and-unit
     steps:
       - uses: actions/checkout@v4
-      - run: deploy/docker/smoke.sh
+      # Host networking keeps the probes simple: the container binds loopback, so setup (loopback-only by default) is reachable exactly as on a server.
+      - run: deploy/docker/smoke.sh --network host

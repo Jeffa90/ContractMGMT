@@ -9,11 +9,19 @@ public sealed class ProblemExceptionHandler(IProblemDetailsService problems, ILo
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
     {
+        // A sensitive action that needs a recent sign-in sends a person to confirm their identity and bring them back; it is not an error.
+        if (exception is ReauthenticationRequiredException && !context.Request.Path.StartsWithSegments("/api") && !context.Request.Path.StartsWithSegments("/health"))
+        {
+            var back = context.Request.Method == "GET" ? context.Request.Path + context.Request.QueryString : context.Request.Path.ToString();
+            context.Response.Redirect("/Reauth?returnUrl=" + Uri.EscapeDataString(back));
+            return true;
+        }
         var (status, code, title) = exception switch
         {
             DomainException d => (StatusCodes.Status422UnprocessableEntity, d.Code, d.Message),
             ResourceNotFoundException => (StatusCodes.Status404NotFound, "not_found", "The resource was not found."),
             ForbiddenException f => (StatusCodes.Status403Forbidden, "forbidden", f.Message),
+            ReauthenticationRequiredException r => (StatusCodes.Status401Unauthorized, "reauthentication_required", r.Message),
             TenantScopeMissingException => (StatusCodes.Status403Forbidden, "tenant_scope_missing", "No tenant scope is established for this request."),
             TenantMismatchException => (StatusCodes.Status403Forbidden, "tenant_mismatch", "The operation targets a different tenant."),
             _ => (StatusCodes.Status500InternalServerError, "internal_error", "An unexpected error occurred.")

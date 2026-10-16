@@ -4,6 +4,7 @@
 @inject IAccessService Access
 @inject EcpHostOptions HostOptions
 @inject Ecp.Host.Setup.BrandingAccessor Brand
+@inject Ecp.Identity.ElevationContext Elevation
 @{
     var branding = await Brand.GetAsync();
     var productName = branding.ProductName == Ecp.Configuration.Branding.Default.ProductName ? L["App.Name"].Value : branding.ProductName;
@@ -22,6 +23,8 @@
         if (await Can("audit.read", "audit.read_admin")) items.Add(("/Admin/Audit", L["Audit events"].Value, "/Admin/Audit"));
         if (await Can("onboarding.run")) items.Add(("/Onboarding", L["Organisation onboarding"].Value, "/Onboarding"));
         if (await Can("migration.stage")) items.Add(("/Migration", L["Data migration"].Value, "/Migration"));
+        if (await Can("support.elevate")) items.Add(("/Admin/Support", L["Support access"].Value, "/Admin/Support"));
+        if (await Can("audit.read_admin")) items.Add(("/Admin/Elevations", L["Access to this tenant"].Value, "/Admin/Elevations"));
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
         if (await Can("setup.run")) items.Add(("/Admin/Setup", L["Installation setup"].Value, "/Admin/Setup"));
     }
@@ -42,6 +45,14 @@
     {
         <div class="env-banner" role="status">@L["Demonstration environment"] (@HostOptions.Mode): @L["synthetic data only, not for production use."]</div>
     }
+    @if (Elevation.Current is { } elevated)
+    {
+        <div class="access-banner" role="alert">
+            <strong>@L["Support access is active"]</strong>
+            (@elevated.Kind, @L["until"] @elevated.ExpiresUtc.ToString("u")): @elevated.Reason
+            <form method="post" asp-page="/Account/EndAccess"><button type="submit" class="secondary">@L["End this access"]</button></form>
+        </div>
+    }
     <header class="site-header">
         <a class="brand" href="/">@productName</a>
         @if (signedIn)
@@ -57,7 +68,7 @@
             </nav>
             <div class="who">
                 <span>@L["Signed in as"] <strong>@User.Identity!.Name</strong></span>
-                <form method="post" action="/SignOut"><button class="secondary" type="submit">@L["Sign out"]</button></form>
+                <form method="post" asp-page="/SignOut"><button class="secondary" type="submit">@L["Sign out"]</button></form>
             </div>
         }
     </header>

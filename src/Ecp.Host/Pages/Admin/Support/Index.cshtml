@@ -1,0 +1,57 @@
+@page "/Admin/Support"
+@model Ecp.Host.Pages.Admin.Support.IndexModel
+@using Ecp.Identity.Domain
+@{ ViewData["Title"] = L["Support and emergency access"].Value; }
+<h1>@L["Support and emergency access"]</h1>
+<p class="lede">@L["Time-limited access to one tenant, for a stated reason. You act as yourself with only the permissions listed; nothing impersonates a person or reveals a password. The tenant's administrators can see this access while it is active and afterwards, and every action carries its identifier in the audit trail."]</p>
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="error-summary" role="alert"><ul>@foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors)) { <li>@e.ErrorMessage</li> }</ul></div>
+}
+<section class="card" aria-labelledby="open-h">
+    <h2 id="open-h">@L["Request access"]</h2>
+    <form method="post" asp-page-handler="Open">
+        <div class="field"><label for="tenantId">@L["Tenant"]</label>
+            <select id="tenantId" name="tenantId" required>@foreach (var t in Model.Tenants) { <option value="@t.Id">@t.Name</option> }</select></div>
+        <div class="field"><label for="kind">@L["Kind of access"]</label>
+            <select id="kind" name="kind"><option value="Support">@L["Support: read-only"]</option><option value="Emergency">@L["Emergency: read-only plus account and role recovery"]</option></select>
+            <p class="hint">@L["Neither kind can change a contract, approve, unlock a record or publish configuration."]</p></div>
+        <div class="field"><label for="reason">@L["Reason"]</label><textarea id="reason" name="reason" rows="3" required minlength="10" maxlength="1000"></textarea></div>
+        <div class="field"><label for="minutes">@L["Minutes (most @Model.MaxMinutes)"]</label><input id="minutes" name="minutes" type="number" min="5" max="@Model.MaxMinutes" value="60" required /></div>
+        <div class="field"><label for="ceiling">@L["Classification ceiling (optional; never above Confidential)"]</label><input id="ceiling" name="ceiling" type="text" /></div>
+        <div class="actions"><button type="submit">@L["Request access"]</button></div>
+        <p class="hint">@L["You will be asked to sign in again first."]</p>
+    </form>
+</section>
+<section aria-labelledby="open-list">
+    <h2 id="open-list">@L["Access waiting or active"]</h2>
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Access waiting or active"]</caption>
+        <thead><tr><th scope="col">@L["Tenant"]</th><th scope="col">@L["Kind"]</th><th scope="col">@L["Who"]</th><th scope="col">@L["Reason"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Expires"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+        <tbody>
+        @foreach (var e in Model.Open)
+        {
+            <tr>
+                <td>@(Model.TenantNames.TryGetValue(e.TenantId, out var n) ? n : e.TenantId.ToString()[..8])</td>
+                <td>@e.Kind</td><td>@e.InitiatorLabel</td><td>@e.Reason</td>
+                <td><span class="badge @(e.State == ElevationState.Active ? "ok" : "warn")">@e.State</span></td>
+                <td>@(e.ExpiresUtc?.ToString("u") ?? "-")</td>
+                <td>
+                    @if (e.State == ElevationState.PendingConfirmation)
+                    {
+                        <form method="post" asp-page-handler="Confirm"><input type="hidden" name="tenantId" value="@e.TenantId" /><input type="hidden" name="id" value="@e.Id" /><button type="submit" class="secondary">@L["Confirm"]</button></form>
+                    }
+                    else if (e.State == ElevationState.Active)
+                    {
+                        <form method="post" asp-page-handler="Start"><input type="hidden" name="tenantId" value="@e.TenantId" /><input type="hidden" name="id" value="@e.Id" /><button type="submit">@L["Work in this tenant"]</button></form>
+                    }
+                    <form method="post" asp-page-handler="End"><input type="hidden" name="tenantId" value="@e.TenantId" /><input type="hidden" name="id" value="@e.Id" /><input type="hidden" name="reason" value="Ended from the support page" /><button type="submit" class="secondary">@L["End"]</button></form>
+                </td>
+            </tr>
+        }
+        @if (Model.Open.Count == 0) { <tr><td colspan="7">@L["Nothing is waiting or active."]</td></tr> }
+        </tbody>
+    </table>
+    </div>
+</section>

@@ -45,6 +45,12 @@ public interface IElevationService
     /// <summary>Ends an elevation now. Allowed to the person it was opened for, to any installation administrator, and to the target tenant's own administrators.</summary>
     Task EndAsync(Guid tenantId, Guid elevationId, string? reason, CancellationToken ct = default);
 
+    /// <summary>The person using the elevation ends it (from the banner). Only the elevation the current request runs under.</summary>
+    Task EndCurrentAsync(string? reason, CancellationToken ct = default);
+
+    /// <summary>Installation administrators: elevations waiting for confirmation or still active, across tenants.</summary>
+    Task<IReadOnlyList<ElevationDto>> ListOpenAcrossTenantsAsync(CancellationToken ct = default);
+
     /// <summary>The elevations of the current tenant, active and past, for its administrators (<c>audit.read_admin</c>).</summary>
     Task<IReadOnlyList<ElevationDto>> ListForCurrentTenantAsync(bool activeOnly, CancellationToken ct = default);
 
@@ -57,7 +63,7 @@ public interface IElevationService
 
 internal sealed class ElevationService(
     IdentityDbContext db, IUnitOfWork uow, IAuditWriter audit, TenantContext tenant, IClock clock, CurrentUser currentUser, IAccessService access, IClassificationScaleProvider scales,
-    ITenantDirectory tenants, IAuditEventSource events, ReauthenticationContext reauth, IdentityOptions options) : IElevationService
+    ITenantDirectory tenants, IAuditEventSource events, ReauthenticationContext reauth, IdentityOptions options, ElevationContext elevationContext) : IElevationService
 {
     private static readonly TimeSpan ReauthWindow = TimeSpan.FromMinutes(10);
     private const string SupportPermission = "support.elevate";
@@ -77,6 +83,7 @@ internal sealed class ElevationService(
         var home = tenant.RequireTenantId();
         var scale = await scales.GetAsync(ct);
 
+        if (r.TenantId == SystemTenant.Id) throw new DomainException("invalid_target", "An elevation targets a customer tenant, not the installation itself.");
         TenantInfo target;
         using (tenant.UseInstallationScope()) target = await tenants.FindAsync(r.TenantId, ct) ?? throw new DomainException("tenant_not_found", "That tenant was not found.");
         if (target.Status != Tenancy.Domain.TenantStatus.Active) throw new DomainException("tenant_not_active", "Access can be opened only to an active tenant.");
@@ -145,6 +152,35 @@ internal sealed class ElevationService(
                     NewValuesJson: IdentityJson.Of(new { endedBy = callerLabel, early = elevation.ExpiresUtc is { } e && clock.UtcNow < e })));
             }, ct);
         }
+    }
+
+    public async Task EndCurrentAsync(string? reason, CancellationToken ct = default)
+    {
+        var grant = elevationContext.Current ?? throw new DomainException("no_elevation", "No support or emergency access is active.");
+        await uow.ExecuteAsync(async c =>
+        {
+            var elevation = await db.Elevations.FirstOrDefaultAsync(e => e.Id == grant.ElevationId, c) ?? throw new ResourceNotFoundException();
+            if (elevation.EndedUtc is not null) return;
+            elevation.End(grant.InitiatorLabel, reason ?? "Ended by the person using it", clock.UtcNow);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("elevation.ended", nameof(Elevation), elevation.Id.ToString(), Reason: reason, ElevationId: elevation.Id, NewValuesJson: IdentityJson.Of(new { endedBy = grant.InitiatorLabel, early = true })));
+        }, ct);
+    }
+
+    public async Task<IReadOnlyList<ElevationDto>> ListOpenAcrossTenantsAsync(CancellationToken ct = default)
+    {
+        await RequireInstallationAdministratorAsync(ct);
+        IReadOnlyList<TenantInfo> all;
+        using (tenant.UseInstallationScope()) all = await tenants.ListAsync(ct);
+        var now = clock.UtcNow;
+        var result = new List<ElevationDto>();
+        foreach (var t in all.Where(t => t.Id != SystemTenant.Id))
+        {
+            using var _ = tenant.Use(t.Id);
+            var rows = await db.Elevations.AsNoTracking().Where(e => e.EndedUtc == null).OrderByDescending(e => e.RequestedUtc).Take(50).ToListAsync(ct);
+            result.AddRange(rows.Where(e => e.StateAt(now) is ElevationState.Active or ElevationState.PendingConfirmation).Select(ToDto));
+        }
+        return result;
     }
 
     public async Task<IReadOnlyList<ElevationDto>> ListForCurrentTenantAsync(bool activeOnly, CancellationToken ct = default)

@@ -47,7 +47,7 @@ builder.Services.AddSingleton(demoIdentity);
 builder.Services.AddEcpPersistence(resolved.Database);
 builder.Services.AddAuditModule();
 builder.Services.AddTenancyModule();
-builder.Services.AddIdentityModule(o => o.Mode = resolved.Host.Mode);
+builder.Services.AddIdentityModule(o => { o.Mode = resolved.Host.Mode; o.RequireEmergencyConfirmation = production; });
 builder.Services.AddConfigurationModule(o => o.RequireSecondPersonPublish = production);
 builder.Services.AddContractsModule(o => builder.Configuration.GetSection("Contracts").Bind(o));
 builder.Services.AddDocumentsModule(o => builder.Configuration.GetSection("Documents").Bind(o),

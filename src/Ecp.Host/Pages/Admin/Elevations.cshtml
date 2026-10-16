@@ -1,0 +1,46 @@
+@page "/Admin/Elevations"
+@model Ecp.Host.Pages.Admin.ElevationsModel
+@{ ViewData["Title"] = L["Support and emergency access to this tenant"].Value; }
+<h1>@L["Support and emergency access to this tenant"]</h1>
+<p class="lede">@L["Every time an installation administrator has been given access to this tenant: who, why, for how long, and what they did. You can end any access that is still active."]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Access to this tenant"]</caption>
+    <thead><tr><th scope="col">@L["Who"]</th><th scope="col">@L["Kind"]</th><th scope="col">@L["Reason"]</th><th scope="col">@L["Requested"]</th><th scope="col">@L["Expires"]</th><th scope="col">@L["State"]</th><th scope="col"><span class="visually-hidden">@L["Details"]</span></th></tr></thead>
+    <tbody>
+    @foreach (var e in Model.Items)
+    {
+        <tr>
+            <td>@e.InitiatorLabel</td><td>@e.Kind</td><td>@e.Reason</td><td>@e.RequestedUtc.ToString("u")</td><td>@(e.ExpiresUtc?.ToString("u") ?? "-")</td>
+            <td><span class="badge @(e.State == Ecp.Identity.Domain.ElevationState.Active ? "bad" : "ok")">@e.State</span></td>
+            <td><a href="/Admin/Elevations?id=@e.Id">@L["What was done"]</a></td>
+        </tr>
+    }
+    @if (Model.Items.Count == 0) { <tr><td colspan="7">@L["No support or emergency access has been opened to this tenant."]</td></tr> }
+    </tbody>
+</table>
+</div>
+@if (Model.Selected is { } sel)
+{
+    <section class="card" aria-labelledby="sel-h">
+        <h2 id="sel-h">@sel.Kind @L["access by"] @sel.InitiatorLabel</h2>
+        <dl class="facts">
+            <dt>@L["Reason"]</dt><dd>@sel.Reason</dd>
+            <dt>@L["Classification ceiling"]</dt><dd>@sel.ClassificationCeiling</dd>
+            <dt>@L["Permissions"]</dt><dd>@string.Join(", ", sel.Permissions)</dd>
+            <dt>@L["Started"]</dt><dd>@(sel.StartUtc?.ToString("u") ?? "-")</dd>
+            <dt>@L["Expires"]</dt><dd>@(sel.ExpiresUtc?.ToString("u") ?? "-")</dd>
+            <dt>@L["Confirmed by"]</dt><dd>@(sel.ConfirmedByLabel ?? "-")</dd>
+            <dt>@L["Ended"]</dt><dd>@(sel.EndedUtc?.ToString("u") ?? "-") @(sel.EndedByLabel is null ? "" : "(" + sel.EndedByLabel + ")")</dd>
+        </dl>
+        @if (sel.State == Ecp.Identity.Domain.ElevationState.Active)
+        {
+            <form method="post" asp-page-handler="End"><input type="hidden" name="id" value="@sel.Id" />
+                <div class="field"><label for="reason">@L["Reason for ending"]</label><input id="reason" name="reason" type="text" required /></div>
+                <div class="actions"><button type="submit">@L["End this access now"]</button></div></form>
+        }
+        <h3>@L["Actions performed"]</h3>
+        <ul>@foreach (var a in Model.Actions) { <li>@a.OccurredUtc.ToString("u") &middot; @a.Action &middot; @a.EntityType (@a.Outcome)</li> }
+            @if (Model.Actions.Count == 0) { <li>@L["Nothing was done under this access."]</li> }</ul>
+    </section>
+}

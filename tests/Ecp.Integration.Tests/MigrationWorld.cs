@@ -28,7 +28,7 @@ internal sealed class MigrationWorld
     public Guid Org1 => World.Org1;
     public const string SourceSystem = "Medius";
 
-    public static async Task<MigrationWorld> CreateAsync(TestApp app, bool legacyPolicy = true, bool allowRegisteredDate = true, bool createMissingCategories = false, string? namingRule = null)
+    public static async Task<MigrationWorld> CreateAsync(TestApp app, bool legacyPolicy = true, bool allowRegisteredDate = true, bool createMissingCategories = false, string? namingRule = null, string? extraMappingRows = null)
     {
         var world = await AccessWorld.CreateAsync(app, "TenantM" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant());
         var mw = new MigrationWorld { App = app, World = world };
@@ -53,7 +53,8 @@ internal sealed class MigrationWorld
             var profiles = s.Get<IMappingProfiles>();
             mw.ProfileId = await profiles.CreateAsync(world.Org1, "Sample register profile", SourceSystem, "2026.1");
             mw.ProfileVersionId = await profiles.OpenDraftAsync(mw.ProfileId);
-            await profiles.ImportFieldMappingsAsync(mw.ProfileVersionId, MigrationSamples.Open("field-mapping-profile-complete.csv"));
+            await profiles.ImportFieldMappingsAsync(mw.ProfileVersionId, extraMappingRows is null ? MigrationSamples.Open("field-mapping-profile-complete.csv")
+                : new MemoryStream([.. MigrationSamples.Bytes("field-mapping-profile-complete.csv"), .. Encoding.UTF8.GetBytes("\r\n" + extraMappingRows)]));
             await profiles.ImportLookupsAsync(mw.ProfileVersionId, MigrationSamples.Open("status-lookup-map.csv"));
             await profiles.SetOptionsAsync(mw.ProfileVersionId, new ProfileOptions(createMissingCategories, namingRule, ["Evergreen"]));
             await profiles.PublishAsync(mw.ProfileVersionId, "Sample profile");

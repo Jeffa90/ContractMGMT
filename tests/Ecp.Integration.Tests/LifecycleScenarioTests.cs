@@ -30,10 +30,13 @@ public sealed class LifecycleScenarioTests_Sqlite
     [Fact] public Task Renewal_cancel() => ProviderRunner.SqliteAsync(LifecycleScenarios3.Cancelling_a_renewal_withdraws_the_draft_successor_and_restores_the_predecessor, LifecycleScenarios.Scanner);
     [Fact] public Task Cross_tenant_lifecycle_attempts() => ProviderRunner.SqliteAsync(LifecycleScenarios3.Another_tenants_records_do_not_exist_for_any_lifecycle_call, LifecycleScenarios.Scanner);
     [Fact] public Task Pinned_workflows() => ProviderRunner.SqliteAsync(LifecycleScenarios3.A_published_workflow_applies_to_new_contracts_while_existing_ones_stay_pinned_and_an_invalid_one_is_refused, LifecycleScenarios.Scanner);
+    [Fact] public Task Ownership_events() => ProviderRunner.SqliteAsync(NotificationScenarios2.Ownership_changes_tell_only_the_person_affected, LifecycleScenarios.Scanner);
+    [Fact] public Task Disposition_events() => ProviderRunner.SqliteAsync(NotificationScenarios2.A_disposition_request_reaches_the_approver_group_and_no_other_group, LifecycleScenarios.Scanner);
+    [Fact] public Task Admin_scope() => ProviderRunner.SqliteAsync(NotificationScenarios2.Notification_administrators_see_only_their_own_organisations_deliveries, LifecycleScenarios.Scanner);
+    [Fact] public Task Job_runs() => ProviderRunner.SqliteAsync(NotificationScenarios2.Background_job_runs_are_recorded_and_visible_only_to_administrators, LifecycleScenarios.Scanner);
+    [Fact] public Task Dashboard_security() => ProviderRunner.SqliteAsync(NotificationScenarios2.Dashboards_never_show_or_count_a_record_the_reader_could_not_open, LifecycleScenarios.Scanner);
 }
 
-[Trait("Category", "Lifecycle")]
-[Trait("Category", "SqlServer")]
 public sealed class LifecycleScenarioTests_SqlServer
 {
     [SqlServerFact] public Task A_contract_goes_from_draft_to_effective() => ProviderRunner.SqlServerAsync(LifecycleScenarios.A_contract_goes_from_draft_to_effective_through_every_stage, LifecycleScenarios.Scanner);
@@ -62,4 +65,9 @@ public sealed class LifecycleScenarioTests_SqlServer
     [SqlServerFact] public Task Renewal_cancel() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.Cancelling_a_renewal_withdraws_the_draft_successor_and_restores_the_predecessor, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Cross_tenant_lifecycle_attempts() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.Another_tenants_records_do_not_exist_for_any_lifecycle_call, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Pinned_workflows() => ProviderRunner.SqlServerAsync(LifecycleScenarios3.A_published_workflow_applies_to_new_contracts_while_existing_ones_stay_pinned_and_an_invalid_one_is_refused, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Ownership_events() => ProviderRunner.SqlServerAsync(NotificationScenarios2.Ownership_changes_tell_only_the_person_affected, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Disposition_events() => ProviderRunner.SqlServerAsync(NotificationScenarios2.A_disposition_request_reaches_the_approver_group_and_no_other_group, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Admin_scope() => ProviderRunner.SqlServerAsync(NotificationScenarios2.Notification_administrators_see_only_their_own_organisations_deliveries, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Job_runs() => ProviderRunner.SqlServerAsync(NotificationScenarios2.Background_job_runs_are_recorded_and_visible_only_to_administrators, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Dashboard_security() => ProviderRunner.SqlServerAsync(NotificationScenarios2.Dashboards_never_show_or_count_a_record_the_reader_could_not_open, LifecycleScenarios.Scanner);
 }

@@ -27,6 +27,7 @@ public sealed class MigrationScenarioTests_SqlServer
         await scenario(app, faults);
     }
 
+    [SqlServerFact] public Task Migrated_classification_is_kept_and_protects() => RunAsync(MigrationClassificationScenario.Migrated_records_keep_their_classification_and_are_protected_by_it);
     [SqlServerFact] public Task The_sample_contracts_manifest_and_archive_load_end_to_end() => RunAsync(MigrationScenarios.The_sample_contracts_manifest_and_archive_load_end_to_end);
     [SqlServerFact] public Task A_dry_run_writes_nothing_to_the_target() => RunAsync(MigrationScenarios.A_dry_run_writes_nothing_to_the_target);
     [SqlServerFact] public Task Error_and_reconciliation_totals_equal_the_processed_input() => RunAsync(MigrationScenarios.Error_and_reconciliation_totals_equal_the_processed_input_and_nothing_is_cut_or_executed);

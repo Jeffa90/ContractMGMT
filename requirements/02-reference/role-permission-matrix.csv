@@ -63,3 +63,4 @@ classification.lower,,,,,,Y,,Y,,,,,DR-2026-10-16 lifecycle slice (owner instruct
 contracts.suspend,,,,,,Y,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
 legal.respond,,,,,,,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
 notifications.administer,,Y,,,,Y,,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
+reminders.configure,,,,,,Y,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)

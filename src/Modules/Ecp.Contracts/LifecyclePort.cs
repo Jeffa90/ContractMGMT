@@ -73,6 +73,8 @@ public interface IContractLifecyclePort
     Task<IReadOnlyDictionary<string, string?>> CurrentValuesAsync(Guid contractId, IReadOnlyCollection<string> fields, CancellationToken ct = default);
 
     Task SetReminderSettingsAsync(Guid contractId, int? leadDays, int? noticePeriodDays, bool criticalNotice, string actor, CancellationToken ct = default);
+    /// <summary>Changes only the reminder lead time, in any workflow state: it is a preference, not contract content. Audited.</summary>
+    Task SetReminderLeadAsync(Guid contractId, int? leadDays, string actor, CancellationToken ct = default);
     /// <summary>Creates the successor Draft of a renewal and links both ways. Returns the new contract id. Nothing of the predecessor's history is copied.</summary>
     Task<Guid> CreateSuccessorAsync(Guid predecessorId, SuccessorSeed seed, string actor, CancellationToken ct = default);
 
@@ -213,6 +215,17 @@ internal sealed class ContractLifecyclePort(
             await SaveAsync(db, c);
             audit.Record(new AuditEntry("contract.reminder_settings_changed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
                 OldValuesJson: old, NewValuesJson: AuditJson.Of(new { leadDays, noticePeriodDays, criticalNotice })));
+        }, ct);
+
+    public Task SetReminderLeadAsync(Guid contractId, int? leadDays, string actor, CancellationToken ct = default)
+        => uow.ExecuteAsync(async c =>
+        {
+            var contract = await LoadTrackedAsync(contractId, c);
+            var old = contract.ReminderLeadDays;
+            contract.SetReminderLead(leadDays, actor, clock.UtcNow);
+            await SaveAsync(db, c);
+            audit.Record(new AuditEntry("contract.reminder_lead_changed", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
+                OldValuesJson: AuditJson.Of(new { leadDays = old }), NewValuesJson: AuditJson.Of(new { leadDays })));
         }, ct);
 
     public Task<Guid> CreateSuccessorAsync(Guid predecessorId, SuccessorSeed seed, string actor, CancellationToken ct = default)

@@ -1,0 +1,34 @@
+@page "/Dashboards"
+@model Ecp.Host.Pages.Dashboards.IndexModel
+@{ ViewData["Title"] = L["Dashboards"].Value; }
+<h1>@L["Dashboards"]</h1>
+<p class="lede">@L["Lists and counts of the agreements that need attention. They show only what you could open yourself, within your organisations, categories and classification ceiling. For analysis, use the external reporting views."]</p>
+@if (Model.Selected is { } card)
+{
+    <p><a href="/Dashboards">&larr; @L["All dashboards"]</a></p>
+    <h2>@card.Title <span class="badge">@card.Count</span></h2>
+    <p class="hint">@card.Description</p>
+    <partial name="_DashboardRows" model="card.Rows" />
+    @if (Model.PageCount > 1)
+    {
+        <nav class="pager" aria-label="@L["Pages"]">
+            @if (Model.PageNumber > 1) { <a href="/Dashboards?card=@card.Key&pageNumber=@(Model.PageNumber - 1)">@L["Previous"]</a> }
+            <span>@L["Page"] @Model.PageNumber @L["of"] @Model.PageCount</span>
+            @if (Model.PageNumber < Model.PageCount) { <a href="/Dashboards?card=@card.Key&pageNumber=@(Model.PageNumber + 1)">@L["Next"]</a> }
+        </nav>
+    }
+}
+else
+{
+    <div class="grid">
+    @foreach (var c in Model.Cards)
+    {
+        <section class="card" aria-labelledby="card-@c.Key">
+            <h2 id="card-@c.Key">@c.Title <span class="badge @(c.Count > 0 && c.Key is "awaiting-my-action" or "reminded-unacknowledged" ? "warn" : "")">@c.Count</span></h2>
+            <p class="hint">@c.Description</p>
+            <partial name="_DashboardRows" model="c.Rows" />
+            @if (c.Count > c.Rows.Count) { <p><a href="/Dashboards?card=@c.Key">@L["Show all"] (@c.Count)</a></p> }
+        </section>
+    }
+    </div>
+}

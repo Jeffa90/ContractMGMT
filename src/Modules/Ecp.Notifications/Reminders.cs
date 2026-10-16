@@ -97,7 +97,7 @@ internal sealed class ReminderScanner(
         }
 
         var days = due.Date.DayNumber - today.DayNumber;
-        var link = $"/Contracts/Details?id={c.ContractId}";
+        var link = $"/Contracts/Details/{c.ContractId}";
         var (subject, body) = renderer.Render(policy, template, new RenderContext(c.AgreementReference, c.Title, c.Classification, "The system", link, due.Date.ToString("yyyy-MM-dd"), days, window), scale);
         var correlation = actor.CorrelationId;
         var created = 0;

@@ -22,6 +22,8 @@ public sealed class NotificationsOptions
     /// <summary>Non-secret SMTP settings; the user and password are secret references. Used by the smtp provider.</summary>
     public EmailSettings? Smtp { get; set; }
     public int BatchSize { get; set; } = 100;
+    /// <summary>Seconds between background runs in the host (0 turns the timer off; the work can still be run from the administration page). The first run waits one interval.</summary>
+    public int JobIntervalSeconds { get; set; } = 60;
 }
 
 public sealed record InboxItem(Guid Id, string EventType, string Kind, string Title, string Body, string? LinkPath, string Classification, bool Mandatory, bool RequiresAcknowledgement, DateTime CreatedUtc,
@@ -112,8 +114,20 @@ public static class NotificationsModule
         services.AddScoped<INotificationInbox, NotificationInbox>();
         services.AddScoped<INotificationAdmin, NotificationAdmin>();
         services.AddScoped<INotificationJobs, NotificationJobs>();
+        services.AddScoped<IReminderSettings, ReminderSettings>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.TryAddSingleton<IEmailDeliveryProviderFactory, EmailDeliveryProviderFactory>();
         return services;
     }
+}
+
+public sealed record ReminderStatusInfo(
+    int LeadDays, bool LeadIsDefault, IReadOnlyList<int> AllowedLeadDays, int? NoticePeriodDays, bool CriticalNotice, bool Evergreen, DateTime? LastReminderSentUtc, string? LastReminderKind, int? LastWindowDays,
+    DateOnly? LastDueDate, bool Unacknowledged, string? AcknowledgedBy, DateTime? AcknowledgedUtc, DateTime? EscalationDueUtc, bool CanConfigure, bool CanAcknowledge, IReadOnlyList<string> Schedule);
+
+/// <summary>A contract's reminder state and lead time, for its page. Reading needs the right to read the contract; changing the lead time needs <c>reminders.configure</c> and a lead time the policy allows.</summary>
+public interface IReminderSettings
+{
+    Task<ReminderStatusInfo> StatusAsync(Guid contractId, CancellationToken ct = default);
+    Task SetLeadDaysAsync(Guid contractId, int? leadDays, CancellationToken ct = default);
 }

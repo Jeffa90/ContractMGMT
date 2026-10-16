@@ -1,0 +1,71 @@
+@page "/Admin/Notifications"
+@model Ecp.Host.Pages.Admin.NotificationsModel
+@{ ViewData["Title"] = L["Notification delivery and background jobs"].Value; }
+<h1>@L["Notification delivery and background jobs"]</h1>
+<partial name="_Errors" model="ViewData.ModelState" />
+<section class="card" aria-labelledby="sum-h">
+    <h2 id="sum-h">@L["Summary"]</h2>
+    <dl class="facts">
+        <dt>@L["Email provider"]</dt><dd>@Model.Summary.EmailProvider @if (Model.Summary.EmailIsSimulated) { <span class="badge warn">@L["Simulated: delivers nothing"]</span> }</dd>
+        <dt>@L["Waiting to send"]</dt><dd>@Model.Summary.Pending</dd>
+        <dt>@L["Failed, will retry"]</dt><dd>@Model.Summary.Failed</dd>
+        <dt>@L["Dead-lettered (gave up)"]</dt><dd>@Model.Summary.DeadLetter</dd>
+        <dt>@L["Sent in the last 24 hours"]</dt><dd>@Model.Summary.SentLast24Hours</dd>
+        <dt>@L["Events waiting to be turned into messages"]</dt><dd>@Model.Summary.EventsWaiting</dd>
+        <dt>@L["Reminders not yet acknowledged"]</dt><dd>@Model.Summary.ReminderUnacknowledged</dd>
+    </dl>
+    <form method="post" asp-page-handler="RunNow"><button type="submit" class="secondary">@L["Run the background work now"]</button></form>
+    @if (Model.Summary.EmailIsSimulated) { <p><a href="/Admin/EmailCapture">@L["Open the development mailbox"]</a></p> }
+</section>
+
+<h2>@L["Deliveries"]</h2>
+<form method="get" class="card"><div class="field"><label for="status">@L["Show"]</label>
+    <select id="status" name="status">
+        @foreach (var (value, text) in new[] { ("problems", "Failures and dead letters"), ("all", "Everything"), ("Pending", "Waiting"), ("Failed", "Failed, will retry"), ("DeadLetter", "Dead-lettered"), ("Sent", "Sent") })
+        {
+            <option value="@value" selected="@(Model.Status == value)">@text</option>
+        }
+    </select></div><div class="actions"><button type="submit">@L["Apply"]</button></div></form>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Deliveries"]</caption>
+    <thead><tr><th scope="col">@L["Created (UTC)"]</th><th scope="col">@L["To"]</th><th scope="col">@L["Channel"]</th><th scope="col">@L["Message"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Attempts"]</th><th scope="col">@L["Last error"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+    <tbody>
+    @foreach (var d in Model.Deliveries.Items)
+    {
+        <tr>
+            <td>@d.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@d.RecipientName</td><td>@d.Channel (@d.Provider)</td><td>@d.Title</td>
+            <td><span class="badge @(d.Status == "DeadLetter" ? "warn" : d.Status == "Sent" ? "ok" : "")">@d.Status</span></td>
+            <td><a href="/Admin/Notifications?delivery=@d.DeliveryId&status=@Model.Status">@d.Attempts</a></td>
+            <td>@d.LastError</td>
+            <td>@if (d.Status is "Failed" or "DeadLetter") { <form method="post" asp-page-handler="Retry"><input type="hidden" name="id" value="@d.DeliveryId" /><button type="submit" class="secondary">@L["Retry"]</button></form> }</td>
+        </tr>
+    }
+    @if (Model.Deliveries.Items.Count == 0) { <tr><td colspan="8">@L["Nothing to show."]</td></tr> }
+    </tbody>
+</table>
+</div>
+@if (Model.Attempts.Count > 0)
+{
+    <h3>@L["Attempts"]</h3>
+    <div class="table-wrap"><table>
+        <thead><tr><th scope="col">#</th><th scope="col">@L["Provider"]</th><th scope="col">@L["Started (UTC)"]</th><th scope="col">@L["Duration (ms)"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Correlation id"]</th></tr></thead>
+        <tbody>@foreach (var a in Model.Attempts) { <tr><td>@a.Number</td><td>@a.Provider</td><td>@a.StartedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><td>@a.DurationMs</td><td>@(a.Succeeded ? "Succeeded" : a.Error)</td><td><code>@a.CorrelationId</code></td></tr> }</tbody>
+    </table></div>
+}
+
+<h2>@L["Background jobs"]</h2>
+<p class="hint">@L["Each run is recorded here. The timer runs them regularly; a job that has not run recently shows an old time."]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Background jobs"]</caption>
+    <thead><tr><th scope="col">@L["Job"]</th><th scope="col">@L["Started (UTC)"]</th><th scope="col">@L["Finished (UTC)"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Processed"]</th><th scope="col">@L["Failures"]</th><th scope="col">@L["Detail"]</th></tr></thead>
+    <tbody>
+    @foreach (var j in Model.Jobs)
+    {
+        <tr><th scope="row">@j.JobName</th><td>@j.StartedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><td>@(j.FinishedUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</td><td><span class="badge @(j.Status == "Failed" ? "warn" : j.Status == "Succeeded" ? "ok" : "")">@j.Status</span></td><td>@j.Processed</td><td>@j.Failures</td><td>@j.Detail</td></tr>
+    }
+    @if (Model.Jobs.Count == 0) { <tr><td colspan="7">@L["No job has run yet."]</td></tr> }
+    </tbody>
+</table>
+</div>

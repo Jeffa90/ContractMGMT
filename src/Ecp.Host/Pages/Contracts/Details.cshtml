@@ -2,10 +2,32 @@
 @model Ecp.Host.Pages.Contracts.DetailsModel
 @{ ViewData["Title"] = Model.Contract.AgreementReference; }
 <h1>@Model.Contract.Title</h1>
-<p><span class="badge">@Model.Contract.AgreementReference</span> <span class="badge">@Model.Contract.Status</span> <span class="badge">@Model.Contract.Classification</span>
+<p><span class="badge">@Model.Contract.AgreementReference</span> <span class="badge">@Model.StatusDisplay</span> <span class="badge">@Model.Contract.Classification</span>
 @if (Model.Contract.RecordLocked) { <span class="badge warn">@L["Locked: changes need an authorised Variation or an audited unlock"]</span> }</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<nav class="tabs" aria-label="@L["This agreement"]">
+    <a href="#details">@L["Details"]</a> <a href="#documents">@L["Documents"]</a> <a href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Lifecycle and history"]</a> <a href="#variations">@L["Variations"] (@Model.VariationList.Count)</a> <a href="#reminders">@L["Reminders"]</a>
+    @if (Model.Review is { } rv) { <a href="/Legal/Review/@rv.ReviewId">@L["Legal review"]</a> }
+</nav>
+@if (Model.Contract.Protection is { } prot)
+{
+    @if (prot.ActiveUnlockId is not null && Model.OpenUnlock is { } ou)
+    {
+        <div class="access-banner" role="alert"><strong>@L["Temporarily unlocked"]</strong> @L["until"] @ou.ExpiresUtc.ToString("yyyy-MM-dd HH:mm") UTC &mdash; @ou.Reason (@ou.OpenedByName).
+            @if (Model.CanUnlock) { <a href="/Contracts/Unlock/@Model.Contract.Id">@L["Manage the unlock"]</a> }</div>
+    }
+    else if (prot.IsLocked)
+    {
+        <div class="flash warn" role="status"><strong>@L["Locked."]</strong> @prot.LockReason
+            @if (prot.LockedBy is { } lb) { <span class="hint">(@L["by"] @lb, @prot.LockedUtc?.ToString("yyyy-MM-dd HH:mm") UTC)</span> }
+            @L["Metadata changes need an authorised Variation."]
+            @if (Model.CanUnlock) { <a href="/Contracts/Unlock/@Model.Contract.Id">@L["Emergency unlock"]</a> }</div>
+    }
+    else if (prot.ContentFrozen) { <div class="flash" role="status"><strong>@L["Content frozen."]</strong> @L["This stage does not allow the details to be edited; the record can be edited again if it is returned to its owner."]</div> }
+}
+<div class="actions"><a class="button" href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Open the lifecycle: next steps and history"]</a></div>
 
-<dl class="facts card">
+<dl class="facts card" id="details">
     <dt>@L["Supplier"]</dt><dd><a href="/Suppliers/Details/@Model.Contract.SupplierId">@Model.Contract.SupplierName</a></dd>
     <dt>@L["Category"]</dt><dd>@Model.Contract.CategoryName</dd>
     <dt>@L["Organisation"]</dt><dd>@Model.OrganisationName</dd>
@@ -23,7 +45,7 @@
 }
 @if (Model.Contract.Description is { Length: > 0 }) { <h2>@L["Description"]</h2><p>@Model.Contract.Description</p> }
 
-<h2>@L["Documents"]</h2>
+<h2 id="documents">@L["Documents"]</h2>
 <div class="table-wrap">
 <table>
     <caption class="visually-hidden">@L["Documents"]</caption>
@@ -44,6 +66,53 @@
     </tbody>
 </table>
 </div>
+
+<section id="renewal">
+@if (Model.Contract.Renewal is { } ren && (ren.PredecessorId is not null || ren.SuccessorId is not null))
+{
+    <h2>@L["Renewal"]</h2>
+    <ul class="plain">
+        @if (ren.PredecessorId is { } pid) { <li>@L["Renews"] @if (ren.PredecessorReference is { } pr) { <a href="/Contracts/Details/@pid">@pr</a> } else { <span class="hint">@L["an agreement you cannot open"]</span> }</li> }
+        @if (ren.SuccessorId is { } sid) { <li>@L["Succeeded by"] @if (ren.SuccessorReference is { } sr) { <a href="/Contracts/Details/@sid">@sr</a> } else { <span class="hint">@L["an agreement you cannot open"]</span> }</li> }
+    </ul>
+}
+</section>
+
+<h2 id="variations">@L["Variations"]</h2>
+<ul class="plain">
+@foreach (var v in Model.VariationList)
+{
+    <li><a href="/Variations/Details/@v.Id">@v.Reference</a>: @v.Title <span class="badge">@v.StatusDisplay</span> @if (v.Outcome is { } o) { <span class="badge">@o</span> } <span class="hint">@v.CreatedUtc.ToString("yyyy-MM-dd")</span></li>
+}
+@if (Model.VariationList.Count == 0) { <li class="hint">@L["No Variation has been raised."]</li> }
+</ul>
+<p><a class="button secondary" href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Start a Variation, renewal or other step"]</a></p>
+
+<h2 id="reminders">@L["Reminders"]</h2>
+<section class="card">
+    <dl class="facts">
+        <dt>@L["Lead time"]</dt><dd>@Model.Reminder.LeadDays @L["days"] @if (Model.Reminder.LeadIsDefault) { <span class="hint">(@L["the organisation's default"])</span> }</dd>
+        <dt>@L["Notice period"]</dt><dd>@(Model.Reminder.NoticePeriodDays is { } np ? np + " " + L["days"].Value : "-") @if (Model.Reminder.CriticalNotice) { <span class="badge warn">@L["Critical Notice"]</span> } @if (Model.Reminder.Evergreen) { <span class="badge">@L["Evergreen"]</span> }</dd>
+        <dt>@L["Last reminder"]</dt><dd>@(Model.Reminder.LastReminderSentUtc is { } lr ? lr.ToString("yyyy-MM-dd HH:mm") + " UTC (" + Model.Reminder.LastReminderKind + ", " + Model.Reminder.LastWindowDays + " " + L["day window"].Value + ")" : L["None sent yet"].Value)</dd>
+        @if (Model.Reminder.LastReminderSentUtc is not null)
+        {
+            <dt>@L["Acknowledgement"]</dt><dd>@if (Model.Reminder.Unacknowledged) { <span class="badge warn">@L["Not acknowledged"]</span> } else { <span class="badge ok">@L["Acknowledged by"] @Model.Reminder.AcknowledgedBy, @Model.Reminder.AcknowledgedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</span> }</dd>
+        }
+    </dl>
+    @if (Model.Reminder.Schedule.Count > 0) { <h3>@L["Reminder dates"]</h3><ul class="plain">@foreach (var line in Model.Reminder.Schedule) { <li>@line</li> }</ul> }
+    @if (Model.Reminder.CanAcknowledge)
+    {
+        <form method="post" asp-page-handler="Acknowledge"><button type="submit">@L["Acknowledge the reminder"]</button></form>
+    }
+    @if (Model.Reminder.CanConfigure)
+    {
+        <form method="post" asp-page-handler="Lead">
+            <div class="field"><label for="LeadDays">@L["Remind this many days ahead"]</label>
+                <select id="LeadDays" name="LeadDays">@foreach (var d in Model.Reminder.AllowedLeadDays) { <option value="@d" selected="@(d == Model.LeadDays)">@d</option> }</select></div>
+            <button type="submit" class="secondary">@L["Save the lead time"]</button>
+        </form>
+    }
+</section>
 
 @if (Model.Contract.Provenance is { } prov)
 {

@@ -198,8 +198,10 @@ internal sealed class NotificationDispatcher(
 
         var scale = await scales.GetAsync(ct);
         var actorName = actorId is { } a ? await directory.DisplayNameAsync(a, ct) ?? "Someone" : "The system";
-        var link = e.SubjectKind == SubjectKinds.Variation ? $"/Variations/Details?id={e.SubjectId}" : type.StartsWith("approval.", StringComparison.Ordinal) && Guid_("requestId") is { } req
-            ? $"/Approvals/Details?id={req}" : type.StartsWith("legal.", StringComparison.Ordinal) && Guid_("reviewId") is { } rv ? $"/Legal/Review?id={rv}" : $"/Contracts/Details?id={e.ContractId}";
+        var link = type.StartsWith("approval.", StringComparison.Ordinal) && Guid_("requestId") is { } req ? $"/Approvals/Details/{req}"
+            : type.StartsWith("legal.", StringComparison.Ordinal) && Guid_("reviewId") is { } rv ? $"/Legal/Review/{rv}"
+            : e.SubjectKind == SubjectKinds.Variation ? $"/Variations/Details/{e.SubjectId}"
+            : $"/Contracts/Details/{e.ContractId}";
         var (subject, body) = renderer.Render(policy, template, new RenderContext(facts.AgreementReference, facts.Title, e.Classification, actorName, link), scale);
 
         var made = 0;

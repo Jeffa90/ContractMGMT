@@ -463,6 +463,14 @@ public sealed class Contract : ITenantOwned
         return changes.Keys.Where(k => !string.Equals(before[k], after[k], StringComparison.Ordinal)).Select(k => new FieldChange(k, before[k], after[k])).ToList();
     }
 
+    /// <summary>Sets how many days ahead the contract's owners are reminded. A reminder preference, not contract content, so it can change in any workflow state.</summary>
+    public void SetReminderLead(int? leadDays, string actor, DateTime nowUtc)
+    {
+        if (leadDays is <= 0 or > 3650) throw new DomainException("invalid_lead", "The reminder lead time must be between 1 and 3650 days.");
+        ReminderLeadDays = leadDays;
+        Touch(actor, nowUtc);
+    }
+
     /// <summary>Sets the reminder attributes the owner maintains on an editable record.</summary>
     public void SetReminderSettings(int? leadDays, int? noticePeriodDays, bool criticalNotice, string actor, DateTime nowUtc)
     {

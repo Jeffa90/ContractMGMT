@@ -1,0 +1,68 @@
+@page "/Admin/Configuration"
+@model Ecp.Host.Pages.Admin.Configuration.IndexModel
+@using Ecp.Configuration
+@{ ViewData["Title"] = L["Workflow and notification configuration"].Value; }
+<h1>@L["Workflow and notification configuration"]</h1>
+<p class="lede">@L["Change how agreements move, who is told and when, without code. A change is a draft first; it must validate before it can be published; every release is kept and can be published again. Agreements already in flight keep the release they started under."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<nav class="tabs" aria-label="@L["Documents"]">
+    @foreach (var k in Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds) { <a href="/Admin/Configuration?kind=@k.Kind&organisationId=@Model.OrganisationId" aria-current="@(k.Kind == Model.Kind ? "page" : null)">@k.Title</a> }
+</nav>
+<p class="hint">@Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds.First(k => k.Kind == Model.Kind).Help</p>
+<form method="get" class="card"><input type="hidden" name="kind" value="@Model.Kind" />
+    <div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <button type="submit" class="secondary">@L["Show"]</button></form>
+
+@if (Model.Latest is { } latest) { <p>@L["In force"]: <strong>@L["release"] @latest.Number</strong> @L["published by"] @latest.PublishedBy, @latest.PublishedUtc.ToString("yyyy-MM-dd HH:mm") UTC. <span class="hint">@latest.Note</span></p> }
+else { <p class="hint">@L["Nothing has been published yet. The reference definition from the solution pack is installed the first time it is needed."]</p> }
+
+@if (Model.Draft is { } draft)
+{
+    <section class="card" aria-labelledby="draft-h">
+        <h2 id="draft-h">@L["Draft"] <span class="badge">@draft.Status</span></h2>
+        <p class="hint">@L["Last edited by"] @draft.LastEditedBy, @draft.UpdatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</p>
+        @if (draft.Validation is { } v)
+        {
+            <div class="@(v.IsValid ? "flash" : "error-summary")" role="status">
+                <strong>@(v.IsValid ? L["Valid: it can be published."] : L["Not valid: fix these before publishing."])</strong>
+                <ul>@foreach (var m in v.Messages) { <li><code>@m.Path</code> [@m.Severity] @m.Message</li> }</ul>
+            </div>
+        }
+        <form method="post">
+            <input type="hidden" name="draftId" value="@draft.Id" /><input type="hidden" name="Kind" value="@Model.Kind" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+            <div class="field"><label for="Definition">@L["Definition (JSON)"]</label><textarea id="Definition" name="Definition" rows="26" spellcheck="false" class="code">@draft.ContentJson</textarea></div>
+            <div class="field"><label for="Note">@L["Note for the release history"]</label><input id="Note" name="Note" type="text" maxlength="500" /></div>
+            <div class="actions">
+                <button type="submit" asp-page-handler="Save" class="secondary">@L["Save"]</button>
+                <button type="submit" asp-page-handler="Validate" class="secondary">@L["Save and validate"]</button>
+                <button type="submit" asp-page-handler="Publish">@L["Publish"]</button>
+                <button type="submit" asp-page-handler="Discard" class="secondary">@L["Discard the draft"]</button>
+            </div>
+        </form>
+    </section>
+}
+else if (Model.OrganisationId is not null)
+{
+    <form method="post" asp-page-handler="Start"><input type="hidden" name="Kind" value="@Model.Kind" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><button type="submit">@L["Start a draft from the release in force"]</button></form>
+}
+
+<h2>@L["Release history"]</h2>
+@if (Model.ReleasesDenied is { } denied) { <p class="hint">@denied</p> }
+else
+{
+    <div class="table-wrap"><table>
+        <thead><tr><th scope="col">@L["Release"]</th><th scope="col">@L["Published (UTC)"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Note"]</th><th scope="col">@L["Checksum"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Releases)
+        {
+            <tr><th scope="row">@r.Number @if (r.RollbackOfNumber is { } rb) { <span class="hint">(@L["republishes"] @rb)</span> }</th><td>@r.PublishedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@r.PublishedBy</td><td>@r.Note</td><td><code>@r.ContentHash[..Math.Min(12, r.ContentHash.Length)]</code></td>
+                <td>@if (r.Number != Model.Latest?.Number)
+                    {
+                        <form method="post" asp-page-handler="Rollback"><input type="hidden" name="Kind" value="@Model.Kind" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="ToRelease" value="@r.Number" />
+                            <input name="Note" type="text" required maxlength="300" placeholder="@L["Reason"]" aria-label="@L["Reason for rolling back"]" /><button type="submit" class="secondary">@L["Publish again"]</button></form>
+                    }</td></tr>
+        }
+        @if (Model.Releases.Count == 0) { <tr><td colspan="6">@L["No release yet."]</td></tr> }
+        </tbody>
+    </table></div>
+}

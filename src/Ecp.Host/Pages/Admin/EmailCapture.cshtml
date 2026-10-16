@@ -1,0 +1,19 @@
+@page "/Admin/EmailCapture"
+@model Ecp.Host.Pages.Admin.EmailCaptureModel
+@{ ViewData["Title"] = L["Development mailbox"].Value; }
+<h1>@L["Development mailbox"]</h1>
+<p class="lede">@L["Emails the platform would have sent, kept here instead because this is a demonstration or test installation. Nothing was delivered to anyone. The content is exactly what a real recipient would receive."]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Captured emails"]</caption>
+    <thead><tr><th scope="col">@L["Captured (UTC)"]</th><th scope="col">@L["To"]</th><th scope="col">@L["Subject"]</th><th scope="col">@L["Body"]</th></tr></thead>
+    <tbody>
+    @foreach (var m in Model.Result.Items)
+    {
+        <tr><td>@m.CapturedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><td>@m.To</td><th scope="row">@m.Subject</th><td><pre class="mail">@m.Body</pre></td></tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="4">@L["No email has been captured."]</td></tr> }
+    </tbody>
+</table>
+</div>
+<p><a href="/Admin/Notifications">&larr; @L["Notification delivery and background jobs"]</a></p>

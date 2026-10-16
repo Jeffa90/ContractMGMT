@@ -6,11 +6,12 @@
 
 <form method="get" class="card" aria-label="@L["Filter contracts"]">
     <div class="field"><label for="q">@L["Search by reference or title"]</label><input id="q" name="q" type="text" value="@Model.Q" /></div>
+    <label><input type="checkbox" name="owned" value="true" checked="@Model.Owned" /> @L["Only categories I own"]</label>
     <div class="field">
         <label for="status">@L["Status"]</label>
         <select id="status" name="status">
             <option value="">@L["Any status"]</option>
-            @foreach (var s in Model.Statuses) { <option value="@s" selected="@(s == Model.Status)">@s</option> }
+            @foreach (var s in Model.Statuses) { <option value="@s" selected="@(s == Model.Status)">@Model.StatusLabels.GetValueOrDefault(s, s)</option> }
         </select>
     </div>
     <div class="field">
@@ -28,18 +29,22 @@
 <div class="table-wrap">
 <table>
     <caption class="visually-hidden">@L["Contracts"]</caption>
-    <thead><tr><th scope="col">@L["Reference"]</th><th scope="col">@L["Title"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Category"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Classification"]</th></tr></thead>
+    <thead><tr><th scope="col">@L["Reference"]</th><th scope="col">@L["Title"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Category"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Classification"]</th><th scope="col">@L["Renewal"]</th></tr></thead>
     <tbody>
     @foreach (var c in Model.Result.Items)
     {
         <tr>
             <th scope="row"><a href="/Contracts/Details/@c.Id">@c.AgreementReference</a></th>
             <td>@c.Title</td><td>@c.SupplierName</td><td>@c.CategoryName</td>
-            <td>@c.Status @if (c.RecordLocked) { <span class="badge">@L["Locked"]</span> }</td>
+            <td>@Model.StatusLabels.GetValueOrDefault(c.Status, c.Status) @if (c.RecordLocked) { <span class="badge">@L["Locked"]</span> }</td>
             <td>@c.Classification</td>
+            <td>
+                @if (c.PredecessorContractId is { } pre) { <span>@L["Renews"] @if (Model.Linked.TryGetValue(pre, out var pr)) { <a href="/Contracts/Details/@pre">@pr</a> } else { <span class="hint">@L["(not visible)"]</span> }</span> }
+                @if (c.SuccessorContractId is { } suc) { <span>@L["Succeeded by"] @if (Model.Linked.TryGetValue(suc, out var sr)) { <a href="/Contracts/Details/@suc">@sr</a> } else { <span class="hint">@L["(not visible)"]</span> }</span> }
+            </td>
         </tr>
     }
-    @if (Model.Result.Items.Count == 0) { <tr><td colspan="6">@L["No contracts match."]</td></tr> }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="7">@L["No contracts match."]</td></tr> }
     </tbody>
 </table>
 </div>

@@ -7,6 +7,8 @@ namespace Ecp.Host;
 /// <summary>Maps exceptions to RFC 9457 problem details with stable codes. Internals are never returned.</summary>
 public sealed class ProblemExceptionHandler(IProblemDetailsService problems, ILogger<ProblemExceptionHandler> logger) : IExceptionHandler
 {
+    private static readonly HashSet<string> ConflictCodes = ["state_changed", "concurrency_conflict", "already_decided", "duplicate_request", "idempotency_conflict", "variation_open", "already_unlocked"];
+
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
     {
         // A sensitive action that needs a recent sign-in sends a person to confirm their identity and bring them back; it is not an error.
@@ -18,6 +20,8 @@ public sealed class ProblemExceptionHandler(IProblemDetailsService problems, ILo
         }
         var (status, code, title) = exception switch
         {
+            // A change that lost a race (someone else moved the record, decided first or saved first) is a conflict the caller can resolve by reloading; other rule failures are unprocessable.
+            DomainException d when ConflictCodes.Contains(d.Code) => (StatusCodes.Status409Conflict, d.Code, d.Message),
             DomainException d => (StatusCodes.Status422UnprocessableEntity, d.Code, d.Message),
             ResourceNotFoundException => (StatusCodes.Status404NotFound, "not_found", "The resource was not found."),
             ForbiddenException f => (StatusCodes.Status403Forbidden, "forbidden", f.Message),

@@ -63,3 +63,4 @@ classification.lower,Lower the classification of a record or document,"Organisat
 contracts.suspend,Suspend and restore an Effective contract,Active category assignment; Procurement Administrator administers,Business,DR-2026-10-16 lifecycle slice (owner instruction)
 legal.respond,Reply to Legal comments and resubmit a contract after rework,Active category assignment,Business,DR-2026-10-16 lifecycle slice (owner instruction)
 notifications.administer,"View notification failures, retries and background-job status; retry a failed notification",Tenant or organisation scope,Business,DR-2026-10-16 lifecycle slice (owner instruction)
+reminders.configure,Set the reminder lead time of a contract and see its reminder state,Active category assignment; allowed in any workflow state (not content),Business,DR-2026-10-16 lifecycle slice (owner instruction)

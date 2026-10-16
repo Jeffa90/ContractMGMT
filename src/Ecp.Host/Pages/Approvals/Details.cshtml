@@ -1,0 +1,91 @@
+@page "/Approvals/Details/{id:guid}"
+@model Ecp.Host.Pages.Approvals.DetailsModel
+@using Ecp.Lifecycle
+@{ ViewData["Title"] = L["Register authorisation"].Value + " " + Model.Approval.AgreementReference; var r = Model.Approval; var s = r.Snapshot; }
+<h1>@L["Register authorisation"]: @r.Title</h1>
+<p><span class="badge">@r.AgreementReference</span> <span class="badge @(r.Status == Ecp.Lifecycle.Domain.ApprovalStatus.Pending ? "warn" : r.Status == Ecp.Lifecycle.Domain.ApprovalStatus.Approved ? "ok" : "")">@r.Status</span> <span class="badge">@s.Classification</span></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+@if (r.Status == Ecp.Lifecycle.Domain.ApprovalStatus.Pending)
+{
+    <section class="card" aria-labelledby="dec-h">
+        <h2 id="dec-h">@L["Your decision"]</h2>
+        @if (r.CanApprove)
+        {
+            <form method="post">
+                <input type="hidden" name="ClientRequestId" value="@Model.ClientRequestId" />
+                <div class="field"><label for="cmt">@L["Comment (required to reject)"]</label><textarea id="cmt" name="Comment" rows="3" maxlength="4000"></textarea></div>
+                <div class="actions">
+                    <button type="submit" asp-page-handler="Approve">@L["Approve"]</button>
+                    <button type="submit" asp-page-handler="Reject" class="secondary">@L["Reject"]</button>
+                </div>
+                <p class="hint">@L["Approving stamps the Registered Date (UTC), makes the agreement Effective and locks it. Whoever responds first decides; the second response is refused."]</p>
+            </form>
+        }
+        else { <p class="flash warn" role="status">@r.CannotBecause</p> }
+    </section>
+}
+else if (r.Decision is { } d)
+{
+    <section class="card" aria-labelledby="dec-h">
+        <h2 id="dec-h">@L["Decision"]</h2>
+        <dl class="facts">
+            <dt>@L["Decision"]</dt><dd>@d.Status</dd>
+            <dt>@L["Decided by"]</dt><dd>@d.DecidedByName (@d.DecidedAsRole) @if (d.OnBehalfOfName is { } o) { <span>@L["on behalf of"] @o</span> }</dd>
+            <dt>@L["Decided"]</dt><dd>@d.DecidedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+            @if (d.Comment is { Length: > 0 }) { <dt>@L["Comment"]</dt><dd>@d.Comment</dd> }
+        </dl>
+    </section>
+}
+
+<section class="card" aria-labelledby="snap-h">
+    <h2 id="snap-h">@L["What was submitted"]</h2>
+    <p class="hint">@L["This is a frozen record of what the approver relied on at submission. It does not change afterwards."] @if (!r.SnapshotIntact) { <strong class="error">@L["The stored snapshot does not match its checksum."]</strong> }</p>
+    <dl class="facts">
+        <dt>@L["Agreement"]</dt><dd>@s.AgreementReference @if (s.VariationReference is { } v) { <span>(@L["Variation"] @v)</span> }</dd>
+        <dt>@L["Supplier"]</dt><dd>@s.SupplierName</dd><dt>@L["Category"]</dt><dd>@s.CategoryName</dd>
+        <dt>@L["Value"]</dt><dd>@(s.EstimatedValue is { } val ? $"{val:N2} {s.CurrencyCode}" : "-")</dd>
+        <dt>@L["Start / End"]</dt><dd>@(s.StartDate ?? "-") / @(s.EndDate ?? "-")</dd>
+        <dt>@L["Review date"]</dt><dd>@(s.ReviewDate ?? "-")</dd>
+        <dt>@L["Legal review"]</dt><dd>@(s.LegalStatus ?? (s.LegalReviewRequired ? "Required" : "Not required")) @if (s.LegalRounds > 0) { <span>(@s.LegalRounds @L["round(s)"]@(s.LegalClearedBy is { } cb ? ", " + L["cleared by"].Value + " " + cb : ""))</span> }</dd>
+        <dt>@L["Execution"]</dt><dd>@(s.ExecutionProvider ?? "-") @(s.EnvelopeId is { } env ? $"· envelope {env}" : "") @(s.ExecutionStatus is { } es ? $"· {es}" : "")</dd>
+        <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @r.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+        <dt>@L["Workflow"]</dt><dd><code>@s.WorkflowRef</code></dd>
+        <dt>@L["Snapshot checksum"]</dt><dd><code>@r.SnapshotSha256</code></dd>
+    </dl>
+    @if (s.ProposedChanges is { Count: > 0 } changes)
+    {
+        <h3>@L["Proposed changes"]</h3>
+        <div class="table-wrap"><table><thead><tr><th scope="col">@L["Field"]</th><th scope="col">@L["Now"]</th><th scope="col">@L["Proposed"]</th></tr></thead>
+        <tbody>@foreach (var (field, proposed) in changes) { <tr><th scope="row">@field</th><td>@(s.CurrentValues?.GetValueOrDefault(field) ?? "-")</td><td>@(proposed ?? "-")</td></tr> }</tbody></table></div>
+    }
+</section>
+
+<section class="card" aria-labelledby="doc-h">
+    <h2 id="doc-h">@L["Executed copy"]</h2>
+    @if (r.ExecutedDocument is { } doc)
+    {
+        <p>@if (doc.CanDownload) { <a href="/Documents/Download/@doc.DocumentId">@doc.Title</a> } else { @doc.Title } <span class="hint">@doc.FileName &middot; SHA-256 <code>@doc.Sha256</code></span></p>
+    }
+    else { <p class="hint">@L["The executed copy is not available to you."]</p> }
+</section>
+
+<section aria-labelledby="who-h">
+    <h2 id="who-h">@L["Who can decide"]</h2>
+    <ul class="plain">@foreach (var e in r.Eligible) { <li>@e.DisplayName <span class="badge">@(e.IsBackup ? L["Backup"] : L["Primary"])</span></li> }</ul>
+    <p class="hint">@L["A backup approver is notified together with the primary approver. The first response stands."]</p>
+</section>
+
+<section aria-labelledby="hist-h">
+    <h2 id="hist-h">@L["Decision history for this agreement"]</h2>
+    <div class="table-wrap"><table>
+        <thead><tr><th scope="col">@L["Submitted"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Decided by"]</th><th scope="col">@L["Comment"]</th></tr></thead>
+        <tbody>
+        @foreach (var h in r.History)
+        {
+            <tr><td>@h.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td><td>@h.SubmittedByName</td><td>@h.Status</td><td>@(h.DecidedByName ?? "-") @(h.OnBehalfOfName is { } ob ? $"(for {ob})" : "")</td><td>@h.Comment</td></tr>
+        }
+        </tbody>
+    </table></div>
+</section>
+<p><a href="/Contracts/Details/@r.ContractId">@L["Open the agreement"]</a> &middot; <a href="/Approvals">&larr; @L["Pending approvals"]</a></p>

@@ -39,7 +39,7 @@ public sealed record LegalTimelineItem(DateTime OccurredUtc, string Kind, string
 public sealed record LegalActions(bool CanSubmit, bool CanRecall, bool CanAssign, bool CanBegin, bool CanComment, bool CanReply, bool CanAttachMarkup, bool CanAttachSupporting, bool CanReturn, bool CanClear, bool CanResubmit);
 
 public sealed record LegalReviewDetail(
-    Guid ReviewId, string SubjectKind, Guid SubjectId, Guid ContractId, string AgreementReference, string ContractTitle, string? VariationReference, string Classification, LegalReviewStatus Status, string StatusDisplay,
+    Guid ReviewId, string SubjectKind, Guid SubjectId, Guid ContractId, Guid OrganisationId, string AgreementReference, string ContractTitle, string? VariationReference, string Classification, LegalReviewStatus Status, string StatusDisplay,
     int CurrentRound, Guid? AssignedToUserId, string? AssignedToName, string SubmittedByName, DateTime SubmittedUtc, string? ClearedBy, DateTime? ClearedUtc, IReadOnlyList<LegalRoundItem> Rounds,
     IReadOnlyList<LegalTimelineItem> Timeline, string Outstanding, LegalActions Actions);
 
@@ -200,7 +200,7 @@ internal sealed class LegalReviewService(
         var timeline = events.Select(e => new LegalTimelineItem(e.OccurredUtc, e.Kind, e.Actor, e.Detail, e.RoundId is { } rid && numbers.TryGetValue(rid, out var n) ? n : null)).ToList();
         var variationRef = subject.IsVariation ? subject.Variation!.Reference : null;
         var title = subject.IsVariation ? subject.Variation!.Title : subject.Contract.Title;
-        return new LegalReviewDetail(review.Id, review.SubjectKind, review.SubjectId, review.ContractId, subject.Contract.AgreementReference, title, variationRef, subject.Classification, review.Status,
+        return new LegalReviewDetail(review.Id, review.SubjectKind, review.SubjectId, review.ContractId, review.OrganisationId, subject.Contract.AgreementReference, title, variationRef, subject.Classification, review.Status,
             StatusDisplay(review.Status), review.CurrentRound, review.AssignedToUserId, review.AssignedToName, review.SubmittedByName, review.SubmittedUtc, review.ClearedBy, review.ClearedUtc, items, timeline,
             OutstandingText(review.Status), await ActionsAsync(review, subject, ct));
     }

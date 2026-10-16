@@ -72,6 +72,7 @@ public static class LifecycleModule
         services.AddScoped<LifecycleEvents>();
         services.AddScoped<ILifecycleOutbox, LifecycleOutbox>();
         services.AddScoped<IContractCreationPolicy, LifecycleCreationPolicy>();
+        services.AddScoped<IStatusLabels, StatusLabels>();
         services.AddScoped<LegalReviewService>();
         services.AddScoped<ILegalReviewService>(sp => sp.GetRequiredService<LegalReviewService>());
         services.AddScoped<VisibleContracts>();
@@ -85,5 +86,24 @@ public static class LifecycleModule
         services.AddScoped<IRenewalService, RenewalService>();
         services.TryAddSingleton<IESignatureProviderFactory, ESignatureProviderFactory>();
         return services;
+    }
+}
+
+/// <summary>State codes mapped to the display names in the workflow definitions in force (terminology can change; the codes never do).</summary>
+public interface IStatusLabels
+{
+    /// <summary>Display names for the states of every organisation's contract workflow, merged (the first organisation's wins where they differ).</summary>
+    Task<IReadOnlyDictionary<string, string>> AllAsync(CancellationToken ct = default);
+}
+
+internal sealed class StatusLabels(IWorkflowDefinitions definitions, Ecp.Tenancy.IOrganisationStructureService structure) : IStatusLabels
+{
+    public async Task<IReadOnlyDictionary<string, string>> AllAsync(CancellationToken ct = default)
+    {
+        var labels = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var org in await structure.ListOrganisationsAsync(ct))
+            foreach (var s in (await definitions.CurrentAsync(WorkflowKinds.ContractLifecycle, org.Id, ct)).Definition.States)
+                labels.TryAdd(s.Code, s.Display);
+        return labels;
     }
 }

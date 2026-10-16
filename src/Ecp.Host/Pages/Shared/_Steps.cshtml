@@ -1,0 +1,121 @@
+@model Ecp.Host.Pages.StepsView
+@using Ecp.Lifecycle
+@using Ecp.Lifecycle.Domain
+@{
+    var v = Model;
+    var isVariation = v.SubjectKind == SubjectKinds.Variation;
+    var requestId = Guid.NewGuid().ToString("N");
+}
+<section class="card" aria-labelledby="steps-h">
+    <h2 id="steps-h">@L["What happens next"]</h2>
+    <p>@L["Now"]: <strong>@v.StatusDisplay</strong></p>
+    @if (v.Steps.Count == 0) { <p class="hint">@L["No further steps are available from here."]</p> }
+    @foreach (var s in v.Steps)
+    {
+        <div class="step">
+            <h3>@s.Display <span class="hint">&rarr; @s.ToDisplay</span> @if (!s.Allowed) { <span class="badge warn">@L["Not available"]</span> }</h3>
+            @if (!s.Allowed) { <p class="hint">@s.BlockedReason</p> }
+            else
+            {
+            switch (s.Role)
+            {
+                case "submitLegal": case "resubmitLegal": case "returnToLegal":
+                    <form method="post" asp-page-handler="LegalSubmit">
+                        <input type="hidden" name="ClientRequestId" value="@requestId" />
+                        <div class="field"><label for="n-@s.Code">@L["Note for Legal"]</label><input id="n-@s.Code" name="Comment" type="text" maxlength="4000" /></div>
+                        <button type="submit">@s.Display</button>
+                    </form>
+                    break;
+                case "recallLegal":
+                    if (v.Legal is { } rl) { <p><a href="/Legal/Review/@rl.ReviewId">@L["Recall it from the Legal review page"]</a></p> }
+                    break;
+                case "beginLegal": case "returnLegal": case "clearLegal":
+                    if (v.Legal is { } lr) { <p><a href="/Legal/Review/@lr.ReviewId">@L["Legal does this from the Legal review page"]</a></p> }
+                    break;
+                case "sendSignature":
+                    <form method="post" asp-page-handler="SendSignature">
+                        <input type="hidden" name="ClientRequestId" value="@requestId" />
+                        <div class="field"><label for="prov-@s.Code">@L["How will it be signed?"]</label>
+                            <select id="prov-@s.Code" name="provider">
+                                @foreach (var p in v.Providers.Where(p => p.Available)) { <option value="@p.Key">@p.Label (@p.Status)</option> }
+                            </select></div>
+                        <p class="hint">@L["Signing and the Delegation of Authority belong to the external signature service. Manual execution means you sign outside the platform and upload the executed copy."]</p>
+                        <button type="submit">@s.Display</button>
+                    </form>
+                    break;
+                case "submitRegister":
+                    <form method="post" asp-page-handler="SubmitApproval">
+                        <input type="hidden" name="ClientRequestId" value="@requestId" />
+                        <div class="field"><label for="ap-@s.Code">@L["Note for the approver"]</label><input id="ap-@s.Code" name="Comment" type="text" maxlength="4000" /></div>
+                        <button type="submit">@s.Display</button>
+                    </form>
+                    break;
+                case "approve": case "reject":
+                    if (v.Approval is { } ap) { <p><a href="/Approvals/Details/@ap.RequestId">@L["The approver decides from the approval page"]</a></p> }
+                    break;
+                case "cancel":
+                    <form method="post" asp-page-handler="Step">
+                        <input type="hidden" name="code" value="@s.Code" />
+                        <div class="field"><label for="c-@s.Code">@L["Reason (required)"]</label><input id="c-@s.Code" name="Comment" type="text" required maxlength="2000" /></div>
+                        <button type="submit" class="secondary">@s.Display</button>
+                    </form>
+                    break;
+                case "openVariation": case "startRenewal": case "completeRenewal": case "cancelRenewal": case "applyVariation": case "rejectVariation": case "cancelVariation":
+                    <p class="hint">@L["Taken from its own page."]</p>
+                    break;
+                default:
+                    <form method="post" asp-page-handler="Step">
+                        <input type="hidden" name="code" value="@s.Code" />
+                        <input type="hidden" name="ClientRequestId" value="@requestId" />
+                        if (s.CommentRequired || s.ReasonRequired)
+                        {
+                            <div class="field"><label for="x-@s.Code">@(s.ReasonRequired ? L["Reason (required)"] : L["Comment (required)"])</label><input id="x-@s.Code" name="Comment" type="text" required maxlength="2000" /></div>
+                        }
+                        <button type="submit" class="@(s.Role is "withdraw" or "flag" ? "secondary" : "")">@s.Display</button>
+                    </form>
+                    break;
+            }
+            }
+        </div>
+    }
+</section>
+
+@if (v.Execution is { } ex)
+{
+    <section class="card" aria-labelledby="exec-h">
+        <h2 id="exec-h">@L["Signing"]</h2>
+        <dl class="facts">
+            <dt>@L["Provider"]</dt><dd>@ex.ProviderLabel @if (ex.IsSimulated) { <span class="badge warn">@L["Simulated"]</span> }</dd>
+            <dt>@L["Status"]</dt><dd>@ex.Status @if (ex.Detail is { Length: > 0 }) { <span class="hint">&mdash; @ex.Detail</span> }</dd>
+            @if (ex.EnvelopeId is { } env) { <dt>@L["Envelope"]</dt><dd><code>@env</code></dd> }
+            <dt>@L["Started"]</dt><dd>@ex.StartedBy, @ex.StartedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+            @if (ex.ExecutedUtc is { } done) { <dt>@L["Executed copy attached"]</dt><dd>@done.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+        </dl>
+        <p class="hint">@L["A completed signature never approves, registers or locks the agreement. It only lets the executed copy be submitted for register authorisation."]</p>
+        @if (ex.Status != ExecutionStatus.Completed && v.Steps.Any(s => s.Role is "submitRegister" or "returnToDrafting"))
+        {
+            <form method="post" asp-page-handler="ExecutedCopy" enctype="multipart/form-data">
+                <div class="field"><label for="ec">@L["Upload the executed copy"]</label><input id="ec" name="file" type="file" required /></div>
+                <button type="submit" class="secondary">@L["Attach the executed copy"]</button>
+            </form>
+        }
+        @if (ex.Provider == "mock" && v.IsMockEnvironment && ex.Status != ExecutionStatus.Completed)
+        {
+            <form method="post" asp-page-handler="Simulate" class="actions">
+                <p class="hint">@L["Mock signature service (demonstration only): report what the service would send."]</p>
+                <button type="submit" name="status" value="Delivered" class="secondary">@L["Delivered"]</button>
+                <button type="submit" name="status" value="Completed" class="secondary">@L["Completed"]</button>
+                <button type="submit" name="status" value="Declined" class="secondary">@L["Declined"]</button>
+                <button type="submit" name="status" value="Voided" class="secondary">@L["Voided"]</button>
+            </form>
+        }
+    </section>
+}
+@if (v.Legal is { } legal)
+{
+    <p>@L["Legal review"]: <a href="/Legal/Review/@legal.ReviewId">@legal.StatusDisplay (@L["round"] @legal.CurrentRound)</a></p>
+}
+@if (v.Approval is { } approval)
+{
+    <p>@L["Register authorisation"]: <a href="/Approvals/Details/@approval.RequestId">@approval.Status</a></p>
+}

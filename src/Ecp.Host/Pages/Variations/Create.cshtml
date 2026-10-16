@@ -1,0 +1,11 @@
+@page "/Variations/Create"
+@model Ecp.Host.Pages.Variations.CreateModel
+@{ ViewData["Title"] = L["Start a Variation"].Value; }
+<h1>@L["Start a Variation"]</h1>
+<p class="lede">@L["A Variation is the way an Effective agreement changes. The agreement"] <a href="/Contracts/Details/@Model.Contract.Id">@Model.Contract.AgreementReference</a> @L["stays locked and unchanged until the Variation is approved and applied."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<form method="post">
+    <input type="hidden" name="ContractId" value="@Model.ContractId" />
+    <partial name="_VariationFields" model="(Model.Form, Model.Fields, Model.Current, (IReadOnlyDictionary<string, string?>)new Dictionary<string, string?>())" />
+    <div class="actions"><button type="submit">@L["Draft the Variation"]</button> <a class="button secondary" href="/Contracts/Details/@Model.Contract.Id">@L["Cancel"]</a></div>
+</form>

@@ -1,0 +1,16 @@
+@model IReadOnlyList<Ecp.Notifications.DashboardRow>
+@if (Model.Count == 0)
+{
+    <p class="hint">@L["Nothing here."]</p>
+}
+else
+{
+    <ul class="plain">
+    @foreach (var r in Model)
+    {
+        <li><a href="@r.Link">@r.Reference</a> &middot; @r.Title
+            @if (!string.IsNullOrEmpty(r.Detail)) { <span class="hint">&mdash; @r.Detail</span> }
+            @if (!string.IsNullOrEmpty(r.Classification)) { <span class="badge">@r.Classification</span> }</li>
+    }
+    </ul>
+}

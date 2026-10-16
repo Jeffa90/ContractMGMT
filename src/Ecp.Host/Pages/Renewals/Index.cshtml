@@ -1,0 +1,21 @@
+@page "/Renewals"
+@model Ecp.Host.Pages.Renewals.IndexModel
+@{ ViewData["Title"] = L["Renewals in progress"].Value; }
+<h1>@L["Renewals in progress"]</h1>
+<p class="lede">@L["Agreements being renewed. Each renewal has a successor draft linked to the agreement it replaces; the agreement being renewed is not changed by the renewal."]</p>
+<p role="status">@Model.Result.Total @L["renewal(s) in progress"]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Renewals in progress"]</caption>
+    <thead><tr><th scope="col">@L["Agreement being renewed"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Successor"]</th><th scope="col">@L["Started"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Copied"]</th></tr></thead>
+    <tbody>
+    @foreach (var r in Model.Result.Items)
+    {
+        <tr><th scope="row"><a href="/Contracts/Lifecycle/@r.PredecessorContractId">@r.PredecessorReference</a> <span class="hint">@r.PredecessorTitle</span></th><td>@r.SupplierName</td>
+            <td>@if (r.SuccessorReference is { } sr) { <a href="/Contracts/Details/@r.SuccessorContractId">@sr</a> <span class="hint">(@r.SuccessorStatus)</span> } else { <span class="hint">@L["not visible to you"]</span> }</td>
+            <td>@r.StartedUtc.ToString("yyyy-MM-dd")</td><td>@r.StartedBy</td><td>@r.CopiedFields.Count @L["field(s)"], @r.CopiedDocuments.Count @L["document(s)"]</td></tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="6">@L["No renewal is in progress."]</td></tr> }
+    </tbody>
+</table>
+</div>

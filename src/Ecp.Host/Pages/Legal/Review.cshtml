@@ -1,0 +1,145 @@
+@page "/Legal/Review/{id:guid}"
+@model Ecp.Host.Pages.Legal.ReviewModel
+@using Ecp.Lifecycle.Domain
+@{ ViewData["Title"] = L["Legal review"].Value + " " + Model.Review.AgreementReference; var r = Model.Review; var a = r.Actions; }
+<h1>@L["Legal review"]: @r.ContractTitle</h1>
+<p><a href="/Contracts/Details/@r.ContractId" class="badge">@r.AgreementReference</a>
+   @if (r.VariationReference is { } vr) { <a class="badge" href="/Variations/Details/@r.SubjectId">@vr</a> }
+   <span class="badge">@r.StatusDisplay</span> <span class="badge">@L["Round"] @r.CurrentRound</span> <span class="badge">@r.Classification</span></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<section class="card" aria-labelledby="sum">
+    <h2 id="sum">@L["Where this stands"]</h2>
+    <dl class="facts">
+        <dt>@L["Next step"]</dt><dd>@r.Outstanding</dd>
+        <dt>@L["Assigned to"]</dt><dd>@(r.AssignedToName ?? "-")</dd>
+        <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @r.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+        @if (r.ClearedBy is not null) { <dt>@L["Cleared by"]</dt><dd>@r.ClearedBy, @r.ClearedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+    </dl>
+    <p class="hint">@L["Clearance records Legal's view only. It does not register the agreement, lock it or make it Effective."]</p>
+</section>
+
+<section class="card" aria-labelledby="act-h">
+    <h2 id="act-h">@L["Actions"]</h2>
+    <div class="actions">
+    @if (a.CanBegin) { <form method="post" asp-page-handler="Begin"><button type="submit">@L["Begin review"]</button></form> }
+    </div>
+    @if (a.CanAssign)
+    {
+        <form method="post" asp-page-handler="Assign">
+            <div class="field"><label for="ReviewerId">@L["Assign to"]</label>
+                <select id="ReviewerId" name="ReviewerId" required>@foreach (var p in Model.Reviewers) { <option value="@p.UserId">@p.DisplayName</option> }</select></div>
+            <button type="submit" class="secondary">@L["Assign"]</button>
+        </form>
+    }
+    @if (a.CanReturn)
+    {
+        <form method="post" asp-page-handler="Return">
+            <div class="field"><label for="ret">@L["Reason for rework (required)"]</label><textarea id="ret" name="Text" rows="3" required maxlength="4000"></textarea></div>
+            <button type="submit" class="secondary">@L["Return for rework"]</button>
+        </form>
+    }
+    @if (a.CanClear)
+    {
+        <form method="post" asp-page-handler="Clear">
+            <div class="field"><label for="clr">@L["Note (optional)"]</label><input id="clr" name="Text" type="text" maxlength="1000" /></div>
+            <button type="submit">@L["Clear: Legal is satisfied"]</button>
+        </form>
+    }
+    @if (a.CanResubmit || a.CanSubmit)
+    {
+        <form method="post" asp-page-handler="Resubmit">
+            <div class="field"><label for="res">@L["Your response and what changed"]</label><textarea id="res" name="Text" rows="3" maxlength="4000"></textarea></div>
+            <button type="submit">@(a.CanResubmit ? L["Respond and resubmit to Legal"] : L["Submit to Legal"])</button>
+        </form>
+    }
+    @if (a.CanRecall)
+    {
+        <form method="post" asp-page-handler="Recall">
+            <div class="field"><label for="rec">@L["Reason for recalling (required)"]</label><input id="rec" name="Text" type="text" required maxlength="1000" /></div>
+            <button type="submit" class="secondary">@L["Recall from Legal"]</button>
+        </form>
+    }
+    @if (a.CanComment || a.CanReply)
+    {
+        <form method="post" asp-page-handler="Comment">
+            <div class="field"><label for="cmt">@(a.CanComment ? L["Add a comment"] : L["Reply"])</label><textarea id="cmt" name="Text" rows="3" required maxlength="8000"></textarea></div>
+            <input type="hidden" name="ParentId" value="" />
+            <button type="submit" class="secondary">@L["Post"]</button>
+        </form>
+    }
+    @if (a.CanAttachMarkup || a.CanAttachSupporting)
+    {
+        <form method="post" asp-page-handler="Attach" enctype="multipart/form-data">
+            <div class="field"><label for="att">@L["Document"]</label><input id="att" name="file" type="file" required /></div>
+            <div class="field"><label for="ttl">@L["Title"]</label><input id="ttl" name="Title" type="text" maxlength="300" /></div>
+            <div class="field"><label for="kind">@L["This is"]</label>
+                <select id="kind" name="Kind">
+                    @if (a.CanAttachMarkup) { <option value="@LegalAttachmentKind.Markup">@L["A mark-up (classified version)"]</option> }
+                    @if (a.CanAttachSupporting) { <option value="@LegalAttachmentKind.Response">@L["A response"]</option><option value="@LegalAttachmentKind.Supporting">@L["A supporting document"]</option> }
+                </select></div>
+            <div class="field"><label for="cls">@L["Classification (never lower than the agreement's)"]</label><input id="cls" name="Classification" type="text" placeholder="@r.Classification" maxlength="30" /></div>
+            <button type="submit" class="secondary">@L["Attach"]</button>
+        </form>
+    }
+    </div>
+</section>
+
+<h2>@L["Rounds"]</h2>
+@foreach (var round in r.Rounds.OrderByDescending(x => x.Number))
+{
+    <section class="card" aria-labelledby="round-@round.Number">
+        <h3 id="round-@round.Number">@L["Round"] @round.Number <span class="badge @(round.Outcome == LegalRoundOutcome.Cleared ? "ok" : round.Outcome == LegalRoundOutcome.ReturnedForRework ? "warn" : "")">@round.Outcome</span></h3>
+        <dl class="facts">
+            <dt>@L["Submitted"]</dt><dd>@round.SubmittedByName, @round.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC @if (round.SubmissionNote is { Length: > 0 }) { <span class="hint">&mdash; @round.SubmissionNote</span> }</dd>
+            @if (round.ReviewerName is not null) { <dt>@L["Reviewer"]</dt><dd>@round.ReviewerName, @L["started"] @round.StartedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+            @if (round.ReworkReason is { Length: > 0 }) { <dt>@(round.Outcome == LegalRoundOutcome.ReturnedForRework ? L["Reason for rework"] : L["Reason"])</dt><dd>@round.ReworkReason</dd> }
+            @if (round.ClosedUtc is { } closed) { <dt>@L["Closed"]</dt><dd>@round.ClosedBy, @closed.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+        </dl>
+        @if (round.Documents.Count > 0)
+        {
+            <h4>@L["Submitted with"]</h4>
+            <ul class="plain">@foreach (var d in round.Documents) { <li><a href="/Documents/Download/@d.DocumentId">@d.Title</a> <span class="hint">@d.DocumentType, @L["version"] @d.VersionNumber</span></li> }</ul>
+        }
+        @if (round.Attachments.Count > 0 || round.HiddenAttachments > 0)
+        {
+            <h4>@L["Documents added in this round"]</h4>
+            <ul class="plain">
+                @foreach (var at in round.Attachments) { <li><a href="/Documents/Download/@at.DocumentId">@at.FileName</a> <span class="badge">@at.Kind</span> <span class="hint">@L["version"] @at.VersionNumber &middot; @at.AddedBy &middot; @at.AddedUtc.ToString("yyyy-MM-dd HH:mm") UTC</span></li> }
+                @if (round.HiddenAttachments > 0) { <li class="hint">@round.HiddenAttachments @L["document(s) are classified above your access and are not shown."]</li> }
+            </ul>
+        }
+        @{ var top = round.Comments.Where(c => c.ParentCommentId is null).ToList(); }
+        @if (round.Comments.Count > 0)
+        {
+            <h4>@L["Comments"]</h4>
+            @foreach (var c in top)
+            {
+                <div class="comment @c.Side.ToLowerInvariant()">
+                    <p><strong>@c.AuthorName</strong> <span class="badge">@c.Side</span> <span class="hint">@c.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</span></p>
+                    <p>@c.Body</p>
+                    @foreach (var reply in round.Comments.Where(x => x.ParentCommentId == c.Id))
+                    {
+                        <div class="comment reply @reply.Side.ToLowerInvariant()"><p><strong>@reply.AuthorName</strong> <span class="badge">@reply.Side</span> <span class="hint">@reply.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</span></p><p>@reply.Body</p></div>
+                    }
+                    @if ((a.CanComment || a.CanReply) && round.Number == r.CurrentRound)
+                    {
+                        <form method="post" asp-page-handler="Comment" class="reply-form">
+                            <input type="hidden" name="ParentId" value="@c.Id" />
+                            <label class="visually-hidden" for="rp-@c.Id">@L["Reply"]</label><input id="rp-@c.Id" name="Text" type="text" required maxlength="8000" placeholder="@L["Reply"]" />
+                            <button type="submit" class="secondary">@L["Reply"]</button>
+                        </form>
+                    }
+                </div>
+            }
+        }
+    </section>
+}
+
+<h2>@L["Timeline"]</h2>
+<ol class="timeline">
+@foreach (var t in r.Timeline)
+{
+    <li><span class="hint">@t.OccurredUtc.ToString("yyyy-MM-dd HH:mm") UTC</span> <strong>@t.Kind</strong> @if (t.Round is { } n) { <span class="badge">@L["Round"] @n</span> } &middot; @t.Actor @if (t.Detail is { Length: > 0 }) { <span class="hint">&mdash; @t.Detail</span> }</li>
+}
+</ol>
+<p><a href="/Legal">&larr; @L["Legal review queue"]</a></p>

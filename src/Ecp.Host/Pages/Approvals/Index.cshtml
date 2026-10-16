@@ -1,0 +1,30 @@
+@page "/Approvals"
+@model Ecp.Host.Pages.Approvals.IndexModel
+@{ ViewData["Title"] = L["Register authorisation"].Value; }
+<h1>@L["Register authorisation"]</h1>
+<p class="lede">@L["Executed agreements waiting for the Group Head of Procurement or a backup. Whoever responds first decides, and nobody can decide their own submission."]</p>
+<form method="get" class="card"><label><input type="checkbox" name="Everything" value="true" checked="@Model.Everything" /> @L["Show every pending request I can see, not only those waiting on me"]</label>
+    <div class="actions"><button type="submit">@L["Apply"]</button></div></form>
+<p role="status">@Model.Result.Total @L["request(s) pending"]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Pending approvals"]</caption>
+    <thead><tr><th scope="col">@L["Agreement"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Category"]</th><th scope="col">@L["Submitted by"]</th><th scope="col">@L["Waiting"]</th><th scope="col">@L["Group"]</th><th scope="col">@L["For you"]</th></tr></thead>
+    <tbody>
+    @foreach (var r in Model.Result.Items)
+    {
+        <tr>
+            <th scope="row"><a href="/Approvals/Details/@r.RequestId">@r.AgreementReference</a> @if (r.VariationReference is { } v) { <span class="badge">@v</span> }<span class="hint">@r.Title</span> <span class="badge">@r.Classification</span></th>
+            <td>@r.SupplierName</td><td>@r.CategoryName</td><td>@r.SubmittedByName</td><td>@r.AgeDays @L["day(s)"]</td><td>@r.ApproverGroupKey</td>
+            <td>@if (r.CanDecide) { <span class="badge warn">@(r.ActingAsBackup ? L["You may decide (as backup)"] : L["You may decide"])</span> } else if (r.IsSubmitter) { <span class="hint">@L["You submitted this"]</span> } else { <span class="hint">@L["View only"]</span> }</td>
+        </tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="7">@L["Nothing is waiting."]</td></tr> }
+    </tbody>
+</table>
+</div>
+@if (Model.Eligible.Count > 0)
+{
+    <h2>@L["Who can decide"]</h2>
+    <ul class="plain">@foreach (var e in Model.Eligible) { <li>@e.DisplayName <span class="badge">@(e.IsBackup ? L["Backup"] : L["Primary"])</span></li> }</ul>
+}

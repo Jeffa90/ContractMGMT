@@ -131,7 +131,7 @@ internal sealed class NotificationInbox(
         var facts = await port.FindAsync(cid, ct);
         if (facts is null) return;
         var recipients = await resolver.ResolveAsync(rule.Recipients, new RecipientContext(source.OrganisationId, cid, source.Classification, me, null, null, null, null, null), true, ct);
-        var link = $"/Contracts/Details?id={cid}";
+        var link = $"/Contracts/Details/{cid}";
         var (subject, body) = renderer.Render(policy, template, new RenderContext(facts.AgreementReference, facts.Title, source.Classification, name, link), await scales.GetAsync(ct));
         foreach (var person in recipients)
             await writer.AddAsync(new NotificationDraft(source.OrganisationId, person, "reminder.acknowledged", "Event", null, cid, SubjectKinds.Contract, cid, source.Classification, subject, body, link, rule, false,

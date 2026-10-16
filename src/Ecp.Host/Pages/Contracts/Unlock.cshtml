@@ -1,0 +1,56 @@
+@page "/Contracts/Unlock/{id:guid}"
+@model Ecp.Host.Pages.Contracts.UnlockModel
+@{ ViewData["Title"] = L["Emergency unlock"].Value; var c = Model.Contract; }
+<h1>@L["Emergency unlock"]: @c.Title</h1>
+<p><a class="badge" href="/Contracts/Details/@c.Id">@c.AgreementReference</a> <span class="badge">@c.Status</span>
+   @if (c.RecordLocked) { <span class="badge warn">@L["Locked"]</span> }</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<p class="lede">@L["An Effective agreement changes through a Variation. An emergency unlock is the audited exception: it needs the permission, a recent sign-in, a written reason and a time limit, opens only the fields you name, and records every change. It never changes the status, the Registered Date or the original approval."]</p>
+
+@if (Model.Current is { } cur)
+{
+    <div class="access-banner" role="alert">
+        <strong>@L["Temporarily unlocked"]</strong> @L["until"] @cur.ExpiresUtc.ToString("yyyy-MM-dd HH:mm") UTC &mdash; @cur.Reason (@cur.OpenedByName)
+    </div>
+    <section class="card" aria-labelledby="chg-h">
+        <h2 id="chg-h">@L["Make changes"]</h2>
+        <form method="post" asp-page-handler="Change">
+            @foreach (var f in cur.Fields)
+            {
+                <div class="field"><label><input type="checkbox" name="Apply_@f" value="true" /> @f</label>
+                    <input name="Value_@f" type="text" value="@(Model.Values.GetValueOrDefault(f))" aria-label="@L["New value for"] @f" /></div>
+            }
+            <div class="actions"><button type="submit">@L["Apply the ticked changes"]</button></div>
+        </form>
+        <form method="post" asp-page-handler="Close"><button type="submit" class="secondary">@L["Close the unlock now"]</button></form>
+    </section>
+}
+else if (c.RecordLocked && Model.Policy.Enabled)
+{
+    <section class="card" aria-labelledby="open-h">
+        <h2 id="open-h">@L["Open an unlock"]</h2>
+        <form method="post" asp-page-handler="Open">
+            <div class="field"><label for="reason">@L["Reason (at least 20 characters; it is shown on the record)"]</label><textarea id="reason" name="Reason" rows="3" required minlength="20" maxlength="1000"></textarea></div>
+            <div class="field"><label for="minutes">@L["Minutes (5 to"] @Model.Policy.MaxMinutes)</label><input id="minutes" name="Minutes" type="number" min="5" max="@Model.Policy.MaxMinutes" value="@Model.Minutes" required /></div>
+            <fieldset><legend>@L["Fields to unlock"]</legend>
+                @foreach (var f in Model.Policy.Fields) { <label><input type="checkbox" name="Open_@f" value="true" /> @f</label> }
+            </fieldset>
+            <p class="hint">@L["You will be asked to sign in again first."]</p>
+            <div class="actions"><button type="submit">@L["Unlock these fields"]</button></div>
+        </form>
+    </section>
+}
+else if (!Model.Policy.Enabled) { <p class="flash warn" role="status">@L["Emergency unlock is not enabled by this organisation's policy."]</p> }
+else { <p class="flash" role="status">@L["This agreement is not locked."]</p> }
+
+<h2>@L["Unlock history"]</h2>
+<div class="table-wrap"><table>
+    <thead><tr><th scope="col">@L["Opened (UTC)"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Reason"]</th><th scope="col">@L["Fields"]</th><th scope="col">@L["Until"]</th><th scope="col">@L["Closed"]</th><th scope="col">@L["Changes"]</th></tr></thead>
+    <tbody>
+    @foreach (var h in Model.History)
+    {
+        <tr><td>@h.OpenedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@h.OpenedByName</td><td>@h.Reason</td><td>@string.Join(", ", h.Fields)</td><td>@h.ExpiresUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@(h.ClosedUtc?.ToString("yyyy-MM-dd HH:mm") ?? (h.IsOpen ? "open" : "-")) @h.CloseKind</td><td>@h.ChangeCount</td></tr>
+    }
+    @if (Model.History.Count == 0) { <tr><td colspan="7">@L["No unlock has been opened."]</td></tr> }
+    </tbody>
+</table></div>

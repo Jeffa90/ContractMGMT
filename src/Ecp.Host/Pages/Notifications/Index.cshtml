@@ -1,0 +1,51 @@
+@page "/Notifications"
+@model Ecp.Host.Pages.Notifications.IndexModel
+@{ ViewData["Title"] = L["Notifications"].Value; }
+<h1>@L["Notifications"]</h1>
+<p class="lede">@L["Messages about work waiting for you and reminders about your agreements. A message about an agreement is shown only while you can open that agreement."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<form method="get" class="card" aria-label="@L["Filter notifications"]">
+    <label><input type="checkbox" name="UnreadOnly" value="true" checked="@Model.UnreadOnly" /> @L["Unread only"]</label>
+    <label><input type="checkbox" name="NeedsAcknowledgement" value="true" checked="@Model.NeedsAcknowledgement" /> @L["Waiting to be acknowledged"]</label>
+    <div class="actions"><button type="submit">@L["Apply"]</button></div>
+</form>
+<form method="post" asp-page-handler="ReadAll"><button type="submit" class="secondary">@L["Mark everything as read"]</button></form>
+<p role="status">@Model.Result.Total @L["message(s)"]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Notifications"]</caption>
+    <thead><tr><th scope="col">@L["When (UTC)"]</th><th scope="col">@L["Message"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+    <tbody>
+    @foreach (var n in Model.Result.Items)
+    {
+        <tr>
+            <td>@n.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</td>
+            <th scope="row">@(n.ReadUtc is null ? "● " : "")@n.Title
+                <span class="hint">@n.Body</span>
+                @if (n.LinkPath is { Length: > 0 } link) { <a href="@link">@L["Open"]</a> }</th>
+            <td>@if (n.Mandatory) { <span class="badge">@L["Mandatory"]</span> }
+                @if (n.RequiresAcknowledgement) { if (n.AcknowledgedUtc is { } at) { <span class="badge ok">@L["Acknowledged by"] @n.AcknowledgedBy, @at.ToString("yyyy-MM-dd HH:mm")</span> } else { <span class="badge warn">@L["Needs acknowledging"]</span> } }</td>
+            <td>
+                @if (n.RequiresAcknowledgement && n.AcknowledgedUtc is null)
+                {
+                    <form method="post" asp-page-handler="Acknowledge"><input type="hidden" name="id" value="@n.Id" /><button type="submit">@L["Acknowledge"]</button></form>
+                }
+                @if (n.ReadUtc is null)
+                {
+                    <form method="post" asp-page-handler="Read"><input type="hidden" name="id" value="@n.Id" /><button type="submit" class="secondary">@L["Mark as read"]</button></form>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="4">@L["No messages."]</td></tr> }
+    </tbody>
+</table>
+</div>
+@if (Model.Result.PageCount > 1)
+{
+    <nav class="pager" aria-label="@L["Pages"]">
+        @if (Model.Result.Page > 1) { <a href="/Notifications?pageNumber=@(Model.Result.Page - 1)&UnreadOnly=@Model.UnreadOnly&NeedsAcknowledgement=@Model.NeedsAcknowledgement">@L["Previous"]</a> }
+        <span>@L["Page"] @Model.Result.Page @L["of"] @Model.Result.PageCount</span>
+        @if (Model.Result.Page < Model.Result.PageCount) { <a href="/Notifications?pageNumber=@(Model.Result.Page + 1)&UnreadOnly=@Model.UnreadOnly&NeedsAcknowledgement=@Model.NeedsAcknowledgement">@L["Next"]</a> }
+    </nav>
+}

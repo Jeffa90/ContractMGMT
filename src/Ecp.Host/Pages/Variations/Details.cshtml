@@ -1,0 +1,70 @@
+@page "/Variations/Details/{id:guid}"
+@model Ecp.Host.Pages.Variations.DetailsModel
+@{ ViewData["Title"] = Model.Variation.Summary.Reference; var v = Model.Variation; var s = v.Summary; }
+<h1>@s.Title</h1>
+<p><span class="badge">@s.Reference</span> <a class="badge" href="/Contracts/Details/@s.ContractId">@s.AgreementReference</a> <span class="badge">@s.StatusDisplay</span> @if (s.Outcome is { } o) { <span class="badge @(o == Ecp.Lifecycle.Domain.VariationOutcome.Applied ? "ok" : "warn")">@o</span> }</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (v.ParentChangedSinceDrafted)
+{
+    <div class="flash warn" role="status">@L["The agreement has changed since this Variation was drafted. Check the 'Now' column before approving."]</div>
+}
+
+@if (Model.Editing)
+{
+    <form method="post" asp-page-handler="Save">
+        <partial name="_VariationFields" model="(Model.Form, v.ChangeableFields, Model.Current, Model.Proposed)" />
+        <div class="actions"><button type="submit">@L["Save"]</button> <a class="button secondary" href="/Variations/Details/@s.Id">@L["Cancel"]</a></div>
+    </form>
+}
+else
+{
+    <section class="card" aria-labelledby="sum-h">
+        <h2 id="sum-h">@L["The Variation"]</h2>
+        <dl class="facts">
+            <dt>@L["Reason"]</dt><dd>@v.Reason</dd>
+            @if (v.Description is { Length: > 0 }) { <dt>@L["Description"]</dt><dd>@v.Description</dd> }
+            <dt>@L["Proposed effective date"]</dt><dd>@(s.ProposedDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
+            <dt>@L["Financial impact"]</dt><dd>@(s.ImpactAmount is { } a ? $"{a:N2} {s.ImpactCurrency}" : "-") @v.ImpactNote</dd>
+            <dt>@L["Legal review"]</dt><dd>@(v.LegalReviewRequired ? L["Required"] : L["Not required"])</dd>
+            <dt>@L["Raised by"]</dt><dd>@s.CreatedBy, @s.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+            <dt>@L["Agreement was"]</dt><dd>@v.ParentStatusBefore</dd>
+            @if (s.CompletedUtc is { } done) { <dt>@L["Completed"]</dt><dd>@done.ToString("yyyy-MM-dd HH:mm") UTC @if (v.OutcomeReason is { Length: > 0 }) { <span class="hint">&mdash; @v.OutcomeReason</span> }</dd> }
+        </dl>
+        @if (v.CanEdit) { <p><a class="button secondary" href="/Variations/Details/@s.Id?edit=true">@L["Edit the Variation"]</a></p> }
+    </section>
+
+    <section class="card" aria-labelledby="cmp-h">
+        <h2 id="cmp-h">@(s.Outcome == Ecp.Lifecycle.Domain.VariationOutcome.Applied ? L["What changed"] : L["Before and after"])</h2>
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Before and after"]</caption>
+            <thead><tr><th scope="col">@L["Field"]</th><th scope="col">@(s.Outcome == Ecp.Lifecycle.Domain.VariationOutcome.Applied ? L["Before it was applied"] : L["Before (when drafted)"])</th><th scope="col">@(s.Outcome == Ecp.Lifecycle.Domain.VariationOutcome.Applied ? L["After it was applied"] : L["Proposed"])</th>@if (s.IsOpen) { <th scope="col">@L["Now"]</th> }</tr></thead>
+            <tbody>
+            @foreach (var c in v.Comparison)
+            {
+                <tr class="@(c.Changed ? "changed" : "")"><th scope="row">@c.Label</th><td>@(c.Before ?? "-")</td><td>@(c.After ?? "-")</td>@if (s.IsOpen) { <td>@(c.Current ?? "-")</td> }</tr>
+            }
+            </tbody>
+        </table></div>
+        <p class="hint">@L["Applying a Variation changes only these fields, in one audited step. The before and after values are kept with the Variation."]</p>
+    </section>
+}
+
+<section class="card" aria-labelledby="docs-h">
+    <h2 id="docs-h">@L["Documents"]</h2>
+    <ul class="plain">
+    @foreach (var d in v.Documents) { <li>@if (d.CanDownload) { <a href="/Documents/Download/@d.DocumentId">@d.Title</a> } else { @d.Title } <span class="badge">@d.Role</span> @if (d.IsExecutedCopy) { <span class="badge">@L["Executed copy"]</span> } <span class="hint">@d.FileName</span></li> }
+    @if (v.Documents.Count == 0) { <li class="hint">@L["No documents yet."]</li> }
+    </ul>
+    @if (v.CanAddDocuments)
+    {
+        <form method="post" asp-page-handler="Document" enctype="multipart/form-data">
+            <div class="field"><label for="df">@L["Document"]</label><input id="df" name="file" type="file" required /></div>
+            <div class="field"><label for="dt">@L["Title"]</label><input id="dt" name="DocumentTitle" type="text" maxlength="300" /></div>
+            <div class="field"><label for="dr">@L["This is"]</label><select id="dr" name="DocumentRole"><option value="Final">@L["The final Variation document to be signed"]</option><option value="Supporting">@L["A supporting document"]</option></select></div>
+            <button type="submit" class="secondary">@L["Add the document"]</button>
+        </form>
+    }
+</section>
+
+<partial name="_Steps" model="Model.Steps" />
+<p><a href="/Variations">&larr; @L["Variations in progress"]</a></p>

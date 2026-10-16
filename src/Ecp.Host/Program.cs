@@ -68,6 +68,7 @@ builder.Services.AddNotificationsModule(o =>
     o.Mode = resolved.Host.Mode;
 });
 builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
+builder.Services.AddHostedService<BackgroundJobService>();
 builder.Services.AddSingleton<DemoSeeder>();
 var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 builder.Services.AddSetupModule(new SetupEnvironment(resolved.Host.Mode, resolved.Host.DataDirectory,

@@ -1,0 +1,42 @@
+@page "/Admin/Studio/History"
+@model Ecp.Host.Pages.Admin.Studio.HistoryModel
+@{ ViewData["Title"] = L["Versions and rollback"].Value; }
+<h1>@L["Versions and rollback"]</h1>
+<p><a href="/Admin/Studio?organisationId=@Model.OrganisationId">@L["Configuration Studio"]</a></p>
+<nav class="tabs" aria-label="@L["What to show"]">
+    <a href="/Admin/Studio/History?organisationId=@Model.OrganisationId&kind=fields" aria-current="@(Model.Kind == "fields" ? "page" : null)">@L["Additional fields"]</a>
+    <a href="/Admin/Studio/History?organisationId=@Model.OrganisationId&kind=views" aria-current="@(Model.Kind == "views" ? "page" : null)">@L["Shared views"]</a>
+</nav>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Denied is not null) { <p class="flash warn" role="status">@Model.Denied</p> }
+else
+{
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Releases"]</caption>
+        <thead><tr><th scope="col">@L["Release"]</th><th scope="col">@L["Published"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Note"]</th><th scope="col">@L["What changed"]</th></tr></thead>
+        <tbody>
+        @foreach (var (r, summary) in Model.Releases)
+        {
+            <tr>
+                <th scope="row">@r.Number @if (r.Number == Model.Current) { <span class="badge ok">@L["In force"]</span> } @if (r.RollbackOfNumber is { } rb) { <span class="badge">@L["Restores"] @rb</span> }</th>
+                <td>@r.PublishedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td><td>@r.PublishedBy</td><td>@r.Note</td><td>@summary</td>
+            </tr>
+        }
+        @if (Model.Releases.Count == 0) { <tr><td colspan="5">@L["Nothing has been published yet."]</td></tr> }
+        </tbody>
+    </table>
+    </div>
+    @if (Model.Releases.Count > 1)
+    {
+        <form method="post" asp-page-handler="Rollback" class="card">
+            <input type="hidden" name="organisationId" value="@Model.OrganisationId" /><input type="hidden" name="kind" value="@Model.Kind" />
+            <h2>@L["Restore an earlier version"]</h2>
+            <p class="hint">@L["The earlier content is published again as a new release; nothing is erased. A restore is refused if it would remove a field or choice that contracts now use."]</p>
+            <div class="field"><label for="ToRelease">@L["Release to restore"]</label><select id="ToRelease" name="ToRelease">@foreach (var (r, _) in Model.Releases.Where(x => x.Release.Number != Model.Current)) { <option value="@r.Number">@r.Number</option> }</select></div>
+            <div class="field"><label for="Reason">@L["Reason"]</label><input id="Reason" name="Reason" type="text" maxlength="500" required /></div>
+            <button type="submit">@L["Restore"]</button>
+        </form>
+    }
+    <p><a href="/Admin/Audit?entityType=@(Model.Kind == "views" ? "ContractListView" : "CustomField")">@L["Audit events for these changes"]</a></p>
+}

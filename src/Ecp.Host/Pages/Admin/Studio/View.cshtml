@@ -1,0 +1,68 @@
+@page "/Admin/Studio/View"
+@model Ecp.Host.Pages.Admin.Studio.ViewModel
+@using Ecp.Contracts.Register
+@{ ViewData["Title"] = (Model.IsNew ? L["Add a view"] : L["Edit a view"]).Value; }
+<h1>@(Model.IsNew ? L["Add a view"] : L["Edit a view"])</h1>
+<p><a href="/Admin/Studio/Views?organisationId=@Model.OrganisationId">@L["Back to the shared views"]</a></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.State.Draft is null) { <p class="flash warn" role="status">@L["Start a draft on the shared views page before changing a view."]</p> }
+<form method="post">
+    <input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+    <fieldset class="card">
+        <legend>@L["Identity"]</legend>
+        <div class="field"><label for="ViewKey">@L["Key"]</label><input id="ViewKey" name="ViewKey" type="text" maxlength="41" value="@Model.ViewKey" readonly="@(!Model.IsNew)" /><p class="hint">@L["Lower-case letters, digits and hyphens, starting with a letter."]</p></div>
+        <div class="field"><label for="ViewName">@L["Name"]</label><input id="ViewName" name="ViewName" type="text" maxlength="100" required value="@Model.ViewName" /></div>
+        <div class="field"><label for="Description">@L["Description"]</label><input id="Description" name="Description" type="text" maxlength="300" value="@Model.Description" /></div>
+    </fieldset>
+    <fieldset class="card">
+        <legend>@L["Columns"]</legend>
+        <p class="hint">@L["Tick the columns to show. They appear in the order listed here. Only fields you yourself can see are offered, so a shared view never names more than you can reach."]</p>
+        @foreach (var f in Model.Catalogue.Fields.Where(f => f.Displayable))
+        {
+            <label><input type="checkbox" name="Columns" value="@f.Key" checked="@Model.Columns.Contains(f.Key, StringComparer.OrdinalIgnoreCase)" /> @f.Label@(f.IsCustom ? " (" + L["additional"].Value + ")" : "")</label>
+        }
+    </fieldset>
+    <fieldset class="card">
+        <legend>@L["Sorting and filters"]</legend>
+        <div class="field"><label for="SortField">@L["Sort by"]</label>
+            <select id="SortField" name="SortField"><option value="">@L["Default"]</option>@foreach (var f in Model.Catalogue.Fields.Where(f => f.Sortable)) { <option value="@f.Key" selected="@(f.Key == Model.SortField)">@f.Label</option> }</select>
+            <label><input type="checkbox" name="SortDescending" value="true" checked="@Model.SortDescending" /> @L["Descending"]</label><input type="hidden" name="SortDescending" value="false" /></div>
+        <div class="field"><label for="Text">@L["Search text"]</label><input id="Text" name="Text" type="text" maxlength="200" value="@Model.Text" /></div>
+        @for (var i = 0; i < Math.Max(3, Model.Ff.Count + 1); i++)
+        {
+            var field = i < Model.Ff.Count ? Model.Ff[i] : ""; var op = i < Model.Fo.Count ? Model.Fo[i] : "Eq"; var value = i < Model.Fv.Count ? Model.Fv[i] : "";
+            <div class="filter-row">
+                <label class="visually-hidden" for="vf@(i)-f">@L["Field"]</label>
+                <select id="vf@(i)-f" name="Ff"><option value="">@L["Field"]</option>@foreach (var f in Model.Catalogue.Fields.Where(f => f.Filterable)) { <option value="@f.Key" selected="@(f.Key == field)">@f.Label</option> }<option value="set" selected="@(field == "set")">@L["A list (awaiting action, ...)"]</option></select>
+                <label class="visually-hidden" for="vf@(i)-o">@L["Operator"]</label>
+                <select id="vf@(i)-o" name="Fo">@foreach (var o in FilterOps.All) { <option value="@o" selected="@(o == op)">@o</option> }</select>
+                <label class="visually-hidden" for="vf@(i)-v">@L["Value"]</label>
+                <input id="vf@(i)-v" name="Fv" type="text" maxlength="500" value="@value" />
+            </div>
+        }
+        <p class="hint">@L["Dates can be relative: @today, @today+30. @me means whoever opens the view. @live means every live state of the workflow."]</p>
+    </fieldset>
+    <fieldset class="card">
+        <legend>@L["Display"]</legend>
+        <div class="field"><label for="PageSize">@L["Rows per page"]</label><input id="PageSize" name="PageSize" type="text" inputmode="numeric" value="@Model.PageSize" /></div>
+        <div class="field"><label><input type="checkbox" name="StatusChips" value="true" checked="@Model.StatusChips" /> @L["Show status chips"]</label><input type="hidden" name="StatusChips" value="false" /></div>
+        <div class="field"><label for="DateFormat">@L["Date format"]</label><select id="DateFormat" name="DateFormat">@foreach (var d in ViewFormats.Dates) { <option value="@d" selected="@(d == Model.DateFormat)">@d</option> }</select></div>
+        <div class="field"><label for="CurrencyFormat">@L["Currency format"]</label><select id="CurrencyFormat" name="CurrencyFormat">@foreach (var d in ViewFormats.Currencies) { <option value="@d" selected="@(d == Model.CurrencyFormat)">@d</option> }</select></div>
+        <div class="field"><label for="GroupBy">@L["Group by"]</label><select id="GroupBy" name="GroupBy"><option value="">@L["No grouping"]</option>@foreach (var d in ViewFormats.Groupings) { <option value="@d" selected="@(d == Model.GroupBy)">@d</option> }</select></div>
+    </fieldset>
+    <div class="actions">
+        <button type="submit" class="secondary" asp-page-handler="Try" formnovalidate>@L["Try it"]</button>
+        <button type="submit" disabled="@(Model.State.Draft is null)">@L["Save in the draft"]</button>
+        <a class="button secondary" href="/Admin/Studio/Views?organisationId=@Model.OrganisationId">@L["Cancel"]</a>
+    </div>
+</form>
+@if (Model.Trial is { } t)
+{
+    <section class="card" aria-labelledby="trial">
+        <h2 id="trial">@L["Trial run"]</h2>
+        <p>@t.Total @L["contract(s) match for you."] @L["Everyone sees only what their own access allows."]</p>
+        @foreach (var n in t.Notes) { <p class="hint">@n</p> }
+        <div class="table-wrap"><table><thead><tr>@foreach (var c in t.Columns) { <th scope="col">@c.Label</th> }</tr></thead>
+        <tbody>@foreach (var r in t.Rows.Take(10)) { <tr>@foreach (var c in t.Columns) { <td>@r.Cells.GetValueOrDefault(c.Key)</td> }</tr> }</tbody></table></div>
+    </section>
+}

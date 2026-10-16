@@ -1,0 +1,121 @@
+@page "/Admin/Studio/Fields"
+@model Ecp.Host.Pages.Admin.Studio.FieldsModel
+@using Ecp.Metadata
+@using Ecp.Configuration
+@{ ViewData["Title"] = L["Additional contract fields"].Value; }
+<h1>@L["Additional contract fields"]</h1>
+<p><a href="/Admin/Studio?organisationId=@Model.OrganisationId">@L["Configuration Studio"]</a></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="card"><div class="field"><label for="organisationId">@L["Organisation"]</label>
+        <select id="organisationId" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+        <button type="submit">@L["Choose"]</button></form>
+}
+@if (Model.State is { } st)
+{
+    var set = st.Working;
+    <p>
+        @if (st.Release is { } rel) { <span class="badge">@L["Published release"] @rel.Number</span> } else { <span class="badge">@L["Nothing published yet"]</span> }
+        @if (st.HasDraft) { <span class="badge warn">@L["Editing a draft"]</span> } else { <span class="badge ok">@L["Showing what is in force"]</span> }
+    </p>
+    @if (!st.HasDraft)
+    {
+        <form method="post" asp-page-handler="Start"><input type="hidden" name="organisationId" value="@Model.OrganisationId" /><button type="submit">@L["Start a draft to make changes"]</button></form>
+    }
+    else
+    {
+        <div class="actions">
+            <a class="button" href="/Admin/Studio/Field?organisationId=@Model.OrganisationId">@L["Add a field"]</a>
+            <a class="button secondary" href="/Admin/Studio/Lists?organisationId=@Model.OrganisationId">@L["Sections and choice lists"]</a>
+        </div>
+    }
+
+    @if (st.Draft is not null)
+    {
+        <section class="card" aria-labelledby="checks">
+            <h2 id="checks">@L["Checks"]</h2>
+            @if (st.DraftMessages.Count == 0) { <p>@L["No checks have been run on this draft yet, or none found anything."]</p> }
+            else
+            {
+                <ul>
+                    @foreach (var m in st.DraftMessages)
+                    {
+                        <li><span class="badge @(m.Severity == ValidationSeverity.Error ? "bad" : "warn")">@(m.Severity == ValidationSeverity.Error ? L["Must fix"] : L["Note"])</span> @m.Message <code class="hint">@m.Path</code></li>
+                    }
+                </ul>
+            }
+            <h3>@L["What publishing would change"]</h3>
+            @if (st.Impact.Count == 0) { <p class="hint">@L["Nothing differs from what is published."]</p> }
+            else
+            {
+                <ul>
+                    @foreach (var i in st.Impact)
+                    {
+                        <li><span class="badge @(i.Level == ImpactLevel.Blocking ? "bad" : i.Level == ImpactLevel.Warning ? "warn" : "")">@(i.Level == ImpactLevel.Blocking ? L["Blocks publishing"] : i.Level == ImpactLevel.Warning ? L["Check"] : L["Info"])</span> <code>@i.Key</code> @i.Message</li>
+                    }
+                </ul>
+            }
+            <form method="post" asp-page-handler="Validate" class="inline"><input type="hidden" name="organisationId" value="@Model.OrganisationId" /><button type="submit" class="secondary">@L["Validate the draft"]</button></form>
+        </section>
+    }
+
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Fields"]</caption>
+        <thead><tr><th scope="col">@L["Section"]</th><th scope="col">@L["Field"]</th><th scope="col">@L["Type"]</th><th scope="col">@L["Where it is used"]</th><th scope="col">@L["Stored values"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+        <tbody>
+        @foreach (var block in set.Fields.GroupBy(f => f.Section).OrderBy(g => set.Sections.FirstOrDefault(s => s.Key == g.Key)?.Order ?? int.MinValue))
+        {
+            var ordered = block.OrderBy(f => f.Order).ThenBy(f => f.Label, StringComparer.Ordinal).ToList();
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                var f = ordered[i];
+                <tr>
+                    <td>@(set.Sections.FirstOrDefault(s => s.Key == f.Section)?.Label ?? (f.Section == "general" ? "Additional details" : f.Section))</td>
+                    <th scope="row">@f.Label <code class="hint">@f.Key</code>@if (f.IsRetired) { <span class="badge"> @L["Retired"]</span> }@if (f.Required) { <span class="badge"> @L["Required"]</span> }</th>
+                    <td>@FieldTypes.Label(f.Type)</td>
+                    <td>
+                        @if (f.Searchable) { <span class="badge">@L["Search"]</span> }
+                        @if (f.Filterable) { <span class="badge">@L["Filter"]</span> }
+                        @if (f.Sortable) { <span class="badge">@L["Sort"]</span> }
+                        @if (f.Reportable) { <span class="badge">@L["Export"]</span> }
+                        @if (f.UsableInApprovals) { <span class="badge">@L["Approvals"]</span> }
+                        <span class="badge">@f.Classification</span>
+                    </td>
+                    <td>@st.Usage.Of(f.Key)</td>
+                    <td>
+                        @if (st.HasDraft)
+                        {
+                            <a href="/Admin/Studio/Field?organisationId=@Model.OrganisationId&key=@Uri.EscapeDataString(f.Key)">@L["Edit"]</a>
+                            <form method="post" class="inline"><input type="hidden" name="organisationId" value="@Model.OrganisationId" /><input type="hidden" name="key" value="@f.Key" />
+                                <button type="submit" class="secondary" asp-page-handler="Move" name="direction" value="-1" disabled="@(i == 0)" aria-label="@L["Move up"]: @f.Label">&uarr;</button>
+                                <button type="submit" class="secondary" asp-page-handler="Move" name="direction" value="1" disabled="@(i == ordered.Count - 1)" aria-label="@L["Move down"]: @f.Label">&darr;</button>
+                                @if (f.IsRetired) { <button type="submit" class="secondary" asp-page-handler="Reinstate">@L["Reinstate"]</button> }
+                                else { <button type="submit" class="secondary" asp-page-handler="Retire">@L["Retire"]</button> }
+                                @if (st.Published.Find(f.Key) is null) { <button type="submit" class="secondary" asp-page-handler="Remove">@L["Delete from draft"]</button> }
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        }
+        @if (set.Fields.Count == 0) { <tr><td colspan="6">@L["No additional fields are defined."]</td></tr> }
+        </tbody>
+    </table>
+    </div>
+
+    @if (st.HasDraft)
+    {
+        <section class="card">
+            <h2>@L["Publish or discard"]</h2>
+            <form method="post" asp-page-handler="Publish">
+                <input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+                <div class="field"><label for="Note">@L["Note for the version history"]</label><input id="Note" name="Note" type="text" maxlength="500" required /></div>
+                <button type="submit">@L["Validate and publish"]</button>
+            </form>
+            <form method="post" asp-page-handler="Discard"><input type="hidden" name="organisationId" value="@Model.OrganisationId" /><button type="submit" class="secondary">@L["Discard the draft"]</button></form>
+        </section>
+    }
+    <p><a href="/Admin/Studio/History?organisationId=@Model.OrganisationId">@L["Versions and rollback"]</a></p>
+}

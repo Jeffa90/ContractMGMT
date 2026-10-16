@@ -1,0 +1,34 @@
+@page "/Admin/Studio/Lists"
+@model Ecp.Host.Pages.Admin.Studio.ListsModel
+@using Ecp.Metadata
+@{ ViewData["Title"] = L["Sections and choice lists"].Value; }
+<h1>@L["Sections and choice lists"]</h1>
+<p><a href="/Admin/Studio/Fields?organisationId=@Model.OrganisationId">@L["Back to the fields"]</a></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (!Model.State.HasDraft) { <p class="flash warn" role="status">@L["Start a draft on the fields page before changing sections or lists."]</p> }
+
+<section class="card">
+    <h2>@L["Sections"]</h2>
+    <p class="hint">@L["Sections group fields on the contract forms and details page, in the order given. The section general always exists."]</p>
+    <ul>@foreach (var s in Model.State.Working.OrderedSections) { <li><code>@s.Key</code> @s.Label (@s.Order)</li> }</ul>
+    <form method="post" asp-page-handler="Section">
+        <input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+        <div class="field"><label for="SectionKey">@L["Key"]</label><input id="SectionKey" name="SectionKey" type="text" maxlength="63" required /></div>
+        <div class="field"><label for="SectionLabel">@L["Label"]</label><input id="SectionLabel" name="SectionLabel" type="text" maxlength="100" required /></div>
+        <div class="field"><label for="SectionOrder">@L["Order"]</label><input id="SectionOrder" name="SectionOrder" type="text" inputmode="numeric" value="10" /></div>
+        <button type="submit" disabled="@(!Model.State.HasDraft)">@L["Save the section"]</button>
+    </form>
+</section>
+
+<section class="card">
+    <h2>@L["Lookup lists"]</h2>
+    <p class="hint">@L["A list can be chosen from by several fields. A list named contractType, agreementType, riskLevel, functionCode or supplierType also controls the matching core field: new values must then come from the list. Members in use can be made inactive, never removed."]</p>
+    <ul>@foreach (var l in Model.State.Working.Lookups) { <li><a href="/Admin/Studio/Lists?organisationId=@Model.OrganisationId&list=@Uri.EscapeDataString(l.Name)">@l.Label</a> <code>@l.Name</code> (@l.Members.Count(m => m.Active) @L["active"], @l.Members.Count(m => !m.Active) @L["inactive"])</li> }</ul>
+    <form method="post" asp-page-handler="List">
+        <input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+        <div class="field"><label for="ListName">@L["Name"]</label><input id="ListName" name="ListName" type="text" maxlength="49" required value="@Model.ListName" /></div>
+        <div class="field"><label for="ListLabel">@L["Label"]</label><input id="ListLabel" name="ListLabel" type="text" maxlength="100" required value="@Model.ListLabel" /></div>
+        <div class="field"><label for="Members">@L["Members: one per line, CODE | Label (add | inactive to retire one)"]</label><textarea id="Members" name="Members" rows="10">@Model.Members</textarea></div>
+        <button type="submit" disabled="@(!Model.State.HasDraft)">@L["Save the list"]</button>
+    </form>
+</section>

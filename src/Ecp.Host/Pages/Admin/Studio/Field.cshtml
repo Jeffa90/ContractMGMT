@@ -1,0 +1,136 @@
+@page "/Admin/Studio/Field"
+@model Ecp.Host.Pages.Admin.Studio.FieldModel
+@using Ecp.Metadata
+@using Ecp.Contracts.Register
+@{ ViewData["Title"] = (Model.IsNew ? L["Add a field"] : L["Edit a field"]).Value; var e = Model.Edit; }
+<h1>@(Model.IsNew ? L["Add a field"] : L["Edit a field"])</h1>
+<p><a href="/Admin/Studio/Fields?organisationId=@Model.OrganisationId">@L["Back to the fields"]</a></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (!Model.State.HasDraft) { <p class="flash warn" role="status">@L["Start a draft on the fields page before changing a field."]</p> }
+@if (Model.Locked) { <p class="hint">@L["This field is published. Its key and type cannot change while values exist; retire it and add a new one instead. Choices can be added or made inactive, never removed while in use."]</p> }
+<form method="post">
+    <input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+    <fieldset class="card">
+        <legend>@L["Identity"]</legend>
+        <div class="field"><label for="Edit_Key">@L["Key"]</label><input id="Edit_Key" name="Edit.Key" type="text" maxlength="63" value="@e.Key" readonly="@(!Model.IsNew)" aria-describedby="key-hint" />
+            <p id="key-hint" class="hint">@L["Lower-case letters, digits and underscores, starting with a letter. It identifies the field in views, exports and approvals and cannot change once published."]</p></div>
+        <div class="field"><label for="Edit_Label">@L["Label"]</label><input id="Edit_Label" name="Edit.Label" type="text" maxlength="100" required value="@e.Label" /></div>
+        <div class="field"><label for="Edit_Type">@L["Type"]</label>
+            <select id="Edit_Type" name="Edit.Type">@foreach (var t in FieldTypes.All) { <option value="@t" selected="@(t == e.Type)">@FieldTypes.Label(t)</option> }</select></div>
+        <div class="field"><label for="Edit_Section">@L["Section"]</label>
+            <select id="Edit_Section" name="Edit.Section">
+                <option value="general" selected="@(e.Section == "general")">@L["Additional details"] (general)</option>
+                @foreach (var s in Model.State.Working.OrderedSections.Where(s => s.Key != "general")) { <option value="@s.Key" selected="@(s.Key == e.Section)">@s.Label</option> }
+            </select></div>
+        <input type="hidden" name="Edit.Order" value="@e.Order" />
+        <div class="field"><label for="Edit_Description">@L["Description (for administrators)"]</label><input id="Edit_Description" name="Edit.Description" type="text" maxlength="300" value="@e.Description" /></div>
+        <div class="field"><label for="Edit_HelpText">@L["Help text shown beside the field"]</label><input id="Edit_HelpText" name="Edit.HelpText" type="text" maxlength="300" value="@e.HelpText" /></div>
+        <div class="field"><label for="Edit_Placeholder">@L["Placeholder"]</label><input id="Edit_Placeholder" name="Edit.Placeholder" type="text" maxlength="100" value="@e.Placeholder" /></div>
+        <div class="field"><label><input type="checkbox" name="Edit.Required" value="true" checked="@e.Required" /> @L["Required"]</label><input type="hidden" name="Edit.Required" value="false" />
+            <p class="hint">@L["Required fields are asked for on new contracts and the next time an existing contract is edited. Nothing is changed in bulk."]</p></div>
+        <div class="field"><label for="Edit_Default">@L["Default value (one per line for multiple choice)"]</label><textarea id="Edit_Default" name="Edit.Default" maxlength="1000">@e.Default</textarea></div>
+    </fieldset>
+
+    <fieldset class="card">
+        <legend>@L["Choices"]</legend>
+        <div class="field"><label for="Edit_Choices">@L["Single and multiple choice: one choice per line"]</label>
+            <textarea id="Edit_Choices" name="Edit.Choices" rows="6" aria-describedby="choices-hint">@e.Choices</textarea>
+            <p id="choices-hint" class="hint">@L["Write CODE | Label. Add | inactive to stop a choice being offered; contracts that already hold it keep it."]</p></div>
+        <div class="field"><label for="Edit_Lookup">@L["Lookup: the list to choose from"]</label>
+            <select id="Edit_Lookup" name="Edit.Lookup"><option value="">@L["None"]</option>@foreach (var l in Model.State.Working.Lookups) { <option value="@l.Name" selected="@(l.Name == e.Lookup)">@l.Label (@l.Name)</option> }</select>
+            <p class="hint"><a href="/Admin/Studio/Lists?organisationId=@Model.OrganisationId">@L["Edit the lists"]</a></p></div>
+    </fieldset>
+
+    <fieldset class="card">
+        <legend>@L["Validation"]</legend>
+        <p class="hint">@L["Only checks that apply to the field's type are allowed; anything else is refused when you validate. Patterns are matched safely and cannot run code."]</p>
+        <div class="field"><label for="Edit_MinLength">@L["Minimum length"]</label><input id="Edit_MinLength" name="Edit.MinLength" type="text" inputmode="numeric" value="@e.MinLength" /></div>
+        <div class="field"><label for="Edit_MaxLength">@L["Maximum length"]</label><input id="Edit_MaxLength" name="Edit.MaxLength" type="text" inputmode="numeric" value="@e.MaxLength" /></div>
+        <div class="field"><label for="Edit_Pattern">@L["Pattern (regular expression)"]</label><input id="Edit_Pattern" name="Edit.Pattern" type="text" maxlength="200" value="@e.Pattern" /></div>
+        <div class="field"><label for="Edit_PatternMessage">@L["Message when the pattern does not match"]</label><input id="Edit_PatternMessage" name="Edit.PatternMessage" type="text" maxlength="200" value="@e.PatternMessage" /></div>
+        <div class="field"><label for="Edit_Min">@L["Minimum value"]</label><input id="Edit_Min" name="Edit.Min" type="text" inputmode="decimal" value="@e.Min" /></div>
+        <div class="field"><label for="Edit_Max">@L["Maximum value"]</label><input id="Edit_Max" name="Edit.Max" type="text" inputmode="decimal" value="@e.Max" /></div>
+        <div class="field"><label for="Edit_Decimals">@L["Decimal places"]</label><input id="Edit_Decimals" name="Edit.Decimals" type="text" inputmode="numeric" value="@e.Decimals" /></div>
+        <div class="field"><label for="Edit_Currency">@L["Currency (currency fields)"]</label><input id="Edit_Currency" name="Edit.Currency" type="text" maxlength="3" value="@e.Currency" /></div>
+        <div class="field"><label for="Edit_MinDate">@L["Earliest date"]</label><input id="Edit_MinDate" name="Edit.MinDate" type="date" value="@e.MinDate" /></div>
+        <div class="field"><label for="Edit_MaxDate">@L["Latest date"]</label><input id="Edit_MaxDate" name="Edit.MaxDate" type="date" value="@e.MaxDate" /></div>
+        <div class="field"><label for="Edit_MinItems">@L["Minimum selections (multiple choice)"]</label><input id="Edit_MinItems" name="Edit.MinItems" type="text" inputmode="numeric" value="@e.MinItems" /></div>
+        <div class="field"><label for="Edit_MaxItems">@L["Maximum selections (multiple choice)"]</label><input id="Edit_MaxItems" name="Edit.MaxItems" type="text" inputmode="numeric" value="@e.MaxItems" /></div>
+    </fieldset>
+
+    <fieldset class="card">
+        <legend>@L["Calculated display value"]</legend>
+        <p class="hint">@L["A calculated field only shows a value worked out from other fields by one of the listed operations. It cannot be typed into and never runs an expression."]</p>
+        <div class="field"><label for="Edit_CalcKind">@L["Operation"]</label>
+            <select id="Edit_CalcKind" name="Edit.CalcKind"><option value="">@L["None"]</option>@foreach (var k in CalculationKinds.All) { <option value="@k" selected="@(k == e.CalcKind)">@k</option> }</select></div>
+        <div class="field"><label for="Edit_CalcOperands">@L["Fields it uses (keys, comma separated)"]</label><input id="Edit_CalcOperands" name="Edit.CalcOperands" type="text" maxlength="300" value="@e.CalcOperands" /></div>
+        <div class="field"><label for="Edit_CalcTemplate">@L["Template (Template operation only; use {key} for a value)"]</label><input id="Edit_CalcTemplate" name="Edit.CalcTemplate" type="text" maxlength="300" value="@e.CalcTemplate" /></div>
+        <div class="field"><label for="Edit_CalcDecimals">@L["Decimal places of the result"]</label><input id="Edit_CalcDecimals" name="Edit.CalcDecimals" type="text" inputmode="numeric" value="@e.CalcDecimals" /></div>
+    </fieldset>
+
+    <fieldset class="card">
+        <legend>@L["Who sees and changes it"]</legend>
+        <div class="field"><label for="Edit_Classification">@L["Classification of the values"]</label>
+            <select id="Edit_Classification" name="Edit.Classification">@foreach (var l in Model.Levels) { <option value="@l" selected="@(l == e.Classification)">@l</option> }</select>
+            <p class="hint">@L["A value is held at the more sensitive of this level and the contract's own. Nobody without access at that level sees it, not in the register, an export or an approval."]</p></div>
+        <fieldset><legend>@L["Visible to roles (none ticked: everyone who can read the contract)"]</legend>
+            @foreach (var r in Model.Roles) { <label><input type="checkbox" name="Edit.VisibleToRoles" value="@r" checked="@e.VisibleToRoles.Contains(r)" /> @r</label> }</fieldset>
+        <fieldset><legend>@L["Editable by roles (none ticked: anyone who can edit the contract)"]</legend>
+            @foreach (var r in Model.Roles) { <label><input type="checkbox" name="Edit.EditableByRoles" value="@r" checked="@e.EditableByRoles.Contains(r)" /> @r</label> }</fieldset>
+        @if (Model.KnownStates is { } states)
+        {
+            <fieldset><legend>@L["Visible in states (none ticked: all)"]</legend>@foreach (var s in states.Order()) { <label><input type="checkbox" name="Edit.VisibleInStates" value="@s" checked="@e.VisibleInStates.Contains(s)" /> @s</label> }</fieldset>
+            <fieldset><legend>@L["Editable in states (none ticked: all)"]</legend>@foreach (var s in states.Order()) { <label><input type="checkbox" name="Edit.EditableInStates" value="@s" checked="@e.EditableInStates.Contains(s)" /> @s</label> }</fieldset>
+        }
+        else
+        {
+            <div class="field"><label for="Edit_VisibleInStates">@L["Visible in states (codes, comma separated; blank: all)"]</label><input id="Edit_VisibleInStates" name="Edit.VisibleInStates" type="text" value="@string.Join(", ", e.VisibleInStates)" /></div>
+            <div class="field"><label for="Edit_EditableInStates">@L["Editable in states (codes, comma separated; blank: all)"]</label><input id="Edit_EditableInStates" name="Edit.EditableInStates" type="text" value="@string.Join(", ", e.EditableInStates)" /></div>
+        }
+        <div class="field"><label for="Edit_ContractTypes">@L["Applies to contract types (comma separated; blank: all)"]</label><input id="Edit_ContractTypes" name="Edit.ContractTypes" type="text" value="@string.Join(", ", e.ContractTypes)" /></div>
+        <div class="field"><label for="Edit_EffectiveFrom">@L["Effective from"]</label><input id="Edit_EffectiveFrom" name="Edit.EffectiveFrom" type="date" value="@e.EffectiveFrom" /></div>
+        <div class="field"><label for="Edit_EffectiveTo">@L["Effective to"]</label><input id="Edit_EffectiveTo" name="Edit.EffectiveTo" type="date" value="@e.EffectiveTo" /></div>
+        <div class="field"><label for="Edit_Status">@L["Status"]</label>
+            <select id="Edit_Status" name="Edit.Status"><option value="Active" selected="@(e.Status == "Active")">@L["Active"]</option><option value="Retired" selected="@(e.Status == "Retired")">@L["Retired (keeps values, takes no new ones)"]</option></select></div>
+    </fieldset>
+
+    <fieldset class="card">
+        <legend>@L["Where it is used"]</legend>
+        <label><input type="checkbox" name="Edit.Searchable" value="true" checked="@e.Searchable" /> @L["Found by the register's free-text search"]</label><input type="hidden" name="Edit.Searchable" value="false" />
+        <label><input type="checkbox" name="Edit.Filterable" value="true" checked="@e.Filterable" /> @L["Can be filtered on"]</label><input type="hidden" name="Edit.Filterable" value="false" />
+        <label><input type="checkbox" name="Edit.Sortable" value="true" checked="@e.Sortable" /> @L["Can be sorted on"]</label><input type="hidden" name="Edit.Sortable" value="false" />
+        <label><input type="checkbox" name="Edit.Reportable" value="true" checked="@e.Reportable" /> @L["Included in exports and the reporting projection"]</label><input type="hidden" name="Edit.Reportable" value="false" />
+        <label><input type="checkbox" name="Edit.UsableInApprovals" value="true" checked="@e.UsableInApprovals" /> @L["Can be used in approval matrices (an approval explanation then shows the values it judged)"]</label><input type="hidden" name="Edit.UsableInApprovals" value="false" />
+    </fieldset>
+
+    <div class="actions">
+        <button type="submit" asp-page-handler="Preview" class="secondary" formnovalidate>@L["Preview"]</button>
+        <button type="submit" disabled="@(!Model.State.HasDraft)">@L["Save in the draft"]</button>
+        <a class="button secondary" href="/Admin/Studio/Fields?organisationId=@Model.OrganisationId">@L["Cancel"]</a>
+    </div>
+</form>
+
+@if (Model.Preview is { } p)
+{
+    var sample = p.Default.FirstOrDefault() ?? p.Choices.FirstOrDefault()?.Code ?? "";
+    var createForm = Model.PreviewForm(p, true, "");
+    var editForm = Model.PreviewForm(p, true, sample);
+    var detailsForm = Model.PreviewForm(p, false, sample.Length == 0 ? "Sample" : sample);
+    <section class="card" aria-labelledby="preview">
+        <h2 id="preview">@L["Preview"]</h2>
+        <p class="hint">@L["How the field will appear in five places. Nothing here is saved."]</p>
+        <h3>1. @L["Create form"]</h3>
+        <partial name="~/Pages/Shared/_CustomFieldInputs.cshtml" model="createForm" />
+        <h3>2. @L["Edit form (with a stored value)"]</h3>
+        <partial name="~/Pages/Shared/_CustomFieldInputs.cshtml" model="editForm" />
+        <h3>3. @L["Contract details page"]</h3>
+        <partial name="~/Pages/Shared/_CustomFieldValues.cshtml" model="detailsForm" />
+        <h3>4. @L["Register: column and filter"]</h3>
+        <p><strong>@p.Label</strong>@if (p.Sortable) { <span class="hint"> (@L["sortable"])</span> }</p>
+        @if (p.Filterable) { <p class="hint">@L["Filter operators"]: @string.Join(", ", FilterOps.For(p.Type))</p> } else { <p class="hint">@L["Not available as a filter."]</p> }
+        <p class="hint">@(p.Searchable ? L["Found by the free-text search."] : L["Not searched by the free-text box."])</p>
+        <h3>5. @L["Export"]</h3>
+        @if (p.Reportable) { <p>@L["Column heading"]: <strong>@p.Label</strong> · @L["reporting column"]: <code>cf_@p.Key</code> · @L["type"]: @FieldTypes.Label(p.Type)</p> }
+        else { <p class="hint">@L["Not included in exports or the reporting projection."]</p> }
+    </section>
+}

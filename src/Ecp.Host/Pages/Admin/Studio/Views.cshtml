@@ -1,0 +1,65 @@
+@page "/Admin/Studio/Views"
+@model Ecp.Host.Pages.Admin.Studio.ViewsModel
+@using Ecp.Configuration
+@{ ViewData["Title"] = L["Shared list views"].Value; }
+<h1>@L["Shared list views"]</h1>
+<p><a href="/Admin/Studio?organisationId=@Model.OrganisationId">@L["Configuration Studio"]</a></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="card"><div class="field"><label for="organisationId">@L["Organisation"]</label>
+        <select id="organisationId" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+        <button type="submit">@L["Choose"]</button></form>
+}
+@if (Model.State is { } st)
+{
+    <p>@if (st.Release is { } r) { <span class="badge">@L["Published release"] @r</span> } else { <span class="badge">@L["Nothing published yet"]</span> }
+       @if (st.Draft is not null) { <span class="badge warn">@L["Editing a draft"]</span> } else { <span class="badge ok">@L["Showing what is in force"]</span> }</p>
+    <p class="hint">@L["The platform's standard views are always available and cannot be changed here. People also keep their own saved views."]</p>
+    @if (st.Draft is null)
+    {
+        <form method="post" asp-page-handler="Start"><input type="hidden" name="organisationId" value="@Model.OrganisationId" /><button type="submit">@L["Start a draft to make changes"]</button></form>
+    }
+    else
+    {
+        <div class="actions"><a class="button" href="/Admin/Studio/View?organisationId=@Model.OrganisationId">@L["Add a view"]</a></div>
+        <section class="card">
+            <h2>@L["Checks"]</h2>
+            @if (st.Messages.Count == 0) { <p>@L["No checks have been run on this draft yet, or none found anything."]</p> }
+            else { <ul>@foreach (var m in st.Messages) { <li><span class="badge @(m.Severity == ValidationSeverity.Error ? "bad" : "warn")">@(m.Severity == ValidationSeverity.Error ? L["Must fix"] : L["Note"])</span> @m.Message</li> }</ul> }
+            <form method="post" asp-page-handler="Validate"><input type="hidden" name="organisationId" value="@Model.OrganisationId" /><button type="submit" class="secondary">@L["Validate the draft"]</button></form>
+        </section>
+    }
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Shared views"]</caption>
+        <thead><tr><th scope="col">@L["View"]</th><th scope="col">@L["Columns"]</th><th scope="col">@L["Filters"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+        <tbody>
+        @foreach (var v in st.Working.Views)
+        {
+            <tr>
+                <th scope="row">@v.Name <code class="hint">@v.Key</code><br /><span class="hint">@v.Description</span></th>
+                <td>@v.Columns.Count</td><td>@v.Filters.Count</td>
+                <td>@if (st.Draft is not null)
+                    {
+                        <a href="/Admin/Studio/View?organisationId=@Model.OrganisationId&key=@Uri.EscapeDataString(v.Key)">@L["Edit"]</a>
+                        <form method="post" class="inline"><input type="hidden" name="organisationId" value="@Model.OrganisationId" /><input type="hidden" name="key" value="@v.Key" /><button type="submit" class="secondary" asp-page-handler="Remove">@L["Remove from draft"]</button></form>
+                    }</td>
+            </tr>
+        }
+        @if (st.Working.Views.Count == 0) { <tr><td colspan="4">@L["No shared views."]</td></tr> }
+        </tbody>
+    </table>
+    </div>
+    @if (st.Draft is not null)
+    {
+        <section class="card">
+            <h2>@L["Publish or discard"]</h2>
+            <form method="post" asp-page-handler="Publish"><input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+                <div class="field"><label for="Note">@L["Note for the version history"]</label><input id="Note" name="Note" type="text" maxlength="500" required /></div>
+                <button type="submit">@L["Validate and publish"]</button></form>
+            <form method="post" asp-page-handler="Discard"><input type="hidden" name="organisationId" value="@Model.OrganisationId" /><button type="submit" class="secondary">@L["Discard the draft"]</button></form>
+        </section>
+    }
+    <p><a href="/Admin/Studio/History?organisationId=@Model.OrganisationId&kind=views">@L["Versions and rollback"]</a></p>
+}

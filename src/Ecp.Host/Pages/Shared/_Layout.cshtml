@@ -37,6 +37,7 @@
         if (await Can("notifications.administer")) items.Add(("/Admin/Notifications", L["Notification delivery"].Value, "/Admin/Notifications"));
         if (await Can("approvals.matrix.read", "approvals.simulate", "approvals.delegate")) items.Add(("/Admin/Approvals", L["Approval matrices"].Value, "/Admin/Approvals"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Configuration", L["Workflow configuration"].Value, "/Admin/Configuration"));
+        if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Studio", L["Configuration Studio"].Value, "/Admin/Studio"));
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
         if (await Can("setup.run")) items.Add(("/Admin/Setup", L["Installation setup"].Value, "/Admin/Setup"));
     }

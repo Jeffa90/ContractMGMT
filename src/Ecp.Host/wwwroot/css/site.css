@@ -90,3 +90,4 @@ ol.steps li.current { font-weight: 700; }
 .filter-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; align-items: center; }
 .filter-row select, .filter-row input[type=text] { min-width: 10rem; }
 .chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; }
+form.inline { display: inline; }

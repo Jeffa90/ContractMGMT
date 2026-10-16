@@ -216,6 +216,7 @@ public static class ContractsModule
         services.AddScoped<Register.RegisterQueryEngine>();
         services.AddScoped<Register.IContractExports, Register.ContractExportService>();
         services.AddScoped<Register.IContractViews, Register.ContractViewService>();
+        services.AddScoped<Register.IContractViewStudio, Register.ContractViewStudio>();
         services.AddScoped<Ecp.Configuration.IConfigurationKind, Register.ContractListViewKind>();
         services.AddScoped<Register.IContractRegister>(sp => sp.GetRequiredService<Register.RegisterQueryEngine>());
         services.AddScoped<ISecuredContractService, SecuredContractService>();

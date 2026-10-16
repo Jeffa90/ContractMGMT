@@ -52,7 +52,9 @@ internal sealed class CustomFieldStudio(IConfigurationService configuration, ISe
     {
         var release = await configuration.LatestReleaseAsync(Kind, organisationId, ct);
         var published = ParseOrEmpty(release?.ContentJson);
-        var draft = await configuration.FindOpenDraftAsync(Kind, organisationId, ct);
+        // Someone who may read the history but not edit has no draft to see.
+        DraftDto? draft = null;
+        try { draft = await configuration.FindOpenDraftAsync(Kind, organisationId, ct); } catch (Ecp.SharedKernel.ForbiddenException) { }
         CustomFieldSet? draftSet = null;
         var messages = new List<ValidationMessage>();
         if (draft is not null)

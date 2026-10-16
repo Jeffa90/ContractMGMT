@@ -1,0 +1,35 @@
+@page "/Admin/Studio"
+@model Ecp.Host.Pages.Admin.Studio.IndexModel
+@{ ViewData["Title"] = L["Configuration Studio"].Value; }
+<h1>@L["Configuration Studio"]</h1>
+<p class="lede">@L["Set up the additional details recorded on contracts and the list views people use, without any code. Every change is a draft first: you validate it, see what it would change, then publish it. Earlier versions are kept and can be restored."]</p>
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="card">
+        <div class="field"><label for="organisationId">@L["Organisation"]</label>
+            <select id="organisationId" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+        <button type="submit">@L["Choose"]</button>
+    </form>
+}
+@if (Model.OrganisationId is { } org)
+{
+    <section class="card">
+        <h2>@L["Additional contract fields"]</h2>
+        <p>@Model.FieldCount @L["published field(s)"]@(Model.FieldRelease is { } r ? $", release {r}" : "") @if (Model.FieldDraft) { <span class="badge warn">@L["Draft open"]</span> }</p>
+        <p>@L["Fields, sections and choice lists. Choose who sees and changes each field, whether it can be searched, filtered, sorted, exported or used in approvals."]</p>
+        <div class="actions">
+            @if (Model.CanDraft) { <a class="button" href="/Admin/Studio/Fields?organisationId=@org">@L["Manage fields"]</a> <a class="button secondary" href="/Admin/Studio/Lists?organisationId=@org">@L["Sections and lists"]</a> }
+            <a class="button secondary" href="/Admin/Studio/History?organisationId=@org">@L["Versions and rollback"]</a>
+        </div>
+    </section>
+    <section class="card">
+        <h2>@L["Shared list views"]</h2>
+        <p>@Model.ViewCount @L["shared view(s)"] @if (Model.ViewDraft) { <span class="badge warn">@L["Draft open"]</span> }</p>
+        <p>@L["Views everyone in the organisation can open from the register: columns, filters, sorting and formats. People also keep their own saved views."]</p>
+        <div class="actions">
+            @if (Model.CanDraft) { <a class="button" href="/Admin/Studio/Views?organisationId=@org">@L["Manage shared views"]</a> }
+            <a class="button secondary" href="/Admin/Studio/History?organisationId=@org&kind=views">@L["Versions and rollback"]</a>
+        </div>
+    </section>
+    <p><a href="/Admin/Audit?entityType=CustomField">@L["Audit history of field changes"]</a> · <a href="/Admin/Audit?entityType=ContractListView">@L["Audit history of view changes"]</a></p>
+}

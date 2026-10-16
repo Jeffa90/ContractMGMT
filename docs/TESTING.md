@@ -66,6 +66,8 @@ Added in that slice: identity and access (`AccessEvaluatorTests`, `IdentityRules
 
 Result after the migration slice (2026-10-16, Release, warnings as errors, `dotnet restore --locked-mode` clean): **with** a real SQL Server 2022 Developer container (`ECP_TEST_SQL`): **546 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** (297 unit, 13 architecture, 174 integration of which 86 run against SQL Server, 62 API). **Without** `ECP_TEST_SQL`: **460 Passed, 0 Failed, 0 Skipped, 86 NOT VERIFIED** (the SQL Server copies of the integration scenarios; never counted as Passed). The migration scenarios (22) run on both providers; the migration unit tests, the 22 service scenarios per provider and the real-page flow (`MigrationUiTests`, SQLite) are in section 7.1. A scripted run over HTTP against the real host (`tools/migration-demo.py`) is recorded in `docs/MIGRATION.md` section 12.1.
 
+GitHub-hosted CI, run 10 on commit `ba712aba` (the migration slice): all three jobs green: build, unit, architecture, API and lightweight-provider tests; container image build and smoke test; SQL Server integration (including the 22 migration scenarios against SQL Server). IIS, Azure and the compose files remain Scaffolded / Not Verified (`deploy/STATUS.md`).
+
 Commands (implemented in M1; `dotnet test` without `ECP_TEST_SQL` reports the SQL Server tests as NOT VERIFIED):
 
 ```

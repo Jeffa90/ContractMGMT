@@ -1,0 +1,72 @@
+@page "/Contracts/Create"
+@model Ecp.Host.Pages.Contracts.CreateModel
+@{ ViewData["Title"] = L["Create a contract"].Value; }
+<h1>@L["Create a contract"]</h1>
+
+@if (Model.Organisations.Count == 0)
+{
+    <p class="flash warn" role="status">@L["You do not hold a role that can create contracts."]</p>
+}
+else if (Model.OrganisationId is null)
+{
+    <form method="get">
+        <p class="lede">@L["Choose the organisation the contract belongs to. Organisation is a mandatory policy and reporting scope."]</p>
+        <div class="field">
+            <label for="orgId">@L["Organisation"]</label>
+            <select id="orgId" name="organisationId" required aria-required="true">
+                @foreach (var o in Model.Organisations) { <option value="@o.Id">@o.Name</option> }
+            </select>
+        </div>
+        <button type="submit">@L["Continue"]</button>
+    </form>
+}
+else
+{
+    <partial name="_Errors" model="ViewData.ModelState" />
+    <p class="lede">@L["Organisation"]: <strong>@Model.OrganisationName</strong>. @L["The agreement reference is assigned automatically using this organisation's prefix:"] <code>@Model.NextReference</code></p>
+    <form method="post">
+        <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+        <div class="field"><label for="Title">@L["Title"]</label><input id="Title" name="Title" type="text" required aria-required="true" maxlength="500" value="@Model.Title" /></div>
+        <div class="field">
+            <label for="SupplierId">@L["Supplier"]</label>
+            <select id="SupplierId" name="SupplierId" required aria-required="true">
+                <option value="">@L["Choose a supplier"]</option>
+                @foreach (var s in Model.Suppliers) { <option value="@s.Id" selected="@(s.Id == Model.SupplierId)">@s.Name</option> }
+            </select>
+            <p class="hint"><a href="/Suppliers/Create?organisationId=@Model.OrganisationId">@L["Add a supplier"]</a></p>
+        </div>
+        <div class="field">
+            <label for="CategoryId">@L["Category"]</label>
+            <select id="CategoryId" name="CategoryId" required aria-required="true">
+                <option value="">@L["Choose a category"]</option>
+                @foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }
+            </select>
+        </div>
+        <div class="field">
+            <label for="BusinessUnitId">@L["Business unit"]</label>
+            <select id="BusinessUnitId" name="BusinessUnitId">
+                <option value="">@L["None"]</option>
+                @foreach (var b in Model.BusinessUnits) { <option value="@b.Id" selected="@(b.Id == Model.BusinessUnitId)">@b.Name</option> }
+            </select>
+        </div>
+        <div class="field">
+            <label for="SiteId">@L["Site"]</label>
+            <select id="SiteId" name="SiteId">
+                <option value="">@L["None"]</option>
+                @foreach (var s in Model.Sites) { <option value="@s.Id" selected="@(s.Id == Model.SiteId)">@s.Name</option> }
+            </select>
+        </div>
+        <div class="field">
+            <label for="Classification">@L["Classification"]</label>
+            <select id="Classification" name="Classification">
+                @foreach (var level in Model.Levels) { <option value="@level" selected="@(level == Model.Classification)">@level</option> }
+            </select>
+        </div>
+        <div class="field"><label for="CurrencyCode">@L["Currency"]</label><input id="CurrencyCode" name="CurrencyCode" type="text" maxlength="3" value="@Model.CurrencyCode" aria-describedby="cur-hint" /><p id="cur-hint" class="hint">@L["Three-letter ISO 4217 code, for example AUD."]</p></div>
+        <div class="field"><label for="EstimatedValue">@L["Estimated value"]</label><input id="EstimatedValue" name="EstimatedValue" type="text" inputmode="decimal" value="@Model.EstimatedValue" aria-describedby="val-hint" /><p id="val-hint" class="hint">@L["Digits with an optional decimal point, for example 125000.50."]</p></div>
+        <div class="field"><label for="StartDate">@L["Start date"]</label><input id="StartDate" name="StartDate" type="date" value="@Model.StartDate" /></div>
+        <div class="field"><label for="EndDate">@L["End date"]</label><input id="EndDate" name="EndDate" type="date" value="@Model.EndDate" /></div>
+        <div class="field"><label for="Description">@L["Description"]</label><textarea id="Description" name="Description" maxlength="4000">@Model.Description</textarea></div>
+        <div class="actions"><button type="submit">@L["Create draft"]</button> <a class="button secondary" href="/Contracts">@L["Cancel"]</a></div>
+    </form>
+}

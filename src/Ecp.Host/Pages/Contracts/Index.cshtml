@@ -1,0 +1,53 @@
+@page "/Contracts"
+@model Ecp.Host.Pages.Contracts.IndexModel
+@{ ViewData["Title"] = L["Contract register"].Value; }
+<h1>@L["Contract register"]</h1>
+<p class="lede">@L["Only contracts inside your assigned organisations, categories, business units, sites and classification ceiling are listed."]</p>
+
+<form method="get" class="card" aria-label="@L["Filter contracts"]">
+    <div class="field"><label for="q">@L["Search by reference or title"]</label><input id="q" name="q" type="text" value="@Model.Q" /></div>
+    <div class="field">
+        <label for="status">@L["Status"]</label>
+        <select id="status" name="status">
+            <option value="">@L["Any status"]</option>
+            @foreach (var s in Model.Statuses) { <option value="@s" selected="@(s == Model.Status)">@s</option> }
+        </select>
+    </div>
+    <div class="field">
+        <label for="categoryId">@L["Category"]</label>
+        <select id="categoryId" name="categoryId">
+            <option value="">@L["Any category"]</option>
+            @foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }
+        </select>
+    </div>
+    <div class="actions"><button type="submit">@L["Apply filters"]</button> <a class="button secondary" href="/Contracts">@L["Clear"]</a></div>
+</form>
+
+<div class="actions"><a class="button" href="/Contracts/Create">@L["Create a contract"]</a></div>
+<p role="status">@Model.Result.Total @L["contract(s) found"]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Contracts"]</caption>
+    <thead><tr><th scope="col">@L["Reference"]</th><th scope="col">@L["Title"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Category"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Classification"]</th></tr></thead>
+    <tbody>
+    @foreach (var c in Model.Result.Items)
+    {
+        <tr>
+            <th scope="row"><a href="/Contracts/Details/@c.Id">@c.AgreementReference</a></th>
+            <td>@c.Title</td><td>@c.SupplierName</td><td>@c.CategoryName</td>
+            <td>@c.Status @if (c.RecordLocked) { <span class="badge">@L["Locked"]</span> }</td>
+            <td>@c.Classification</td>
+        </tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="6">@L["No contracts match."]</td></tr> }
+    </tbody>
+</table>
+</div>
+@if (Model.Result.PageCount > 1)
+{
+    <nav class="pager" aria-label="@L["Pages"]">
+        @if (Model.Result.Page > 1) { <a href="@Model.PageLink(Model.Result.Page - 1)">@L["Previous"]</a> }
+        <span>@L["Page"] @Model.Result.Page @L["of"] @Model.Result.PageCount</span>
+        @if (Model.Result.Page < Model.Result.PageCount) { <a href="@Model.PageLink(Model.Result.Page + 1)">@L["Next"]</a> }
+    </nav>
+}

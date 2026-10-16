@@ -1,0 +1,21 @@
+@page "/Suppliers/Details/{id:guid}"
+@model Ecp.Host.Pages.Suppliers.DetailsModel
+@{ ViewData["Title"] = Model.Supplier.Name; }
+<h1>@Model.Supplier.Name</h1>
+<dl class="facts card">
+    <dt>@L["Vendor number"]</dt><dd>@(Model.Supplier.VendorNumber ?? "-")</dd>
+    <dt>@L["ABN"]</dt><dd>@(Model.Supplier.Abn ?? "-")</dd>
+    <dt>@L["Status"]</dt><dd>@Model.Supplier.Status</dd>
+</dl>
+<h2>@L["Contracts you can see for this supplier"]</h2>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Contracts"]</caption>
+    <thead><tr><th scope="col">@L["Reference"]</th><th scope="col">@L["Title"]</th><th scope="col">@L["Status"]</th></tr></thead>
+    <tbody>
+    @foreach (var c in Model.Contracts) { <tr><th scope="row"><a href="/Contracts/Details/@c.Id">@c.AgreementReference</a></th><td>@c.Title</td><td>@c.Status</td></tr> }
+    @if (Model.Contracts.Count == 0) { <tr><td colspan="3">@L["None visible to you."]</td></tr> }
+    </tbody>
+</table>
+</div>
+<p><a href="/Suppliers">@L["Back to suppliers"]</a></p>

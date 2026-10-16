@@ -22,6 +22,9 @@ public interface ITenantProvisioningService
     /// <summary>Creates a tenant and its first organisation (installation-level operation, audited).</summary>
     Task<ProvisionedTenant> ProvisionAsync(ProvisionTenantRequest request, CancellationToken ct = default);
 
+    /// <summary>Creates only the tenant (installation-level, audited). Setup uses this so administrators exist before the first organisation is configured.</summary>
+    Task<Guid> CreateTenantAsync(string tenantName, TenancyMode tenancyMode, EcpMode mode, CancellationToken ct = default);
+
     /// <summary>Adds an organisation to the current tenant (requires an established tenant scope). The reference prefix must be unique in the tenant.</summary>
     Task<Guid> AddOrganisationAsync(AddOrganisationRequest request, CancellationToken ct = default);
 }
@@ -30,6 +33,9 @@ public interface ITenantDirectory
 {
     Task<TenantInfo?> FindByNameAsync(string name, CancellationToken ct = default);
     Task<TenantInfo?> FindAsync(Guid tenantId, CancellationToken ct = default);
+
+    /// <summary>Every tenant in the registry (installation-level read; the caller's scope is restored afterwards).</summary>
+    Task<IReadOnlyList<TenantInfo>> ListAsync(CancellationToken ct = default);
 
     /// <summary>True if the organisation exists in the current tenant scope (organisations of other tenants are invisible).</summary>
     Task<bool> OrganisationExistsAsync(Guid organisationId, CancellationToken ct = default);
@@ -70,6 +76,23 @@ internal sealed class TenantProvisioningService(
         }
     }
 
+    public async Task<Guid> CreateTenantAsync(string tenantName, TenancyMode tenancyMode, EcpMode mode, CancellationToken ct = default)
+    {
+        var created = Tenant.Create(tenantName, tenancyMode, mode, clock.UtcNow);
+        using (tenant.UseInstallationScope())
+        {
+            await uow.ExecuteAsync(async c =>
+            {
+                db.Tenants.Add(created);
+                try { await db.SaveChangesAsync(c); }
+                catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("tenant_exists", "A tenant with that name already exists."); }
+                audit.Record(new AuditEntry("tenant.created", nameof(Tenant), created.Id.ToString(),
+                    NewValuesJson: $"{{\"name\":\"{created.Name.Replace("\"", "'")}\",\"mode\":\"{mode}\"}}"));
+            }, ct);
+        }
+        return created.Id;
+    }
+
     public async Task<Guid> AddOrganisationAsync(AddOrganisationRequest r, CancellationToken ct = default)
     {
         var tenantId = tenant.RequireTenantId();
@@ -97,6 +120,23 @@ internal sealed class TenantDirectory(TenantContext tenant, TenancyDbContext db)
 
     public Task<bool> OrganisationExistsAsync(Guid organisationId, CancellationToken ct = default)
         => db.Organisations.AsNoTracking().AnyAsync(o => o.Id == organisationId, ct);
+
+    public async Task<IReadOnlyList<TenantInfo>> ListAsync(CancellationToken ct = default)
+    {
+        List<Tenant> tenants;
+        using (tenant.UseInstallationScope())
+            tenants = await db.Tenants.AsNoTracking().OrderBy(t => t.CreatedUtc).ToListAsync(ct);
+        var result = new List<TenantInfo>();
+        foreach (var t in tenants)
+        {
+            using (tenant.Use(t.Id))
+            {
+                var orgId = await db.Organisations.AsNoTracking().OrderBy(o => o.CreatedUtc).Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct);
+                result.Add(new TenantInfo(t.Id, t.Name, t.Status, orgId));
+            }
+        }
+        return result;
+    }
 
     // A narrow, read-only registry lookup in installation scope; the previous scope is restored afterwards.
     private async Task<TenantInfo?> LookupAsync(IQueryable<Tenant> query, CancellationToken ct)

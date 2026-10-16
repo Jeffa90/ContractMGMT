@@ -1,26 +1,32 @@
 using System.Reflection;
 using System.Threading.RateLimiting;
 using Ecp.Audit;
-using Ecp.Contracts;
 using Ecp.Configuration;
+using Ecp.Contracts;
+using Ecp.DataMigration;
 using Ecp.Documents;
-using Ecp.Identity;
 using Ecp.Documents.Storage;
 using Ecp.Host;
-using Ecp.DataMigration;
+using Ecp.Host.Security;
+using Ecp.Identity;
 using Ecp.Operations;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.SharedKernel.Localisation;
 using Ecp.SharedKernel.Secrets;
 using Ecp.Tenancy;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var secrets = new EnvironmentAndFileSecretProvider();
 var resolved = HostConfiguration.Resolve(builder.Configuration, secrets, builder.Environment.ContentRootPath);
+var production = resolved.Host.Mode == EcpMode.Production;
 Directory.CreateDirectory(resolved.Host.DataDirectory);
 
 var localisation = new LocalisationOptions();
@@ -32,22 +38,75 @@ builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
 builder.Services.AddSingleton<ISecretProvider>(secrets);
 builder.Services.AddSingleton(resolved.Host);
 builder.Services.AddSingleton(resolved.Facts);
-builder.Services.AddSingleton<DemoTenantCache>();
+var demoIdentity = new DemoIdentityOptions();
+builder.Configuration.GetSection("Identity:Demo").Bind(demoIdentity);
+builder.Services.AddSingleton(demoIdentity);
+
 builder.Services.AddEcpPersistence(resolved.Database);
 builder.Services.AddAuditModule();
 builder.Services.AddTenancyModule();
 builder.Services.AddIdentityModule(o => o.Mode = resolved.Host.Mode);
-builder.Services.AddConfigurationModule(o => o.RequireSecondPersonPublish = resolved.Host.Mode == EcpMode.Production);
+builder.Services.AddConfigurationModule(o => o.RequireSecondPersonPublish = production);
 builder.Services.AddContractsModule(o => builder.Configuration.GetSection("Contracts").Bind(o));
 builder.Services.AddDocumentsModule(o => builder.Configuration.GetSection("Documents").Bind(o),
     new LocalFileSystemOptions { RootPath = Path.Combine(resolved.Host.DataDirectory, "documents") });
 builder.Services.AddMigrationModule();
 builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
-builder.Services.AddScoped<DemoSeeder>();
+builder.Services.AddSingleton<DemoSeeder>();
 
+// Keys for cookies, antiforgery and temp data live in the data directory (persistent volume) so sessions survive restarts (R-SEC-04).
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("EnterpriseContractPlatform")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(resolved.Host.DataDirectory, "keyring")));
+if (OperatingSystem.IsWindows()) dataProtection.ProtectKeysWithDpapi();
+
+// Sessions: a signed cookie issued after a verified sign-in. Organisation identity providers register their own schemes at run time.
+builder.Services.AddSingleton<SessionIssuer>();
+builder.Services.AddSingleton<DemoIdentityService>();
+builder.Services.AddSingleton<OidcSchemeManager>();
+builder.Services.AddSingleton<OidcEvents>();
+builder.Services.AddSingleton<IIdentityProviderListener, OidcSchemeListener>();
+builder.Services.AddTransient<OpenIdConnectHandler>();
+builder.Services.AddSingleton<IConfigureOptions<OpenIdConnectOptions>, OidcOptionsConfigurator>();
+builder.Services.AddSingleton<IPostConfigureOptions<OpenIdConnectOptions>, OpenIdConnectPostConfigureOptions>();
+builder.Services.AddAuthentication(EcpSchemes.Session).AddCookie(EcpSchemes.Session, o =>
+{
+    o.Cookie.Name = "ecp.session";
+    o.Cookie.HttpOnly = true;
+    o.Cookie.SameSite = SameSiteMode.Lax;
+    o.Cookie.SecurePolicy = production ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+    o.ExpireTimeSpan = TimeSpan.FromHours(8);
+    o.SlidingExpiration = true;
+    o.LoginPath = "/SignIn";
+    o.AccessDeniedPath = "/Error?code=403";
+    o.ReturnUrlParameter = "returnUrl";
+    o.Events.OnRedirectToLogin = ctx =>
+    {
+        if (ctx.Request.Path.StartsWithSegments("/api")) ctx.Response.StatusCode = StatusCodes.Status401Unauthorized; else ctx.Response.Redirect(ctx.RedirectUri);
+        return Task.CompletedTask;
+    };
+    o.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
+});
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, RecentAuthenticationHandler>();
+builder.Services.AddAuthorization(o =>
+{
+    // Every endpoint requires a signed-in user unless it opts out with [AllowAnonymous] (ARC-008).
+    o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+    o.AddPolicy(Policies.RecentAuthentication, p => p.RequireAuthenticatedUser().AddRequirements(new RecentAuthenticationRequirement(TimeSpan.FromMinutes(10))));
+});
+
+builder.Services.AddAntiforgery(o =>
+{
+    o.Cookie.Name = "ecp.csrf";
+    o.Cookie.HttpOnly = true;
+    o.Cookie.SameSite = SameSiteMode.Strict;
+    o.Cookie.SecurePolicy = production ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+    o.HeaderName = "X-CSRF-TOKEN";
+});
+builder.Services.AddRazorPages().AddViewLocalization();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ProblemExceptionHandler>();
-builder.Services.AddAuthorization();
 builder.Services.AddOpenApi();
 builder.Services.AddRateLimiter(o =>
 {
@@ -55,6 +114,9 @@ builder.Services.AddRateLimiter(o =>
     o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         RateLimitPartition.GetFixedWindowLimiter(ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions { PermitLimit = 600, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // Credential-style endpoints get a much tighter budget.
+    o.AddPolicy("signin", ctx => RateLimitPartition.GetFixedWindowLimiter("signin:" + (ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
 var app = builder.Build();
@@ -89,26 +151,36 @@ if (args.Length > 0 && !args[0].StartsWith('-'))
 if (resolved.Database.AutoMigrate && resolved.Host.Mode != EcpMode.Production)
     await app.Services.GetRequiredService<MigrationRunner>().RunAsync();
 if (resolved.Host.DemoSeed && resolved.Host.Mode != EcpMode.Production)
+    await app.Services.GetRequiredService<DemoSeeder>().SeedAsync();
+try { await app.Services.GetRequiredService<OidcSchemeManager>().ReloadAsync(app.Services); }
+catch (Exception ex) when (ex is not OperationCanceledException)
 {
-    await using var scope = app.Services.CreateAsyncScope();
-    await scope.ServiceProvider.GetRequiredService<DemoSeeder>().SeedAsync();
+    // The database may not be migrated yet (Production before `migrate`); readiness reports that. No provider is registered until it is.
+    app.Logger.LogWarning("Identity providers were not loaded at start-up: {Reason}", ex.GetType().Name);
 }
 
 app.UseMiddleware<CorrelationMiddleware>();
+// Error pages: status-code re-execution wraps the exception handler, so a handled exception with no body becomes an HTML error page for browsers.
+app.UseWhen(c => !c.Request.Path.StartsWithSegments("/api") && !c.Request.Path.StartsWithSegments("/health"),
+    b => b.UseStatusCodePagesWithReExecute("/Error", "?code={0}"));
+// API and health callers get RFC 9457 problem details for bare status codes (401, 404, 429).
+app.UseWhen(c => c.Request.Path.StartsWithSegments("/api") || c.Request.Path.StartsWithSegments("/health"), b => b.UseStatusCodePages());
 app.UseExceptionHandler();
-app.UseStatusCodePages();
 app.UseMiddleware<SecurityHeadersMiddleware>();
-// Culture comes from the organisation default or an explicit cookie, not from browser Accept-Language (an en-US browser must not
-// silently switch an Australian organisation to month-first dates).
+if (production) app.UseHsts();
+app.UseStaticFiles();
 app.UseRequestLocalization(o =>
 {
     o.SetDefaultCulture(localisation.DefaultCulture).AddSupportedCultures([.. localisation.SupportedCultures]).AddSupportedUICultures([.. localisation.SupportedCultures]);
+    // Culture comes from the organisation default or an explicit cookie, not from browser Accept-Language (an en-US browser must not
+    // silently switch an Australian organisation to month-first dates).
     o.RequestCultureProviders = [new Microsoft.AspNetCore.Localization.CookieRequestCultureProvider()];
     o.ApplyCurrentCultureToResponseHeaders = true;
 });
-if (resolved.Host.Mode == EcpMode.Production) app.UseHsts();
 app.UseRateLimiter();
-if (resolved.Host.DemoTenantResolution) app.UseMiddleware<DemoTenantMiddleware>();
+app.UseRouting();
+app.UseAuthentication();
+app.UseMiddleware<SessionMiddleware>();
 app.UseAuthorization();
 
 var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
@@ -129,8 +201,8 @@ app.MapGet("/health/ready", async (ReadinessService readiness, EcpHostOptions op
     return Results.Json(body, statusCode: report.Overall == ReadinessStatus.Unhealthy ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status200OK);
 }).AllowAnonymous();
 app.MapGet("/api/v1/info", (EcpHostOptions options) => Results.Json(new { name = "Enterprise Contract Platform", version, mode = options.Mode.ToString() })).AllowAnonymous();
-app.MapGet("/", () => Results.Content("<!doctype html><html lang=\"en-AU\"><head><meta charset=\"utf-8\"><title>Enterprise Contract Platform</title></head><body><main><h1>Enterprise Contract Platform</h1><p>Walking skeleton. Health: /health/ready</p></main></body></html>", "text/html")).AllowAnonymous();
 if (resolved.Host.Mode != EcpMode.Production) app.MapOpenApi("/api/v1/openapi.json").AllowAnonymous();
+app.MapRazorPages();
 
 await app.RunAsync();
 return 0;

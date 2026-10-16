@@ -1,0 +1,43 @@
+@page "/Admin/Simulation"
+@model Ecp.Host.Pages.Admin.SimulationModel
+@{ ViewData["Title"] = L["Access simulation"].Value; }
+<h1>@L["Access simulation"]</h1>
+<p class="lede">@L["See what a person could do with a record that has the attributes you choose. This is a what-if: it reads no contract, changes nothing and is not recorded as a real denial."]</p>
+<form method="get" class="card" aria-label="@L["Choose the organisation"]">
+    <div class="field"><label for="OrganisationChoice">@L["Organisation"]</label>
+        <select id="OrganisationChoice" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <button class="secondary" type="submit">@L["Show this organisation's categories, business units and sites"]</button>
+</form>
+<form method="post">
+    <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+    <div class="field"><label for="UserId">@L["Person"]</label>
+        <select id="UserId" name="UserId" required aria-required="true">@foreach (var p in Model.People) { <option value="@p.Id" selected="@(p.Id == Model.UserId)">@p.DisplayName (@p.Email)</option> }</select></div>
+    <div class="field"><label for="CategoryId">@L["Category"]</label>
+        <select id="CategoryId" name="CategoryId"><option value="">@L["None"]</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }</select></div>
+    <div class="field"><label for="BusinessUnitId">@L["Business unit"]</label>
+        <select id="BusinessUnitId" name="BusinessUnitId"><option value="">@L["None"]</option>@foreach (var b in Model.BusinessUnits) { <option value="@b.Id" selected="@(b.Id == Model.BusinessUnitId)">@b.Name</option> }</select></div>
+    <div class="field"><label for="SiteId">@L["Site"]</label>
+        <select id="SiteId" name="SiteId"><option value="">@L["None"]</option>@foreach (var s in Model.Sites) { <option value="@s.Id" selected="@(s.Id == Model.SiteId)">@s.Name</option> }</select></div>
+    <div class="field"><label for="Classification">@L["Classification"]</label>
+        <select id="Classification" name="Classification">@foreach (var l in Model.Levels) { <option value="@l" selected="@(l == Model.Classification)">@l</option> }</select></div>
+    <div class="check field"><input id="Locked" name="Locked" type="checkbox" value="true" checked="@Model.Locked" /><label for="Locked">@L["The record is locked (Effective)"]</label></div>
+    <button type="submit">@L["Simulate"]</button>
+</form>
+@if (Model.Results.Count > 0)
+{
+    <h2>@L["Result for"] @Model.UserName</h2>
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Simulation result"]</caption>
+        <thead><tr><th scope="col">@L["Permission"]</th><th scope="col">@L["What it allows"]</th><th scope="col">@L["Decision"]</th><th scope="col">@L["Why"]</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Results)
+        {
+            <tr><th scope="row"><code>@r.Permission</code></th><td>@r.Description</td>
+                <td><span class="badge @(r.Decision.Allowed ? "ok" : "bad")">@(r.Decision.Allowed ? L["Allowed"] : r.Decision.Deny == Ecp.Identity.Access.DenyKind.NotFound ? L["Not visible (404)"] : L["Forbidden (403)"])</span></td>
+                <td>@(r.Decision.Allowed ? $"{L["via"]} {r.Decision.RoleCode}" : $"{L["Layer"]} {r.Decision.Layer}: {r.Decision.Reason}")</td></tr>
+        }
+        </tbody>
+    </table>
+    </div>
+}

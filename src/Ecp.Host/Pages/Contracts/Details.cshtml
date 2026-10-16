@@ -1,0 +1,24 @@
+@page "/Contracts/Details/{id:guid}"
+@model Ecp.Host.Pages.Contracts.DetailsModel
+@{ ViewData["Title"] = Model.Contract.AgreementReference; }
+<h1>@Model.Contract.Title</h1>
+<p><span class="badge">@Model.Contract.AgreementReference</span> <span class="badge">@Model.Contract.Status</span> <span class="badge">@Model.Contract.Classification</span>
+@if (Model.Contract.RecordLocked) { <span class="badge warn">@L["Locked: changes need an authorised Variation or an audited unlock"]</span> }</p>
+
+<dl class="facts card">
+    <dt>@L["Supplier"]</dt><dd><a href="/Suppliers/Details/@Model.Contract.SupplierId">@Model.Contract.SupplierName</a></dd>
+    <dt>@L["Category"]</dt><dd>@Model.Contract.CategoryName</dd>
+    <dt>@L["Organisation"]</dt><dd>@Model.OrganisationName</dd>
+    <dt>@L["Business unit"]</dt><dd>@(Model.BusinessUnitName ?? "-")</dd>
+    <dt>@L["Site"]</dt><dd>@(Model.SiteName ?? "-")</dd>
+    <dt>@L["Estimated value"]</dt><dd>@(Model.Value ?? "-")</dd>
+    <dt>@L["Start date"]</dt><dd>@(Model.Start ?? "-")</dd>
+    <dt>@L["End date"]</dt><dd>@(Model.End ?? "-")</dd>
+    <dt>@L["Registered"]</dt><dd>@(Model.Registered ?? L["Not yet registered"].Value)</dd>
+    <dt>@L["Created"]</dt><dd>@Model.Created @L["by"] @Model.Contract.CreatedBy</dd>
+</dl>
+@if (Model.Contract.Description is { Length: > 0 }) { <h2>@L["Description"]</h2><p>@Model.Contract.Description</p> }
+<div class="actions">
+    @if (Model.Contract.CanEdit) { <a class="button" href="/Contracts/Edit/@Model.Contract.Id">@L["Edit details"]</a> }
+    <a class="button secondary" href="/Contracts">@L["Back to the register"]</a>
+</div>

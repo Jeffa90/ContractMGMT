@@ -1,0 +1,8 @@
+@page "/Error"
+@model ErrorModel
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@{ ViewData["Title"] = Model.Title; }
+<h1>@Model.Title</h1>
+<p>@Model.Detail</p>
+<p><a href="/">@L["Return to the home page"]</a></p>
+@if (Model.CorrelationId is not null) { <p class="hint">@L["Reference"]: <code>@Model.CorrelationId</code></p> }

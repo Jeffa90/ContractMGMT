@@ -1,0 +1,23 @@
+@page "/Admin/Health"
+@model Ecp.Host.Pages.Admin.HealthModel
+@{ ViewData["Title"] = L["Health and readiness"].Value; }
+<h1>@L["Health and readiness"]</h1>
+<p class="lede">@L["Detailed checks are shown here to administrators only. The public health endpoints reveal no dependency detail in Production."]</p>
+<p><span class="badge @(Model.Report.Overall == Ecp.Operations.ReadinessStatus.Healthy ? "ok" : Model.Report.Overall == Ecp.Operations.ReadinessStatus.Degraded ? "warn" : "bad")">@L["Overall"]: @Model.Report.Overall</span></p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Readiness checks"]</caption>
+    <thead><tr><th scope="col">@L["Check"]</th><th scope="col">@L["Description"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Detail"]</th></tr></thead>
+    <tbody>
+    @foreach (var r in Model.Report.Results)
+    {
+        <tr><th scope="row"><code>@r.Id</code></th><td>@r.Description</td><td><span class="badge @(r.Status == Ecp.Operations.ReadinessStatus.Healthy ? "ok" : r.Status == Ecp.Operations.ReadinessStatus.Degraded ? "warn" : "bad")">@r.Status</span></td><td>@r.Message</td></tr>
+    }
+    </tbody>
+</table>
+</div>
+<dl class="facts card">
+    <dt>@L["Mode"]</dt><dd>@Model.Mode</dd>
+    <dt>@L["Culture and time zone"]</dt><dd>@Model.Culture / @Model.TimeZone</dd>
+    <dt>@L["Version"]</dt><dd>@Model.Version</dd>
+</dl>

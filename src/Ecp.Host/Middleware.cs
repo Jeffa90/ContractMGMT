@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
 using Ecp.SharedKernel;
-using Ecp.Tenancy;
 
 namespace Ecp.Host;
 
@@ -46,30 +45,3 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
         return next(context);
     }
 }
-
-/// <summary>
-/// Demo/Test only: resolves the single demonstration tenant so the Demo runs without an identity provider. It is enabled only when
-/// <c>Ecp:DemoTenantResolution</c> is true, which the Production guard refuses (R-ID-01). Real tenant resolution arrives with identity (M2).
-/// </summary>
-public sealed class DemoTenantMiddleware(RequestDelegate next, EcpHostOptions options, DemoTenantCache cache)
-{
-    public async Task InvokeAsync(HttpContext context, TenantContext tenant, ITenantDirectory directory, ActorContext actor)
-    {
-        var path = context.Request.Path;
-        var needsTenant = !(path.StartsWithSegments("/health") || path.StartsWithSegments("/api/v1/openapi.json"));
-        if (needsTenant)
-        {
-            var info = cache.Value ??= await directory.FindByNameAsync(options.DemoTenantName, context.RequestAborted);
-            if (info is { Status: Ecp.Tenancy.Domain.TenantStatus.Active })
-            {
-                actor.ActorId = "demo:anonymous";
-                actor.Type = ActorType.System;
-                using (tenant.Use(info.Id)) { await next(context); }
-                return;
-            }
-        }
-        await next(context);
-    }
-}
-
-public sealed class DemoTenantCache { public TenantInfo? Value { get; set; } }

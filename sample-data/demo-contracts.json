@@ -1,0 +1,150 @@
+{
+  "synthetic": true,
+  "description": "Synthetic demonstration suppliers and contracts for the Demo and tests. Statuses are workflow state codes supplied as data (the platform's compiled code names none). Every name is fictitious. Locked records model Effective agreements.",
+  "suppliers": [
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "key": "sup-southern",
+      "name": "Southern Cross Demo Supplies Pty Ltd",
+      "vendorNumber": "900001"
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "key": "sup-energy",
+      "name": "Demo Energy Markets Pty Ltd",
+      "vendorNumber": "900002"
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "key": "sup-unused",
+      "name": "Unused Demo Supplier Pty Ltd",
+      "vendorNumber": "900003"
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a2",
+      "key": "sup-facilities",
+      "name": "Demo Facilities Services Pty Ltd",
+      "vendorNumber": "900101"
+    },
+    {
+      "tenant": "tenant-b",
+      "organisation": "org-b1",
+      "key": "sup-b",
+      "name": "Isolation Test Supplier Ltd",
+      "vendorNumber": "700001"
+    }
+  ],
+  "contracts": [
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "title": "Synthetic Packaging Supply Agreement",
+      "supplier": "sup-southern",
+      "category": "PACKAGING-FLEX",
+      "status": "Effective",
+      "locked": true,
+      "classification": "Internal",
+      "businessUnit": "bu-a1-1",
+      "site": "site-a1-1",
+      "currency": "AUD",
+      "estimatedValue": 125000,
+      "startDate": "2024-01-01",
+      "endDate": "2027-12-31"
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "title": "Synthetic Energy Agreement",
+      "supplier": "sup-energy",
+      "category": "ENERGY-ELEC",
+      "status": "Effective",
+      "locked": true,
+      "classification": "Confidential",
+      "businessUnit": "bu-a1-2",
+      "site": "site-a1-2",
+      "currency": "AUD",
+      "estimatedValue": 900000,
+      "startDate": "2025-07-01"
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "title": "Packaging Film Supply (draft)",
+      "supplier": "sup-southern",
+      "category": "PACKAGING",
+      "status": "Draft",
+      "locked": false,
+      "classification": "Internal",
+      "businessUnit": "bu-a1-1",
+      "site": "site-a1-1",
+      "currency": "AUD",
+      "estimatedValue": 48000
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "title": "Network Services Agreement (draft)",
+      "supplier": "sup-energy",
+      "category": "ENERGY",
+      "status": "Draft",
+      "locked": false,
+      "classification": "Restricted",
+      "businessUnit": "bu-a1-2",
+      "site": "site-a1-1",
+      "currency": "AUD",
+      "estimatedValue": 310000
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "title": "Energy Metering Services (draft)",
+      "supplier": "sup-energy",
+      "category": "ENERGY",
+      "status": "Draft",
+      "locked": false,
+      "classification": "Internal",
+      "businessUnit": "bu-a1-2",
+      "site": "site-a1-1",
+      "currency": "AUD",
+      "estimatedValue": 22000
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "title": "General Packaging Terms (public template)",
+      "supplier": "sup-southern",
+      "category": "PACKAGING",
+      "status": "Draft",
+      "locked": false,
+      "classification": "Public"
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a2",
+      "title": "Facilities Cleaning Services (draft)",
+      "supplier": "sup-facilities",
+      "category": "FACILITIES",
+      "status": "Draft",
+      "locked": false,
+      "classification": "Internal",
+      "currency": "AUD",
+      "estimatedValue": 72000
+    },
+    {
+      "tenant": "tenant-b",
+      "organisation": "org-b1",
+      "title": "Isolation Test Packaging Agreement",
+      "supplier": "sup-b",
+      "category": "PACKAGING",
+      "status": "Draft",
+      "locked": false,
+      "classification": "Internal",
+      "currency": "NZD",
+      "estimatedValue": 15000
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+@page "/Admin/Users"
+@model Ecp.Host.Pages.Admin.Users.IndexModel
+@{ ViewData["Title"] = L["Users and roles"].Value; }
+<h1>@L["Users and roles"]</h1>
+<p class="lede">@L["You see the people you are allowed to administer. Roles are granted with an organisational scope, optional narrowing and a classification ceiling; access is the intersection of all of them."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<div class="table-wrap">
+<table>
+    <caption>@L["People"]</caption>
+    <thead><tr><th scope="col">@L["Name"]</th><th scope="col">@L["Email"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Current roles"]</th></tr></thead>
+    <tbody>
+    @foreach (var u in Model.People)
+    {
+        <tr><th scope="row"><a href="/Admin/Users/Details/@u.Id">@u.DisplayName</a></th><td>@u.Email</td><td>@u.Status</td><td>@(u.Roles.Count == 0 ? "-" : string.Join(", ", u.Roles))</td></tr>
+    }
+    </tbody>
+</table>
+</div>
+<h2>@L["Invite a person"]</h2>
+<p class="hint">@L["Sign-in is invite-only. The person's account is linked to their identity provider the first time they sign in with a verified matching email address."]</p>
+<form method="post" asp-page-handler="Invite">
+    <div class="field"><label for="DisplayName">@L["Name"]</label><input id="DisplayName" name="displayName" type="text" required aria-required="true" maxlength="200" /></div>
+    <div class="field"><label for="Email">@L["Email"]</label><input id="Email" name="email" type="email" required aria-required="true" maxlength="254" /></div>
+    <button type="submit">@L["Send invitation"]</button>
+</form>

@@ -1,0 +1,46 @@
+@page "/"
+@model IndexModel
+@{ ViewData["Title"] = L["Home"].Value; }
+<h1>@L["Home"]</h1>
+<p class="lede">@L["Your view of the contract register is limited to the organisations, categories, business units, sites and classifications assigned to you."]</p>
+
+@if (Model.Roles.Count > 0)
+{
+    <section aria-labelledby="roles-h" class="card">
+        <h2 id="roles-h">@L["Your access"]</h2>
+        <div class="table-wrap">
+            <table>
+                <caption class="visually-hidden">@L["Your current role assignments"]</caption>
+                <thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["Scope"]</th><th scope="col">@L["Classification ceiling"]</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.Roles)
+                {
+                    <tr><td>@r.Role</td><td>@r.Scope</td><td>@r.Ceiling</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+else
+{
+    <p class="flash warn" role="status">@L["You have no active role assignment, so no records are visible. Ask an administrator for access."]</p>
+}
+
+@if (Model.CanReadContracts)
+{
+    <section aria-labelledby="counts-h">
+        <h2 id="counts-h">@L["Contracts you can see"]</h2>
+        @if (Model.StatusCounts.Count == 0) { <p>@L["No contracts are visible to you."]</p> }
+        else
+        {
+            <div class="grid">
+                @foreach (var (status, count) in Model.StatusCounts)
+                {
+                    <div class="card"><span class="stat">@count</span><a href="/Contracts?status=@Uri.EscapeDataString(status)">@status</a></div>
+                }
+            </div>
+        }
+        <p><a class="button" href="/Contracts">@L["Open the contract register"]</a></p>
+    </section>
+}

@@ -25,8 +25,11 @@ public sealed class EcpFactory : WebApplicationFactory<Program>
 {
     private readonly Dictionary<string, string?> _previous = [];
 
-    public EcpFactory(Dictionary<string, string?> settings)
+    private readonly Action<IServiceCollection>? _services;
+
+    public EcpFactory(Dictionary<string, string?> settings, Action<IServiceCollection>? services = null)
     {
+        _services = services;
         foreach (var (key, value) in settings)
         {
             var name = key.Replace(":", "__");
@@ -46,6 +49,11 @@ public sealed class EcpFactory : WebApplicationFactory<Program>
         ["Database:ConnectionStringRef"] = "",
         ["Database:AutoMigrate"] = "true",
     };
+
+    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    {
+        if (_services is not null) builder.ConfigureServices(_services);
+    }
 
     protected override void Dispose(bool disposing)
     {
@@ -97,12 +105,12 @@ public class DemoHostTests
         using var _ = factory; using var __ = keeper;
         using var client = factory.CreateClient(); // starts the host: migrations and seeding run
         await using var scope = factory.Services.CreateAsyncScope();
-        var info = await scope.ServiceProvider.GetRequiredService<ITenantDirectory>().FindByNameAsync("Demo Tenant");
+        var info = await scope.ServiceProvider.GetRequiredService<ITenantDirectory>().FindByNameAsync("Demo Tenant A");
         Assert.NotNull(info);
         Assert.NotNull(info!.FirstOrganisationId);
         // A second seeding pass must not create another tenant.
         await scope.ServiceProvider.GetRequiredService<DemoSeeder>().SeedAsync();
-        Assert.Equal(info.Id, (await scope.ServiceProvider.GetRequiredService<ITenantDirectory>().FindByNameAsync("Demo Tenant"))!.Id);
+        Assert.Equal(info.Id, (await scope.ServiceProvider.GetRequiredService<ITenantDirectory>().FindByNameAsync("Demo Tenant A"))!.Id);
     }
 
     [Theory]
@@ -144,7 +152,10 @@ public class DemoHostTests
         var (factory, keeper) = Start();
         using var _ = factory; using var __ = keeper;
         using var client = factory.CreateClient();
-        var response = await client.GetAsync("/api/v1/does-not-exist");
+        // Unauthenticated callers cannot probe for routes: the fallback policy answers 401 for everything that is not explicitly anonymous.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/does-not-exist")).StatusCode);
+        using var signedIn = await DemoApp.Start().SignInAsync("viewer.all@a.example.test");
+        var response = await signedIn.GetAsync("/api/v1/does-not-exist");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         var body = await response.Content.ReadAsStringAsync();
@@ -158,15 +169,24 @@ public class DemoHostTests
         var (factory, keeper) = Start();
         using var _ = factory; using var __ = keeper;
         using var client = factory.CreateClient();
-        string[] anonymousAllowlist = ["/", "/health/live", "/health/startup", "/health/ready", "/api/v1/info", "/api/v1/openapi.json"];
+        // Anonymous pages and endpoints: health probes, public info, the sign-in flow and the generic error page. Nothing else.
+        string[] anonymousAllowlist =
+        [
+            "/health/live", "/health/startup", "/health/ready", "/api/v1/info", "/api/v1/openapi.json",
+            "/SignIn", "/SignOut", "/Error", "/Account/Challenge"
+        ];
         var endpoints = factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>().ToList();
         Assert.NotEmpty(endpoints);
+        var policies = factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
+        var fallback = await policies.GetFallbackPolicyAsync();
+        Assert.NotNull(fallback); // everything not marked anonymous requires a signed-in user
+        Assert.Contains(fallback!.Requirements, r => r is Microsoft.AspNetCore.Authorization.Infrastructure.DenyAnonymousAuthorizationRequirement);
         foreach (var endpoint in endpoints)
         {
             var route = "/" + endpoint.RoutePattern.RawText!.TrimStart('/');
-            var protectedEndpoint = endpoint.Metadata.GetMetadata<IAuthorizeData>() is not null;
+            if (route == "//") route = "/";
             var anonymous = endpoint.Metadata.GetMetadata<IAllowAnonymous>() is not null;
-            Assert.True(protectedEndpoint || (anonymous && anonymousAllowlist.Contains(route)), $"Endpoint {route} has no authorisation requirement and is not on the anonymous allowlist");
+            if (anonymous) Assert.True(anonymousAllowlist.Contains(route), $"Endpoint {route} allows anonymous access but is not on the allowlist");
         }
     }
 

@@ -17,7 +17,7 @@ public sealed record EcpHostOptions
     public EcpMode Mode { get; init; } = EcpMode.Demo;
     public bool DemoTenantResolution { get; init; }
     public bool DemoSeed { get; init; }
-    public string DemoTenantName { get; init; } = "Demo Tenant";
+    public string DemoTenantName { get; init; } = "Demo Tenant A";
     public string DataDirectory { get; init; } = "data";
 }
 
@@ -36,7 +36,7 @@ public static class HostConfiguration
             Mode = Enum.TryParse<EcpMode>(config["Ecp:Mode"], true, out var mode) ? mode : EcpMode.Production, // unknown value fails safe
             DemoTenantResolution = config.GetValue("Ecp:DemoTenantResolution", false),
             DemoSeed = config.GetValue("Ecp:DemoSeed", false),
-            DemoTenantName = config["Ecp:DemoTenantName"] ?? "Demo Tenant",
+            DemoTenantName = config["Ecp:DemoTenantName"] ?? "Demo Tenant A",
             DataDirectory = config["Ecp:DataDirectory"] ?? "data"
         };
         var provider = Enum.TryParse<DatabaseProvider>(config["Database:Provider"], true, out var p) ? p : DatabaseProvider.SqlServer;

@@ -1,0 +1,17 @@
+@page "/Contracts/Edit/{id:guid}"
+@model Ecp.Host.Pages.Contracts.EditModel
+@{ ViewData["Title"] = L["Edit contract"].Value; }
+<h1>@L["Edit contract"] <small>@Model.Reference</small></h1>
+<partial name="_Errors" model="ViewData.ModelState" />
+<form method="post">
+    <div class="field">
+        <label for="Title">@L["Title"]</label>
+        <input id="Title" asp-for="Title" type="text" required aria-required="true" maxlength="500" aria-describedby="@(ModelState.ContainsKey("Title") ? "Title-error" : null)" />
+        <span id="Title-error" class="field-error" asp-validation-for="Title"></span>
+    </div>
+    <div class="field">
+        <label for="Description">@L["Description"]</label>
+        <textarea id="Description" asp-for="Description" maxlength="4000"></textarea>
+    </div>
+    <div class="actions"><button type="submit">@L["Save changes"]</button> <a class="button secondary" href="/Contracts/Details/@Model.Id">@L["Cancel"]</a></div>
+</form>

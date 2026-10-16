@@ -17,11 +17,6 @@ public sealed record ContractListItem(
 
 public sealed record ContractFilter(string? Search = null, string? Status = null, Guid? CategoryId = null, Guid? SupplierId = null, int Page = 1, int PageSize = 25);
 
-public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize)
-{
-    public int PageCount => Math.Max(1, (int)Math.Ceiling(Total / (double)PageSize));
-}
-
 public sealed record ContractDetails(
     Guid Id, Guid OrganisationId, string AgreementReference, string Title, string? Description, Guid SupplierId, string SupplierName, Guid CategoryId,
     string CategoryName, Guid? BusinessUnitId, Guid? SiteId, string Status, bool RecordLocked, string Classification, string? CurrencyCode, decimal? EstimatedValue,
@@ -63,6 +58,26 @@ public interface ISecuredCategoryService
     Task DeactivateAsync(Guid categoryId, CancellationToken ct = default);
     Task<Guid> AssignOwnerAsync(Guid categoryId, Guid userId, bool isPrimary, string? reason, CancellationToken ct = default);
     Task EndOwnershipAsync(Guid assignmentId, string reason, CancellationToken ct = default);
+}
+
+/// <summary>Trusted lookups used for idempotent seeding and import (no per-user authorisation; not reachable from request input).</summary>
+public interface ISupplierDirectory
+{
+    Task<Guid?> FindByVendorNumberAsync(Guid organisationId, string vendorNumber, CancellationToken ct = default);
+    Task<bool> ContractTitleExistsAsync(Guid organisationId, string title, CancellationToken ct = default);
+    Task<bool> AnyContractAsync(CancellationToken ct = default);
+}
+
+/// <summary>Trusted Agreement Reference allocation for installation and Demo seeding; request-driven creation allocates through the secured service.</summary>
+public interface IAgreementReferenceAllocator
+{
+    Task<string> AllocateAsync(Guid organisationId, CancellationToken ct = default);
+}
+
+/// <summary>Trusted lifecycle application used by Demo seeding and, later, the workflow engine (M4a). Not reachable from request input.</summary>
+public interface IContractLifecycleService
+{
+    Task ApplyStateAsync(Guid contractId, string statusCode, bool locks, CancellationToken ct = default);
 }
 
 /// <summary>Trusted category operations used by publication of onboarding configuration and Demo seeding (no per-user authorisation).</summary>
@@ -396,4 +411,37 @@ internal sealed class CategoryHierarchyProvider(ContractAccessContext context) :
 {
     public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> AncestryAsync(CancellationToken ct = default)
         => (await context.CategoryTreeAsync(ct)).Ancestry;
+}
+
+internal sealed class TrustedReferenceAllocator(ReferenceAllocator allocator, IUnitOfWork uow) : IAgreementReferenceAllocator
+{
+    public Task<string> AllocateAsync(Guid organisationId, CancellationToken ct = default)
+        => uow.ExecuteAsync(c => allocator.AllocateAsync(organisationId, consume: true, c), ct);
+}
+
+internal sealed class ContractLifecycleService(ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, IActorContext actor) : IContractLifecycleService
+{
+    public async Task ApplyStateAsync(Guid contractId, string statusCode, bool locks, CancellationToken ct = default)
+    {
+        await uow.ExecuteAsync(async c =>
+        {
+            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, c) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+            var old = contract.Status;
+            contract.ApplyWorkflowState(statusCode, locks, actor.ActorId ?? "system", clock.UtcNow);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("contract.state_applied", nameof(Contract), contractId.ToString(), OrganisationId: contract.OrganisationId,
+                OldValuesJson: AuditJson.Of(new { status = old }), NewValuesJson: AuditJson.Of(new { status = statusCode, locked = contract.RecordLocked })));
+        }, ct);
+    }
+}
+
+internal sealed class SupplierDirectory(ContractsDbContext db) : ISupplierDirectory
+{
+    public Task<Guid?> FindByVendorNumberAsync(Guid organisationId, string vendorNumber, CancellationToken ct = default)
+        => db.Suppliers.AsNoTracking().Where(s => s.OrganisationId == organisationId && s.VendorNumber == vendorNumber).Select(s => (Guid?)s.Id).FirstOrDefaultAsync(ct);
+
+    public Task<bool> ContractTitleExistsAsync(Guid organisationId, string title, CancellationToken ct = default)
+        => db.Contracts.AsNoTracking().AnyAsync(c => c.OrganisationId == organisationId && c.ContractTitle == title, ct);
+
+    public Task<bool> AnyContractAsync(CancellationToken ct = default) => db.Contracts.AsNoTracking().AnyAsync(ct);
 }

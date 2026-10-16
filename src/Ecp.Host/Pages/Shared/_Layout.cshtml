@@ -1,0 +1,68 @@
+@using System.Globalization
+@using Ecp.Identity
+@using Ecp.SharedKernel
+@inject IAccessService Access
+@inject EcpHostOptions HostOptions
+@{
+    var title = ViewData["Title"] as string ?? L["App.Name"].Value;
+    var path = Context.Request.Path.Value ?? "/";
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    async Task<bool> Can(params string[] permissions) { foreach (var p in permissions) if (await Access.HoldsAnywhereAsync(p)) return true; return false; }
+    var items = new List<(string Href, string Text, string Match)>();
+    if (signedIn)
+    {
+        items.Add(("/", L["Home"].Value, "/"));
+        if (await Can("contracts.read")) items.Add(("/Contracts", L["Contracts"].Value, "/Contracts"));
+        if (await Can("suppliers.read")) items.Add(("/Suppliers", L["Suppliers"].Value, "/Suppliers"));
+        if (await Can("categories.manage", "contracts.read")) items.Add(("/Admin/Categories", L["Categories"].Value, "/Admin/Categories"));
+        if (await Can("users.manage")) items.Add(("/Admin/Users", L["Users and roles"].Value, "/Admin/Users"));
+        if (await Can("audit.read", "audit.read_admin")) items.Add(("/Admin/Audit", L["Audit events"].Value, "/Admin/Audit"));
+        if (await Can("onboarding.run")) items.Add(("/Onboarding", L["Organisation onboarding"].Value, "/Onboarding"));
+        if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
+        if (await Can("setup.run")) items.Add(("/Admin/Setup", L["Installation setup"].Value, "/Admin/Setup"));
+    }
+}
+<!DOCTYPE html>
+<html lang="@CultureInfo.CurrentUICulture.Name">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>@title - @L["App.Name"]</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <a class="skip-link" href="#main">@L["Skip to main content"]</a>
+    @if (HostOptions.Mode != EcpMode.Production)
+    {
+        <div class="env-banner" role="status">@L["Demonstration environment"] (@HostOptions.Mode): @L["synthetic data only, not for production use."]</div>
+    }
+    <header class="site-header">
+        <a class="brand" href="/">@L["App.Name"]</a>
+        @if (signedIn)
+        {
+            <nav aria-label="@L["Main"]">
+                <ul>
+                    @foreach (var item in items)
+                    {
+                        var current = item.Match == "/" ? path == "/" : path.StartsWith(item.Match, StringComparison.OrdinalIgnoreCase);
+                        <li><a href="@item.Href" aria-current="@(current ? "page" : null)">@item.Text</a></li>
+                    }
+                </ul>
+            </nav>
+            <div class="who">
+                <span>@L["Signed in as"] <strong>@User.Identity!.Name</strong></span>
+                <form method="post" action="/SignOut"><button class="secondary" type="submit">@L["Sign out"]</button></form>
+            </div>
+        }
+    </header>
+    <main id="main" tabindex="-1">
+        @if (TempData["Flash"] is string flash)
+        {
+            <div class="flash" role="status">@flash</div>
+        }
+        @RenderBody()
+    </main>
+    <footer class="site-footer">@L["App.Name"] &middot; @L["Production approval is external governance; this build does not declare it."]</footer>
+</body>
+</html>

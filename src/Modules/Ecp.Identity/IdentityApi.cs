@@ -101,6 +101,12 @@ public interface IGroupMappingService
     Task DeactivateAsync(Guid id, CancellationToken ct = default);
 }
 
+/// <summary>Notified after identity-provider settings are saved, so the host can (re)build its sign-in handlers without a restart.</summary>
+public interface IIdentityProviderListener
+{
+    Task ChangedAsync(Guid tenantId, IdentityProviderSettings settings, CancellationToken ct);
+}
+
 public interface IProviderRegistry
 {
     Task<IReadOnlyList<IdentityProviderSettings>> ListAsync(CancellationToken ct = default);
@@ -471,7 +477,8 @@ internal sealed class GroupMappingService(IdentityDbContext db, IUnitOfWork uow,
     }
 }
 
-internal sealed class ProviderRegistry(IdentityDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IdentityOptions options, ISecretProvider secrets) : IProviderRegistry
+internal sealed class ProviderRegistry(IdentityDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IdentityOptions options, ISecretProvider secrets,
+    IEnumerable<IIdentityProviderListener> listeners) : IProviderRegistry
 {
     public async Task<IReadOnlyList<IdentityProviderSettings>> ListAsync(CancellationToken ct = default)
         => (await db.Providers.AsNoTracking().OrderBy(p => p.Key).ToListAsync(ct)).Select(p => p.ToSettings()).ToList();
@@ -491,6 +498,7 @@ internal sealed class ProviderRegistry(IdentityDbContext db, IUnitOfWork uow, IA
             audit.Record(new AuditEntry(existing is null ? "identityprovider.created" : "identityprovider.updated", nameof(IdentityProviderRegistration), settings.Key,
                 NewValuesJson: IdentityJson.Of(new { settings.Key, kind = settings.Kind.ToString(), settings.Enabled, secretReferenceSet = !string.IsNullOrWhiteSpace(settings.ClientSecretRef) })));
         }, ct);
+        foreach (var listener in listeners) await listener.ChangedAsync(tenantId, settings, ct);
         return issues;
     }
 
@@ -612,6 +620,9 @@ public static class IdentityModule
         services.AddScoped<IGroupMappingService, GroupMappingService>();
         services.AddScoped<IProviderRegistry, ProviderRegistry>();
         services.AddScoped<IAccessService, AccessService>();
+        services.AddScoped<IAuditBrowser, AuditBrowser>();
+        services.AddScoped<IPeopleDirectory, PeopleDirectory>();
+        services.AddScoped<IUserAdministration, UserAdministration>();
         services.AddScoped<IClassificationScaleProvider, DefaultClassificationScaleProvider>();
         return services;
     }

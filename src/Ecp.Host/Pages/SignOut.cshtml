@@ -1,0 +1,6 @@
+@page "/SignOut"
+@model SignOutModel
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@{ ViewData["Title"] = L["Sign out"].Value; }
+<h1>@L["Sign out"]</h1>
+<form method="post"><button type="submit">@L["Sign out"]</button></form>

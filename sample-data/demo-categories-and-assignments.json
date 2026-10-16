@@ -2,16 +2,86 @@
   "synthetic": true,
   "description": "Demo taxonomy and category ownership for tenant-a / org-a1 (matches migration-samples/status-lookup-map.csv) plus one category in tenant-b for isolation tests.",
   "categories": [
-    { "tenant": "tenant-a", "organisation": "org-a1", "code": "PACKAGING", "name": "Packaging", "parent": null },
-    { "tenant": "tenant-a", "organisation": "org-a1", "code": "PACKAGING-FLEX", "name": "Flexible Packaging", "parent": "PACKAGING" },
-    { "tenant": "tenant-a", "organisation": "org-a1", "code": "ENERGY", "name": "Energy", "parent": null },
-    { "tenant": "tenant-a", "organisation": "org-a1", "code": "ENERGY-ELEC", "name": "Electricity", "parent": "ENERGY" },
-    { "tenant": "tenant-b", "organisation": "org-b1", "code": "PACKAGING", "name": "Packaging", "parent": null }
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "code": "PACKAGING",
+      "name": "Packaging",
+      "parent": null
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "code": "PACKAGING-FLEX",
+      "name": "Flexible Packaging",
+      "parent": "PACKAGING"
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "code": "ENERGY",
+      "name": "Energy",
+      "parent": null
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "code": "ENERGY-ELEC",
+      "name": "Electricity",
+      "parent": "ENERGY"
+    },
+    {
+      "tenant": "tenant-b",
+      "organisation": "org-b1",
+      "code": "PACKAGING",
+      "name": "Packaging",
+      "parent": null
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a2",
+      "code": "FACILITIES",
+      "name": "Facilities",
+      "parent": null
+    }
   ],
   "assignments": [
-    { "tenant": "tenant-a", "organisation": "org-a1", "category": "PACKAGING", "user": "catowner.packaging@a.example.test", "effectiveFrom": "2024-01-01T00:00:00Z", "effectiveTo": null, "isPrimary": true },
-    { "tenant": "tenant-a", "organisation": "org-a1", "category": "ENERGY", "user": "catowner.energy@a.example.test", "effectiveFrom": "2024-01-01T00:00:00Z", "effectiveTo": null, "isPrimary": true },
-    { "tenant": "tenant-a", "organisation": "org-a1", "category": "ENERGY", "user": "catowner.packaging@a.example.test", "effectiveFrom": "2023-01-01T00:00:00Z", "effectiveTo": "2023-12-31T23:59:59Z", "isPrimary": false, "note": "Ended assignment: must grant no edit rights today" },
-    { "tenant": "tenant-b", "organisation": "org-b1", "category": "PACKAGING", "user": "catowner@b.example.test", "effectiveFrom": "2024-01-01T00:00:00Z", "effectiveTo": null, "isPrimary": true }
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "category": "PACKAGING",
+      "user": "catowner.packaging@a.example.test",
+      "effectiveFrom": "2024-01-01T00:00:00Z",
+      "effectiveTo": null,
+      "isPrimary": true
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "category": "ENERGY",
+      "user": "catowner.energy@a.example.test",
+      "effectiveFrom": "2024-01-01T00:00:00Z",
+      "effectiveTo": null,
+      "isPrimary": true
+    },
+    {
+      "tenant": "tenant-a",
+      "organisation": "org-a1",
+      "category": "ENERGY",
+      "user": "catowner.packaging@a.example.test",
+      "effectiveFrom": "2023-01-01T00:00:00Z",
+      "effectiveTo": "2023-12-31T23:59:59Z",
+      "isPrimary": false,
+      "note": "Ended assignment: must grant no edit rights today"
+    },
+    {
+      "tenant": "tenant-b",
+      "organisation": "org-b1",
+      "category": "PACKAGING",
+      "user": "catowner@b.example.test",
+      "effectiveFrom": "2024-01-01T00:00:00Z",
+      "effectiveTo": null,
+      "isPrimary": true
+    }
   ]
 }

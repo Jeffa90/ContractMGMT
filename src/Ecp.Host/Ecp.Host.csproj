@@ -16,7 +16,15 @@
     <ProjectReference Include="../Modules/Ecp.Operations/Ecp.Operations.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Synthetic Demo data: one canonical copy under sample-data/. Used only when Demo seeding is enabled (refused in Production). -->
+    <EmbeddedResource Include="../../sample-data/demo-organisation-structure.json" LogicalName="Ecp.Demo.organisation-structure.json" />
+    <EmbeddedResource Include="../../sample-data/demo-users-and-roles.json" LogicalName="Ecp.Demo.users-and-roles.json" />
+    <EmbeddedResource Include="../../sample-data/demo-categories-and-assignments.json" LogicalName="Ecp.Demo.categories-and-assignments.json" />
+    <EmbeddedResource Include="../../sample-data/demo-contracts.json" LogicalName="Ecp.Demo.contracts.json" />
   </ItemGroup>
 </Project>

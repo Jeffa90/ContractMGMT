@@ -1,0 +1,39 @@
+@page "/Admin/Audit"
+@model Ecp.Host.Pages.Admin.AuditModel
+@{ ViewData["Title"] = L["Audit events"].Value; }
+<h1>@L["Audit events"]</h1>
+<p class="lede">@L["Audit events are append-only and hash-chained. You see the events your role and scopes allow; administrative readers see that an administrative change happened, not business field values."]</p>
+<form method="get" class="card">
+    <div class="field"><label for="action">@L["Action starts with"]</label><input id="action" name="action" type="text" value="@Model.Action" /></div>
+    <div class="field"><label for="entityType">@L["Entity type"]</label><input id="entityType" name="entityType" type="text" value="@Model.EntityType" /></div>
+    <div class="field"><label for="actor">@L["Actor id"]</label><input id="actor" name="actor" type="text" value="@Model.Actor" /></div>
+    <div class="actions"><button type="submit">@L["Filter"]</button> <a class="button secondary" href="/Admin/Audit">@L["Clear"]</a></div>
+</form>
+@if (Model.CanExport)
+{
+    <p><a class="button secondary" href="/Admin/Audit?handler=Export&amp;action=@Uri.EscapeDataString(Model.Action ?? "")&amp;entityType=@Uri.EscapeDataString(Model.EntityType ?? "")&amp;actor=@Uri.EscapeDataString(Model.Actor ?? "")">@L["Export evidence (JSON with hashes)"]</a></p>
+}
+<p role="status">@Model.Result.Total @L["event(s)"]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Audit events"]</caption>
+    <thead><tr><th scope="col">#</th><th scope="col">@L["When"]</th><th scope="col">@L["Actor"]</th><th scope="col">@L["Action"]</th><th scope="col">@L["Entity"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Detail"]</th></tr></thead>
+    <tbody>
+    @foreach (var e in Model.Result.Items)
+    {
+        <tr><th scope="row">@e.Sequence</th><td>@Model.When(e.OccurredUtc)</td><td>@e.ActorType @e.ActorId</td><td>@e.Action</td><td>@e.EntityType</td>
+            <td><span class="badge @(e.Outcome == "Success" ? "ok" : "bad")">@e.Outcome</span></td>
+            <td>@e.Reason @if (e.NewValuesJson is { Length: > 0 }) { <details><summary>@L["Values"]</summary><pre>@e.NewValuesJson</pre></details> }</td></tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="7">@L["No events are visible to you."]</td></tr> }
+    </tbody>
+</table>
+</div>
+@if (Model.Result.PageCount > 1)
+{
+    <nav class="pager" aria-label="@L["Pages"]">
+        @if (Model.Result.Page > 1) { <a href="@Model.PageLink(Model.Result.Page - 1)">@L["Previous"]</a> }
+        <span>@L["Page"] @Model.Result.Page @L["of"] @Model.Result.PageCount</span>
+        @if (Model.Result.Page < Model.Result.PageCount) { <a href="@Model.PageLink(Model.Result.Page + 1)">@L["Next"]</a> }
+    </nav>
+}

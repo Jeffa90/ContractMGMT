@@ -1,0 +1,16 @@
+@model Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary
+@if (!Model.IsValid)
+{
+    <div class="error-summary" role="alert" tabindex="-1" id="error-summary">
+        <h2>@L["There is a problem"]</h2>
+        <ul>
+            @foreach (var e in Model.Where(kv => kv.Value!.Errors.Count > 0))
+            {
+                foreach (var err in e.Value!.Errors)
+                {
+                    <li>@if (!string.IsNullOrEmpty(e.Key)) { <a href="#@e.Key">@err.ErrorMessage</a> } else { @err.ErrorMessage }</li>
+                }
+            }
+        </ul>
+    </div>
+}

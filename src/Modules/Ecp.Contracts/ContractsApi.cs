@@ -176,6 +176,10 @@ public static class ContractsModule
         services.AddScoped<ContractAccessContext>();
         services.AddScoped<ReferenceAllocator>();
         services.AddScoped<ICategoryAdministration, CategoryAdministration>();
+        services.AddScoped<IAgreementReferenceAllocator, TrustedReferenceAllocator>();
+        services.AddScoped<IContractLifecycleService, ContractLifecycleService>();
+        services.AddScoped<ISupplierDirectory, SupplierDirectory>();
+        services.AddScoped<IAccessSimulator, AccessSimulator>();
         services.AddScoped<ISecuredContractService, SecuredContractService>();
         services.AddScoped<ISecuredSupplierService, SecuredSupplierService>();
         services.AddScoped<ISecuredCategoryService, SecuredCategoryService>();

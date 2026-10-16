@@ -1,0 +1,71 @@
+@page "/Admin/Categories"
+@model Ecp.Host.Pages.Admin.CategoriesModel
+@{ ViewData["Title"] = L["Categories"].Value; }
+<h1>@L["Categories"]</h1>
+<p class="lede">@L["Category ownership decides who can edit contracts. Owners edit only the categories they currently own; ending an ownership removes edit rights immediately."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+<div class="table-wrap">
+<table>
+    <caption>@L["Category tree"]</caption>
+    <thead><tr><th scope="col">@L["Category"]</th><th scope="col">@L["Organisation"]</th><th scope="col">@L["Current owners"]</th><th scope="col">@L["Status"]</th>@if (Model.CanAssign || Model.CanManage) { <th scope="col">@L["Actions"]</th> }</tr></thead>
+    <tbody>
+    @foreach (var row in Model.Rows)
+    {
+        <tr>
+            <th scope="row">@row.Indent@row.Category.Name <span class="hint">(@row.Category.Code)</span></th>
+            <td>@Model.OrganisationName(row.Category.OrganisationId)</td>
+            <td>
+                @foreach (var o in row.Category.Owners)
+                {
+                    <div>@Model.UserName(o.UserId) @if (o.IsPrimary) { <span class="badge">@L["primary"]</span> }
+                    @if (Model.CanAssign)
+                    {
+                        <form method="post" asp-page-handler="End" class="inline"><input type="hidden" name="assignmentId" value="@o.AssignmentId" /><input type="hidden" name="reason" value="Ownership ended from the category list" />
+                            <button class="secondary" type="submit" aria-label="@L["End ownership for"] @Model.UserName(o.UserId) @L["of"] @row.Category.Name">@L["End"]</button></form>
+                    }</div>
+                }
+                @if (row.Category.Owners.Count == 0) { <span class="hint">@L["No current owner"]</span> }
+            </td>
+            <td>@(row.Category.IsActive ? L["Active"] : L["Inactive"])</td>
+            @if (Model.CanAssign || Model.CanManage)
+            {
+                <td>
+                    @if (Model.CanAssign && row.Category.IsActive)
+                    {
+                        <form method="post" asp-page-handler="Assign">
+                            <input type="hidden" name="categoryId" value="@row.Category.Id" />
+                            <label for="owner-@row.Category.Id" class="visually-hidden">@L["Owner for"] @row.Category.Name</label>
+                            <select id="owner-@row.Category.Id" name="userId" required aria-required="true">
+                                <option value="">@L["Choose an owner"]</option>
+                                @foreach (var u in Model.OwnerCandidates(row.Category.OrganisationId)) { <option value="@u.Id">@u.DisplayName</option> }
+                            </select>
+                            <button type="submit">@L["Assign owner"]</button>
+                        </form>
+                    }
+                    @if (Model.CanManage && row.Category.IsActive)
+                    {
+                        <form method="post" asp-page-handler="Deactivate"><input type="hidden" name="categoryId" value="@row.Category.Id" /><button class="secondary" type="submit" aria-label="@L["Deactivate"] @row.Category.Name">@L["Deactivate"]</button></form>
+                    }
+                </td>
+            }
+        </tr>
+    }
+    @if (Model.Rows.Count == 0) { <tr><td colspan="5">@L["No categories are visible to you."]</td></tr> }
+    </tbody>
+</table>
+</div>
+
+@if (Model.CanManage)
+{
+    <h2>@L["Add a category"]</h2>
+    <form method="post" asp-page-handler="Create">
+        <div class="field"><label for="OrganisationId">@L["Organisation"]</label>
+            <select id="OrganisationId" name="OrganisationId" required aria-required="true">@foreach (var o in Model.ManageOrganisations) { <option value="@o.Id">@o.Name</option> }</select></div>
+        <div class="field"><label for="Code">@L["Code"]</label><input id="Code" name="Code" type="text" required aria-required="true" maxlength="100" /></div>
+        <div class="field"><label for="Name">@L["Name"]</label><input id="Name" name="Name" type="text" required aria-required="true" maxlength="200" /></div>
+        <div class="field"><label for="ParentCategoryId">@L["Parent category"]</label>
+            <select id="ParentCategoryId" name="ParentCategoryId"><option value="">@L["None (top level)"]</option>@foreach (var r in Model.Rows.Where(r => r.Category.IsActive)) { <option value="@r.Category.Id">@r.Category.Name (@Model.OrganisationName(r.Category.OrganisationId))</option> }</select></div>
+        <button type="submit">@L["Add category"]</button>
+    </form>
+}

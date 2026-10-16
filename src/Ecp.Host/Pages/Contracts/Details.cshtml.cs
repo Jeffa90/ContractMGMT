@@ -1,4 +1,5 @@
 using Ecp.Contracts;
+using Ecp.Identity;
 using Ecp.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -6,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ecp.Host.Pages.Contracts;
 
 [Authorize(Policy = "perm:contracts.read")]
-public sealed class DetailsModel(ISecuredContractService contracts, IOrganisationStructureService organisations) : EcpPageModel
+public sealed class DetailsModel(ISecuredContractService contracts, ISecuredContractDocuments documents, IOrganisationStructureService organisations, IAccessService access) : EcpPageModel
 {
     public ContractDetails Contract { get; private set; } = null!;
     public string OrganisationName { get; private set; } = "";
@@ -17,6 +18,9 @@ public sealed class DetailsModel(ISecuredContractService contracts, IOrganisatio
     public string? End { get; private set; }
     public string? Registered { get; private set; }
     public string Created { get; private set; } = "";
+    public IReadOnlyList<ContractDocumentItem> Documents { get; private set; } = [];
+    public bool CanSeeMigration { get; private set; }
+    public string? SourceExtracted { get; private set; }
 
     public Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
     {
@@ -31,6 +35,9 @@ public sealed class DetailsModel(ISecuredContractService contracts, IOrganisatio
         End = Contract.EndDate is { } e ? fmt.Date(e) : null;
         Registered = Contract.RegisteredDateUtc is { } r ? fmt.DateTime(r) : null;
         Created = fmt.DateTime(Contract.CreatedUtc);
+        Documents = await documents.ListAsync(id, ct);
+        SourceExtracted = Contract.Provenance?.SourceExtractedUtc is { } x ? fmt.DateTime(x) : null;
+        CanSeeMigration = await access.HoldsAnywhereAsync("migration.stage", ct);
         return Page();
     });
 }

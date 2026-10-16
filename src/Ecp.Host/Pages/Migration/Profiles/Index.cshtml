@@ -1,0 +1,26 @@
+@page "/Migration/Profiles"
+@model Ecp.Host.Pages.Migration.Profiles.IndexModel
+@{ ViewData["Title"] = L["Mapping profiles"].Value; }
+<p><a href="/Migration">&larr; @L["Data migration"]</a></p>
+<h1>@L["Mapping profiles"]</h1>
+<p class="lede">@L["A mapping profile says how each column of a source file becomes a field in the platform: which transformation to apply, which value to use when the source is empty, which lookup translates codes, and which checks apply. It is data, never code, and every published version is kept unchanged."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Mapping profiles"]</caption>
+    <thead><tr><th scope="col">@L["Profile"]</th><th scope="col">@L["Source system"]</th><th scope="col">@L["Latest version"]</th><th scope="col">@L["Published versions"]</th></tr></thead>
+    <tbody>
+    @foreach (var p in Model.Profiles) { <tr><th scope="row"><a href="/Migration/Profiles/@p.Id">@p.Name</a></th><td>@p.SourceSystem @p.SourceSystemVersion</td><td>@p.LatestVersionNumber</td><td>@p.PublishedVersions</td></tr> }
+    @if (Model.Profiles.Count == 0) { <tr><td colspan="4">@L["There are no mapping profiles yet."]</td></tr> }
+    </tbody>
+</table>
+</div>
+<h2>@L["Create a profile"]</h2>
+<form method="post" class="card">
+    <div class="field"><label for="OrganisationId">@L["Organisation"]</label>
+        <select id="OrganisationId" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <div class="field"><label for="Name">@L["Profile name"]</label><input id="Name" name="Name" type="text" maxlength="200" value="@Model.Name" required /></div>
+    <div class="field"><label for="SourceSystem">@L["Source system"]</label><input id="SourceSystem" name="SourceSystem" type="text" maxlength="100" value="@Model.SourceSystem" required /></div>
+    <div class="field"><label for="SourceSystemVersion">@L["Source system version (optional)"]</label><input id="SourceSystemVersion" name="SourceSystemVersion" type="text" maxlength="100" value="@Model.SourceSystemVersion" /></div>
+    <div class="actions"><button type="submit">@L["Create profile"]</button></div>
+</form>

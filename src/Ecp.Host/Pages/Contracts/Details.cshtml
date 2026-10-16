@@ -17,7 +17,48 @@
     <dt>@L["Registered"]</dt><dd>@(Model.Registered ?? L["Not yet registered"].Value)</dd>
     <dt>@L["Created"]</dt><dd>@Model.Created @L["by"] @Model.Contract.CreatedBy</dd>
 </dl>
+@if (Model.Contract.IsArchived)
+{
+    <div class="flash warn" role="status"><strong>@L["Archived."]</strong> @Model.Contract.ArchiveReason</div>
+}
 @if (Model.Contract.Description is { Length: > 0 }) { <h2>@L["Description"]</h2><p>@Model.Contract.Description</p> }
+
+<h2>@L["Documents"]</h2>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Documents"]</caption>
+    <thead><tr><th scope="col">@L["Document"]</th><th scope="col">@L["Type"]</th><th scope="col">@L["Versions"]</th><th scope="col">@L["Size"]</th><th scope="col">@L["Scan"]</th><th scope="col">@L["Source"]</th></tr></thead>
+    <tbody>
+    @foreach (var d in Model.Documents)
+    {
+        <tr>
+            <th scope="row">@if (d.CanDownload) { <a href="/Documents/Download/@d.DocumentId">@d.Title</a> } else { @d.Title }
+                @if (d.IsExecutedCopy) { <span class="badge">@L["Executed copy"]</span> } @if (d.Status != "Active") { <span class="badge warn">@d.Status</span> }
+                <span class="hint">@d.FileName@(d.VersionLabel is null ? "" : " · version " + d.VersionLabel)@(d.DocumentDate is { } dd ? " · " + dd.ToString("yyyy-MM-dd") : "")</span></th>
+            <td>@d.DocumentType</td><td>@d.Versions</td><td>@(d.SizeBytes / 1024 + 1) KB</td>
+            <td>@d.ScanStatus @if (!d.CanDownload) { <span class="hint">(@L["download not available"])</span> }</td>
+            <td>@if (d.MigrationBatchId is { } mb) { if (Model.CanSeeMigration) { <a href="/Migration/Batches/@mb/Provenance">@L["Migrated"] @d.SourceSystem</a> } else { <span>@L["Migrated"] @d.SourceSystem</span> } } else { <span>-</span> }</td>
+        </tr>
+    }
+    @if (Model.Documents.Count == 0) { <tr><td colspan="6">@L["No documents."]</td></tr> }
+    </tbody>
+</table>
+</div>
+
+@if (Model.Contract.Provenance is { } prov)
+{
+    <h2>@L["Migration provenance"]</h2>
+    <dl class="facts card">
+        <dt>@L["Source system"]</dt><dd>@prov.SourceSystem</dd>
+        <dt>@L["Source record"]</dt><dd>@prov.SourceRecordId</dd>
+        <dt>@L["Source agreement reference"]</dt><dd>@(prov.SourceAgreementReference ?? "-")</dd>
+        <dt>@L["Source status"]</dt><dd>@(prov.SourceStatus ?? "-")</dd>
+        <dt>@L["Source extracted"]</dt><dd>@(Model.SourceExtracted ?? "-")</dd>
+        <dt>@L["Registered Date came from"]</dt><dd>@(prov.RegisteredDateProvenance is null ? "-" : prov.RegisteredDateProvenance == "Migration" ? $"the source system (value {prov.SourceRegisteredValue})" : "this platform")</dd>
+        <dt>@L["Loaded by batch"]</dt><dd>@if (prov.MigrationBatchId is { } batch) { if (Model.CanSeeMigration) { <a href="/Migration/Batches/@batch">@batch</a> } else { <code>@batch</code> } } else { <span>-</span> }</dd>
+        <dt>@L["Legacy load"]</dt><dd>@(Model.Contract.IsLegacyLoad ? L["Yes: loaded locked from a previous system"].Value : L["No"].Value)</dd>
+    </dl>
+}
 <div class="actions">
     @if (Model.Contract.CanEdit) { <a class="button" href="/Contracts/Edit/@Model.Contract.Id">@L["Edit details"]</a> }
     <a class="button secondary" href="/Contracts">@L["Back to the register"]</a>

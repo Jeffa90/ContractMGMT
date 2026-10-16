@@ -24,10 +24,16 @@ public sealed record ProjectSummary(Guid Id, Guid OrganisationId, string Name, s
 public sealed record ProjectDetail(Guid Id, Guid OrganisationId, string Name, string SourceSystem, string? SourceSystemVersion, string DataOwner, DateTime ExtractionUtc,
     DateTime? FreezeStartUtc, DateTime? FreezeEndUtc, bool TargetFreezeEnabled, bool LegacyLoadEnabled, bool LegacyAllowRegisteredDateImport, DateTime? LegacyPolicyExpiresUtc,
     IReadOnlyList<string> LegacyAllowedStatuses, bool LegacyAllowOverwriteLocked, string? LegacyOverwriteReason, ReferencePolicy ReferencePolicy, ProjectStatus Status,
-    string CreatedBy, DateTime CreatedUtc, IReadOnlyList<BatchSummary> Batches);
+    string CreatedBy, DateTime CreatedUtc, IReadOnlyList<BatchSummary> Batches, ProjectCapabilities Can);
+
+/// <summary>What the signed-in person may do on a project, so a page offers only actions that will be accepted.</summary>
+public sealed record ProjectCapabilities(bool CanStage, bool CanLegacyLoad, bool CanCommit, bool CanAccept);
 
 public sealed record BatchSummary(Guid Id, Guid ProjectId, string? Name, BatchKind Kind, BatchStatus Status, bool IsLegacyLoad, DuplicateStrategy DuplicateStrategy, string CreatedBy, DateTime CreatedUtc,
     long SourceRows, long Created, long Updated, long Rejected, long Skipped);
+
+/// <summary>An organisation the signed-in person may run migrations for.</summary>
+public sealed record OrganisationOption(Guid Id, string Name);
 
 public sealed record CreateProjectInput(Guid OrganisationId, string Name, string SourceSystem, string? SourceSystemVersion, string DataOwner, DateTime ExtractionUtc);
 

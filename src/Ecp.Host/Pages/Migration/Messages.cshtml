@@ -1,0 +1,34 @@
+@page "/Migration/Batches/{id:guid}/Messages"
+@model Ecp.Host.Pages.Migration.MessagesModel
+@using Ecp.DataMigration.Domain
+@{ ViewData["Title"] = L["Errors and warnings"].Value; }
+<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the batch"]</a></p>
+<h1>@L["Errors and warnings"]</h1>
+<p class="lede">@L["Each message has a stable code. An error rejects the row or file it concerns; a warning is information. The error report downloads every message together with the source values of rejected rows."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<form method="get" class="card">
+    <div class="field"><label for="severity">@L["Severity"]</label>
+        <select id="severity" name="severity"><option value="">@L["All"]</option><option value="Error" selected="@(Model.Severity == MessageSeverity.Error)">@L["Errors"]</option><option value="Warning" selected="@(Model.Severity == MessageSeverity.Warning)">@L["Warnings"]</option></select></div>
+    <div class="field"><label for="code">@L["Code (for example MIG-E004)"]</label><input id="code" name="code" type="text" value="@Model.Code" maxlength="20" /></div>
+    <div class="actions"><button type="submit">@L["Filter"]</button> <a class="button secondary" href="/Migration/Batches/@Model.BatchId/Messages?handler=Export&amp;xlsx=true">@L["Download Excel"]</a> <a class="button secondary" href="/Migration/Batches/@Model.BatchId/Messages?handler=Export&amp;xlsx=false">@L["Download CSV"]</a></div>
+</form>
+<p role="status">@Model.Result.Total @L["message(s)"]</p>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Messages"]</caption>
+    <thead><tr><th scope="col">@L["Severity"]</th><th scope="col">@L["Code"]</th><th scope="col">@L["Applies to"]</th><th scope="col">@L["Where"]</th><th scope="col">@L["Field"]</th><th scope="col">@L["Message"]</th></tr></thead>
+    <tbody>
+    @foreach (var m in Model.Result.Items)
+    {
+        <tr><td><span class="badge @(m.Severity == MessageSeverity.Error ? "bad" : "warn")">@m.Severity</span></td><th scope="row">@m.Code</th><td>@m.Subject</td><td>@m.Location</td><td>@m.FieldName</td><td>@m.Message</td></tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="6">@L["No messages."]</td></tr> }
+    </tbody>
+</table></div>
+@if (Model.Result.PageCount > 1)
+{
+    <nav class="pager" aria-label="@L["Pages"]">
+        @if (Model.Result.Page > 1) { <a href="@Model.PageLink(Model.Result.Page - 1)">@L["Previous"]</a> }
+        <span>@L["Page"] @Model.Result.Page @L["of"] @Model.Result.PageCount</span>
+        @if (Model.Result.Page < Model.Result.PageCount) { <a href="@Model.PageLink(Model.Result.Page + 1)">@L["Next"]</a> }
+    </nav>
+}

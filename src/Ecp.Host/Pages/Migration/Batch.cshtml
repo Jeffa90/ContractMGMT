@@ -1,0 +1,280 @@
+@page "/Migration/Batches/{id:guid}"
+@model Ecp.Host.Pages.Migration.BatchModel
+@using Ecp.DataMigration
+@using Ecp.DataMigration.Domain
+@{
+    var b = Model.Batch; var can = b.Can; var v = b.Validation;
+    ViewData["Title"] = b.Name ?? L["Batch"].Value;
+    var contracts = b.Sources.FirstOrDefault(s => s.Role == SourceFileRole.Contracts);
+    var manifest = b.Sources.FirstOrDefault(s => s.Role == SourceFileRole.Manifest);
+    var archive = b.Sources.FirstOrDefault(s => s.Role == SourceFileRole.Archive);
+    var terminal = b.Status is BatchStatus.Accepted or BatchStatus.RolledBack or BatchStatus.Compensated;
+    string Cls(BatchStatus s) => Ecp.Host.Pages.Migration.MigrationPageModel.BadgeFor(s);
+    string Lab(BatchStatus s) => Ecp.Host.Pages.Migration.MigrationPageModel.Label(s);
+}
+<p><a href="/Migration/Projects/@b.ProjectId">&larr; @b.ProjectName</a></p>
+<h1>@(b.Name ?? L["Migration batch"].Value)</h1>
+<p>
+    <span class="badge @Cls(b.Status)">@Lab(b.Status)</span>
+    <span class="badge">@Ecp.Host.Pages.Migration.MigrationPageModel.Label(b.Kind)</span>
+    @if (b.IsLegacyLoad) { <span class="badge warn">@L["Legacy load: needs a second person to confirm"]</span> }
+    <span class="hint">@L["Created"] @Model.When(b.CreatedUtc) @L["by"] @b.CreatedBy</span>
+</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (b.Status == BatchStatus.Failed)
+{
+    <div class="error-summary" role="alert"><h2>@L["The commit stopped"]</h2><p>@b.FailureReason</p><p>@L["Nothing was lost and nothing was duplicated: each stage is committed with its checkpoint. Fix the cause and commit again to carry on from the last checkpoint."]</p></div>
+}
+
+<nav aria-label="@L["Steps"]"><ol class="steps">
+    <li><a href="#sources">1. @L["Source files"]</a> <span class="hint">@(contracts is null ? L["Not loaded"].Value : $"{contracts.RowCount} rows")</span></li>
+    <li><a href="#profile">2. @L["Mapping profile and duplicate options"]</a> <span class="hint">@(b.ProfileName is null ? L["Not chosen"].Value : $"{b.ProfileName} v{b.ProfileVersionNumber}")</span></li>
+    <li><a href="#dryrun">3. @L["Dry run"]</a> <span class="hint">@(b.ValidatedUtc is null ? L["Not run"].Value : Model.When(b.ValidatedUtc))</span></li>
+    <li><a href="#review">4. @L["Review"]</a> <span class="hint">@b.Counts.Errors @L["errors"], @b.Counts.Warnings @L["warnings"]</span></li>
+    <li><a href="#commit">5. @L["Confirm and commit"]</a></li>
+    <li><a href="#reconcile">6. @L["Reconcile"]</a></li>
+    <li><a href="#accept">7. @L["Business acceptance"]</a></li>
+    <li><a href="#rollback">8. @L["Roll back or compensate"]</a></li>
+</ol></nav>
+
+<section id="sources" aria-labelledby="h-sources">
+<h2 id="h-sources">1. @L["Source files"]</h2>
+<p class="hint">@L["Each file is kept exactly as supplied (with its SHA-256) in tenant-bound storage. The values in every row are kept in staging as they arrived. Nothing is written to the platform by loading a file."]</p>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Source files"]</caption>
+    <thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["File"]</th><th scope="col">@L["Rows or entries"]</th><th scope="col">@L["SHA-256"]</th><th scope="col">@L["Loaded"]</th></tr></thead>
+    <tbody>
+    @foreach (var s in b.Sources) { <tr><th scope="row">@s.Role</th><td>@s.FileName @if (s.Note is { Length: > 0 }) { <span class="hint">(@s.Note)</span> } @if (s.Delimiter is not null) { <span class="hint">@s.Encoding, @L["delimiter"] @s.Delimiter</span> }</td><td>@s.RowCount</td><td><code>@s.Sha256[..16]…</code></td><td>@Model.When(s.UploadedUtc) @L["by"] @s.UploadedBy</td></tr> }
+    @if (b.Sources.Count == 0) { <tr><td colspan="5">@L["No files loaded yet."]</td></tr> }
+    </tbody>
+</table></div>
+@foreach (var n in b.Sources.SelectMany(s => s.Notices)) { <p class="hint">@n</p> }
+@if (can.CanStage)
+{
+    <div class="grid">
+    <form method="post" asp-page-handler="UploadContracts" enctype="multipart/form-data" class="card">
+        <h3>@L["Contracts file"]</h3>
+        <div class="field"><label for="contractsFile">@L["CSV or Excel (.xlsx) file"]</label><input id="contractsFile" name="file" type="file" accept=".csv,.xlsx" required /></div>
+        <details><summary>@L["Reading options"]</summary>
+            <div class="field"><label for="d1">@L["Delimiter"]</label><select id="d1" name="Delimiter"><option value="">@L["Detect"]</option><option value="comma">@L["Comma"]</option><option value="semicolon">@L["Semicolon"]</option><option value="tab">@L["Tab"]</option><option value="pipe">@L["Pipe"]</option></select></div>
+            <div class="field"><label for="e1">@L["Text encoding"]</label><select id="e1" name="Encoding"><option value="">@L["Detect (UTF-8 or UTF-16)"]</option><option value="windows-1252">@L["Windows-1252 (confirm that the file uses it)"]</option></select></div>
+            <div class="field"><label for="s1">@L["Excel sheet (blank for the first visible sheet)"]</label><input id="s1" name="Sheet" type="text" /></div>
+        </details>
+        <button type="submit">@(contracts is null ? L["Load contracts file"].Value : L["Replace contracts file"].Value)</button>
+    </form>
+    <form method="post" asp-page-handler="UploadManifest" enctype="multipart/form-data" class="card">
+        <h3>@L["Attachment manifest"]</h3>
+        <p class="hint">@L["Optional if the ZIP contains attachment-manifest.csv at its root."]</p>
+        <div class="field"><label for="manifestFile">@L["CSV or Excel (.xlsx) file"]</label><input id="manifestFile" name="file" type="file" accept=".csv,.xlsx" required /></div>
+        <button type="submit">@(manifest is null ? L["Load manifest"].Value : L["Replace manifest"].Value)</button>
+    </form>
+    <form method="post" asp-page-handler="UploadArchive" enctype="multipart/form-data" class="card">
+        <h3>@L["Attachment archive (ZIP)"]</h3>
+        <p class="hint">@L["Every entry is checked for unsafe paths, size, type, content and malware before it is held. Nothing is extracted to disk."]</p>
+        <div class="field"><label for="archiveFile">@L["ZIP file"]</label><input id="archiveFile" name="file" type="file" accept=".zip" required /></div>
+        <button type="submit">@(archive is null ? L["Load archive"].Value : L["Replace archive"].Value)</button>
+    </form>
+    </div>
+}
+</section>
+
+<section id="profile" aria-labelledby="h-profile">
+<h2 id="h-profile">2. @L["Mapping profile and duplicate options"]</h2>
+<dl class="facts card">
+    <dt>@L["Mapping profile"]</dt><dd>@(b.ProfileName is null ? L["None chosen"].Value : $"{b.ProfileName}, version {b.ProfileVersionNumber}")</dd>
+    <dt>@L["Configuration release"]</dt><dd>@(b.ConfigReleaseNumber is { } r ? $"{r} (captured with the batch)" : L["No configuration published yet"].Value)</dd>
+    <dt>@L["Reference policy"]</dt><dd>@(b.ReferencePolicy == ReferencePolicy.KeepSource ? L["Keep the source reference where it is free"].Value : L["Generate a new reference"].Value)</dd>
+    <dt>@L["Duplicate strategy"]</dt><dd>@Ecp.Host.Pages.Migration.MigrationPageModel.Label(b.DuplicateStrategy)</dd>
+    <dt>@L["Document duplicates"]</dt><dd>@Ecp.Host.Pages.Migration.MigrationPageModel.Label(b.DocumentOption)</dd>
+</dl>
+@if (can.CanStage)
+{
+    <form method="post" asp-page-handler="SelectProfile" class="card">
+        <div class="field"><label for="ProfileVersionId">@L["Choose a published profile version"]</label>
+            <select id="ProfileVersionId" name="ProfileVersionId">@foreach (var c in Model.ProfileChoices) { <option value="@c.VersionId" selected="@(c.VersionId == b.ProfileVersionId)">@c.Label</option> }</select></div>
+        <button type="submit" class="secondary">@L["Use this version"]</button> <a href="/Migration/Profiles">@L["Manage mapping profiles"]</a>
+    </form>
+    <form method="post" asp-page-handler="Strategies" class="card">
+        <div class="field"><label for="Strategy">@L["When a source record was loaded before, or its reference is in use"]</label>
+            <select id="Strategy" name="Strategy">@foreach (var s in Ecp.Host.Pages.Migration.MigrationPageModel.Strategies) { <option value="@s.Value" selected="@(s.Value == Model.Strategy)">@s.Label</option> }</select></div>
+        <div class="field"><label for="DocumentOption">@L["When a document's content is already in the platform"]</label>
+            <select id="DocumentOption" name="DocumentOption">@foreach (var o in Ecp.Host.Pages.Migration.MigrationPageModel.DocumentOptions) { <option value="@o.Value" selected="@(o.Value == Model.DocumentOption)">@o.Label</option> }</select></div>
+        <button type="submit" class="secondary">@L["Save"]</button>
+    </form>
+}
+</section>
+
+<section id="dryrun" aria-labelledby="h-dryrun">
+<h2 id="h-dryrun">3. @L["Dry run"]</h2>
+<p class="hint">@L["Reads the staged files, maps and checks every row, resolves suppliers and categories, applies the duplicate rules and the legacy-load policy, and matches attachments. It writes nothing to the platform's records, sends no notifications and creates no reminders. You can run it as often as you like."]</p>
+@if (can.CanValidate)
+{
+    <form method="post" asp-page-handler="Validate"><button type="submit">@(v is null ? L["Run the dry run"].Value : L["Run the dry run again"].Value)</button></form>
+}
+@if (v is not null)
+{
+    <div class="grid">
+        <div class="card"><span class="stat">@v.Rows</span>@L["source rows"]</div>
+        <div class="card"><span class="stat">@v.Accepted</span>@L["would load"] (@v.ToCreate @L["new"], @v.ToUpdate @L["updated"])</div>
+        <div class="card"><span class="stat">@v.Rejected</span>@L["rejected with errors"]</div>
+        <div class="card"><span class="stat">@v.Skipped</span>@L["skipped"]</div>
+        <div class="card"><span class="stat">@v.ReviewRequired</span>@L["waiting for a decision"]</div>
+        <div class="card"><span class="stat">@v.SuppliersToCreate</span>@L["suppliers to create"] (@v.SuppliersToLink @L["existing linked"])</div>
+        <div class="card"><span class="stat">@v.CategoriesToCreate</span>@L["categories to create"] (@v.CategoriesToLink @L["existing linked"])</div>
+        <div class="card"><span class="stat">@v.DocumentsToImport</span>@L["documents to import"] (@v.FilesMatched @L["matched"], @v.FilesUnmatched @L["unmatched"], @v.FilesInvalid @L["invalid"], @v.FilesDuplicate @L["duplicates"])</div>
+    </div>
+    @if (v.ManifestRows > 0) { <p>@L["Manifest"]: @v.ManifestRows @L["rows"]; @v.ManifestPaired @L["paired with a file"], @v.ManifestOrphans @L["name a file that is not there"], @v.ManifestInvalid @L["invalid"].</p> }
+
+    <h3>@L["What each mapping does"]</h3>
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Mapping effect"]</caption>
+        <thead><tr><th scope="col">@L["Source column"]</th><th scope="col">@L["Target field"]</th><th scope="col">@L["Transformation"]</th><th scope="col">@L["Rows"]</th><th scope="col">@L["Changed"]</th><th scope="col">@L["Default used"]</th><th scope="col">@L["Problems"]</th></tr></thead>
+        <tbody>@foreach (var m in v.Mapping) { <tr><th scope="row">@m.SourceColumn</th><td>@m.TargetField</td><td>@m.Transformation</td><td>@m.Rows</td><td>@m.Changed</td><td>@m.Defaulted</td><td>@m.Errors</td></tr> }</tbody>
+    </table></div>
+    @if (v.Sample.Count > 0)
+    {
+        <h3>@L["Sample of original and transformed values"]</h3>
+        @foreach (var row in v.Sample.Take(3))
+        {
+            <details class="card"><summary>@L["Row"] @row.RowNumber: @row.Outcome @if (row.Summary.Length > 0) { <span>- @row.Summary</span> }</summary>
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Row"] @row.RowNumber</caption>
+                <thead><tr><th scope="col">@L["Field"]</th><th scope="col">@L["Original"]</th><th scope="col">@L["Becomes"]</th></tr></thead>
+                <tbody>@foreach (var val in row.Values) { <tr><th scope="row">@val.TargetField</th><td>@val.Original</td><td>@val.Transformed @if (val.Failed) { <span class="badge bad">@L["problem"]</span> } else if (val.Changed) { <span class="badge">@L["changed"]</span> }</td></tr> }</tbody>
+            </table></div></details>
+        }
+    }
+}
+</section>
+
+<section id="review" aria-labelledby="h-review">
+<h2 id="h-review">4. @L["Review"]</h2>
+<ul class="actions">
+    <li><a class="button secondary" href="/Migration/Batches/@b.Id/Messages">@L["Errors and warnings"] (@b.Counts.Errors / @b.Counts.Warnings)</a></li>
+    <li><a class="button secondary" href="/Migration/Batches/@b.Id/Rows">@L["Source rows"] (@b.Counts.Rows)@if (b.Counts.ReviewRequired > 0) { <span class="badge bad">@b.Counts.ReviewRequired @L["need a decision"]</span> }</a></li>
+    <li><a class="button secondary" href="/Migration/Batches/@b.Id/Files">@L["Attachments and the unmatched queue"] (@b.Counts.Files)@if (b.Counts.FilesUnmatched > 0) { <span class="badge warn">@b.Counts.FilesUnmatched @L["unmatched"]</span> }</a></li>
+    <li><a class="button secondary" href="/Migration/Batches/@b.Id/Provenance">@L["Provenance"]</a></li>
+    <li><a class="button secondary" href="/Migration/Batches/@b.Id?handler=ErrorsXlsx">@L["Download the error report (Excel)"]</a></li>
+    <li><a class="button secondary" href="/Migration/Batches/@b.Id?handler=ErrorsCsv">@L["Download the error report (CSV)"]</a></li>
+</ul>
+</section>
+
+<section id="commit" aria-labelledby="h-commit">
+<h2 id="h-commit">5. @L["Confirm and commit"]</h2>
+@if (b.Kind == BatchKind.DryRun)
+{
+    <p class="card">@L["This batch is a dry run, so it never commits. Create a mock or final batch from the project to load the data."]</p>
+}
+else
+{
+    <p class="hint">@L["Committing writes suppliers, contracts and documents in stages of up to 500 items. Each stage is saved together with a checkpoint, so a stopped commit carries on from where it stopped and never creates a record or a file twice. Every record and audit entry carries this batch's identifier."]</p>
+    @if (b.IsLegacyLoad)
+    {
+        <p class="card">@if (b.ConfirmationCurrent) { <span class="badge ok">@L["Confirmed"]</span> <span>@L["by"] @b.ConfirmedBy @L["on"] @Model.When(b.ConfirmedUtc)</span> } else { <span class="badge warn">@L["Not confirmed"]</span> <span>@L["A second person with the legacy-load permission must confirm exactly what was validated. The person who confirms cannot also commit."]</span> }</p>
+        @if (can.CanConfirm) { <form method="post" asp-page-handler="Confirm"><button type="submit" class="secondary">@L["Confirm this legacy load"]</button></form> }
+    }
+    @if (b.Status is BatchStatus.Committing or BatchStatus.Failed or BatchStatus.Committed or BatchStatus.Reconciled or BatchStatus.Accepted)
+    {
+        <div class="table-wrap"><table>
+            <caption>@L["Progress"]</caption>
+            <thead><tr><th scope="col">@L["Stage"]</th><th scope="col">@L["Last completed"]</th><th scope="col">@L["Done"]</th><th scope="col">@L["Updated"]</th></tr></thead>
+            <tbody>@foreach (var c in b.Checkpoints) { <tr><th scope="row">@c.Phase</th><td>@c.LastCompletedSequence</td><td>@(c.Complete ? L["Yes"].Value : L["No"].Value)</td><td>@Model.When(c.UpdatedUtc)</td></tr> }</tbody>
+        </table></div>
+        <p>@L["Started"] @Model.When(b.CommitStartedUtc) @L["by"] @b.CommittedBy. @if (b.CommitCompletedUtc is not null) { <span>@L["Finished"] @Model.When(b.CommitCompletedUtc).</span> }</p>
+    }
+    @if (can.CanCommit)
+    {
+        <form method="post" asp-page-handler="Commit">
+            <p>@(b.Counts.Rejected + b.Counts.Skipped > 0 ? $"{b.Counts.Rejected} rejected and {b.Counts.Skipped} skipped rows will not be loaded. " : "")@(b.Counts.FilesUnmatched > 0 ? $"{b.Counts.FilesUnmatched} unmatched files will stay in the queue. " : "")</p>
+            <button type="submit">@(b.Status is BatchStatus.Failed or BatchStatus.Committing ? L["Resume the commit"].Value : L["Commit this batch"].Value)</button>
+        </form>
+    }
+    else if (b.Status == BatchStatus.Validated) { <p class="hint">@L["The commit is not available yet: the batch must be validated, nothing may be waiting for a decision, and a legacy load must be confirmed by a second person."]</p> }
+}
+</section>
+
+<section id="reconcile" aria-labelledby="h-reconcile">
+<h2 id="h-reconcile">6. @L["Reconcile"]</h2>
+@if (Model.Reconciliation is { } rec)
+{
+    <p><span class="badge @(rec.Balanced ? "ok" : "bad")">@(rec.Balanced ? L["Balanced"].Value : L["Does not balance"].Value)</span>
+       @L["Source"] @rec.Totals.SourceRows = @L["accepted"] @rec.Totals.Accepted + @L["rejected"] @rec.Totals.Rejected + @L["skipped"] @rec.Totals.Skipped; @L["accepted"] = @L["created"] @rec.Totals.Created + @L["updated"] @rec.Totals.Updated.</p>
+    @foreach (var i in rec.Imbalances) { <p class="error">@i</p> }
+    <p><a class="button secondary" href="/Migration/Batches/@b.Id/Reconciliation">@L["Open the reconciliation report"]</a></p>
+    @if (can.CanReconcile)
+    {
+        <form method="post" asp-page-handler="Reconcile" class="card">
+            <button type="submit">@L["Save the reconciliation"]</button>
+            @if (!rec.Balanced && can.CanApproveExceptions)
+            {
+                <div class="field"><label for="Note">@L["Reason for approving these exceptions (recorded)"]</label><input id="Note" name="Note" type="text" maxlength="2000" /></div>
+                <div class="check field"><input id="ApproveExceptions" name="ApproveExceptions" type="checkbox" value="true" /><label for="ApproveExceptions">@L["I approve the exceptions listed and accept that the batch is reconciled with them"]</label></div>
+            }
+        </form>
+    }
+}
+else { <p class="hint">@L["Available once the batch has been committed."]</p> }
+</section>
+
+<section id="accept" aria-labelledby="h-accept">
+<h2 id="h-accept">7. @L["Business acceptance"]</h2>
+@if (b.Status == BatchStatus.Accepted)
+{
+    <p class="card"><span class="badge ok">@L["Accepted"]</span> @L["by"] @b.AcceptedBy @L["on"] @Model.When(b.AcceptedUtc). @b.AcceptanceNote</p>
+}
+else if (can.CanAccept)
+{
+    <form method="post" asp-page-handler="Accept" class="card">
+        <p class="hint">@L["Accepting finalises the batch. After this it can no longer be rolled back; only compensating archival is possible."]</p>
+        <div class="field"><label for="AcceptNote">@L["What the business owner checked (recorded)"]</label><textarea id="AcceptNote" name="Note" rows="3" maxlength="2000" required></textarea></div>
+        <div class="check field"><input id="Acknowledge" name="Acknowledge" type="checkbox" value="true" /><label for="Acknowledge">@L["I accept any rejected rows and unresolved files as exceptions"]</label></div>
+        <button type="submit">@L["Accept this batch"]</button>
+    </form>
+}
+else { <p class="hint">@L["Available once the batch is reconciled, to someone who may record acceptance."]</p> }
+</section>
+
+<section id="rollback" aria-labelledby="h-rollback">
+<h2 id="h-rollback">8. @L["Roll back or compensate"]</h2>
+@if (b.Status is BatchStatus.RolledBack or BatchStatus.Compensated)
+{
+    <p class="card"><span class="badge warn">@Lab(b.Status)</span> @L["by"] @b.RolledBackBy @L["on"] @Model.When(b.RolledBackUtc): @b.RollbackReason</p>
+}
+@if (can.CanRollBack && Model.Preview is { } pv)
+{
+    <div class="card">
+        <h3>@L["What a rollback would do"]</h3>
+        @if (!pv.Allowed) { <p>@pv.BlockedReason</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Rollback preview"]</caption>
+                <thead><tr><th scope="col">@L["Records"]</th><th scope="col">@L["Action"]</th><th scope="col">@L["Count"]</th><th scope="col">@L["Why"]</th></tr></thead>
+                <tbody>@foreach (var line in pv.Lines) { <tr><th scope="row">@line.Entity</th><td>@line.Action</td><td>@line.Count</td><td>@line.Detail</td></tr> }
+                @if (pv.Lines.Count == 0) { <tr><td colspan="4">@L["Nothing to roll back."]</td></tr> }</tbody>
+            </table></div>
+            <p class="hint">@L["Only what this batch created or updated is touched. Records that were there before, and other batches, are never changed."]</p>
+        }
+        <form method="post" asp-page-handler="Rollback">
+            <div class="field"><label for="Reason">@L["Reason (recorded)"]</label><input id="Reason" name="Reason" type="text" maxlength="1000" required /></div>
+            <button type="submit" class="danger">@L["Roll back this batch"]</button>
+        </form>
+    </div>
+}
+@if (can.CanCompensate)
+{
+    <form method="post" asp-page-handler="Compensate" class="card">
+        <h3>@L["Compensating archival"]</h3>
+        <p class="hint">@L["The only way back after acceptance. Nothing is deleted: the batch's contracts and documents are archived with the reason and the batch identifier, and shared suppliers and categories are kept."]</p>
+        <div class="field"><label for="Reason2">@L["Reason (recorded)"]</label><input id="Reason2" name="Reason" type="text" maxlength="1000" required /></div>
+        <button type="submit" class="danger">@L["Archive this batch's records"]</button>
+    </form>
+}
+@if (terminal)
+{
+    <form method="post" asp-page-handler="Purge" class="card">
+        <p class="hint">@L["Deletes the restricted staging copies of files that were never imported. Files in the unmatched queue are kept until someone resolves or discards them."]</p>
+        <button type="submit" class="secondary">@L["Delete unneeded staged copies"]</button>
+    </form>
+}
+</section>

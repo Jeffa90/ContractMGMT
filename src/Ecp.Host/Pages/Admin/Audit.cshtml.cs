@@ -14,6 +14,7 @@ public sealed class AuditModel(IAuditBrowser audit, IAccessService access, Local
     [BindProperty(SupportsGet = true)] public string? Action { get; set; }
     [BindProperty(SupportsGet = true)] public string? EntityType { get; set; }
     [BindProperty(SupportsGet = true)] public string? Actor { get; set; }
+    [BindProperty(SupportsGet = true)] public Guid? Batch { get; set; }
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
     public PagedResult<AuditEventDto> Result { get; private set; } = new([], 0, 1, 50);
     public bool CanExport { get; private set; }
@@ -34,10 +35,10 @@ public sealed class AuditModel(IAuditBrowser audit, IAccessService access, Local
         return File(Encoding.UTF8.GetBytes(json), "application/json", $"audit-evidence-{evidence.ExportedUtc:yyyyMMddTHHmmssZ}.json");
     });
 
-    private AuditFilter Filter() => new(Action, EntityType, Actor, Page: Math.Max(1, PageNumber));
+    private AuditFilter Filter() => new(Action, EntityType, Actor, Page: Math.Max(1, PageNumber), MigrationBatchId: Batch);
     public string When(DateTime utc) => _fmt.DateTime(utc);
 
     public string PageLink(int page)
-        => "/Admin/Audit?" + string.Join("&", new[] { ("action", Action), ("entityType", EntityType), ("actor", Actor), ("pageNumber", page.ToString()) }
+        => "/Admin/Audit?" + string.Join("&", new[] { ("action", Action), ("entityType", EntityType), ("actor", Actor), ("batch", Batch?.ToString()), ("pageNumber", page.ToString()) }
             .Where(p => !string.IsNullOrEmpty(p.Item2)).Select(p => $"{p.Item1}={Uri.EscapeDataString(p.Item2!)}"));
 }

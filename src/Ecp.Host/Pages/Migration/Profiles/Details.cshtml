@@ -1,0 +1,107 @@
+@page "/Migration/Profiles/{id:guid}"
+@model Ecp.Host.Pages.Migration.Profiles.DetailsModel
+@using Ecp.DataMigration.Domain
+@{ ViewData["Title"] = Model.Profile.Profile.Name; var pr = Model.Profile.Profile; var v = Model.Version; var isDraft = v?.Version.Status == ProfileVersionStatus.Draft; }
+<p><a href="/Migration/Profiles">&larr; @L["Mapping profiles"]</a></p>
+<h1>@pr.Name</h1>
+<p>@pr.SourceSystem @pr.SourceSystemVersion</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+<h2>@L["Versions"]</h2>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Versions"]</caption>
+    <thead><tr><th scope="col">@L["Version"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Field mappings"]</th><th scope="col">@L["Lookup entries"]</th><th scope="col">@L["Created"]</th><th scope="col">@L["Published"]</th></tr></thead>
+    <tbody>
+    @foreach (var ver in Model.Profile.Versions)
+    {
+        <tr>
+            <th scope="row"><a href="/Migration/Profiles/@pr.Id?versionId=@ver.Id" aria-current="@(ver.Id == v?.Version.Id ? "true" : null)">@ver.VersionNumber</a></th>
+            <td><span class="badge @(ver.Status == ProfileVersionStatus.Published ? "ok" : "warn")">@ver.Status</span></td><td>@ver.FieldMappings</td><td>@ver.LookupEntries</td>
+            <td>@ver.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td><td>@(ver.PublishedUtc is { } pu ? pu.ToString("yyyy-MM-dd HH:mm") + " UTC by " + ver.PublishedBy : "-")</td>
+        </tr>
+    }
+    </tbody>
+</table>
+</div>
+@if (!Model.Profile.Versions.Any(x => x.Status == ProfileVersionStatus.Draft))
+{
+    <form method="post" asp-page-handler="OpenDraft"><button type="submit">@L["Start a new draft from the latest version"]</button></form>
+}
+
+@if (v is not null)
+{
+    <h2>@L["Version"] @v.Version.VersionNumber @(isDraft ? L["(draft)"].Value : L["(published, unchangeable)"].Value)</h2>
+    @if (v.Issues.Count > 0)
+    {
+        <div class="card" role="status"><h3>@L["Checks"]</h3>
+            <ul>@foreach (var issue in v.Issues) { <li><span class="badge @(issue.IsError ? "bad" : "warn")">@(issue.IsError ? L["Fix"].Value : L["Note"].Value)</span> <strong>@issue.Field</strong> @issue.Message</li> }</ul></div>
+    }
+    else { <p><span class="badge ok">@L["All checks pass"]</span></p> }
+
+    @if (isDraft)
+    {
+        <div class="card">
+            <h3>@L["Load the field mappings"]</h3>
+            <p class="hint">@L["A CSV with the columns SourceColumn, TargetField, Transformation, DefaultValue, Required, LookupMapKey, Validation, Notes. Loading replaces the mappings in this draft."]</p>
+            <form method="post" asp-page-handler="Fields" enctype="multipart/form-data">
+                <input type="hidden" name="VersionId" value="@v.Version.Id" />
+                <div class="field"><label for="fieldsFile">@L["Field mapping file (.csv)"]</label><input id="fieldsFile" name="file" type="file" accept=".csv" required /></div>
+                <button type="submit">@L["Load field mappings"]</button>
+            </form>
+        </div>
+        <div class="card">
+            <h3>@L["Load the lookups"]</h3>
+            <p class="hint">@L["A CSV with the columns LookupMapKey, SourceValue, TargetCode, Notes. Loading replaces the lookups in this draft."]</p>
+            <form method="post" asp-page-handler="Lookups" enctype="multipart/form-data">
+                <input type="hidden" name="VersionId" value="@v.Version.Id" />
+                <div class="field"><label for="lookupsFile">@L["Lookup file (.csv)"]</label><input id="lookupsFile" name="file" type="file" accept=".csv" required /></div>
+                <button type="submit">@L["Load lookups"]</button>
+            </form>
+        </div>
+        <form method="post" asp-page-handler="Options" class="card">
+            <h3>@L["Options"]</h3>
+            <input type="hidden" name="VersionId" value="@v.Version.Id" />
+            <div class="check field"><input id="CreateMissingCategories" name="CreateMissingCategories" type="checkbox" value="true" checked="@Model.CreateMissingCategories" /><label for="CreateMissingCategories">@L["Create categories that do not exist yet (otherwise an unknown category is an error)"]</label></div>
+            <div class="field"><label for="OpenEndedTypes">@L["Extension types that legitimately have no end date (comma separated)"]</label><input id="OpenEndedTypes" name="OpenEndedTypes" type="text" value="@Model.OpenEndedTypes" /></div>
+            <div class="field"><label for="NamingRule">@L["Attachment naming rule (optional pattern)"]</label><input id="NamingRule" name="NamingRule" type="text" value="@Model.NamingRule" maxlength="300" aria-describedby="rule-hint" />
+                <p class="hint" id="rule-hint">@L["A pattern with a group called agreementReference or sourceRecordId, applied to each file's path when the manifest does not say which contract it belongs to. It runs on a safe engine with a time limit."]</p></div>
+            <button type="submit">@L["Save options"]</button>
+        </form>
+        <form method="post" asp-page-handler="Publish" class="card">
+            <h3>@L["Publish this version"]</h3>
+            <input type="hidden" name="VersionId" value="@v.Version.Id" />
+            <div class="field"><label for="PublishNote">@L["Note (optional)"]</label><input id="PublishNote" name="PublishNote" type="text" maxlength="1000" /></div>
+            <button type="submit" disabled="@(v.Issues.Any(i => i.IsError))">@L["Publish"]</button>
+            @if (v.Issues.Any(i => i.IsError)) { <p class="hint">@L["Fix the problems listed above first."]</p> }
+        </form>
+    }
+
+    <h3>@L["Field mappings"]</h3>
+    <div class="actions"><a class="button secondary" href="/Migration/Profiles/@pr.Id?handler=ExportFields&amp;versionId=@v.Version.Id">@L["Download as CSV"]</a></div>
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Field mappings"]</caption>
+        <thead><tr><th scope="col">@L["Source column"]</th><th scope="col">@L["Target field"]</th><th scope="col">@L["Transformation"]</th><th scope="col">@L["Default"]</th><th scope="col">@L["Required"]</th><th scope="col">@L["Lookup"]</th><th scope="col">@L["Parameters and checks"]</th></tr></thead>
+        <tbody>
+        @foreach (var f in v.Definition.Fields)
+        {
+            <tr><th scope="row">@f.SourceColumn</th><td>@f.TargetField</td><td>@f.Transformation</td><td>@f.DefaultValue</td><td>@(f.Required ? L["Yes"].Value : L["No"].Value)</td><td>@f.LookupMapKey</td><td>@f.Validation</td></tr>
+        }
+        @if (v.Definition.Fields.Count == 0) { <tr><td colspan="7">@L["No field mappings yet."]</td></tr> }
+        </tbody>
+    </table>
+    </div>
+    <h3>@L["Lookups"]</h3>
+    <div class="actions"><a class="button secondary" href="/Migration/Profiles/@pr.Id?handler=ExportLookups&amp;versionId=@v.Version.Id">@L["Download as CSV"]</a></div>
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Lookups"]</caption>
+        <thead><tr><th scope="col">@L["Lookup"]</th><th scope="col">@L["Source value"]</th><th scope="col">@L["Becomes"]</th><th scope="col">@L["Notes"]</th></tr></thead>
+        <tbody>
+        @foreach (var l in v.Definition.Lookups) { <tr><th scope="row">@l.LookupMapKey</th><td>@l.SourceValue</td><td>@l.TargetCode</td><td>@l.Notes</td></tr> }
+        @if (v.Definition.Lookups.Count == 0) { <tr><td colspan="4">@L["No lookup entries yet."]</td></tr> }
+        </tbody>
+    </table>
+    </div>
+}

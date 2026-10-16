@@ -70,6 +70,20 @@
       ]
     },
     {
+      "email": "procadmin2@a.example.test",
+      "tenant": "tenant-a",
+      "roles": [
+        {
+          "role": "Procurement Administrator",
+          "scopeLevel": "Organisation",
+          "organisations": [
+            "org-a1"
+          ],
+          "classificationCeiling": "Confidential"
+        }
+      ]
+    },
+    {
       "email": "procadmin@a.example.test",
       "tenant": "tenant-a",
       "roles": [

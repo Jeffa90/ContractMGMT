@@ -12,6 +12,8 @@ namespace Ecp.DataMigration;
 public interface IMigrationProjects
 {
     Task<IReadOnlyList<ProjectSummary>> ListAsync(CancellationToken ct = default);
+    /// <summary>The organisations the caller may stage migrations for (those their migration.stage permission covers).</summary>
+    Task<IReadOnlyList<OrganisationOption>> ListOrganisationsAsync(CancellationToken ct = default);
     Task<ProjectDetail> GetAsync(Guid projectId, CancellationToken ct = default);
     Task<Guid> CreateAsync(CreateProjectInput input, CancellationToken ct = default);
     Task SetReferencePolicyAsync(Guid projectId, ReferencePolicy policy, CancellationToken ct = default);
@@ -23,8 +25,17 @@ public interface IMigrationProjects
     Task CloseProjectAsync(Guid projectId, CancellationToken ct = default);
 }
 
-internal sealed class MigrationProjectService(MigrationKernel k, ITenantDirectory tenants) : IMigrationProjects
+internal sealed class MigrationProjectService(MigrationKernel k, ITenantDirectory tenants, IOrganisationStructureService structure) : IMigrationProjects
 {
+    public async Task<IReadOnlyList<OrganisationOption>> ListOrganisationsAsync(CancellationToken ct = default)
+    {
+        var grants = await k.Access.GrantsAsync(MigrationPermissions.Stage, ct);
+        if (grants.Count == 0) return [];
+        var all = grants.Any(g => g.OrganisationIds is null);
+        var allowed = all ? null : grants.SelectMany(g => g.OrganisationIds!).ToHashSet();
+        return (await structure.ListOrganisationsAsync(ct)).Where(o => allowed == null || allowed.Contains(o.Id)).Select(o => new OrganisationOption(o.Id, o.Name)).ToList();
+    }
+
     public async Task<IReadOnlyList<ProjectSummary>> ListAsync(CancellationToken ct = default)
     {
         var grants = await k.Access.GrantsAsync(MigrationPermissions.Stage, ct);
@@ -42,7 +53,8 @@ internal sealed class MigrationProjectService(MigrationKernel k, ITenantDirector
             .Select(b => new BatchSummary(b.Id, b.ProjectId, b.Name, b.Kind, b.Status, b.IsLegacyLoad, b.DuplicateStrategy, b.CreatedBy, b.CreatedUtc, b.SourceRows, b.Created, b.Updated, b.Rejected, b.Skipped)).ToListAsync(ct);
         return new ProjectDetail(p.Id, p.OrganisationId, p.Name, p.SourceSystem, p.SourceSystemVersion, p.DataOwner, p.ExtractionUtc, p.FreezeStartUtc, p.FreezeEndUtc, p.TargetFreezeEnabled,
             p.LegacyLoadEnabled, p.LegacyAllowRegisteredDateImport, p.LegacyPolicyExpiresUtc, p.LegacyAllowedStatuses, p.LegacyAllowOverwriteLocked, p.LegacyOverwriteReason, p.ReferencePolicy,
-            p.Status, p.CreatedBy, p.CreatedUtc, batches);
+            p.Status, p.CreatedBy, p.CreatedUtc, batches,
+            new ProjectCapabilities(p.Status == ProjectStatus.Active, await k.HoldsAsync(MigrationPermissions.LegacyLoad, p, ct), await k.HoldsAsync(MigrationPermissions.Commit, p, ct), await k.HoldsAsync(MigrationPermissions.Accept, p, ct)));
     }
 
     public async Task<Guid> CreateAsync(CreateProjectInput r, CancellationToken ct = default)

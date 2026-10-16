@@ -21,6 +21,7 @@
         if (await Can("users.manage")) items.Add(("/Admin/Users", L["Users and roles"].Value, "/Admin/Users"));
         if (await Can("audit.read", "audit.read_admin")) items.Add(("/Admin/Audit", L["Audit events"].Value, "/Admin/Audit"));
         if (await Can("onboarding.run")) items.Add(("/Onboarding", L["Organisation onboarding"].Value, "/Onboarding"));
+        if (await Can("migration.stage")) items.Add(("/Migration", L["Data migration"].Value, "/Migration"));
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
         if (await Can("setup.run")) items.Add(("/Admin/Setup", L["Installation setup"].Value, "/Admin/Setup"));
     }

@@ -1,0 +1,50 @@
+@page "/Migration/Batches/{id:guid}/Rows"
+@model Ecp.Host.Pages.Migration.RowsModel
+@using Ecp.DataMigration.Domain
+@{ ViewData["Title"] = L["Source rows"].Value; }
+<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the batch"]</a></p>
+<h1>@L["Source rows"]</h1>
+<p class="lede">@L["Every row of the contracts file, with its original values and what the dry run decided to do with it. Rejected rows are never loaded."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<form method="get" class="card">
+    <div class="field"><label for="outcome">@L["Outcome"]</label>
+        <select id="outcome" name="outcome"><option value="">@L["All"]</option>@foreach (var o in Enum.GetValues<RowOutcome>()) { <option value="@o" selected="@(Model.Outcome == o)">@o</option> }</select></div>
+    <div class="check field"><input id="reviewOnly" name="reviewOnly" type="checkbox" value="true" checked="@Model.ReviewOnly" /><label for="reviewOnly">@L["Only rows that need a decision"]</label></div>
+    <div class="actions"><button type="submit">@L["Filter"]</button></div>
+</form>
+<p role="status">@Model.Result.Total @L["row(s)"]</p>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Rows"]</caption>
+    <thead><tr><th scope="col">@L["Row"]</th><th scope="col">@L["Source record"]</th><th scope="col">@L["Agreement reference"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["What will happen"]</th><th scope="col">@L["Problems"]</th><th scope="col">@L["Decision"]</th></tr></thead>
+    <tbody>
+    @foreach (var r in Model.Result.Items)
+    {
+        <tr>
+            <th scope="row">@r.RowNumber</th><td>@r.SourceRecordId</td><td>@r.AgreementReference</td>
+            <td><span class="badge @(r.Outcome is RowOutcome.Rejected ? "bad" : r.Outcome is RowOutcome.Created or RowOutcome.Updated or RowOutcome.Accepted ? "ok" : "")">@r.Outcome</span></td>
+            <td>@r.PlanSummary</td><td>@r.Errors @L["errors"], @r.Warnings @L["warnings"]</td>
+            <td>
+            @if (r.Review == ReviewDecision.Required && Model.Can.CanStage)
+            {
+                <form method="post" asp-page-handler="Decide">
+                    <input type="hidden" name="RowId" value="@r.Id" />
+                    <label class="visually-hidden" for="d-@r.Id">@L["Decision for row"] @r.RowNumber</label>
+                    <select id="d-@r.Id" name="Decision"><option value="Skip">@L["Skip"]</option><option value="Update">@L["Update the existing record"]</option><option value="CreateNew">@L["Create with a new reference"]</option><option value="Reject">@L["Reject"]</option></select>
+                    <button type="submit" class="secondary">@L["Decide"]</button>
+                </form>
+            }
+            else if (r.Review != ReviewDecision.None) { <span>@r.Review</span> }
+            </td>
+        </tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="7">@L["No rows."]</td></tr> }
+    </tbody>
+</table></div>
+@if (Model.Result.PageCount > 1)
+{
+    <nav class="pager" aria-label="@L["Pages"]">
+        @if (Model.Result.Page > 1) { <a href="@Model.PageLink(Model.Result.Page - 1)">@L["Previous"]</a> }
+        <span>@L["Page"] @Model.Result.Page @L["of"] @Model.Result.PageCount</span>
+        @if (Model.Result.Page < Model.Result.PageCount) { <a href="@Model.PageLink(Model.Result.Page + 1)">@L["Next"]</a> }
+    </nav>
+}

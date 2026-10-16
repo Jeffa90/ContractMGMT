@@ -1,0 +1,30 @@
+@page "/Migration/Batches/{id:guid}/Provenance"
+@model Ecp.Host.Pages.Migration.ProvenanceModel
+@{ ViewData["Title"] = L["Provenance"].Value; }
+<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the batch"]</a></p>
+<h1>@L["Provenance"]</h1>
+<p class="lede">@L["What this batch created, updated or linked, and the source record each came from. Rollback uses only this list, so records that were there before, or that belong to another batch, are never touched."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<p><a class="button secondary" href="/Migration/Batches/@Model.BatchId/Provenance?handler=Export">@L["Download Excel"]</a></p>
+<p role="status">@Model.Result.Total @L["record(s)"]</p>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Provenance"]</caption>
+    <thead><tr><th scope="col">@L["Record type"]</th><th scope="col">@L["Action"]</th><th scope="col">@L["Source system"]</th><th scope="col">@L["Source record"]</th><th scope="col">@L["SHA-256"]</th><th scope="col">@L["Rollback"]</th></tr></thead>
+    <tbody>
+    @foreach (var p in Model.Result.Items)
+    {
+        <tr>
+            <th scope="row">@(p.EntityType == "Contract" ? Html.Raw($"<a href=\"/Contracts/Details/{p.EntityId}\">Contract</a>") : Html.Raw(p.EntityType))</th>
+            <td>@p.Action</td><td>@p.SourceSystem</td><td>@p.SourceRecordId</td><td>@(p.Sha256 is null ? "" : p.Sha256[..12] + "…")</td><td>@p.ReversalState @p.ReversalNote</td>
+        </tr>
+    }
+    </tbody>
+</table></div>
+@if (Model.Result.PageCount > 1)
+{
+    <nav class="pager" aria-label="@L["Pages"]">
+        @if (Model.Result.Page > 1) { <a href="/Migration/Batches/@Model.BatchId/Provenance?pageNumber=@(Model.Result.Page - 1)">@L["Previous"]</a> }
+        <span>@L["Page"] @Model.Result.Page @L["of"] @Model.Result.PageCount</span>
+        @if (Model.Result.Page < Model.Result.PageCount) { <a href="/Migration/Batches/@Model.BatchId/Provenance?pageNumber=@(Model.Result.Page + 1)">@L["Next"]</a> }
+    </nav>
+}

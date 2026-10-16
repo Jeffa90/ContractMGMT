@@ -92,6 +92,7 @@ public static class DocumentsModule
         services.AddSingleton<IDocumentStorageProvider, LocalFileSystemStorageProvider>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IDocumentMigrationPort, DocumentMigrationPort>();
+        services.AddScoped<IDocumentQuery, DocumentQuery>();
         services.TryAddSingleton<IMalwareScanner, DisabledMalwareScanner>();
         return services;
     }

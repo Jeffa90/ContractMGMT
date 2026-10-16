@@ -1,0 +1,67 @@
+@page "/Migration/Batches/{id:guid}/Reconciliation"
+@model Ecp.Host.Pages.Migration.ReconciliationModel
+@{ ViewData["Title"] = L["Reconciliation"].Value; var r = Model.Report; }
+<p><a href="/Migration/Batches/@Model.BatchId#reconcile">&larr; @L["Back to the batch"]</a></p>
+<h1>@L["Reconciliation report"]</h1>
+<p class="lede">@L["A batch is not complete until the totals balance, or the exceptions are approved and recorded."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<p><span class="badge @(r.Balanced ? "ok" : "bad")">@(r.Balanced ? L["Balanced"].Value : L["Does not balance"].Value)</span>
+@if (r.ExceptionsApproved) { <span class="badge warn">@L["Exceptions approved by"] @r.ApprovedBy</span> }
+<span class="hint">@(r.Saved ? $"Saved report {r.Sequence}" : "Live figures (not saved yet)")</span></p>
+@foreach (var i in r.Imbalances) { <p class="error">@i</p> }
+@if (r.ApprovalNote is { Length: > 0 }) { <p class="card">@L["Reason recorded"]: @r.ApprovalNote</p> }
+
+<h2>@L["Rows"]</h2>
+<table>
+    <caption class="visually-hidden">@L["Row totals"]</caption>
+    <tbody>
+        <tr><th scope="row">@L["Source rows"]</th><td>@r.Totals.SourceRows</td></tr>
+        <tr><th scope="row">@L["Accepted"]</th><td>@r.Totals.Accepted</td></tr>
+        <tr><th scope="row">@L["Rejected"]</th><td>@r.Totals.Rejected</td></tr>
+        <tr><th scope="row">@L["Skipped"]</th><td>@r.Totals.Skipped</td></tr>
+        <tr><th scope="row">@L["Created"]</th><td>@r.Totals.Created</td></tr>
+        <tr><th scope="row">@L["Updated"]</th><td>@r.Totals.Updated</td></tr>
+    </tbody>
+</table>
+<p class="hint">@L["Source rows = accepted + rejected + skipped. Accepted = created + updated."]</p>
+
+<h2>@L["Manifest and files"]</h2>
+<table>
+    <caption class="visually-hidden">@L["File totals"]</caption>
+    <tbody>
+        <tr><th scope="row">@L["Manifest rows"]</th><td>@r.Files.ManifestRows</td></tr>
+        <tr><th scope="row">@L["paired with a file"]</th><td>@r.Files.ManifestMatched</td></tr>
+        <tr><th scope="row">@L["naming a file that is not there"]</th><td>@r.Files.ManifestOrphans</td></tr>
+        <tr><th scope="row">@L["invalid"]</th><td>@r.Files.ManifestInvalid</td></tr>
+        <tr><th scope="row">@L["Files in the archive"]</th><td>@r.Files.FilesInArchive</td></tr>
+        <tr><th scope="row">@L["imported"]</th><td>@r.Files.Imported</td></tr>
+        <tr><th scope="row">@L["failed"]</th><td>@r.Files.Failed</td></tr>
+        <tr><th scope="row">@L["rejected as invalid"]</th><td>@r.Files.Invalid</td></tr>
+        <tr><th scope="row">@L["duplicates handled"]</th><td>@r.Files.DuplicateHandled</td></tr>
+        <tr><th scope="row">@L["unmatched (still in the queue)"]</th><td>@r.Files.Unmatched</td></tr>
+        <tr><th scope="row">@L["discarded"]</th><td>@r.Files.Discarded</td></tr>
+        <tr><th scope="row">@L["Documents created"]</th><td>@r.Files.DocumentsCreated</td></tr>
+    </tbody>
+</table>
+<p class="hint">@L["Manifest rows = paired + orphan + invalid. Files = imported + failed + invalid + duplicates handled + unmatched + discarded."]</p>
+
+<h2>@L["Source against target"]</h2>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Distributions"]</caption>
+    <thead><tr><th scope="col">@L["Measure"]</th><th scope="col">@L["Key"]</th><th scope="col">@L["Source"]</th><th scope="col">@L["Target"]</th></tr></thead>
+    <tbody>
+    @foreach (var k in r.Distributions.SourceStatus.Keys.Union(r.Distributions.TargetStatus.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["Status"]</th><td>@k</td><td>@r.Distributions.SourceStatus.GetValueOrDefault(k)</td><td>@r.Distributions.TargetStatus.GetValueOrDefault(k)</td></tr> }
+    @foreach (var k in r.Distributions.SourceCategory.Keys.Union(r.Distributions.TargetCategory.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["Category"]</th><td>@k</td><td>@r.Distributions.SourceCategory.GetValueOrDefault(k)</td><td>@r.Distributions.TargetCategory.GetValueOrDefault(k)</td></tr> }
+    @foreach (var k in r.Distributions.SourceValueByCurrency.Keys.Union(r.Distributions.TargetValueByCurrency.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["Estimated value"]</th><td>@k</td><td>@r.Distributions.SourceValueByCurrency.GetValueOrDefault(k).ToString("N2")</td><td>@r.Distributions.TargetValueByCurrency.GetValueOrDefault(k).ToString("N2")</td></tr> }
+    </tbody>
+</table></div>
+
+@if (r.OutstandingItems.Count > 0)
+{
+    <h2>@L["Still outstanding"]</h2>
+    <ul>@foreach (var o in r.OutstandingItems) { <li>@o</li> }</ul>
+}
+<div class="actions">
+    <a class="button secondary" href="/Migration/Batches/@Model.BatchId/Reconciliation?handler=Export&amp;xlsx=true">@L["Download Excel"]</a>
+    <a class="button secondary" href="/Migration/Batches/@Model.BatchId/Reconciliation?handler=Export&amp;xlsx=false">@L["Download CSV"]</a>
+</div>

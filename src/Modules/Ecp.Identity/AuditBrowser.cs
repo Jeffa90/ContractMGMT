@@ -12,10 +12,10 @@ namespace Ecp.Identity;
 
 public sealed record AuditEventDto(
     long Sequence, DateTime OccurredUtc, string ActorType, string? ActorId, string Action, string EntityType, string EntityId, string Outcome,
-    Guid? OrganisationId, string? Reason, string? OldValuesJson, string? NewValuesJson, string PreviousHash, string Hash);
+    Guid? OrganisationId, string? Reason, string? OldValuesJson, string? NewValuesJson, string PreviousHash, string Hash, Guid? MigrationBatchId = null);
 
 public sealed record AuditFilter(string? Action = null, string? EntityType = null, string? Actor = null, DateTime? FromUtc = null, DateTime? ToUtc = null,
-    Guid? OrganisationId = null, int Page = 1, int PageSize = 50);
+    Guid? OrganisationId = null, int Page = 1, int PageSize = 50, Guid? MigrationBatchId = null);
 
 public sealed record AuditEvidence(DateTime ExportedUtc, string ExportedBy, Guid TenantId, int EventCount, long? FirstSequence, long? LastSequence,
     bool TenantChainValid, long ChainEventsChecked, string Sha256OfEvents, string EventsJson);
@@ -83,11 +83,12 @@ internal sealed class AuditBrowser(IAuditEventSource eventSource, IAccessService
         if (f.FromUtc is { } from) query = query.Where(e => e.OccurredUtc >= from);
         if (f.ToUtc is { } to) query = query.Where(e => e.OccurredUtc < to);
         if (f.OrganisationId is { } org) query = query.Where(e => e.OrganisationId == org);
+        if (f.MigrationBatchId is { } batch) query = query.Where(e => e.MigrationBatchId == batch);
         return query;
     }
 
     private static AuditEventDto ToDto(AuditEvent e, bool redact) => new(e.Sequence, e.OccurredUtc, e.ActorType, e.ActorId, e.Action, e.EntityType, e.EntityId, e.Outcome,
-        e.OrganisationId, e.Reason, redact ? null : e.OldValuesJson, redact ? null : e.NewValuesJson, e.PreviousHash, e.Hash);
+        e.OrganisationId, e.Reason, redact ? null : e.OldValuesJson, redact ? null : e.NewValuesJson, e.PreviousHash, e.Hash, e.MigrationBatchId);
 
     public async Task<AuditEvidence> ExportAsync(AuditFilter f, CancellationToken ct = default)
     {

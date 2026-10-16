@@ -52,7 +52,13 @@ builder.Services.AddConfigurationModule(o => o.RequireSecondPersonPublish = prod
 builder.Services.AddContractsModule(o => builder.Configuration.GetSection("Contracts").Bind(o));
 builder.Services.AddDocumentsModule(o => builder.Configuration.GetSection("Documents").Bind(o),
     new LocalFileSystemOptions { RootPath = Path.Combine(resolved.Host.DataDirectory, "documents") });
-builder.Services.AddMigrationModule();
+builder.Services.AddMigrationModule(o =>
+{
+    builder.Configuration.GetSection("Migration").Bind(o);
+    if (production) o.RequireMalwareScan = true; // no scanner adapter exists yet, so Production holds attachments rather than importing them unscanned (MIG-F014)
+});
+// The mocked scanner stands in for a provider adapter in Demonstration and tests only; Production never gets it.
+if (resolved.Host.Mode != EcpMode.Production) builder.Services.AddSingleton<Ecp.Documents.IMalwareScanner, Ecp.Documents.MockMalwareScanner>();
 builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
 builder.Services.AddSingleton<DemoSeeder>();
 var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";

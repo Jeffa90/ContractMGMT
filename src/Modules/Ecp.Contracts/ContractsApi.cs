@@ -185,6 +185,7 @@ public static class ContractsModule
         services.AddScoped<ISecuredContractService, SecuredContractService>();
         services.AddScoped<ISecuredSupplierService, SecuredSupplierService>();
         services.AddScoped<ISecuredCategoryService, SecuredCategoryService>();
+        services.AddScoped<ISecuredContractDocuments, SecuredContractDocuments>();
         services.AddScoped<Ecp.Identity.ICategoryHierarchy, CategoryHierarchyProvider>();
         return services;
     }

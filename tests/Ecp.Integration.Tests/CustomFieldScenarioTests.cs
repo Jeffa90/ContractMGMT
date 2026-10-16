@@ -14,6 +14,7 @@ public sealed class CustomFieldScenarioTests_Sqlite
     [Fact] public Task Versions_and_retirement() => ProviderRunner.SqliteAsync(CustomFieldScenarios.Definitions_are_versioned_retired_never_deleted_and_the_values_they_hold_are_protected, LifecycleScenarios.Scanner);
     [Fact] public Task Tenant_isolation_and_cache() => ProviderRunner.SqliteAsync(CustomFieldScenarios.Definitions_and_values_belong_to_one_tenant_and_the_published_cache_never_crosses_or_goes_stale, LifecycleScenarios.Scanner);
     [Fact] public Task Failed_publish() => ProviderRunner.SqliteAsync(CustomFieldScenarios.A_failed_publish_leaves_the_published_definitions_and_the_cache_unchanged, LifecycleScenarios.Scanner);
+    [Fact] public Task Change_history() => ProviderRunner.SqliteAsync(ChangeHistoryScenarios.The_change_history_shows_each_edit_to_the_person_who_may_read_it_and_never_a_hidden_value, LifecycleScenarios.Scanner);
     [Fact] public Task Variation_changes_configured_fields() => ProviderRunner.SqliteAsync(VariationFieldScenarios.A_Variation_changes_configured_fields_only_the_person_may_see_and_only_when_approved, LifecycleScenarios.Scanner);
 }
 
@@ -29,6 +30,7 @@ public sealed class CustomFieldScenarioTests_SqlServer
     [SqlServerFact] public Task Versions_and_retirement() => ProviderRunner.SqlServerAsync(CustomFieldScenarios.Definitions_are_versioned_retired_never_deleted_and_the_values_they_hold_are_protected, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Tenant_isolation_and_cache() => ProviderRunner.SqlServerAsync(CustomFieldScenarios.Definitions_and_values_belong_to_one_tenant_and_the_published_cache_never_crosses_or_goes_stale, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Failed_publish() => ProviderRunner.SqlServerAsync(CustomFieldScenarios.A_failed_publish_leaves_the_published_definitions_and_the_cache_unchanged, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Change_history() => ProviderRunner.SqlServerAsync(ChangeHistoryScenarios.The_change_history_shows_each_edit_to_the_person_who_may_read_it_and_never_a_hidden_value, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Variation_changes_configured_fields() => ProviderRunner.SqlServerAsync(VariationFieldScenarios.A_Variation_changes_configured_fields_only_the_person_may_see_and_only_when_approved, LifecycleScenarios.Scanner);
 }
 

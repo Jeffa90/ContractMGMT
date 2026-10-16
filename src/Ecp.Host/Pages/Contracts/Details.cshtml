@@ -66,6 +66,23 @@
 }
 @if (Model.Contract.Description is { Length: > 0 }) { <h2>@L["Description"]</h2><p>@Model.Contract.Description</p> }
 
+@if (Model.Changes.Count > 0)
+{
+    <h2 id="changes">@L["Change history"]</h2>
+    <p class="hint">@L["Changes to the details of this agreement, newest first. Changes to details you are not cleared to see are not shown."]</p>
+    <ul class="plain">
+    @foreach (var ch in Model.Changes)
+    {
+        <li><strong>@ch.What</strong> <span class="hint">@ch.OccurredUtc.ToString("yyyy-MM-dd HH:mm") UTC · @ch.Who@(ch.Reason is { Length: > 0 } rs ? " · " + rs : "")</span>
+            @if (ch.Fields.Count > 0)
+            {
+                <ul>@foreach (var f in ch.Fields) { <li>@(Model.Fields?.Fields.FirstOrDefault(x => "cf." + x.Definition.Key == f.Field)?.Definition.Label ?? f.Field): @(f.Before ?? "-") &rarr; @(f.After ?? "-")</li> }</ul>
+            }
+        </li>
+    }
+    </ul>
+}
+
 <h2 id="documents">@L["Documents"]</h2>
 <p><a href="/Contracts/Documents/@Model.Contract.Id">@L["Add a document or a new version"]</a></p>
 <div class="table-wrap">

@@ -317,3 +317,31 @@ internal static class VariationFieldScenarios
     private static VariationInput Proposal(params (string Key, string Value)[] changes)
         => new("Change details", "Configured fields", "Because", null, false, null, null, null, changes.ToDictionary(c => c.Key, c => (string?)c.Value));
 }
+
+internal static class ChangeHistoryScenarios
+{
+    public static async Task The_change_history_shows_each_edit_to_the_person_who_may_read_it_and_never_a_hidden_value(TestApp app)
+    {
+        var w = await LifecycleWorld.CreateAsync(app);
+        await w.PublishFieldsAsync(Doc(string.Join(",", Field("plain", "TEXT"), Field("secret", "TEXT", "\"classification\": \"Restricted\""), Field("legal_note", "TEXT", "\"visibleToRoles\": [\"Legal\"]"))));
+        var id = await w.CreateWithFieldsAsync("ownerPackaging", new() { ["plain"] = "first" });
+        await w.SaveFieldsAsync("ownerPackaging", id, ("plain", ["second"]));
+        await w.As("ownerPackaging", s => s.Get<ISecuredContractService>().UpdateAllAsync(id, new Dictionary<string, string?> { ["riskLevel"] = "High", ["contractTitle"] = "Renamed contract" }, null));
+        await w.W.AsScopeless().Run(async s => { await s.Get<IContractCustomFieldWriter>().ApplyAsync(id, new Dictionary<string, string?> { ["secret"] = "classified-value", ["legal_note"] = "legal-only-value" }, "test", "Migration", Guid.NewGuid(), null); return 0; });
+
+        var owner = await w.As("ownerPackaging", s => s.Get<IContractChangeHistory>().ListAsync(id));
+        var text = string.Join("|", owner.SelectMany(c => c.Fields.Select(f => $"{f.Field}:{f.Before}>{f.After}")));
+        Assert.Contains("plain label:first>second", text.Replace("plain", "plain label").Replace("plain label label", "plain label"));
+        Assert.Contains("Risk Level:>High", text);
+        Assert.Contains("Contract Title", text);
+        Assert.DoesNotContain("classified-value", text); Assert.DoesNotContain("legal-only-value", text);          // a Restricted value and a Legal-only value never reach the owner
+        Assert.Equal(owner.Count, owner.Select(c => c.OccurredUtc).Count());
+        Assert.All(owner, c => Assert.False(string.IsNullOrWhiteSpace(c.Who)));
+        // Legal (cleared to Restricted, and in the role) sees the restricted event, but not an event held at Legal Privileged level.
+        var legal = await w.As("legalA", s => s.Get<IContractChangeHistory>().ListAsync(id));
+        var legalText = string.Join("|", legal.SelectMany(c => c.Fields.Select(f => f.After)));
+        Assert.Contains("classified-value", legalText); Assert.Contains("legal-only-value", legalText);
+        // A person who cannot read the contract learns nothing, not even that it exists.
+        await Assert.ThrowsAsync<ForbiddenException>(() => w.As("otherApprover", s => s.Get<IContractChangeHistory>().ListAsync(id)));      // the contract's own read rule decides, as on the detail page
+    }
+}

@@ -208,6 +208,7 @@ public static class ContractsModule
         services.AddScoped<IContractLifecyclePort, ContractLifecyclePort>();
         services.AddScoped<ICutoverFreeze, NoCutoverFreeze>();
         services.AddScoped<ICoreFieldLists, CoreFieldLists>();
+        services.AddScoped<IContractChangeHistory, ContractChangeHistory>();
         services.AddScoped<ContractCustomFieldService>();
         services.AddScoped<IContractCustomFields>(sp => sp.GetRequiredService<ContractCustomFieldService>());
         services.AddScoped<IContractCustomFieldWriter>(sp => sp.GetRequiredService<ContractCustomFieldService>());

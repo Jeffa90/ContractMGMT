@@ -10,7 +10,7 @@ namespace Ecp.Host.Pages.Contracts;
 
 [Authorize(Policy = "perm:contracts.read")]
 public sealed class DetailsModel(ISecuredContractService contracts, ISecuredContractDocuments documents, IOrganisationStructureService organisations, IAccessService access, IStatusLabels labels,
-    IVariationService variations, IRecordUnlockService unlocks, IReminderSettings reminders, INotificationInbox inbox, ILegalReviewService legal, IContractCustomFields customFields) : EcpPageModel
+    IVariationService variations, IRecordUnlockService unlocks, IReminderSettings reminders, INotificationInbox inbox, ILegalReviewService legal, IContractCustomFields customFields, IContractChangeHistory changes) : EcpPageModel
 {
     public ContractDetails Contract { get; private set; } = null!;
     public string OrganisationName { get; private set; } = "";
@@ -31,6 +31,7 @@ public sealed class DetailsModel(ISecuredContractService contracts, ISecuredCont
     public ReminderStatusInfo Reminder { get; private set; } = null!;
     public LegalReviewDetail? Review { get; private set; }
     public CustomFieldForm? Fields { get; private set; }
+    public IReadOnlyList<ContractChange> Changes { get; private set; } = [];
     public string? LegalEntityName { get; private set; }
     [BindProperty] public int? LeadDays { get; set; }
 
@@ -59,6 +60,7 @@ public sealed class DetailsModel(ISecuredContractService contracts, ISecuredCont
         LeadDays = Reminder.LeadDays;
         Review = await legal.FindForSubjectAsync(Ecp.Lifecycle.Domain.SubjectKinds.Contract, id, ct);
         Fields = await customFields.ForContractAsync(id, null, null, ct);
+        Changes = await changes.ListAsync(id, 25, ct);
         return Page();
     });
 

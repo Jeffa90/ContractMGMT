@@ -8,3 +8,18 @@ Out for Signature,Return to drafting,Initial Creation,contracts.edit_owned,Signa
 Variation in Progress,Apply variation,Effective,approvals.action,VariationOutcomeApplied,Completes Variation lifecycle (CON-04); approved DR-2026-10-15,Confirmed
 Variation in Progress,Cancel variation,Effective,variations.create,ReasonRequired; VariationOutcomeNotApplied,Completes Variation lifecycle (CON-04); approved DR-2026-10-15,Confirmed
 Variation in Progress,Reject variation,Effective,approvals.action,CommentRequired; VariationOutcomeNotApplied,Completes Variation lifecycle (CON-04); approved DR-2026-10-15,Confirmed
+Legal Cleared,Return to Legal,Awaiting Legal,contracts.submit_legal,ControlledFieldChanged,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Awaiting Legal,Recall from Legal,Draft,contracts.submit_legal,,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Draft,Withdraw (draft),Withdrawn,contracts.edit_owned,ReasonRequired,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Effective,Start renewal,Renewal in Progress,renewals.create,NoOpenRenewal; NoOtherOpenVariation,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Renewal in Progress,Complete renewal,Effective,renewals.create,RenewalSuccessorEffective,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Renewal in Progress,Cancel renewal,Effective,renewals.create,ReasonRequired,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Effective,Suspend,Suspended,contracts.suspend,ReasonRequired; NoOtherOpenVariation,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Suspended,Reinstate,Effective,contracts.suspend,ReasonRequired,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Effective,Terminate,Terminated,contracts.close,ReasonRequired; NoOtherOpenVariation,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Suspended,Terminate,Terminated,contracts.close,ReasonRequired,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Ended,Flag for disposition,Flagged for Disposition,disposition.request,ReasonRequired,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Terminated,Flag for disposition,Flagged for Disposition,disposition.request,ReasonRequired,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Flagged for Disposition,Decline disposition,Ended,disposition.approve,CommentRequired,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Flagged for Disposition,Archive,Disposed-Archived,disposition.approve,RetentionChecksPass; NoLegalHold; SubmitterNotApprover,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open
+Terminated,Archive,Disposed-Archived,disposition.approve,RetentionChecksPass; NoLegalHold,Added by the lifecycle slice as reference-pack data (LIF-ASM-02); reversible; awaiting owner confirmation,Open

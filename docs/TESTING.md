@@ -66,6 +66,8 @@ Added in that slice: identity and access (`AccessEvaluatorTests`, `IdentityRules
 
 Result after the migration slice (2026-10-16, Release, warnings as errors, `dotnet restore --locked-mode` clean): **with** a real SQL Server 2022 Developer container (`ECP_TEST_SQL`): **546 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** (297 unit, 13 architecture, 174 integration of which 86 run against SQL Server, 62 API). **Without** `ECP_TEST_SQL`: **460 Passed, 0 Failed, 0 Skipped, 86 NOT VERIFIED** (the SQL Server copies of the integration scenarios; never counted as Passed). The migration scenarios (22) run on both providers; the migration unit tests, the 22 service scenarios per provider and the real-page flow (`MigrationUiTests`, SQLite) are in section 7.1. A scripted run over HTTP against the real host (`tools/migration-demo.py`) is recorded in `docs/MIGRATION.md` section 12.1.
 
+Result after the lifecycle slice (2026-10-16, Release, warnings as errors, `dotnet restore --locked-mode` clean, `tools/check-repo.py` and `tools/supply-chain.sh` clean): **with** a real SQL Server 2022 Developer container (`ECP_TEST_SQL`): **675 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** (331 unit, 13 architecture, 67 API, 264 integration of which 132 ran on SQL Server). **Without** `ECP_TEST_SQL`: **543 Passed, 0 Failed, 0 Skipped, 132 NOT VERIFIED** (the 132 SQL Server wrappers are reported NOT VERIFIED, never as passed). The lifecycle slice added 129 tests over the migration slice's 546: 34 unit (workflow definition validator, notification policy validator, renderer, email and signature providers, permission counts), the lifecycle, Legal, execution, register authorisation, Variation, renewal, unlock, notification, reminder, dashboard, classification and elevation scenarios (each on SQLite and SQL Server) and the API tests through the real pages. A defect found by this pass: the lifecycle SQL Server wrappers were missing the `Category=SqlServer` trait, so the CI SQL Server job would not have run them; fixed. Docker: the runtime stage `tools/docker-runtime-smoke.sh` and `tools/compose-smoke.sh` passed in the workspace (the SDK build stage runs in CI only; see `deploy/STATUS.md`).
+
 GitHub-hosted CI, run 10 on commit `ba712aba` (the migration slice): all three jobs green: build, unit, architecture, API and lightweight-provider tests; container image build and smoke test; SQL Server integration (including the 22 migration scenarios against SQL Server). IIS, Azure and the compose files remain Scaffolded / Not Verified (`deploy/STATUS.md`).
 
 Commands (implemented in M1; `dotnet test` without `ECP_TEST_SQL` reports the SQL Server tests as NOT VERIFIED):
@@ -239,6 +241,47 @@ Implemented and passing on SQLite (lightweight; not SQL Server proof) and on a d
 | APR-008 | Matrix version pinned on submission |
 | APR-009 | Simulator output equals runtime resolution for the same inputs |
 | APR-010 | Currency mismatch without rate table blocks (no implicit conversion) |
+
+### 8.1 Implementation status of the lifecycle suite (lifecycle slice, 2026-10-16)
+
+Scenarios live in `tests/Ecp.Integration.Tests/Lifecycle*.cs`, `NotificationScenarios*.cs`, `ClassificationScenarios.cs`, `ElevationScenarios.cs` and `MigrationClassificationScenario.cs`; each runs on SQLite (lightweight, **not** SQL Server proof) and on a real SQL Server 2022 container through the wrappers in `LifecycleScenarioTests.cs` (traits `Category=Lifecycle` and, for SQL Server, `Category=SqlServer`). Unit tests: `WorkflowDefinitionTests.cs`, `NotificationDeliveryTests.cs`, `SignatureProviderTests.cs`. API tests (real host, real pages): `LifecycleUiTests.cs`, `ElevationUiTests.cs`.
+
+| ID | Status | Where it is covered |
+|---|---|---|
+| WFL-001 | Covered | `Every_state_offers_exactly_its_transitions_and_every_other_step_is_refused`; `A_locked_contract_refuses_every_crafted_step_and_edit_whoever_asks`; `A_contract_goes_from_draft_to_effective_through_every_stage` |
+| WFL-002 | **Partial**: guards are exercised through the scenarios that need them (executed copy, submitter-not-approver, comment and reason required, open Variation, Legal required, final document); there is no table-driven true/false test for every guard in the vocabulary | |
+| WFL-003 | Covered by validator unit tests (`Dead_ends_unknown_references_and_vocabulary_breaches_are_found`, `Approval_must_keep_its_guards…`, `A_transition_cannot_unlock_a_locked_record`) and by publication of the shipped pack | |
+| WFL-004, WFL-005 | `Register_authorisation_rules_self_approval_backup_rejection_and_registered_date`; `A_Variation_changes_an_effective_contract_only_when_approved…` (Registered Date not re-stamped) | |
+| WFL-006 | `A_locked_contract_refuses_every_crafted_step_and_edit_whoever_asks` (no status setter on any API; crafted `Step` POST through the real page in `LifecycleUiTests`) | |
+| WFL-007 | `A_published_workflow_applies_to_new_contracts_while_existing_ones_stay_pinned_and_an_invalid_one_is_refused` | |
+| WFL-008 | `Legal_rounds_are_kept_and_a_privileged_review_is_invisible…`; `A_Variation_that_needs_Legal_goes_through_Legal_rounds…` | |
+| WFL-009 | `LifecycleScenarios3` Variation scenarios (apply, cancel, reject, one open, restricted fields, Legal path) | |
+| WFL-010 | **Partial**: reminder windows, Evergreen, Critical Notice, dedupe and ownership are covered (`NotificationScenarios`); the organisation's time zone is used but there is no daylight-saving-boundary test, and "recompute on Variation" is covered only in that a changed date opens new windows | |
+| WFL-011 | `A_force_unlock_needs_permission_recent_sign_in_reason_and_a_time_limit_and_is_fully_audited`; `Emergency_access_adds_only_account_recovery_and_can_never_alter_an_effective_record` | |
+| WFL-012 | Withdraw paths in `Every_state_offers_exactly_its_transitions…`; no user-facing hard delete exists | |
+| WFL-013 | `The_same_step_taken_twice_at_once_happens_once` | |
+| APR-001 to APR-004, APR-008 to APR-010 | **Not built** (approval matrix is Future: WFE-02) | |
+| APR-005 | **Partial**: first-response model only | |
+| APR-006 | **Partial**: backup approver covered; delegation windows for approvals are not built | |
+| APR-007 | `Register_authorisation_rules_self_approval_backup_rejection_and_registered_date`; API `Register_authorisation_is_refused_to_everyone_but_the_assigned_approvers_and_to_the_second_responder` | |
+| CNC-002 | `Two_people_deciding_at_once_produce_one_decision_and_one_registration` (SQL Server) | |
+| NTF-001 | `A_workflow_event_tells_the_right_people_once_and_a_second_run_changes_nothing` | |
+| NTF-002 | `Failed_email_is_retried_with_a_back_off_then_dead_lettered…` | |
+| NTF-003 | **Partial**: idempotent re-runs are tested; a kill in the middle of a send is not | |
+| NTF-004 | `Reminders_are_sent_once_per_window_and_follow_current_ownership` | |
+| NTF-005 | `Failed_email_is_retried_with_a_back_off_then_dead_lettered…`; `Background_job_runs_are_recorded_and_visible_only_to_administrators` | |
+| NTF-006 | `Notification_content_never_leaks_a_classified_record…`; `A_title_is_withheld_from_the_message_at_the_restricted_level…`; `A_person_who_loses_access…`; unit `NotificationRendererTests` | |
+| NTF-007 | Not built (no translated templates; en-AU only) | |
+| ADP-001, ADP-002 | **Partial**: back-off, dead-letter, visibility and retry for email deliveries; replay of lifecycle outbox events beyond the ten-attempt park is not built | |
+| ADP-003 to ADP-005 | Not built for external adapters (no live adapter); provider fail-closed behaviour is unit-tested (`SignatureProviderTests`, `EmailProviderTests`) | |
+| MIG-024 (suppression) | `A_legacy_load_causes_no_workflow_notifications_and_only_the_reminders_it_is_due` | |
+| Classification | `ClassificationScenarios` (7 scenarios) and `Migrated_records_keep_their_classification_and_are_protected_by_it` | |
+| Elevation (IDN-03) | `ElevationScenarios` (6 scenarios) and `ElevationUiTests` | |
+| Cross-tenant | `Another_tenants_records_do_not_exist_for_any_lifecycle_call`; `Notification_administrators_see_only_their_own_organisations_deliveries` | |
+| Dashboards | `Dashboards_never_show_or_count_a_record_the_reader_could_not_open`; `A_reminder_is_acknowledged_by_a_current_owner_and_the_dashboard_follows`; API `The_new_pages_need_sign_in_and_the_permissions_they_name` | |
+| Signature boundary | `The_signature_boundary_stores_envelope_status_and_a_completed_envelope_only_supplies_the_executed_copy`; unit `SignatureProviderTests` | |
+
+Not tested by design or not possible here: SMTP and Graph against live services; a real e-signature service; browser-level accessibility of the new pages (ACC-01 remains open); daylight-saving boundaries for reminders; performance of the dashboards with large registers (PER-001 baseline is not measured).
 
 ## 9. No-code, packages and portability suite
 

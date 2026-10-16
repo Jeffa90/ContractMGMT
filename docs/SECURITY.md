@@ -67,6 +67,18 @@ Every route taking an id loads the resource **through the scoped query** and the
 
 Transitions are the only way to change status. A transition is authorised, guarded and executed in one transaction with audit and outbox. Client-supplied target states are ignored; the client names a transition code. Approver identity is the authenticated user (never a callback field). Rules cannot override locks.
 
+### 4.6 Lifecycle, classification and notification controls (implemented, lifecycle slice)
+
+* **Classification (ADR-0019).** Five levels; Legal Privileged is a privileged level that needs `records.read_privileged` (Legal) or an explicit assignment flag in addition to the ceiling. Lowering needs `classification.lower` and a reason. Elevations (support, emergency) can never carry the privileged permission or any lifecycle, approval, unlock or publication permission.
+* **Transitions.** Visible (404) → permission (403) → idempotency → from-state and expected state (409) → managed-role check → guards. Managed steps (Legal, signature, approval, Variation, renewal) cannot be run through the generic call. The status has no public setter; the client names a transition code and never a target state.
+* **Locks.** Effective contracts are locked in the domain layer; the only writers are an approved Variation and an audited emergency unlock (permission, recent sign-in, reason of at least 20 characters, bounded time, only the opener may change fields, classification never offered, automatic re-lock). Every change under an unlock carries the unlock id in audit.
+* **Segregation of duties.** The submitter of a register authorisation or disposition cannot decide it; the guard is in the definition and validation refuses a definition that removes it. First response wins; a second gets `already_decided`.
+* **Approver reach.** An approver can read a contract only while a request for that approver's group is pending (or the contract is flagged for disposition for that group); access ends with the decision.
+* **Notifications (ADR-0021).** Recipients are filtered through the same `contracts.read` evaluation as the record; content is withheld by classification threshold (title from Restricted, everything from Legal Privileged); the inbox re-checks access when it is read; templates are plain text with allow-listed placeholders (no markup, no logic); subjects are stripped of control characters; email addresses are masked in logs; secrets are references. Demonstration and capture providers are refused in Production.
+* **Administration.** `notifications.administer` is limited to the administrator's organisations; other organisations' deliveries return not found.
+* **Dashboards** are built from the secured reads; there is no separate query path that could skip a limit.
+* **External adapters.** The e-signature adapter and Graph email are scaffolds with no credentials and no egress; they fail closed.
+
 ## 5. Data protection
 
 | Topic | Control |

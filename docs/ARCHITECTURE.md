@@ -103,11 +103,12 @@ flowchart TB
 | Audit | Audit events, hash chain, evidence export | `IAuditWriter`, `IAuditQuery` |
 | Configuration | Definitions, versions, releases, drafts, validation, simulation harness, packages | `IConfigurationReader` (published release snapshot), `IConfigurationAuthoring`, `IPackageImporter` |
 | Rules | Condition/action interpreter, field-value evaluator, calculated display | `IRuleEngine`, `IExpressionEvaluator` |
-| Workflow | Workflow instances, transitions, guards, approval matrix resolver, legal-review rounds, reminders | `IWorkflowEngine`, `IApprovalResolver` |
+| Workflow (planned name; the lifecycle slice delivers its engine as the Lifecycle module below; an approval-matrix resolver remains Future) | Workflow instances, transitions, guards, approval matrix resolver | `IWorkflowEngine`, `IApprovalResolver` |
 | Contracts | Supplier, Category and assignments, Contract, Variation, RecordUnlock | `IContractService`, `IContractQuery` |
 | Documents | Document, versions, storage, scan status, download authorisation | `IDocumentService`, `IDocumentStorageProvider` |
+| Lifecycle (tier 7; implemented) | Workflow definitions (Configuration kinds `WorkflowContractLifecycle`, `WorkflowVariation`), the transition engine and guard evaluator, status history, Legal review (rounds, comments, attachments, events), execution records and the e-signature boundary, register-authorisation requests with immutable snapshots, emergency unlocks, Variations, renewals, the lifecycle outbox | `ILifecycleService`, `ILegalReviewService`, `IExecutionService`, `IRegisterAuthorisationService`, `IRecordUnlockService`, `IVariationService`, `IRenewalService`, `ILifecycleOutbox`, `IWorkflowDefinitions`; reaches contract state only through `IContractLifecyclePort` |
 | Migration | Projects, profiles, batches, staging, matching, commit, rollback, reconciliation | `IMigrationService`; consumes Contracts/Documents public contracts only |
-| Notifications | Templates (consumer), recipients, dedupe, in-app inbox | `INotificationService` |
+| Notifications (tier 9; implemented) | Notification policy (a Configuration kind), recipient resolution, rendering, notifications and deliveries with attempts, reminder windows and tracking, in-app inbox, email providers, job runs, ten dashboards | `INotificationInbox`, `INotificationAdmin`, `IReminderScanner`, `INotificationDispatcher`, `IDeliveryRunner`, `INotificationJobs`, `IReminderSettings`, `IDashboardService` |
 | Integrations | Adapters, outbox, inbox, webhook endpoints, egress guard | Provider interfaces from `ADAPTER_CATALOGUE.md` |
 | Retention | Policies, legal holds, disposition | `IRetentionService` |
 | Reporting | Projections and curated views, export endpoints | `IReportingService` |
@@ -228,6 +229,27 @@ All images use a non-root user, include ICU and time-zone data (L-06), run read-
 - **Scheduled jobs:** reminders, unlock expiry, projection refresh, outbox dispatch, orphan-blob sweeper, audit verification, export expiry. Each job takes a named `sp_getapplock` lease, runs within an explicit tenant scope per unit of work, and is resumable.
 - **Egress guard:** all outbound HTTP uses one `HttpClient` factory with SSRF protections (`ADAPTER_CATALOGUE.md`, README rule 7).
 
+### 9.1 Lifecycle and notifications architecture (as implemented; ADR-0019 to ADR-0021, `docs/LIFECYCLE_AND_NOTIFICATIONS.md`)
+
+```mermaid
+flowchart LR
+  UI["Razor pages (Legal, Approvals, Variations, Renewals, Contracts/Lifecycle, Unlock, Dashboards, Notifications, Admin)"] --> Lifecycle
+  Lifecycle["Lifecycle module (engine, Legal, execution, register authorisation, unlock, Variations, renewals)"] -->|IContractLifecyclePort| Contracts
+  Lifecycle --> Configuration["Configuration (workflow definitions: draft, validate, publish, rollback)"]
+  Lifecycle --> Documents
+  Lifecycle -->|same transaction| Outbox[("LifecycleEvent outbox + audit")]
+  Outbox --> Notifications["Notifications module (dispatcher, reminder scanner, delivery runner, inbox, dashboards)"]
+  Audit[("Audit stream (ownership changes)")] --> Notifications
+  Notifications --> Providers["Email providers: demo log, dev capture, SMTP, Graph scaffold"]
+  Host["Host BackgroundJobService (per tenant, timer)"] --> Notifications
+```
+
+* The Lifecycle module is tier 7 and the Notifications module tier 9 (the architecture tests enforce both, including "no module references another module's persistence"). Contracts exposes `IContractLifecyclePort` (state changes with history, controlled field changes, successor creation, reminder candidates, current owners) and `IPendingApprovalSource` (lets the access layer know when an approver may read a contract). Identity gained an `ApproverGroupKey` on assignments and a pending-approval layer in the evaluator.
+* Every state change is one unit of work: contract state, `StatusHistory`, `LifecycleEvent` and audit commit together or not at all. Idempotency is by `ClientRequestId`; one pending approval per subject, one open Variation per contract and one renewal in progress per contract are unique filtered indexes.
+* Notifications are produced by a dispatcher that reads the outbox (parked after ten failed attempts) and a cursor over the audit stream, never by the lifecycle code, so a notification failure cannot fail a transition.
+* The host timer calls `INotificationJobs.RunAllAsync` for each active tenant (dispatch, email delivery, reminder scan, unlock expiry) and records each run; the same service backs the administration page. The work is idempotent, so running it on two instances or twice is safe.
+* Concurrency was verified on SQL Server (exactly one of two simultaneous approvals wins). A multi-instance lease for the timer is Future (ADR-0010 describes it; today every instance runs the idempotent jobs).
+
 ## 10. Migration architecture (ADR-0004; `MIGRATION_SUPPLEMENT.md`)
 
 ```mermaid
@@ -305,5 +327,8 @@ flowchart LR
 | 0016 | Setup state and first-run protection | Proposed |
 | 0017 | Organisation onboarding as a configuration kind with a provenance ledger | Proposed |
 | 0018 | Migration slice design: staging, provenance ledger, resumable commit, provenance-driven rollback | Proposed |
+| 0019 | Five-level classification, privileged access and support/emergency elevation | Accepted (lifecycle slice) |
+| 0020 | Lifecycle engine, workflow definitions as configuration, execution boundary | Accepted (lifecycle slice) |
+| 0021 | Notifications, reminders and operational dashboards | Accepted (lifecycle slice) |
 
 ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.

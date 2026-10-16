@@ -35,8 +35,11 @@ public sealed class LifecycleScenarioTests_Sqlite
     [Fact] public Task Admin_scope() => ProviderRunner.SqliteAsync(NotificationScenarios2.Notification_administrators_see_only_their_own_organisations_deliveries, LifecycleScenarios.Scanner);
     [Fact] public Task Job_runs() => ProviderRunner.SqliteAsync(NotificationScenarios2.Background_job_runs_are_recorded_and_visible_only_to_administrators, LifecycleScenarios.Scanner);
     [Fact] public Task Dashboard_security() => ProviderRunner.SqliteAsync(NotificationScenarios2.Dashboards_never_show_or_count_a_record_the_reader_could_not_open, LifecycleScenarios.Scanner);
+    [Fact] public Task Signature_boundary() => ProviderRunner.SqliteAsync(LifecycleScenarios4.The_signature_boundary_stores_envelope_status_and_a_completed_envelope_only_supplies_the_executed_copy, LifecycleScenarios.Scanner);
 }
 
+[Trait("Category", "Lifecycle")]
+[Trait("Category", "SqlServer")]
 public sealed class LifecycleScenarioTests_SqlServer
 {
     [SqlServerFact] public Task A_contract_goes_from_draft_to_effective() => ProviderRunner.SqlServerAsync(LifecycleScenarios.A_contract_goes_from_draft_to_effective_through_every_stage, LifecycleScenarios.Scanner);
@@ -70,4 +73,5 @@ public sealed class LifecycleScenarioTests_SqlServer
     [SqlServerFact] public Task Admin_scope() => ProviderRunner.SqlServerAsync(NotificationScenarios2.Notification_administrators_see_only_their_own_organisations_deliveries, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Job_runs() => ProviderRunner.SqlServerAsync(NotificationScenarios2.Background_job_runs_are_recorded_and_visible_only_to_administrators, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Dashboard_security() => ProviderRunner.SqlServerAsync(NotificationScenarios2.Dashboards_never_show_or_count_a_record_the_reader_could_not_open, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Signature_boundary() => ProviderRunner.SqlServerAsync(LifecycleScenarios4.The_signature_boundary_stores_envelope_status_and_a_completed_envelope_only_supplies_the_executed_copy, LifecycleScenarios.Scanner);
 }

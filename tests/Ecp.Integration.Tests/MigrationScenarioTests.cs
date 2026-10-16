@@ -27,6 +27,7 @@ public sealed class MigrationScenarioTests_Sqlite
         await scenario(app, faults);
     }
 
+    [Fact] public Task A_legacy_load_sends_no_workflow_notifications() => RunAsync(MigrationClassificationScenario.A_legacy_load_causes_no_workflow_notifications_and_only_the_reminders_it_is_due);
     [Fact] public Task Migrated_classification_is_kept_and_protects() => RunAsync(MigrationClassificationScenario.Migrated_records_keep_their_classification_and_are_protected_by_it);
     [Fact] public Task The_sample_contracts_manifest_and_archive_load_end_to_end() => RunAsync(MigrationScenarios.The_sample_contracts_manifest_and_archive_load_end_to_end);
     [Fact] public Task A_dry_run_writes_nothing_to_the_target() => RunAsync(MigrationScenarios.A_dry_run_writes_nothing_to_the_target);

@@ -12,6 +12,10 @@ ContractStatus,VariationInProgress,Variation in Progress,Confirmed,status-transi
 ContractStatus,Ended,Ended,Confirmed,status-transitions.csv
 ContractStatus,DisposedArchived,Disposed-Archived,Confirmed,status-transitions.csv
 ContractStatus,Withdrawn,Withdrawn,Confirmed,status-transitions-supplemental.csv
+ContractStatus,RenewalInProgress,Renewal in Progress,Open,status-transitions-supplemental.csv (lifecycle slice; awaiting confirmation)
+ContractStatus,Suspended,Suspended,Open,status-transitions-supplemental.csv (lifecycle slice; awaiting confirmation)
+ContractStatus,Terminated,Terminated,Open,status-transitions-supplemental.csv (lifecycle slice; awaiting confirmation)
+ContractStatus,FlaggedForDisposition,Flagged for Disposition,Open,status-transitions-supplemental.csv (lifecycle slice; awaiting confirmation)
 LockState,Unlocked,Unlocked,Confirmed,WORKFLOW_SPEC.md
 LockState,Locked,Locked,Confirmed,contracts.csv (recordLocked)
 LockState,UnlockedEmergency,Temporarily unlocked (emergency),Confirmed,WORKFLOW_SPEC.md

@@ -189,3 +189,8 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Modules/Ecp.Notifications/Reminders.cs`
 - `src/Modules/Ecp.Notifications/packages.lock.json`
 - `tools/regen-lifecycle-migration.sh`
+- `decisions/ADR-0019-classification-privileged-access-and-elevation.md`
+- `decisions/ADR-0020-lifecycle-engine-and-workflow-as-configuration.md`
+- `decisions/ADR-0021-notifications-reminders-and-dashboards.md`
+- `docs/LIFECYCLE_AND_NOTIFICATIONS.md`
+- `docs/USER_GUIDE_LIFECYCLE.md`

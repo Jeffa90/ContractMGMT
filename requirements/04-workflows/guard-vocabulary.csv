@@ -19,3 +19,6 @@ SignatureVoidedOrDeclined,The e-signature provider reported a declined or voided
 RequiredFieldsPresent,All fields marked required for the target state in the published configuration are present,Published form and field definitions,Any transition configured to require fields,Master (Workflow designer: required fields)
 RequiredDocumentsPresent,All document types required for the target state are present,Published workflow definition,Any transition configured to require documents,Master (Workflow designer: required documents)
 ClassificationClearance,Actor's clearance covers the record's classification,Access evaluator,All read and write actions,Master (classification rules)
+NoExecutedCopy,No executed copy exists for the record,Document query,Withdraw (Initial Creation),Added by the lifecycle slice (LIF-ASM-02); reversible
+NoOpenRenewal,No renewal is in progress for the contract,Renewal query (filtered unique index),Start renewal,Added by the lifecycle slice (LIF-ASM-02); reversible
+RenewalSuccessorEffective,The successor contract of the renewal is Effective,Successor contract status,Complete renewal,Added by the lifecycle slice (LIF-ASM-02); reversible

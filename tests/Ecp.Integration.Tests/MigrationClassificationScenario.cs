@@ -2,6 +2,7 @@ using Ecp.Contracts;
 using Ecp.Contracts.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Ecp.DataMigration;
+using Ecp.Notifications;
 using Ecp.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -38,5 +39,32 @@ internal static class MigrationClassificationScenario
         Assert.Contains(list.Items, i => i.Id == byReference["AGR-K3"].Id);
         Assert.DoesNotContain(list.Items, i => i.Id == byReference["AGR-K2"].Id);
         await Assert.ThrowsAsync<Ecp.SharedKernel.ResourceNotFoundException>(() => mw.World.AsAsync("viewerAll", s => s.Get<ISecuredContractService>().GetAsync(byReference["AGR-K2"].Id)));
+    }
+
+    /// <summary>MIG-024 / legacy loads: no workflow notification is produced for loaded records; reminders are the only thing they can cause, once, after the load.</summary>
+    public static async Task A_legacy_load_causes_no_workflow_notifications_and_only_the_reminders_it_is_due(TestApp app)
+    {
+        var mw = await MigrationWorld.CreateAsync(app);
+        async Task<List<InboxItem>> Inbox() => (await mw.World.AsAsync("ownerPackaging", s => s.Get<INotificationInbox>().ListAsync(new InboxFilter(PageSize: 200)))).Items.ToList();
+        Task Jobs() => mw.World.AsScopeless().Run(s => s.Get<INotificationJobs>().RunAllAsync());
+        await Jobs();                                                    // drain what the set-up of the world produced
+        var before = (await Inbox()).Count;
+
+        var end = DateOnly.FromDateTime(app.Clock.UtcNow.AddDays(20)).ToString("yyyy-MM-dd");
+        var batch = await mw.CreateBatchAsync();
+        await mw.UploadAsync(batch, contracts: MigrationWorld.Csv(MigrationWorld.ContractsHeader,
+            MigrationWorld.Row("L-1", "AGR-L1", end: end, review: ""), MigrationWorld.Row("L-2", "AGR-L2", end: "2035-12-31", review: "")));
+        await mw.ValidateAndCommitAsync(batch);
+        await Jobs();
+        await Jobs();                                                    // running again changes nothing
+
+        var after = await Inbox();
+        Assert.DoesNotContain(after, n => n.Kind != "Reminder" && n.CreatedUtc >= app.Clock.UtcNow.AddMinutes(-5) && n.EventType != "ownership.assigned");
+        var reminders = after.Where(n => n.Kind == "Reminder").ToList();
+        Assert.Equal(before + 1, after.Count);
+        var only = Assert.Single(reminders);
+        Assert.Equal("endDate", only.ReminderKind);
+        Assert.Contains("AGR-L1", only.Title + only.Body);
+        Assert.DoesNotContain("AGR-L2", only.Title + only.Body);
     }
 }

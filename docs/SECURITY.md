@@ -80,6 +80,16 @@ Transitions are the only way to change status. A transition is authorised, guard
 * **Dashboards** are built from the secured reads; there is no separate query path that could skip a limit.
 * **External adapters.** The e-signature adapter and Graph email are scaffolds with no credentials and no egress; they fail closed.
 
+### 4.7 Configurable metadata, search, views and exports (implemented, CFG-03/DOM-03/STU-01; ADR-0023)
+
+* **No customer text is code.** Field definitions are strict JSON (unknown members are errors) written by the Studio from a typed model; patterns run on the non-backtracking engine with a time limit; calculations are a closed list; views and filters are typed (field, operator, values); nothing is evaluated as SQL, script, expression or template. Column and sort names reach the database only after being matched against a catalogue.
+* **Hidden means absent.** A configured field the caller may not see (role, state, contract type, effective dates, classification, Legal Privileged) is absent from forms, details, the register catalogue, filters, sorts, free-text search, columns, exports, the reporting schema, Variation pages, approval snapshots and change history, and is answered as an unknown field. Values are held at the more sensitive of the field's and the contract's classification; audit events at the most sensitive level changed.
+* **Access first.** Register search applies the caller's access in the database before any filter, sort or page; page size is capped (200); a configured-field filter is an uncorrelated subquery (no per-row lookup). Failures are plain-language messages; nothing about hidden data is revealed.
+* **Exports** need `records.export`, include only readable and reportable fields, neutralise formula-looking text, are limited (normal and large with a recorded reason), audited without content, and shared the register's own query. Shared views are published through configuration (versioned, audited); a person's own views are private.
+* **Studio** needs `config.draft`/`config.publish`/`config.rollback`/`config.history.read`; organisations the person has no configuration right in are not offered and are not-found if named. Antiforgery applies to every POST.
+* **Migration** into configured fields is trusted but bounded: values are checked against the published definition, nothing is guessed, retired fields are refused, the source value and batch are kept, and the audit event carries the batch.
+* **Known limits:** audit readers (`audit.read`) see change events at their classification level, including role-hidden fields' values; CSV/XLSX cannot be made safe for every spreadsheet product (apostrophe prefix is the mitigation); SQL Server behaviour of the new tables is not yet verified (see TESTING.md).
+
 ## 5. Data protection
 
 | Topic | Control |

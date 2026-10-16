@@ -56,10 +56,14 @@ An approver delegates their own authority for a group to another member of the g
 
 Editing uses *Workflow configuration* (draft, validate, publish, rollback). To use a matrix, publish a workflow whose `settings.approval.matrix` names it; the workflow cannot be published if the matrix does not exist, and the matrix cannot be removed while a workflow names it.
 
+## Facts the matrix is judged on
+
+One `ApprovalFactService` builds the facts for a live submission (and a Variation as it would be once applied) and for the simulator, so they cannot drift: value and currency, category path, business unit, site, **legal entity, contract type, risk level, supplier type**, classification, and the additional fields an administrator has marked **usable in approvals**. The simulator's "use the facts of a contract" fills the form from a real contract through the same service (`approvals.simulate` and the right to read the contract). A condition on a fact the platform does not supply, or on an additional field that is not usable in approvals, is refused at publication (`fact_unavailable`). Tests: `ApprovalFactScenarios` (live and simulated plans agree for the same contract; only usable fields feed a matrix).
+
 ## Audit
 
 `approval.matrix.published` (with a row-by-row change summary), `approval.simulated`, `approval.resolution_blocked`, `approval.step_approved`, `approval.delegation.created`/`revoked`, and the usual approval decision events.
 
 ## Limits (honest)
 
-Escalation timers and messages; configurable segregation of duties beyond the submitter; re-resolving an in-flight plan when a named primary leaves; a visual designer (STU-06); facts such as contract type, risk level, supplier type, legal entity and custom fields reach the resolver only through an `IApprovalFactContributor` or the simulator because contracts do not store them yet (an unknown fact never satisfies a condition, so such a row blocks rather than approving wrongly). The allocation of the four approval permissions is owner-confirmed (CONFIRMED_DECISIONS D6); Procurement Administrators hold `approvals.delegate.administer` only by explicit assignment, and no explicit per-user permission grant mechanism exists yet (Future).
+Escalation timers and messages; configurable segregation of duties beyond the submitter; re-resolving an in-flight plan when a named primary leaves; a visual designer (STU-06). Contract type, risk level, supplier type, legal entity and the additional fields marked usable in approvals now reach the resolver (see above); a multiple-choice, long-text, web-address, file-reference or calculated field cannot be offered to a matrix. The allocation of the four approval permissions is owner-confirmed (CONFIRMED_DECISIONS D6); Procurement Administrators hold `approvals.delegate.administer` only by explicit assignment, and no explicit per-user permission grant mechanism exists yet (Future).

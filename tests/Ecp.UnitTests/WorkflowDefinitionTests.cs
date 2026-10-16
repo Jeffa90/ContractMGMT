@@ -109,6 +109,9 @@ public sealed class WorkflowDefinitionTests
         Assert.Contains("transition_role", ErrorsOf(d.With(transition: t => t.Role == "approve" ? t with { Role = "superuser" } : t)));
         Assert.Contains("state_role", ErrorsOf(d.With(state: s => s.Initial ? s with { Role = "godmode" } : s)));
         Assert.Contains("field_unknown", ErrorsOf(d.With(transition: t => t.Code == d.Transitions[0].Code ? t with { RequiredFields = ["passwordHash"] } : t)));
+        // A configured field and the new core fields can be required; the wildcard cannot (a requirement names one field).
+        Assert.DoesNotContain("field_unknown", ErrorsOf(d.With(transition: t => t.Code == d.Transitions[0].Code ? t with { RequiredFields = ["cf.service_tier", "riskLevel", "contractType", "legalEntity"] } : t)));
+        Assert.Contains("field_unknown", ErrorsOf(d.With(transition: t => t.Code == d.Transitions[0].Code ? t with { RequiredFields = ["cf.*"] } : t)));
     }
 
     private static IEnumerable<string> DeadEnd(WorkflowDefinition d)
@@ -168,6 +171,10 @@ public sealed class WorkflowDefinitionTests
         Assert.Contains("variation_field", Check(v.With(settings: s => s with { Variation = s.Variation with { ChangeableFields = [.. s.Variation.ChangeableFields, "classification"] } })));
         Assert.Contains("variation_field", Check(v.With(settings: s => s with { Variation = s.Variation with { ChangeableFields = [] } })));
         Assert.Contains("variation_legal", Check(v.With(settings: s => s with { Variation = s.Variation with { LegalReview = "Maybe" } })));
+        // Configured fields are named cf.<key>, or cf.* for any of them; anything else that looks like one is refused.
+        Assert.DoesNotContain("variation_field", Check(v.With(settings: s => s with { Variation = s.Variation with { ChangeableFields = ["estimatedValue", "cf.service_tier", "cf.*"] } })));
+        Assert.Contains("variation_field", Check(v.With(settings: s => s with { Variation = s.Variation with { ChangeableFields = ["cf.Bad Key"] } })));
+        Assert.Contains("variation_field", Check(v.With(settings: s => s with { Variation = s.Variation with { ChangeableFields = ["cf."] } })));
         Assert.Contains("subject", ErrorsOf(v, "Contract"));
     }
 

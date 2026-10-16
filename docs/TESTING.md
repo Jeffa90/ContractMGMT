@@ -290,6 +290,26 @@ Scenarios live in `tests/Ecp.Integration.Tests/Lifecycle*.cs`, `NotificationScen
 
 Not tested by design or not possible here: SMTP and Graph against live services; a real e-signature service; browser-level accessibility of the new pages (ACC-01 remains open); daylight-saving boundaries for reminders; performance of the dashboards with large registers (PER-001 baseline is not measured).
 
+### 8.2 Implementation status of the metadata, search, views, exports, Studio and migration scenarios (CFG-03, DOM-03, STU-01; 2026-10-16)
+
+Each scenario runs on SQLite (lightweight, **not** SQL Server proof) and, through the `SqlServer` wrappers, on a real SQL Server when `ECP_TEST_SQL` is set. **In this workspace the SQL Server wrappers did not run: the container daemon could not be started (the start command was denied), so every `SqlServer` test for this slice is NOT VERIFIED.**
+
+| Area | Where it is covered |
+|---|---|
+| Field model, parser, validator, impact, writer | unit `CustomFieldTests` (56), `StudioModelTests` (5); `WorkflowDefinitionTests` (`cf.` names) |
+| Values: every type, validation, defaults, requiredness, role/state/type rules, classification and privileged hiding, locks, versions and retirement, tenant isolation and cache, failed publish | `CustomFieldScenarios` (8 scenarios), `CacheFailureScenarios`, `VariationFieldScenarios` |
+| Studio service (draft, edit, order, validate, impact, publish, retire, rollback, permissions, audit) | `StudioScenarios`; pages: `StudioUiTests` (real host, antiforgery) |
+| Typed search: filters, sorts, paging, limits, grammar refusals, scope, hidden fields, tenant | `RegisterScenarios` (2) |
+| Views: 11 shipped views, personal (private, validated, unique, deletable), shared (configuration lifecycle, per-viewer access, retired fields) | `RegisterViewScenarios` |
+| Exports: columns, filters, formula safety, limits, large export reason, audit; reporting schema | `RegisterViewScenarios` (2) |
+| Contract change history and hidden values | `ChangeHistoryScenarios` |
+| Approval facts: live and simulated parity; only usable fields | `ApprovalFactScenarios` |
+| Migration into configured and core fields: mapping, dry run, explicit choice mapping, retired and unsupported fields, provenance, idempotent rerun, update, rollback | `MigrationCustomFieldScenarios`; unit `The_custom_field_sample_columns_map_…` |
+| Architecture: tiers for Formats and Metadata, same-tier edge, no cross-module persistence, no expression compilation | `ArchitectureTests` |
+| Performance baseline (10,000 contracts) and shape guard | `PerformanceBaselineTests_Sqlite`; `PerformanceBaselineTests_SqlServer` (NOT VERIFIED) |
+
+Not covered: browser-level accessibility of the Studio and register pages (ACC-01 remains open); concurrency of two administrators editing one draft beyond the conflict message; keyset paging (not built); SQL Server row-level security and index plans for `ContractCustomValue` and `SavedView`.
+
 ## 9. No-code, packages and portability suite
 
 | ID | Test |
@@ -460,8 +480,8 @@ Automated axe-core checks plus scripted keyboard tests on every page type; manua
 
 | ID | Test |
 |---|---|
-| PER-001 | Contract list/search p95 < 500 ms at 100k contracts |
-| PER-002 | Search by custom field with 50 fields per entity uses indexes (query plan check) |
+| PER-001 | Contract list/search p95 < 500 ms at 100k contracts. **Partly measured**: a baseline at 10,000 contracts on SQLite is in `PERFORMANCE.md`; 100,000 contracts and SQL Server are NOT VERIFIED |
+| PER-002 | Search by custom field with 50 fields per entity uses indexes (query plan check). **Not yet verified**: the index design is in `SEARCH_AND_VIEWS.md`; a SQL Server query-plan check has not been run |
 | PER-003 | Migration of 25k contracts and 50k documents completes resumably within budget; memory bounded |
 | PER-004 | Export/report/import under concurrent load stays within rate limits and does not starve interactive users |
 | PER-005 | Row-Level Security overhead measured and within budget |

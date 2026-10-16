@@ -108,7 +108,9 @@ flowchart TB
 | Documents | Document, versions, storage, scan status, download authorisation | `IDocumentService`, `IDocumentStorageProvider` |
 | Approvals (tier 6; implemented) | Approval matrices (a Configuration kind), the resolver and trace, plan evaluation (sequential, parallel, first response, all required), approval delegations with cycle protection, the simulator | `IApprovalMatrixStore`, `IApprovalResolver`, `IApprovalSimulator`, `IApprovalDelegations`, `IApprovalSimulationInputs`, `IApprovalFactContributor`; knows nothing of contracts or workflow states |
 | Lifecycle (tier 7; implemented) | Workflow definitions (Configuration kinds `WorkflowContractLifecycle`, `WorkflowVariation`), the transition engine and guard evaluator, status history, Legal review (rounds, comments, attachments, events), execution records and the e-signature boundary, register-authorisation requests with immutable snapshots, emergency unlocks, Variations, renewals, the lifecycle outbox | `ILifecycleService`, `ILegalReviewService`, `IExecutionService`, `IRegisterAuthorisationService`, `IRecordUnlockService`, `IVariationService`, `IRenewalService`, `ILifecycleOutbox`, `IWorkflowDefinitions`; reaches contract state only through `IContractLifecyclePort` |
-| Migration | Projects, profiles, batches, staging, matching, commit, rollback, reconciliation | `IMigrationService`; consumes Contracts/Documents public contracts only |
+| Metadata (tier 5; implemented) | Custom field model (17 types), the definition document and its strict parser/validator (`CustomField` Configuration kind), value parsing and formatting, the closed calculator, impact analysis, the form-based Studio service | `ICustomFieldCatalogue`, `ICustomFieldStudio`, `ICustomFieldUsage`, `IWorkflowStateSource`; values are stored and served by Contracts |
+| Formats (tier 0; implemented) | CSV and XLSX readers and writers, formula-injection defence (`SafeCell`) | `CsvReader`, `CsvWriter`, `XlsxWriter`; shared by Migration and Exports |
+| Migration | Projects, profiles, batches, staging, matching, commit, rollback, reconciliation; loads core and additional fields | `IMigrationService`; consumes Contracts/Documents public contracts only |
 | Notifications (tier 9; implemented) | Notification policy (a Configuration kind), recipient resolution, rendering, notifications and deliveries with attempts, reminder windows and tracking, in-app inbox, email providers, job runs, ten dashboards | `INotificationInbox`, `INotificationAdmin`, `IReminderScanner`, `INotificationDispatcher`, `IDeliveryRunner`, `INotificationJobs`, `IReminderSettings`, `IDashboardService` |
 | Integrations | Adapters, outbox, inbox, webhook endpoints, egress guard | Provider interfaces from `ADAPTER_CATALOGUE.md` |
 | Retention | Policies, legal holds, disposition | `IRetentionService` |
@@ -266,6 +268,24 @@ flowchart LR
 * One resolver serves both the simulator and a real submission. The plan, trace and explanations are stored with the request, so a later publication never changes an in-flight approval; who may respond is re-checked against the group and delegations as they are now.
 * Without `settings.approval.matrix` the lifecycle runs the reference model (one approver group, first response wins) exactly as before.
 
+### 9.3 Configurable metadata, search, views and exports (as implemented; ADR-0023, `docs/CUSTOM_FIELDS.md`, `docs/SEARCH_AND_VIEWS.md`, `docs/EXPORTS.md`, `docs/CONFIGURATION_STUDIO.md`)
+
+```mermaid
+flowchart LR
+  Studio["Studio pages /Admin/Studio (forms)"] --> StudioSvc["Metadata: ICustomFieldStudio, FieldWriter, FieldImpact"]
+  StudioSvc --> Config["Configuration: CustomField and ContractListView kinds (draft, validate, publish, rollback)"]
+  Config --> Cache[("Published-configuration cache: generation guard, invalidated after commit")]
+  Forms["Contract create / edit / details / Variation pages"] --> Fields["Contracts: IContractCustomFields (access first, then field rules)"]
+  Fields --> Values[("ContractCustomValue: typed columns, filtered indexes, RLS")]
+  Register["Register page, views, exports"] --> Engine["Contracts: IContractRegister (typed query, access first, database-side)"]
+  Engine --> Values
+  Migration["Migration: custom.<key> targets"] --> Port["IContractMigrationPort"] --> Values
+  Approvals["Approval matrix and simulator"] --> Facts["ApprovalFactService (one service for live and simulated)"] --> Values
+```
+
+* Definitions are configuration; values are typed rows; a hidden field is absent from every read path; one fact service serves live approvals and the simulator; every configured-field condition is an uncorrelated `IN` subquery.
+* SQL Server proof of the new tables and indexes, and of register performance, is pending (see `TESTING.md` section 8.2 and `PERFORMANCE.md`).
+
 ## 10. Migration architecture (ADR-0004; `MIGRATION_SUPPLEMENT.md`)
 
 ```mermaid
@@ -343,6 +363,7 @@ flowchart LR
 | 0016 | Setup state and first-run protection | Proposed |
 | 0017 | Organisation onboarding as a configuration kind with a provenance ledger | Proposed |
 | 0018 | Migration slice design: staging, provenance ledger, resumable commit, provenance-driven rollback | Proposed |
+| 0023 | Configurable metadata, typed search, list views and the form-based Studio | Accepted |
 | 0019 | Five-level classification, privileged access and support/emergency elevation | Accepted (lifecycle slice) |
 | 0020 | Lifecycle engine, workflow definitions as configuration, execution boundary | Accepted (lifecycle slice) |
 | 0021 | Notifications, reminders and operational dashboards | Accepted (lifecycle slice) |

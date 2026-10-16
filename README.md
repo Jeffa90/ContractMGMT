@@ -20,3 +20,12 @@ Open the repository in a Claude Code cloud session and paste the contents of `pr
 ## Data safety
 
 Everything supplied here is synthetic. Never commit production credentials, signed contracts, supplier pricing, personal information, legal advice or live integration secrets.
+
+## Run it (development)
+
+```
+dotnet run --project src/Ecp.Host                 # seeded synthetic Demo (SQLite); sign in as a demo user; not for real data
+Ecp__DemoSeed=false dotnet run --project src/Ecp.Host   # unconfigured installation: run `dotnet src/Ecp.Host/bin/.../Ecp.Host.dll setup-token`, then open /Setup
+```
+
+First-run setup and organisation onboarding: `docs/SETUP_AND_ONBOARDING.md`. Identity and access: `docs/ACCESS_AND_IDENTITY.md`. Build status, test counts and what is and is not verified: `TASKS.md`, `docs/TESTING.md`, `deploy/STATUS.md`. Nothing here declares production approval.

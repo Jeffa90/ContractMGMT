@@ -48,12 +48,13 @@ Each is a slice that runs end to end from the page through the services to the d
 | Lifecycle | Classification, state machine, Legal review, execution, register authorisation, Variations, renewals, notifications, dashboards | `docs/LIFECYCLE_AND_NOTIFICATIONS.md` |
 | Approval matrix (WFE-02) | Resolver, simulator, delegation, plans pinned per request | `docs/APPROVAL_MATRIX.md` |
 | Metadata, search and Studio (CFG-03 / DOM-03 / STU-01) | Core fields, the field engine, dynamic forms, typed search, views, exports, Studio, migration into additional fields | `docs/CUSTOM_FIELDS.md`, `docs/SEARCH_AND_VIEWS.md`, `docs/CONFIGURATION_STUDIO.md`, `docs/EXPORTS.md` |
-| PER-002 query-plan review | Plans captured on SQL Server, two evidence-based optimisations, regression guards | `docs/PERFORMANCE_REVIEW.md`, `docs/PERFORMANCE.md` |
-| Portability audit | Where JBS and vendor names appear, classified | `docs/PORTABILITY_AUDIT.md` |
+| PER-002 query-plan review | Plans captured on SQL Server; one optimisation retained and one tried and reverted on same-runner evidence; configured-field text search 599 to 417 ms median (target below 500 ms met on the benchmark operation); regression guards | `docs/PERFORMANCE_REVIEW.md`, `docs/PERFORMANCE.md` |
+| Portability audit and remediation plan | Where JBS and vendor names appear, classified; ordered remediation actions | `docs/PORTABILITY_AUDIT.md`, `docs/PORTABILITY_REMEDIATION_PLAN.md` |
+| Portability remediation S1 | Solution pack resolved by organisation; neutral Blank lifecycle, Variation workflow and notification policy; no compiled default pack (installation default is host configuration, unset); stronger ARC-010; first PRT-002 proof test. Role identifiers untouched | ADR-0024, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.6 |
 
 ## 4. Open tasks
 
-`TASKS.md` holds @@OPEN@@ unticked rows against @@DONE@@ ticked. They fall into three groups.
+`TASKS.md` holds 65 unticked rows against 34 ticked. They fall into three groups.
 
 ### 4.1 Built but not ticked (acceptance incomplete)
 
@@ -62,7 +63,7 @@ Each is a slice that runs end to end from the page through the services to the d
 | T0.3, T0.5 | ADRs exist; the repository checker runs in CI | ADR acceptance pass not recorded; checker row not ticked |
 | TNC-02, SCR-01 | Row-Level Security, composite keys, layer-off tests (SQL Server); CSRF, cookies, CSP, Production guard | Full TEN and SEC catalogues; XSS/SQLi corpora |
 | SET-03, SET-04, SET-05, SET-06 | Readiness checks, wizard, onboarding | Full readiness catalogue; automated accessibility tests; delegated-administrator journey; pack selection and taxonomy import with dry run |
-| CFG-01, CFG-03, CFG-04 | Configuration kernel, field engine, pack installation of the two shipped packs | Schema-validation framework; **PER-002 closed by this pass, see section 8 for what it did not prove**; a pack loader (see audit P-03) |
+| CFG-01, CFG-04 | Configuration kernel, pack installation of the two shipped packs (resolved per organisation since S1) | Schema-validation framework; a pack loader (audit P-03: packs are still embedded in assemblies by the project files) |
 | WFE-01 | Lifecycle module delivers the runtime | Rules-engine integration (RUL-01), designer |
 | DOM-01, DOM-02, DOM-03, DCM-01, INT-01 | Suppliers, categories, contracts, register, documents, outbox | JSON API for contracts and search; some acceptance tests |
 | MGR-02, MGR-05, MGR-11, DOCS-MIG | Intake, attachments, scripted end-to-end run | Runbook from the template; remaining acceptance tests |
@@ -83,7 +84,7 @@ Each is a slice that runs end to end from the page through the services to the d
 
 ### 4.3 First incomplete task
 
-The first incomplete task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. Portability finding P-01 (the JBS pack selected by a code default; `docs/PORTABILITY_AUDIT.md`) is the first thing to fix before any second business is onboarded.
+The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. CFG-03 was ticked once the PER-002 plan check was done (section 3). The first incomplete **portability remediation** task is **S2** (`docs/PORTABILITY_REMEDIATION_PLAN.md` section 5: migrated contracts take the workflow's initial status, and the unowned-category reminder fall-back comes from policy rather than `RoleCodes.ProcurementAdministrator`). P-01 is fixed by S1; P-03 (packs embedded by project files) and P-02a/b (reminder fall-back and compiled role catalogue) remain open and block onboarding a second business without a rebuild.
 
 ## 5. Deferred tasks
 
@@ -101,14 +102,14 @@ Deferred means decided not to build yet, recorded in `TASKS.md` and the ADRs; th
 
 ## 6. Verified capabilities
 
-Test totals at the end of this pass (details and history in `docs/TESTING.md`):
+Test totals at the end of this pass (details and history in `docs/TESTING.md`; CI figures are from run 32, commit `a0293ee`, the final code; the documentation commit after it changes no code):
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
-| Workspace, no SQL Server: unit @@UNIT@@, architecture @@ARCH@@, API @@API@@, integration on SQLite @@INTSQLITE@@ | @@LOCALPASS@@ | 0 | 0 | @@LOCALNV@@ (the SQL Server wrappers) |
-| CI, GitHub-hosted, SQL Server 2022 container | @@CISQL@@ | 0 | 0 | 0 |
+| Workspace, no SQL Server: unit 451, architecture 20, API 72, integration on SQLite 187 | 730 | 0 | 0 | 189 (the SQL Server wrappers) |
+| CI, GitHub-hosted, SQL Server 2022 container (the 189 `SqlServer` tests; the performance baseline is a separate step) | 189 | 0 | 0 | 0 |
 
-Verified on CI (runs @@CIRUNS@@): locked restore; Release build with warnings as errors and the NuGet audit as a gate; all non-SQL tests; the repository, tooling and supply-chain checks (SBOM, vulnerability and licence scan); the SQL Server suite (migrations, composite keys, Row-Level Security, audit chain, every slice's scenarios run on both providers); the Dockerfile SDK build stage, image verification and smoke test with host networking.
+Verified on CI (runs 31 and 32; all three jobs succeeded in both): locked restore; Release build with warnings as errors and the NuGet audit as a gate; all non-SQL tests; the repository, tooling and supply-chain checks (SBOM, vulnerability and licence scan); the SQL Server suite (migrations, composite keys, Row-Level Security, audit chain, every slice's scenarios run on both providers); the Dockerfile SDK build stage, image verification and smoke test with host networking.
 
 Verified in the workspace only: `tools/docker-runtime-smoke.sh` and `tools/compose-smoke.sh` for earlier slices (the container daemon could not be started for the latest slices; nothing was worked around).
 
@@ -122,7 +123,8 @@ By capability:
 * **Lifecycle**: configurable state machine, Legal review rounds, execution boundary, register authorisation without self-approval, Variations, renewals, locks and force-unlock.
 * **Approval matrix**: overlap, gap and tie validation; fail-closed resolver; simulator parity with live submission.
 * **Migration**: dry run, resumable commit, idempotent reruns, provenance, rollback, additional-field mapping.
-* **Performance (register, SQL Server, 10,000 contracts, one CI runner)**: see `docs/PERFORMANCE.md`. No service-level target exists.
+* **Performance (register, SQL Server, 10,000 contracts, one CI runner)**: see `docs/PERFORMANCE.md` and `docs/PERFORMANCE_REVIEW.md`. No service-level target exists; against the owner's PER-002 target, configured-field text search measured 599 ms before and 417 ms after on the same runner (410 ms on the final code). A selective second search word (about 0.8 s) is outside it and is recorded as a remaining bottleneck.
+* **Pack resolution (portability S1)**: a Blank organisation resolves the Blank pack and a JBS organisation the JBS pack; an organisation with no pack is refused unless the host sets `Ecp:DefaultPackId`; no compiled platform code names a default pack; ARC-010 (any spelling of the business and vendor names in `src`) passes; the Blank lifecycle opens a Variation using only Blank states and policy.
 
 ## 7. Not verified capabilities
 
@@ -141,7 +143,8 @@ Never reported as passed:
 | Scale: 100,000 contracts, concurrency, cold start, HTTP and rendering time | Only the 10,000-contract in-process baseline exists |
 | Backup, restore and disaster recovery | OPS-01 to OPS-04 not built |
 | Penetration test and external security review | Not performed |
-| A second business pack (PRT-002), terminology aliases (PRT-004), configuration and tenant export round trips (PRT-006, PRT-011), renamed roles and states (PRT-013) | The features or tests do not exist yet (`docs/PORTABILITY_AUDIT.md` section 4) |
+| PRT-002 as a whole (a second business end to end), terminology aliases (PRT-004), configuration and tenant export round trips (PRT-006, PRT-011), renamed roles and states (PRT-013) | Only the first PRT-002 step is proved (S1: a Blank organisation resolves its own pack and opens a Variation); the rest of the features or tests do not exist yet (`docs/PORTABILITY_AUDIT.md` section 4) |
+| Performance at 100,000 contracts, selective multi-word configured-field text search | Not measured; the second word of a text search still costs about 0.8 s when it is selective (`docs/PERFORMANCE_REVIEW.md` section 10) |
 | Mermaid diagram rendering | Structure is checked; rendering needs `mmdc` |
 
 ## 8. Pilot readiness assessment
@@ -157,9 +160,9 @@ A **pilot** here means a time-boxed, supervised use by one organisation, on non-
 | Deployment on IIS or Azure | **Not ready to rely on** | Scaffolded and unverified |
 | Operations | **Not ready without a manual runbook** | No backup and restore tooling, no maintenance mode, no support bundle, no operations dashboard |
 | Accessibility | **Unknown** | Pages follow accessible patterns (labels, error summaries, keyboard operation) but no audit was run |
-| Performance | **Probably adequate at pilot scale** | 10,000 contracts: register pages 40 to 75 ms; configured-field text search was the slowest operation and is addressed in `docs/PERFORMANCE_REVIEW.md`; larger scale is unmeasured |
+| Performance | **Probably adequate at pilot scale** | 10,000 contracts: register pages 40 to 75 ms; configured-field text search was the slowest operation and now measures about 0.4 s (selective second words about 0.8 s; `docs/PERFORMANCE_REVIEW.md`); larger scale is unmeasured |
 | Business configuration without code | **Partly** | Fields, shared views, approval matrices, workflows and notification policy are configuration with draft, publish and rollback; workflows and policies are edited as JSON, not in a designer; terminology, branding and feature flags are not built |
-| A second, non-JBS business | **Not possible today** | Portability findings P-01 and P-03 |
+| A second, non-JBS business | **Partly possible; not ready** | S1 fixed P-01 (pack per organisation, neutral Blank pack). P-03 (packs embedded by project files, no loader) and P-02a/b (reminder fall-back and role catalogue) are open |
 
 Conditions a pilot should set: an external SQL Server with backups owned by the pilot organisation; a real identity provider configured and Demo sign-in disabled; Production guard on; a named support owner; and the open items above accepted in writing. `docs/PRODUCTION_READINESS_CHECKLIST.md` lists the formal items.
 
@@ -173,7 +176,7 @@ Conditions a pilot should set: an external SQL Server with backups owned by the 
 | Tenant provisioning and lifecycle (sign-up, suspend, offboard, delete) | Not built; a tenant is created by first-run setup |
 | Operator control plane (fleet health, per-tenant limits, support tooling beyond audited elevation) | Not built |
 | Billing, metering, plans, quotas | Not built |
-| Business portability (a second business without source change) | Blocked by P-01 and P-03; no pack loader, no package import and export (PKM-01), no tenant export (EXP-01) |
+| Business portability (a second business without source change) | P-01 fixed; blocked by P-03 and P-02; no pack loader, no package import and export (PKM-01), no tenant export (EXP-01) |
 | Scale, concurrency and noisy-neighbour protection | Unmeasured beyond 10,000 contracts; per-tenant rate and size limits are not built |
 | Availability, backup, restore, disaster recovery, upgrade without downtime | Not built; forward-only migrations with rollback by restore are planned (OPS-02) |
 | Observability (metrics, tracing, SIEM sinks) | Structured logging with redaction exists; sinks not built (INT-04) |
@@ -184,4 +187,4 @@ Conditions a pilot should set: an external SQL Server with backups owned by the 
 | Cloud hosting (Azure) | Scaffold only |
 | Documentation for customers (admin guides, API reference, accessibility statement) | Partly; the no-code administration guides and API documentation are not written |
 
-The shortest honest path from here is: fix the portability findings (P-01, P-02, P-03), build the pack loader and packages (PKM-01, PKM-04), the operations track (OPS-01 to OPS-04), the API (API-01), then a scale and security assurance pass; only then is a SaaS offering a reasonable question to ask.
+The shortest honest path from here is: fix the remaining portability findings (P-02, P-03), build the pack loader and packages (PKM-01, PKM-04), the operations track (OPS-01 to OPS-04), the API (API-01), then a scale and security assurance pass; only then is a SaaS offering a reasonable question to ask.

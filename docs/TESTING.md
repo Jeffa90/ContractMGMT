@@ -308,7 +308,7 @@ Each scenario runs on SQLite (lightweight, **not** SQL Server proof) and, throug
 | Architecture: tiers for Formats and Metadata, same-tier edge, no cross-module persistence, no expression compilation | `ArchitectureTests` |
 | Performance baseline (10,000 contracts) and shape guard | `PerformanceBaselineTests_Sqlite`; `PerformanceBaselineTests_SqlServer` (Passed in CI run 22; numbers in `PERFORMANCE.md`) |
 
-Not covered: browser-level accessibility of the Studio and register pages (ACC-01 remains open); concurrency of two administrators editing one draft beyond the conflict message; keyset paging (not built); SQL Server index plans for `ContractCustomValue` and `SavedView` (PER-002 not done; the SQL Server scenario wrappers did exercise row-level security and composite keys).
+Not covered: browser-level accessibility of the Studio and register pages (ACC-01 remains open); concurrency of two administrators editing one draft beyond the conflict message; keyset paging (not built); SQL Server index plans for `ContractCustomValue` and `SavedView` were reviewed afterwards (PER-002, section 8.4); 100,000-contract scale is not measured.
 
 ### 8.3 Pack resolution and the Blank pack (portability slice S1, ADR-0024; PRT-001, first step of PRT-002)
 
@@ -322,6 +322,22 @@ Not covered: browser-level accessibility of the Studio and register pages (ACC-0
 | The business-name guard (ARC-010, stage A) matches every spelling, including a lowercase pack id and a name inside an identifier | `ArchitectureTests` `The_business_name_guard_recognises_every_spelling` (7 cases) and `No_business_pack_names_or_workflow_state_literals_in_compiled_code` |
 
 PRT-002 as a whole (a second business with its own fields, rules and approvals) stays **NOT VERIFIED**; it needs slice S9.
+
+### 8.4 PER-002: query-plan review and search regression guards (SQL Server)
+
+| Area | Where it is covered |
+|---|---|
+| The access subquery is left out for a field every grant allows, and kept otherwise: the open/closed decision, including empty grants and case | unit `LevelVisibilityTests` (4) |
+| A text search, configured filter and configured sort read the `Contract` table at most twice (before the change: seven reads; the test fails against the old code) | `SearchPlanShapeScenarios` `Open_fields_skip_the_access_subquery`, SQLite and SQL Server |
+| The number of SELECT statements for a page does not grow with the rows on it, within 40 (34 measured) | `SearchPlanShapeScenarios` `Statements_do_not_grow_with_rows`, SQLite and SQL Server |
+| Results and visibility unchanged: hidden fields absent and unusable in filters, sorts and text; another tenant; role-hidden field | existing `RegisterScenarios`, `RegisterViewScenarios`, `CustomFieldScenarios`, `ApprovalFactScenarios`, `MigrationCustomFieldScenarios` on both providers |
+| Baseline and plan report on every CI run | `PerformanceBaselineTests_SqlServer` (separate CI step; prints summary, JSON and plans) |
+
+No time limit is asserted (runner variance is up to 2.4 times). Result: `docs/PERFORMANCE_REVIEW.md` section 9.
+
+### 8.5 Totals at the end of the PER-002 / S1 pass
+
+Without `ECP_TEST_SQL`: **730 Passed, 0 Failed, 0 Skipped, 189 NOT VERIFIED** (451 unit, 20 architecture, 72 API, 187 integration on SQLite). CI with SQL Server 2022 (run 32, commit a0293ee): **189 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** for the SQL Server suite; the performance baseline is a separate step; the other two jobs also succeeded.
 
 ## 9. No-code, packages and portability suite
 
@@ -494,7 +510,7 @@ Automated axe-core checks plus scripted keyboard tests on every page type; manua
 | ID | Test |
 |---|---|
 | PER-001 | Contract list/search p95 < 500 ms at 100k contracts. **Partly measured**: a baseline at 10,000 contracts on SQLite is in `PERFORMANCE.md`; SQL Server measured at 10,000 contracts in CI (`PERFORMANCE.md`); 100,000 contracts and the plan review are NOT DONE |
-| PER-002 | Search by custom field with 50 fields per entity uses indexes (query plan check). **Not yet verified**: the index design is in `SEARCH_AND_VIEWS.md`; a SQL Server query-plan check has not been run |
+| PER-002 | Search by custom field with 50 fields per entity uses indexes (query plan check). **Done at 10,000 contracts and 35,000 values** on SQL Server 2022 in CI (plans in `PERFORMANCE_REVIEW.md`; configured-field text search 599 to 417 ms median). Not verified at 50 fields per entity or 100,000 contracts |
 | PER-003 | Migration of 25k contracts and 50k documents completes resumably within budget; memory bounded |
 | PER-004 | Export/report/import under concurrent load stays within rate limits and does not starve interactive users |
 | PER-005 | Row-Level Security overhead measured and within budget |

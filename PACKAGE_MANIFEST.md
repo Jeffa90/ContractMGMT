@@ -144,7 +144,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 ## Foundation, identity, configuration, setup and onboarding slice (2026-10-16; source listed by directory)
 
 - `src/Modules/Ecp.Identity/`, `src/Modules/Ecp.Configuration/`, `src/Modules/Ecp.Setup/` (each with `packages.lock.json`; the Setup project also holds the onboarding wizard)
-- `templates/packs/` (Blank and reference solution packs, embedded as data), `sample-data/demo-contracts.json`
+- `templates/packs/` (Blank and reference solution packs, embedded as data; the Blank pack carries the neutral lifecycle `blank/workflows/contract-lifecycle.json`, Variation workflow `blank/workflows/variation.json` and notification policy `blank/notifications/notification-policy.json` added by portability slice S1), `sample-data/demo-contracts.json`
 - `.config/dotnet-tools.json` (pinned local tools: EF, CycloneDX, nuget-license)
 - `tools/check-licences.py`, `tools/licence-policy.json`, `tools/patch-migration-rls.py`, `tools/supply-chain.sh`, `tools/tests/`
 - `deploy/docker/verify-image.sh`

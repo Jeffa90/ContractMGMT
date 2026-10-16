@@ -1,6 +1,6 @@
 # Performance Review (PER-002): configured-field search on SQL Server
 
-Status: **PER-002 query-plan review done on SQL Server; two evidence-based changes made; target result in section 9.** This document records the evidence, the reasoning and the limits. It states no service-level target: the figure the owner asked for (configured-field text search below 500 ms median) is treated as a target to report against, not a promise. Measurements for the register overall are in `docs/PERFORMANCE.md`.
+Status: **PER-002 closed. Query-plan review done on SQL Server; two evidence-based changes were tried, one retained and one rejected on same-runner measurement; the target (configured-field text search below 500 ms median) is met on the benchmark operation: 599 ms before, 417 ms after on the same runner (section 9).** A selective second search word is still slower than the target (section 10). This document records the evidence, the reasoning and the limits. It states no service-level target: the figure the owner asked for (configured-field text search below 500 ms median) is treated as a target to report against, not a promise. Measurements for the register overall are in `docs/PERFORMANCE.md`.
 
 ## 1. Scope and method
 
@@ -8,7 +8,7 @@ Status: **PER-002 query-plan review done on SQL Server; two evidence-based chang
 * **Why CI:** this workspace has no SQL Server (the container daemon could not be started and that was not worked around). The only SQL Server available is the disposable SQL Server 2022 container of the GitHub-hosted `sqlserver-integration` job.
 * **Instrument:** `tests/Ecp.Integration.Tests/QueryPlanReport.cs`, called from the performance harness (`tests/Ecp.Integration.Tests/PerformanceBaseline.cs`). For each operation it clears the plan cache of the test server, runs the operation once, then reads `sys.dm_exec_query_stats` with `sys.dm_exec_query_plan_stats` (the last **actual** plan, with actual rows, executions and logical reads per operator; `LAST_QUERY_PLAN_STATS` is enabled on the test database). It prints a digest: statements sent, repeated statements, elapsed, CPU, logical reads, an operator tree with estimated and actual rows, the object read, residual predicates, missing-index suggestions, warnings and compiled parameter values. It also runs a parameter-sensitivity probe. It asserts nothing.
 * **Data:** the synthetic tenant of the baseline: 10,000 contracts, 40 suppliers, 35,000 configured values (service tier, score, memo on every contract; renewal date on half). The text-search operation is "note 42" (two words) against the searchable `memo` and `service_tier` fields; 463 contracts match.
-* **Runs used:** CI run 22 (first baseline), run 24 (plans captured, before any change), run 26 (change 1, with the earlier commit rebuilt and re-run **on the same runner** for a like-for-like comparison) and run 27 (changes 1 and 2, same comparison). The temporary same-runner comparison step is in `.github/workflows/ci.yml` and is removed once this review is accepted.
+* **Runs used:** CI run 22 (first baseline), run 24 (plans captured, before any change), run 26 (change 1 against the earlier commit, rebuilt on the same runner), run 29 and **run 31** (three builds measured on **one** runner: before, change 1 only, changes 1 and 2) and **run 32** (the final code, change 1 only, with the permanent report step). The temporary comparison step that built the three variants has been removed from `.github/workflows/ci.yml`; the permanent step that prints the summary, the baseline JSON and the plan report remains.
 * **Environment:** Ubuntu 24.04 on an Azure-hosted GitHub runner, 4 logical cores, about 16 GB, .NET 10.0.13, Release build, SQL Server 2022 Developer in a container on the same machine with default settings. Runners differ between runs by a factor of up to about 2.4 for identical code (the unchanged text search measured 1,719 ms in run 22, 714 ms in run 24 and 872 ms in the run 26 baseline), so **only same-runner comparisons and logical reads are used to judge a change.** Logical reads do not depend on the machine.
 
 ## 2. Current search architecture
@@ -83,12 +83,12 @@ Both constructions hide an independent set behind an `OR` or an expression of a 
 
 ## 6. Fixes applied (only where the evidence points)
 
-| # | Change | Evidence it answers | Where |
+| # | Change | Evidence it answers | Outcome |
 |---|---|---|---|
-| 1 | **Leave the access test out when it is a constant.** `LevelVisibility.IsOpen(level)` is true when every grant allows the level; then the filter, the text match, the sort and the cell visibility skip the test. Otherwise the test is exactly as before. | RC-1: eager spools, estimate of one row, 289,235 reads | `src/Modules/Ecp.Contracts/Register/RegisterEngine.cs`, `RegisterFilters.cs` |
-| 2 | **Combine the two match sets as `id IN (row matches UNION ALL configured matches)`**, an uncorrelated set the optimiser can hash. | RC-2: per-contract probes | `src/Modules/Ecp.Contracts/Register/RegisterEngine.cs` |
+| 1 | **Leave the access test out when it is a constant.** `LevelVisibility.IsOpen(level)` is true when every grant allows the level; then the filter, the text match, the sort and the cell visibility skip the test. Otherwise the test is exactly as before. (`src/Modules/Ecp.Contracts/Register/RegisterEngine.cs`, `RegisterFilters.cs`) | RC-1: eager spools, estimate of one row, 289,235 reads | **Retained.** Same-runner text search 599 to 417 ms; configured filter 340 to 32 ms; export 124 to 46 ms; saved view 97 to 63 ms |
+| 2 | Combine the two match sets as `id IN (row matches UNION ALL configured matches)`, an uncorrelated set the optimiser can hash. | RC-2: per-contract probes | **Tried and reverted.** Fewer reads for the count, but slower on the same runner (section 6.2) |
 
-Behaviour is unchanged: the same rows come back, no field becomes visible to anyone who could not see it before. The decision in change 1 is a pure function with its own unit tests; the existing hidden-field scenarios (the owner who cannot read a Restricted field, a field hidden by role, another tenant) run on both providers.
+Behaviour is unchanged by the retained change: the same rows come back, no field becomes visible to anyone who could not see it before. The decision in change 1 is a pure function with its own unit tests; the existing hidden-field scenarios (the owner who cannot read a Restricted field, a field hidden by role, another tenant) run on both providers.
 
 ### 6.1 Considered and not done
 
@@ -102,10 +102,20 @@ Behaviour is unchanged: the same rows come back, no field becomes visible to any
 | A `OPTION (HASH JOIN)` or other query hint | Hides the problem, ties the code to one engine, and was not needed |
 | Narrow the page projection | No measurable cost at 25 rows |
 
+### 6.2 Change 2, tried and reverted
+
+Rewriting each word's condition as `contract id IN (row matches UNION ALL configured matches)` removed the per-contract probe from the **count** statement: logical reads for the text-search count fell from 91,935 to 66,231. The **page** statement did the opposite: the optimiser flattened the set into a hash join plus a per-row `TOP` probe (19,800 seeks for the second word) and its reads rose from 20,753 to 25,403. Measured on one runner in run 31, the rewrite was slower in time even though the count read less:
+
+| Metric (same runner, run 31) | Core filtered search | Configured text search (median / p95) | Scoped owner text search (median / p95) |
+|---|---|---|---|
+| Change 1 only | 87 ms | 417.1 / 426 ms | 408.2 / 411 ms |
+| Changes 1 and 2 | 168 ms | 449.9 / 453 ms | 417.8 / 571 ms |
+
+Change 2 was therefore rejected on evidence and removed in `a0293ee`; a comment at the free-text loop in `RegisterEngine.cs` records why, so the rewrite is not tried again without a new plan. Fewer reads on one statement did not predict time. This is why every later decision here uses measured time on one runner together with reads.
+
 ## 7. Risks
 
 * **Change 1 skips a security test in a defined case.** The risk is a wrong "open" decision. The rule is exact and narrow (a grant list that is non-empty and in which every grant lists the level by exact, case-sensitive match), is a pure function with unit tests for the open, closed, empty and case cases, and the closed path is untouched. The existing hidden-field scenarios cover the closed path on both providers. A future change that adds a new kind of grant (for example a deny rule) must revisit `LevelVisibility.IsOpen`; its comment says so.
-* **Change 2 reads the joined rows twice per word** that also searches a configured field (once for the page, once inside the set). That is linear in the rows and measured below; at 100,000 contracts it is a cost to watch (PRF-01).
 * **Plan choice stays the optimiser's.** Nothing forces a hash join. A different data distribution or a statistics change could choose another plan. The shape guards fail if the structure that caused this comes back; they cannot promise a plan. The plan report is repeatable in CI for the next review.
 * **The measurements are from one shared runner each**, untuned, with the container on the same machine. They are evidence of direction and order of magnitude, not a capacity statement.
 * **The "before" columns have wide noise** between runs (up to about 2.4 times). The same-runner comparisons and logical reads are the evidence; single numbers are not.
@@ -114,7 +124,7 @@ Behaviour is unchanged: the same rows come back, no field becomes visible to any
 
 | Guard | What it catches |
 |---|---|
-| `SearchPlanShapeTests_*.Open_fields_skip_the_access_subquery` (SQLite and SQL Server) | Records the SQL a text search, configured filter and configured sort send and asserts the `Contract` table is read at most once plus once per text word. Before the change the same query read it seven times, and the test fails against the old code |
+| `SearchPlanShapeTests_*.Open_fields_skip_the_access_subquery` (SQLite and SQL Server) | Records the SQL a text search, configured filter and configured sort send and asserts the `Contract` table is read at most twice (a search, a configured filter and a configured sort). Before change 1 the same query read it seven times, and the test fails against the old code |
 | `SearchPlanShapeTests_*.Statements_do_not_grow_with_rows` | The number of SELECT statements for a page does not grow with the rows on it (N+1), and stays within 40 (34 measured) |
 | `LevelVisibilityTests` (unit) | The open/closed decision |
 | Existing `RegisterScenarios`, `RegisterViewScenarios`, `CustomFieldScenarios`, `ApprovalFactScenarios`, `MigrationCustomFieldScenarios` | Results and visibility are unchanged, on SQLite and SQL Server |
@@ -124,11 +134,74 @@ A time limit is not asserted: a time depends on the runner (section 1).
 
 ## 9. Results
 
-@@RESULTS@@
+Data: 10,000 contracts, 35,000 configured values. SQL Server 2022 container on a GitHub-hosted 4-core runner, .NET 10.0.13, Release build.
+
+### 9.1 Same-runner timings (run 31: three builds, one runner)
+
+Median over the harness runs (p95 in brackets), milliseconds.
+
+| Operation | Before (`b5adb83`) | Change 1 only (`0241c84`) | Changes 1 and 2 (`e07af20`) |
+|---|---|---|---|
+| **Configured-field text search, administrator** | **599.2** (609) | **417.1** (426) | 449.9 (453) |
+| Configured-field text search, scoped owner | n/a | 408.2 (411) | 417.8 (571) |
+| Configured-field filter (tier, score range, date, sorted) | 339.5 | 31.7 | 31.4 |
+| Saved view load | 96.5 | 63.3 | 62.9 |
+| Export initiation (500 rows) | 123.9 | 46.1 | 43.2 |
+| Core-field filtered search | 134 | 87 | 168 |
+| Register first page / Expiring Soon | about 31 to 33 / about 23 to 24 | unchanged | unchanged |
+
+### 9.2 Final code (run 32, change 1 only; a different runner, so not comparable with 9.1)
+
+| Operation | Median ms | p95 ms |
+|---|---|---|
+| Configured-field text search, administrator | 410.4 | 420.0 |
+| Configured-field text search, scoped owner | 402.8 | 406.0 |
+| Configured-field filter | 30.1 | 36.6 |
+| Saved view load | 61.9 | 82.5 |
+| Export initiation | 42.0 | 48.7 |
+| Core-field filtered search | 86.3 | 104.7 |
+| Register first page / page 40 | 33.0 / 30.7 | 58.7 / 60.6 |
+| Expiring Soon | 23.8 | 26.2 |
+| Contract detail load | 13.4 | 16.0 |
+
+### 9.3 Logical reads (machine-independent)
+
+| Statement | Before (run 24) | After change 1 (run 32, final code) |
+|---|---|---|
+| Text search, count | 289,235 | 92,128 |
+| Text search, page (25 rows) | 33,106 | 20,828 |
+| Configured filter, page / count | 85,653 / 58,971 | 4,034 / 2,216 |
+| Saved view, count | 36,363 | 1,174 (page 1,368) |
+| Export, page / count | 41,092 / 41,088 | 2,709 / 2,709 |
+| Core filtered search, count | 56,375 | 9,172 (page 7,761) |
+
+Run 24 and run 32 differ only by the retained change and the report tooling, so these reads are comparable. Change 2 (not retained) gave a text-search count of 66,231 and a page of 25,403.
+
+### 9.4 Plan findings, before and after
+
+| Finding | Before | After |
+|---|---|---|
+| Table or clustered scans | Contract scanned in full several times per statement via eager index spools (10,005 rows each) | One clustered scan of Contract per statement (count and page); no spools |
+| Missing index | One suggestion on `Contract (TenantId, OrganisationId, SupplierId, IsArchived)` with `Classification` | Same suggestion, not applied (section 6.1) |
+| Key lookups | None | None |
+| Parameter sniffing | Not the cause | Not the cause for the benchmark term. A selective second word is slower (section 10) |
+| Sort or hash spills | None | None |
+| Cardinality | Estimate of 1 row for the access test and for the configured set | Access test removed in the open case; the configured set estimate is still low |
+| N+1 | None over contract rows; tenancy lookups repeated 3 to 5 times at about 0.1 ms each | Unchanged; 34 SELECT statements for a page, guarded at 40 |
+| Projection | Full contract entity for 25 rows | Unchanged; no measurable cost |
+
+### 9.5 Target
+
+**Met on the benchmark operation.** Configured-field text search (administrator) went from a 599 ms median to 417 ms on the same runner and measured 410 ms on the final-code run. That is about 17% inside the 500 ms target on this data set and these runners. The scoped owner measured 408 and 403 ms. Runner variance is up to 2.4 times between runners, so this is not a guarantee on other hardware; and it does not cover a selective second word (section 10).
 
 ## 10. Remaining bottlenecks
 
-@@REMAINING@@
+1. **RC-2 is still present.** The configured-field set is evaluated per contract in the `OR` form. The first word is cheap; the second and later words cost most. The parameter probe in run 32 shows it: the term `note` alone takes 179 to 240 ms, while `note 4242` takes 766 to 851 ms (single-digit samples after a cold start; the plan is the same shape whichever value compiled first, so this is not sniffing). The benchmark term `note 42` is within target; a selective second word such as `note 4242` is **not** (about 0.8 s on this data set). The one rewrite tried (change 2) was slower, so a fix needs a different approach and a new plan review. It is recorded as a follow-up, not done.
+2. **Full clustered scan of Contract** for the count and page statements, with the missing-index suggestion unapplied. 92,128 reads for the count is the floor of the present design; it grows linearly with contracts. No 100,000-contract measurement exists (PRF-01).
+3. **Repeated small tenancy reads** (three to five per request, about 0.1 ms each, under 3 ms total).
+4. **Full-entity projection** for the page: no cost measured at 25 rows.
+5. **Core-field text search** (86 ms) is untouched and well inside any target.
+6. **Runner variance:** timings from different runners differ by up to 2.4 times; only same-runner comparison and logical reads are evidence.
 
 ## 11. Reproducing
 

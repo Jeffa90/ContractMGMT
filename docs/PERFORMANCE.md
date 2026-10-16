@@ -1,6 +1,6 @@
 # Performance baseline (register, search, views, exports, configuration)
 
-Status: **Measured on SQLite (workspace) and on SQL Server 2022 (GitHub-hosted runner, CI run 22).** PER-002 (the query-plan review) has **not** been done. This page records what was measured and how to measure again. It states **no service-level target**: a baseline is evidence about one machine and one engine, not a promise.
+Status: **Measured on SQLite (workspace) and on SQL Server 2022 (GitHub-hosted runner; first baseline CI run 22, PER-002 before/after CI runs 24 to 32).** PER-002 (the SQL Server query-plan review) is **done**; the full evidence is in `docs/PERFORMANCE_REVIEW.md`. This page records what was measured and how to measure again. It states **no service-level target**: the owner's figure for PER-002 (configured-field text search below 500 ms median) was treated as a target to report against and is **met** on the benchmark operation (section "PER-002: before and after"). A baseline is evidence about one machine and one engine, not a promise.
 
 ## What was measured
 
@@ -56,7 +56,31 @@ Measured by `PerformanceBaselineTests_SqlServer` in CI [run 22](https://github.c
 | Configuration resolution, warm cache | system | 0.3 | 0.3 | n/a | n/a |
 | Configuration resolution, cold (after invalidation) | system | 2.7 | 5.2 | n/a | n/a |
 
-Finding: on SQL Server the **configured-field text search (about 1.7 s) and the configured-field filter (about 0.8 s)** are the slowest operations and are 5 to 10 times slower than on SQLite. The text search is a substring match over typed text values and cannot use an index seek. No target has been set, so this page does not call it a failure; it is the first thing to look at in the PER-002 plan review (actual plans, statistics, the filtered indexes, and whether a full-text index or a narrower searchable-field rule is justified). Nothing was tuned for this run.
+Finding at the time: on SQL Server the **configured-field text search (about 1.7 s) and the configured-field filter (about 0.8 s)** were the slowest operations and 5 to 10 times slower than on SQLite. This first sample came from a slower runner than later runs (the same code measured 0.6 to 0.9 s on other runners), so the table above is **not** the "before" of PER-002; that comparison is made on one runner in the next section. Nothing was tuned for this run.
+
+## PER-002: before and after (SQL Server, same runner)
+
+CI run 31 built three variants of the code on **one** runner and measured each (10,000 contracts, 35,000 configured values, 4 cores, .NET 10.0.13, Release). Medians in milliseconds, 95th percentile in brackets. Runner-to-runner variance is up to 2.4 times for identical code, so only this same-runner comparison is used to judge a change.
+
+| Operation | Before | After change 1 (retained) | Changes 1 + 2 (change 2 rejected) |
+|---|---:|---:|---:|
+| **Configured-field text search** | **599.2** (609) | **417.1** (426) | 449.9 (453) |
+| Configured-field text search, scoped owner | n/a | 408.2 (411) | 417.8 (571) |
+| Configured-field filter (tier, score range, date, sorted) | 339.5 | 31.7 | 31.4 |
+| Saved view load | 96.5 | 63.3 | 62.9 |
+| Export initiation (500-row search) | 123.9 | 46.1 | 43.2 |
+| Core-field filtered search | 134 | 87 | 168 |
+
+Final code, run 32 (a different runner; not comparable with the table above): text search 410.4 ms (p95 420), scoped owner 402.8, configured filter 30.1, saved view 61.9, export 42.0, core filtered search 86.3, register first page 33.0, Expiring Soon 23.8.
+
+Logical reads (machine-independent), before (run 24) to after (run 32): text search count 289,235 to 92,128 and page 33,106 to 20,828; configured filter page 85,653 to 4,034 and count 58,971 to 2,216; saved view count 36,363 to 1,174; export page 41,092 to 2,709; core filtered search count 56,375 to 9,172.
+
+| Change | Retained? | Why |
+|---|---|---|
+| 1. Skip the per-field access test when every grant allows the field's classification (`LevelVisibility.IsOpen`) | **Yes** | Removed the eager index spools and the one-row estimates; reads fell by 3 to 70 times; text search 599 to 417 ms |
+| 2. Combine row and configured text matches as `id IN (... UNION ALL ...)` | **No, reverted** | Count reads fell (91,935 to 66,231) but the page statement grew (20,753 to 25,403) and time rose on the same runner (417 to 450 ms; core search 87 to 168 ms) |
+
+**Target met:** the benchmark operation is under 500 ms median (417 ms same-runner, 410 ms on the final-code run; about 17% margin). **Not covered:** a selective second word (for example `note 4242`) still takes 0.77 to 0.85 s because the configured-field set is evaluated per contract in the OR form (root cause RC-2, not fixed; change 2 did not help). Other remaining bottlenecks: one clustered scan of Contract per statement (linear in contracts, no 100,000-contract measurement), small repeated tenancy reads, runner variance. See `docs/PERFORMANCE_REVIEW.md` sections 9 and 10.
 
 ## What the measurement found and fixed
 
@@ -74,7 +98,7 @@ The filter is now an uncorrelated `ContractId IN (matching values)` subquery (th
 ## What this does and does not show
 
 * It shows that on 10,000 contracts no register operation is slow enough to need caching beyond the published-configuration cache, and that the cost of a configured-field search follows the number of matching values.
-* The SQL Server run above is one sample on a shared 4-core runner with an untuned container. It shows the shape on SQL Server but is **not** the PER-002 plan review: execution plans, statistics, parameter sniffing and the row-level security predicate cost have not been inspected. Re-run locally with `tools/sqlserver-up.sh`, then `dotnet test --filter "Category=Performance&Category=SqlServer"`.
+* The SQL Server runs are samples on shared 4-core runners with an untuned container. The execution plans, statistics, parameter sensitivity and the row-level security predicate were inspected for the PER-002 review (`docs/PERFORMANCE_REVIEW.md`); the plan report is printed on every CI run. Re-run locally with `tools/sqlserver-up.sh`, then `dotnet test --filter "Category=Performance&Category=SqlServer"`.
 * It does not include HTTP, TLS, rendering or browser time; it does not test concurrency (many users at once), 100,000 contracts, or cold start.
 * The SQLite numbers come from a Debug build and the SQL Server numbers from a Release build, so the two tables are not a like-for-like comparison of engines.
 
@@ -83,4 +107,4 @@ The filter is now an uncorrelated `ContractId IN (matching values)` subquery (th
 * Core columns: organisation, status, dates, reference are indexed; access predicates are translated to the database.
 * Configured values: six filtered typed-column indexes plus tenant/organisation/field and batch indexes (see SEARCH_AND_VIEWS.md).
 * Configuration: the latest release per tenant, organisation and kind is cached for five minutes with a generation guard; the parsed definitions are cached per release number (a release never changes). A publish invalidates before and after commit; a cache that fails is bypassed (reads fall back to the database) and a failed invalidation fails the publish. The warm/cold rows above show the cost of a miss.
-* Not done, deliberately: materialised search tables, full-text indexes, a search service, or caching of contract data. They are not justified by this baseline.
+* Not done, deliberately: materialised search tables, full-text indexes, a search service, the `Contract` missing-index suggestion, or caching of contract data. They are not justified by the measurements so far; revisit the index at 100,000 contracts (PRF-01).

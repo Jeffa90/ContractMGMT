@@ -299,6 +299,23 @@ Two deviations from the plan text, both found in the code while implementing:
 
 Decisions taken inside the slice (the plan left them open): the seeded `org-a2` stays on the Blank pack and now has the neutral lifecycle (the cheapest permanent non-JBS organisation); the Blank lifecycle has no Legal review, signature or approval step, so a Blank organisation's contracts do not get a Registered Date until a pack adds one.
 
+### 8.7 Verification of S1
+
+| Check | Result |
+|---|---|
+| A Blank organisation resolves by organisation | Passed: `PackResolutionScenarios` (SQLite local; SQL Server in CI runs 31 and 32) |
+| The JBS pack resolves only when the organisation selects it or the host sets `Ecp:DefaultPackId` | Passed: `Installation_default` and `No_installation_default` scenarios; the shipped `appsettings.json` leaves the key empty |
+| No compiled platform code silently defaults to `jbs-procurement` | Passed: the property is `string?` with no default in both option classes; a scan of `src` finds `jbs-procurement` in no `.cs` or `.cshtml` file; only two project-file embedding lines remain (P-03, open) |
+| Blank-pack contracts use only Blank states and policies | Passed: the contract's state path and history contain no JBS state; the notification policy has no Legal-review rule |
+| JBS-pack behaviour unchanged | Passed: no JBS pack file changed; the existing lifecycle, notification, approval and migration scenarios pass unchanged on both providers (test hosts name `TestPacks.Reference` as installation default, which is how the shipped JBS configuration is selected) |
+| Existing published releases and migrated contracts remain compatible | Passed by construction: resolution applies only when an organisation has published nothing; a published release is read as before and contracts stay pinned to their workflow release. No EF migration, schema or data change (`git diff` of the migrations since the audit is empty) |
+| ARC-010 | Passed (20 architecture tests, including the spelling theory) |
+| Release build with warnings as errors | Passed locally and on CI (runs 31 and 32) |
+| Repository, supply-chain and Docker checks | Repository, tooling and supply-chain checks passed locally and on CI; the container image build and smoke passed on CI; Docker smoke was not run in the workspace (no daemon) |
+| All existing and new portability tests on SQL Server | Passed: 189 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED (run 32, commit a0293ee) |
+
+Remaining high-severity findings after S1: **P-03** (packs embedded in assemblies by project files; no loader) and **P-02a** (the reminder fall-back for an unowned category names a JBS role). **First incomplete remediation task: S2.** PRT-002 as a whole remains NOT VERIFIED.
+
 ## 9. Open decisions for the owner
 
 | Decision | Needed by | Recommendation |

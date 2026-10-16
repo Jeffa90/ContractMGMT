@@ -218,15 +218,19 @@ internal sealed partial class RegisterQueryEngine(
                    select new Row { C = c, S = s, G = g };
 
         // Free text: every word must match somewhere readable (reference, title, supplier, vendor number, ABN, SAP number, or a searchable configured field the caller may see).
+        // Without a searchable configured field the match is a plain predicate on the row. With one it is "id in (ids that match in the row, ids that match in a configured field)": the two sets are
+        // uncorrelated, so the database reads each once and joins once. Written as "row match OR id in (configured match)" it ran the configured match once for every contract (docs/PERFORMANCE_REVIEW.md).
+        var unfiltered = rows;
+        static IQueryable<Row> RowMatch(IQueryable<Row> q, string t, string upper)
+            => q.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
+                || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)));
         foreach (var token in (q.Text ?? "").Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries).Take(MaxTokens))
         {
             var t = token.Trim(); var upper = t.ToUpperInvariant();
             var custom = SearchableMatches(set, catalogue, t, vis);
-            rows = custom is null
-                ? rows.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
-                    || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)))
-                : rows.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
-                    || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)) || custom.Contains(r.C.Id));
+            if (custom is null) { rows = RowMatch(rows, t, upper); continue; }
+            var matching = RowMatch(unfiltered, t, upper).Select(r => r.C.Id).Concat(custom);
+            rows = rows.Where(r => matching.Contains(r.C.Id));
         }
 
         var total = await rows.CountAsync(ct);

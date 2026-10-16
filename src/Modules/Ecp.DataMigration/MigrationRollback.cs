@@ -35,10 +35,12 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
         catch (DomainException ex) { return new RollbackPreview(false, ex.Message, []); }
         var tally = new Dictionary<(string, string), (int Count, string Detail)>();
         // Records are considered in the order a rollback acts, so a supplier is previewed as removable once the contracts that would be removed are taken into account.
-        var wouldRemove = new HashSet<Guid>(); var wouldRemoveDocuments = new HashSet<Guid>();
-        foreach (var p in (await ActiveAsync(batchId, ct)).OrderBy(x => Array.IndexOf(EntityOrder, x.TargetEntityType)))
+        var wouldRemove = new HashSet<Guid>(); var wouldRemoveDocuments = new HashSet<Guid>(); var wouldRemoveCategories = new HashSet<Guid>();
+        var active = await ActiveAsync(batchId, ct);
+        foreach (var created in active.Where(x => x.TargetEntityType == "Category" && x.Action == ProvenanceAction.Created)) wouldRemoveCategories.Add(created.TargetEntityId); // indicative: a child is judged on its own
+        foreach (var p in active.OrderBy(x => Array.IndexOf(EntityOrder, x.TargetEntityType)))
         {
-            var (action, detail) = await DecideAsync(batch, p, apply: false, compensate: false, ct, preview: wouldRemove, previewDocuments: wouldRemoveDocuments);
+            var (action, detail) = await DecideAsync(batch, p, apply: false, compensate: false, ct, preview: wouldRemove, previewDocuments: wouldRemoveDocuments, previewCategories: wouldRemoveCategories);
             if (p.TargetEntityType == "Contract" && action == "Remove") wouldRemove.Add(p.TargetEntityId);
             if (p.TargetEntityType == "Document" && action == "Remove") wouldRemoveDocuments.Add(p.TargetEntityId);
             var key = (p.TargetEntityType, action);
@@ -70,25 +72,33 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
 
         foreach (var entity in EntityOrder)
         {
+            // A category that still has child categories from this batch waits until the children have been dealt with; if nothing more can progress, it is retained.
+            var deferred = new HashSet<Guid>(); var progressed = false; var allowDefer = true;
             while (true)
             {
+                var skip = deferred.ToList();
                 var more = await k.Uow.ExecuteAsync(async c =>
                 {
-                    var chunk = await k.Db.Provenance.Where(p => p.BatchId == batchId && p.ReversalState == ReversalState.Active && p.TargetEntityType == entity)
+                    var chunk = await k.Db.Provenance.Where(p => p.BatchId == batchId && p.ReversalState == ReversalState.Active && p.TargetEntityType == entity && !skip.Contains(p.Id))
                         .OrderByDescending(p => p.CreatedUtc).ThenByDescending(p => p.Id).Take(ChunkSize).ToListAsync(c);
                     if (chunk.Count == 0) return false;
                     foreach (var p in chunk)
                     {
-                        var (action, detail) = await DecideAsync(batch, p, apply: true, compensate, c, releasedKeys, reason);
+                        var (action, detail) = await DecideAsync(batch, p, apply: true, compensate, c, releasedKeys, reason, allowDefer: allowDefer);
+                        if (action == "Defer") { deferred.Add(p.Id); continue; }
                         var state = action switch { "Remove" or "Restore" or "Unlink" => ReversalState.Reversed, "Archive" => ReversalState.Archived, "Keep" => ReversalState.Retained, _ => ReversalState.NotReversible };
                         p.Resolve(state, detail, k.Clock.UtcNow);
+                        progressed = true;
                     }
                     await k.Db.SaveChangesAsync(c);
                     return true;
                 }, ct);
                 contracts.ReleaseTracked(); documents.ReleaseTracked(); k.Db.ChangeTracker.Clear();
-                if (!more) break;
+                if (more) continue;
                 // The batch row is re-read for each chunk because the tracker was cleared.
+                if (deferred.Count == 0) break;
+                if (progressed) { deferred.Clear(); progressed = false; continue; }   // children were removed: ask the parents again
+                allowDefer = false; deferred.Clear();                                  // nothing can progress: decide the rest as they stand
             }
         }
 
@@ -120,7 +130,7 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
     /// What to do with one provenance record, and (when <paramref name="apply"/>) doing it. Returns the action and a plain explanation that is stored with the record.
     /// Actions: Remove, Restore, Unlink, Archive, Keep, NotReversible.
     /// </summary>
-    private async Task<(string Action, string Detail)> DecideAsync(MigrationBatch batch, ProvenanceRecord p, bool apply, bool compensate, CancellationToken ct, HashSet<string>? released = null, string? reason = null, HashSet<Guid>? preview = null, HashSet<Guid>? previewDocuments = null)
+    private async Task<(string Action, string Detail)> DecideAsync(MigrationBatch batch, ProvenanceRecord p, bool apply, bool compensate, CancellationToken ct, HashSet<string>? released = null, string? reason = null, HashSet<Guid>? preview = null, HashSet<Guid>? previewDocuments = null, bool allowDefer = false, HashSet<Guid>? previewCategories = null)
     {
         var why = reason ?? "Rollback";
         switch (p.TargetEntityType)
@@ -189,8 +199,10 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
             {
                 if (p.Action == ProvenanceAction.Linked) return ("Unlink", "Nothing to undo: the batch only linked an existing category.");
                 if (compensate) return ("Keep", "Shared reference data is kept after acceptance.");
-                var uses = await contracts.CountContractsOfCategoryAsync(p.TargetEntityId, preview?.ToList(), ct) + await contracts.CountChildCategoriesAsync(p.TargetEntityId, ct);
-                if (uses > 0) return ("Keep", $"Kept: {uses} contract(s) or subcategories still refer to this category (it was created by a rolled-back batch).");
+                var contractUses = await contracts.CountContractsOfCategoryAsync(p.TargetEntityId, preview?.ToList(), ct);
+                var children = await contracts.CountChildCategoriesAsync(p.TargetEntityId, previewCategories?.ToList(), ct);
+                if (contractUses == 0 && children > 0 && allowDefer) return ("Defer", "Waiting for the subcategories.");
+                if (contractUses + children > 0) return ("Keep", $"Kept: {contractUses + children} contract(s) or subcategories still refer to this category (it was created by a rolled-back batch).");
                 if (apply) await contracts.RemoveCategoryAsync(p.TargetEntityId, batch.Id, why, ct);
                 return ("Remove", "The category was created by this batch and nothing refers to it.");
             }

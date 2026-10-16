@@ -59,7 +59,8 @@ public interface IContractMigrationPort
     /// <summary>Contracts that refer to the supplier, not counting the ones a rollback preview has already decided to remove.</summary>
     Task<int> CountContractsOfSupplierAsync(Guid supplierId, IReadOnlyCollection<Guid>? excluding = null, CancellationToken ct = default);
     Task<int> CountContractsOfCategoryAsync(Guid categoryId, IReadOnlyCollection<Guid>? excluding = null, CancellationToken ct = default);
-    Task<int> CountChildCategoriesAsync(Guid categoryId, CancellationToken ct = default);
+    /// <summary>Child categories, not counting those a rollback has already decided to remove.</summary>
+    Task<int> CountChildCategoriesAsync(Guid categoryId, IReadOnlyCollection<Guid>? excluding = null, CancellationToken ct = default);
     Task RemoveSupplierAsync(Guid supplierId, Guid batchId, string reason, CancellationToken ct = default);
     Task RemoveCategoryAsync(Guid categoryId, Guid batchId, string reason, CancellationToken ct = default);
     Task<BatchContractSummary> SummariseBatchAsync(Guid batchId, CancellationToken ct = default);
@@ -239,7 +240,8 @@ internal sealed class ContractMigrationPort(
         => excluding is { Count: > 0 } ? db.Contracts.AsNoTracking().CountAsync(c => c.SupplierId == supplierId && !excluding.Contains(c.Id), ct) : db.Contracts.AsNoTracking().CountAsync(c => c.SupplierId == supplierId, ct);
     public Task<int> CountContractsOfCategoryAsync(Guid categoryId, IReadOnlyCollection<Guid>? excluding = null, CancellationToken ct = default)
         => excluding is { Count: > 0 } ? db.Contracts.AsNoTracking().CountAsync(c => c.CategoryId == categoryId && !excluding.Contains(c.Id), ct) : db.Contracts.AsNoTracking().CountAsync(c => c.CategoryId == categoryId, ct);
-    public Task<int> CountChildCategoriesAsync(Guid categoryId, CancellationToken ct = default) => db.Categories.AsNoTracking().CountAsync(c => c.ParentCategoryId == categoryId, ct);
+    public Task<int> CountChildCategoriesAsync(Guid categoryId, IReadOnlyCollection<Guid>? excluding = null, CancellationToken ct = default)
+        => excluding is { Count: > 0 } ? db.Categories.AsNoTracking().CountAsync(c => c.ParentCategoryId == categoryId && !excluding.Contains(c.Id), ct) : db.Categories.AsNoTracking().CountAsync(c => c.ParentCategoryId == categoryId, ct);
 
     public async Task RemoveSupplierAsync(Guid supplierId, Guid batchId, string reason, CancellationToken ct = default)
         => await uow.ExecuteAsync(async c =>

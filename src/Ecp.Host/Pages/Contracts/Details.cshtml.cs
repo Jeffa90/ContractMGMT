@@ -10,7 +10,7 @@ namespace Ecp.Host.Pages.Contracts;
 
 [Authorize(Policy = "perm:contracts.read")]
 public sealed class DetailsModel(ISecuredContractService contracts, ISecuredContractDocuments documents, IOrganisationStructureService organisations, IAccessService access, IStatusLabels labels,
-    IVariationService variations, IRecordUnlockService unlocks, IReminderSettings reminders, INotificationInbox inbox, ILegalReviewService legal) : EcpPageModel
+    IVariationService variations, IRecordUnlockService unlocks, IReminderSettings reminders, INotificationInbox inbox, ILegalReviewService legal, IContractCustomFields customFields) : EcpPageModel
 {
     public ContractDetails Contract { get; private set; } = null!;
     public string OrganisationName { get; private set; } = "";
@@ -30,6 +30,8 @@ public sealed class DetailsModel(ISecuredContractService contracts, ISecuredCont
     public bool CanUnlock { get; private set; }
     public ReminderStatusInfo Reminder { get; private set; } = null!;
     public LegalReviewDetail? Review { get; private set; }
+    public CustomFieldForm? Fields { get; private set; }
+    public string? LegalEntityName { get; private set; }
     [BindProperty] public int? LeadDays { get; set; }
 
     public Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
@@ -40,6 +42,7 @@ public sealed class DetailsModel(ISecuredContractService contracts, ISecuredCont
         OrganisationName = (await organisations.GetOrganisationAsync(Contract.OrganisationId, ct))?.Name ?? "";
         BusinessUnitName = structure.BusinessUnits.FirstOrDefault(b => b.Id == Contract.BusinessUnitId)?.Name;
         SiteName = structure.Sites.FirstOrDefault(s => s.Id == Contract.SiteId)?.Name;
+        LegalEntityName = structure.LegalEntities.FirstOrDefault(l => l.Id == Contract.Classifiers?.LegalEntityId)?.Name;
         Value = Contract is { EstimatedValue: { } v } ? fmt.Money(v, Contract.CurrencyCode) : null;
         Start = Contract.StartDate is { } s ? fmt.Date(s) : null;
         End = Contract.EndDate is { } e ? fmt.Date(e) : null;
@@ -55,6 +58,7 @@ public sealed class DetailsModel(ISecuredContractService contracts, ISecuredCont
         Reminder = await reminders.StatusAsync(id, ct);
         LeadDays = Reminder.LeadDays;
         Review = await legal.FindForSubjectAsync(Ecp.Lifecycle.Domain.SubjectKinds.Contract, id, ct);
+        Fields = await customFields.ForContractAsync(id, null, null, ct);
         return Page();
     });
 

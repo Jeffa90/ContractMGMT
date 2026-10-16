@@ -19,6 +19,7 @@ public static class MetadataModule
     {
         services.AddScoped<IConfigurationKind, CustomFieldConfigurationKind>();
         services.AddScoped<ICustomFieldCatalogue, CustomFieldCatalogue>();
+        services.AddScoped<ICustomFieldStudio, CustomFieldStudio>();
         return services;
     }
 }

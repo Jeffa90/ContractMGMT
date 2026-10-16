@@ -1,0 +1,88 @@
+@using Ecp.Metadata
+@using Ecp.Contracts
+@model Ecp.Contracts.CustomFieldForm
+@foreach (var (block, entries) in Model.Sections())
+{
+    var editable = entries.Where(e => e.Editable).ToList();
+    if (editable.Count == 0) { continue; }
+    <fieldset class="card">
+        <legend>@block.Label</legend>
+        @foreach (var e in editable)
+        {
+            var d = e.Definition; var name = "cf." + d.Key; var id = "cf_" + d.Key; var hint = id + "-hint"; var err = id + "-error";
+            var describedBy = string.Join(' ', new[] { d.HelpText.Length > 0 ? hint : null, e.Error is not null ? err : null }.Where(x => x is not null));
+            var first = e.Raw.FirstOrDefault() ?? "";
+            <div class="field">
+                <input type="hidden" name="cfp.@d.Key" value="1" />
+                @if (d.Type == FieldTypes.Boolean)
+                {
+                    <label for="@id">@d.Label@if (d.Required) { <span aria-hidden="true"> *</span> }</label>
+                    <select id="@id" name="@name" aria-describedby="@describedBy">
+                        <option value="">@L["Not set"]</option>
+                        <option value="true" selected="@(first == "true")">@L["Yes"]</option>
+                        <option value="false" selected="@(first == "false")">@L["No"]</option>
+                    </select>
+                }
+                else if (d.Type == FieldTypes.MultiChoice)
+                {
+                    <fieldset>
+                        <legend>@d.Label@if (d.Required) { <span aria-hidden="true"> *</span> }</legend>
+                        @foreach (var c in Model.Set.ChoicesOf(d).Where(c => c.Active || e.Raw.Contains(c.Code)))
+                        {
+                            <label><input type="checkbox" name="@name" value="@c.Code" checked="@e.Raw.Contains(c.Code)" /> @c.Label</label>
+                        }
+                    </fieldset>
+                }
+                else
+                {
+                    <label for="@id">@d.Label@if (d.Required) { <span aria-hidden="true"> *</span> }</label>
+                    @switch (d.Type)
+                    {
+                        case FieldTypes.LongText:
+                            <textarea id="@id" name="@name" maxlength="@(d.Validation.MaxLength ?? 4000)" aria-describedby="@describedBy" placeholder="@d.Placeholder">@first</textarea>
+                            break;
+                        case FieldTypes.SingleChoice or FieldTypes.Lookup:
+                            <select id="@id" name="@name" aria-describedby="@describedBy">
+                                <option value="">@L["Not set"]</option>
+                                @foreach (var c in Model.Set.ChoicesOf(d).Where(c => c.Active || c.Code == first)) { <option value="@c.Code" selected="@(c.Code == first)">@c.Label</option> }
+                            </select>
+                            break;
+                        case FieldTypes.Person:
+                            <select id="@id" name="@name" aria-describedby="@describedBy">
+                                <option value="">@L["Not set"]</option>
+                                @foreach (var p in Model.People) { <option value="@p.Id" selected="@(p.Id.ToString("D") == first)">@p.DisplayName</option> }
+                            </select>
+                            break;
+                        case FieldTypes.FileReference:
+                            <select id="@id" name="@name" aria-describedby="@describedBy">
+                                <option value="">@L["Not set"]</option>
+                                @foreach (var doc in Model.Documents ?? []) { <option value="@doc.Id" selected="@(doc.Id.ToString("D") == first)">@doc.Title</option> }
+                            </select>
+                            break;
+                        case FieldTypes.Date:
+                            <input id="@id" name="@name" type="date" value="@first" aria-describedby="@describedBy" />
+                            break;
+                        case FieldTypes.DateTime:
+                            <input id="@id" name="@name" type="datetime-local" value="@(first.EndsWith('Z') ? first[..^1] : first)" aria-describedby="@describedBy" />
+                            <p class="hint">@L["Time is in UTC."]</p>
+                            break;
+                        case FieldTypes.Integer or FieldTypes.Decimal or FieldTypes.Currency or FieldTypes.Percentage:
+                            <input id="@id" name="@name" type="text" inputmode="decimal" value="@first" aria-describedby="@describedBy" placeholder="@d.Placeholder" />
+                            break;
+                        case FieldTypes.Email:
+                            <input id="@id" name="@name" type="email" maxlength="254" value="@first" aria-describedby="@describedBy" placeholder="@d.Placeholder" />
+                            break;
+                        case FieldTypes.Url:
+                            <input id="@id" name="@name" type="url" maxlength="2000" value="@first" aria-describedby="@describedBy" placeholder="@d.Placeholder" />
+                            break;
+                        default:
+                            <input id="@id" name="@name" type="text" maxlength="@(d.Validation.MaxLength ?? 500)" value="@first" aria-describedby="@describedBy" placeholder="@d.Placeholder" />
+                            break;
+                    }
+                }
+                @if (d.HelpText.Length > 0) { <p id="@hint" class="hint">@d.HelpText</p> }
+                @if (e.Error is not null) { <p id="@err" class="field-error" role="alert">@e.Error</p> }
+            </div>
+        }
+    </fieldset>
+}

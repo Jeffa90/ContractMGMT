@@ -120,6 +120,7 @@ public static partial class ViewParser
 public enum ViewScope { System, Shared, Personal }
 
 public sealed record ViewSummary(string Ref, string Name, string Description, ViewScope Scope, Guid? OrganisationId, bool CanEdit);
+public sealed record PreparedView(ResolvedView View, ContractQuery Query, IReadOnlyList<string> Notes);
 public sealed record ResolvedView(string Ref, ViewDefinition Definition, ViewScope Scope, Guid? OrganisationId, IReadOnlyList<string> Notes, bool CanEdit);
 
 /// <summary>The register's views: those the platform ships, those an organisation has published (versioned configuration) and the signed-in person's own.</summary>
@@ -128,11 +129,13 @@ public interface IContractViews
     Task<IReadOnlyList<ViewSummary>> ListAsync(Guid? organisationId = null, CancellationToken ct = default);
     Task<ResolvedView> GetAsync(string viewRef, Guid? organisationId = null, CancellationToken ct = default);
     /// <summary>Runs a view for the signed-in person. Columns, filters or sorts they cannot use are left out (with a note), never an error that reveals why.</summary>
-    Task<RegisterPage> RunAsync(string viewRef, Guid? organisationId = null, int page = 1, string? extraText = null, IReadOnlyList<FilterClause>? extraFilters = null, CancellationToken ct = default);
+    Task<RegisterPage> RunAsync(string viewRef, Guid? organisationId = null, int page = 1, string? extraText = null, IReadOnlyList<FilterClause>? extraFilters = null, IReadOnlyList<SortClause>? sortOverride = null, CancellationToken ct = default);
     Task<IReadOnlyList<RegisterIssue>> ValidateAsync(ViewDefinition definition, Guid? organisationId = null, CancellationToken ct = default);
     /// <summary>Saves (or replaces) one of the person's own views. At most 50. Refused if it exposes anything they cannot see.</summary>
     Task<string> SaveMineAsync(string? existingRef, ViewDefinition definition, CancellationToken ct = default);
     Task DeleteMineAsync(string viewRef, CancellationToken ct = default);
+    /// <summary>The query the register runs for a view as the signed-in person: columns, filters and sorts they cannot use are left out (with notes). A page runs it and an export uses the very same query.</summary>
+    Task<PreparedView> PrepareAsync(string viewRef, Guid? organisationId = null, int page = 1, string? extraText = null, IReadOnlyList<FilterClause>? extraFilters = null, IReadOnlyList<SortClause>? sortOverride = null, CancellationToken ct = default);
     /// <summary>The query a view stands for, for callers that run or export it themselves.</summary>
     ContractQuery ToQuery(ViewDefinition definition, Guid? organisationId, int page, string? extraText = null, IReadOnlyList<FilterClause>? extraFilters = null);
 }
@@ -274,7 +277,7 @@ internal sealed class ContractViewService(
         return new ContractQuery(text.Length == 0 ? null : text, [.. v.Filters, .. extraFilters ?? []], sorts.Take(RegisterQueryEngine.MaxSorts).ToList(), page, v.PageSize, v.Columns, organisationId);
     }
 
-    public async Task<RegisterPage> RunAsync(string viewRef, Guid? organisationId = null, int page = 1, string? extraText = null, IReadOnlyList<FilterClause>? extraFilters = null, CancellationToken ct = default)
+    public async Task<PreparedView> PrepareAsync(string viewRef, Guid? organisationId = null, int page = 1, string? extraText = null, IReadOnlyList<FilterClause>? extraFilters = null, IReadOnlyList<SortClause>? sortOverride = null, CancellationToken ct = default)
     {
         var view = await GetAsync(viewRef, organisationId, ct);
         var org = organisationId ?? view.OrganisationId;
@@ -283,7 +286,7 @@ internal sealed class ContractViewService(
         // Anything the person cannot use is dropped with a note; a shared view built by someone with wider access still runs, showing only what they may see.
         var columns = view.Definition.Columns.Where(c => catalogue.Find(c) is { Displayable: true }).ToList();
         foreach (var c in view.Definition.Columns.Except(columns, StringComparer.OrdinalIgnoreCase)) notes.Add($"The column '{c}' is not available to you and is not shown.");
-        var sorts = view.Definition.Sort.Where(s => catalogue.Find(s.Field) is { Sortable: true }).ToList();
+        var sorts = (sortOverride is { Count: > 0 } ? sortOverride : view.Definition.Sort).Where(s => catalogue.Find(s.Field) is { Sortable: true }).ToList();
         var filters = new List<FilterClause>();
         foreach (var f in view.Definition.Filters)
         {
@@ -291,8 +294,14 @@ internal sealed class ContractViewService(
             else notes.Add($"The filter on '{f.Field}' uses a field that is not available to you, so it is not applied.");
         }
         var safe = view.Definition with { Columns = columns.Count > 0 ? columns : RegisterQueryEngine.DefaultColumns.ToList(), Sort = sorts, Filters = filters };
-        var result = await register.SearchAsync(ToQuery(safe, org, page, extraText, extraFilters), ct);
-        return result with { Notes = [.. notes, .. result.Notes] };
+        return new PreparedView(view, ToQuery(safe, org, page, extraText, extraFilters), notes);
+    }
+
+    public async Task<RegisterPage> RunAsync(string viewRef, Guid? organisationId = null, int page = 1, string? extraText = null, IReadOnlyList<FilterClause>? extraFilters = null, IReadOnlyList<SortClause>? sortOverride = null, CancellationToken ct = default)
+    {
+        var prepared = await PrepareAsync(viewRef, organisationId, page, extraText, extraFilters, sortOverride, ct);
+        var result = await register.SearchAsync(prepared.Query, ct);
+        return result with { Notes = [.. prepared.Notes, .. result.Notes] };
     }
 
     public async Task<IReadOnlyList<RegisterIssue>> ValidateAsync(ViewDefinition definition, Guid? organisationId = null, CancellationToken ct = default)

@@ -68,6 +68,8 @@ public interface ISecuredContractService
     /// Refused unless the caller may edit this record and it is not locked or frozen; a change of scope (business unit, site) must stay inside the caller's own scope. Returns what actually changed.
     /// </summary>
     Task<IReadOnlyList<FieldChange>> UpdateFieldsAsync(Guid id, IReadOnlyDictionary<string, string?> changes, CancellationToken ct = default);
+    /// <summary>Saves the core fields and the configured fields of a record together: either both are saved and audited, or neither. Returns the core changes.</summary>
+    Task<IReadOnlyList<FieldChange>> UpdateAllAsync(Guid id, IReadOnlyDictionary<string, string?> changes, CustomFieldInput? configured, CancellationToken ct = default);
     /// <summary>Allocates the next Agreement Reference for the organisation using its prefix and numbering rule (D3).</summary>
     Task<string> PreviewNextReferenceAsync(Guid organisationId, CancellationToken ct = default);
     /// <summary>Descriptor for access simulation and tests: the facts the evaluator sees for a stored contract.</summary>
@@ -196,7 +198,7 @@ internal sealed class SecuredContractService(
     ContractsDbContext db, IAccessService access, ContractAccessContext context, IContractService contracts, IUnitOfWork uow,
     ReferenceAllocator allocator, IOrganisationStructureService structure, ITenantContext tenant, IClock clock, ICutoverFreeze freeze,
     IAuditWriter audit, Ecp.Documents.IDocumentClassification documentClassification, CurrentUser currentUser, IContractLifecyclePort port,
-    IContractCustomFields customFields, IEnumerable<IContractCreationPolicy> creationPolicies) : ISecuredContractService
+    IContractCustomFields customFields, IEnumerable<IContractCreationPolicy> creationPolicies, ICoreFieldLists coreLists) : ISecuredContractService
 {
     private async Task<IQueryable<Contract>> FilteredAsync(ContractFilter f, CancellationToken ct)
     {
@@ -402,6 +404,10 @@ internal sealed class SecuredContractService(
             await access.RequireAsync("contracts.edit_owned", descriptor with { BusinessUnitId = newBu, SiteId = newSite, DivisionId = org.DivisionOfBusinessUnit(newBu) }, ct);
         }
         var actor = currentUser.UserId?.ToString() ?? "system";
+        var canonical = new Dictionary<string, string?>(changes, StringComparer.Ordinal);
+        foreach (var (key, current) in new[] { ("contractType", c.ContractType), ("agreementType", c.AgreementType), ("riskLevel", c.RiskLevel), ("functionCode", c.FunctionCode) })
+            if (canonical.TryGetValue(key, out var raw)) canonical[key] = await coreLists.CheckAsync(c.OrganisationId, key, raw, current, ct);
+        changes = canonical;
         return await uow.ExecuteAsync(async cx =>
         {
             var tracked = await db.Contracts.FirstAsync(x => x.Id == id, cx);
@@ -414,6 +420,14 @@ internal sealed class SecuredContractService(
             return applied;
         }, ct);
     }
+
+    public async Task<IReadOnlyList<FieldChange>> UpdateAllAsync(Guid id, IReadOnlyDictionary<string, string?> changes, CustomFieldInput? configured, CancellationToken ct = default)
+        => await uow.ExecuteAsync(async c =>
+        {
+            var core = await UpdateFieldsAsync(id, changes, c);
+            if (configured is { Count: > 0 }) await customFields.SaveAsync(id, configured, c);
+            return core;
+        }, ct);
 
     public async Task<string> PreviewNextReferenceAsync(Guid organisationId, CancellationToken ct = default)
     {
@@ -447,8 +461,13 @@ internal sealed class SecuredContractService(
         await access.RequireAsync("contracts.create", descriptor, ct);
         // Configured fields are checked as this person (roles, requiredness, types) before a reference number is used or anything is written.
         var initialStatus = creationPolicies.FirstOrDefault() is { } policy ? (await policy.ResolveAsync(r.OrganisationId, ct)).InitialStatus : "";
-        await customFields.ValidateForNewAsync(r.OrganisationId, r.ContractType, initialStatus, r.CustomValues is null ? new CustomFieldInput() : CustomFieldInput.From(r.CustomValues), ct);
+        await customFields.ValidateForNewAsync(r.OrganisationId, r.ContractType, initialStatus, r.CustomFieldValues(), ct);
 
+        r = r with
+        {
+            ContractType = await coreLists.CheckAsync(r.OrganisationId, "contractType", r.ContractType, null, ct), AgreementType = await coreLists.CheckAsync(r.OrganisationId, "agreementType", r.AgreementType, null, ct),
+            RiskLevel = await coreLists.CheckAsync(r.OrganisationId, "riskLevel", r.RiskLevel, null, ct), FunctionCode = await coreLists.CheckAsync(r.OrganisationId, "functionCode", r.FunctionCode, null, ct)
+        };
         var reference = r.AgreementReference;
         if (string.IsNullOrWhiteSpace(reference))
         {

@@ -33,7 +33,11 @@ public sealed record CreateContractRequest(
     DateOnly? ReviewDate = null, DateOnly? EndDate = null, Guid? BusinessUnitId = null, Guid? SiteId = null,
     Guid? LegalEntityId = null, string? ContractType = null, string? AgreementType = null, string? RiskLevel = null, string? FunctionCode = null,
     string? SapOutlineAgreementNumber = null, int? NoticePeriodValue = null, string? NoticePeriodUnit = null, bool CriticalNotice = false,
-    IReadOnlyDictionary<string, string?>? CustomValues = null);
+    IReadOnlyDictionary<string, string?>? CustomValues = null, CustomFieldInput? CustomInput = null)
+{
+    /// <summary>The configured field values to store: a form's values (a multiple-choice field posts several) or else the single values given.</summary>
+    public CustomFieldInput CustomFieldValues() => CustomInput ?? (CustomValues is null ? new CustomFieldInput() : CustomFieldInput.From(CustomValues));
+}
 
 public sealed record ContractDto(
     Guid Id, Guid OrganisationId, string AgreementReference, string Title, string? Description, Guid SupplierId, Guid CategoryId,
@@ -146,7 +150,7 @@ internal sealed class ContractService(
             audit.Record(new AuditEntry("contract.created", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
                 NewValuesJson: AuditJson.Of(new { contract.AgreementReference, contract.ContractTitle, contract.Status, contract.Classification })));
             // Configured fields: values given at creation, and the defaults of the fields that have one. They commit with the contract or not at all.
-            await customFields.WriteNewAsync(contract.Id, r.CustomValues is null ? new CustomFieldInput() : CustomFieldInput.From(r.CustomValues), actor.ActorId ?? "system", c);
+            await customFields.WriteNewAsync(contract.Id, r.CustomFieldValues(), actor.ActorId ?? "system", c);
             return contract.Id;
         }, ct);
     }
@@ -203,6 +207,7 @@ public static class ContractsModule
         services.AddScoped<IContractMigrationPort, ContractMigrationPort>();
         services.AddScoped<IContractLifecyclePort, ContractLifecyclePort>();
         services.AddScoped<ICutoverFreeze, NoCutoverFreeze>();
+        services.AddScoped<ICoreFieldLists, CoreFieldLists>();
         services.AddScoped<ContractCustomFieldService>();
         services.AddScoped<IContractCustomFields>(sp => sp.GetRequiredService<ContractCustomFieldService>());
         services.AddScoped<IContractCustomFieldWriter>(sp => sp.GetRequiredService<ContractCustomFieldService>());

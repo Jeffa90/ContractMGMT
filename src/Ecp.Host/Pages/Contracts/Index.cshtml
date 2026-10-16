@@ -1,58 +1,145 @@
 @page "/Contracts"
 @model Ecp.Host.Pages.Contracts.IndexModel
+@using Ecp.Contracts.Register
 @{ ViewData["Title"] = L["Contract register"].Value; }
 <h1>@L["Contract register"]</h1>
 <p class="lede">@L["Only contracts inside your assigned organisations, categories, business units, sites and classification ceiling are listed."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+<form method="get" class="card" aria-label="@L["Choose a view"]">
+    <div class="field">
+        <label for="view">@L["View"]</label>
+        <select id="view" name="view">
+            @foreach (var group in Model.Views.GroupBy(v => v.Scope))
+            {
+                <optgroup label="@(group.Key == ViewScope.System ? L["Standard views"] : group.Key == ViewScope.Shared ? L["Shared by your organisation"] : L["My views"])">
+                    @foreach (var v in group) { <option value="@v.Ref" selected="@(v.Ref == Model.View)">@v.Name</option> }
+                </optgroup>
+            }
+        </select>
+        @if (Model.Current is { } cur && cur.Definition.Description.Length > 0) { <p class="hint">@cur.Definition.Description</p> }
+    </div>
+    <button type="submit">@L["Open the view"]</button>
+</form>
 
 <form method="get" class="card" aria-label="@L["Filter contracts"]">
-    <div class="field"><label for="q">@L["Search by reference or title"]</label><input id="q" name="q" type="text" value="@Model.Q" /></div>
-    <label><input type="checkbox" name="owned" value="true" checked="@Model.Owned" /> @L["Only categories I own"]</label>
-    <div class="field">
-        <label for="status">@L["Status"]</label>
-        <select id="status" name="status">
-            <option value="">@L["Any status"]</option>
-            @foreach (var s in Model.Statuses) { <option value="@s" selected="@(s == Model.Status)">@Model.StatusLabels.GetValueOrDefault(s, s)</option> }
-        </select>
-    </div>
-    <div class="field">
-        <label for="categoryId">@L["Category"]</label>
-        <select id="categoryId" name="categoryId">
-            <option value="">@L["Any category"]</option>
-            @foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }
-        </select>
-    </div>
-    <div class="actions"><button type="submit">@L["Apply filters"]</button> <a class="button secondary" href="/Contracts">@L["Clear"]</a></div>
+    <input type="hidden" name="view" value="@Model.View" />
+    <div class="field"><label for="q">@L["Search by reference, title, supplier or searchable details"]</label><input id="q" name="q" type="text" maxlength="200" value="@Model.Q" /></div>
+    @if (Model.Organisations.Count > 1)
+    {
+        <div class="field">
+            <label for="org">@L["Organisation"]</label>
+            <select id="org" name="org"><option value="">@L["All I can reach"]</option>@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.Org)">@o.Name</option> }</select>
+            <p class="hint">@L["Choose one organisation to filter and sort on its additional fields."]</p>
+        </div>
+    }
+    <fieldset>
+        <legend>@L["Filters"]</legend>
+        @{ var rows = Model.Rows.Concat(Enumerable.Repeat(("", "Eq", ""), 3)).Take(Math.Max(3, Model.Rows.Count + 1)).ToList(); }
+        @for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            <div class="filter-row">
+                <label class="visually-hidden" for="ff@(i)-field">@L["Field"]</label>
+                <select id="ff@(i)-field" name="ff">
+                    <option value="">@L["Field"]</option>
+                    @foreach (var g in Model.Catalogue.Fields.Where(f => f.Filterable).GroupBy(f => f.IsCustom ? "Additional details" : f.Group))
+                    {
+                        <optgroup label="@g.Key">@foreach (var f in g) { <option value="@f.Key" selected="@(f.Key == row.Item1)">@f.Label</option> }</optgroup>
+                    }
+                </select>
+                <label class="visually-hidden" for="ff@(i)-op">@L["Operator"]</label>
+                <select id="ff@(i)-op" name="fo">
+                    @foreach (var (op, label) in IndexModel.Operators) { <option value="@op" selected="@(op == row.Item2)">@L[label]</option> }
+                </select>
+                <label class="visually-hidden" for="ff@(i)-value">@L["Value"]</label>
+                <input id="ff@(i)-value" name="fv" type="text" maxlength="500" value="@row.Item3" />
+            </div>
+        }
+        <p class="hint">@L["Dates are yyyy-mm-dd; you can also use @today or @today+30. Use @me for yourself. A choice field takes its code or label."]</p>
+    </fieldset>
+    <div class="actions"><button type="submit">@L["Apply filters"]</button> <a class="button secondary" href="/Contracts?view=@Uri.EscapeDataString(Model.View)">@L["Clear"]</a></div>
 </form>
+
+@if (Model.StatusChips.Count > 0)
+{
+    <nav aria-label="@L["Status"]" class="chips">
+        @foreach (var s in Model.StatusChips) { <a class="badge" href="@Model.LinkTo(1, null, null, s)">@Model.StatusLabels.GetValueOrDefault(s, s)</a> }
+    </nav>
+}
 
 <div class="actions"><a class="button" href="/Contracts/Create">@L["Create a contract"]</a></div>
 <p role="status">@Model.Result.Total @L["contract(s) found"]</p>
+@foreach (var note in Model.Result.Notes) { <p class="hint" role="note">@note</p> }
 <div class="table-wrap">
 <table>
     <caption class="visually-hidden">@L["Contracts"]</caption>
-    <thead><tr><th scope="col">@L["Reference"]</th><th scope="col">@L["Title"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Category"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Classification"]</th><th scope="col">@L["Renewal"]</th></tr></thead>
+    <thead>
+        <tr>
+        @foreach (var col in Model.Result.Columns)
+        {
+            var sortable = Model.Catalogue.Find(col.Key) is { Sortable: true };
+            <th scope="col" aria-sort="@(Model.Sort == col.Key ? (Model.Desc ? "descending" : "ascending") : "none")">
+                @if (sortable) { <a href="@Model.SortLink(col.Key)">@col.Label</a> } else { @col.Label }
+                @if (col.Retired) { <span class="badge">@L["Retired"]</span> }
+            </th>
+        }
+        </tr>
+    </thead>
     <tbody>
-    @foreach (var c in Model.Result.Items)
+    @foreach (var row in Model.Result.Rows)
     {
         <tr>
-            <th scope="row"><a href="/Contracts/Details/@c.Id">@c.AgreementReference</a></th>
-            <td>@c.Title</td><td>@c.SupplierName</td><td>@c.CategoryName</td>
-            <td>@Model.StatusLabels.GetValueOrDefault(c.Status, c.Status) @if (c.RecordLocked) { <span class="badge">@L["Locked"]</span> }</td>
-            <td>@c.Classification</td>
-            <td>
-                @if (c.PredecessorContractId is { } pre) { <span>@L["Renews"] @if (Model.Linked.TryGetValue(pre, out var pr)) { <a href="/Contracts/Details/@pre">@pr</a> } else { <span class="hint">@L["(not visible)"]</span> }</span> }
-                @if (c.SuccessorContractId is { } suc) { <span>@L["Succeeded by"] @if (Model.Linked.TryGetValue(suc, out var sr)) { <a href="/Contracts/Details/@suc">@sr</a> } else { <span class="hint">@L["(not visible)"]</span> }</span> }
-            </td>
+        @foreach (var col in Model.Result.Columns)
+        {
+            var text = row.Cells.GetValueOrDefault(col.Key);
+            if (col.Key == "agreementReference") { <th scope="row"><a href="/Contracts/Details/@row.Id">@row.AgreementReference</a></th> }
+            else if (col.Key == "status") { <td>@Model.StatusLabels.GetValueOrDefault(row.Status, row.Status)</td> }
+            else if (col.Type == "BOOLEAN") { <td>@(text == "true" ? L["Yes"] : text == "false" ? L["No"] : "")</td> }
+            else { <td>@text</td> }
+        }
         </tr>
     }
-    @if (Model.Result.Items.Count == 0) { <tr><td colspan="7">@L["No contracts match."]</td></tr> }
+    @if (Model.Result.Rows.Count == 0) { <tr><td colspan="@Math.Max(1, Model.Result.Columns.Count)">@L["No contracts match."]</td></tr> }
     </tbody>
 </table>
 </div>
-@if (Model.Result.PageCount > 1)
+@if (Model.Result.Pages > 1)
 {
     <nav class="pager" aria-label="@L["Pages"]">
-        @if (Model.Result.Page > 1) { <a href="@Model.PageLink(Model.Result.Page - 1)">@L["Previous"]</a> }
-        <span>@L["Page"] @Model.Result.Page @L["of"] @Model.Result.PageCount</span>
-        @if (Model.Result.Page < Model.Result.PageCount) { <a href="@Model.PageLink(Model.Result.Page + 1)">@L["Next"]</a> }
+        @if (Model.Result.Page > 1) { <a href="@Model.LinkTo(Model.Result.Page - 1)">@L["Previous"]</a> }
+        <span>@L["Page"] @Model.Result.Page @L["of"] @Model.Result.Pages</span>
+        @if (Model.Result.Page < Model.Result.Pages) { <a href="@Model.LinkTo(Model.Result.Page + 1)">@L["Next"]</a> }
     </nav>
+}
+
+<details class="card">
+    <summary>@L["Save this search as my view"]</summary>
+    <form method="post" asp-page-handler="Save">
+        <input type="hidden" name="View" value="@Model.View" /><input type="hidden" name="Q" value="@Model.Q" /><input type="hidden" name="Org" value="@Model.Org" />
+        <input type="hidden" name="Sort" value="@Model.Sort" /><input type="hidden" name="Desc" value="@Model.Desc.ToString().ToLowerInvariant()" />
+        @foreach (var f in Model.F) { <input type="hidden" name="F" value="@f" /> }
+        <div class="field"><label for="SaveName">@L["Name"]</label><input id="SaveName" name="SaveName" type="text" required maxlength="100" /></div>
+        <button type="submit" class="secondary">@L["Save view"]</button>
+    </form>
+</details>
+@if (Model.Current is { Scope: ViewScope.Personal } mine)
+{
+    <form method="post" asp-page-handler="Delete"><input type="hidden" name="View" value="@Model.View" /><button type="submit" class="secondary">@L["Delete my view"] "@mine.Definition.Name"</button></form>
+}
+@if (Model.CanExport)
+{
+    <details class="card">
+        <summary>@L["Export what this search finds"]</summary>
+        <p class="hint">@L["Exports include only the columns you can see and that are marked reportable, and are recorded in the audit history. Large results need a reason."]</p>
+        <form method="post" asp-page-handler="Export">
+            <input type="hidden" name="View" value="@Model.View" /><input type="hidden" name="Q" value="@Model.Q" /><input type="hidden" name="Org" value="@Model.Org" />
+            <input type="hidden" name="Sort" value="@Model.Sort" /><input type="hidden" name="Desc" value="@Model.Desc.ToString().ToLowerInvariant()" />
+            @foreach (var f in Model.F) { <input type="hidden" name="F" value="@f" /> }
+            <div class="field"><label for="ExportFormat">@L["Format"]</label><select id="ExportFormat" name="ExportFormat"><option value="csv">CSV</option><option value="xlsx">Excel (XLSX)</option></select></div>
+            <div class="field"><label><input type="checkbox" name="ExportLarge" value="true" /> @L["This is a large export"]</label><input type="hidden" name="ExportLarge" value="false" /></div>
+            <div class="field"><label for="ExportReason">@L["Reason (required for a large export)"]</label><input id="ExportReason" name="ExportReason" type="text" maxlength="500" /></div>
+            <button type="submit" class="secondary">@L["Export"]</button>
+        </form>
+    </details>
 }

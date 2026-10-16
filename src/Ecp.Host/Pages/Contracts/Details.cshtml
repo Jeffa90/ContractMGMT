@@ -38,7 +38,28 @@
     <dt>@L["End date"]</dt><dd>@(Model.End ?? "-")</dd>
     <dt>@L["Registered"]</dt><dd>@(Model.Registered ?? L["Not yet registered"].Value)</dd>
     <dt>@L["Created"]</dt><dd>@Model.Created @L["by"] @Model.Contract.CreatedBy</dd>
+    @if (Model.Contract.Classifiers is { } cl)
+    {
+        <dt>@L["Legal entity"]</dt><dd>@(Model.LegalEntityName ?? "-")</dd>
+        <dt>@L["Contract type"]</dt><dd>@(cl.ContractType ?? "-")</dd>
+        <dt>@L["Agreement type"]</dt><dd>@(cl.AgreementType ?? "-")</dd>
+        <dt>@L["Risk level"]</dt><dd>@(cl.RiskLevel ?? "-")</dd>
+        <dt>@L["Function"]</dt><dd>@(cl.FunctionCode ?? "-")</dd>
+        <dt>@L["SAP outline agreement number"]</dt><dd>@(cl.SapOutlineAgreementNumber ?? "-")</dd>
+        <dt>@L["Supplier type"]</dt><dd>@(cl.SupplierType ?? "-")</dd>
+        <dt>@L["Supplier ABN"]</dt><dd>@(cl.SupplierAbn ?? "-")</dd>
+        <dt>@L["Supplier vendor number"]</dt><dd>@(cl.SupplierVendorNumber ?? "-")</dd>
+    }
+    <dt>@L["Extension type"]</dt><dd>@(Model.Contract.ExtensionType ?? "-")</dd>
+    <dt>@L["Effective date"]</dt><dd>@(Model.Contract.EffectiveDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
+    <dt>@L["Review date"]</dt><dd>@(Model.Contract.ReviewDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
+    <dt>@L["Legal review required"]</dt><dd>@(Model.Contract.LegalReviewRequired ? L["Yes"] : L["No"])</dd>
 </dl>
+@if (Model.Fields is { } extra && extra.Fields.Count > 0)
+{
+    <h2 id="additional">@L["Additional details"]</h2>
+    <partial name="_CustomFieldValues" model="extra" />
+}
 @if (Model.Contract.IsArchived)
 {
     <div class="flash warn" role="status"><strong>@L["Archived."]</strong> @Model.Contract.ArchiveReason</div>

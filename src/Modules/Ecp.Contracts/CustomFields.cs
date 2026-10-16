@@ -20,7 +20,10 @@ public sealed record CustomFieldEntry(FieldDefinition Definition, IReadOnlyList<
     public bool HasValue => Raw.Count > 0;
 }
 
-public sealed record CustomFieldForm(int Release, CustomFieldSet Set, IReadOnlyList<CustomFieldEntry> Fields, IReadOnlyList<PersonName> People)
+/// <summary>A document of the contract the person may see, offered to a file-reference field.</summary>
+public sealed record DocumentChoice(Guid Id, string Title);
+
+public sealed record CustomFieldForm(int Release, CustomFieldSet Set, IReadOnlyList<CustomFieldEntry> Fields, IReadOnlyList<PersonName> People, IReadOnlyList<DocumentChoice>? Documents = null)
 {
     /// <summary>The visible fields grouped by section in the configured order. A section with nothing to show is left out.</summary>
     public IEnumerable<(FieldSection Section, IReadOnlyList<CustomFieldEntry> Fields)> Sections()
@@ -197,8 +200,32 @@ internal sealed class ContractCustomFieldService(
             var text = shown ? Calculate(e.Definition, set, stored, c, culture, zone) : null;
             entries[i] = e with { Display = text ?? "" };
         }
-        var people_ = entries.Any(e => e.Editable && e.Definition.Type == FieldTypes.Person) ? await people.ColleaguesAsync(c.OrganisationId, ct) : [];
-        return new CustomFieldForm(set.ReleaseNumber, set, entries, people_);
+        // People and documents are shown by name, never by their identifier; a document the person may not see is not offered or named.
+        var colleagues = entries.Any(e => e.Editable && e.Definition.Type == FieldTypes.Person) ? await people.ColleaguesAsync(c.OrganisationId, ct) : [];
+        var wantsDocuments = entries.Any(e => e.Definition.Type == FieldTypes.FileReference);
+        var visibleDocuments = wantsDocuments ? await VisibleDocumentsAsync(c, descriptor, ct) : [];
+        var personIds = entries.Where(e => e.Definition.Type == FieldTypes.Person).SelectMany(e => e.Raw).Select(x => Guid.TryParse(x, out var g) ? g : (Guid?)null).Where(g => g.HasValue).Select(g => g!.Value).Distinct().ToList();
+        var names = personIds.Count == 0 ? new Dictionary<Guid, string>() : await people.DisplayNamesAsync(personIds, ct);
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var e = entries[i];
+            if (e.Definition.Type is not (FieldTypes.Person or FieldTypes.FileReference) || !e.HasValue) continue;
+            var shown = e.Raw.Select(x => Guid.TryParse(x, out var g) ? (e.Definition.Type == FieldTypes.Person ? names.GetValueOrDefault(g) : visibleDocuments.FirstOrDefault(d => d.Id == g)?.Title) : null).Where(x => x is not null);
+            entries[i] = e with { Display = string.Join("; ", shown) };
+        }
+        return new CustomFieldForm(set.ReleaseNumber, set, entries, colleagues, visibleDocuments);
+    }
+
+    private async Task<IReadOnlyList<DocumentChoice>> VisibleDocumentsAsync(Contract c, ResourceDescriptor descriptor, CancellationToken ct)
+    {
+        var scale = await access.ClassificationScaleAsync(ct);
+        var result = new List<DocumentChoice>();
+        foreach (var d in await documents.ListForContractAsync(c.Id, ct))
+        {
+            var strictest = scale.Rank(d.Classification) > scale.Rank(c.Classification) ? d.Classification : c.Classification;
+            if ((await access.CheckSilentAsync("contracts.read", descriptor with { Classification = strictest }, ct)).Allowed) result.Add(new DocumentChoice(d.DocumentId, d.Title));
+        }
+        return result;
     }
 
     private static IEnumerable<string> PlaceholdersOf(string? template)

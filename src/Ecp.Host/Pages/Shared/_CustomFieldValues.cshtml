@@ -1,0 +1,21 @@
+@using Ecp.Metadata
+@using Ecp.Contracts
+@model Ecp.Contracts.CustomFieldForm
+@foreach (var (block, entries) in Model.Sections())
+{
+    <section class="card" aria-label="@block.Label">
+        <h3>@block.Label</h3>
+        <dl class="facts">
+            @foreach (var e in entries)
+            {
+                <dt>@e.Definition.Label@if (e.Definition.IsRetired) { <span class="badge"> @L["Retired field"]</span> }</dt>
+                <dd>
+                    @if (e.Definition.Type == FieldTypes.Url && e.HasValue && Uri.TryCreate(e.Display, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+                    { <a href="@uri.AbsoluteUri" rel="noopener noreferrer">@e.Display</a> }
+                    else if (e.Definition.Type == FieldTypes.LongText) { <span class="prewrap">@(e.Display.Length == 0 ? "-" : e.Display)</span> }
+                    else { @(e.Display.Length == 0 ? "-" : e.Display) }
+                </dd>
+            }
+        </dl>
+    </section>
+}

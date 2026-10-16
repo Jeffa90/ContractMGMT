@@ -9,9 +9,15 @@
         <input id="Title" asp-for="Title" type="text" required aria-required="true" maxlength="500" aria-describedby="@(ModelState.ContainsKey("Title") ? "Title-error" : null)" />
         <span id="Title-error" class="field-error" asp-validation-for="Title"></span>
     </div>
+    <partial name="_ContractFields" model="new ContractFieldsView(Model.Input, Model.Options)" />
     <div class="field">
         <label for="Description">@L["Description"]</label>
         <textarea id="Description" asp-for="Description" maxlength="4000"></textarea>
     </div>
+    @if (Model.Fields is { } fields && fields.AnyEditable)
+    {
+        <h2>@L["Additional details"]</h2>
+        <partial name="_CustomFieldInputs" model="fields" />
+    }
     <div class="actions"><button type="submit">@L["Save changes"]</button> <a class="button secondary" href="/Contracts/Details/@Model.Id">@L["Cancel"]</a></div>
 </form>

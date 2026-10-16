@@ -30,6 +30,19 @@ public sealed class CustomFieldScenarioTests_SqlServer
     [SqlServerFact] public Task Failed_publish() => ProviderRunner.SqlServerAsync(CustomFieldScenarios.A_failed_publish_leaves_the_published_definitions_and_the_cache_unchanged, LifecycleScenarios.Scanner);
 }
 
+[Trait("Category", "Studio")]
+public sealed class StudioScenarioTests_Sqlite
+{
+    [Fact] public Task Draft_to_rollback() => ProviderRunner.SqliteAsync(StudioScenarios.A_draft_is_edited_ordered_validated_published_retired_and_rolled_back_through_the_studio, LifecycleScenarios.Scanner);
+}
+
+[Trait("Category", "Studio")]
+[Trait("Category", "SqlServer")]
+public sealed class StudioScenarioTests_SqlServer
+{
+    [SqlServerFact] public Task Draft_to_rollback() => ProviderRunner.SqlServerAsync(StudioScenarios.A_draft_is_edited_ordered_validated_published_retired_and_rolled_back_through_the_studio, LifecycleScenarios.Scanner);
+}
+
 [Trait("Category", "Register")]
 public sealed class RegisterScenarioTests_Sqlite
 {

@@ -84,3 +84,9 @@ tr.changed th, tr.changed td { background: rgba(255, 213, 79, 0.18); }
 pre.mail { white-space: pre-wrap; margin: 0; max-width: 60ch; }
 textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; width: 100%; }
 ol.steps li.current { font-weight: 700; }
+
+/* Additional details and the register's filter rows */
+.prewrap { white-space: pre-wrap; }
+.filter-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; align-items: center; }
+.filter-row select, .filter-row input[type=text] { min-width: 10rem; }
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; }

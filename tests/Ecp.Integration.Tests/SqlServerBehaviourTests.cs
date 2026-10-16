@@ -84,7 +84,7 @@ public sealed class SqlServerBehaviourTests(SqlServerFixture fx)
         await runner.RunAsync(); // second run: nothing to do
         var status = await runner.GetStatusAsync();
         Assert.True(status.IsCurrent);
-        Assert.Equal(5, status.Applied.Count);
+        Assert.Equal(7, status.Applied.Count);
         await using var c = await OpenAsync();
         var schemas = new HashSet<string>();
         await using (var cmd = c.CreateCommand())
@@ -93,7 +93,18 @@ public sealed class SqlServerBehaviourTests(SqlServerFixture fx)
             await using var r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync()) schemas.Add(r.GetString(0));
         }
-        foreach (var expected in new[] { "audit", "tenancy", "contracts", "documents", "migration" }) Assert.Contains(expected, schemas);
+        foreach (var expected in new[] { "audit", "tenancy", "identity", "configuration", "contracts", "documents", "migration" }) Assert.Contains(expected, schemas);
+    }
+
+    [SqlServerFact]
+    public async Task Timestamps_are_stored_in_datetime2_and_read_back_as_utc()
+    {
+        await using var a = App.ScopeFor(fx.TenantA);
+        var contract = await a.Get<ContractsDbContext>().Contracts.AsNoTracking().SingleAsync(c => c.Id == fx.ContractA);
+        Assert.Equal(DateTimeKind.Utc, contract.CreatedUtc.Kind); // the provider returns Unspecified; the converter makes it Utc
+        Assert.Equal(App.Clock.UtcNow.Date, contract.CreatedUtc.Date);
+        await using var c = await OpenAsync(fx.TenantA);
+        Assert.Equal("datetime2", await Scalar<string>(c, "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='contracts' AND TABLE_NAME='Contract' AND COLUMN_NAME='CreatedUtc'"));
     }
 
     [SqlServerFact]

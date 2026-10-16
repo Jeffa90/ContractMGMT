@@ -2,13 +2,16 @@ using System.Reflection;
 using System.Threading.RateLimiting;
 using Ecp.Audit;
 using Ecp.Contracts;
+using Ecp.Configuration;
 using Ecp.Documents;
+using Ecp.Identity;
 using Ecp.Documents.Storage;
 using Ecp.Host;
-using Ecp.Migration;
+using Ecp.DataMigration;
 using Ecp.Operations;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
+using Ecp.SharedKernel.Localisation;
 using Ecp.SharedKernel.Secrets;
 using Ecp.Tenancy;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +23,12 @@ var secrets = new EnvironmentAndFileSecretProvider();
 var resolved = HostConfiguration.Resolve(builder.Configuration, secrets, builder.Environment.ContentRootPath);
 Directory.CreateDirectory(resolved.Host.DataDirectory);
 
+var localisation = new LocalisationOptions();
+builder.Configuration.GetSection("Ecp:Localisation").Bind(localisation);
+localisation.Validate();
+builder.Services.AddSingleton(localisation);
+builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+
 builder.Services.AddSingleton<ISecretProvider>(secrets);
 builder.Services.AddSingleton(resolved.Host);
 builder.Services.AddSingleton(resolved.Facts);
@@ -27,6 +36,8 @@ builder.Services.AddSingleton<DemoTenantCache>();
 builder.Services.AddEcpPersistence(resolved.Database);
 builder.Services.AddAuditModule();
 builder.Services.AddTenancyModule();
+builder.Services.AddIdentityModule(o => o.Mode = resolved.Host.Mode);
+builder.Services.AddConfigurationModule(o => o.RequireSecondPersonPublish = resolved.Host.Mode == EcpMode.Production);
 builder.Services.AddContractsModule(o => builder.Configuration.GetSection("Contracts").Bind(o));
 builder.Services.AddDocumentsModule(o => builder.Configuration.GetSection("Documents").Bind(o),
     new LocalFileSystemOptions { RootPath = Path.Combine(resolved.Host.DataDirectory, "documents") });
@@ -87,6 +98,14 @@ app.UseMiddleware<CorrelationMiddleware>();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseMiddleware<SecurityHeadersMiddleware>();
+// Culture comes from the organisation default or an explicit cookie, not from browser Accept-Language (an en-US browser must not
+// silently switch an Australian organisation to month-first dates).
+app.UseRequestLocalization(o =>
+{
+    o.SetDefaultCulture(localisation.DefaultCulture).AddSupportedCultures([.. localisation.SupportedCultures]).AddSupportedUICultures([.. localisation.SupportedCultures]);
+    o.RequestCultureProviders = [new Microsoft.AspNetCore.Localization.CookieRequestCultureProvider()];
+    o.ApplyCurrentCultureToResponseHeaders = true;
+});
 if (resolved.Host.Mode == EcpMode.Production) app.UseHsts();
 app.UseRateLimiter();
 if (resolved.Host.DemoTenantResolution) app.UseMiddleware<DemoTenantMiddleware>();

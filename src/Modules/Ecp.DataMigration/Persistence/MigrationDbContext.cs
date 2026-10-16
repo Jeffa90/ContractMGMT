@@ -1,9 +1,9 @@
-using Ecp.Migration.Domain;
+using Ecp.DataMigration.Domain;
 using Ecp.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace Ecp.Migration.Persistence;
+namespace Ecp.DataMigration.Persistence;
 
 public sealed class MigrationDbContext(DbContextOptions<MigrationDbContext> options, DbContextServices services) : TenantDbContext(options, services)
 {

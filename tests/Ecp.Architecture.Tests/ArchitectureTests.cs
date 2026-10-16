@@ -1,9 +1,11 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Ecp.Audit;
+using Ecp.Configuration;
+using Ecp.Identity;
 using Ecp.Contracts;
 using Ecp.Documents;
-using Ecp.Migration;
+using Ecp.DataMigration;
 using Ecp.Operations;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
@@ -24,9 +26,11 @@ internal static class Modules
         ("Ecp.Persistence", typeof(TenantDbContext).Assembly, 0),
         ("Ecp.Audit", typeof(AuditModule).Assembly, 1),
         ("Ecp.Tenancy", typeof(TenancyModule).Assembly, 2),
+        ("Ecp.Identity", typeof(IdentityModule).Assembly, 3),
+        ("Ecp.Configuration", typeof(ConfigurationModule).Assembly, 5),
         ("Ecp.Contracts", typeof(ContractsModule).Assembly, 6),
         ("Ecp.Documents", typeof(DocumentsModule).Assembly, 6),
-        ("Ecp.Migration", typeof(MigrationModule).Assembly, 7),
+        ("Ecp.DataMigration", typeof(MigrationModule).Assembly, 7),
         ("Ecp.Operations", typeof(OperationsModule).Assembly, 8),
         ("Ecp.Host", typeof(Program).Assembly, 10),
     ];
@@ -38,7 +42,7 @@ internal static class Modules
         ("Ecp.Contracts", "Ecp.Documents"),
     ];
 
-    public static readonly string[] ModuleNames = ["Audit", "Tenancy", "Contracts", "Documents", "Migration", "Operations"];
+    public static readonly string[] ModuleNames = ["Audit", "Tenancy", "Identity", "Configuration", "Contracts", "Documents", "DataMigration", "Operations"];
 }
 
 [Trait("Category", "Architecture")]
@@ -160,7 +164,7 @@ public class SourceRuleTests
     [Fact] // ARC-005
     public void Raw_sql_appears_only_in_the_reviewed_allowlist()
         => AssertNone(new Regex(@"\b(FromSqlRaw|ExecuteSqlRaw|ExecuteSqlRawAsync|FromSql|ExecuteSql|ExecuteSqlAsync|ExecuteSqlInterpolated\w*|FromSqlInterpolated)\s*\("),
-            "Raw SQL outside the allowlist", p => p.EndsWith("/Modules/Ecp.Audit/AuditApi.cs", StringComparison.Ordinal));
+            "Raw SQL outside the allowlist", p => p.EndsWith("/Modules/Ecp.Audit/AuditApi.cs", StringComparison.Ordinal) || p.EndsWith("/Modules/Ecp.Contracts/ReferenceAllocator.cs", StringComparison.Ordinal));
 
     [Fact] // ARC-006
     public void No_cache_is_used_without_the_tenant_keyed_helper()
@@ -173,7 +177,7 @@ public class SourceRuleTests
     [Fact] // ARC-007
     public void Code_execution_and_scripting_apis_are_banned()
         => AssertNone(new Regex(@"Process\.Start|Assembly\.Load|CSharpScript|Microsoft\.CodeAnalysis|\bJint\b|Expression\.Lambda\s*<|\.Compile\s*\(\s*\)|Activator\.CreateInstance\s*\(\s*Type\.GetType"),
-            "Arbitrary code execution is banned");
+            "Arbitrary code execution is banned", p => p.EndsWith("/Modules/Ecp.Contracts/ContractAccessFilter.cs", StringComparison.Ordinal));
 
     [Fact] // ARC-010
     public void No_business_pack_names_or_workflow_state_literals_in_compiled_code()

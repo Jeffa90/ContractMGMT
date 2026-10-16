@@ -25,7 +25,7 @@ public sealed record CreateContractRequest(
     Guid OrganisationId, string AgreementReference, string Title, Guid SupplierId, Guid CategoryId, string? Description = null,
     string Classification = Classifications.Internal, string? CurrencyCode = null, decimal? EstimatedValue = null,
     string? ExtensionType = null, bool LegalReviewRequired = false, DateOnly? StartDate = null, DateOnly? EffectiveDate = null,
-    DateOnly? ReviewDate = null, DateOnly? EndDate = null);
+    DateOnly? ReviewDate = null, DateOnly? EndDate = null, Guid? BusinessUnitId = null, Guid? SiteId = null);
 
 public sealed record ContractDto(
     Guid Id, Guid OrganisationId, string AgreementReference, string Title, string? Description, Guid SupplierId, Guid CategoryId,
@@ -109,7 +109,7 @@ internal sealed class ContractService(
         var contract = Contract.CreateDraft(new NewContract(
             tenantId, r.OrganisationId, r.AgreementReference, r.Title, r.SupplierId, r.CategoryId, initial, actor.ActorId ?? "system", clock.UtcNow,
             r.Description, r.Classification, r.CurrencyCode, r.EstimatedValue, r.ExtensionType, r.LegalReviewRequired,
-            r.StartDate, r.EffectiveDate, r.ReviewDate, r.EndDate));
+            r.StartDate, r.EffectiveDate, r.ReviewDate, r.EndDate, r.BusinessUnitId, r.SiteId));
 
         // Tenant-wide uniqueness (D3). The message never says where a colliding reference lives.
         if (await db.Contracts.AnyAsync(c => c.AgreementReference == contract.AgreementReference, ct))
@@ -173,6 +173,13 @@ public static class ContractsModule
         services.AddScoped<ISupplierService, SupplierService>();
         services.AddScoped<IContractService, ContractService>();
         services.AddScoped<Ecp.Documents.IDocumentParentValidator, ContractDocumentParentValidator>();
+        services.AddScoped<ContractAccessContext>();
+        services.AddScoped<ReferenceAllocator>();
+        services.AddScoped<ICategoryAdministration, CategoryAdministration>();
+        services.AddScoped<ISecuredContractService, SecuredContractService>();
+        services.AddScoped<ISecuredSupplierService, SecuredSupplierService>();
+        services.AddScoped<ISecuredCategoryService, SecuredCategoryService>();
+        services.AddScoped<Ecp.Identity.ICategoryHierarchy, CategoryHierarchyProvider>();
         return services;
     }
 }

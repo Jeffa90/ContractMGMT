@@ -1,13 +1,13 @@
 using Ecp.Audit;
-using Ecp.Migration.Domain;
-using Ecp.Migration.Persistence;
+using Ecp.DataMigration.Domain;
+using Ecp.DataMigration.Persistence;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Ecp.Migration;
+namespace Ecp.DataMigration;
 
 public sealed record CreateProjectRequest(Guid OrganisationId, string Name, string SourceSystem, string? SourceSystemVersion, string DataOwner, DateTime ExtractionUtc);
 public sealed record CreateBatchRequest(Guid ProjectId, BatchKind Kind, DuplicateStrategy DuplicateStrategy, DocumentDuplicateOption DocumentOption, bool IsLegacyLoad = false);

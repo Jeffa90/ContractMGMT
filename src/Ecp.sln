@@ -17,7 +17,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.Contracts", "Modules\Ec
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.Documents", "Modules\Ecp.Documents\Ecp.Documents.csproj", "{9E5A5DB1-F3DE-487B-88A2-C0F0D1223037}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.Migration", "Modules\Ecp.Migration\Ecp.Migration.csproj", "{93C7D72E-F96F-48DC-B118-2B4282C4DFEA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.DataMigration", "Modules\Ecp.DataMigration\Ecp.DataMigration.csproj", "{93C7D72E-F96F-48DC-B118-2B4282C4DFEA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.Operations", "Modules\Ecp.Operations\Ecp.Operations.csproj", "{5B3F533E-CD85-4641-994A-0C6330A6953B}"
 EndProject
@@ -32,6 +32,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.Integration.Tests", "..\tests\Ecp.Integration.Tests\Ecp.Integration.Tests.csproj", "{82AC30F8-6E76-421B-B597-FC7D2F0597DC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.Api.Tests", "..\tests\Ecp.Api.Tests\Ecp.Api.Tests.csproj", "{5DDD1292-31D5-4EF4-BA2A-C1FEE1008B0E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.Identity", "Modules\Ecp.Identity\Ecp.Identity.csproj", "{C127B8C7-396E-4FF3-8172-B1A94314F6C6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecp.Configuration", "Modules\Ecp.Configuration\Ecp.Configuration.csproj", "{15B773AF-3686-4D76-9415-F9E99BD3ABF9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -211,6 +215,30 @@ Global
 		{5DDD1292-31D5-4EF4-BA2A-C1FEE1008B0E}.Release|x64.Build.0 = Release|Any CPU
 		{5DDD1292-31D5-4EF4-BA2A-C1FEE1008B0E}.Release|x86.ActiveCfg = Release|Any CPU
 		{5DDD1292-31D5-4EF4-BA2A-C1FEE1008B0E}.Release|x86.Build.0 = Release|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Debug|x64.Build.0 = Debug|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Debug|x86.Build.0 = Debug|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Release|x64.ActiveCfg = Release|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Release|x64.Build.0 = Release|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Release|x86.ActiveCfg = Release|Any CPU
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6}.Release|x86.Build.0 = Release|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Debug|x64.Build.0 = Debug|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Debug|x86.Build.0 = Debug|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Release|x64.ActiveCfg = Release|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Release|x64.Build.0 = Release|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Release|x86.ActiveCfg = Release|Any CPU
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -222,5 +250,7 @@ Global
 		{9E5A5DB1-F3DE-487B-88A2-C0F0D1223037} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 		{93C7D72E-F96F-48DC-B118-2B4282C4DFEA} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 		{5B3F533E-CD85-4641-994A-0C6330A6953B} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
+		{C127B8C7-396E-4FF3-8172-B1A94314F6C6} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
+		{15B773AF-3686-4D76-9415-F9E99BD3ABF9} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 	EndGlobalSection
 EndGlobal

@@ -6,8 +6,8 @@ using Ecp.Contracts.Persistence;
 using Ecp.Documents;
 using Ecp.Documents.Domain;
 using Ecp.Documents.Persistence;
-using Ecp.Migration;
-using Ecp.Migration.Domain;
+using Ecp.DataMigration;
+using Ecp.DataMigration.Domain;
 using Ecp.Operations;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
@@ -73,6 +73,23 @@ public sealed class LightweightProviderTests : IAsyncLifetime
         Assert.Contains("supplier.created", events);
         Assert.Contains("category.created", events);
         Assert.True((await s.Get<AuditChainVerifier>().VerifyAsync()).IsValid);
+    }
+
+    [Fact]
+    public async Task Timestamps_read_back_as_utc_and_a_non_utc_value_cannot_be_written()
+    {
+        await using var s = _app.ScopeFor(_a);
+        var (cat, sup) = await TestData.ReferenceDataAsync(s, _orgA);
+        await s.Get<IContractService>().CreateDraftAsync(TestData.Contract(_orgA, cat, sup));
+        var contract = await s.Get<ContractsDbContext>().Contracts.AsNoTracking().SingleAsync();
+        Assert.Equal(DateTimeKind.Utc, contract.CreatedUtc.Kind);
+        Assert.Equal(_app.Clock.UtcNow, contract.CreatedUtc);
+
+        var converter = new UtcDateTimeConverter();
+        var local = new DateTime(2026, 10, 16, 9, 0, 0, DateTimeKind.Local);
+        Assert.Throws<DomainException>(() => converter.ConvertToProvider(local));
+        Assert.Throws<DomainException>(() => converter.ConvertToProvider(new DateTime(2026, 10, 16, 9, 0, 0, DateTimeKind.Unspecified)));
+        Assert.Equal(DateTimeKind.Utc, ((DateTime)converter.ConvertFromProvider(new DateTime(2026, 10, 16, 9, 0, 0, DateTimeKind.Unspecified))!).Kind);
     }
 
     [Fact]

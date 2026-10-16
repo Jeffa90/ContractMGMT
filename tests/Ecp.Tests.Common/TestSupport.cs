@@ -1,8 +1,10 @@
 using Ecp.Audit;
+using Ecp.Configuration;
+using Ecp.Identity;
 using Ecp.Contracts;
 using Ecp.Documents;
 using Ecp.Documents.Storage;
-using Ecp.Migration;
+using Ecp.DataMigration;
 using Ecp.Operations;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
@@ -110,6 +112,8 @@ public sealed class TestApp : IAsyncDisposable
         services.AddEcpPersistence(new DatabaseOptions { Provider = provider, ConnectionString = cs });
         services.AddAuditModule();
         services.AddTenancyModule();
+        services.AddIdentityModule(o => o.Mode = EcpMode.Test);
+        services.AddConfigurationModule();
         services.AddContractsModule(o => o.InitialStatusCode = "Draft");
         services.AddDocumentsModule(_ => { }, new LocalFileSystemOptions { RootPath = Path.Combine(root, "documents") });
         services.AddMigrationModule();

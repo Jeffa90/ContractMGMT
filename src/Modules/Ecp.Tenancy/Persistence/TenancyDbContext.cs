@@ -9,7 +9,28 @@ public sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> options,
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Organisation> Organisations => Set<Organisation>();
+    public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
+    public DbSet<Division> Divisions => Set<Division>();
+    public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
+    public DbSet<Site> Sites => Set<Site>();
     protected override string SchemaName => TenancyModule.Schema;
+
+    private static void ConfigureStructure<T>(ModelBuilder mb, string table, Action<Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<T>> extra) where T : StructureItem
+    {
+        mb.Entity<T>(e =>
+        {
+            e.ToTable(table);
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Key).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RowVersion);
+            // Composite foreign key keeps the item in the organisation's own tenant (ADR-0003).
+            e.HasOne<Organisation>().WithMany().HasForeignKey(x => new { x.TenantId, x.OrganisationId }).HasPrincipalKey(o => new { o.TenantId, o.Id }).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.Key }).IsUnique();
+            extra(e);
+        });
+    }
 
     protected override void ConfigureModule(ModelBuilder mb)
     {
@@ -46,6 +67,15 @@ public sealed class TenancyDbContext(DbContextOptions<TenancyDbContext> options,
             // Prefix unique within the tenant so Agreement References cannot collide across organisations (D3).
             e.HasIndex(x => new { x.TenantId, x.ReferencePrefix }).IsUnique();
         });
+
+        ConfigureStructure<LegalEntity>(mb, "LegalEntity", e => e.Property(x => x.RegistrationNumber).HasMaxLength(50));
+        ConfigureStructure<Division>(mb, "Division", _ => { });
+        ConfigureStructure<BusinessUnit>(mb, "BusinessUnit", e =>
+        {
+            e.HasOne<Division>().WithMany().HasForeignKey(x => new { x.TenantId, x.DivisionId }).HasPrincipalKey(d => new { d.TenantId, d.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureStructure<Site>(mb, "Site", e => e.Property(x => x.TimeZoneId).HasMaxLength(100));
+        mb.Entity<Division>().HasAlternateKey(x => new { x.TenantId, x.Id });
     }
 }
 

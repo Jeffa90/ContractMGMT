@@ -125,13 +125,13 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `templates/demo/.gitkeep`
 - `tests/.gitkeep`
 
-## M1 additions (2026-10-16; source tree listed by directory, build output `bin/` and `obj/` excluded)
+## M1 additions (2026-10-16; source tree listed by directory; generated build output is never committed)
 
 - `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.dockerignore`
 - `src/Ecp.sln`, `src/Ecp.SharedKernel/`, `src/Ecp.Persistence/`, `src/Ecp.Host/`
-- `src/Modules/Ecp.Audit/`, `src/Modules/Ecp.Tenancy/`, `src/Modules/Ecp.Contracts/`, `src/Modules/Ecp.Documents/`, `src/Modules/Ecp.Migration/`, `src/Modules/Ecp.Operations/` (each with `packages.lock.json`)
+- `src/Modules/Ecp.Audit/`, `src/Modules/Ecp.Tenancy/`, `src/Modules/Ecp.Contracts/`, `src/Modules/Ecp.Documents/`, `src/Modules/Ecp.DataMigration/`, `src/Modules/Ecp.Operations/` (each with `packages.lock.json`; the bulk-migration module is `Ecp.DataMigration`, ADR-0015)
 - `tests/Ecp.Tests.Common/`, `tests/Ecp.UnitTests/`, `tests/Ecp.Integration.Tests/`, `tests/Ecp.Architecture.Tests/`, `tests/Ecp.Api.Tests/`
-- `tools/add-migration.sh`, `tools/dev-sandbox.sh`, `tools/docker-runtime-smoke.sh`, `tools/sqlserver-up.sh`, `tools/test-report.sh`
+- `tools/add-migration.sh`, `tools/check-repo.py`, `tools/dev-sandbox.sh`, `tools/docker-runtime-smoke.sh`, `tools/sqlserver-up.sh`, `tools/test-report.sh`
 - `deploy/README.md`, `deploy/STATUS.md`, `deploy/docker/` (Dockerfile, compose.yml, compose.production.yml, smoke.sh), `deploy/iis/` (web.config, README.md), `deploy/azure/` (main.bicep, README.md)
 - `.github/workflows/ci.yml`
 - `docs/ENVIRONMENT.md`

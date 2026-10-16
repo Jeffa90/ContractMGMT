@@ -8,9 +8,11 @@
     <ProjectReference Include="../Ecp.Persistence/Ecp.Persistence.csproj" />
     <ProjectReference Include="../Modules/Ecp.Tenancy/Ecp.Tenancy.csproj" />
     <ProjectReference Include="../Modules/Ecp.Audit/Ecp.Audit.csproj" />
+    <ProjectReference Include="../Modules/Ecp.Identity/Ecp.Identity.csproj" />
+    <ProjectReference Include="../Modules/Ecp.Configuration/Ecp.Configuration.csproj" />
     <ProjectReference Include="../Modules/Ecp.Contracts/Ecp.Contracts.csproj" />
     <ProjectReference Include="../Modules/Ecp.Documents/Ecp.Documents.csproj" />
-    <ProjectReference Include="../Modules/Ecp.Migration/Ecp.Migration.csproj" />
+    <ProjectReference Include="../Modules/Ecp.DataMigration/Ecp.DataMigration.csproj" />
     <ProjectReference Include="../Modules/Ecp.Operations/Ecp.Operations.csproj" />
   </ItemGroup>
   <ItemGroup>

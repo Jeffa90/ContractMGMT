@@ -10,6 +10,8 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<Contract> Contracts => Set<Contract>();
+    public DbSet<CategoryAssignment> CategoryAssignments => Set<CategoryAssignment>();
+    public DbSet<ReferenceCounter> ReferenceCounters => Set<ReferenceCounter>();
     protected override string SchemaName => ContractsModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
@@ -28,6 +30,25 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.Code }).IsUnique();
             e.HasOne<Category>().WithMany().HasForeignKey(x => new { x.TenantId, x.ParentCategoryId })
                 .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        mb.Entity<CategoryAssignment>(e =>
+        {
+            e.ToTable("CategoryAssignment");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.AssignedByLabel).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Reason).HasMaxLength(1000);
+            e.Property(x => x.RowVersion);
+            e.HasOne<Category>().WithMany().HasForeignKey(x => new { x.TenantId, x.CategoryId }).HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.CategoryId, x.EffectiveToUtc });
+            e.HasIndex(x => new { x.TenantId, x.UserId });
+        });
+
+        mb.Entity<ReferenceCounter>(e =>
+        {
+            e.ToTable("ReferenceCounter");
+            e.HasKey(x => new { x.TenantId, x.OrganisationId });
         });
 
         mb.Entity<Supplier>(e =>

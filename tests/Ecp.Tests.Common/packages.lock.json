@@ -402,11 +402,30 @@
           "Ecp.SharedKernel": "[1.0.0, )"
         }
       },
+      "ecp.configuration": {
+        "type": "Project",
+        "dependencies": {
+          "Ecp.Audit": "[1.0.0, )",
+          "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Persistence": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.0.0, )"
+        }
+      },
       "ecp.contracts": {
         "type": "Project",
         "dependencies": {
           "Ecp.Audit": "[1.0.0, )",
           "Ecp.Documents": "[1.0.0, )",
+          "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Persistence": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.Tenancy": "[1.0.0, )"
+        }
+      },
+      "ecp.datamigration": {
+        "type": "Project",
+        "dependencies": {
+          "Ecp.Audit": "[1.0.0, )",
           "Ecp.Persistence": "[1.0.0, )",
           "Ecp.SharedKernel": "[1.0.0, )",
           "Ecp.Tenancy": "[1.0.0, )"
@@ -420,7 +439,7 @@
           "Ecp.SharedKernel": "[1.0.0, )"
         }
       },
-      "ecp.migration": {
+      "ecp.identity": {
         "type": "Project",
         "dependencies": {
           "Ecp.Audit": "[1.0.0, )",

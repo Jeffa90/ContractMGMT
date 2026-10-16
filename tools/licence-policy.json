@@ -1,0 +1,49 @@
+{
+  "description": "Machine-readable licence policy for third-party packages. This is an engineering control, NOT legal advice and NOT legal approval of any licence. Categories and exceptions are decisions recorded by the maintainers for the product owner and counsel to review (docs/SUPPLY_CHAIN.md).",
+  "allowed": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MS-PL", "0BSD", "Zlib", "Unlicense", "BSL-1.0", "CC0-1.0"],
+  "restricted": ["MPL-2.0", "LGPL-2.1-only", "LGPL-2.1-or-later", "LGPL-3.0-only", "LGPL-3.0-or-later", "EPL-1.0", "EPL-2.0", "CDDL-1.0", "CC-BY-4.0", "CC-BY-3.0"],
+  "prohibited": ["GPL-2.0-only", "GPL-2.0-or-later", "GPL-3.0-only", "GPL-3.0-or-later", "AGPL-3.0-only", "AGPL-3.0-or-later", "SSPL-1.0", "BUSL-1.1", "Commons-Clause", "CC-BY-NC-4.0", "CC-BY-NC-SA-4.0", "Elastic-2.0"],
+  "urlMappings": {
+    "http://opensource.org/licenses/mit-license.php": "MIT",
+    "https://licenses.nuget.org/MIT": "MIT",
+    "https://licenses.nuget.org/Apache-2.0": "Apache-2.0",
+    "https://raw.githubusercontent.com/xunit/xunit/master/license.txt": "Apache-2.0"
+  },
+  "exceptions": [
+    {
+      "package": "NetArchTest.Rules",
+      "resolvedLicence": "MIT",
+      "scope": "test-only (not shipped)",
+      "status": "Recorded",
+      "evidence": "The package metadata carries no licence element; the upstream repository (github.com/BenMorris/NetArchTest) declares the MIT licence. Recorded by the maintainers from the repository; to be confirmed by the product owner."
+    },
+    {
+      "package": "Mono.Cecil",
+      "resolvedLicence": "MIT",
+      "scope": "test-only (transitive of NetArchTest.Rules)",
+      "status": "Recorded",
+      "evidence": "licenseUrl points to the MIT licence text (opensource.org)."
+    },
+    {
+      "package": "xunit.abstractions",
+      "resolvedLicence": "Apache-2.0",
+      "scope": "test-only (not shipped)",
+      "status": "Recorded",
+      "evidence": "licenseUrl points to the xunit licence file (Apache-2.0)."
+    },
+    {
+      "package": "Microsoft.Data.SqlClient.SNI.runtime",
+      "resolvedLicence": "LicenseRef-Microsoft-Software-License-Terms",
+      "scope": "shipped (native Windows SQL client networking library, transitive of Microsoft.Data.SqlClient)",
+      "status": "PendingOwnerReview",
+      "evidence": "The package ships Microsoft Software License Terms (licence file, acceptance required). Not an OSI licence. Redistribution terms must be reviewed by the product owner or counsel before a release that includes the Windows native library is distributed."
+    },
+    {
+      "package": "Microsoft.Identity.Client.NativeInterop",
+      "resolvedLicence": "LicenseRef-Microsoft-Software-License-Terms",
+      "scope": "shipped (native interop for Microsoft authentication library, transitive of Azure.Identity)",
+      "status": "PendingOwnerReview",
+      "evidence": "The package ships Microsoft Software License Terms (licence file). Not an OSI licence. Review before distribution."
+    }
+  ]
+}

@@ -23,6 +23,138 @@ namespace Ecp.Tenancy.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Ecp.Tenancy.Domain.BusinessUnit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DivisionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DivisionId");
+
+                    b.HasIndex("TenantId", "OrganisationId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("BusinessUnit", "tenancy");
+                });
+
+            modelBuilder.Entity("Ecp.Tenancy.Domain.Division", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "OrganisationId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("Division", "tenancy");
+                });
+
+            modelBuilder.Entity("Ecp.Tenancy.Domain.LegalEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RegistrationNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "OrganisationId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("LegalEntity", "tenancy");
+                });
+
             modelBuilder.Entity("Ecp.Tenancy.Domain.Organisation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -80,8 +212,6 @@ namespace Ecp.Tenancy.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("TenantId", "Name")
                         .IsUnique();
 
@@ -89,6 +219,51 @@ namespace Ecp.Tenancy.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Organisation", "tenancy");
+                });
+
+            modelBuilder.Entity("Ecp.Tenancy.Domain.Site", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TimeZoneId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "OrganisationId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("Site", "tenancy");
                 });
 
             modelBuilder.Entity("Ecp.Tenancy.Domain.Tenant", b =>
@@ -131,6 +306,52 @@ namespace Ecp.Tenancy.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Tenant", "tenancy");
+                });
+
+            modelBuilder.Entity("Ecp.Tenancy.Domain.BusinessUnit", b =>
+                {
+                    b.HasOne("Ecp.Tenancy.Domain.Division", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DivisionId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Ecp.Tenancy.Domain.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrganisationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Ecp.Tenancy.Domain.Division", b =>
+                {
+                    b.HasOne("Ecp.Tenancy.Domain.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrganisationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Ecp.Tenancy.Domain.LegalEntity", b =>
+                {
+                    b.HasOne("Ecp.Tenancy.Domain.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrganisationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Ecp.Tenancy.Domain.Site", b =>
+                {
+                    b.HasOne("Ecp.Tenancy.Domain.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OrganisationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

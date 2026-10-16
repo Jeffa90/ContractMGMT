@@ -1,6 +1,8 @@
 using Ecp.Persistence;
 using Ecp.SharedKernel;
+using Ecp.SharedKernel.Localisation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Ecp.Operations;
@@ -123,6 +125,21 @@ internal sealed class DataDirectoryReadinessCheck(DataDirectoryOptions options) 
     }
 }
 
+/// <summary>R-OPS-02: culture data (ICU) and time-zone data are present and the configured defaults resolve.</summary>
+internal sealed class GlobalisationReadinessCheck(LocalisationOptions options) : IReadinessCheck
+{
+    public string Id => "R-OPS-02";
+
+    public Task<ReadinessResult> RunAsync(CancellationToken ct)
+    {
+        const string description = "ICU and time-zone data present";
+        var failed = GlobalisationProbe.Run(options.DefaultCulture, options.DefaultTimeZoneId).Where(r => !r.Ok).ToList();
+        return Task.FromResult(failed.Count == 0
+            ? new ReadinessResult(Id, description, ReadinessStatus.Healthy, "Culture and time-zone data are present.")
+            : new ReadinessResult(Id, description, ReadinessStatus.Unhealthy, string.Join(" ", failed.Select(f => f.Message))));
+    }
+}
+
 public static class OperationsModule
 {
     public static IServiceCollection AddOperationsModule(this IServiceCollection services, string dataDirectory)
@@ -130,6 +147,8 @@ public static class OperationsModule
         services.AddSingleton(new DataDirectoryOptions { Path = dataDirectory });
         services.AddScoped<IReadinessCheck, DatabaseReadinessCheck>();
         services.AddScoped<IReadinessCheck, DataDirectoryReadinessCheck>();
+        services.TryAddSingleton(new LocalisationOptions());
+        services.AddScoped<IReadinessCheck, GlobalisationReadinessCheck>();
         services.AddScoped<ReadinessService>();
         return services;
     }

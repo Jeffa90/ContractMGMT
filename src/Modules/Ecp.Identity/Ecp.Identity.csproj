@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../Ecp.SharedKernel/Ecp.SharedKernel.csproj" />
+    <ProjectReference Include="../../Ecp.Persistence/Ecp.Persistence.csproj" />
+    <ProjectReference Include="../Ecp.Audit/Ecp.Audit.csproj" />
+    <ProjectReference Include="../Ecp.Tenancy/Ecp.Tenancy.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- One canonical copy: the repository's confirmed permission catalogue and role-permission matrix are embedded, not duplicated (IDN-02). -->
+    <EmbeddedResource Include="../../../requirements/02-reference/role-permission-matrix.csv" LogicalName="Ecp.Identity.role-permission-matrix.csv" />
+    <EmbeddedResource Include="../../../requirements/02-reference/permission-catalogue.csv" LogicalName="Ecp.Identity.permission-catalogue.csv" />
+  </ItemGroup>
+</Project>

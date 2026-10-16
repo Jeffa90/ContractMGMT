@@ -44,6 +44,16 @@ public abstract class TenantDbContext : DbContext
 
     protected abstract void ConfigureModule(ModelBuilder modelBuilder);
 
+    /// <summary>
+    /// Timestamps are UTC everywhere: writing a non-UTC <see cref="DateTime"/> is refused and every value read back has Kind Utc,
+    /// so a provider that returns "unspecified" kinds can never produce a local-looking instant.
+    /// </summary>
+    protected sealed override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+        configurationBuilder.Properties<DateTime?>().HaveConversion<NullableUtcDateTimeConverter>();
+    }
+
     protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
@@ -105,3 +115,13 @@ public abstract class TenantDbContext : DbContext
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
         => throw new NotSupportedException("Use SaveChangesAsync inside IUnitOfWork.ExecuteAsync so changes and audit commit together.");
 }
+
+/// <summary>Stores UTC instants only; reads back Kind Utc.</summary>
+public sealed class UtcDateTimeConverter() : Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime, DateTime>(
+    v => EnsureUtc(v), v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
+{
+    internal static DateTime EnsureUtc(DateTime v) => v.Kind == DateTimeKind.Utc ? v : throw new DomainException("not_utc", "Timestamps must be UTC instants.");
+}
+
+public sealed class NullableUtcDateTimeConverter() : Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime?, DateTime?>(
+    v => v.HasValue ? UtcDateTimeConverter.EnsureUtc(v.Value) : v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);

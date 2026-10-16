@@ -13,8 +13,9 @@ PORT=${ECP_SMOKE_PORT:-18080}
 docker run -d --name ecp-smoke --network host -e ASPNETCORE_URLS="http://127.0.0.1:$PORT" -e Ecp__Mode=Demo \
   -e Database__Provider=Sqlite -e Database__ConnectionString="Data Source=/var/ecp/ecp-demo.db" ecp:smoke >/dev/null
 for i in $(seq 1 40); do curl -fsS "http://127.0.0.1:$PORT/health/ready" >/dev/null 2>&1 && break; sleep 1; done
-curl -fsS "http://127.0.0.1:$PORT/health/ready" >/dev/null || { docker logs --tail 30 ecp-smoke >&2; echo "FAILED: not ready" >&2; exit 1; }
+READY=$(curl -fsS "http://127.0.0.1:$PORT/health/ready") || { docker logs --tail 30 ecp-smoke >&2; echo "FAILED: not ready" >&2; exit 1; }
+echo "$READY" | grep -q '"id":"R-OPS-02","status":"Healthy"' || { echo "FAILED: ICU/time-zone data missing in the image: $READY" >&2; exit 1; }
 USER_ID=$(docker exec ecp-smoke id -u); [[ "$USER_ID" != "0" ]] || { echo "FAILED: runs as root" >&2; exit 1; }
 if docker run --rm --network host -e Ecp__Mode=Production -e Database__Provider=Sqlite -e Database__ConnectionString="Data Source=x.db" ecp:smoke >/dev/null 2>&1; then
   echo "FAILED: Production accepted demo settings" >&2; exit 1; fi
-echo "VERIFIED (runtime stage only): Demo ready, non-root uid $USER_ID, Production refuses demo/SQLite settings."
+echo "VERIFIED (runtime stage only): Demo ready, ICU and time-zone data present (R-OPS-02), non-root uid $USER_ID, Production refuses demo/SQLite settings."

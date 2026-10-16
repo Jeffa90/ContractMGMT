@@ -1,6 +1,6 @@
 using Ecp.SharedKernel;
 
-namespace Ecp.Migration.Domain;
+namespace Ecp.DataMigration.Domain;
 
 public enum BatchKind { DryRun, Mock, Final }
 

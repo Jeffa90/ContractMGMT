@@ -1,6 +1,6 @@
 using Ecp.Audit;
 using Ecp.Audit.Domain;
-using Ecp.Migration.Domain;
+using Ecp.DataMigration.Domain;
 using Ecp.Operations;
 using Ecp.Persistence;
 using Ecp.SharedKernel;

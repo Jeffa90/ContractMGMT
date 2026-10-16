@@ -33,10 +33,20 @@ jobs:
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category!=SqlServer" --logger "trx;LogFileName=non-sql.trx" --results-directory TestResults
         env:
           ECP_TEST_SQL: ""
-      - name: Vulnerable package gate
-        run: |
-          dotnet list src/Ecp.sln package --vulnerable --include-transitive 2>&1 | tee vuln.txt
-          if grep -q "has the following vulnerable packages" vuln.txt; then echo "Vulnerable packages found"; exit 1; fi
+      - name: Repository consistency checks (links, CSV/JSON, references, manifest, Mermaid structure)
+        run: python3 -I tools/check-repo.py .
+      - name: Tooling script tests
+        run: python3 -I -m unittest discover -s tools/tests
+      - name: Supply chain (vulnerabilities, SBOM, licence policy)
+        run: tools/supply-chain.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: supply-chain
+          path: |
+            artifacts/sbom/ecp.bom.json
+            artifacts/licences/licence-report.md
+            artifacts/vulnerabilities.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:

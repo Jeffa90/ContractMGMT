@@ -463,6 +463,15 @@
           "Ecp.SharedKernel": "[1.0.0, )"
         }
       },
+      "ecp.identity": {
+        "type": "Project",
+        "dependencies": {
+          "Ecp.Audit": "[1.0.0, )",
+          "Ecp.Persistence": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.Tenancy": "[1.0.0, )"
+        }
+      },
       "ecp.persistence": {
         "type": "Project",
         "dependencies": {

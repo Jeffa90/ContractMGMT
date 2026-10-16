@@ -27,6 +27,8 @@ public sealed class Category : ITenantOwned
     public Guid TenantId { get; private set; }
     public Guid OrganisationId { get; private set; }
     public Guid? ParentCategoryId { get; private set; }
+    /// <summary>Optional owning division, used to scope delegated (Division/Site) administration of the taxonomy.</summary>
+    public Guid? DivisionId { get; private set; }
     public string Code { get; private set; } = "";
     public string Name { get; private set; } = "";
     public bool IsActive { get; private set; } = true;
@@ -42,6 +44,52 @@ public sealed class Category : ITenantOwned
     };
 
     public void Deactivate() => IsActive = false;
+    public void Activate() => IsActive = true;
+    public void Rename(string name) => Name = Guard.NotBlank(name, "Category name", 200);
+    public void SetDivision(Guid? divisionId) => DivisionId = divisionId;
+}
+
+/// <summary>
+/// Effective-dated ownership of a category by a user (IDN-04). Edit rights follow the assignment that is active at the moment of the action;
+/// ending an assignment removes them immediately and history is retained. Ownership of a category covers its subcategories.
+/// </summary>
+public sealed class CategoryAssignment : ITenantOwned
+{
+    private CategoryAssignment() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid OrganisationId { get; private set; }
+    public Guid CategoryId { get; private set; }
+    public Guid UserId { get; private set; }
+    public bool IsPrimary { get; private set; }
+    public DateTime EffectiveFromUtc { get; private set; }
+    public DateTime? EffectiveToUtc { get; private set; }
+    public string AssignedByLabel { get; private set; } = "";
+    public string? Reason { get; private set; }
+    public DateTime CreatedUtc { get; private set; }
+    public byte[] RowVersion { get; private set; } = [];
+
+    public static CategoryAssignment Create(Guid tenantId, Guid organisationId, Guid categoryId, Guid userId, bool isPrimary, DateTime effectiveFromUtc,
+        DateTime? effectiveToUtc, string assignedBy, string? reason, DateTime nowUtc)
+    {
+        if (effectiveToUtc.HasValue && Guard.Utc(effectiveToUtc.Value, nameof(effectiveToUtc)) <= Guard.Utc(effectiveFromUtc, nameof(effectiveFromUtc)))
+            throw new DomainException("invalid_dates", "The assignment must end after it starts.");
+        return new CategoryAssignment
+        {
+            Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
+            CategoryId = Guard.NotEmpty(categoryId, nameof(categoryId)), UserId = Guard.NotEmpty(userId, nameof(userId)), IsPrimary = isPrimary,
+            EffectiveFromUtc = effectiveFromUtc, EffectiveToUtc = effectiveToUtc, AssignedByLabel = Guard.NotBlank(assignedBy, "Assigned by", 200),
+            Reason = Guard.OptionalBounded(reason, "Reason", 1000), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+        };
+    }
+
+    public bool IsActiveAt(DateTime utc) => EffectiveFromUtc <= utc && (EffectiveToUtc is null || utc < EffectiveToUtc);
+
+    public void End(DateTime nowUtc)
+    {
+        Guard.Utc(nowUtc, nameof(nowUtc));
+        if (EffectiveToUtc is null || EffectiveToUtc > nowUtc) EffectiveToUtc = nowUtc < EffectiveFromUtc ? EffectiveFromUtc : nowUtc;
+    }
 }
 
 public sealed partial class Supplier : ITenantOwned
@@ -95,11 +143,23 @@ public sealed partial class Supplier : ITenantOwned
     private static partial Regex Whitespace();
 }
 
+/// <summary>Last Agreement Reference number issued for an organisation. Numbers are allocated transactionally and never reused (D3).</summary>
+public sealed class ReferenceCounter : ITenantOwned
+{
+    private ReferenceCounter() { }
+    public Guid TenantId { get; private set; }
+    public Guid OrganisationId { get; private set; }
+    public long LastValue { get; private set; }
+
+    public static ReferenceCounter Start(Guid tenantId, Guid organisationId) => new() { TenantId = tenantId, OrganisationId = organisationId, LastValue = 0 };
+}
+
 public sealed record NewContract(
     Guid TenantId, Guid OrganisationId, string AgreementReference, string Title, Guid SupplierId, Guid CategoryId,
     string InitialStatusCode, string CreatedBy, DateTime NowUtc, string? Description = null, string Classification = Classifications.Internal,
     string? CurrencyCode = null, decimal? EstimatedValue = null, string? ExtensionType = null, bool LegalReviewRequired = false,
-    DateOnly? StartDate = null, DateOnly? EffectiveDate = null, DateOnly? ReviewDate = null, DateOnly? EndDate = null);
+    DateOnly? StartDate = null, DateOnly? EffectiveDate = null, DateOnly? ReviewDate = null, DateOnly? EndDate = null,
+    Guid? BusinessUnitId = null, Guid? SiteId = null);
 
 public sealed record SourceProvenance(string SourceSystem, string SourceRecordId, string? SourceAgreementReference, string? SourceStatus, DateTime? SourceExtractedUtc);
 
@@ -116,6 +176,8 @@ public sealed class Contract : ITenantOwned
     public string? Description { get; private set; }
     public Guid SupplierId { get; private set; }
     public Guid CategoryId { get; private set; }
+    public Guid? BusinessUnitId { get; private set; }
+    public Guid? SiteId { get; private set; }
 
     /// <summary>Workflow state code. Changed only through <see cref="ApplyWorkflowState"/> by the workflow engine (INV-02).</summary>
     public string Status { get; private set; } = "";
@@ -214,7 +276,7 @@ public sealed class Contract : ITenantOwned
             CategoryId = Guard.NotEmpty(n.CategoryId, nameof(n.CategoryId)), Classification = n.Classification, CurrencyCode = currency,
             EstimatedValue = n.EstimatedValue, ExtensionType = Guard.OptionalBounded(n.ExtensionType, "Extension type", 50),
             LegalReviewRequired = n.LegalReviewRequired, StartDate = n.StartDate, EffectiveDate = n.EffectiveDate, ReviewDate = n.ReviewDate,
-            EndDate = n.EndDate, CreatedUtc = Guard.Utc(n.NowUtc, nameof(n.NowUtc)), CreatedBy = actor, UpdatedUtc = n.NowUtc, UpdatedBy = actor
+            EndDate = n.EndDate, BusinessUnitId = n.BusinessUnitId, SiteId = n.SiteId, CreatedUtc = Guard.Utc(n.NowUtc, nameof(n.NowUtc)), CreatedBy = actor, UpdatedUtc = n.NowUtc, UpdatedBy = actor
         };
     }
 

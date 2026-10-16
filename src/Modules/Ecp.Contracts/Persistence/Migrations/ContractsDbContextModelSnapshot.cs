@@ -33,6 +33,9 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid?>("DivisionId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -77,6 +80,59 @@ namespace Ecp.Contracts.Persistence.Migrations
                     b.ToTable("Category", "contracts");
                 });
 
+            modelBuilder.Entity("Ecp.Contracts.Domain.CategoryAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AssignedByLabel")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EffectiveFromUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveToUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "UserId");
+
+                    b.HasIndex("TenantId", "CategoryId", "EffectiveToUtc");
+
+                    b.ToTable("CategoryAssignment", "contracts");
+                });
+
             modelBuilder.Entity("Ecp.Contracts.Domain.Contract", b =>
                 {
                     b.Property<Guid>("Id")
@@ -86,6 +142,9 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uniqueidentifier");
@@ -169,6 +228,9 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<Guid?>("SiteId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("SourceAgreementReference")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -232,6 +294,22 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasFilter("[SourceRecordId] IS NOT NULL");
 
                     b.ToTable("Contract", "contracts");
+                });
+
+            modelBuilder.Entity("Ecp.Contracts.Domain.ReferenceCounter", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("LastValue")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("TenantId", "OrganisationId");
+
+                    b.ToTable("ReferenceCounter", "contracts");
                 });
 
             modelBuilder.Entity("Ecp.Contracts.Domain.Supplier", b =>
@@ -311,6 +389,16 @@ namespace Ecp.Contracts.Persistence.Migrations
                         .HasForeignKey("TenantId", "ParentCategoryId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Ecp.Contracts.Domain.CategoryAssignment", b =>
+                {
+                    b.HasOne("Ecp.Contracts.Domain.Category", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CategoryId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Ecp.Contracts.Domain.Contract", b =>

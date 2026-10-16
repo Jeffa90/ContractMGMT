@@ -522,7 +522,8 @@ internal sealed class SecuredCategoryService(
             var tracked = await db.CategoryAssignments.FirstAsync(x => x.Id == assignmentId, c);
             tracked.End(clock.UtcNow);
             await db.SaveChangesAsync(c);
-            audit.Record(new AuditEntry("category.ownership_ended", nameof(CategoryAssignment), assignmentId.ToString(), OrganisationId: tracked.OrganisationId, Reason: why));
+            audit.Record(new AuditEntry("category.ownership_ended", nameof(CategoryAssignment), assignmentId.ToString(), OrganisationId: tracked.OrganisationId, Reason: why,
+                NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { categoryId = tracked.CategoryId, userId = tracked.UserId })));
         }, ct);
     }
 
@@ -597,7 +598,8 @@ internal sealed class CategoryAdministration(
             if (assignment is null || !assignment.IsActiveAt(clock.UtcNow)) return;
             assignment.End(clock.UtcNow);
             await db.SaveChangesAsync(c);
-            audit.Record(new AuditEntry("category.ownership_ended", nameof(CategoryAssignment), assignmentId.ToString(), OrganisationId: assignment.OrganisationId, Reason: reason));
+            audit.Record(new AuditEntry("category.ownership_ended", nameof(CategoryAssignment), assignmentId.ToString(), OrganisationId: assignment.OrganisationId, Reason: reason,
+                NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { categoryId = assignment.CategoryId, userId = assignment.UserId })));
         }, ct);
     }
 

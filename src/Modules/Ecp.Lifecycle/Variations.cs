@@ -114,7 +114,7 @@ internal sealed class VariationService(
                 "Raised", engine.ActorLabel, user, input.Reason, variationDef.WorkflowRef, variationDef.ReleaseId, "-", null, null, scope.NowUtc, await engine.NextHistorySequenceAsync(contractId, c)));
             await engine.SaveAsync(c);
             id = variation.Id;
-            events.Raise(LifecycleEventTypes.VariationRaised, scope.Subject.OrganisationId, SubjectKinds.Variation, variation.Id, contractId, scope.Subject.Classification, new { variationId = variation.Id, reference });
+            events.Raise(LifecycleEventTypes.VariationRaised, scope.Subject.OrganisationId, SubjectKinds.Variation, variation.Id, contractId, scope.Subject.Classification, new { variationId = variation.Id, reference, submitterUserId = user });
             audit.Record(new AuditEntry("variation.raised", nameof(Variation), variation.Id.ToString(), OrganisationId: scope.Subject.OrganisationId, Reason: input.Reason, Classification: scope.Subject.Classification,
                 NewValuesJson: AuditJson.Of(new { reference, contractId, fields = input.ProposedChanges.Keys, parentStatus = scope.Subject.Status })));
             await db.SaveChangesAsync(c);
@@ -304,7 +304,7 @@ internal sealed class VariationService(
         variation.Complete(outcome, variationScope.Transition.To, reason, appliedBefore, appliedAfter, variationScope.NowUtc);
         await db.SaveChangesAsync(c);
         var type = outcome switch { VariationOutcome.Applied => LifecycleEventTypes.VariationApplied, VariationOutcome.Rejected => LifecycleEventTypes.VariationRejected, _ => LifecycleEventTypes.VariationCancelled };
-        events.Raise(type, variationScope.Subject.OrganisationId, SubjectKinds.Variation, variation.Id, variation.ContractId, variationScope.Subject.Classification, new { variationId = variation.Id, reference = variation.Reference, outcome = outcome.ToString() });
+        events.Raise(type, variationScope.Subject.OrganisationId, SubjectKinds.Variation, variation.Id, variation.ContractId, variationScope.Subject.Classification, new { variationId = variation.Id, reference = variation.Reference, outcome = outcome.ToString(), submitterUserId = variation.CreatedByUserId });
         audit.Record(new AuditEntry("variation." + outcome.ToString().ToLowerInvariant(), nameof(Variation), variation.Id.ToString(), OrganisationId: variation.OrganisationId, Reason: reason, Classification: variationScope.Subject.Classification,
             OldValuesJson: appliedBefore, NewValuesJson: AuditJson.Of(new { variation.Reference, contractId = variation.ContractId, outcome = outcome.ToString(), after = appliedAfter is null ? null : JsonSerializer.Deserialize<Dictionary<string, string?>>(appliedAfter) })));
     }

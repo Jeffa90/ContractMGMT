@@ -95,7 +95,7 @@ internal sealed class RegisterAuthorisationService(
             db.Approvals.Add(request);
             await engine.SaveAsync(c);
             id = request.Id;
-            events.Raise(LifecycleEventTypes.ApprovalSubmitted, scope.Subject, new { requestId = request.Id, group });
+            events.Raise(LifecycleEventTypes.ApprovalSubmitted, scope.Subject, new { requestId = request.Id, group, submitterUserId = me });
             audit.Record(new AuditEntry("approval.submitted", nameof(ApprovalRequest), request.Id.ToString(), OrganisationId: scope.Subject.OrganisationId, Reason: note, Classification: scope.Subject.Classification,
                 NewValuesJson: AuditJson.Of(new { subjectKind, subjectId, group, snapshotSha256 = sha, executedDocumentId = snapshot.ExecutedDocumentId, eligible = eligible.Select(e => new { e.UserId, e.RoleCode }) })));
             await db.SaveChangesAsync(c);
@@ -272,8 +272,8 @@ internal sealed class RegisterAuthorisationService(
                 var name = await directory.DisplayNameAsync(me, c) ?? scope.Actor;
                 request.Decide(approve ? ApprovalStatus.Approved : ApprovalStatus.Rejected, me, name, asRole, onBehalf?.UserId, onBehalf?.DisplayName, comment, null, scope.NowUtc);
                 await engine.SaveAsync(c);
-                events.Raise(approve ? LifecycleEventTypes.ApprovalApproved : LifecycleEventTypes.ApprovalRejected, scope.Subject, new { requestId = request.Id, decidedBy = me, asRole });
-                if (approve && !scope.Subject.IsVariation) events.Raise(LifecycleEventTypes.ContractRegistered, scope.Subject, new { requestId = request.Id });
+                events.Raise(approve ? LifecycleEventTypes.ApprovalApproved : LifecycleEventTypes.ApprovalRejected, scope.Subject, new { requestId = request.Id, decidedBy = me, asRole, submitterUserId = request.SubmittedByUserId, group = request.ApproverGroupKey });
+                if (approve && !scope.Subject.IsVariation) events.Raise(LifecycleEventTypes.ContractRegistered, scope.Subject, new { requestId = request.Id, submitterUserId = request.SubmittedByUserId });
                 audit.Record(new AuditEntry(approve ? "approval.approved" : "approval.rejected", nameof(ApprovalRequest), request.Id.ToString(), OrganisationId: scope.Subject.OrganisationId, Reason: comment,
                     Classification: scope.Subject.Classification, OldValuesJson: AuditJson.Of(new { status = "Pending" }),
                     NewValuesJson: AuditJson.Of(new { status = request.Status.ToString(), decidedBy = me, asRole, onBehalfOf = onBehalf?.UserId, snapshotSha256 = request.SnapshotSha256, subjectKind = request.SubjectKind })));

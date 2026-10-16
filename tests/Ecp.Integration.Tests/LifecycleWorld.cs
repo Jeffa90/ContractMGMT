@@ -6,6 +6,7 @@ using Ecp.Identity.Access;
 using Ecp.Identity.Domain;
 using Ecp.Lifecycle;
 using Ecp.Lifecycle.Domain;
+using Ecp.Notifications;
 using Ecp.SharedKernel;
 using Ecp.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,13 +49,26 @@ internal sealed class LifecycleWorld
     public static MemoryStream Bytes(string text = "synthetic document") => new(Encoding.UTF8.GetBytes(text));
 
     /// <summary>A new draft contract created by the Packaging owner through the secured path (so it is pinned to the workflow in force).</summary>
-    public async Task<Guid> NewDraftAsync(string classification = "Internal", bool legal = true, string? title = null)
+    public async Task<Guid> NewDraftAsync(string classification = "Internal", bool legal = true, string? title = null, DateOnly? end = null, DateOnly? review = null, string? extension = null, int? lead = null,
+        int? notice = null, bool critical = false, string owner = "ownerPackaging", Guid? category = null)
     {
         var n = Interlocked.Increment(ref _n);
-        return await W.AsAsync("ownerPackaging", s => s.Get<ISecuredContractService>().CreateDraftAsync(
-            new CreateContractRequest(W.Org1, $"LC-{W.TenantId.ToString("N")[..5].ToUpperInvariant()}-{n:000}", title ?? $"Lifecycle {n}", W.Sup1, W.CatPackaging, Classification: classification, LegalReviewRequired: legal,
-                CurrencyCode: "AUD", EstimatedValue: 1000m, EndDate: DateOnly.FromDateTime(W.Now.AddDays(300)))));
+        var id = await W.AsAsync(owner, s => s.Get<ISecuredContractService>().CreateDraftAsync(
+            new CreateContractRequest(W.Org1, $"LC-{W.TenantId.ToString("N")[..5].ToUpperInvariant()}-{n:000}", title ?? $"Lifecycle {n}", W.Sup1, category ?? W.CatPackaging, Classification: classification, LegalReviewRequired: legal,
+                CurrencyCode: "AUD", EstimatedValue: 1000m, ExtensionType: extension, ReviewDate: review, EndDate: end ?? DateOnly.FromDateTime(W.Now.AddDays(300)))));
+        if (lead is not null || notice is not null || critical)
+            await W.AsAsync(owner, s => s.Get<ISecuredContractService>().UpdateReminderSettingsAsync(id, lead, notice, critical));
+        return id;
     }
+
+    public DateOnly Today => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(W.Now, TimeZoneInfo.FindSystemTimeZoneById("Australia/Brisbane")));
+
+    public Task<IReadOnlyList<JobRow>> RunJobsAsync() => W.AsScopeless().Run(s => s.Get<INotificationJobs>().RunAllAsync());
+
+    public async Task<List<InboxItem>> InboxAsync(string user) => (await As(user, s => s.Get<INotificationInbox>().ListAsync(new InboxFilter(PageSize: 200)))).Items.ToList();
+
+    public async Task<List<Ecp.Notifications.Domain.CapturedEmail>> CapturedAsync()
+        => await W.AsScopeless().Run(async s => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(s.Get<Ecp.Notifications.Persistence.NotificationsDbContext>().Captured));
 
     public Task<string> StatusAsync(Guid contractId) => W.AsScopeless().Run(async s => (await s.Get<IContractLifecyclePort>().FindAsync(contractId))!.Status);
 
@@ -82,6 +96,15 @@ internal sealed class LifecycleWorld
         await As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, contractId, "manual"));
         await As("ownerPackaging", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, contractId, "executed.pdf", "application/pdf", Bytes("executed"))));
         return await As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, contractId, "Executed copy attached"));
+    }
+
+    /// <summary>An Effective agreement (no Legal step) with the given dates and reminder settings.</summary>
+    public async Task<Guid> ToEffectiveInOrderAsync(DateOnly? end = null, DateOnly? review = null, string? extension = null, int? lead = null, int? notice = null, bool critical = false)
+    {
+        var id = await NewDraftAsync(legal: false, end: end, review: review, extension: extension, lead: lead, notice: notice, critical: critical);
+        var request = await ToAwaitingApprovalAsync(id, legal: false);
+        await As("groupHead", s => s.Get<IRegisterAuthorisationService>().ApproveAsync(request, "Approved"));
+        return id;
     }
 
     /// <summary>Takes a contract all the way to Effective.</summary>

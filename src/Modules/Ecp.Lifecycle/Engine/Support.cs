@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Ecp.Lifecycle.Domain;
 using Ecp.Lifecycle.Persistence;
+using Ecp.Identity;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -42,15 +43,22 @@ public static class LifecycleEventTypes
     public const string ExecutionChanged = "execution.changed";
 }
 
-/// <summary>Writes outbound events into the lifecycle's own table in the caller's transaction. The caller saves.</summary>
-internal sealed class LifecycleEvents(LifecycleDbContext db, ITenantContext tenant, IClock clock, ActorContext actor)
+/// <summary>Writes outbound events into the lifecycle's own table in the caller's transaction. The caller saves. Every payload carries the acting person's id so recipients can be resolved without reading lifecycle tables.</summary>
+internal sealed class LifecycleEvents(LifecycleDbContext db, ITenantContext tenant, IClock clock, ActorContext actor, CurrentUser currentUser)
 {
     public void Raise(string eventType, SubjectView subject, object payload)
-        => db.Events.Add(LifecycleEvent.Raise(tenant.RequireTenantId(), subject.OrganisationId, eventType, subject.Kind, subject.Id, subject.ContractId, subject.Classification, AuditJson.Of(payload),
+        => db.Events.Add(LifecycleEvent.Raise(tenant.RequireTenantId(), subject.OrganisationId, eventType, subject.Kind, subject.Id, subject.ContractId, subject.Classification, Payload(payload),
             actor.CorrelationId, actor.ActorId ?? "system", clock.UtcNow));
 
     public void Raise(string eventType, Guid organisationId, string subjectKind, Guid subjectId, Guid contractId, string classification, object payload)
-        => db.Events.Add(LifecycleEvent.Raise(tenant.RequireTenantId(), organisationId, eventType, subjectKind, subjectId, contractId, classification, AuditJson.Of(payload), actor.CorrelationId, actor.ActorId ?? "system", clock.UtcNow));
+        => db.Events.Add(LifecycleEvent.Raise(tenant.RequireTenantId(), organisationId, eventType, subjectKind, subjectId, contractId, classification, Payload(payload), actor.CorrelationId, actor.ActorId ?? "system", clock.UtcNow));
+
+    private string Payload(object payload)
+    {
+        var node = System.Text.Json.Nodes.JsonNode.Parse(AuditJson.Of(payload))!.AsObject();
+        if (currentUser.UserId is { } id) node["actorUserId"] = id.ToString("D");
+        return node.ToJsonString();
+    }
 }
 
 public sealed record LifecycleEventItem(Guid Id, Guid OrganisationId, string EventType, string SubjectKind, Guid SubjectId, Guid ContractId, string Classification, string PayloadJson,

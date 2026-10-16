@@ -5,6 +5,7 @@ using Ecp.Configuration;
 using Ecp.Contracts;
 using Ecp.DataMigration;
 using Ecp.Lifecycle;
+using Ecp.Notifications;
 using Ecp.Documents;
 using Ecp.Documents.Storage;
 using Ecp.Host;
@@ -61,6 +62,11 @@ builder.Services.AddMigrationModule(o =>
 // The mocked scanner stands in for a provider adapter in Demonstration and tests only; Production never gets it.
 if (resolved.Host.Mode != EcpMode.Production) builder.Services.AddSingleton<Ecp.Documents.IMalwareScanner, Ecp.Documents.MockMalwareScanner>();
 builder.Services.AddLifecycleModule(o => o.Mode = resolved.Host.Mode);
+builder.Services.AddNotificationsModule(o =>
+{
+    builder.Configuration.GetSection("Notifications").Bind(o);
+    o.Mode = resolved.Host.Mode;
+});
 builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
 builder.Services.AddSingleton<DemoSeeder>();
 var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";

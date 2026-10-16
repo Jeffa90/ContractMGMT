@@ -272,7 +272,7 @@ internal sealed class LegalReviewService(
             db.LegalEvents.Add(LegalEvent.Record(tenant.RequireTenantId(), review.Id, round.Id, resubmission ? "Resubmitted" : "Submitted", Label, $"Round {review.CurrentRound}", round.Id, now, await engine.NextLegalSequenceAsync(review.Id, c)));
             await db.SaveChangesAsync(c);
             reviewId = review.Id;
-            events.Raise(resubmission ? LifecycleEventTypes.LegalResubmitted : LifecycleEventTypes.LegalSubmitted, scope.Subject, new { reviewId = review.Id, round = review.CurrentRound });
+            events.Raise(resubmission ? LifecycleEventTypes.LegalResubmitted : LifecycleEventTypes.LegalSubmitted, scope.Subject, new { reviewId = review.Id, round = review.CurrentRound, submitterUserId = UserId, assignedToUserId = review.AssignedToUserId });
             audit.Record(new AuditEntry(resubmission ? "legal.resubmitted" : "legal.submitted", nameof(LegalReview), review.Id.ToString(), OrganisationId: scope.Subject.OrganisationId, Classification: scope.Subject.Classification,
                 Reason: r.Note, NewValuesJson: AuditJson.Of(new { subjectKind = r.SubjectKind, subjectId = r.SubjectId, round = review.CurrentRound, documents = docs.Count })));
         }, ct);
@@ -311,7 +311,7 @@ internal sealed class LegalReviewService(
         review.Withdraw(now);
         db.LegalEvents.Add(LegalEvent.Record(tenant.RequireTenantId(), review.Id, round?.Id, "Withdrawn", Label, reason, null, now, await engine.NextLegalSequenceAsync(review.Id, c)));
         await db.SaveChangesAsync(c);
-        events.Raise(LifecycleEventTypes.LegalWithdrawn, scope.Subject, new { reviewId = review.Id });
+        events.Raise(LifecycleEventTypes.LegalWithdrawn, scope.Subject, new { reviewId = review.Id, submitterUserId = review.SubmittedByUserId });
         audit.Record(new AuditEntry("legal.withdrawn", nameof(LegalReview), review.Id.ToString(), OrganisationId: scope.Subject.OrganisationId, Reason: reason, Classification: scope.Subject.Classification));
     }
 
@@ -353,7 +353,7 @@ internal sealed class LegalReviewService(
             round.Start(UserId, name, scope.NowUtc);
             db.LegalEvents.Add(LegalEvent.Record(tenant.RequireTenantId(), reviewId, round.Id, "Started", Label, $"Round {round.Number} started by {name}", null, scope.NowUtc, await engine.NextLegalSequenceAsync(reviewId, c)));
             await db.SaveChangesAsync(c);
-            events.Raise(LifecycleEventTypes.LegalStarted, scope.Subject, new { reviewId, round = round.Number });
+            events.Raise(LifecycleEventTypes.LegalStarted, scope.Subject, new { reviewId, round = round.Number, submitterUserId = tracked.SubmittedByUserId });
             audit.Record(new AuditEntry("legal.started", nameof(LegalReview), reviewId.ToString(), OrganisationId: scope.Subject.OrganisationId, Classification: scope.Subject.Classification, NewValuesJson: AuditJson.Of(new { round = round.Number })));
         }, ct);
     }
@@ -388,7 +388,7 @@ internal sealed class LegalReviewService(
             db.LegalEvents.Add(LegalEvent.Record(tenant.RequireTenantId(), review.Id, round.Id, side == "Legal" ? "LegalComment" : "OwnerComment", Label, r.ParentCommentId is null ? "Comment" : "Reply", comment.Id, clock.UtcNow, await engine.NextLegalSequenceAsync(review.Id, c)));
             await engine.SaveAsync(c);
             id = comment.Id;
-            events.Raise(LifecycleEventTypes.LegalCommented, subject, new { reviewId = review.Id, commentId = comment.Id, side });
+            events.Raise(LifecycleEventTypes.LegalCommented, subject, new { reviewId = review.Id, commentId = comment.Id, side, submitterUserId = review.SubmittedByUserId, assignedToUserId = review.AssignedToUserId });
             audit.Record(new AuditEntry("legal.commented", nameof(LegalReview), review.Id.ToString(), OrganisationId: subject.OrganisationId, Classification: subject.Classification, NewValuesJson: AuditJson.Of(new { commentId = comment.Id, side, round = round.Number })));
             await db.SaveChangesAsync(c);
         }, ct);
@@ -466,7 +466,7 @@ internal sealed class LegalReviewService(
             tracked.ReturnForRework(scope.NowUtc);
             db.LegalEvents.Add(LegalEvent.Record(tenant.RequireTenantId(), reviewId, round.Id, "Returned", Label, $"Round {round.Number} returned for rework", null, scope.NowUtc, await engine.NextLegalSequenceAsync(reviewId, c)));
             await db.SaveChangesAsync(c);
-            events.Raise(LifecycleEventTypes.LegalReturned, scope.Subject, new { reviewId, round = round.Number });
+            events.Raise(LifecycleEventTypes.LegalReturned, scope.Subject, new { reviewId, round = round.Number, submitterUserId = tracked.SubmittedByUserId });
             audit.Record(new AuditEntry("legal.returned", nameof(LegalReview), reviewId.ToString(), OrganisationId: scope.Subject.OrganisationId, Reason: reason, Classification: scope.Subject.Classification,
                 NewValuesJson: AuditJson.Of(new { round = round.Number })));
         }, ct);
@@ -489,7 +489,7 @@ internal sealed class LegalReviewService(
             tracked.Clear(Label, stamp, scope.NowUtc);
             db.LegalEvents.Add(LegalEvent.Record(tenant.RequireTenantId(), reviewId, round.Id, "Cleared", Label, note ?? $"Round {round.Number} cleared", null, scope.NowUtc, await engine.NextLegalSequenceAsync(reviewId, c)));
             await db.SaveChangesAsync(c);
-            events.Raise(LifecycleEventTypes.LegalCleared, scope.Subject, new { reviewId, round = round.Number });
+            events.Raise(LifecycleEventTypes.LegalCleared, scope.Subject, new { reviewId, round = round.Number, submitterUserId = tracked.SubmittedByUserId });
             audit.Record(new AuditEntry("legal.cleared", nameof(LegalReview), reviewId.ToString(), OrganisationId: scope.Subject.OrganisationId, Reason: note, Classification: scope.Subject.Classification,
                 NewValuesJson: AuditJson.Of(new { round = round.Number, note = "Legal clearance is not register authorisation" })));
         }, ct);

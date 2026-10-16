@@ -204,20 +204,13 @@ internal sealed partial class RegisterQueryEngine(
         var org = catalogue.OrganisationId;
         var set = org is { } oid ? await customCatalogue.PublishedAsync(oid, ct) : CustomFieldSet.Empty;
         var scale = await access.ClassificationScaleAsync(ct);
-        var levelIds = new Dictionary<string, IQueryable<Guid>>(StringComparer.Ordinal);
-        IQueryable<Guid> IdsAt(string level)
-        {
-            if (!levelIds.TryGetValue(level, out var ids))
-                levelIds[level] = ids = db.Contracts.AsNoTracking().Where(ContractAccessFilter.Build(grants.Where(g => g.AllowedClassifications.Contains(level)).ToList(), listCtx)).Select(c => c.Id);
-            return ids;
-        }
-        string[] Above(string level) => scale.Levels.Where(l => scale.Rank(l) > scale.Rank(level)).ToArray();
+        var vis = new LevelVisibility(db, grants, listCtx, scale);
         var now = clock.UtcNow;
         var today = TodayFor(org is { } o2 ? await structure.GetOrganisationAsync(o2, ct) : null);
 
         // Typed filters are applied to the contracts and suppliers before they are joined, so each is one narrow predicate the database can use an index for.
         foreach (var f in q.Filters ?? [])
-            (cq, sq) = await ApplyFilterAsync(cq, sq, f, catalogue, set, listCtx, IdsAt, Above, today, now, ct);
+            (cq, sq) = await ApplyFilterAsync(cq, sq, f, catalogue, set, listCtx, vis, today, now, ct);
 
         var rows = from c in cq
                    join s in sq on new { c.TenantId, Id = c.SupplierId } equals new { s.TenantId, s.Id }
@@ -228,7 +221,7 @@ internal sealed partial class RegisterQueryEngine(
         foreach (var token in (q.Text ?? "").Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries).Take(MaxTokens))
         {
             var t = token.Trim(); var upper = t.ToUpperInvariant();
-            var custom = SearchableMatches(set, catalogue, t, IdsAt, Above, scale);
+            var custom = SearchableMatches(set, catalogue, t, vis);
             rows = custom is null
                 ? rows.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
                     || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)))
@@ -237,9 +230,9 @@ internal sealed partial class RegisterQueryEngine(
         }
 
         var total = await rows.CountAsync(ct);
-        var ordered = ApplySorts(rows, q.Sorts ?? [], catalogue, set, IdsAt, Above);
+        var ordered = ApplySorts(rows, q.Sorts ?? [], catalogue, set, vis);
         var pageRows = await ordered.Skip((page - 1) * size).Take(size).ToListAsync(ct);
-        var cells = await BuildRowsAsync(pageRows, columns, set, scale, IdsAt, Above, ct);
+        var cells = await BuildRowsAsync(pageRows, columns, set, scale, vis, ct);
         return new RegisterPage(columns, cells, total, page, size, notes);
     }
 
@@ -250,26 +243,66 @@ internal sealed partial class RegisterQueryEngine(
     // ---- text over configured fields ---------------------------------------------------------------------------------------------------------------------
 
     /// <summary>Ids of contracts whose searchable configured fields (that the caller may see) contain the text. Null when there are none.</summary>
-    private IQueryable<Guid>? SearchableMatches(CustomFieldSet set, RegisterCatalogue catalogue, string text, Func<string, IQueryable<Guid>> idsAt, Func<string, string[]> above, ClassificationScale scale)
+    private IQueryable<Guid>? SearchableMatches(CustomFieldSet set, RegisterCatalogue catalogue, string text, LevelVisibility vis)
     {
         var fields = set.Fields.Where(d => d.Searchable && !d.IsCalculated && catalogue.Find(d.Key) is not null && d.Type is FieldTypes.Text or FieldTypes.LongText or FieldTypes.Email or FieldTypes.Url or FieldTypes.SingleChoice or FieldTypes.MultiChoice or FieldTypes.Lookup).ToList();
         IQueryable<Guid>? union = null;
         foreach (var group in fields.GroupBy(d => (d.Classification, States: string.Join("|", d.VisibleInStates.Order(StringComparer.Ordinal)))))
         {
             var keys = group.Select(d => d.Key).ToArray(); var upper = text.ToUpperInvariant();
-            var allowedIds = idsAt(group.Key.Classification); var higher = above(group.Key.Classification);
             var states = group.First().VisibleInStates.ToArray();
             // Choice fields hold codes: search the label as well as the code by matching the codes whose label contains the text.
             var codes = group.Where(d => FieldTypes.UsesList(d.Type)).SelectMany(d => set.ChoicesOf(d)).Where(c => c.Label.Contains(text, StringComparison.OrdinalIgnoreCase)).Select(c => c.Code).Distinct().ToArray();
-            var matches = from v in db.CustomValues.AsNoTracking()
-                          where keys.Contains(v.FieldKey) && ((v.TextValue != null && (v.TextValue.ToUpper().Contains(upper) || codes.Contains(v.TextValue))) || (v.LongTextValue != null && v.LongTextValue.ToUpper().Contains(upper)))
-                          join c in db.Contracts.AsNoTracking() on new { v.TenantId, Id = v.ContractId } equals new { c.TenantId, c.Id }
-                          where higher.Contains(c.Classification) || allowedIds.Contains(c.Id)
-                          select new { c.Id, c.Status };
-            var ids = states.Length == 0 ? matches.Select(x => x.Id) : matches.Where(x => states.Contains(x.Status)).Select(x => x.Id);
+            var values = db.CustomValues.AsNoTracking().Where(v => keys.Contains(v.FieldKey) && ((v.TextValue != null && (v.TextValue.ToUpper().Contains(upper) || codes.Contains(v.TextValue))) || (v.LongTextValue != null && v.LongTextValue.ToUpper().Contains(upper))));
+            // The contracts here are already limited to what the caller may read. When every grant also lets them read this field's level, no further access test is needed (see LevelVisibility); otherwise the values
+            // of contracts the caller could not see this field on are left out. A state limit needs the contract's status, so only then is the contract joined.
+            IQueryable<Guid> ids;
+            var open = vis.IsOpen(group.Key.Classification);
+            if (open && states.Length == 0) ids = values.Select(v => v.ContractId);
+            else if (open)
+                ids = (from v in values
+                       join c in db.Contracts.AsNoTracking() on new { v.TenantId, Id = v.ContractId } equals new { c.TenantId, c.Id }
+                       where states.Contains(c.Status)
+                       select c.Id);
+            else
+            {
+                var allowedIds = vis.Ids(group.Key.Classification); var higher = vis.Above(group.Key.Classification);
+                var matches = from v in values
+                              join c in db.Contracts.AsNoTracking() on new { v.TenantId, Id = v.ContractId } equals new { c.TenantId, c.Id }
+                              where higher.Contains(c.Classification) || allowedIds.Contains(c.Id)
+                              select new { c.Id, c.Status };
+                ids = states.Length == 0 ? matches.Select(x => x.Id) : matches.Where(x => states.Contains(x.Status)).Select(x => x.Id);
+            }
             union = union is null ? ids : union.Union(ids);
         }
         return union;
     }
 
+}
+
+/// <summary>
+/// Which contracts a person may see a configured field on, by the field's classification level. A value is visible on a contract the person can read when the contract is held above the field's level, or the
+/// person has a grant that covers the contract and allows that level. The query already holds only the contracts the person can read, so when <b>every</b> grant allows the level the second test is true for each
+/// of those contracts and adds nothing: <see cref="IsOpen"/> says so, and callers leave the test out. Evidence (docs/PERFORMANCE_REVIEW.md): the test written as "level above OR id in (access subquery)" made
+/// SQL Server estimate one row, choose a nested loop and re-scan the contracts for each row; leaving it out where it is redundant removes that.
+/// </summary>
+internal sealed class LevelVisibility(ContractsDbContext db, IReadOnlyList<AccessGrant> grants, ContractAccessFilter.Context listCtx, ClassificationScale scale)
+{
+    private readonly Dictionary<string, IQueryable<Guid>> ids = new(StringComparer.Ordinal);
+
+    /// <summary>True when every grant that lets the person read contracts also allows this classification level.</summary>
+    public bool IsOpen(string level) => IsOpen(grants, level);
+
+    internal static bool IsOpen(IReadOnlyList<AccessGrant> grants, string level) => grants.Count > 0 && grants.All(g => g.AllowedClassifications.Contains(level, StringComparer.Ordinal));
+
+    /// <summary>Ids of the contracts the person may read through grants that allow this level.</summary>
+    public IQueryable<Guid> Ids(string level)
+    {
+        if (!ids.TryGetValue(level, out var q))
+            ids[level] = q = db.Contracts.AsNoTracking().Where(ContractAccessFilter.Build(grants.Where(g => g.AllowedClassifications.Contains(level)).ToList(), listCtx)).Select(c => c.Id);
+        return q;
+    }
+
+    /// <summary>The classification levels above this one: a contract held at one of them is readable for the field by anyone who can read the contract.</summary>
+    public string[] Above(string level) => scale.Levels.Where(l => scale.Rank(l) > scale.Rank(level)).ToArray();
 }

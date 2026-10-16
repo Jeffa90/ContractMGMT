@@ -100,7 +100,7 @@ internal static class PerformanceBaseline
         var operations = new Dictionary<string, (string User, Func<TenantScope, Task<(int Rows, int Total)>> Work)>(StringComparer.Ordinal);
         async Task Run(string op, string user, Func<TenantScope, Task<(int Rows, int Total)>> f, string note = "")
         {
-            operations.TryAdd(op, (user, f));
+            operations.TryAdd(user == "procAdmin" ? op : op + " [" + user + "]", (user, f));
             (int Rows, int Total) last = default;
             var t = await TimeAsync(async () => last = await w.As(user, f));
             samples.Add(Summarise(op, user, t, last.Rows, last.Total, note));
@@ -135,6 +135,11 @@ internal static class PerformanceBaseline
             var p = await s.Get<IContractRegister>().SearchAsync(new ContractQuery(Text: "note 42", OrganisationId: org));
             return (p.Rows.Count, p.Total);
         });
+        await Run("Configured-field text search (searchable field)", "ownerPackaging", async s =>
+        {
+            var p = await s.Get<IContractRegister>().SearchAsync(new ContractQuery(Text: "note 42", OrganisationId: org));
+            return (p.Rows.Count, p.Total);
+        }, "limited to the owner's categories");
         string savedRef = "";
         await w.As("procAdmin", async s =>
         {
@@ -206,7 +211,7 @@ internal static class PerformanceBaseline
             await QueryPlanReport.EnableAsync(app.ConnectionString);
             foreach (var name in new[]
             {
-                "Configured-field text search (searchable field)", "Configured-field filter (tier + score range + date, sorted by score)",
+                "Configured-field text search (searchable field)", "Configured-field text search (searchable field) [ownerPackaging]", "Configured-field filter (tier + score range + date, sorted by score)",
                 "Saved view load (personal view, configured columns and filter)", "Export initiation (CSV of a 500-row search)", "Filtered search (core fields: value range, type, risk, supplier text)"
             })
             {

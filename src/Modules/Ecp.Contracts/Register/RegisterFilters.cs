@@ -13,7 +13,7 @@ namespace Ecp.Contracts.Register;
 internal sealed partial class RegisterQueryEngine
 {
     private async Task<(IQueryable<Contract> C, IQueryable<Supplier> S)> ApplyFilterAsync(IQueryable<Contract> cq, IQueryable<Supplier> sq, FilterClause f, RegisterCatalogue catalogue, CustomFieldSet set,
-        ContractAccessFilter.Context listCtx, Func<string, IQueryable<Guid>> idsAt, Func<string, string[]> above, DateOnly today, DateTime now, CancellationToken ct)
+        ContractAccessFilter.Context listCtx, LevelVisibility vis, DateOnly today, DateTime now, CancellationToken ct)
     {
         if (f.Field == "set")
         {
@@ -22,7 +22,7 @@ internal sealed partial class RegisterQueryEngine
             return (cq.Where(c => ids.Contains(c.Id)), sq);
         }
         var field = catalogue.Find(f.Field)!;
-        if (field.IsCustom) return (ApplyCustom(cq, set, set.Find(field.Key)!, f, idsAt, above, today), sq);
+        if (field.IsCustom) return (ApplyCustom(cq, set, set.Find(field.Key)!, f, vis, today), sq);
 
         switch (field.Key)
         {
@@ -219,12 +219,17 @@ internal sealed partial class RegisterQueryEngine
         return cq.Where(c => !ids.Contains(c.Id));
     }
 
-    private IQueryable<Contract> ApplyCustom(IQueryable<Contract> cq, CustomFieldSet set, FieldDefinition d, FilterClause f, Func<string, IQueryable<Guid>> idsAt, Func<string, string[]> above, DateOnly today)
+    private IQueryable<Contract> ApplyCustom(IQueryable<Contract> cq, CustomFieldSet set, FieldDefinition d, FilterClause f, LevelVisibility vis, DateOnly today)
     {
         var key = d.Key;
-        var allowed = idsAt(d.Classification); var higher = above(d.Classification); var states = d.VisibleInStates.ToArray();
-        // Only rows where the caller could see this field's value take part, so no result can reveal a value that is hidden from them.
-        cq = cq.Where(c => higher.Contains(c.Classification) || allowed.Contains(c.Id));
+        var states = d.VisibleInStates.ToArray();
+        // Only rows where the caller could see this field's value take part, so no result can reveal a value that is hidden from them. Where every grant allows the field's level the contracts in the query
+        // all qualify already and the test is left out (LevelVisibility.IsOpen).
+        if (!vis.IsOpen(d.Classification))
+        {
+            var allowed = vis.Ids(d.Classification); var higher = vis.Above(d.Classification);
+            cq = cq.Where(c => higher.Contains(c.Classification) || allowed.Contains(c.Id));
+        }
         if (states.Length > 0) cq = cq.Where(c => states.Contains(c.Status));
         var cv = db.CustomValues.AsNoTracking().Where(v => v.FieldKey == key);
         if (f.Op == FilterOps.IsEmpty) return NotMatching(cq, cv);
@@ -312,7 +317,7 @@ internal sealed partial class RegisterQueryEngine
 
     // ---- sorting -----------------------------------------------------------------------------------------------------------------------------------------
 
-    private IQueryable<Row> ApplySorts(IQueryable<Row> rows, IReadOnlyList<SortClause> sorts, RegisterCatalogue catalogue, CustomFieldSet set, Func<string, IQueryable<Guid>> idsAt, Func<string, string[]> above)
+    private IQueryable<Row> ApplySorts(IQueryable<Row> rows, IReadOnlyList<SortClause> sorts, RegisterCatalogue catalogue, CustomFieldSet set, LevelVisibility vis)
     {
         IOrderedQueryable<Row>? ordered = null;
         void Add<K>(System.Linq.Expressions.Expression<Func<Row, K>> key, bool desc)
@@ -325,8 +330,22 @@ internal sealed partial class RegisterQueryEngine
             if (field.IsCustom)
             {
                 var def = set.Find(field.Key)!;
-                var key = def.Key; var allowed = idsAt(def.Classification); var higher = above(def.Classification); var states = def.VisibleInStates.ToArray();
+                var key = def.Key; var states = def.VisibleInStates.ToArray();
                 var cv = db.CustomValues.AsNoTracking().Where(v => v.FieldKey == key && v.Ordinal == 0);
+                if (vis.IsOpen(def.Classification))
+                {
+                    // Every grant allows this field's level, so the access test would be true for every row in the query and is left out (LevelVisibility.IsOpen).
+                    switch (FieldTypes.StorageOf(def.Type))
+                    {
+                        case StorageKind.Text: Add(r => (states.Length == 0 || states.Contains(r.C.Status)) ? cv.Where(v => v.ContractId == r.C.Id).Select(v => v.TextValue).FirstOrDefault() : null, d); break;
+                        case StorageKind.Number: Add(r => (states.Length == 0 || states.Contains(r.C.Status)) ? cv.Where(v => v.ContractId == r.C.Id).Select(v => v.NumberValue).FirstOrDefault() : null, d); break;
+                        case StorageKind.Date: Add(r => (states.Length == 0 || states.Contains(r.C.Status)) ? cv.Where(v => v.ContractId == r.C.Id).Select(v => v.DateValue).FirstOrDefault() : null, d); break;
+                        case StorageKind.DateTime: Add(r => (states.Length == 0 || states.Contains(r.C.Status)) ? cv.Where(v => v.ContractId == r.C.Id).Select(v => v.DateTimeValue).FirstOrDefault() : null, d); break;
+                        case StorageKind.Bool: Add(r => (states.Length == 0 || states.Contains(r.C.Status)) ? cv.Where(v => v.ContractId == r.C.Id).Select(v => v.BoolValue).FirstOrDefault() : null, d); break;
+                    }
+                    continue;
+                }
+                var allowed = vis.Ids(def.Classification); var higher = vis.Above(def.Classification);
                 switch (FieldTypes.StorageOf(def.Type))
                 {
                     case StorageKind.Text: Add(r => (higher.Contains(r.C.Classification) || allowed.Contains(r.C.Id)) && (states.Length == 0 || states.Contains(r.C.Status)) ? cv.Where(v => v.ContractId == r.C.Id).Select(v => v.TextValue).FirstOrDefault() : null, d); break;
@@ -377,8 +396,7 @@ internal sealed partial class RegisterQueryEngine
 
     // ---- cells -------------------------------------------------------------------------------------------------------------------------------------------
 
-    private async Task<IReadOnlyList<RegisterRow>> BuildRowsAsync(List<Row> page, List<RegisterColumn> columns, CustomFieldSet set, ClassificationScale scale, Func<string, IQueryable<Guid>> idsAt,
-        Func<string, string[]> above, CancellationToken ct)
+    private async Task<IReadOnlyList<RegisterRow>> BuildRowsAsync(List<Row> page, List<RegisterColumn> columns, CustomFieldSet set, ClassificationScale scale, LevelVisibility vis, CancellationToken ct)
     {
         var ids = page.Select(r => r.C.Id).ToArray();
         var names = new Dictionary<Guid, (Dictionary<Guid, string> Bu, Dictionary<Guid, string> Site, Dictionary<Guid, string> Le)>();
@@ -407,7 +425,7 @@ internal sealed partial class RegisterQueryEngine
                 var def = set.Find(v.FieldKey)!;
                 (stored.TryGetValue((v.ContractId, v.FieldKey), out var list) ? list : stored[(v.ContractId, v.FieldKey)] = []).Add(Contracts.ContractCustomFieldService.ToTyped(v, FieldTypes.StorageOf(def.Type)));
             }
-            foreach (var level in customColumns.Select(d => d.Classification).Distinct()) visibleAt[level] = (await idsAt(level).Where(id => ids.Contains(id)).ToListAsync(ct)).ToHashSet();
+            foreach (var level in customColumns.Select(d => d.Classification).Distinct()) visibleAt[level] = vis.IsOpen(level) ? ids.ToHashSet() : (await vis.Ids(level).Where(id => ids.Contains(id)).ToListAsync(ct)).ToHashSet();
         }
         var rolesByOrg = new Dictionary<Guid, IReadOnlySet<string>>();
         foreach (var org in page.Select(r => r.C.OrganisationId).Distinct()) rolesByOrg[org] = customColumns.Count == 0 ? new HashSet<string>() : await RolesAsync(org, ct);

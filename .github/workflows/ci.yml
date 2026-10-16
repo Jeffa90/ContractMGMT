@@ -90,6 +90,88 @@ jobs:
       - name: Baseline for comparison on this runner (PER-002; temporary)
         if: always()
         run: |
+          set -uo pipefail
+          # Two earlier commits are rebuilt and measured on this same runner: the one before PER-002 and the one with only the first change.
+          for c in b5adb83527f42e18e745eb242f084a2f218e3428 0241c8402aa465efcbd106dce6d04c32a830ef48; do
+            git fetch --depth=1 origin "$c"
+            git worktree add "../ecp-base-${c:0:7}" FETCH_HEAD
+            (cd "../ecp-base-${c:0:7}" \
+              && dotnet restore src/Ecp.sln --locked-mode \
+              && dotnet build src/Ecp.sln -c Release --no-restore \
+              && dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx;LogFileName=base-perf.trx" --results-directory "../base-results-${c:0:7}") || true
+          done
+        continue-on-error: true
+      - name: Print performance baseline and plan report
+        if: always()
+        run: |
+          echo "runner: $(uname -sr) cpus=$(nproc) mem=$(free -m | awk '/Mem:/{print $2}')MB"
+          echo "== SUMMARY (after, this commit): user, median ms, p95 ms, operation"
+          jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' artifacts/performance/sqlserver.json || true
+          echo "== SUMMARY (change 1 only, commit 0241c84 on this runner): user, median ms, p95 ms, operation"
+          jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' ../ecp-base-0241c84/artifacts/performance/sqlserver.json || echo "no comparison run"
+          echo "== SUMMARY (before, commit b5adb83 on this runner): user, median ms, p95 ms, operation"
+          jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' ../ecp-base-b5adb83/artifacts/performance/sqlserver.json || echo "no comparison run"
+          echo "== FULL (after)"
+          cat artifacts/performance/sqlserver.json || echo "no baseline file written"
+          echo "== PLANS (after)"
+          cat artifacts/performance/plans-sqlserver.txt || echo "no plan report written"
+      - name: Honest result summary (Passed / Failed / Skipped / NOT VERIFIED)
+        if: always()
+        run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Repository consistency checks (links, CSV/JSON, references, manifest, Mermaid structure)
+        run: python3 -I tools/check-repo.py .
+      - name: Tooling script tests
+        run: python3 -I -m unittest discover -s tools/tests
+      - name: Supply chain (vulnerabilities, SBOM, licence policy)
+        run: tools/supply-chain.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: supply-chain
+          path: |
+            artifacts/sbom/ecp.bom.json
+            artifacts/licences/licence-report.md
+            artifacts/vulnerabilities.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-non-sql
+          path: TestResults/*.trx
+
+  sqlserver-integration:
+    name: SQL Server integration (migrations, constraints, RLS, provider behaviour)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: build-and-unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Start disposable SQL Server (generated, masked password)
+        id: sql
+        run: |
+          set -euo pipefail
+          PW="Aa1!$(openssl rand -hex 16)"
+          echo "::add-mask::$PW"
+          docker run -d --name ecp-sql -p 14330:1433 -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:2022-latest >/dev/null
+          for i in $(seq 1 60); do
+            if docker exec ecp-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$PW" -Q "SELECT 1" >/dev/null 2>&1; then
+              echo "ECP_TEST_SQL=Server=127.0.0.1,14330;User Id=sa;Password=$PW;TrustServerCertificate=True;Encrypt=True" >> "$GITHUB_ENV"
+              echo "available=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi; sleep 2
+          done
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::SQL Server did not start; SQL Server tests are NOT VERIFIED"
+      - run: dotnet restore src/Ecp.sln --locked-mode
+      - run: dotnet build src/Ecp.sln -c Release --no-restore
+      - name: SQL Server tests
+        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category!=Performance" --logger "trx" --results-directory TestResults
+      - name: Performance baseline and query plans (SQL Server)
+        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx" --results-directory TestResults
+      - name: Baseline for comparison on this runner (PER-002; temporary)
+        if: always()
+        run: |
           set -euo pipefail
           git fetch --depth=1 origin b5adb83527f42e18e745eb242f084a2f218e3428
           git worktree add ../ecp-base FETCH_HEAD

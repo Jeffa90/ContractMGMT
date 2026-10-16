@@ -97,8 +97,10 @@ internal static class PerformanceBaseline
 
         // ---- measurements ------------------------------------------------------------------------------------------------------------------------------
         var samples = new List<Sample>();
+        var operations = new Dictionary<string, (string User, Func<TenantScope, Task<(int Rows, int Total)>> Work)>(StringComparer.Ordinal);
         async Task Run(string op, string user, Func<TenantScope, Task<(int Rows, int Total)>> f, string note = "")
         {
+            operations.TryAdd(op, (user, f));
             (int Rows, int Total) last = default;
             var t = await TimeAsync(async () => last = await w.As(user, f));
             samples.Add(Summarise(op, user, t, last.Rows, last.Total, note));
@@ -171,6 +173,9 @@ internal static class PerformanceBaseline
         cold.Sort();
         samples.Add(Summarise("Configuration resolution, cold (after invalidation)", "system", cold, 4, 4));
 
+        // ---- PER-002 evidence (SQL Server only): the statements, plans and parameter sensitivity of the configured-field operations --------------------------------
+        if (provider == "sqlserver") await WritePlanReportAsync(app, w, org, operations, output);
+
         // ---- record ------------------------------------------------------------------------------------------------------------------------------------
         var environment = new
         {
@@ -191,6 +196,48 @@ internal static class PerformanceBaseline
         var export = samples.First(x => x.Operation.StartsWith("Export initiation", StringComparison.Ordinal)).MedianMs;
         Assert.True(configured < Math.Max(5000, 50 * core), $"A configured-field filter took {configured} ms against {core} ms for a core-field search.");
         Assert.True(export < Math.Max(5000, 50 * core), $"A 500-row export took {export} ms against {core} ms for a core-field search.");
+    }
+
+    private static async Task WritePlanReportAsync(TestApp app, LifecycleWorld w, Guid org, Dictionary<string, (string User, Func<TenantScope, Task<(int Rows, int Total)>> Work)> operations, ITestOutputHelper output)
+    {
+        var report = new System.Text.StringBuilder();
+        try
+        {
+            await QueryPlanReport.EnableAsync(app.ConnectionString);
+            foreach (var name in new[]
+            {
+                "Configured-field text search (searchable field)", "Configured-field filter (tier + score range + date, sorted by score)",
+                "Saved view load (personal view, configured columns and filter)", "Export initiation (CSV of a 500-row search)", "Filtered search (core fields: value range, type, risk, supplier text)"
+            })
+            {
+                if (!operations.TryGetValue(name, out var op)) continue;
+                report.AppendLine(await QueryPlanReport.CaptureAsync(app.ConnectionString, name, () => w.As(op.User, op.Work)));
+            }
+
+            // Parameter sensitivity: the same statement shape compiled for a rare value and then used for a common one, and the reverse, each timed once cold and twice warm.
+            async Task<string> Probe(string label, Func<string, Task> run, string first, string second)
+            {
+                await QueryPlanReport.ForgetPlansAsync(app.ConnectionString);
+                var t = new List<string>();
+                foreach (var v in new[] { first, second, second, first })
+                {
+                    var sw = Stopwatch.StartNew(); await run(v); sw.Stop();
+                    t.Add($"{v}={sw.Elapsed.TotalMilliseconds:0.0}ms");
+                }
+                return $"{label}: compiled for '{first}' then {string.Join(", ", t)}";
+            }
+            Task Text(string v) => w.As("procAdmin", s => s.Get<IContractRegister>().SearchAsync(new ContractQuery(Text: v, OrganisationId: org)));
+            Task Score(string v) => w.As("procAdmin", s => s.Get<IContractRegister>().SearchAsync(new ContractQuery(Filters: [new FilterClause("score", FilterOps.Between, [v, v])], Sorts: [new SortClause("score", true)], OrganisationId: org)));
+            report.AppendLine("=== parameter sensitivity");
+            report.AppendLine(await Probe("text search, rare first", Text, "note 4242", "note"));
+            report.AppendLine(await Probe("text search, common first", Text, "note", "note 4242"));
+            report.AppendLine(await Probe("score filter, rare first", Score, "100", "50"));
+            report.AppendLine(await Probe("score filter, common first", Score, "50", "100"));
+        }
+        catch (Exception e) { report.AppendLine("PLAN REPORT FAILED: " + e); }
+        var dir = Path.Combine(FindRepoRoot(), "artifacts", "performance"); Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(Path.Combine(dir, "plans-sqlserver.txt"), report.ToString());
+        output.WriteLine(report.ToString());
     }
 
     private static string FindRepoRoot()

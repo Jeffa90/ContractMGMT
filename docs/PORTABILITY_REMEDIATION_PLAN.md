@@ -1,6 +1,6 @@
 # Portability Remediation Plan
 
-Status: **plan only. No code, configuration, pack or data was changed to write it.** It turns the findings of `docs/PORTABILITY_AUDIT.md` (P-01 to P-10, R-01 to R-06) into ordered, testable work. Finding IDs below are the audit's. Every fact about current behaviour was checked in the code and is cited by file and line; where something is a judgement it says so.
+Status: **S1 implemented (see section 8.6); every other slice is still a plan.** The plan itself changed no code, configuration, pack or data. It turns the findings of `docs/PORTABILITY_AUDIT.md` (P-01 to P-10, R-01 to R-06) into ordered, testable work. Finding IDs below are the audit's. Every fact about current behaviour was checked in the code and is cited by file and line; where something is a judgement it says so.
 
 The target is the rule in `CLAUDE.md` and `requirements/01-authoritative/PORTABILITY_AND_NO_CODE.md`: JBS is a shipped reference configuration, not platform logic, and a second business must install and run with no source change (PRT-002, PRT-013).
 
@@ -147,7 +147,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 
 | Slice | Contents | Depends on | Exit evidence |
 |---|---|---|---|
-| **S1 (first)** | R1, R4 stage A, a minimal PRT-002 test | none | section 7 |
+| **S1 (first), done** | R1, R4 stage A, a minimal PRT-002 test | none | section 8.6 |
 | S2 | R2 and R3 | S1 | Migrated contracts take the workflow's initial status; unowned-category reminder fall-back comes from the policy; JBS pack states the same recipient it has today |
 | S3 | R6 | none (can run in parallel with S2) | Signature request vocabulary neutral; EF migration renames the column and filtered index; no data loss |
 | S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions |
@@ -276,6 +276,28 @@ Initial status for migrated contracts (S2), the reminder fall-back (S2), vocabul
 ### 8.5 Rollback
 
 Revert the commit. Nothing persisted depends on it: organisations that already have releases are untouched, and organisations that installed the Blank definitions by the new path would simply re-resolve on the next start (their releases remain valid configuration).
+
+
+### 8.6 Outcome of S1
+
+Implemented as defined, with no change to role identifiers (`ProcurementAdministrator` and the other eleven are untouched, and no Option B migration was done) and no other remediation action. Record: ADR-0024 (`decisions/ADR-0024-solution-pack-resolved-by-organisation.md`).
+
+| Plan item | What was done |
+|---|---|
+| Resolve the pack from the organisation | `PackSelection.ResolveAsync` (`src/Modules/Ecp.Tenancy/PackSelection.cs`), used by `WorkflowDefinitionStore` and `NotificationPolicyStore` |
+| Remove the JBS code default | `DefaultPackId` is now `string?` with no default in both option classes |
+| Installation default as host configuration, unset | `Ecp:DefaultPackId` read in `src/Ecp.Host/Program.cs`, key present and empty in `src/Ecp.Host/appsettings.json`; refusal code `no_solution_pack` when neither names a pack |
+| Neutral lifecycle, Variation workflow and notification policy | `templates/packs/blank/workflows/contract-lifecycle.json`, `templates/packs/blank/workflows/variation.json`, `templates/packs/blank/notifications/notification-policy.json`, embedded like the JBS ones (S7 will remove the embedding) |
+| Test infrastructure names the pack it relies on | `tests/Ecp.Tests.Common/TestSupport.cs`: `TestPacks.Reference` as the installation default of the test hosts |
+| Guard stage A | `tests/Ecp.Architecture.Tests/ArchitectureTests.cs`: case-insensitive, inside identifiers, plus a theory proving each previously invisible spelling is now seen |
+| First PRT-002 proof | `tests/Ecp.Integration.Tests/PackResolutionScenarios.cs` (four scenarios on SQLite and SQL Server) and `tests/Ecp.UnitTests/BlankPackTests.cs` (the neutral definitions validate, name no JBS state or business) |
+
+Two deviations from the plan text, both found in the code while implementing:
+
+* **The guard needed no word boundaries.** The plan said "case-insensitive"; a class named after a vendor (`DocuSignClient`) would still have passed a whole-word match, so the pattern is a substring match. Nothing in `src/` is affected.
+* **The neutral approver group is required, not optional.** The workflow validator refuses a definition with no `approverGroupKey`, so the Blank workflows name the neutral group `Approvers`.
+
+Decisions taken inside the slice (the plan left them open): the seeded `org-a2` stays on the Blank pack and now has the neutral lifecycle (the cheapest permanent non-JBS organisation); the Blank lifecycle has no Legal review, signature or approval step, so a Blank organisation's contracts do not get a Registered Date until a pack adds one.
 
 ## 9. Open decisions for the owner
 

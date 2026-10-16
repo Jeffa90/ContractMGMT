@@ -1,3 +1,4 @@
+using Ecp.Tenancy;
 using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
 using Ecp.Configuration;
@@ -34,7 +35,7 @@ public interface INotificationPolicyStore
     Task<NotificationPolicy> CurrentAsync(Guid organisationId, CancellationToken ct = default);
 }
 
-internal sealed class NotificationPolicyStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, IOptions<NotificationsOptions> options) : INotificationPolicyStore
+internal sealed class NotificationPolicyStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, Ecp.Tenancy.IOrganisationStructureService organisations, IOptions<NotificationsOptions> options) : INotificationPolicyStore
 {
     private static readonly ConcurrentDictionary<Guid, NotificationPolicy> Parsed = new();
 
@@ -43,8 +44,9 @@ internal sealed class NotificationPolicyStore(IConfigurationReleases releases, I
         var latest = await releases.LatestAsync(NotificationPolicyKinds.Policy, organisationId, ct);
         if (latest is null)
         {
-            var json = ReadPackPolicy(options.Value.DefaultPackId);
-            try { latest = await bootstrap.DraftValidatePublishAsync(NotificationPolicyKinds.Policy, organisationId, json, "system", $"Installed the {options.Value.DefaultPackId} reference notification policy", ct); }
+            var packId = await organisations.ResolveAsync(organisationId, options.Value.DefaultPackId, ct);
+            var json = ReadPackPolicy(packId);
+            try { latest = await bootstrap.DraftValidatePublishAsync(NotificationPolicyKinds.Policy, organisationId, json, "system", $"Installed the {packId} reference notification policy", ct); }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 latest = await releases.LatestAsync(NotificationPolicyKinds.Policy, organisationId, ct);

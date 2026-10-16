@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- The reference notification policy of the built-in solution pack: one canonical copy under templates/packs/. -->
+    <EmbeddedResource Include="../../../templates/packs/blank/notifications/notification-policy.json" LogicalName="Ecp.Notifications.blank.notification-policy.json" />
     <EmbeddedResource Include="../../../templates/packs/jbs-procurement/notifications/notification-policy.json" LogicalName="Ecp.Notifications.jbs-procurement.notification-policy.json" />
   </ItemGroup>
 </Project>

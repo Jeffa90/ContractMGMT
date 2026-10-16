@@ -99,7 +99,7 @@ dotnet Ecp.Host.dll setup-token              # prints a one-time token
 # open http://localhost:<port>/Setup from the server and follow the steps
 ```
 
-Configuration keys: `Ecp:Mode`, `Ecp:DemoSeed`, `Ecp:DemoTenantResolution`, `Ecp:DataDirectory`, `Ecp:Setup:AllowRemote` (default `false`), `Database:*`. See `docs/ENVIRONMENT.md` and `deploy/README.md`.
+Configuration keys: `Ecp:Mode`, `Ecp:DemoSeed`, `Ecp:DemoTenantResolution`, `Ecp:DataDirectory`, `Ecp:DefaultPackId` (the installation default solution pack, used only for an organisation that has none of its own; unset by default, so such an organisation is refused rather than given some business's pack: ADR-0024), `Ecp:Setup:AllowRemote` (default `false`), `Database:*`. See `docs/ENVIRONMENT.md` and `deploy/README.md`.
 
 ## 9. Tests
 

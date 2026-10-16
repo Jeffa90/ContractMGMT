@@ -98,7 +98,8 @@ An Effective contract is locked: no edit, no document upload, no ownership-depen
 | `Notifications:BaseUrl` | Prefix for links in email | empty (relative links) |
 | `Notifications:Smtp:*` | Host, port, TLS, from-address; user and password are **secret references** | none |
 | `Notifications:BatchSize`, `Notifications:JobIntervalSeconds` | Work per run, timer | 100, 60 |
-| `Lifecycle` options (code) | Pack used for defaults, re-authentication window | `jbs-procurement`, 10 minutes |
+| `Ecp:DefaultPackId` (host configuration; read by the Lifecycle and Notifications modules) | The installation default pack, used only for an organisation that has no pack of its own; unset by default (ADR-0024) | unset |
+| `Lifecycle` options (code) | Re-authentication window | 10 minutes |
 
 ## 8. Dashboards
 

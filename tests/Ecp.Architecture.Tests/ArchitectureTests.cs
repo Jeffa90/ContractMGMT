@@ -190,10 +190,24 @@ public class SourceRuleTests
     [Fact] // ARC-010
     public void No_business_pack_names_or_workflow_state_literals_in_compiled_code()
     {
-        AssertNone(new Regex(@"\b(JBS|JBSAUS|Medius|Qlik|DocuSign)\b"), "Business or vendor names belong in packs, samples and adapters, not core code");
+        // Any spelling, and inside identifiers too: the pack identifier is lower case ("jbs-procurement") and a class named after a vendor would sit inside a longer word, and the original rule (case-sensitive, whole words only)
+        // could see neither (portability audit P-01, P-09). Stage A of the guard; Razor, project and JSON
+        // files and the role and function names follow with the slices that remove them (docs/PORTABILITY_REMEDIATION_PLAN.md, R4).
+        AssertNone(new Regex("(JBS|Medius|Qlik|DocuSign)", RegexOptions.IgnoreCase), "Business or vendor names belong in packs, samples and adapters, not core code");
         AssertNone(new Regex("\"(Draft|AwaitingLegal|InLegalReview|LegalReworkRequired|LegalCleared|InitialCreation|OutForSignature|AwaitingApproval|Effective|VariationInProgress|Ended|DisposedArchived)\""),
             "Workflow state codes come from workflow definitions, not code");
     }
+
+    [Theory] // the guard must see the spellings that slipped past it before PER-002/S1
+    [InlineData("DefaultPackId = \"jbs-procurement\"")]
+    [InlineData("var x = \"JBSAUS-000001\";")]
+    [InlineData("// Medius import")]
+    [InlineData("new QlikSettings()")]
+    [InlineData("docusign.Send()")]
+    [InlineData("class DocuSignClient")]
+    [InlineData("MediusImporter.Run()")]
+    public void The_business_name_guard_recognises_every_spelling(string line)
+        => Assert.Matches(new Regex("(JBS|Medius|Qlik|DocuSign)", RegexOptions.IgnoreCase), line);
 
     [Fact]
     public void Secrets_are_not_hard_coded_in_source()

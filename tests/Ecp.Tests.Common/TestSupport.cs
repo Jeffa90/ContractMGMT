@@ -65,6 +65,13 @@ public sealed class TenantScope(AsyncServiceScope scope, IDisposable token, Guid
 }
 
 /// <summary>Composes the application services for tests on SQLite (provider-independent, not SQL Server proof) or on real SQL Server.</summary>
+/// <summary>Pack identifiers the test hosts use.</summary>
+public static class TestPacks
+{
+    public const string Reference = "jbs-procurement";
+    public const string Blank = "blank";
+}
+
 public sealed class TestApp : IAsyncDisposable
 {
     private readonly SqliteConnection? _keeper;
@@ -147,8 +154,9 @@ public sealed class TestApp : IAsyncDisposable
         services.AddContractsModule(o => o.InitialStatusCode = "Draft");
         services.AddDocumentsModule(_ => { }, new LocalFileSystemOptions { RootPath = Path.Combine(root, "documents") });
         services.AddMigrationModule();
-        services.AddLifecycleModule(o => o.Mode = setupMode);
-        services.AddNotificationsModule(o => o.Mode = setupMode);
+        // The test worlds create organisations without a solution pack and exercise the reference (JBS) lifecycle and notification policy, so the installation default names that pack here and only here.
+        services.AddLifecycleModule(o => { o.Mode = setupMode; o.DefaultPackId = TestPacks.Reference; });
+        services.AddNotificationsModule(o => { o.Mode = setupMode; o.DefaultPackId = TestPacks.Reference; });
         services.AddOperationsModule(root);
         services.AddSetupModule(new SetupEnvironment(setupMode, root, DemoIdentityEnabled: false, DemoSeedEnabled: false, ConnectionFromSecretReference: false,
             provider.ToString(), "test", AllowRemoteSetup: false));

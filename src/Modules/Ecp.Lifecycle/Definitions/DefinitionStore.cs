@@ -1,3 +1,4 @@
+using Ecp.Tenancy;
 using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
 using System.Reflection;
@@ -10,8 +11,11 @@ namespace Ecp.Lifecycle.Definitions;
 
 public sealed class LifecycleOptions
 {
-    /// <summary>The solution pack whose reference workflow definitions are installed for an organisation that has published none yet. They are a starting point, edited like any configuration.</summary>
-    public string DefaultPackId { get; set; } = "jbs-procurement";
+    /// <summary>
+    /// The installation default solution pack, used only for an organisation that has none of its own (<c>Ecp:DefaultPackId</c>). Not set unless the installer sets it. An organisation that has published no
+    /// workflow yet gets the reference definitions of <b>its own</b> pack, as a starting point edited like any configuration.
+    /// </summary>
+    public string? DefaultPackId { get; set; }
     /// <summary>Installation mode. Mock providers and simulated signing events are refused in Production.</summary>
     public EcpMode Mode { get; set; } = EcpMode.Production;
     /// <summary>How recently the person must have signed in to force-unlock a record.</summary>
@@ -64,7 +68,7 @@ public interface IWorkflowDefinitions
     Task<ResolvedDefinition> CurrentAsync(string kind, Guid organisationId, CancellationToken ct = default);
 }
 
-internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, IOptions<LifecycleOptions> options) : IWorkflowDefinitions
+internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, Ecp.Tenancy.IOrganisationStructureService organisations, IOptions<LifecycleOptions> options) : IWorkflowDefinitions
 {
     // A published release is immutable, so parsing it once per release id is safe for the life of the process.
     private static readonly ConcurrentDictionary<Guid, WorkflowDefinition> Parsed = new();
@@ -84,8 +88,9 @@ internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, I
         var latest = await releases.LatestAsync(kind, organisationId, ct);
         if (latest is null)
         {
-            var json = ReadPackDefinition(options.Value.DefaultPackId, kind);
-            try { latest = await bootstrap.DraftValidatePublishAsync(kind, organisationId, json, "system", $"Installed the {options.Value.DefaultPackId} reference definition", ct); }
+            var packId = await organisations.ResolveAsync(organisationId, options.Value.DefaultPackId, ct);
+            var json = ReadPackDefinition(packId, kind);
+            try { latest = await bootstrap.DraftValidatePublishAsync(kind, organisationId, json, "system", $"Installed the {packId} reference definition", ct); }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Another request may have installed it first (the release number is unique); use theirs. Anything else is a real failure.

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "description": "Neutral notification policy of the Blank pack: the review, end-date and critical-notice reminders to the owners of a contract's category, and their acknowledgement. Data, not code: every event, recipient rule, template and reminder window here is editable configuration.",
+  "reminders": {
+    "defaultLeadDays": 90,
+    "allowedLeadDays": [ 30, 60, 90, 120 ],
+    "reviewDate": true,
+    "endDate": true,
+    "criticalNotice": { "enabled": true, "offsetsDays": [ 30, 14, 7, 1 ], "earlierLeadDays": 30 },
+    "evergreen": { "suppressEndDate": true, "keepReviewDate": true },
+    "escalateUnacknowledgedAfterDays": 3
+  },
+  "content": { "withholdTitleFromLevel": "Restricted", "withholdEverythingFromLevel": "Legal Privileged" },
+  "delivery": { "maxAttempts": 5, "backoffMinutes": [ 1, 5, 30, 120, 720 ] },
+  "events": [
+    { "event": "reminder.reviewDate", "recipients": [ "CategoryOwners" ], "template": "reminderReview", "channels": [ "InApp", "Email" ], "mandatory": true },
+    { "event": "reminder.endDate", "recipients": [ "CategoryOwners" ], "template": "reminderEnd", "channels": [ "InApp", "Email" ], "mandatory": true },
+    { "event": "reminder.criticalNotice", "recipients": [ "CategoryOwners" ], "template": "reminderCritical", "channels": [ "InApp", "Email" ], "mandatory": true },
+    { "event": "reminder.acknowledged", "recipients": [ "CategoryOwners" ], "template": "reminderAcknowledged", "channels": [ "InApp" ], "mandatory": false }
+  ],
+  "templates": {
+    "reminderReview": { "subject": "Review due in {{days.remaining}} days: {{contract.reference}}", "body": "{{contract.reference}} ({{contract.title}}) is due for review on {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}" },
+    "reminderEnd": { "subject": "Ends in {{days.remaining}} days: {{contract.reference}}", "body": "{{contract.reference}} ({{contract.title}}) ends on {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}" },
+    "reminderCritical": { "subject": "Critical notice deadline in {{days.remaining}} days: {{contract.reference}}", "body": "The notice deadline for {{contract.reference}} ({{contract.title}}) is {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}" },
+    "reminderAcknowledged": { "subject": "Reminder acknowledged: {{contract.reference}}", "body": "{{actor.name}} acknowledged the reminder for {{contract.reference}} ({{contract.title}}). {{link}}" }
+  }
+}

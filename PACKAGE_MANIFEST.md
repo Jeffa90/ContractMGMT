@@ -221,6 +221,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Modules/Ecp.Lifecycle/Persistence/Migrations/20261016074947_AddApprovalPlans.cs`
 - `src/Modules/Ecp.Lifecycle/RegisterAuthorisation.Plans.cs`
 - `decisions/ADR-0023-configurable-metadata-typed-search-and-studio.md`
+- `decisions/ADR-0024-solution-pack-resolved-by-organisation.md`
 - `docs/CONFIGURATION_STUDIO.md`
 - `docs/CUSTOM_FIELDS.md`
 - `docs/EXPORTS.md`

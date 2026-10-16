@@ -61,11 +61,14 @@ builder.Services.AddMigrationModule(o =>
 });
 // The mocked scanner stands in for a provider adapter in Demonstration and tests only; Production never gets it.
 if (resolved.Host.Mode != EcpMode.Production) builder.Services.AddSingleton<Ecp.Documents.IMalwareScanner, Ecp.Documents.MockMalwareScanner>();
-builder.Services.AddLifecycleModule(o => o.Mode = resolved.Host.Mode);
+// The installation default solution pack applies only to an organisation that has none of its own; it is unset unless the installer sets it (docs/SETUP_AND_ONBOARDING.md).
+var installationDefaultPack = builder.Configuration["Ecp:DefaultPackId"];
+builder.Services.AddLifecycleModule(o => { o.Mode = resolved.Host.Mode; o.DefaultPackId = installationDefaultPack; });
 builder.Services.AddNotificationsModule(o =>
 {
     builder.Configuration.GetSection("Notifications").Bind(o);
     o.Mode = resolved.Host.Mode;
+    o.DefaultPackId = installationDefaultPack;
 });
 builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
 builder.Services.AddHostedService<BackgroundJobService>();

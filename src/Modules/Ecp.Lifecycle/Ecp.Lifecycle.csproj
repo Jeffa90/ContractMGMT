@@ -16,6 +16,8 @@
   </ItemGroup>
   <ItemGroup>
     <!-- The reference workflow definitions of the built-in solution pack: one canonical copy under templates/packs/. -->
+    <EmbeddedResource Include="../../../templates/packs/blank/workflows/contract-lifecycle.json" LogicalName="Ecp.Workflow.blank.contract-lifecycle.json" />
+    <EmbeddedResource Include="../../../templates/packs/blank/workflows/variation.json" LogicalName="Ecp.Workflow.blank.variation.json" />
     <EmbeddedResource Include="../../../templates/packs/jbs-procurement/workflows/contract-lifecycle.json" LogicalName="Ecp.Workflow.jbs-procurement.contract-lifecycle.json" />
     <EmbeddedResource Include="../../../templates/packs/jbs-procurement/workflows/variation.json" LogicalName="Ecp.Workflow.jbs-procurement.variation.json" />
   </ItemGroup>

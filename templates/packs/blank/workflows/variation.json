@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "workflow": "variation",
+  "subject": "Variation",
+  "description": "Neutral Variation workflow of the Blank pack: a change to an active agreement is prepared, submitted with its executed copy, and applied or rejected by an approver. Its outcome returns the parent agreement to its prior state. Data, not code: editable configuration.",
+  "settings": {
+    "documents": {
+      "executedCopyType": "ExecutedContract",
+      "finalTypes": [ "VariationDocument" ],
+      "legalMarkupType": "LegalMarkup",
+      "approvalEvidenceType": "ApprovalEvidence"
+    },
+    "approval": { "approverGroupKey": "Approvers", "requireExecutedCopy": true },
+    "legal": { "reworkReasonRequired": true },
+    "variation": {
+      "legalReview": "None",
+      "changeableFields": [
+        "currencyCode", "estimatedValue", "extensionType", "noticePeriodDays", "criticalNotice", "reviewDate", "endDate", "businessUnitId", "siteId", "legalEntityId",
+        "riskLevel", "noticePeriodValue", "noticePeriodUnit", "cf.*"
+      ]
+    }
+  },
+  "states": [
+    { "code": "Open", "display": "Open", "role": "initial", "locked": false, "freezeContent": false, "documentPolicy": "Open", "initial": true },
+    { "code": "Submitted", "display": "Submitted for approval", "role": "approval", "locked": false, "freezeContent": true, "documentPolicy": "Open" },
+    { "code": "Applied", "display": "Applied", "role": "applied", "locked": false, "freezeContent": false, "documentPolicy": "Open", "terminal": true },
+    { "code": "Rejected", "display": "Rejected", "role": "rejected", "locked": false, "freezeContent": false, "documentPolicy": "Open", "terminal": true },
+    { "code": "Cancelled", "display": "Cancelled", "role": "cancelled", "locked": false, "freezeContent": false, "documentPolicy": "Open", "terminal": true }
+  ],
+  "transitions": [
+    { "code": "Submit", "display": "Submit for approval", "from": [ "Open" ], "to": "Submitted", "permission": "variations.create", "role": "submitRegister", "guards": [ "ExecutedCopyExists" ] },
+    { "code": "Approve", "display": "Approve and apply", "from": [ "Submitted" ], "to": "Applied", "permission": "approvals.action", "role": "approve", "guards": [ "ExecutedCopyExists", "AuthorisedApprover", "SubmitterNotApprover" ] },
+    { "code": "Reject", "display": "Reject", "from": [ "Submitted" ], "to": "Rejected", "permission": "approvals.action", "role": "reject", "guards": [ "CommentRequired", "AuthorisedApprover", "SubmitterNotApprover" ], "commentRequired": true },
+    { "code": "CancelOpen", "display": "Cancel", "from": [ "Open" ], "to": "Cancelled", "permission": "variations.create", "role": "cancel", "guards": [ "ReasonRequired" ], "reasonRequired": true }
+  ]
+}

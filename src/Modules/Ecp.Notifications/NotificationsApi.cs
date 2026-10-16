@@ -11,8 +11,8 @@ namespace Ecp.Notifications;
 
 public sealed class NotificationsOptions
 {
-    /// <summary>The solution pack whose reference notification policy is installed for an organisation that has published none.</summary>
-    public string DefaultPackId { get; set; } = "jbs-procurement";
+    /// <summary>The installation default solution pack, used only for an organisation that has none of its own (<c>Ecp:DefaultPackId</c>); not set unless the installer sets it. An organisation that has published no policy gets the reference policy of its own pack.</summary>
+    public string? DefaultPackId { get; set; }
     /// <summary>Installation mode. The demonstration log and the development capture are refused in Production.</summary>
     public EcpMode Mode { get; set; } = EcpMode.Production;
     /// <summary>Email provider: demo-log, dev-capture, smtp or graph. Production accepts only smtp or graph.</summary>

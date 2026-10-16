@@ -310,6 +310,19 @@ Each scenario runs on SQLite (lightweight, **not** SQL Server proof) and, throug
 
 Not covered: browser-level accessibility of the Studio and register pages (ACC-01 remains open); concurrency of two administrators editing one draft beyond the conflict message; keyset paging (not built); SQL Server index plans for `ContractCustomValue` and `SavedView` (PER-002 not done; the SQL Server scenario wrappers did exercise row-level security and composite keys).
 
+### 8.3 Pack resolution and the Blank pack (portability slice S1, ADR-0024; PRT-001, first step of PRT-002)
+
+| Area | Where it is covered |
+|---|---|
+| Each organisation of one tenant works from its own pack; a Blank-pack contract is created in `Open`, activated, locked, and no JBS state code appears in its state path or history; the installed Blank definition names the neutral approver group and no JBS group; the JBS organisation is unaffected | `PackResolutionScenarios` (`Own_pack`), SQLite and SQL Server |
+| A Blank organisation resolves its Variation workflow and notification policy and can open a Variation on an active contract (the parent moves to `Amending`); no Legal-review rule exists in its policy | `PackResolutionScenarios` (`Variation_and_policy`) |
+| An organisation without a pack uses the installation default (the test hosts set it to the reference pack) | `PackResolutionScenarios` (`Installation_default`) |
+| With no installation default (the shipped configuration) an organisation without a pack is refused with `no_solution_pack` for both the workflow and the policy, nothing is installed, and an organisation with a pack of its own is unaffected | `PackResolutionScenarios` (`No_installation_default`) |
+| The neutral lifecycle, Variation workflow and notification policy validate through the normal validators, share no state code with the JBS lifecycle, and name no business | unit `BlankPackTests` (4) |
+| The business-name guard (ARC-010, stage A) matches every spelling, including a lowercase pack id and a name inside an identifier | `ArchitectureTests` `The_business_name_guard_recognises_every_spelling` (7 cases) and `No_business_pack_names_or_workflow_state_literals_in_compiled_code` |
+
+PRT-002 as a whole (a second business with its own fields, rules and approvals) stays **NOT VERIFIED**; it needs slice S9.
+
 ## 9. No-code, packages and portability suite
 
 | ID | Test |

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "workflow": "contract-lifecycle",
+  "subject": "Contract",
+  "description": "Neutral starting lifecycle of the Blank pack: open, active, closed or cancelled, with amendments (Variations) to an active agreement. It has no Legal review, signature or approval step. Data, not code: every state, transition and permission here is editable configuration, and an organisation replaces it by publishing its own.",
+  "settings": {
+    "documents": {
+      "executedCopyType": "ExecutedContract",
+      "finalTypes": [ "FinalAgreement" ],
+      "legalMarkupType": "LegalMarkup",
+      "approvalEvidenceType": "ApprovalEvidence",
+      "uploadTypes": [ "FinalAgreement", "Schedule", "SupportingDocument", "Correspondence" ]
+    },
+    "approval": { "approverGroupKey": "Approvers", "requireExecutedCopy": true },
+    "legal": { "reworkReasonRequired": true },
+    "unlock": { "defaultMinutes": 60, "maxMinutes": 240, "requireSecondPerson": false },
+    "variation": { "workflow": "variation" }
+  },
+  "states": [
+    { "code": "Open", "display": "Open", "role": "initial", "locked": false, "freezeContent": false, "documentPolicy": "Open", "initial": true },
+    { "code": "Active", "display": "Active", "role": "effective", "locked": true, "freezeContent": false, "documentPolicy": "Closed", "lockReason": "Active: changes need an authorised Variation or an audited emergency unlock" },
+    { "code": "Amending", "display": "Being amended", "role": "variation", "locked": true, "freezeContent": false, "documentPolicy": "Closed", "lockReason": "A Variation is open on this agreement" },
+    { "code": "Closed", "display": "Closed", "role": "ended", "locked": true, "freezeContent": false, "documentPolicy": "Closed", "lockReason": "Closed", "terminal": true },
+    { "code": "Cancelled", "display": "Cancelled", "role": "withdrawn", "locked": true, "freezeContent": false, "documentPolicy": "Closed", "lockReason": "Cancelled before it became active", "terminal": true }
+  ],
+  "transitions": [
+    { "code": "Activate", "display": "Activate", "from": [ "Open" ], "to": "Active", "permission": "contracts.edit_owned", "role": "plain" },
+    { "code": "Cancel", "display": "Cancel", "from": [ "Open" ], "to": "Cancelled", "permission": "contracts.edit_owned", "role": "withdraw", "guards": [ "ReasonRequired" ], "reasonRequired": true },
+    { "code": "Close", "display": "Close", "from": [ "Active" ], "to": "Closed", "permission": "contracts.close", "role": "plain", "guards": [ "Authorised", "NoOtherOpenVariation" ] },
+    { "code": "OpenAmendment", "display": "Create variation", "from": [ "Active" ], "to": "Amending", "permission": "variations.create", "role": "openVariation", "guards": [ "ParentRemainsLocked", "NoOtherOpenVariation" ] },
+    { "code": "ApplyAmendment", "display": "Apply variation", "from": [ "Amending" ], "to": "Active", "permission": "approvals.action", "role": "applyVariation", "guards": [ "VariationOutcomeApplied" ] },
+    { "code": "CancelAmendment", "display": "Cancel variation", "from": [ "Amending" ], "to": "Active", "permission": "variations.create", "role": "cancelVariation", "guards": [ "ReasonRequired", "VariationOutcomeNotApplied" ], "reasonRequired": true },
+    { "code": "RejectAmendment", "display": "Reject variation", "from": [ "Amending" ], "to": "Active", "permission": "approvals.action", "role": "rejectVariation", "guards": [ "CommentRequired", "VariationOutcomeNotApplied" ], "commentRequired": true }
+  ]
+}

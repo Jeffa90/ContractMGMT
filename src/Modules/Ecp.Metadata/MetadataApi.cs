@@ -48,12 +48,15 @@ internal sealed class CustomFieldCatalogue(IConfigurationReleases releases, IPub
     {
         var release = await releases.LatestAsync(MetadataModule.CustomFieldKind, organisationId, ct);
         if (release is null) return CustomFieldSet.Empty;
-        return cache.GetParsed(tenant.RequireTenantId(), release, r =>
+        static CustomFieldSet Parse(ReleaseDto r)
         {
             var (set, messages) = FieldParser.Parse(r.ContentJson);
             if (set is null || messages.Any(m => m.Severity == ValidationSeverity.Error)) return CustomFieldSet.Empty;     // a published release was validated; this is only a guard
             return new CustomFieldSet { SchemaVersion = set.SchemaVersion, Sections = set.Sections, Lookups = set.Lookups, Fields = set.Fields, ReleaseNumber = r.Number };
-        });
+        }
+        // The remembered parse is an optimisation: if the cache fails, the release is parsed again and the answer is the same.
+        try { return cache.GetParsed(tenant.RequireTenantId(), release, Parse); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return Parse(release); }
     }
 }
 

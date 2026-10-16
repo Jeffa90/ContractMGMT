@@ -10,6 +10,7 @@ using Ecp.SharedKernel;
 using Ecp.Tests.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 using static Ecp.Integration.Tests.CustomFieldWorld;
 
@@ -343,5 +344,55 @@ internal static class ChangeHistoryScenarios
         Assert.Contains("classified-value", legalText); Assert.Contains("legal-only-value", legalText);
         // A person who cannot read the contract learns nothing, not even that it exists.
         await Assert.ThrowsAsync<ForbiddenException>(() => w.As("otherApprover", s => s.Get<IContractChangeHistory>().ListAsync(id)));      // the contract's own read rule decides, as on the detail page
+    }
+}
+
+/// <summary>A published-configuration cache that fails on demand, to show that a failing cache never changes an answer.</summary>
+internal sealed class FaultyCache : IPublishedConfigurationCache
+{
+    public bool FailReads { get; set; } = true;
+    public bool FailInvalidate { get; set; }
+    public int Calls { get; private set; }
+    private Exception Boom() { Calls++; return new InvalidOperationException("the cache is unavailable"); }
+    public bool TryGetLatest(Guid tenantId, Guid organisationId, string kind, out ReleaseDto? release) { if (FailReads) throw Boom(); release = null; return false; }
+    public long Generation(Guid tenantId, Guid organisationId, string kind) => FailReads ? throw Boom() : 0;
+    public void StoreLatest(Guid tenantId, Guid organisationId, string kind, ReleaseDto? release, long generation) { if (FailReads) throw Boom(); }
+    public void Invalidate(Guid tenantId, Guid organisationId, string kind) { if (FailInvalidate) throw Boom(); }
+    public T GetParsed<T>(Guid tenantId, ReleaseDto release, Func<ReleaseDto, T> parse) where T : class => FailReads ? throw Boom() : parse(release);
+    public ConfigurationCacheStatistics Statistics => new(0, 0, 0, 0, 0);
+    public void Clear() { }
+}
+
+internal static class CacheFailureScenarios
+{
+    public static readonly FaultyCache Cache = new();
+    public static readonly Action<IServiceCollection> Configure = s =>
+    {
+        LifecycleScenarios.Scanner(s);
+        s.Replace(ServiceDescriptor.Singleton<IPublishedConfigurationCache>(Cache));
+    };
+
+    public static async Task A_cache_that_fails_never_changes_an_answer_and_a_failed_invalidation_stops_the_publish(TestApp app)
+    {
+        var cache = Cache; cache.FailReads = true; cache.FailInvalidate = false;
+        var w = await LifecycleWorld.CreateAsync(app);
+        await w.PublishFieldsAsync(Doc(Field("note", "TEXT")));
+        // Every read is served from the database, the same as with a healthy cache.
+        for (var i = 0; i < 3; i++) Assert.Equal(["note"], (await w.W.AsScopeless().Run(s => s.Get<ICustomFieldCatalogue>().PublishedAsync(w.W.Org1))).Fields.Select(f => f.Key).ToArray());
+        var id = await w.CreateWithFieldsAsync("ownerPackaging", new() { ["note"] = "works without a cache" });
+        Assert.Equal("works without a cache", string.Join("", (await w.FormAsync("ownerPackaging", id)).Entry("note")!.Raw));
+        Assert.True(cache.Calls > 0);
+
+        // A publish while reads fail still takes effect at once, because there is nothing remembered to go stale.
+        await w.PublishFieldsAsync(Doc(Field("note", "TEXT") + "," + Field("extra", "TEXT")));
+        Assert.Equal(["extra", "note"], (await w.W.AsScopeless().Run(s => s.Get<ICustomFieldCatalogue>().PublishedAsync(w.W.Org1))).Fields.Select(f => f.Key).Order().ToArray());
+
+        // If the remembered answer cannot be dropped, the publish fails and rolls back: a stale definition is never left in force silently.
+        cache.FailReads = false; cache.FailInvalidate = true;
+        await Assert.ThrowsAnyAsync<Exception>(() => w.PublishFieldsAsync(Doc(Field("note", "TEXT") + "," + Field("extra", "TEXT") + "," + Field("never_published", "TEXT"))));
+        cache.FailInvalidate = false;
+        var current = await w.W.AsScopeless().Run(s => s.Get<ICustomFieldCatalogue>().PublishedAsync(w.W.Org1));
+        Assert.DoesNotContain(current.Fields, f => f.Key == "never_published");
+        Assert.Equal(2, current.ReleaseNumber);
     }
 }

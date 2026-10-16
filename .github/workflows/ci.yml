@@ -87,11 +87,28 @@ jobs:
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category!=Performance" --logger "trx" --results-directory TestResults
       - name: Performance baseline and query plans (SQL Server)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx" --results-directory TestResults
+      - name: Baseline for comparison on this runner (PER-002; temporary)
+        if: always()
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin b5adb83527f42e18e745eb242f084a2f218e3428
+          git worktree add ../ecp-base FETCH_HEAD
+          cd ../ecp-base
+          dotnet restore src/Ecp.sln --locked-mode
+          dotnet build src/Ecp.sln -c Release --no-restore
+          dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx;LogFileName=base-perf.trx" --results-directory ../base-results
+        continue-on-error: true
       - name: Print performance baseline and plan report
         if: always()
         run: |
           echo "runner: $(uname -sr) cpus=$(nproc) mem=$(free -m | awk '/Mem:/{print $2}')MB"
+          echo "== SUMMARY (after, this commit): user, median ms, p95 ms, operation"
+          jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' artifacts/performance/sqlserver.json || true
+          echo "== SUMMARY (before, commit b5adb83 on this runner): user, median ms, p95 ms, operation"
+          jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' ../ecp-base/artifacts/performance/sqlserver.json || echo "no comparison run"
+          echo "== FULL (after)"
           cat artifacts/performance/sqlserver.json || echo "no baseline file written"
+          echo "== PLANS (after)"
           cat artifacts/performance/plans-sqlserver.txt || echo "no plan report written"
       - name: Honest result summary
         if: always()

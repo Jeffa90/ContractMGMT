@@ -203,9 +203,24 @@ internal sealed class PackStage : SetupStageBase
             notes.Add($"{p.Name()}: {p.DescriptionText()}" + (p.Synthetic ? " Contains synthetic example data only." : "") + (p.Capabilities.Count > 0 ? $" Capabilities: {string.Join(", ", p.Capabilities)}." : "")
                 + (p.Trust.IsTrusted ? "" : " This package is unsigned and is accepted only because this is a Demo or Test environment."));
             notes.Add($"{p.Name()} wording: {ExampleWording(p.PackKey)}");
+            notes.Add($"{p.Name()} optional steps: {OptionalSteps(p.PackKey)}");
         }
+        notes.Add("Optional steps ([[legal.review|lower]], [[registration.approval|lower]], [[variation|plural|lower]], [[renewal|plural|lower]] and signature requests) are switched on or off by the pack as a default and by the [[organisation|lower]] later under Administration, Capabilities. Switching a step off removes it from the pages and lifecycle; it never changes who may do anything.");
         notes.Add("Wording (what the pack calls a [[contract|lower]], a [[supplier|lower]] and so on) is data in the pack. It applies as the default for the [[organisation|lower]] you create, and you can change any label later under Administration, Terminology. Nothing is published, and labels never change what anyone may do.");
         return notes;
+    }
+
+    /// <summary>Which optional steps the pack switches off, in the pack's own data (never a pack or business named in this code).</summary>
+    private string OptionalSteps(string packKey)
+    {
+        var json = _catalogue.CapabilitiesOf(packKey);
+        if (json is null) return "all on (the platform default; this pack gives none).";
+        try
+        {
+            var set = CapabilityDocument.Parse(json).AsSet();
+            return set.Disabled.Count == 0 ? "all on." : "off: " + string.Join(", ", set.Disabled.Select(k => CapabilityCatalogue.ByKey[k].Label)) + "; the rest are on.";
+        }
+        catch (DomainException) { return "the pack's capability defaults could not be read; every optional step is on."; }
     }
 
     /// <summary>A few headline labels from the pack's terminology, as plain text for the notes (the pack's own words, never wording written into this code).</summary>

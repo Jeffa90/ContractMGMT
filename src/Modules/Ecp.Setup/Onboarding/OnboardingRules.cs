@@ -11,7 +11,7 @@ namespace Ecp.Setup.Onboarding;
 /// <summary>What already exists in the organisation and tenant, as keys. Everything a validation or preview needs, with no database access of its own.</summary>
 public sealed record OnboardingFacts(
     Guid OrganisationId, ISet<string> LegalEntities, ISet<string> Divisions, ISet<string> BusinessUnits, ISet<string> Sites, ISet<string> Categories,
-    ISet<string> KnownEmails, ISet<string> ProviderKeys, ISet<string> PackIds, ClassificationScale Scale)
+    ISet<string> KnownEmails, ISet<string> ProviderKeys, ISet<string> PackIds, ClassificationScale Scale, CapabilitySet? Capabilities = null)
 {
     public static OnboardingFacts None(ClassificationScale? scale = null) => new(Guid.Empty, new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(),
         new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), scale ?? ClassificationScale.Default);
@@ -142,6 +142,9 @@ public static class OnboardingValidator
             CheckCeiling(path + ".ceiling", g.Ceiling);
             if (ErrorCount() == before) DomainCheck(path, g.RoleCode ?? "", g.ViewerKind, g.CategoryCodes, g.BusinessUnitKeys, g.SiteKeys, g.Ceiling);
             if (!mappingKeys.Add(Canonical.Mapping(g))) Error(path, "duplicate", "This group mapping is listed twice.");
+            // A role whose whole purpose is a capability this organisation has switched off has nothing to do here: say so (a note, not an error; the capability may be switched on later).
+            if (g.RoleCode == RoleCodes.Legal && facts.Capabilities is { } caps && !caps.IsEnabled(CapabilityKeys.LegalReview))
+                Warn(path + ".role", "role_unused_capability", "[[legal.review|sentence]] is switched off for this [[organisation|lower]], so this role has nothing to do until it is switched on (Administration, Capabilities).");
             if (g.RoleCode is RoleCodes.ProcurementAdministrator or RoleCodes.DivisionSiteAdministrator)
                 Warn(path + ".role", "privileged_mapping", $"Everyone in group '{g.GroupKey}' becomes a {g.RoleCode}. Confirm the group's membership is controlled.");
         }

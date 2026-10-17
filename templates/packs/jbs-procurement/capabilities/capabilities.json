@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "mode": "defaults",
+  "capabilities": [
+    {
+      "key": "legal.review",
+      "enabled": true
+    },
+    {
+      "key": "register.authorisation",
+      "enabled": true
+    },
+    {
+      "key": "variations",
+      "enabled": true
+    },
+    {
+      "key": "renewals",
+      "enabled": true
+    },
+    {
+      "key": "signature.requests",
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+@page "/Admin/Capabilities/Preview"
+@model Ecp.Host.Pages.Admin.Capabilities.PreviewModel
+@{ ViewData["Title"] = L["Preview capabilities"].Value; }
+<h1>@L["Preview capabilities"]</h1>
+<p class="lede">@L["What would change once the draft is published. A capability switches an optional step of the process; it does not change permissions, roles or records."]</p>
+<partial name="_Picker" model="Model" />
+@if (Model.Result is { } r)
+{
+    @if (!r.HasDraft) { <p class="alert" role="status">@L["There is no open draft, so \"after\" is the same as \"now\"."]</p> }
+    <div class="table-wrap"><table>
+        <caption>@L["Capabilities now and after publishing"]</caption>
+        <thead><tr><th scope="col">@L["Capability"]</th><th scope="col">@L["Now"]</th><th scope="col">@L["After publishing"]</th><th scope="col">@L["Effect"]</th></tr></thead>
+        <tbody>@foreach (var c in r.Changes) { <tr><th scope="row">@Terms.Expand(c.Label) <code class="id">@c.Key</code></th><td>@(c.Now ? L["On"] : L["Off"])</td><td>@(c.After ? L["On"] : L["Off"])</td><td>@Terms.Expand(c.Effect)</td></tr> }</tbody>
+    </table></div>
+    <section class="card" aria-labelledby="chk-h">
+        <h2 id="chk-h">@L["Compatibility checks on the draft"]</h2>
+        @if (r.Findings.Count == 0) { <p>@L["No problems: what the draft chooses fits the published workflows and nothing is stranded."]</p> }
+        else { <ul class="plain">@foreach (var f in r.Findings) { <li><span class="badge @(f.Severity == Ecp.Configuration.ValidationSeverity.Error ? "bad" : "warn")">@(f.Severity == Ecp.Configuration.ValidationSeverity.Error ? L["Problem"].Value : L["Note"].Value)</span> <code class="id">@f.Capability</code> @Terms.Expand(f.Message)</li> }</ul> }
+    </section>
+    <p><a class="button" href="/Admin/Capabilities/Edit?organisationId=@r.OrganisationId">@L["Back to the draft"]</a> <a href="/Admin/Capabilities?organisationId=@r.OrganisationId">@L["Overview"]</a></p>
+}

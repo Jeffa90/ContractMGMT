@@ -9,6 +9,7 @@ using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Ecp.Configuration;
 
@@ -16,7 +17,13 @@ public sealed record PackKindOutcome(string Kind, string Scope, string Outcome, 
 public sealed record PackAssignmentResult(Guid OrganisationId, string PackKey, string Version, IReadOnlyList<PackKindOutcome> Kinds, IReadOnlyList<string> NextSteps);
 public sealed record PackAssignmentPreviewItem(string Kind, string Scope, bool HasPublishedRelease, bool HasOpenDraft, string Effect);
 public sealed record PackAssignmentPreview(Guid OrganisationId, string OrganisationName, string? CurrentPackKey, PackCatalogueEntry Entry, IReadOnlyList<PackAssignmentPreviewItem> Items, IReadOnlyList<string> Warnings,
-    IReadOnlyList<TerminologyPreviewRow>? Terminology = null);
+    IReadOnlyList<TerminologyPreviewRow>? Terminology = null)
+{
+    /// <summary>For each capability, whether it is on now and whether it would be on once the pack is assigned (the organisation's own published choice still wins).</summary>
+    public IReadOnlyList<(string Key, bool Now, bool After)> Capabilities { get; init; } = [];
+    /// <summary>Problems the assignment would create: a capability turned off while work is in flight or the organisation's published workflows still use it. Errors stop the assignment.</summary>
+    public IReadOnlyList<CapabilityFinding> CapabilityFindings { get; init; } = [];
+}
 public sealed record OrganisationPackStatus(Guid OrganisationId, string Name, string? PackKey, string? Version, string? Source, string? Origin, DateTime? AssignedUtc, bool PackUsable);
 
 /// <summary>
@@ -31,7 +38,7 @@ public interface IPackAssignments
 }
 
 internal sealed class PackAssignments(IPackLoader loader, IConfigurationService configuration, ConfigurationDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IAccessService access,
-    CurrentUser currentUser, ActorContext actor, IClock clock, IOrganisationStructureService organisations, PackKindRegistry kinds, ITerminologyResolver terminology) : IPackAssignments
+    CurrentUser currentUser, ActorContext actor, IClock clock, IOrganisationStructureService organisations, PackKindRegistry kinds, ITerminologyResolver terminology, ICapabilityResolver capabilities, IServiceProvider services) : IPackAssignments
 {
     private string Who() => currentUser.UserId?.ToString() ?? actor.ActorId ?? "system";
     private static ResourceDescriptor OrgResource(Guid tenantId, Guid organisationId) => new("SolutionPack", tenantId, organisationId, Dimensions: ScopeDimensions.OrganisationOnly);
@@ -70,6 +77,9 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
                     : hasDraft ? $"A terminology draft is already open and is kept. The pack's {count} terms apply as defaults beneath it once the pack is assigned. Nothing is published."
                     : $"The pack's {count} terms apply to this organisation as defaults as soon as the pack is assigned, and a terminology draft is prepared from them so you can review and change labels before publishing your own. Nothing is published, and no permission or workflow changes.";
             }
+            if (c.Kind == CapabilityKinds.Name)
+                effect = hasRelease ? "The organisation already publishes its own capability choices, which stay in force. The pack's defaults apply only to capabilities it has not decided. No draft is created."
+                    : "The pack's capability defaults apply to this organisation as soon as the pack is assigned (see the table below). No draft is created; an organisation can publish its own choice later.";
             items.Add(new PackAssignmentPreviewItem(c.Kind, c.Scope, hasRelease, hasDraft, effect));
         }
         var warnings = new List<string>();
@@ -81,13 +91,30 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
             var now = await terminology.GetAsync(organisationId, ct: ct);
             terms = TerminologyPreview.Rows(TerminologyDocument.Parse(termsJson), now);
         }
-        return new PackAssignmentPreview(organisationId, org.Name, org.SolutionPackKey, entry, items, warnings, terms);
+        var (capabilityRows, findings) = await CapabilityEffectAsync(organisationId, packKey, version, ct);
+        if (findings.Any(f => f.Severity == ValidationSeverity.Error)) warnings.Add("The capability defaults of this pack do not fit this organisation as it is now; the assignment would be refused (see the capability problems below).");
+        return new PackAssignmentPreview(organisationId, org.Name, org.SolutionPackKey, entry, items, warnings, terms) { Capabilities = capabilityRows, CapabilityFindings = findings };
+    }
+
+    /// <summary>What assigning the pack would do to the organisation's capabilities, and whether the result is coherent with its workflows and the work in flight.</summary>
+    private async Task<(IReadOnlyList<(string Key, bool Now, bool After)> Rows, IReadOnlyList<CapabilityFinding> Findings)> CapabilityEffectAsync(Guid organisationId, string packKey, string version, CancellationToken ct)
+    {
+        var now = await capabilities.GetAsync(organisationId, ct);
+        var after = await capabilities.AfterPackAsync(organisationId, packKey, version, ct);
+        var findings = new List<CapabilityFinding>();
+        foreach (var u in after.Unmet()) findings.Add(new(ValidationSeverity.Error, u.Capability, "capability_requires", $"'{u.Capability}' needs '{u.Requires}', which is off."));
+        foreach (var check in services.GetServices<ICapabilityCompatibility>()) findings.AddRange(await check.CheckAsync(organisationId, after, now, ct));
+        return (CapabilityKeys.All.Select(k => (k, now.IsEnabled(k), after.IsEnabled(k))).ToList(), findings);
     }
 
     public async Task<PackAssignmentResult> AssignAsync(Guid organisationId, string packKey, string version, CancellationToken ct = default)
     {
         var tenantId = tenant.RequireTenantId();
         var (org, entry, package) = await ResolveAsync(organisationId, packKey, version, "packs.assign", ct);
+        // A pack's capability defaults are an operating-model change: never apply them where they would switch a capability off from under work in flight or leave the organisation's workflows using it.
+        var (_, capabilityFindings) = await CapabilityEffectAsync(organisationId, packKey, version, ct);
+        if (capabilityFindings.Where(f => f.Severity == ValidationSeverity.Error).ToList() is { Count: > 0 } blockers)
+            throw new DomainException("capability_conflict", "This pack's capability defaults do not fit this organisation as it is now, so it was not assigned. " + string.Join(" ", blockers.Select(b => b.Message)));
         var outcomes = new List<PackKindOutcome>();
         foreach (var c in InstallableContent(package))
         {
@@ -97,6 +124,12 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
                 var open = await configuration.FindOpenDraftAsync(c.Kind, scopeOrg, ct);
                 if (open is not null) { outcomes.Add(new PackKindOutcome(c.Kind, c.Scope, "An open draft already exists and was kept", true, "Review that draft; the pack's content was not added to it.")); continue; }
                 var json = package.Document(c.Kind)!;
+                if (c.Kind == CapabilityKinds.Name)
+                {
+                    // Capability defaults are layered beneath the organisation's own choice and apply from the assignment; nothing is drafted or published.
+                    outcomes.Add(new PackKindOutcome(c.Kind, c.Scope, "Applied as defaults", false, "The pack's capability defaults apply to this organisation now; its own published choice, if any, still wins."));
+                    continue;
+                }
                 if (c.Kind == TerminologyKind.KindName)
                 {
                     // Terminology is layered: the pack's wording already applies beneath the organisation's own. An organisation that publishes its own terminology keeps it untouched; otherwise a draft is prepared from the pack.

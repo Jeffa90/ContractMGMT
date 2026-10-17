@@ -74,4 +74,5 @@
     <p class="hint">@L["Give both the length and the unit, or neither."]</p>
 </fieldset>
 <div class="field"><label><input type="checkbox" name="Input.CriticalNotice" value="true" checked="@i.CriticalNotice" /> @L["Critical Notice"]</label><input type="hidden" name="Input.CriticalNotice" value="false" /></div>
-<div class="field"><label><input type="checkbox" name="Input.LegalReviewRequired" value="true" checked="@i.LegalReviewRequired" /> @L["[[legal.review|sentence]] required"]</label><input type="hidden" name="Input.LegalReviewRequired" value="false" /></div>
+@if (Terms.Uses(CapabilityKeys.LegalReview)) { <div class="field"><label><input type="checkbox" name="Input.LegalReviewRequired" value="true" checked="@i.LegalReviewRequired" /> @L["[[legal.review|sentence]] required"]</label><input type="hidden" name="Input.LegalReviewRequired" value="false" /></div> }
+else { <input type="hidden" name="Input.LegalReviewRequired" value="@(i.LegalReviewRequired ? "true" : "false")" /> }

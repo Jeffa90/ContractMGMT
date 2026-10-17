@@ -13,9 +13,11 @@ namespace Ecp.Host.Terminology;
 /// never query for a label. A page that is about one organisation's record (a contract, a supplier) calls <see cref="UseOrganisationAsync"/> so that record is described in its own organisation's words.
 /// Terminology is presentation only: nothing here decides what a person may see or do.
 /// </summary>
-public sealed class TermContext(ITerminologyResolver resolver, ITenantContext tenant, ILogger<TermContext> logger)
+public sealed class TermContext(ITerminologyResolver resolver, ICapabilityResolver capabilities, ITenantContext tenant, ILogger<TermContext> logger)
 {
     private bool _loaded;
+    private IReadOnlySet<string> _anywhere = new HashSet<string>(CapabilityKeys.All, StringComparer.Ordinal);
+    private CapabilitySet? _record;
     public TermSet Current { get; private set; } = TermSet.Neutral();
     public Guid? OrganisationId { get; private set; }
 
@@ -29,14 +31,27 @@ public sealed class TermContext(ITerminologyResolver resolver, ITenantContext te
         try { if (signedIn) home = await resolver.HomeOrganisationAsync(ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "The home organisation for terminology could not be determined; the installation wording is used."); }
         await LoadAsync(home, ct);
+        try { if (signedIn) _anywhere = await capabilities.EnabledForCurrentPersonAsync(ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "The capabilities in reach could not be determined; every capability is treated as on."); }
     }
+
+    /// <summary>
+    /// Whether a capability is on for what the page is about. On a page about one organisation's record (it called <see cref="UseOrganisationAsync"/>) that is the record's organisation; on any other page, any organisation the
+    /// person can reach. Presentation only: the same rule is enforced where the work is done, and no permission depends on it.
+    /// </summary>
+    public bool Uses(string capability) => _record is { } r ? r.IsEnabled(capability) : _anywhere.Contains(capability);
+
+    /// <summary>Whether a capability is on in at least one organisation the person can reach (navigation, home).</summary>
+    public bool UsesAnywhere(string capability) => _anywhere.Contains(capability);
 
     /// <summary>Describes the rest of the request in the words of one organisation. Safe to call more than once.</summary>
     public async Task UseOrganisationAsync(Guid organisationId, CancellationToken ct = default)
     {
         _loaded = true;
-        if (OrganisationId == organisationId) return;
+        if (OrganisationId == organisationId && _record is not null) return;
         await LoadAsync(organisationId, ct);
+        try { _record = await capabilities.GetAsync(organisationId, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "The capabilities of the organisation could not be resolved; every capability is treated as on."); _record = CapabilitySet.Default; }
     }
 
     private async Task LoadAsync(Guid? organisationId, CancellationToken ct)

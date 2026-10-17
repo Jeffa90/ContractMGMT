@@ -1,0 +1,27 @@
+@page "/Admin/Capabilities/Audit"
+@model Ecp.Host.Pages.Admin.Capabilities.AuditModel
+@{ ViewData["Title"] = L["Capability audit history"].Value; }
+<h1>@L["Capability audit history"]</h1>
+<p class="lede">@L["Every draft, check, publication and restoration of this organisation's capability choices, with who did it. The action codes are stable identifiers: they do not change when a label does, so old entries stay readable."]</p>
+<form method="get" class="card inline-form" aria-label="@L["Choose the organisation"]">
+    <div class="field"><label for="OrganisationId">@L["[[organisation]]"]</label>
+        <select id="OrganisationId" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <div class="actions"><button type="submit" class="secondary">@L["Show"]</button></div>
+</form>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Capability audit events"]</caption>
+    <thead><tr><th scope="col">@L["When (UTC)"]</th><th scope="col">@L["Action code"]</th><th scope="col">@L["Who"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Subject"]</th><th scope="col">@L["Reason"]</th></tr></thead>
+    <tbody>
+    @foreach (var a in Model.Items.Items) { <tr><td>@a.OccurredUtc.ToString("u")</td><td><code class="id">@a.Action</code></td><td>@(a.Actor ?? "-")</td><td>@a.Outcome</td><td>@a.Subject</td><td>@(a.Reason ?? "-")</td></tr> }
+    @if (Model.Items.Items.Count == 0) { <tr><td colspan="6">@L["Nothing has been recorded yet."]</td></tr> }
+    </tbody>
+</table></div>
+@if (Model.Items.PageCount > 1)
+{
+    <nav class="pager" aria-label="@L["Pages"]">
+        @if (Model.Items.Page > 1) { <a href="/Admin/Capabilities/Audit?organisationId=@Model.OrganisationId&amp;page=@(Model.Items.Page - 1)">@L["Previous"]</a> }
+        <span>@L["Page"] @Model.Items.Page @L["of"] @Model.Items.PageCount</span>
+        @if (Model.Items.Page < Model.Items.PageCount) { <a href="/Admin/Capabilities/Audit?organisationId=@Model.OrganisationId&amp;page=@(Model.Items.Page + 1)">@L["Next"]</a> }
+    </nav>
+}
+<p><a href="/Admin/Capabilities?organisationId=@Model.OrganisationId">@L["Back to capabilities"]</a></p>

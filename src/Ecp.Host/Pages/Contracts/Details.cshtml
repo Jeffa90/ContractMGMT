@@ -6,7 +6,7 @@
 @if (Model.Contract.RecordLocked) { <span class="badge warn">@L["Locked: changes need an authorised [[variation]] or an audited unlock"]</span> }</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <nav class="tabs" aria-label="@L["This [[agreement|lower]]"]">
-    <a href="#details">@L["Details"]</a> <a href="#documents">@L["[[document|plural]]"]</a> <a href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Lifecycle and history"]</a> <a href="#variations">@L["[[variation|plural]]"] (@Model.VariationList.Count)</a> <a href="#reminders">@L["Reminders"]</a>
+    <a href="#details">@L["Details"]</a> <a href="#documents">@L["[[document|plural]]"]</a> <a href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Lifecycle and history"]</a> @if (Terms.Uses(CapabilityKeys.Variations) || Model.VariationList.Count > 0) { <a href="#variations">@L["[[variation|plural]]"] (@Model.VariationList.Count)</a> } <a href="#reminders">@L["Reminders"]</a>
     @if (Model.Review is { } rv) { <a href="/Legal/Review/@rv.ReviewId">@L["[[legal.review|sentence]]"]</a> }
 </nav>
 @if (Model.Contract.Protection is { } prot)
@@ -53,7 +53,7 @@
     <dt>@L["Extension type"]</dt><dd>@(Model.Contract.ExtensionType ?? "-")</dd>
     <dt>@L["Effective date"]</dt><dd>@(Model.Contract.EffectiveDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
     <dt>@L["Review date"]</dt><dd>@(Model.Contract.ReviewDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
-    <dt>@L["[[legal.review|sentence]] required"]</dt><dd>@(Model.Contract.LegalReviewRequired ? L["Yes"] : L["No"])</dd>
+    @if (Terms.Uses(CapabilityKeys.LegalReview) || Model.Review is not null) { <dt>@L["[[legal.review|sentence]] required"]</dt><dd>@(Model.Contract.LegalReviewRequired ? L["Yes"] : L["No"])</dd> }
 </dl>
 @if (Model.Fields is { } extra && extra.Fields.Count > 0)
 {
@@ -117,6 +117,8 @@
 }
 </section>
 
+@if (Terms.Uses(CapabilityKeys.Variations) || Model.VariationList.Count > 0)
+{
 <h2 id="variations">@L["[[variation|plural]]"]</h2>
 <ul class="plain">
 @foreach (var v in Model.VariationList)
@@ -125,7 +127,8 @@
 }
 @if (Model.VariationList.Count == 0) { <li class="hint">@L["No [[variation]] has been raised."]</li> }
 </ul>
-<p><a class="button secondary" href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Start [[variation|a]], [[renewal|lower]] or other step"]</a></p>
+}
+<p><a class="button secondary" href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Next steps and history"]</a></p>
 
 <h2 id="reminders">@L["Reminders"]</h2>
 <section class="card">

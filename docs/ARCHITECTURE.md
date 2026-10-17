@@ -295,6 +295,14 @@ flowchart LR
 * **Consumers** (higher tiers) take `ITerminologyResolver`: register query engine and change history (Contracts), notification dispatcher, reminders, inbox and dashboards (Notifications), migration reports, exports, view service. The Host adds `TermContext` (per request), `TermLocalizer` (every `L["…"]` expands tokens) and `TermMiddleware`.
 * **Dependency direction** is unchanged and enforced by the architecture tests: no module references a pack or a business; wording flows from data to the edge of a response.
 
+### 9.5 Capabilities (as implemented in S6; ADR-0030, `docs/CAPABILITIES.md`)
+
+* **Model** in `Ecp.SharedKernel` (tier 0, no business wording): `CapabilityKeys`, `CapabilityCatalogue` (five capabilities bound to the closed workflow vocabularies, register fields and built-in list or card keys), `CapabilitySet` (organisation over pack over the platform default of everything on).
+* **Resolver, kind and administration** in `Ecp.Configuration` (tier 5): `ICapabilityResolver` (dependencies resolved lazily to keep the configuration service's kind graph acyclic), `ICapabilityCache` (tenant, organisation, release and pack identity), the `Capabilities` configuration kind with `capabilities.*` permissions, `ICapabilityAdministration`. Pack defaults are read through `IPackLoader` only. Resolution fails open.
+* **Gate and compatibility** in `Ecp.Lifecycle` (tier 7): `CapabilityGate` at `LifecycleEngine.ExecuteAsync` and `AvailableAsync`; `ICapabilityCompatibility` (workflows using a capability that is off; work in flight) implemented there and reached from Configuration through the interface only.
+* **Consumers** take `ICapabilityResolver`: register query engine and built-in views (Contracts), dashboards (Notifications), onboarding and setup (Setup), pack assignment (Configuration), and the Host's `TermContext` for navigation and forms.
+* **Dependency direction** is unchanged: no module names a pack or a business, and the architecture tests (`tests/Ecp.Architecture.Tests/CapabilityGuardTests.cs`) refuse a second spelling of a capability key.
+
 ## 10. Migration architecture (ADR-0004; `MIGRATION_SUPPLEMENT.md`)
 
 ```mermaid
@@ -380,5 +388,6 @@ flowchart LR
 | 0027 | The signature boundary is provider-neutral (S3) | Accepted (owner, 2026-10-17) |
 | 0028 | Terminology is data: stable keys, layered labels, no label ever decides authority (S4) | Accepted (owner, 2026-10-17) |
 | 0029 | Role codes, permission codes and approver-group keys are permanent identifiers (S5) | Accepted (owner, 2026-10-17) |
+| 0030 | Optional platform steps are configurable capabilities, never authority (S6) | Accepted (owner, 2026-10-17) |
 
 ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.

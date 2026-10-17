@@ -37,7 +37,9 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0027-provider-neutral-signature-boundary.md`
 - `decisions/ADR-0028-configurable-terminology.md`
 - `decisions/ADR-0029-stable-role-and-permission-identifiers.md`
+- `decisions/ADR-0030-configurable-capabilities.md`
 - `docs/ARCHITECTURE.md`
+- `docs/CAPABILITIES.md`
 - `docs/DOCUMENT_INDEX.md`
 - `docs/DOMAIN_MODEL.md`
 - `docs/GITHUB_CLOUD_SETUP.md`
@@ -189,6 +191,8 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `docs/SETUP_AND_ONBOARDING.md`, `docs/ACCESS_AND_IDENTITY.md`, `docs/SUPPLY_CHAIN.md`, `docs/MIGRATION.md`
 - `decisions/ADR-0015-datamigration-module-name.md`, `decisions/ADR-0016-setup-state-and-first-run-protection.md`, `decisions/ADR-0017-onboarding-as-a-configuration-kind.md`, `decisions/ADR-0018-migration-slice-design.md`
 - `src/Modules/Ecp.Lifecycle/AssemblyInfo.cs`
+- `src/Modules/Ecp.Lifecycle/Capabilities/CapabilityGate.cs`
+- `src/Modules/Ecp.Lifecycle/Capabilities/LifecycleCapabilityCompatibility.cs`
 - `src/Modules/Ecp.Lifecycle/Definitions/DefinitionStore.cs`
 - `src/Modules/Ecp.Lifecycle/Definitions/WorkflowDefinition.cs`
 - `src/Modules/Ecp.Lifecycle/Domain/LifecycleRecords.cs`

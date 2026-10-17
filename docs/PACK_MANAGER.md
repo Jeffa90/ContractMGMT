@@ -76,3 +76,7 @@ Manual options, in order of preference: (1) install the missing pack, then reope
 * **Upgrade and rollback.** The database migration `AddSolutionPacks` is additive and idempotent: it adds three tenant tables with row-level security and changes no existing table. Rollback is by **restoring the database backup taken before the upgrade** (the migration has no down-step that preserves data); restore the matching application version with it.
 * **Caches.** Opened packages are cached by tenant and package hash; a changed file, a retirement or a trust change is seen on the next read. If the cache is empty or unavailable the loader reads the authoritative storage.
 * **Readiness.** A missing pack folder is *Unhealthy*; no usable shipped pack (for example unsigned in Production) is *Degraded* with the reason. See `docs/SETUP_AND_ONBOARDING.md`.
+
+## Capability defaults (S6)
+
+A pack may carry a `Capabilities` document (`docs/PACK_AUTHORING.md` section 3b). The Pack Manager preview and the assignment preview show, per capability, whether it is on now and whether it would be on once the pack is assigned; the organisation's own published choice still wins. Assigning a pack creates no capability draft: the defaults apply from the assignment. **Assignment is refused** with `capability_conflict` when the pack's defaults would switch a capability off from under work in flight, or while the organisation's published workflows still use it, and the reasons are shown first in the preview. See `docs/CAPABILITIES.md` section 4.

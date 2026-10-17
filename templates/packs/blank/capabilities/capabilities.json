@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "mode": "defaults",
+  "capabilities": [
+    {
+      "key": "legal.review",
+      "enabled": false,
+      "note": "The neutral lifecycle has no legal review step."
+    },
+    {
+      "key": "register.authorisation",
+      "enabled": true,
+      "note": "A variation is approved by an approver group."
+    },
+    {
+      "key": "variations",
+      "enabled": true
+    },
+    {
+      "key": "renewals",
+      "enabled": false,
+      "note": "The neutral lifecycle has no renewal step."
+    },
+    {
+      "key": "signature.requests",
+      "enabled": false,
+      "note": "The neutral lifecycle has no signature step."
+    }
+  ]
+}

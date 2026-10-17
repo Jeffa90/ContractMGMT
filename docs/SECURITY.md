@@ -200,3 +200,7 @@ Production refuses: Demo identity, default credentials, ephemeral storage, expos
 * Administration is least-privilege (`terminology.*`), publish and rollback need recent authentication and follow second-person rules, every step is audited under stable action codes, and diagnostics never log label values.
 * Pack terminology is inside the signed manifest: tampering fails verification; the content scan rejects unsafe text; installation creates a draft only.
 * The resolver fails safe to the neutral wording; a cache failure falls back to persistence. No secret or live confidential data is part of terminology.
+
+## Capabilities (S6)
+
+A capability switch is operating-model configuration, not authorisation (ADR-0030 D1). It cannot grant, widen or remove a permission, and the refusal it produces (`capability_disabled`) is made after the permission, tenant, organisation, classification and lock checks, never instead of them. The capabilities document is plain data validated like other configuration (no markup, template or expression syntax; bounded size), published only by the Tenant and Organisation Administrators, audited, versioned and rolled back through the ordinary lifecycle. The resolved set is cached by tenant, organisation and version, so one tenant's switches are never served to another. On a read failure the platform fails open (everything on), which can only add steps, never bypass a control. See `docs/CAPABILITIES.md`.

@@ -1,0 +1,32 @@
+@page "/Admin/Capabilities/History"
+@model Ecp.Host.Pages.Admin.Capabilities.HistoryModel
+@{ ViewData["Title"] = L["Capability history"].Value; }
+<h1>@L["Capability history"]</h1>
+<partial name="_Errors" model="ViewData.ModelState" />
+<partial name="_Picker" model="Model" />
+@if (Model.Releases.Count == 0) { <p>@L["No capability choice has been published for this [[organisation|lower]]."]</p> }
+else
+{
+    <div class="table-wrap"><table>
+        <caption>@L["Published releases"]</caption>
+        <thead><tr><th scope="col">@L["Release"]</th><th scope="col">@L["Published"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Note"]</th><th scope="col">@L["Changes"]</th><th scope="col">@L["Restore"]</th></tr></thead>
+        <tbody>
+        @foreach (var v in Model.Releases)
+        {
+            <tr>
+                <th scope="row">@v.Release.Number</th><td>@v.Release.PublishedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td><td>@v.Release.PublishedBy</td><td>@v.Release.Note</td>
+                <td>@(v.Changes.Count == 0 ? "-" : string.Join("; ", v.Changes))</td>
+                <td>@if (Model.CanRollback && v.Release.Number != Model.Releases.Max(x => x.Release.Number))
+                    {
+                        <form method="post" asp-page-handler="Rollback">
+                            <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="ToRelease" value="@v.Release.Number" />
+                            <label class="visually-hidden" for="reason-@v.Release.Number">@L["Reason for restoring release {0}", v.Release.Number]</label>
+                            <input id="reason-@v.Release.Number" name="Reason" type="text" maxlength="500" required placeholder="@L["Reason"]" /> <button type="submit" class="secondary">@L["Restore"]</button>
+                        </form>
+                    }</td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+}
+<p><a href="/Admin/Capabilities?organisationId=@Model.OrganisationId">@L["Back to capabilities"]</a></p>

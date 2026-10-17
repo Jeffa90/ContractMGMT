@@ -81,3 +81,8 @@ terminology.draft,,Y,Y,,Y,,,,,,,,S4 owner decision
 terminology.publish,,Y,Y,,Y,,,,,,,,S4 owner decision
 terminology.rollback,,Y,Y,,Y,,,,,,,,S4 owner decision
 terminology.audit.read,,Y,Y,,Y,,,,,,Y,,S4 owner decision
+capabilities.read,,Y,Y,,Y,,,,,,Y,,S6 owner decision
+capabilities.draft,,Y,Y,,Y,,,,,,,,S6 owner decision
+capabilities.publish,,Y,Y,,,,,,,,,,S6 owner decision
+capabilities.rollback,,Y,Y,,,,,,,,,,S6 owner decision
+capabilities.audit.read,,Y,Y,,Y,,,,,,Y,,S6 owner decision

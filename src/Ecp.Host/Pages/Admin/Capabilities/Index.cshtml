@@ -1,0 +1,49 @@
+@page "/Admin/Capabilities"
+@model Ecp.Host.Pages.Admin.Capabilities.IndexModel
+@{ ViewData["Title"] = L["Capabilities"].Value; }
+<h1>@L["Capabilities"]</h1>
+<p class="lede">@L["A capability is an optional step of the process, such as [[legal.review|lower]] or [[renewal|plural|lower]]. Switching one off removes the step from the pages, lists and lifecycle for this [[organisation|lower]]; it never changes who may do anything. The order is: this [[organisation|lower]]'s published choice, then its [[solution.pack|lower]]'s defaults, then the platform default (everything on)."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<partial name="_Picker" model="Model" />
+@if (Model.Overview is { } o)
+{
+    <section class="card" aria-labelledby="status-h">
+        <h2 id="status-h">@o.OrganisationName</h2>
+        <p>@(o.PackKey is null ? L["No solution pack."] : L["Solution pack"].Value + " " + o.PackKey + " " + o.PackVersion + (o.PackHasCapabilities ? "" : " (" + L["it gives no capability defaults"].Value + ")")).
+           @(o.ReleaseNumber is { } n ? L["Published release {0}.", n] : L["This organisation has published no choice of its own."])
+           @(o.Draft is null ? L["There is no open draft."] : L["A draft is open."])</p>
+        <p class="actions">
+            @if (o.CanDraft) { <a class="button" href="/Admin/Capabilities/Edit?organisationId=@o.OrganisationId">@(o.Draft is null ? L["Start a draft"] : L["Edit the draft"])</a> }
+            <a class="button secondary" href="/Admin/Capabilities/Preview?organisationId=@o.OrganisationId">@L["Preview"]</a>
+            @if (o.CanReadHistory) { <a class="button secondary" href="/Admin/Capabilities/History?organisationId=@o.OrganisationId">@L["Version history"]</a> }
+            @if (o.CanReadAudit) { <a class="button secondary" href="/Admin/Capabilities/Audit?organisationId=@o.OrganisationId">@L["Audit history"]</a> }
+        </p>
+    </section>
+    <div class="table-wrap"><table>
+        <caption>@L["Capabilities in force"]</caption>
+        <thead><tr><th scope="col">@L["Capability"]</th><th scope="col">@L["In force"]</th><th scope="col">@L["Source"]</th><th scope="col">@L["Pack default"]</th><th scope="col">@L["Published choice"]</th><th scope="col">@L["Draft"]</th><th scope="col">@L["Needs"]</th></tr></thead>
+        <tbody>
+        @foreach (var r in o.Rows)
+        {
+            <tr>
+                <th scope="row">@Terms.Expand(r.Label) <code class="id">@r.Key</code><br /><span class="hint">@Terms.Expand(r.Description)</span></th>
+                <td>@if (r.Enabled) { <span class="badge ok">@L["On"]</span> } else { <span class="badge warn">@L["Off"]</span> }</td>
+                <td>@(r.Layer switch { Ecp.SharedKernel.CapabilityLayer.Organisation => L["Organisation choice"].Value, Ecp.SharedKernel.CapabilityLayer.Pack => L["Pack default"].Value, _ => L["Platform default"].Value })</td>
+                <td>@(r.PackDefault is { } pd ? (pd ? L["On"].Value : L["Off"].Value) : "-")@if (r.PackNote is { } pn) { <br /><span class="hint">@pn</span> }</td>
+                <td>@(r.Published is { } pub ? (pub ? L["On"].Value : L["Off"].Value) : "-")</td>
+                <td>@(r.Draft is { } dr ? (dr ? L["On"].Value : L["Off"].Value) : (o.Draft is null ? "-" : L["inherits"].Value))</td>
+                <td>@(r.Requires.Count == 0 ? "-" : string.Join(", ", r.Requires.Select(x => x)))</td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+    <section class="card" aria-labelledby="checks-h">
+        <h2 id="checks-h">@L["Compatibility checks"]</h2>
+        @if (o.Findings.Count == 0) { <p>@L["Every capability that is on has what it needs, no published workflow uses a capability that is off, and nothing is stranded."]</p> }
+        else
+        {
+            <ul class="plain">@foreach (var f in o.Findings) { <li><span class="badge @(f.Severity == Ecp.Configuration.ValidationSeverity.Error ? "bad" : "warn")">@(f.Severity == Ecp.Configuration.ValidationSeverity.Error ? L["Problem"].Value : L["Note"].Value)</span> <code class="id">@f.Capability</code> @Terms.Expand(f.Message)</li> }</ul>
+        }
+    </section>
+}
+<p class="hint">@L["Nothing here changes a permission, a role or a record. Capabilities are published through the same draft, validate, preview, publish, history and rollback steps as every other configuration."]</p>

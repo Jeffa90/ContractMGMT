@@ -1,6 +1,6 @@
 # Project Status
 
-Status date: **2026-10-17** (after PER-002, portability remediation S1, S2, S3, S4 and S7 external solution packs; the S7 CI result is recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
+Status date: **2026-10-17** (after PER-002 and portability remediation S1 to S7, including S5 stable identifiers and S6 configurable capabilities; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
 
 **Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 10 and 11 are an engineering assessment of evidence, not an approval.
 
@@ -110,6 +110,7 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| Workspace after S6, no SQL Server: unit 695, architecture 71, API 101, integration on SQLite 231 | 1,098 | 0 | 0 | 230 (the SQL Server wrappers, including 11 new capability wrappers) |
 | Workspace after S5, no SQL Server: unit 655, architecture 64, API 95, integration on SQLite 220 | 1,034 | 0 | 0 | 219 (the SQL Server wrappers, including 1 new group-and-role wrapper) |
 | Workspace after S4, no SQL Server: unit 629, architecture 64, API 93, integration on SQLite 219 | 1,005 | 0 | 0 | 218 (the SQL Server wrappers, including 9 new terminology wrappers) |
 | Workspace after S3, no SQL Server: unit 563, architecture 36, API 80, integration on SQLite 207 | 886 | 0 | 0 | 209 (the SQL Server wrappers, including the S3 migration test) |
@@ -166,7 +167,7 @@ Known shortcuts and gaps in what is built, each with where it is tracked. None i
 | Production key custody for pack signing is external: the shipped packs are built unsigned, so a Production installation needs operator-signed packs and a trusted key before any pack is usable (readiness: Degraded until then) | First Production start needs an operator step | `docs/PACK_SIGNING.md`; by design (ADR-0026 D7) |
 | Pack upgrade across versions, per-item merge, pack and tenant export, marketplace | A new pack version is installed and assigned (drafts) manually | S7d/e/f; Future |
 | The 12-role catalogue (including `ProcurementAdministrator`) is compiled; the new reminder rule `OrganisationAdministrators` still resolves to it | Role *codes* are permanent identifiers by decision (ADR-0029); their names, approver-group names and role visibility are configurable. A different role set or authority model is Future | P-02b closed by policy; S5 done, S8 retired |
-| Legal review and register authorisation (with Registered Date stamping) are compiled capabilities that are always on; pack `features` switches are read and ignored | A business without them cannot switch them off | R-05, P-04; slice S6 |
+| Legal review and register authorisation (with Registered Date stamping) were compiled capabilities that were always on; pack `features` switches were read and ignored | **Fixed in S6 (ADR-0030)**: Legal Review, Register Authorisation, Variations, Renewals and Signature Requests are configurable capabilities (organisation over pack over default of all on), enforced at the engine, hidden in pages, lists and dashboards, with compatibility checks. The metadata `features` stay informational. Category ownership, critical notice and external reporting are not capabilities (Future) | R-05, P-04 closed; slice S6 |
 | Labels, dashboard titles and help text were resource strings that named JBS roles and states | **Fixed in S4 (ADR-0028)**: terminology keys, a resolver, a versioned configuration kind, pack terminology; role *codes* remain compiled (P-02b, S5/S8) | P-05 to P-07, R-06; slice S4 |
 | The signature boundary was shaped like one vendor | **Fixed in S3 (ADR-0027)**: provider-neutral vocabulary, interfaces, status mapper, event inbox and a renaming migration. A live adapter and the callback endpoint remain Future | P-10; slice S3 |
 | Country and ERP specifics in core fields and validation (ABN, SAP outline agreement number), the compiled classification name `Legal Privileged`, `en-AU` and Brisbane defaults | Another country or ERP needs source changes | R-01 to R-04; slice S10 |
@@ -198,9 +199,11 @@ Portability means a second business can run on the platform by configuration, pa
 | P-03 packs embedded by project files, no loader | **High** | **Fixed (S7, ADR-0026)**: external signed-or-allowed packs, one loader, Pack Manager; evidence in `docs/PORTABILITY_AUDIT.md` section 0.2 |
 | P-02b compiled role catalogue | Medium | **Closed by policy (S5, ADR-0029)**: permanent identifiers, names from terminology; a data-driven catalogue is Future |
 | P-10 the signature boundary shaped like one vendor | Low | **Fixed (S3, ADR-0027)**: provider-neutral vocabulary and interfaces, status mapper, idempotent event inbox, renaming migration, guard over all of `src/` |
-| P-04, P-05 compiled capabilities and JBS vocabulary in code and pages | Medium | **Open** (S4, S6) |
+| P-04 compiled capabilities, pack feature flags ignored | Medium | **Fixed (S6, ADR-0030)** for the five platform capabilities; evidence in `docs/PORTABILITY_AUDIT.md` section 0.6 |
+| P-05 JBS vocabulary in code and pages | Medium | **Fixed (S4, ADR-0028)** |
 | P-06, P-07, R-03, R-04 | Low | **Open** (S4, S10) |
-| R-01, R-02, R-05 | Medium | **Open** (S6, S10) |
+| R-01, R-02 | Medium | **Open** (S10) |
+| R-05 compiled Legal-review and register steps | Medium | **On/off closed (S6)**; the capabilities remain compiled, with a switch |
 | R-06 | Info | **Open** |
 
 Remaining high-severity portability violation: **none** from the original audit (P-02b is Medium). PRT-002 as a whole is still NOT VERIFIED (S9).
@@ -226,7 +229,7 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S3 neutral signature vocabulary with an EF migration | **Done** (ADR-0027); CI run 41 (commit 3d1597a) green: SQL Server 209 Passed, 0 Failed, 0 Skipped, including the migration test (`deploy/STATUS.md`) |
 | S4 vocabulary and terminology read side, guard stage B | **Done** (ADR-0028); local 1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED; CI run 44 (commit 6f9d862) green: SQL Server 218 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`) |
 | S5 role catalogue decision (ADR) | **Done** (ADR-0029, Option A+): identifiers permanent, frozen by tests; approver-group names and role visibility built; CI run 46 (commit f99c464) green: SQL Server 219 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED (`deploy/STATUS.md`) |
-| S6 feature flags that gate capabilities | **First incomplete** (not started); role-visibility support is ready for it to use |
+| S6 feature flags that gate capabilities | **Done** (ADR-0030): catalogue, `Capabilities` kind, pack defaults, organisation overrides, resolver, engine gate, capability-aware navigation, onboarding and setup, compatibility and readiness checks, guard; local 1,098 Passed, 0 Failed, 0 Skipped, 230 NOT VERIFIED; CI result in `deploy/STATUS.md` |
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |
 | S8 implement the role decision | **Retired**: superseded by S4 and ADR-0029 |
 | S9 second pack end to end (PRT-002, PRT-004, PRT-013) | Not started |
@@ -246,7 +249,7 @@ A **pilot** here means a time-boxed, supervised use by one organisation, on non-
 | Operations | **Not ready without a manual runbook** | No backup and restore tooling, no maintenance mode, no support bundle, no operations dashboard |
 | Accessibility | **Unknown** | Pages follow accessible patterns (labels, error summaries, keyboard operation) but no audit was run |
 | Performance | **Probably adequate at pilot scale** | 10,000 contracts: register pages 40 to 75 ms; configured-field text search was the slowest operation and now measures about 0.4 s (selective second words about 0.8 s; `docs/PERFORMANCE_REVIEW.md`); larger scale is unmeasured |
-| Business configuration without code | **Partly** | Fields, shared views, approval matrices, workflows and notification policy are configuration with draft, publish and rollback; workflows and policies are edited as JSON, not in a designer; terminology, branding and feature flags are not built |
+| Business configuration without code | **Partly** | Fields, shared views, approval matrices, workflows and notification policy are configuration with draft, publish and rollback; workflows and policies are edited as JSON, not in a designer; terminology (S4) and capabilities (S6, the feature flags) are configuration with the same lifecycle; branding administration is not built |
 | A second, non-JBS business | **Partly possible; not ready** | S1 fixed P-01 (pack per organisation, neutral Blank pack), S2 fixed P-02a and P-08 (reminder fall-back, initial status) and S7 fixed P-03 (a pack is installed from a file without a rebuild; proved by a third pack built in a test). Still open: and P-02b (role catalogue) are open |
 
 Conditions a pilot should set: an external SQL Server with backups owned by the pilot organisation; a real identity provider configured and Demo sign-in disabled; Production guard on; a named support owner; and the open items above accepted in writing. `docs/PRODUCTION_READINESS_CHECKLIST.md` lists the formal items.

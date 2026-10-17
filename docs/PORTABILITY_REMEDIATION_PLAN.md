@@ -152,7 +152,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 | S3 | R6 | none (can run in parallel with S2) | Signature request vocabulary neutral; EF migration renames the column and filtered index; no data loss. **Done 2026-10-17 (section 8.11, ADR-0027).** |
 | S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions. **Done 2026-10-17 (section 8.12, ADR-0028).** |
 | S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013. **Done 2026-10-17: Option A+ accepted (section 8.13, ADR-0029, `docs/ROLE_CATALOGUE_ADR.md`).** |
-| S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged |
+| S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged. **Done 2026-10-17 (section 8.14, ADR-0030): a business can operate with Legal Review, Register Authorisation, Variations, Renewals and Signature Requests all off.** |
 | S7 | R7 pack loader and store (CFG-04, PKM-01); remove embedded JBS resources; R4 stage C | S1, S5, S6 | A pack installs from the store with no rebuild; the three `.csproj` embeds are gone. **Done 2026-10-17 for S7a to S7c plus the Pack Manager, setup and onboarding integration (section 8.10); S7d to S7f are future.** The order dependency on S5 and S6 was waived by the owner's instruction. |
 | S8 | R8 step 2: implement the ADR | S5, S7 | **Retired 2026-10-17, superseded by S4 (ADR-0028) and ADR-0029.** The accepted decision needs no rename; its follow-ups were delivered in section 8.13. |
 | S9 | R11: second pack (PKM-04) with PRT-002, PRT-004, PRT-013 end-to-end | S1 to S8 | PRT-002 passes |
@@ -395,12 +395,31 @@ Delivered on the owner's decision (Option A+): design in `docs/ROLE_CATALOGUE_AD
 
 **Not done:** a capability or feature-flag mechanism (S6), a data-driven role catalogue (Future), regional defaults (S10), another pack slice. **First incomplete remediation task after S5:** S6 (feature flags that gate capabilities), then S9 and S10.
 
+### 8.14 Slice S6: configurable capabilities (ADR-0030)
+
+Delivered on the owner's S6 instruction. Design and matrix in `docs/CAPABILITIES.md`; decision in `decisions/ADR-0030-configurable-capabilities.md`.
+
+* **Catalogue (Implemented).** Five capabilities with permanent keys bound to the closed workflow vocabularies, register fields and built-in list and card keys (`src/Ecp.SharedKernel/Capabilities/CapabilityCatalogue.cs`).
+* **Feature-flag configuration kind (Implemented).** The `Capabilities` kind with draft, validate, preview, publish, history, rollback and audit; five permissions (`capabilities.read`, `.draft`, `.publish`, `.rollback`, `.audit.read`; decision D7d).
+* **Pack defaults (Implemented).** A packable `Capabilities` content kind; Blank 1.4.0 turns Legal Review, Renewals and Signature Requests off, the reference pack 2.4.0 leaves all on. Assigning a pack applies its defaults without a draft.
+* **Organisation overrides and resolver (Implemented).** Organisation over pack over the platform default of all on; cached by tenant, organisation and version; remembered per request; fails open.
+* **Gate (Implemented).** One chokepoint in the lifecycle engine refuses new starts and hides the step; work in flight can finish.
+* **Capability-aware navigation, pages, register, lists, dashboards (Implemented).**
+* **Onboarding and setup (Implemented).** The pack step shows each pack's optional steps; a mapping to the Legal role while Legal Review is off gets a warning.
+* **Readiness and compatibility (Implemented).** Errors for a capability on without one it needs, a published workflow using one that is off, turning one off with work in flight and an incoherent pack assignment; the readiness check `capabilities` covers the shipped packs.
+* **Guard (Implemented).** `CapabilityGuardTests` (keys only through the constants, the gate present and early, navigation consults the resolver, only the resolver reads the kind, packs state every capability, documents are data).
+* **Exit criteria.** "A pack without Legal review installs and runs; JBS unchanged": met (Blank organisation proof; the reference pack has all on and the existing suites pass unchanged). "A business can operate with all five off with no code change": met (`A_business_can_operate_with_all_five_capabilities_switched_off_with_no_code_change`, SQLite locally and SQL Server in CI).
+
+**Found while testing, fixed:** the first version resolved the configuration service from the resolver's constructor and made the kind graph circular (the test host crashed); the resolver now resolves its services on first use.
+
+**Not done, by design:** capabilities beyond the five (category ownership, critical notice, external reporting; Future), hiding pages by direct address (work in flight must stay reachable), reporting, DocuSign, operations, API work, AI, marketplace, role renaming. **First incomplete remediation task after S6:** S9 (second pack end to end), then S10 (regional defaults).
+
 ## 9. Open decisions for the owner
 
 | Decision | Needed by | Recommendation |
 |---|---|---|
 | Role catalogue: Option A (names from terminology, codes stay) or Option B (rename with alias) | S5 | **Decided 2026-10-17: Option A+ (ADR-0029).** B and a data-driven catalogue are not pursued |
-| Is Legal review a platform capability (flag-gated) or a JBS pack feature (removable)? | S6 | A flag-gated platform capability: the data model and pages stay, the pack chooses whether to use them |
+| Is Legal review a platform capability (flag-gated) or a JBS pack feature (removable)? | S6 | **Decided and built 2026-10-17 (ADR-0030): a flag-gated platform capability.** The data model and pages stay; the pack proposes and the organisation decides whether to use them |
 | `org-a2` in the Demonstration seed: keep on Blank (and accept the neutral lifecycle) or move to the JBS pack | S1 | Keep on Blank; it is the cheapest permanent test of a non-JBS organisation |
 | Move ABN and SAP number into fields? | S10 | No; make the validation a rule |
 | Who owns the second pack (PKM-04) and which business should it model? | S9 | A construction or facilities example already named in the plan; synthetic, like JBS |

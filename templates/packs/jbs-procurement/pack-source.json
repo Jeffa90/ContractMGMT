@@ -1,7 +1,7 @@
 {
   "packageId": "platform.pack.jbs-procurement",
   "packKey": "jbs-procurement",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "displayName": {
     "en-AU": "JBS Procurement Reference"
   },
@@ -66,6 +66,14 @@
       "source": "terminology/terminology.json",
       "path": "content/terminology.json",
       "kind": "Terminology",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "capabilities/capabilities.json",
+      "path": "content/capabilities.json",
+      "kind": "Capabilities",
       "scope": "organisation",
       "schemaVersion": 1,
       "required": false

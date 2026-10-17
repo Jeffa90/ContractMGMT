@@ -44,7 +44,7 @@ public interface IDashboardService
 
 internal sealed class DashboardService(
     ISecuredContractService contracts, ILegalReviewService legal, IRegisterAuthorisationService approvals, IVariationService variations, IRenewalService renewals, IWorkflowDefinitions workflows,
-    INotificationPolicyStore policies, IOrganisationStructureService structure, IClock clock, NotificationsDbContext db, Ecp.Configuration.ITerminologyResolver terminology) : IDashboardService
+    INotificationPolicyStore policies, IOrganisationStructureService structure, IClock clock, NotificationsDbContext db, Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.ICapabilityResolver capabilities) : IDashboardService
 {
     private static readonly string[] LiveRoles = ["effective", "variation", "renewal", "suspended"];
     private static readonly string[] OwnerActionRoles = ["legalRework", "legalCleared", "drafting", "signature"];
@@ -52,7 +52,8 @@ internal sealed class DashboardService(
     public async Task<IReadOnlyList<DashboardCard>> OverviewAsync(int rowsPerCard = 5, CancellationToken ct = default)
     {
         var cards = new List<DashboardCard>();
-        foreach (var key in DashboardKeys.All) cards.Add(await CardAsync(key, 1, rowsPerCard, ct));
+        var on = await capabilities.EnabledForCurrentPersonAsync(ct);
+        foreach (var key in DashboardKeys.All.Where(k => CapabilityCatalogue.OfView(k) is not { } needs || on.Contains(needs))) cards.Add(await CardAsync(key, 1, rowsPerCard, ct));
         return cards;
     }
 
@@ -80,6 +81,8 @@ internal sealed class DashboardService(
     /// <summary>A card in the words of the signed-in person's organisation: titles, descriptions and row texts are written with <c>[[term]]</c> tokens and expanded here.</summary>
     public async Task<DashboardCard> CardAsync(string key, int page = 1, int pageSize = 25, CancellationToken ct = default)
     {
+        // A card that exists only because of a capability nobody in reach uses is not there.
+        if (CapabilityCatalogue.OfView(key) is { } needs && !(await capabilities.EnabledForCurrentPersonAsync(ct)).Contains(needs)) throw new ResourceNotFoundException();
         var card = await BuildAsync(key, page, pageSize, ct);
         var terms = await terminology.GetAsync(await terminology.HomeOrganisationAsync(ct), ct: ct);
         return card with

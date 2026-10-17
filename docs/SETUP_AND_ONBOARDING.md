@@ -119,3 +119,12 @@ Configuration keys: `Ecp:Mode`, `Ecp:DemoSeed`, `Ecp:DemoTenantResolution`, `Ecp
 * **Wording before assignment.** In onboarding, *Solution pack and classification* shows, for the pack you select, the terminology it would introduce and a handful of example labels (what a contract, counterparty, reviewer would be called), before anything is assigned. Choosing the pack prepares an organisation `Terminology` **draft** from the pack's wording; it never publishes, never overwrites a published release or an open draft, and the page says so. Overrides are possible only after a pack is selected, on the Terminology pages the step links to.
 * **Plain-language guidance** uses the labels of the organisation being onboarded. The setup report and onboarding review are written with tokens and expanded for the organisation.
 * **Not changed:** the CSV column names (`email`, `viewerKind`, …), step identifiers and routes are machine identifiers.
+
+## Capabilities in setup and onboarding (S6)
+
+* **Setup, `pack` step.** The notes under each pack now say which optional steps it switches off (Legal Review, Register Authorisation, Variations, Renewals, Signature Requests), read from the pack's own `Capabilities` document, and where to change them later (Administration, Capabilities). A pack that gives none says all are on. Nothing is chosen for you and nothing is published.
+* **Onboarding, pack step.** Each pack shows an "Optional steps" list with on or off and the pack's note.
+* **Onboarding, group mapping.** Mapping a group to the Legal role while Legal Review is off gives a warning (`role_unused_capability`), not an error: the capability may be switched on later.
+* **Roles.** Which roles a picker offers is still decided by terminology role visibility (ADR-0029 D8); capabilities do not hide or revoke a role.
+
+See `docs/CAPABILITIES.md`.

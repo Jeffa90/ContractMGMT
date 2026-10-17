@@ -81,3 +81,8 @@ terminology.draft,"Create and edit terminology drafts, validate and preview them
 terminology.publish,"Publish a validated terminology draft as the organisation's terminology release","Organisation scope; step-up authentication; second-person policy applies",High,S4 owner decision
 terminology.rollback,"Publish an earlier terminology release as a new release","Same as terminology.publish",High,S4 owner decision
 terminology.audit.read,"Read the terminology change history","Organisation scope",Business,S4 owner decision
+capabilities.read,"Read the organisation's capability switches, drafts, releases and the pack defaults beneath them, and the compatibility checks (resolving whether a capability is on needs no permission)","Organisation scope",Business,S6 owner decision
+capabilities.draft,"Create and edit capability drafts, validate them and see the preview and compatibility checks (an operating-model change: nothing takes effect until published)","Organisation scope; tenant administrator for any organisation",Business,S6 owner decision
+capabilities.publish,"Publish a validated capability draft as the organisation's capability release (switches optional steps of the process on or off; changes no permission)","Organisation scope; step-up authentication; second-person policy applies",High,S6 owner decision
+capabilities.rollback,"Publish an earlier capability release as a new release","Same as capabilities.publish",High,S6 owner decision
+capabilities.audit.read,"Read the capability change history","Organisation scope",Business,S6 owner decision

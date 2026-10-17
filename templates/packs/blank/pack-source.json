@@ -1,7 +1,7 @@
 {
   "packageId": "platform.pack.blank",
   "packKey": "blank",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "displayName": {
     "en-AU": "Blank (no business defaults)"
   },
@@ -61,6 +61,14 @@
       "source": "terminology/terminology.json",
       "path": "content/terminology.json",
       "kind": "Terminology",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "capabilities/capabilities.json",
+      "path": "content/capabilities.json",
+      "kind": "Capabilities",
       "scope": "organisation",
       "schemaVersion": 1,
       "required": false

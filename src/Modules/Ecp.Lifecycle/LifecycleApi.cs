@@ -65,11 +65,13 @@ public static class LifecycleModule
         if (configure is not null) services.Configure(configure);
         services.AddApprovalsModule();
         services.AddModuleDbContext<LifecycleDbContext>(Name, Tier, Schema);
-        services.AddScoped<Ecp.Configuration.IConfigurationKind>(sp => new WorkflowDefinitionKind(WorkflowKinds.ContractLifecycle, sp.GetRequiredService<IApprovalMatrixStore>()));
-        services.AddScoped<Ecp.Configuration.IConfigurationKind>(sp => new WorkflowDefinitionKind(WorkflowKinds.Variation, sp.GetRequiredService<IApprovalMatrixStore>()));
+        services.AddScoped<Ecp.Configuration.IConfigurationKind>(sp => new WorkflowDefinitionKind(WorkflowKinds.ContractLifecycle, sp.GetRequiredService<IApprovalMatrixStore>(), () => sp.GetRequiredService<Ecp.Configuration.ICapabilityResolver>()));
+        services.AddScoped<Ecp.Configuration.IConfigurationKind>(sp => new WorkflowDefinitionKind(WorkflowKinds.Variation, sp.GetRequiredService<IApprovalMatrixStore>(), () => sp.GetRequiredService<Ecp.Configuration.ICapabilityResolver>()));
         services.AddScoped<IWorkflowDefinitions, WorkflowDefinitionStore>();
         services.TryAddScoped<IDispositionChecks, NoDispositionBlocks>();
         services.AddScoped<GuardEvaluator>();
+        services.AddScoped<Ecp.Lifecycle.Capabilities.CapabilityGate>();
+        services.AddScoped<Ecp.Configuration.ICapabilityCompatibility, Ecp.Lifecycle.Capabilities.LifecycleCapabilityCompatibility>();
         services.AddScoped<LifecycleEngine>();
         services.AddScoped<ILifecycleService, LifecycleService>();
         services.AddScoped<LifecycleEvents>();

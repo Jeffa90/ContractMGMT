@@ -4,7 +4,7 @@
 <div class="field"><label for="Form_Reason">@L["Reason for the [[variation]]"]</label><textarea id="Form_Reason" name="Form.Reason" rows="3" required maxlength="2000">@Model.Form.Reason</textarea></div>
 <div class="field"><label for="Form_Description">@L["Description"]</label><textarea id="Form_Description" name="Form.Description" rows="3" maxlength="4000">@Model.Form.Description</textarea></div>
 <div class="field"><label for="Form_ProposedDate">@L["Proposed effective date"]</label><input id="Form_ProposedDate" name="Form.ProposedDate" type="date" value="@Model.Form.ProposedDate?.ToString("yyyy-MM-dd")" /></div>
-<div class="field"><label><input type="checkbox" name="Form.LegalReviewRequired" value="true" checked="@Model.Form.LegalReviewRequired" /> @L["Needs [[legal.review|sentence]] (if the workflow leaves it optional)"]</label></div>
+<div class="field" hidden="@(!Terms.Uses(CapabilityKeys.LegalReview))"><label><input type="checkbox" name="Form.LegalReviewRequired" value="true" checked="@Model.Form.LegalReviewRequired" /> @L["Needs [[legal.review|sentence]] (if the workflow leaves it optional)"]</label></div>
 <fieldset class="card"><legend>@L["Financial impact (optional)"]</legend>
     <div class="field"><label for="Form_FinancialImpactAmount">@L["Amount"]</label><input id="Form_FinancialImpactAmount" name="Form.FinancialImpactAmount" type="number" step="0.01" value="@Model.Form.FinancialImpactAmount" /></div>
     <div class="field"><label for="Form_FinancialImpactCurrency">@L["Currency (3 letters)"]</label><input id="Form_FinancialImpactCurrency" name="Form.FinancialImpactCurrency" type="text" maxlength="3" value="@Model.Form.FinancialImpactCurrency" /></div>

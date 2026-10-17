@@ -35,7 +35,7 @@ internal sealed record TransitionScope(SubjectView Subject, ResolvedDefinition D
 /// </summary>
 internal sealed class LifecycleEngine(
     LifecycleDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, ActorContext actor, CurrentUser currentUser, IAccessService access, IContractLifecyclePort port,
-    ISecuredContractService contracts, IWorkflowDefinitions definitions, GuardEvaluator guards, LifecycleEvents events)
+    ISecuredContractService contracts, IWorkflowDefinitions definitions, GuardEvaluator guards, LifecycleEvents events, Ecp.Lifecycle.Capabilities.CapabilityGate capabilityGate)
 {
     public string ActorLabel => actor.ActorId ?? currentUser.UserId?.ToString() ?? "system";
     public Guid? ActorUserId => currentUser.UserId;
@@ -90,6 +90,8 @@ internal sealed class LifecycleEngine(
         foreach (var t in def.Definition.From(s.Status))
         {
             string? blocked = null;
+            // A step that would start work in a capability this organisation does not use is not offered (work already inside the capability can still be finished).
+            if (await capabilityGate.BlockedByAsync(s.OrganisationId, def.Definition, t, s.Status, ct) is not null) continue;
             var permitted = await access.CheckSilentAsync(t.Permission, await ForPermissionAsync(descriptor, s, def, t.Permission, ct), ct);
             if (!permitted.Allowed) blocked = permitted.Deny == DenyKind.NotFound ? "You do not have access to this record." : "You do not have permission to take this step.";
             else
@@ -134,6 +136,7 @@ internal sealed class LifecycleEngine(
             await RecordDeniedAsync(subject, transition, $"The {subject.Noun} is {def.DisplayOf(subject.Status)}.", ct);
             throw new DomainException("invalid_transition", $"'{transition.Display}' is not available while the {subject.Noun} is {def.DisplayOf(subject.Status)}. {hint}");
         }
+        await capabilityGate.RequireAsync(subject.OrganisationId, def, transition, subject.Status, ct);
         if (cmd.ExpectedStatus is not null && !string.Equals(cmd.ExpectedStatus, subject.Status, StringComparison.Ordinal))
             throw new DomainException("state_changed", $"The {subject.Noun} has moved on since you opened it: it is now {def.DisplayOf(subject.Status)}. Reload it to see its current state.");
         if (transition.Managed && !cmd.AllowManaged)

@@ -1,0 +1,46 @@
+@page "/Admin/Capabilities/Edit"
+@model Ecp.Host.Pages.Admin.Capabilities.EditModel
+@{ ViewData["Title"] = L["Edit the capability draft"].Value; }
+<h1>@L["Edit the capability draft"]</h1>
+<p class="lede">@L["For each capability, inherit the pack's default (otherwise the platform's: on) or choose on or off for this [[organisation|lower]]. Saving never publishes. A capability can be switched off only when no published workflow uses it and nothing is under way in it. Nothing here changes who may do anything."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Form is { } f)
+{
+    <p>@f.OrganisationName. @(f.Draft is null ? L["There is no open draft yet; saving starts one."] : L["A draft is open."])</p>
+    <form method="post" aria-label="@L["Capability draft"]">
+        <input type="hidden" name="OrganisationId" value="@f.OrganisationId" />
+        @for (var i = 0; i < Model.Rows.Count; i++)
+        {
+            var row = f.Rows.First(x => x.Key == Model.Rows[i].Key);
+            <fieldset class="term">
+                <legend>@Terms.Expand(row.Label) <code class="id">@row.Key</code> <span class="hint">@L["inherits"] @(row.InheritedEnabled ? L["on"] : L["off"]) (@(row.InheritedFrom == Ecp.SharedKernel.CapabilityLayer.Pack ? L["pack"] : L["platform"]))</span></legend>
+                <input type="hidden" name="Rows[@i].Key" value="@row.Key" />
+                <p class="hint">@Terms.Expand(row.Description)@if (row.Requires.Count > 0) { <text> @L["Needs"]: @string.Join(", ", row.Requires).</text> }</p>
+                <div class="field"><label for="cap-@i-choice">@L["Choice for {0}", row.Key]</label>
+                    <select id="cap-@i-choice" name="Rows[@i].Choice">
+                        <option value="inherit" selected="@(Model.Rows[i].Choice == "inherit")">@L["Inherit"] (@(row.InheritedEnabled ? L["on"] : L["off"]))</option>
+                        <option value="on" selected="@(Model.Rows[i].Choice == "on")">@L["On"]</option>
+                        <option value="off" selected="@(Model.Rows[i].Choice == "off")">@L["Off"]</option>
+                    </select></div>
+                <div class="field"><label for="cap-@i-note">@L["Reason (optional)"]</label><input id="cap-@i-note" name="Rows[@i].Note" type="text" maxlength="300" value="@Model.Rows[i].Note" /></div>
+            </fieldset>
+        }
+        <section class="card" aria-labelledby="act-h">
+            <h2 id="act-h">@L["Save, check and publish"]</h2>
+            <div class="field"><label for="Note">@L["Note for the history (optional)"]</label><input id="Note" name="Note" type="text" maxlength="500" value="@Model.Note" /></div>
+            <div class="actions">
+                <button type="submit" asp-page-handler="Save">@L["Save the draft"]</button>
+                <button type="submit" class="secondary" asp-page-handler="Validate">@L["Save and validate"]</button>
+                @if (Model.CanPublish) { <button type="submit" asp-page-handler="Publish">@L["Publish"]</button> }
+                <a class="button secondary" href="/Admin/Capabilities/Preview?organisationId=@f.OrganisationId">@L["Preview"]</a>
+            </div>
+            <p class="hint">@L["Publishing needs a recent sign-in, and a second person where your installation requires it."]</p>
+        </section>
+    </form>
+    @if (f.Draft is not null)
+    {
+        <form method="post" asp-page-handler="Discard"><input type="hidden" name="OrganisationId" value="@f.OrganisationId" />
+            <div class="actions"><button type="submit" class="secondary">@L["Discard the draft"]</button></div></form>
+    }
+}
+<p><a href="/Admin/Capabilities">@L["Back to capabilities"]</a></p>

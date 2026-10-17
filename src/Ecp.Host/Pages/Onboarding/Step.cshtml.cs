@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Onboarding;
 
-public sealed class StepModel(IOnboardingService onboarding, IOrganisationStructureService organisations, IPackLoader packs, ITerminologyAdministration terminology) : OnboardingPageModel(onboarding, organisations)
+public sealed class StepModel(IOnboardingService onboarding, IOrganisationStructureService organisations, IPackLoader packs, ITerminologyAdministration terminology, ICapabilityAdministration capabilities) : OnboardingPageModel(onboarding, organisations)
 {
     public StepHelp Help { get; private set; } = null!;
     public OnboardingState? State { get; private set; }
@@ -13,12 +13,16 @@ public sealed class StepModel(IOnboardingService onboarding, IOrganisationStruct
     public IReadOnlyList<PackCatalogueEntry> Packs { get; private set; } = [];
     public IReadOnlyDictionary<string, PackWordingExample> Wording { get; private set; } = new Dictionary<string, PackWordingExample>();
     public PackWordingResult? Prepared { get; private set; }
+    public IReadOnlyDictionary<string, PackCapabilityExample> CapabilityDefaults { get; private set; } = new Dictionary<string, PackCapabilityExample>();
     private async Task LoadPacksAsync(CancellationToken ct)
     {
         await LoadPackListAsync(ct);
         var examples = new Dictionary<string, PackWordingExample>(StringComparer.Ordinal);
         foreach (var p in Packs) if (await terminology.ExampleOfPackAsync(p.PackKey, ct) is { } e) examples[p.PackKey] = e;
         Wording = examples;
+        var defaults = new Dictionary<string, PackCapabilityExample>(StringComparer.Ordinal);
+        foreach (var p in Packs) if (await capabilities.ExampleOfPackAsync(p.PackKey, ct) is { } c) defaults[p.PackKey] = c;
+        CapabilityDefaults = defaults;
     }
 
     private async Task LoadPackListAsync(CancellationToken ct)

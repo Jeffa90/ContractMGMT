@@ -1,0 +1,8 @@
+@model Ecp.Host.Pages.Admin.Capabilities.CapabilityPage
+<form method="get" class="card inline-form" aria-label="@L["Choose what to show"]">
+    <div class="field"><label for="OrganisationId">@L["[[organisation]]"]</label>
+        <select id="OrganisationId" name="OrganisationId">
+            @foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }
+        </select></div>
+    <div class="actions"><button type="submit" class="secondary">@L["Show"]</button></div>
+</form>

@@ -10,7 +10,7 @@ namespace Ecp.Setup.Onboarding;
 
 /// <summary>Loads what already exists, as keys, for validation and preview.</summary>
 internal sealed class OnboardingFactsLoader(IOrganisationStructureService structure, ICategoryAdministration categories, IUserService users, IProviderRegistry providers,
-    IPackLoader packs, IClassificationScaleProvider scales)
+    IPackLoader packs, IClassificationScaleProvider scales, ICapabilityResolver capabilities)
 {
     public async Task<OnboardingFacts> LoadAsync(Guid organisationId, CancellationToken ct)
     {
@@ -19,7 +19,7 @@ internal sealed class OnboardingFactsLoader(IOrganisationStructureService struct
         var emails = (await users.ListAsync(ct)).Select(u => u.Email.Trim().ToLowerInvariant()).ToHashSet();
         return new OnboardingFacts(organisationId, Set(s.LegalEntities.Select(x => x.Key)), Set(s.Divisions.Select(x => x.Key)), Set(s.BusinessUnits.Select(x => x.Key)),
             Set(s.Sites.Select(x => x.Key)), Set(cats.Select(c => c.Code)), emails, Set((await providers.ListAsync(ct)).Select(p => p.Key)), Set((await packs.ListAsync(ct)).Where(p => p.IsUsable && p.Info is not null).Select(p => p.PackKey)),
-            await scales.GetAsync(ct));
+            await scales.GetAsync(ct), await capabilities.GetAsync(organisationId, ct));
     }
 
     private static ISet<string> Set(IEnumerable<string> v) => v.ToHashSet(StringComparer.Ordinal);

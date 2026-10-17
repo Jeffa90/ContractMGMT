@@ -205,3 +205,12 @@ At every milestone exit: re-run the abuse cases as automated tests; add threats 
 | Poisoned pack terminology | Hashed and signed with the manifest; content scan; installs as draft only | `PackTerminologyTests` |
 | User data read as a token | Expansion before argument formatting | `TerminologyTests`, `NotificationDeliveryTests` |
 | Denial of service by a huge document | 600-term and field-length limits, bounded cache | `TerminologyTests` |
+
+## Capabilities (S6)
+
+| ID | Threat | Mitigation | Residual |
+|---|---|---|---|
+| T-S6-01 | A tenant or organisation reads another's capability switches through the cache | Cache key carries tenant, organisation and the release and pack identity; invalidated on publish; tested in `tests/Ecp.Integration.Tests/CapabilityScenarios.cs` | Low |
+| T-S6-02 | A capability switch is used to bypass an approval or a lock | A capability only removes optional steps and cannot grant or skip a permission, lock, classification or lifecycle rule; the gate runs after those checks at the single engine chokepoint | Low |
+| T-S6-03 | A pack or organisation document carries script or template syntax | Plain-data document; validator refuses markup, template and expression syntax in notes; unknown keys have no effect | Low |
+| T-S6-04 | A capability is turned off to strand in-flight work | Turning one off with work in flight, or while a published workflow uses it, is refused; work already under way can always be finished | Low |

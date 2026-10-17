@@ -36,7 +36,7 @@ public static class WorkflowKinds
 }
 
 /// <summary>Configuration kind for a workflow definition: gives it draft, validate, preview, publish, version history, rollback and audit like any other configuration.</summary>
-internal sealed class WorkflowDefinitionKind(string kind, Ecp.Approvals.IApprovalMatrixStore? matrices = null) : IConfigurationKind
+internal sealed class WorkflowDefinitionKind(string kind, Ecp.Approvals.IApprovalMatrixStore? matrices = null, Func<ICapabilityResolver>? capabilities = null) : IConfigurationKind
 {
     public string Kind => kind;
 
@@ -53,6 +53,15 @@ internal sealed class WorkflowDefinitionKind(string kind, Ecp.Approvals.IApprova
                 if (published is null) messages.Add(new ValidationMessage(ValidationSeverity.Error, "$.settings.approval.matrix", "matrix_missing", $"The workflow names the approval matrix '{code}', but no approval matrix has been published for this organisation. Publish the matrix first."));
                 else if (published.Set.Find(code) is null) messages.Add(new ValidationMessage(ValidationSeverity.Error, "$.settings.approval.matrix", "matrix_missing", $"The workflow names the approval matrix '{code}', which is not in the published approval matrix document. Publish it first or correct the code."));
             }
+        }
+        // A workflow must not use a capability the organisation has switched off: it would offer steps nobody can take. (The Variation workflow only matters while Variations are on.)
+        if (definition is not null && capabilities is not null && organisationId != Guid.Empty)
+        {
+            var set = await capabilities().GetAsync(organisationId, ct);
+            if (kind != WorkflowKinds.Variation || set.IsEnabled(CapabilityKeys.Variations))
+                foreach (var group in Ecp.Lifecycle.Capabilities.WorkflowCapabilityUse.Of(definition).Where(u => !set.IsEnabled(u.Capability)).GroupBy(u => u.Capability))
+                    messages.Add(new ValidationMessage(ValidationSeverity.Error, "$.transitions", "capability_disabled_in_workflow",
+                        $"This workflow uses {CapabilityCatalogue.ByKey[group.Key].Label} ({string.Join("; ", group.Select(g => g.What).Distinct().Take(3))}), which this organisation has switched off. Remove those steps, or turn the capability on first."));
         }
         return new ValidationReport(messages);
     }

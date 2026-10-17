@@ -26,17 +26,17 @@ public sealed class FrozenIdentifierTests
     private static readonly string[] FrozenPermissions =
     [
             "ai.use", "approvals.action", "approvals.delegate", "approvals.delegate.administer", "approvals.matrix.read", "approvals.simulate", "audit.export",
-            "audit.read", "audit.read_admin", "audit.read_system", "categories.assign", "categories.manage", "classification.lower", "config.draft",
-            "config.history.read", "config.publish", "config.rollback", "contracts.close", "contracts.create", "contracts.edit_owned", "contracts.read",
-            "contracts.submit_approval", "contracts.submit_legal", "contracts.suspend", "contracts.unlock_emergency", "disposition.administer", "disposition.approve",
-            "disposition.request", "documents.download", "documents.upload", "identity.configure", "integrations.manage", "legal.clear", "legal.markup", "legal.respond",
-            "legal.review", "legalhold.manage", "migration.accept", "migration.commit", "migration.legacy_load", "migration.rollback", "migration.stage",
-            "notifications.administer", "onboarding.run", "ops.manage", "org.structure.manage", "organisations.manage", "packages.export", "packages.import",
-            "packs.assign", "packs.audit.read", "packs.install", "packs.read", "packs.retire", "packs.trust.manage", "packs.upload", "packs.validate", "records.export",
-            "records.read_privileged", "reminders.configure", "renewals.create", "reporting.external", "retention.manage", "rolemappings.manage", "roles.delegate",
-            "secrets.manage", "settings.operational", "setup.run", "suppliers.manage", "suppliers.read", "support.elevate", "system.configure", "templates.manage",
-            "tenant.configure", "tenants.manage", "terminology.audit.read", "terminology.draft", "terminology.publish", "terminology.read", "terminology.rollback",
-            "users.manage", "variations.create"
+            "audit.read", "audit.read_admin", "audit.read_system", "capabilities.audit.read", "capabilities.draft", "capabilities.publish", "capabilities.read",
+            "capabilities.rollback", "categories.assign", "categories.manage", "classification.lower", "config.draft", "config.history.read", "config.publish",
+            "config.rollback", "contracts.close", "contracts.create", "contracts.edit_owned", "contracts.read", "contracts.submit_approval", "contracts.submit_legal",
+            "contracts.suspend", "contracts.unlock_emergency", "disposition.administer", "disposition.approve", "disposition.request", "documents.download",
+            "documents.upload", "identity.configure", "integrations.manage", "legal.clear", "legal.markup", "legal.respond", "legal.review", "legalhold.manage",
+            "migration.accept", "migration.commit", "migration.legacy_load", "migration.rollback", "migration.stage", "notifications.administer", "onboarding.run",
+            "ops.manage", "org.structure.manage", "organisations.manage", "packages.export", "packages.import", "packs.assign", "packs.audit.read", "packs.install",
+            "packs.read", "packs.retire", "packs.trust.manage", "packs.upload", "packs.validate", "records.export", "records.read_privileged", "reminders.configure",
+            "renewals.create", "reporting.external", "retention.manage", "rolemappings.manage", "roles.delegate", "secrets.manage", "settings.operational", "setup.run",
+            "suppliers.manage", "suppliers.read", "support.elevate", "system.configure", "templates.manage", "tenant.configure", "tenants.manage",
+            "terminology.audit.read", "terminology.draft", "terminology.publish", "terminology.read", "terminology.rollback", "users.manage", "variations.create"
     ];
 
     [Fact]

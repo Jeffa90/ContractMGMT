@@ -37,7 +37,7 @@ public interface IContractRegister
 
 internal sealed partial class RegisterQueryEngine(
     ContractsDbContext db, IAccessService access, ContractAccessContext context, ICustomFieldCatalogue customCatalogue, IClock clock, IOrganisationStructureService structure,
-    IEnumerable<IContractSetProvider> setProviders, IEnumerable<IStatusGroupProvider> statusGroups, IPeopleDirectory people, Ecp.Configuration.ITerminologyResolver terminology) : IContractRegister
+    IEnumerable<IContractSetProvider> setProviders, IEnumerable<IStatusGroupProvider> statusGroups, IPeopleDirectory people, Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.ICapabilityResolver capabilities) : IContractRegister
 {
     public const int MaxPageSize = 200, DefaultPageSize = 25, MaxFilters = 20, MaxSorts = 3, MaxValues = 50, MaxColumns = 30, MaxTokens = 5, MaxText = 200;
 
@@ -60,6 +60,10 @@ internal sealed partial class RegisterQueryEngine(
         return subject is null ? new HashSet<string>() : subject.Assignments.Where(a => a.IsActiveAt(now) && (a.Scope.Level is ScopeLevel.Tenant or ScopeLevel.Installation || a.Scope.OrganisationIds.Contains(organisationId))).Select(a => a.RoleCode).ToHashSet(StringComparer.Ordinal);
     }
 
+    /// <summary>The capabilities that are on where the person is looking: for one organisation, that organisation's; otherwise any organisation they can reach.</summary>
+    private async Task<IReadOnlySet<string>> EnabledAsync(Guid? organisationId, CancellationToken ct)
+        => organisationId is { } o ? (await capabilities.GetAsync(o, ct)).Enabled.ToHashSet(StringComparer.Ordinal) : await capabilities.EnabledForCurrentPersonAsync(ct);
+
     public async Task<RegisterCatalogue> CatalogueAsync(Guid? organisationId = null, CancellationToken ct = default)
     {
         var (grants, orgs) = await ReachAsync(ct);
@@ -67,6 +71,9 @@ internal sealed partial class RegisterQueryEngine(
         Guid? org = organisationId is { } o && orgs.Contains(o) ? o : organisationId is null && orgs.Count == 1 ? orgs[0] : null;
         var terms = await terminology.GetAsync(org ?? await terminology.HomeOrganisationAsync(ct), ct: ct);
         var fields = CoreFields.All.Select(f => new RegisterField(f.Key, terms.Expand(f.Label), f.Type, false, f.Sortable, f.Filterable, f.Key is "agreementReference" or "contractTitle" or "supplier" or "supplierVendorNumber" or "supplierAbn" or "sapOutlineAgreementNumber", terms.Expand(f.Group), Displayable: f.Key != "legalReviewStatus")).ToList();
+        // Fields that exist only because of a capability this organisation does not use are not offered as columns or filters.
+        var on = await EnabledAsync(org, ct);
+        fields.RemoveAll(f => CapabilityCatalogue.OfField(f.Key) is { } needs && !on.Contains(needs));
         var release = 0;
         if (org is { } id)
         {
@@ -88,6 +95,8 @@ internal sealed partial class RegisterQueryEngine(
         if (!(await access.GrantsAsync("config.draft", ct)).Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(organisationId))) throw new ResourceNotFoundException();
         var terms = await terminology.GetAsync(organisationId, ct: ct);
         var fields = CoreFields.All.Select(f => new RegisterField(f.Key, terms.Expand(f.Label), f.Type, false, f.Sortable, f.Filterable, f.Key is "agreementReference" or "contractTitle" or "supplier" or "supplierVendorNumber" or "supplierAbn" or "sapOutlineAgreementNumber", terms.Expand(f.Group), Displayable: f.Key != "legalReviewStatus")).ToList();
+        var onHere = await EnabledAsync(organisationId, ct);
+        fields.RemoveAll(f => CapabilityCatalogue.OfField(f.Key) is { } needs && !onHere.Contains(needs));
         var set = await customCatalogue.PublishedAsync(organisationId, ct);
         foreach (var d in set.Fields)
             fields.Add(new RegisterField(d.Key, d.Label, d.Type, true, d.Sortable && !d.IsCalculated, d.Filterable && !d.IsCalculated, d.Searchable, set.Sections.FirstOrDefault(s => s.Key == d.Section)?.Label ?? "Additional details", d.IsRetired, d.Section, Displayable: !d.IsCalculated, Reportable: d.Reportable));

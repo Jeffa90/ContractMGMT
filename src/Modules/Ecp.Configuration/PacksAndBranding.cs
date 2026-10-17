@@ -29,6 +29,8 @@ public interface ISolutionPackCatalogue
     IReadOnlyList<PackCatalogueEntry> ListEntries();
     /// <summary>The pack's terminology document (its wording), or null if it carries none. Setup shows example labels from it before the pack is chosen.</summary>
     string? TerminologyOf(string packKey);
+    /// <summary>The pack's capability defaults document, or null if it gives none (every capability is then on). Setup shows which optional steps a pack switches off before the pack is chosen.</summary>
+    string? CapabilitiesOf(string packKey) => null;
 }
 
 /// <summary>Tenant-level record of the applied solution pack (version-controlled like any configuration). The pack must exist and be usable here.</summary>

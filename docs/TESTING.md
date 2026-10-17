@@ -523,7 +523,7 @@ Found by the tests and fixed: the render sweep found four contract-field labels 
 
 Changed existing tests (reasons recorded in the commit): the page-statement ceiling (42 to 44), reminders now assert the organisation's date format instead of ISO (finding G12 fixed), pack version numbers, the supplier form of an organisation with no identifier type, the localisation API tests, and the onboarding-review wording scan excludes the organisation's own regional section.
 
-Result (local workspace, Release, warnings as errors, locked restore): unit 819, architecture 108, API 114, integration 257 on SQLite (256 SQL Server wrappers NOT VERIFIED locally, run in CI): **1,298 Passed, 0 Failed, 0 Skipped**.
+Result (local workspace, Release, warnings as errors, locked restore): unit 819, architecture 108, API 114, integration 257 on SQLite (256 SQL Server wrappers NOT VERIFIED locally, run in CI): **1,298 Passed, 0 Failed, 0 Skipped**. CI run 58 (commit 13e7805): SQL Server **256 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED**; container build and smoke test succeeded.
 ## 10. Security regression suite (`Category=Security`)
 
 | ID | Test |

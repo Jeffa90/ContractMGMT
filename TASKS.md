@@ -20,7 +20,7 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 * **Terminology and packs (Implemented).** `address.*`, `regional.*`, `supplier.identifier`; Blank 1.6.0, JBS Procurement 2.6.0 (Suburb or City, State or Territory, Postcode, ABN), Construction Subcontracts 1.1.0 (City, State, ZIP Code).
 * **Guard stage C (Implemented).** Six new rules and one widened, ten file-specific allowances, stale allowances fail.
 * **Defects found and fixed by the work.** The identifier write path ignored the classification dimension; the page-statement ceiling moved 42 to 44.
-* **Verification.** Local: **1,298 Passed, 0 Failed, 0 Skipped, 256 NOT VERIFIED** (the SQL Server wrappers; unit 819, architecture 108, API 114, integration 257 on SQLite). `tools/check-repo.py`, `tools/check-packs.sh` and the locked restore pass. CI and container results: `deploy/STATUS.md`.
+* **Verification.** Local: **1,298 Passed, 0 Failed, 0 Skipped, 256 NOT VERIFIED** (the SQL Server wrappers; unit 819, architecture 108, API 114, integration 257 on SQLite). `tools/check-repo.py`, `tools/check-packs.sh` and the locked restore pass. CI [run 58](https://github.com/Jeffa90/ContractMGMT/actions/runs/39047952731) (commit 13e7805) green: SQL Server 256 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke test succeeded (`deploy/STATUS.md`).
 * **Not done, by design:** registry verification, FX, address validation for any country, page-text translation, reporting integration, public API, SaaS control plane, Professional Services, a PR.
 * **First incomplete remediation task:** none in the S1 to S10 list (open: R-01, R-02). **First incomplete product task:** INT-03's live e-signature adapter (unchanged).
 

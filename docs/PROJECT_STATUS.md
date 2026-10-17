@@ -240,7 +240,7 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S8 implement the role decision | **Retired**: superseded by S4 and ADR-0029 |
 | S9 second pack end to end (PRT-002, PRT-004, PRT-013) | **Done** (ADR-0032, `docs/SECOND_BUSINESS_PROOF.md` section 16, `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`); local 1,145 Passed, 0 Failed, 0 Skipped; CI run 56 (commit 626877d) green: SQL Server 244 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke test passed (`deploy/STATUS.md`) |
 | S9 readiness prerequisites (G11, content-kind smoke test, G1a, G1b, locale probe; owner decisions D1 to D4) | **Done** (`docs/S9_READINESS.md` section 13); local 1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED; CI run 53 (commit c5d9ce2) green: SQL Server 233 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`). S9 itself has not started |
-| S10 regional defaults, locale neutrality, country-aware organisation settings and configurable counterparty tax identifiers | **Done** (ADR-0033, `docs/REGIONAL_SETTINGS.md`, `docs/TAX_IDENTIFIERS.md`, `docs/PORTABILITY_AUDIT.md` section 0.9). Test and CI figures: `docs/TESTING.md` section 9.5 and `deploy/STATUS.md` |
+| S10 regional defaults, locale neutrality, country-aware organisation settings and configurable counterparty tax identifiers | **Done** (ADR-0033, `docs/REGIONAL_SETTINGS.md`, `docs/TAX_IDENTIFIERS.md`, `docs/PORTABILITY_AUDIT.md` section 0.9). Local 1,298 Passed, 0 Failed, 0 Skipped, 256 NOT VERIFIED; CI run 58 (commit 13e7805) green: SQL Server 256 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke test succeeded (`docs/TESTING.md` section 9.5, `deploy/STATUS.md`) |
 
 ## 10. Pilot readiness assessment
 

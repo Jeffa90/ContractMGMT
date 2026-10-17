@@ -1,8 +1,8 @@
 # Project Status
 
-Status date: **2026-10-16**. Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
+Status date: **2026-10-17** (after PER-002, portability remediation S1 and S2, and CI run 35). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
 
-**Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 8 and 9 are an engineering assessment of evidence, not an approval.
+**Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 10 and 11 are an engineering assessment of evidence, not an approval.
 
 ## 1. How to read this page
 
@@ -149,7 +149,80 @@ Never reported as passed:
 | Performance at 100,000 contracts, selective multi-word configured-field text search | Not measured; the second word of a text search still costs about 0.8 s when it is selective (`docs/PERFORMANCE_REVIEW.md` section 10) |
 | Mermaid diagram rendering | Structure is checked; rendering needs `mmdc` |
 
-## 8. Pilot readiness assessment
+## 8. Technical debt
+
+Known shortcuts and gaps in what is built, each with where it is tracked. None is hidden in the "Implemented" labels above; they are the reasons some rows are unticked or labelled partial.
+
+| Debt | Effect | Tracked as |
+|---|---|---|
+| Solution packs are embedded in module assemblies by project files and looked up by resource name; there is no pack loader or store | A new business's pack needs a rebuild | Portability P-03; CFG-04, PKM-01; slice S7 |
+| The 12-role catalogue (including `ProcurementAdministrator`) is compiled; the new reminder rule `OrganisationAdministrators` still resolves to it | Roles cannot be renamed or replaced per business | P-02b; slices S5, S8 |
+| Legal review and register authorisation (with Registered Date stamping) are compiled capabilities that are always on; pack `features` switches are read and ignored | A business without them cannot switch them off | R-05, P-04; slice S6 |
+| Labels, dashboard titles and help text are resource strings that name JBS roles and states; no terminology service | Terminology aliases (PRT-004) cannot work | P-05 to P-07, R-06; CFG-02, slice S4 |
+| The signature boundary is shaped like one vendor (envelope request, vendor-style column names) | An EF migration and vocabulary change are needed before a second provider | P-10; slice S3 |
+| Country and ERP specifics in core fields and validation (ABN, SAP outline agreement number), the compiled classification name `Legal Privileged`, `en-AU` and Brisbane defaults | Another country or ERP needs source changes | R-01 to R-04; slice S10 |
+| The architecture guard ARC-010 scans C# only (stage A); Razor, JSON and project files are not scanned | A business name could return in a page or data file unseen | P-09; slices S4, S7 |
+| Configured-field text search: a selective second word costs about 0.8 s, every statement scans the contract table once, the missing-index suggestion is unapplied, small tenancy reads repeat, offset paging only | Fine at 10,000 contracts, unknown at 100,000 | `docs/PERFORMANCE_REVIEW.md` section 10; PRF-01 |
+| `RegisterFilters` keeps two copies of the sort lambda (open and closed access) | Two places to keep in step | PER-002 follow-up, no ID |
+| Workflows, notification policies and approval matrices are edited as JSON; no schema-validation framework; no designers | Usable by an administrator who can edit JSON, not by a business user | CFG-01, STU-03 to STU-06, WFE-01 |
+| Contracts pinned to a workflow release cannot be moved to a newer one; a migrated, non-legacy contract is not pinned to a workflow | Workflow changes apply to new contracts only | Recorded as Future in the lifecycle slice |
+| Emergency unlock changes core fields only; person and file-reference fields cannot be migrated | Narrower than the requirement | Lifecycle slice, migration slice |
+| CI actions are tagged, not pinned to commit SHAs | Supply-chain exposure on the build | `TODO(SEC-060)` in `.github/workflows/ci.yml` |
+| Performance timings come from shared runners and vary by up to about 2.4 times; no time limit is asserted | Regressions in time are caught by shape guards and logical reads, not by a threshold | `docs/PERFORMANCE_REVIEW.md` sections 1 and 8 |
+| Docker, compose, IIS and Azure checks are not runnable in the cloud workspace; only CI runs the container smoke test | Deployment claims rest on CI and on Scaffolded files | `deploy/STATUS.md` |
+| Mermaid diagrams are checked for structure, not rendered | Rendering errors would be found late | `tools/check-repo.py` |
+
+## 9. Portability status
+
+Portability means a second business can run on the platform by configuration, packs and exports, with no source change (PRT-001 to PRT-015). Evidence: `docs/PORTABILITY_AUDIT.md` (what was found), `docs/PORTABILITY_REMEDIATION_PLAN.md` (the order of work and the outcome of each slice).
+
+**Position: partly portable, not yet portable to a second business without a rebuild.** The platform no longer chooses a business's pack or defaults; the pack, lifecycle, Variation workflow, notification policy, reminder fall-back and migrated initial state of an organisation now come from that organisation's configuration. Packs themselves are still compiled into the assemblies, and roles are still a compiled catalogue.
+
+### 9.1 Findings
+
+| Finding | Severity | Status |
+|---|---|---|
+| P-01 a code default selected the JBS pack for every organisation | High | **Fixed (S1, ADR-0024)**: resolved by organisation, installation default is host configuration and ships unset |
+| P-02a the reminder fall-back named a JBS role | High | **Fixed (S2, ADR-0025)**: a notification-policy rule; Blank states none |
+| P-08 migrated contracts started in a host-configured JBS state | Medium | **Fixed (S2, ADR-0025)**: from the organisation's lifecycle |
+| P-09 the architecture guard was too narrow | Medium | **Stage A done (S1)**; stages B and C open |
+| P-03 packs embedded by project files, no loader | **High** | **Open** (S7) |
+| P-02b compiled role catalogue | Medium | **Open** (S5, S8) |
+| P-04, P-05 compiled capabilities and JBS vocabulary in code and pages | Medium | **Open** (S4, S6) |
+| P-06, P-07, P-10, R-03, R-04 | Low | **Open** (S3, S4, S10) |
+| R-01, R-02, R-05 | Medium | **Open** (S6, S10) |
+| R-06 | Info | **Open** |
+
+Remaining high-severity portability violation: **P-03** only.
+
+### 9.2 Acceptance criteria
+
+| Criterion | State |
+|---|---|
+| PRT-001 static scan | Partly verified: ARC-010 passes with every spelling in C#; no business or vendor name in `src` C#; the only `jbs-procurement` text in `src` is two project-file embedding lines (P-03) |
+| PRT-002 a second business | **NOT VERIFIED** as a whole. Its first step passes on SQLite and SQL Server: a Blank organisation gets its own states, Variation workflow, notification policy and reminder behaviour and opens a Variation, and no JBS state or reminder recipient appears |
+| PRT-003 no schema change per field | Verified |
+| PRT-004 terminology aliases | **NOT VERIFIED** (not built) |
+| PRT-006 and PRT-011 export and import round trips | **NOT VERIFIED** (not built) |
+| PRT-012 locale per organisation | Partly verified |
+| PRT-013 renamed roles and states | **NOT VERIFIED** (roles compiled) |
+
+### 9.3 Slices
+
+| Slice | State |
+|---|---|
+| S1 pack per organisation, neutral Blank pack, guard stage A, first PRT-002 proof | **Done**, CI-verified |
+| S2 reminder fall-back and migrated initial status | **Done**, CI-verified (run 35) |
+| S3 neutral signature vocabulary with an EF migration | **First incomplete** |
+| S4 vocabulary and terminology read side, guard stage B | Not started |
+| S5 role catalogue decision (ADR) | Not started |
+| S6 feature flags that gate capabilities | Not started |
+| S7 pack loader and store; remove embedded packs | Not started |
+| S8 implement the role decision | Not started |
+| S9 second pack end to end (PRT-002, PRT-004, PRT-013) | Not started |
+| S10 cleanup of country, ERP and locale defaults | Not started |
+
+## 10. Pilot readiness assessment
 
 A **pilot** here means a time-boxed, supervised use by one organisation, on non-critical or synthetic-then-migrated data, on a Docker host with an external SQL Server and a real OpenID Connect provider, with the owner accepting the limits below. This is an engineering reading of the evidence; the decision belongs to the owner and to external governance.
 
@@ -168,7 +241,7 @@ A **pilot** here means a time-boxed, supervised use by one organisation, on non-
 
 Conditions a pilot should set: an external SQL Server with backups owned by the pilot organisation; a real identity provider configured and Demo sign-in disabled; Production guard on; a named support owner; and the open items above accepted in writing. `docs/PRODUCTION_READINESS_CHECKLIST.md` lists the formal items.
 
-## 9. Commercial SaaS readiness assessment
+## 11. Commercial SaaS readiness assessment
 
 **Not ready.** The platform has the right foundations for multi-tenancy, but SaaS needs a layer that does not exist yet.
 

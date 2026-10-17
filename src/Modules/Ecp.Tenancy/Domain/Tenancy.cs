@@ -82,6 +82,23 @@ public sealed class Organisation : ITenantOwned
     /// <summary>Records which solution pack the organisation works from (the pack's stable key). It changes no configuration; published releases and pinned contracts are untouched.</summary>
     public void AssignSolutionPack(string solutionPackKey) => SolutionPackKey = Guard.NotBlank(solutionPackKey, "[[solution.pack|sentence]]", 100);
 
+    /// <summary>
+    /// Records the organisation's effective locale, time zone and default currency (the values a published regional profile resolves to). Timestamps stay in UTC and existing amounts keep their own currency;
+    /// only how the organisation reads and enters values changes.
+    /// </summary>
+    public void SetRegional(string timeZoneId, string cultureCode, string defaultCurrencyCode)
+    {
+        var tz = Guard.NotBlank(timeZoneId, "Time zone", 100);
+        try { TimeZoneInfo.FindSystemTimeZoneById(tz); }
+        catch (TimeZoneNotFoundException) { throw new DomainException("invalid_time_zone", $"Time zone '{tz}' was not recognised."); }
+        var culture = Guard.NotBlank(cultureCode, "Culture", 20);
+        try { _ = CultureInfo.GetCultureInfo(culture, predefinedOnly: true); }
+        catch (CultureNotFoundException) { throw new DomainException("invalid_culture", $"Culture '{culture}' was not recognised."); }
+        var currency = Guard.NotBlank(defaultCurrencyCode, "Default currency", 3).ToUpperInvariant();
+        if (!Regex.IsMatch(currency, "^[A-Z]{3}$", RegexOptions.NonBacktracking)) throw new DomainException("invalid_currency", "Default currency must be a three-letter ISO 4217 code.");
+        TimeZoneId = tz; CultureCode = culture; DefaultCurrencyCode = currency;
+    }
+
     public static Organisation Create(Guid tenantId, string name, string timeZoneId, string cultureCode, string defaultCurrencyCode,
         ReferenceNumberingRule referenceRule, string? solutionPackKey, DateTime nowUtc)
     {

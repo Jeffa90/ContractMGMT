@@ -237,7 +237,7 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
             AddProvenance(provenance, batch, l, nameof(Ecp.Contracts.Domain.Supplier), existing, ProvenanceAction.Linked, null, null, key, null, row.Id, null, null);
             return existing;
         }
-        var id = await contracts.CreateSupplierAsync(batch.OrganisationId, batch.Id, s.Name, s.VendorNumber, l.Project.SourceSystem, key, ct);
+        var id = await contracts.CreateSupplierAsync(batch.OrganisationId, batch.Id, s.Name, s.VendorNumber, l.Project.SourceSystem, key, s.TaxIdentifier, ct);
         s.Id = id;
         AddProvenance(provenance, batch, l, nameof(Ecp.Contracts.Domain.Supplier), id, ProvenanceAction.Created, null, null, key, null, row.Id, null, null);
         return id;

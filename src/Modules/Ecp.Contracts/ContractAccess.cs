@@ -36,7 +36,7 @@ public sealed record ContractDetails(
 /// <summary>The classifying facts of a contract beyond the basics, as they are stored. The supplier's own ABN, vendor number and type are shown with the contract but belong to the supplier.</summary>
 public sealed record ContractClassifiers(
     Guid? LegalEntityId, string? ContractType, string? AgreementType, string? RiskLevel, string? FunctionCode, string? SapOutlineAgreementNumber, int? NoticePeriodValue, string? NoticePeriodUnit,
-    string? SupplierType, string? SupplierAbn, string? SupplierVendorNumber);
+    string? SupplierType, string? SupplierTaxIdentifier, string? SupplierVendorNumber);
 
 /// <summary>Why a record cannot be edited, in the words shown on the contract: locked (and by what), content-frozen by its workflow state, or open under an audited emergency unlock.</summary>
 public sealed record ContractProtection(bool IsLocked, string? LockReason, string? LockedBy, DateTime? LockedUtc, bool ContentFrozen, string DocumentPolicy, Guid? ActiveUnlockId, DateTime? UnlockExpiresUtc, string? WorkflowRef);
@@ -51,7 +51,7 @@ public sealed record ContractProvenanceInfo(
     string? SourceSystem, string? SourceRecordId, string? SourceAgreementReference, string? SourceStatus, DateTime? SourceExtractedUtc, Guid? MigrationBatchId,
     string? RegisteredDateProvenance, string? SourceRegisteredValue);
 
-public sealed record SupplierListItem(Guid Id, Guid OrganisationId, string Name, string? VendorNumber, string? Abn, string Status, string? SupplierType = null);
+public sealed record SupplierListItem(Guid Id, Guid OrganisationId, string Name, string? VendorNumber, string? TaxIdentifier, string Status, string? SupplierType = null);
 
 public sealed record CategoryItem(Guid Id, Guid OrganisationId, string Code, string Name, Guid? ParentCategoryId, Guid? DivisionId, bool IsActive, IReadOnlyList<CategoryOwnerItem> Owners);
 public sealed record CategoryOwnerItem(Guid AssignmentId, Guid UserId, bool IsPrimary, DateTime EffectiveFromUtc, DateTime? EffectiveToUtc);
@@ -95,6 +95,10 @@ public interface ISecuredSupplierService
     Task<SupplierListItem> GetAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<ContractListItem>> ContractsOfAsync(Guid supplierId, CancellationToken ct = default);
     Task<Guid> CreateAsync(CreateSupplierRequest request, CancellationToken ct = default);
+    /// <summary>The counterparty's address, for a reader who may see the counterparty. Empty when none is recorded.</summary>
+    Task<Ecp.SharedKernel.Localisation.SupplierAddress> GetAddressAsync(Guid supplierId, CancellationToken ct = default);
+    /// <summary>Records the address, checked against the organisation's address profile (a required field must be present, an unused field must be empty). Audited.</summary>
+    Task SetAddressAsync(Guid supplierId, Ecp.SharedKernel.Localisation.SupplierAddress address, CancellationToken ct = default);
 }
 
 public interface ISecuredCategoryService
@@ -198,7 +202,7 @@ internal sealed class SecuredContractService(
     ContractsDbContext db, IAccessService access, ContractAccessContext context, IContractService contracts, IUnitOfWork uow,
     ReferenceAllocator allocator, IOrganisationStructureService structure, ITenantContext tenant, IClock clock, ICutoverFreeze freeze,
     IAuditWriter audit, Ecp.Documents.IDocumentClassification documentClassification, CurrentUser currentUser, IContractLifecyclePort port,
-    IContractCustomFields customFields, IEnumerable<IContractCreationPolicy> creationPolicies, ICoreFieldLists coreLists) : ISecuredContractService
+    IContractCustomFields customFields, IEnumerable<IContractCreationPolicy> creationPolicies, ICoreFieldLists coreLists, TaxIdentifierGate taxGate) : ISecuredContractService
 {
     private async Task<IQueryable<Contract>> FilteredAsync(ContractFilter f, CancellationToken ct)
     {
@@ -267,8 +271,9 @@ internal sealed class SecuredContractService(
         if (c is null) throw new ResourceNotFoundException(); // absent, or another tenant's (filtered out): the answer is the same 404
         var descriptor = await context.DescribeAsync(c, ct);
         await access.RequireAsync("contracts.read", descriptor, ct);
-        var supplierRow = await db.Suppliers.AsNoTracking().Where(s => s.Id == c.SupplierId).Select(s => new { s.Name, s.SupplierType, s.Abn, s.VendorNumber }).FirstOrDefaultAsync(ct);
+        var supplierRow = await db.Suppliers.AsNoTracking().Where(s => s.Id == c.SupplierId).Select(s => new { s.Name, s.SupplierType, s.TaxIdentifier, s.VendorNumber }).FirstOrDefaultAsync(ct);
         var supplier = supplierRow?.Name ?? "";
+        var taxVisible = (await taxGate.ReadableOrganisationsAsync(await access.GrantsAsync("contracts.read", ct), [c.OrganisationId], ct)).Contains(c.OrganisationId);
         var category = await db.Categories.AsNoTracking().Where(s => s.Id == c.CategoryId).Select(s => s.Name).FirstOrDefaultAsync(ct) ?? "";
         var canEdit = !c.ContentFrozen && (await access.CheckSilentAsync("contracts.edit_owned", descriptor, ct)).Allowed;
         // A renewal link names the other agreement only when the caller could open it themselves.
@@ -287,7 +292,7 @@ internal sealed class SecuredContractService(
             new ContractReminderInfo(c.ReminderLeadDays, c.NoticePeriodDays, c.CriticalNotice),
             new ContractRenewalInfo(c.PredecessorContractId, Ref(c.PredecessorContractId), c.SuccessorContractId, Ref(c.SuccessorContractId)), c.LegalReviewRequired, c.ExtensionType,
             new ContractClassifiers(c.LegalEntityId, c.ContractType, c.AgreementType, c.RiskLevel, c.FunctionCode, c.SapOutlineAgreementNumber, c.NoticePeriodValue, c.NoticePeriodUnit,
-                supplierRow?.SupplierType, supplierRow?.Abn, supplierRow?.VendorNumber));
+                supplierRow?.SupplierType, taxVisible ? supplierRow?.TaxIdentifier : null, supplierRow?.VendorNumber));
     }
 
     public async Task ChangeClassificationAsync(Guid id, string newClassification, string? reason, CancellationToken ct = default)
@@ -490,7 +495,8 @@ internal sealed class SecuredContractService(
 }
 
 internal sealed class SecuredSupplierService(
-    ContractsDbContext db, IAccessService access, ContractAccessContext context, ISupplierService suppliers, ISecuredContractService contracts, ITenantContext tenant) : ISecuredSupplierService
+    ContractsDbContext db, IAccessService access, ContractAccessContext context, ISupplierService suppliers, ISecuredContractService contracts, ITenantContext tenant, TaxIdentifierGate taxGate, IUnitOfWork uow, IAuditWriter audit,
+    Ecp.Configuration.IRegionalSettingsResolver regional) : ISecuredSupplierService
 {
     public async Task<IReadOnlyList<SupplierListItem>> ListAsync(string? search = null, CancellationToken ct = default)
     {
@@ -505,11 +511,12 @@ internal sealed class SecuredSupplierService(
         var contractsVisible = ContractAccessFilter.Build(grants, await context.ListContextAsync(access.CurrentUserId, ct));
         var supplierIdsWithVisibleContracts = (await db.Contracts.AsNoTracking().Where(contractsVisible).Select(c => c.SupplierId).Distinct().ToListAsync(ct)).ToHashSet();
         var result = new List<SupplierListItem>();
+        var taxReadable = await taxGate.ReadableOrganisationsAsync(grants, all.Select(x => x.OrganisationId), ct);
         foreach (var sup in all)
         {
             var visible = grants.Any(g => (g.OrganisationIds is null || g.OrganisationIds.Contains(sup.OrganisationId))
                 && (IsOrgWide(g) || supplierIdsWithVisibleContracts.Contains(sup.Id)));
-            if (visible) result.Add(new SupplierListItem(sup.Id, sup.OrganisationId, sup.Name, sup.VendorNumber, sup.Abn, sup.Status, sup.SupplierType));
+            if (visible) result.Add(new SupplierListItem(sup.Id, sup.OrganisationId, sup.Name, sup.VendorNumber, taxReadable.Contains(sup.OrganisationId) ? sup.TaxIdentifier : null, sup.Status, sup.SupplierType));
         }
         return result;
     }
@@ -533,6 +540,29 @@ internal sealed class SecuredSupplierService(
     {
         await access.RequireAsync("suppliers.manage", new ResourceDescriptor("Supplier", tenant.RequireTenantId(), request.OrganisationId, Id: "new", Dimensions: ScopeDimensions.OrganisationOnly), ct);
         return await suppliers.CreateAsync(request, ct);
+    }
+
+    public async Task<Ecp.SharedKernel.Localisation.SupplierAddress> GetAddressAsync(Guid supplierId, CancellationToken ct = default)
+    {
+        await GetAsync(supplierId, ct);        // the same answer whether the counterparty is missing or out of scope
+        return (await db.Suppliers.AsNoTracking().FirstAsync(s => s.Id == supplierId, ct)).Address;
+    }
+
+    public async Task SetAddressAsync(Guid supplierId, Ecp.SharedKernel.Localisation.SupplierAddress address, CancellationToken ct = default)
+    {
+        var item = await GetAsync(supplierId, ct);
+        await access.RequireAsync("suppliers.manage", new ResourceDescriptor("Supplier", tenant.RequireTenantId(), item.OrganisationId, Id: supplierId.ToString(), Dimensions: ScopeDimensions.OrganisationOnly), ct);
+        var cleaned = address.Cleaned();
+        var problems = cleaned.Check((await regional.GetAsync(item.OrganisationId, ct)).Address);
+        if (problems.Count > 0) throw new DomainException(problems[0].Code, "Address: " + problems[0].Message);
+        await uow.ExecuteAsync(async c =>
+        {
+            var supplier = await db.Suppliers.FirstAsync(s => s.Id == supplierId, c);
+            var before = supplier.Address;
+            supplier.SetAddress(cleaned);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("supplier.address.set", nameof(Supplier), supplierId.ToString(), OrganisationId: item.OrganisationId, OldValuesJson: AuditJson.Of(before), NewValuesJson: AuditJson.Of(cleaned)));
+        }, ct);
     }
 }
 

@@ -11,10 +11,10 @@ namespace Ecp.Host.Pages.Migration;
 [Authorize(Policy = "perm:migration.stage")]
 public abstract class MigrationPageModel : EcpPageModel
 {
-    protected LocaleFormatter Fmt { get; private set; } = new("en-AU", "Australia/Brisbane", "AUD");
+    protected LocaleFormatter Fmt => Format.Formatter;
 
     protected async Task LoadFormatterAsync(IOrganisationStructureService organisations, Guid organisationId, CancellationToken ct)
-        => Fmt = await OrgLocale.ForAsync(organisations, organisationId, ct);
+        => await Format.UseAsync(organisationId, ct);
 
     public string When(DateTime? utc) => utc is { } u ? Fmt.DateTime(u) : "-";
 

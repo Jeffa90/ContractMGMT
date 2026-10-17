@@ -2,11 +2,35 @@
 @model Ecp.Host.Pages.Suppliers.DetailsModel
 @{ ViewData["Title"] = Model.Supplier.Name; }
 <h1>@Model.Supplier.Name</h1>
+<partial name="_Errors" model="ViewData.ModelState" />
 <dl class="facts card">
     <dt>@L["[[supplier.number]]"]</dt><dd>@(Model.Supplier.VendorNumber ?? "-")</dd>
-    <dt>@L["[[supplier.tax.id]]"]</dt><dd>@(Model.Supplier.Abn ?? "-")</dd>
+    @foreach (var i in Model.Identifiers)
+    {
+        <dt>@i.Label</dt>
+        <dd>@i.Value <span class="hint">(@Model.VerificationText(i.Verification)@(i.IsPrimary ? "" : ""))</span>
+            @if (Model.CanManage) { <form method="post" asp-page-handler="End" class="inline"><input type="hidden" name="identifierId" value="@i.Id" /><button type="submit" class="secondary">@L["End"]</button></form> }
+        </dd>
+    }
+    @if (Model.Identifiers.Count == 0) { <dt>@L["[[supplier.tax.id]]"]</dt><dd>-</dd> }
+    @foreach (var key in Ecp.SharedKernel.Localisation.AddressProfile.FieldKeys)
+    {
+        if (!Model.AddressProfile.Spec(key).Used) { continue; }
+        <dt>@L["[[address." + key + "]]"]</dt><dd>@(Model.Address.Get(key) ?? "-")</dd>
+    }
     <dt>@L["[[field.status]]"]</dt><dd>@Model.Supplier.Status</dd>
 </dl>
+@if (Model.CanManage && Model.Types.Count > 0)
+{
+    <form method="post" asp-page-handler="Add" class="card">
+        <h2>@L["Add an identifier"]</h2>
+        <div class="field"><label for="TypeKey">@L["Identifier type"]</label>
+            <select id="TypeKey" name="TypeKey">@foreach (var t in Model.Types) { <option value="@t.Key">@t.Label</option> }</select></div>
+        <div class="field"><label for="Value">@L["Value"]</label><input id="Value" name="Value" type="text" maxlength="80" required aria-required="true" /></div>
+        <p class="hint">@L["Only the format is checked. A value that fits the format is not verified against any registry."]</p>
+        <button type="submit">@L["Add"]</button>
+    </form>
+}
 <h2>@L["[[contract|plural]] you can see for this [[supplier|lower]]"]</h2>
 <div class="table-wrap">
 <table>

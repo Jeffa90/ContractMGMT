@@ -48,7 +48,10 @@ public interface IContractMigrationPort
     Task<IReadOnlyList<ExistingContractRef>> FindContractsAsync(Guid organisationId, string sourceSystem, IReadOnlyCollection<string> sourceRecordIds,
         IReadOnlyCollection<string> agreementReferences, CancellationToken ct = default);
     Task<string> AllocateReferenceAsync(Guid organisationId, CancellationToken ct = default);
-    Task<Guid> CreateSupplierAsync(Guid organisationId, Guid batchId, string name, string? vendorNumber, string sourceSystem, string sourceRecordId, CancellationToken ct = default);
+    /// <summary>Creates a counterparty for a batch. A <paramref name="taxIdentifier"/> is recorded as the organisation's primary identifier type, with the batch and source system as its provenance; it must already have passed the checker.</summary>
+    Task<Guid> CreateSupplierAsync(Guid organisationId, Guid batchId, string name, string? vendorNumber, string sourceSystem, string sourceRecordId, string? taxIdentifier = null, CancellationToken ct = default);
+    /// <summary>Checks a tax identifier column against the organisation's primary identifier type. Built once for a batch; no database work per row. <see cref="IMigrationIdentifierChecker.TypeKey"/> is null when the organisation has none.</summary>
+    Task<IMigrationIdentifierChecker> IdentifierCheckerAsync(Guid organisationId, CancellationToken ct = default);
     Task<Guid> CreateCategoryAsync(Guid organisationId, Guid batchId, string code, string name, Guid? parentId, string sourceSystem, string sourceRecordId, CancellationToken ct = default);
     Task<Guid> CreateContractAsync(MigratedContract contract, CancellationToken ct = default);
     /// <summary>Updates only the named fields and returns their previous values. A locked record needs <paramref name="lockedOverwriteAuthorised"/>.</summary>
@@ -74,9 +77,26 @@ public interface IContractMigrationPort
     void ReleaseTracked();
 }
 
+/// <summary>Checks tax identifier values of a migration batch against the organisation's primary identifier type (structure only).</summary>
+public interface IMigrationIdentifierChecker
+{
+    string? TypeKey { get; }
+    string? Label { get; }
+    Ecp.SharedKernel.Localisation.IdentifierCheck Check(string value);
+}
+
+internal sealed class MigrationIdentifierChecker(Ecp.SharedKernel.Localisation.IdentifierTypeProfile? profile) : IMigrationIdentifierChecker
+{
+    public string? TypeKey => profile?.Key;
+    public string? Label => profile?.Label;
+    public Ecp.SharedKernel.Localisation.IdentifierCheck Check(string value) => profile is null
+        ? new(false, "", "identifier_type_unknown", "No tax identifier type is set up for this organisation.") : Ecp.SharedKernel.Localisation.IdentifierRules.Check(profile, value);
+}
+
 internal sealed class ContractMigrationPort(
     ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IActorContext actor, IClock clock, ITenantContext tenant, ReferenceAllocator allocator,
-    ITenantDirectory tenants, IOptions<ContractsOptions> options, IEnumerable<IContractCreationPolicy> policies, IContractCustomFieldWriter customFields, ICustomFieldCatalogue fieldCatalogue) : IContractMigrationPort
+    ITenantDirectory tenants, IOptions<ContractsOptions> options, IEnumerable<IContractCreationPolicy> policies, IContractCustomFieldWriter customFields, ICustomFieldCatalogue fieldCatalogue,
+    ISupplierIdentifierWriter identifiers, Ecp.Configuration.IRegionalSettingsResolver regional) : IContractMigrationPort
 {
     // The same source the contract pages use: the lifecycle definition in force for the organisation. Only a host with no lifecycle module falls back to the configured code.
     public async Task<string> InitialStatusAsync(Guid organisationId, CancellationToken ct = default)
@@ -123,7 +143,10 @@ internal sealed class ContractMigrationPort(
 
     public Task<string> AllocateReferenceAsync(Guid organisationId, CancellationToken ct = default) => allocator.AllocateAsync(organisationId, consume: true, ct);
 
-    public async Task<Guid> CreateSupplierAsync(Guid organisationId, Guid batchId, string name, string? vendorNumber, string sourceSystem, string sourceRecordId, CancellationToken ct = default)
+    public async Task<IMigrationIdentifierChecker> IdentifierCheckerAsync(Guid organisationId, CancellationToken ct = default)
+        => new MigrationIdentifierChecker((await regional.GetAsync(organisationId, ct)).PrimaryIdentifier);
+
+    public async Task<Guid> CreateSupplierAsync(Guid organisationId, Guid batchId, string name, string? vendorNumber, string sourceSystem, string sourceRecordId, string? taxIdentifier = null, CancellationToken ct = default)
     {
         await RequireOrganisationAsync(organisationId, ct);
         var supplier = Supplier.Create(tenant.RequireTenantId(), organisationId, name, null, vendorNumber, clock.UtcNow);
@@ -136,6 +159,11 @@ internal sealed class ContractMigrationPort(
             audit.Record(new AuditEntry("migration.supplier.created", nameof(Supplier), supplier.Id.ToString(), OrganisationId: organisationId, MigrationBatchId: batchId,
                 NewValuesJson: AuditJson.Of(new { supplier.Name, supplier.VendorNumber, sourceSystem, sourceRecordId })));
         }, ct);
+        if (!string.IsNullOrWhiteSpace(taxIdentifier))
+        {
+            var primary = (await regional.GetAsync(organisationId, ct)).PrimaryIdentifier ?? throw new DomainException("identifier_type_unknown", "No [[supplier.tax.id]] type is set up for this [[organisation|lower]].");
+            await identifiers.RecordTrustedAsync(organisationId, supplier.Id, primary.Key, taxIdentifier, IdentifierSources.Migration, sourceSystem, batchId, ct);
+        }
         return supplier.Id;
     }
 
@@ -307,6 +335,8 @@ internal sealed class ContractMigrationPort(
         {
             var supplier = await db.Suppliers.FirstOrDefaultAsync(x => x.Id == supplierId && x.MigrationBatchId == batchId, c);
             if (supplier is null) return;
+            // The identifiers the batch recorded go with the counterparty it created; the audit events that recorded them stay.
+            db.SupplierIdentifiers.RemoveRange(await db.SupplierIdentifiers.Where(i => i.SupplierId == supplierId).ToListAsync(c));
             db.Suppliers.Remove(supplier);
             await db.SaveChangesAsync(c);
             audit.Record(new AuditEntry("migration.supplier.removed", nameof(Supplier), supplierId.ToString(), OrganisationId: supplier.OrganisationId, Reason: reason, MigrationBatchId: batchId,

@@ -3,15 +3,40 @@
 @{ ViewData["Title"] = L["Add [[supplier|lower|a]]"].Value; }
 <h1>@L["Add [[supplier|lower|a]]"]</h1>
 <partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="card">
+        <div class="field">
+            <label for="OrganisationId">@L["[[organisation]]"]</label>
+            <select id="OrganisationId" name="OrganisationId">
+                @foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }
+            </select>
+        </div>
+        <button type="submit" class="secondary">@L["Show the fields for this [[organisation|lower]]"]</button>
+    </form>
+}
 <form method="post">
-    <div class="field">
-        <label for="OrganisationId">@L["[[organisation]]"]</label>
-        <select id="OrganisationId" name="OrganisationId" required aria-required="true">
-            @foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }
-        </select>
-    </div>
+    <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
     <div class="field"><label for="Name">@L["Name"]</label><input id="Name" name="Name" type="text" required aria-required="true" maxlength="300" value="@Model.Name" /></div>
     <div class="field"><label for="VendorNumber">@L["[[supplier.number]]"]</label><input id="VendorNumber" name="VendorNumber" type="text" maxlength="50" value="@Model.VendorNumber" /></div>
-    <div class="field"><label for="Abn">@L["[[supplier.tax.id]]"]</label><input id="Abn" name="Abn" type="text" inputmode="numeric" maxlength="14" value="@Model.Abn" aria-describedby="abn-hint" /><p id="abn-hint" class="hint">@L["[[supplier.tax.id]] is eleven digits. The format is checked; a registry lookup is not performed."]</p></div>
+    @foreach (var t in Model.Types)
+    {
+        var id = "Identifier_" + t.Key.Replace('.', '_');
+        <div class="field">
+            <label for="@id">@t.Label@(t.Required ? "" : "")</label>
+            <input id="@id" name="Identifier[@t.Key]" type="text" maxlength="80" value="@(Model.Identifier.TryGetValue(t.Key, out var v) ? v : "")" aria-describedby="@(id)-hint" required="@t.Required" />
+            <p id="@(id)-hint" class="hint">@L["The format is checked ({0}). A registry lookup is not performed and a value that fits the format is not thereby verified.", t.Hint]</p>
+        </div>
+    }
+    @foreach (var key in Ecp.SharedKernel.Localisation.AddressProfile.FieldKeys)
+    {
+        var spec = Model.AddressProfile.Spec(key);
+        if (!spec.Used) { continue; }
+        var id = "Address_" + key;
+        <div class="field">
+            <label for="@id">@L["[[address." + key + "]]"]</label>
+            <input id="@id" name="Address[@key]" type="text" maxlength="@Ecp.SharedKernel.Localisation.SupplierAddress.MaxLengths[key]" value="@(Model.Address.TryGetValue(key, out var av) ? av : "")" required="@spec.Required" />
+        </div>
+    }
     <div class="actions"><button type="submit">@L["Add [[supplier|lower]]"]</button> <a class="button secondary" href="/Suppliers">@L["Cancel"]</a></div>
 </form>

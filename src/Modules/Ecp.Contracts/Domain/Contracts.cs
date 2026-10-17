@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Ecp.SharedKernel;
+using Ecp.SharedKernel.Localisation;
 
 namespace Ecp.Contracts.Domain;
 
@@ -131,8 +132,18 @@ public sealed partial class Supplier : ITenantOwned
     public string Name { get; private set; } = "";
     public string NormalisedName { get; private set; } = "";
     public string? LegalName { get; private set; }
-    public string? Abn { get; private set; }
+    /// <summary>
+    /// The normalised value of the counterparty's primary tax identifier (the first identifier type in the organisation's profile). A projection kept for lists, search and exports; the identifiers themselves,
+    /// with their type, verification status and provenance, are <see cref="SupplierIdentifier"/> rows. The column keeps its original name (<c>Abn</c>) so existing data and queries stay valid.
+    /// </summary>
+    public string? TaxIdentifier { get; private set; }
     public string? VendorNumber { get; private set; }
+    public string? AddressLine1 { get; private set; }
+    public string? AddressLine2 { get; private set; }
+    public string? AddressLocality { get; private set; }
+    public string? AddressRegion { get; private set; }
+    public string? AddressPostal { get; private set; }
+    public string? AddressCountry { get; private set; }
     /// <summary>The kind of supplier (a configured code, for example a strategic or a transactional supplier). A fact the approval matrix can use.</summary>
     public string? SupplierType { get; private set; }
     public string Status { get; private set; } = "Active";
@@ -149,13 +160,26 @@ public sealed partial class Supplier : ITenantOwned
         SupplierType = v;
     }
 
-    public static Supplier Create(Guid tenantId, Guid organisationId, string name, string? abn, string? vendorNumber, DateTime nowUtc, string? supplierType = null)
+    /// <summary>Records the primary identifier's normalised value (already checked against the organisation's identifier profile by the identifier service; the domain assumes no format).</summary>
+    /// <summary>Records the address as free text of bounded length. Whether the organisation requires or uses each field is checked by the caller against its address profile.</summary>
+    public void SetAddress(SupplierAddress address)
+    {
+        var a = address.Cleaned();
+        AddressLine1 = Guard.OptionalBounded(a.Line1, "Address", 200); AddressLine2 = Guard.OptionalBounded(a.Line2, "Address", 200); AddressLocality = Guard.OptionalBounded(a.Locality, "Address", 100);
+        AddressRegion = Guard.OptionalBounded(a.Region, "Address", 100); AddressPostal = Guard.OptionalBounded(a.Postal, "Address", 30); AddressCountry = Guard.OptionalBounded(a.Country, "Address", 100);
+    }
+
+    public SupplierAddress Address => new(AddressLine1, AddressLine2, AddressLocality, AddressRegion, AddressPostal, AddressCountry);
+
+    public void SetTaxIdentifier(string? normalisedValue) => TaxIdentifier = string.IsNullOrWhiteSpace(normalisedValue) ? null : Guard.OptionalBounded(normalisedValue.Trim(), "[[supplier.tax.id]]", 64);
+
+    public static Supplier Create(Guid tenantId, Guid organisationId, string name, string? taxIdentifier, string? vendorNumber, DateTime nowUtc, string? supplierType = null)
     {
         var cleanName = Guard.NotBlank(name, "[[supplier]] name", 300);
         return new Supplier
         {
             Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
-            Name = cleanName, NormalisedName = NormaliseName(cleanName), Abn = NormaliseAbn(abn),
+            Name = cleanName, NormalisedName = NormaliseName(cleanName), TaxIdentifier = string.IsNullOrWhiteSpace(taxIdentifier) ? null : Guard.OptionalBounded(taxIdentifier.Trim(), "[[supplier.tax.id]]", 64),
             VendorNumber = Guard.OptionalBounded(vendorNumber, "[[supplier.number]]", 50), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
         }.WithType(supplierType);
     }
@@ -178,18 +202,69 @@ public sealed partial class Supplier : ITenantOwned
         return n.ToUpperInvariant();
     }
 
-    /// <summary>Format check only (eleven digits). Registry validation is an optional adapter and never blocks manual entry.</summary>
-    public static string? NormaliseAbn(string? abn)
-    {
-        if (string.IsNullOrWhiteSpace(abn)) return null;
-        var digits = new string(abn.Where(char.IsDigit).ToArray());
-        if (digits.Length != 11 || abn.Any(c => !char.IsDigit(c) && c != ' '))
-            throw new DomainException("invalid_abn", "[[supplier.tax.id]] must be eleven digits.");
-        return digits;
-    }
-
     [GeneratedRegex(@"\s+", RegexOptions.NonBacktracking)]
     private static partial Regex Whitespace();
+}
+
+/// <summary>How an identifier came to be recorded.</summary>
+public static class IdentifierSources
+{
+    /// <summary>Entered by a person.</summary>
+    public const string Manual = "Manual";
+    /// <summary>Loaded by a migration batch (the batch and source system are kept).</summary>
+    public const string Migration = "Migration";
+    /// <summary>Carried over from the single tax-identifier column that existed before identifiers were a model; its value is unchanged.</summary>
+    public const string Legacy = "Legacy";
+}
+
+/// <summary>
+/// One identifier of a counterparty: a tax or registration number of a configured type (docs/TAX_IDENTIFIERS.md). The type key names a profile in the organisation's regional settings; the platform checks structure only,
+/// and a stored status of <c>FormatValid</c> says nothing about whether the number is legally valid or registered anywhere. <c>ExternallyVerified</c>, the provider key and the verification time are reserved for a later
+/// registry integration; nothing in S10 sets them.
+/// </summary>
+public sealed class SupplierIdentifier : ITenantOwned
+{
+    private SupplierIdentifier() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid OrganisationId { get; private set; }
+    public Guid SupplierId { get; private set; }
+    public string TypeKey { get; private set; } = "";
+    /// <summary>The value as entered (separators kept) for display.</summary>
+    public string Value { get; private set; } = "";
+    /// <summary>The value with separators removed and letters upper-cased: what duplicate checks and searches compare.</summary>
+    public string NormalisedValue { get; private set; } = "";
+    public string VerificationStatus { get; private set; } = IdentifierVerification.NotChecked;
+    public DateTime? VerifiedUtc { get; private set; }
+    public string? VerificationProviderKey { get; private set; }
+    /// <summary>The classification the identifier was recorded at (its type's classification then). A reader without that level never sees the value.</summary>
+    public string Classification { get; private set; } = "Internal";
+    public string SourceKind { get; private set; } = IdentifierSources.Manual;
+    public string? SourceSystem { get; private set; }
+    public Guid? MigrationBatchId { get; private set; }
+    public DateTime EffectiveFromUtc { get; private set; }
+    public DateTime? EffectiveToUtc { get; private set; }
+    public DateTime CreatedUtc { get; private set; }
+    public string CreatedBy { get; private set; } = "";
+    public byte[] RowVersion { get; private set; } = [];
+
+    public bool IsActive => EffectiveToUtc is null;
+
+    public static SupplierIdentifier Create(Guid tenantId, Guid organisationId, Guid supplierId, string typeKey, string value, string normalised, string verificationStatus, string classification, string sourceKind,
+        string? sourceSystem, Guid? migrationBatchId, string createdBy, DateTime nowUtc)
+    {
+        if (!IdentifierVerification.All.Contains(verificationStatus)) throw new DomainException("invalid_value", "The verification status is not recognised.");
+        return new SupplierIdentifier
+        {
+            Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)), SupplierId = Guard.NotEmpty(supplierId, nameof(supplierId)),
+            TypeKey = Guard.NotBlank(typeKey, "Identifier type", 40), Value = Guard.NotBlank(value, "[[supplier.tax.id]]", 80), NormalisedValue = Guard.NotBlank(normalised, "[[supplier.tax.id]]", 80),
+            VerificationStatus = verificationStatus, Classification = Guard.NotBlank(classification, "Classification", 30), SourceKind = Guard.NotBlank(sourceKind, "Source", 20),
+            SourceSystem = Guard.OptionalBounded(sourceSystem, "Source system", 100), MigrationBatchId = migrationBatchId, CreatedBy = Guard.NotBlank(createdBy, "Created by", 100),
+            EffectiveFromUtc = Guard.Utc(nowUtc, nameof(nowUtc)), CreatedUtc = nowUtc
+        };
+    }
+
+    public void End(DateTime nowUtc) { if (EffectiveToUtc is null) EffectiveToUtc = Guard.Utc(nowUtc, nameof(nowUtc)); }
 }
 
 /// <summary>Last Agreement Reference number issued for an organisation. Numbers are allocated transactionally and never reused (D3).</summary>

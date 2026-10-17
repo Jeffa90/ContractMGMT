@@ -12,7 +12,7 @@ namespace Ecp.Contracts.Register;
 // from the catalogue and an operator from the grammar, and everything else is a parameter.
 internal sealed partial class RegisterQueryEngine
 {
-    private async Task<(IQueryable<Contract> C, IQueryable<Supplier> S)> ApplyFilterAsync(IQueryable<Contract> cq, IQueryable<Supplier> sq, FilterClause f, RegisterCatalogue catalogue, CustomFieldSet set,
+    private async Task<(IQueryable<Contract> C, IQueryable<Supplier> S)> ApplyFilterAsync(IQueryable<Contract> cq, IQueryable<Supplier> sq, FilterClause f, RegisterCatalogue catalogue, CustomFieldSet set, IReadOnlySet<Guid> taxReadable,
         ContractAccessFilter.Context listCtx, LevelVisibility vis, DateOnly today, DateTime now, CancellationToken ct)
     {
         if (f.Field == "set")
@@ -30,7 +30,7 @@ internal sealed partial class RegisterQueryEngine
             case "contractTitle": return (TextOn(cq, nameof(Contract.ContractTitle), f, v => v), sq);
             case "supplier": return (cq, TextOn(sq, nameof(Supplier.NormalisedName), f, v => v.ToUpperInvariant()));
             case "supplierVendorNumber": return (cq, TextOn(sq, nameof(Supplier.VendorNumber), f, v => v));
-            case "supplierAbn": return (cq, TextOn(sq, nameof(Supplier.Abn), f, v => new string(v.Where(char.IsDigit).ToArray())));
+            case "supplierAbn": return (cq, TextOn(sq.Where(s => taxReadable.Contains(s.OrganisationId)), nameof(Supplier.TaxIdentifier), f, v => new string(v.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant()));
             case "supplierType": return (cq, TextOn(sq, nameof(Supplier.SupplierType), f, v => v));
             case "sapOutlineAgreementNumber": return (TextOn(cq, nameof(Contract.SapOutlineAgreementNumber), f, v => v), sq);
             case "contractType": return (TextOn(cq, nameof(Contract.ContractType), f, v => v), sq);
@@ -317,7 +317,7 @@ internal sealed partial class RegisterQueryEngine
 
     // ---- sorting -----------------------------------------------------------------------------------------------------------------------------------------
 
-    private IQueryable<Row> ApplySorts(IQueryable<Row> rows, IReadOnlyList<SortClause> sorts, RegisterCatalogue catalogue, CustomFieldSet set, LevelVisibility vis)
+    private IQueryable<Row> ApplySorts(IQueryable<Row> rows, IReadOnlyList<SortClause> sorts, RegisterCatalogue catalogue, CustomFieldSet set, IReadOnlySet<Guid> taxReadable, LevelVisibility vis)
     {
         IOrderedQueryable<Row>? ordered = null;
         void Add<K>(System.Linq.Expressions.Expression<Func<Row, K>> key, bool desc)
@@ -362,7 +362,7 @@ internal sealed partial class RegisterQueryEngine
                 case "contractTitle": Add(r => r.C.ContractTitle, d); break;
                 case "supplier": Add(r => r.S.NormalisedName, d); break;
                 case "supplierVendorNumber": Add(r => r.S.VendorNumber, d); break;
-                case "supplierAbn": Add(r => r.S.Abn, d); break;
+                case "supplierAbn": Add(r => taxReadable.Contains(r.C.OrganisationId) ? r.S.TaxIdentifier : null, d); break;
                 case "supplierType": Add(r => r.S.SupplierType, d); break;
                 case "category": Add(r => r.G.Name, d); break;
                 case "status": Add(r => r.C.Status, d); break;
@@ -396,7 +396,7 @@ internal sealed partial class RegisterQueryEngine
 
     // ---- cells -------------------------------------------------------------------------------------------------------------------------------------------
 
-    private async Task<IReadOnlyList<RegisterRow>> BuildRowsAsync(List<Row> page, List<RegisterColumn> columns, CustomFieldSet set, ClassificationScale scale, LevelVisibility vis, CancellationToken ct)
+    private async Task<IReadOnlyList<RegisterRow>> BuildRowsAsync(List<Row> page, List<RegisterColumn> columns, CustomFieldSet set, ClassificationScale scale, IReadOnlySet<Guid> taxReadable, LevelVisibility vis, CancellationToken ct)
     {
         var ids = page.Select(r => r.C.Id).ToArray();
         var names = new Dictionary<Guid, (Dictionary<Guid, string> Bu, Dictionary<Guid, string> Site, Dictionary<Guid, string> Le)>();
@@ -454,7 +454,7 @@ internal sealed partial class RegisterQueryEngine
                 cells[col.Key] = col.Key switch
                 {
                     "agreementReference" => c.AgreementReference, "contractTitle" => c.ContractTitle, "description" => c.Description, "supplier" => r.S.Name, "supplierVendorNumber" => r.S.VendorNumber,
-                    "supplierAbn" => r.S.Abn, "supplierType" => r.S.SupplierType, "category" => r.G.Name, "status" => c.Status, "classification" => c.Classification, "contractType" => c.ContractType,
+                    "supplierAbn" => taxReadable.Contains(c.OrganisationId) ? r.S.TaxIdentifier : null, "supplierType" => r.S.SupplierType, "category" => r.G.Name, "status" => c.Status, "classification" => c.Classification, "contractType" => c.ContractType,
                     "agreementType" => c.AgreementType, "riskLevel" => c.RiskLevel, "functionCode" => c.FunctionCode,
                     "legalEntity" => c.LegalEntityId is { } le && n.Le.TryGetValue(le, out var lname) ? lname : null,
                     "businessUnit" => c.BusinessUnitId is { } bu && n.Bu.TryGetValue(bu, out var bname) ? bname : null,

@@ -14,6 +14,9 @@ public abstract class EcpPageModel : PageModel
     /// <summary>The terminology in force for this request (organisation, then solution pack, then neutral wording). Presentation only.</summary>
     protected Ecp.Host.Terminology.TermContext Terms => HttpContext.RequestServices.GetRequiredService<Ecp.Host.Terminology.TermContext>();
 
+    /// <summary>How this request shows dates, times, numbers and amounts: the formats of the organisation the page is about (see <see cref="PageFormat"/>).</summary>
+    protected PageFormat Format => HttpContext.RequestServices.GetRequiredService<PageFormat>();
+
     /// <summary>Replaces <c>[[term]]</c> tokens in a message with the organisation's own words.</summary>
     protected string T(string message) => Terms.Expand(message);
 

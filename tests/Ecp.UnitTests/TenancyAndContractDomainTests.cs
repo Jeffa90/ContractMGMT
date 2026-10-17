@@ -189,18 +189,25 @@ public class SupplierAndCategoryTests
     public void Supplier_names_normalise_for_exact_matching(string input, string expected)
         => Assert.Equal(expected, Supplier.NormaliseName(input));
 
+    // The eleven-digit rule is a pack-supplied identifier profile, not domain logic (S10): the same values are checked by the generic structural rules.
+    private static readonly Ecp.SharedKernel.Localisation.IdentifierTypeProfile ElevenDigits = new("test.eleven", "Test number", null, false, false, Ecp.SharedKernel.Localisation.IdentifierRuleKinds.Digits, "11", null, Ecp.SharedKernel.Localisation.IdentifierChecksums.None);
+
     [Theory]
     [InlineData("51 824 753 556", "51824753556")]
     [InlineData("51824753556", "51824753556")]
-    public void Valid_abns_are_normalised_to_digits(string abn, string expected)
-        => Assert.Equal(expected, Supplier.NormaliseAbn(abn));
+    public void Eleven_digit_values_are_normalised_by_the_generic_rule(string value, string expected)
+    {
+        var check = Ecp.SharedKernel.Localisation.IdentifierRules.Check(ElevenDigits, value);
+        Assert.True(check.Valid);
+        Assert.Equal(expected, check.Normalised);
+    }
 
     [Theory]
     [InlineData("1234")]
     [InlineData("5182475355A")]
     [InlineData("518247535567")]
-    public void Invalid_abns_are_rejected(string abn)
-        => Assert.Equal("invalid_abn", Assert.Throws<DomainException>(() => Supplier.NormaliseAbn(abn)).Code);
+    public void Values_that_do_not_fit_the_profile_are_rejected(string value)
+        => Assert.False(Ecp.SharedKernel.Localisation.IdentifierRules.Check(ElevenDigits, value).Valid);
 
     [Fact]
     public void Supplier_creation_requires_a_name_and_a_valid_tenant()

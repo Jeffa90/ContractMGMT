@@ -50,7 +50,8 @@ internal sealed class BatchRuntime(MigrationKernel k, IContractMigrationPort con
         {
             TenantId = k.TenantId, OrganisationId = l.Batch.OrganisationId, SourceSystem = l.Project.SourceSystem, SourceExtractedUtc = l.Project.ExtractionUtc, Project = l.Project, Batch = l.Batch,
             Definition = l.Definition, InitialStatusCode = await contracts.InitialStatusAsync(l.Batch.OrganisationId, ct), IsKnownClassification = scale.IsKnown, DefaultClassification = scale.DefaultLevel, NowUtc = k.Clock.UtcNow,
-            CustomChecker = l.Definition.Fields.Any(f => MappingCatalogue.IsCustomTarget(f.TargetField)) ? await contracts.CustomFieldCheckerAsync(l.Batch.OrganisationId, ct) : null
+            CustomChecker = l.Definition.Fields.Any(f => MappingCatalogue.IsCustomTarget(f.TargetField)) ? await contracts.CustomFieldCheckerAsync(l.Batch.OrganisationId, ct) : null,
+            IdentifierChecker = l.Definition.Fields.Any(f => f.TargetField == "supplier.taxIdentifier") ? await contracts.IdentifierCheckerAsync(l.Batch.OrganisationId, ct) : null
         };
         var snapshot = await contracts.SnapshotReferenceDataAsync(l.Batch.OrganisationId, ct);
         foreach (var s in snapshot.Suppliers) ctx.Suppliers.Add(new WorkingSupplier(s.Id, s.Name, s.NormalisedName, s.VendorNumber));

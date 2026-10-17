@@ -48,7 +48,7 @@ public static class MappingCatalogue
     public static bool IsCustomTarget(string target) => target.StartsWith(CustomPrefix, StringComparison.Ordinal) && Regex.IsMatch(target, "^custom\\.[a-z][a-z0-9_]{1,62}$", RegexOptions.NonBacktracking);
     public static string CustomKeyOf(string target) => target[CustomPrefix.Length..];
 
-    public static readonly IReadOnlyList<string> EntityFields = ["supplier.name", "supplier.vendorNumber", "category.name", "subcategory.name"];
+    public static readonly IReadOnlyList<string> EntityFields = ["supplier.name", "supplier.vendorNumber", "supplier.taxIdentifier", "category.name", "subcategory.name"];
 
     /// <summary>The fields every contract load must map.</summary>
     public static readonly IReadOnlyList<string> RequiredTargets = ["sourceRecordId", "agreementReference", "contractTitle", "status", "supplier.name", "category.name"];

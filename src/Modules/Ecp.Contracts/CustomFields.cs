@@ -107,7 +107,7 @@ internal sealed class ContractCustomFieldService(
     {
         var org = await structure.GetOrganisationAsync(organisationId, ct);
         var zone = org is null ? TimeZoneInfo.Utc : TimeZones.Find(org.TimeZoneId);
-        var culture = org is null ? CultureInfo.GetCultureInfo("en-AU") : CultureInfo.GetCultureInfo(org.CultureCode);
+        var culture = org is null || string.IsNullOrWhiteSpace(org.CultureCode) ? CultureInfo.InvariantCulture : CultureInfo.GetCultureInfo(org.CultureCode);
         return (culture, zone, TimeZones.LocalDate(clock.UtcNow, zone));
     }
 

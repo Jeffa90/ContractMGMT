@@ -39,6 +39,7 @@ localisation.Validate();
 builder.Services.AddSingleton(localisation);
 builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
 // Page text goes through the terminology-aware localiser: [[term]] tokens become the organisation's own words (see docs/TERMINOLOGY.md).
+builder.Services.AddScoped<Ecp.Host.Pages.PageFormat>();
 builder.Services.AddScoped<Ecp.Host.Terminology.TermContext>();
 builder.Services.AddScoped<Microsoft.Extensions.Localization.IStringLocalizer<SharedResource>, Ecp.Host.Terminology.TermLocalizer>();
 

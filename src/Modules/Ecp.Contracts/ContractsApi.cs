@@ -5,6 +5,7 @@ using Ecp.Contracts.Persistence;
 using Ecp.Metadata;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
+using Ecp.SharedKernel.Localisation;
 using Ecp.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,7 +27,12 @@ public sealed class ContractsOptions
 }
 
 public sealed record CreateCategoryRequest(Guid OrganisationId, string Code, string Name, Guid? ParentCategoryId = null);
-public sealed record CreateSupplierRequest(Guid OrganisationId, string Name, string? Abn = null, string? VendorNumber = null, string? SupplierType = null);
+/// <summary>
+/// A new counterparty. <see cref="TaxIdentifier"/> is a value for the organisation's primary identifier type; <see cref="Identifiers"/> are further values by type key. Either is checked against the organisation's
+/// identifier profile (docs/TAX_IDENTIFIERS.md); an organisation with no identifier profile records none. <see cref="IdentifierSource"/> says whether a person or a migration batch supplied them.
+/// </summary>
+public sealed record CreateSupplierRequest(Guid OrganisationId, string Name, string? TaxIdentifier = null, string? VendorNumber = null, string? SupplierType = null, IReadOnlyDictionary<string, string>? Identifiers = null,
+    string IdentifierSource = "Manual", string? SourceSystem = null, Guid? MigrationBatchId = null, SupplierAddress? Address = null);
 public sealed record CreateContractRequest(
     Guid OrganisationId, string AgreementReference, string Title, Guid SupplierId, Guid CategoryId, string? Description = null,
     string Classification = Classifications.Internal, string? CurrencyCode = null, decimal? EstimatedValue = null,
@@ -85,15 +91,40 @@ internal sealed class CategoryService(ContractsDbContext db, IUnitOfWork uow, IA
     }
 }
 
-internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, ITenantDirectory tenants) : ISupplierService
+internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, ITenantDirectory tenants, ISupplierIdentifierWriter identifiers,
+    Ecp.Configuration.IRegionalSettingsResolver regional) : ISupplierService
 {
     public async Task<Guid> CreateAsync(CreateSupplierRequest r, CancellationToken ct = default)
     {
         var tenantId = tenant.RequireTenantId();
         if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
             throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
-        var supplier = Supplier.Create(tenantId, r.OrganisationId, r.Name, r.Abn, r.VendorNumber, clock.UtcNow, r.SupplierType);
-        return await uow.ExecuteAsync(async c =>
+        // Identifier values are checked against the organisation's profile before anything is stored, so a refusal leaves no half-created counterparty.
+        var wanted = new List<(string Type, string Value)>();
+        var settings = await regional.GetAsync(r.OrganisationId, ct);
+        if (!string.IsNullOrWhiteSpace(r.TaxIdentifier))
+        {
+            var primary = settings.PrimaryIdentifier ?? throw new DomainException("identifier_type_unknown", "No [[supplier.tax.id]] type is set up for this [[organisation|lower]].");
+            wanted.Add((primary.Key, r.TaxIdentifier));
+        }
+        foreach (var (type, value) in r.Identifiers ?? new Dictionary<string, string>()) if (!string.IsNullOrWhiteSpace(value)) wanted.Add((type, value));
+        foreach (var (type, value) in wanted)
+        {
+            var check = await identifiers.CheckTrustedAsync(r.OrganisationId, type, value, ct);
+            if (!check.Valid) throw new DomainException(check.Code ?? "identifier_invalid", $"[[supplier.tax.id]]: {check.Message}");
+        }
+        foreach (var required in settings.Identifiers.Where(i => i.Required))
+            if (r.IdentifierSource == IdentifierSources.Manual && !wanted.Any(w => w.Type == required.Key)) throw new DomainException("identifier_required", $"{required.Label} is required.");
+        if (r.Address is { IsEmpty: false } address)
+        {
+            var problems = address.Check(settings.Address);
+            if (problems.Count > 0) throw new DomainException(problems[0].Code, "Address: " + problems[0].Message);
+        }
+        else if (settings.Address.Fields.Any(f => f.Used && f.Required) && r.IdentifierSource == IdentifierSources.Manual)
+            throw new DomainException("address_required", "The address is required.");
+        var supplier = Supplier.Create(tenantId, r.OrganisationId, r.Name, null, r.VendorNumber, clock.UtcNow, r.SupplierType);
+        if (r.Address is { IsEmpty: false } addr) supplier.SetAddress(addr);
+        var id = await uow.ExecuteAsync(async c =>
         {
             db.Suppliers.Add(supplier);
             try { await db.SaveChangesAsync(c); }
@@ -103,6 +134,8 @@ internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IA
                 NewValuesJson: AuditJson.Of(new { supplier.Name })));
             return supplier.Id;
         }, ct);
+        foreach (var (type, value) in wanted) await identifiers.RecordTrustedAsync(r.OrganisationId, id, type, value, r.IdentifierSource, r.SourceSystem, r.MigrationBatchId, ct);
+        return id;
     }
 }
 
@@ -196,6 +229,10 @@ public static class ContractsModule
         services.AddModuleDbContext<ContractsDbContext>(Name, Tier, Schema);
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<ISupplierService, SupplierService>();
+        services.AddScoped<SupplierIdentifierService>();
+        services.AddScoped<ISupplierIdentifiers>(sp => sp.GetRequiredService<SupplierIdentifierService>());
+        services.AddScoped<ISupplierIdentifierWriter>(sp => sp.GetRequiredService<SupplierIdentifierService>());
+        services.AddScoped<TaxIdentifierGate>();
         services.AddScoped<IContractService, ContractService>();
         services.AddScoped<Ecp.Documents.IDocumentParentValidator, ContractDocumentParentValidator>();
         services.AddScoped<ContractAccessContext>();

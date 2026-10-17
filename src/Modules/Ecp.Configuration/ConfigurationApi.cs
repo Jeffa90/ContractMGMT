@@ -415,6 +415,10 @@ public static class ConfigurationModule
         services.TryAddSingleton<ICapabilityCache>(_ => new CapabilityCache());
         services.AddScoped<IConfigurationKind, CapabilityKind>();
         services.AddScoped<ICapabilityResolver, CapabilityResolver>();
+        services.TryAddSingleton(new Ecp.SharedKernel.Localisation.LocalisationOptions());
+        services.TryAddSingleton<IRegionalCache>(_ => new RegionalCache());
+        services.AddScoped<IConfigurationKind, RegionalProfileKind>();
+        services.AddScoped<IRegionalSettingsResolver, RegionalResolver>();
         services.AddScoped<ICapabilityAdministration, CapabilityAdministration>();
         services.AddScoped<ITerminologyAdministration, TerminologyAdministration>();
         // Replace the default scale with the configured one (registered after the Identity module).

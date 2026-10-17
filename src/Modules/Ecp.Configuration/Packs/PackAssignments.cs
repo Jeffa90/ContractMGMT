@@ -77,6 +77,9 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
                     : hasDraft ? $"A terminology draft is already open and is kept. The pack's {count} terms apply as defaults beneath it once the pack is assigned. Nothing is published."
                     : $"The pack's {count} terms apply to this organisation as defaults as soon as the pack is assigned, and a terminology draft is prepared from them so you can review and change labels before publishing your own. Nothing is published, and no permission or workflow changes.";
             }
+            if (c.Kind == RegionalKinds.Name)
+                effect = hasRelease ? "The organisation already publishes its regional profile, which stays in force. A draft that inherits from this pack version is prepared; the pack changes no setting until it is published and the organisation can override any value."
+                    : "A regional-profile draft that inherits from this pack version is prepared so you can review the proposed locale, currency, time zone, identifier profiles and address fields, override any of them, and publish. Nothing changes until it is published.";
             if (c.Kind == CapabilityKinds.Name)
                 effect = hasRelease ? "The organisation already publishes its own capability choices, which stay in force. The pack's defaults apply only to capabilities it has not decided. No draft is created."
                     : "The pack's capability defaults apply to this organisation as soon as the pack is assigned (see the table below). No draft is created; an organisation can publish its own choice later.";
@@ -138,6 +141,8 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
                     { outcomes.Add(new PackKindOutcome(c.Kind, c.Scope, "Existing terminology kept", false, "This organisation publishes its own terminology; the pack's terms apply only where it has none.")); continue; }
                     json = TerminologyDocument.Parse(json).WithSource(packKey, version, TerminologyDocument.Overrides).ToJson();
                 }
+                // A pack's regional document is its proposal. The organisation's draft inherits from this pack version and decides nothing itself, so the organisation reviews, overrides and publishes; the pack never forces a setting.
+                if (c.Kind == RegionalKinds.Name) json = RegionalProfileDocument.Parse(json).InheritingFrom(packKey, version).ToJson();
                 var draft = await configuration.GetOrCreateDraftAsync(c.Kind, scopeOrg, json, ct);
                 var validated = await configuration.ValidateAsync(draft.Id, ct);
                 var errorMessages = validated.Validation?.Messages.Where(m => m.Severity == ValidationSeverity.Error).ToList() ?? [];

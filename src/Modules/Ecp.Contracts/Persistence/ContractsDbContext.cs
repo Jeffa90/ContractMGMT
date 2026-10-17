@@ -13,6 +13,7 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<CategoryAssignment> CategoryAssignments => Set<CategoryAssignment>();
     public DbSet<ReferenceCounter> ReferenceCounters => Set<ReferenceCounter>();
+    public DbSet<SupplierIdentifier> SupplierIdentifiers => Set<SupplierIdentifier>();
     public DbSet<ContractCustomValue> CustomValues => Set<ContractCustomValue>();
     public DbSet<SavedView> SavedViews => Set<SavedView>();
     protected override string SchemaName => ContractsModule.Schema;
@@ -97,8 +98,15 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.Property(x => x.Name).HasMaxLength(300).IsRequired();
             e.Property(x => x.NormalisedName).HasMaxLength(300).IsRequired();
             e.Property(x => x.LegalName).HasMaxLength(300);
-            e.Property(x => x.Abn).HasMaxLength(11).IsFixedLength();
+            e.Property(x => x.TaxIdentifier).HasColumnName("Abn").HasMaxLength(64);
             e.Property(x => x.VendorNumber).HasMaxLength(50);
+            e.Property(x => x.AddressLine1).HasMaxLength(200);
+            e.Property(x => x.AddressLine2).HasMaxLength(200);
+            e.Property(x => x.AddressLocality).HasMaxLength(100);
+            e.Property(x => x.AddressRegion).HasMaxLength(100);
+            e.Property(x => x.AddressPostal).HasMaxLength(30);
+            e.Property(x => x.AddressCountry).HasMaxLength(100);
+            e.Ignore(x => x.Address);
             e.Property(x => x.SupplierType).HasMaxLength(100);
             e.Property(x => x.Status).HasMaxLength(20);
             e.Property(x => x.SourceSystem).HasMaxLength(100);
@@ -109,6 +117,27 @@ public sealed class ContractsDbContext(DbContextOptions<ContractsDbContext> opti
             e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.SupplierType });
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.VendorNumber }).IsUnique().HasFilter("[VendorNumber] IS NOT NULL");
+        });
+
+        mb.Entity<SupplierIdentifier>(e =>
+        {
+            e.ToTable("SupplierIdentifier");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.TypeKey).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Value).HasMaxLength(80).IsRequired();
+            e.Property(x => x.NormalisedValue).HasMaxLength(80).IsRequired();
+            e.Property(x => x.VerificationStatus).HasMaxLength(20).IsRequired();
+            e.Property(x => x.VerificationProviderKey).HasMaxLength(100);
+            e.Property(x => x.Classification).HasMaxLength(30).IsRequired();
+            e.Property(x => x.SourceKind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.SourceSystem).HasMaxLength(100);
+            e.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
+            e.Property(x => x.RowVersion);
+            e.Ignore(x => x.IsActive);
+            e.HasIndex(x => new { x.TenantId, x.SupplierId, x.TypeKey });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.TypeKey, x.NormalisedValue });
+            e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
         });
 
         mb.Entity<Contract>(e =>

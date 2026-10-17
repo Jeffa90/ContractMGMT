@@ -13,7 +13,7 @@ namespace Ecp.Host.Terminology;
 /// never query for a label. A page that is about one organisation's record (a contract, a supplier) calls <see cref="UseOrganisationAsync"/> so that record is described in its own organisation's words.
 /// Terminology is presentation only: nothing here decides what a person may see or do.
 /// </summary>
-public sealed class TermContext(ITerminologyResolver resolver, ICapabilityResolver capabilities, ITenantContext tenant, ILogger<TermContext> logger)
+public sealed class TermContext(ITerminologyResolver resolver, ICapabilityResolver capabilities, ITenantContext tenant, Ecp.Host.Pages.PageFormat format, ILogger<TermContext> logger)
 {
     private bool _loaded;
     private IReadOnlySet<string> _anywhere = new HashSet<string>(CapabilityKeys.All, StringComparer.Ordinal);
@@ -31,6 +31,7 @@ public sealed class TermContext(ITerminologyResolver resolver, ICapabilityResolv
         try { if (signedIn) home = await resolver.HomeOrganisationAsync(ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "The home organisation for terminology could not be determined; the installation wording is used."); }
         await LoadAsync(home, ct);
+        await format.UseAsync(home, ct);
         try { if (signedIn) _anywhere = await capabilities.EnabledForCurrentPersonAsync(ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "The capabilities in reach could not be determined; every capability is treated as on."); }
     }
@@ -50,6 +51,7 @@ public sealed class TermContext(ITerminologyResolver resolver, ICapabilityResolv
         _loaded = true;
         if (OrganisationId == organisationId && _record is not null) return;
         await LoadAsync(organisationId, ct);
+        await format.UseAsync(organisationId, ct);
         try { _record = await capabilities.GetAsync(organisationId, ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "The capabilities of the organisation could not be resolved; every capability is treated as on."); _record = CapabilitySet.Default; }
     }
@@ -123,11 +125,16 @@ public sealed class TermLocalizer(IStringLocalizerFactory factory, TermContext t
 /// <summary>Loads the request's terminology before any page runs. Static files, health and API calls do not need it.</summary>
 public sealed class TermMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, TermContext terms)
+    public async Task InvokeAsync(HttpContext context, TermContext terms, Ecp.Host.Pages.PageFormat format)
     {
         var path = context.Request.Path;
         if (!path.StartsWithSegments("/api") && !path.StartsWithSegments("/health") && !path.StartsWithSegments("/css"))
+        {
             await terms.InitialiseAsync(context.User.Identity?.IsAuthenticated == true, context.RequestAborted);
+            // The ambient culture of the request follows the person's home organisation, so any value formatted without an explicit formatter still reads in that organisation's locale rather than the server's.
+            // The page language (the UI culture) is separate and is not touched. With no organisation settings the culture is left alone.
+            if (format.OrganisationId is not null && format.Formatter.Culture.Name.Length > 0) CultureInfo.CurrentCulture = format.Formatter.Culture;
+        }
         await next(context);
     }
 }

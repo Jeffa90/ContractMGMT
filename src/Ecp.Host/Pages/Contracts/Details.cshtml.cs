@@ -39,7 +39,7 @@ public sealed class DetailsModel(ISecuredContractService contracts, ISecuredCont
     {
         Contract = await contracts.GetAsync(id, ct);
         await Terms.UseOrganisationAsync(Contract.OrganisationId, ct);
-        var fmt = await OrgLocale.ForAsync(organisations, Contract.OrganisationId, ct);
+        var fmt = Format.Formatter;
         var structure = await organisations.GetAsync(Contract.OrganisationId, ct);
         OrganisationName = (await organisations.GetOrganisationAsync(Contract.OrganisationId, ct))?.Name ?? "";
         BusinessUnitName = structure.BusinessUnits.FirstOrDefault(b => b.Id == Contract.BusinessUnitId)?.Name;

@@ -36,7 +36,7 @@ public interface IContractRegister
 }
 
 internal sealed partial class RegisterQueryEngine(
-    ContractsDbContext db, IAccessService access, ContractAccessContext context, ICustomFieldCatalogue customCatalogue, IClock clock, IOrganisationStructureService structure,
+    ContractsDbContext db, IAccessService access, ContractAccessContext context, ICustomFieldCatalogue customCatalogue, IClock clock, IOrganisationStructureService structure, TaxIdentifierGate taxGate,
     IEnumerable<IContractSetProvider> setProviders, IEnumerable<IStatusGroupProvider> statusGroups, IPeopleDirectory people, Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.ICapabilityResolver capabilities) : IContractRegister
 {
     public const int MaxPageSize = 200, DefaultPageSize = 25, MaxFilters = 20, MaxSorts = 3, MaxValues = 50, MaxColumns = 30, MaxTokens = 5, MaxText = 200;
@@ -211,6 +211,9 @@ internal sealed partial class RegisterQueryEngine(
         if (!q.IncludeArchived) cq = cq.Where(c => !c.IsArchived);
         if (q.OrganisationId is { } onlyOrg) cq = cq.Where(c => c.OrganisationId == onlyOrg);
         var sq = db.Suppliers.AsNoTracking();
+        // The primary tax identifier is shown, searched, filtered and sorted only in the organisations where the caller may read its classification (docs/TAX_IDENTIFIERS.md).
+        var taxOrgs = grants.Any(g => g.OrganisationIds is null) ? (await structure.ListOrganisationsAsync(ct)).Select(o => o.Id).ToList() : grants.SelectMany(g => g.OrganisationIds!).Distinct().ToList();
+        var taxReadable = await taxGate.ReadableOrganisationsAsync(grants, taxOrgs, ct);
 
         var org = catalogue.OrganisationId;
         var set = org is { } oid ? await customCatalogue.PublishedAsync(oid, ct) : CustomFieldSet.Empty;
@@ -221,7 +224,7 @@ internal sealed partial class RegisterQueryEngine(
 
         // Typed filters are applied to the contracts and suppliers before they are joined, so each is one narrow predicate the database can use an index for.
         foreach (var f in q.Filters ?? [])
-            (cq, sq) = await ApplyFilterAsync(cq, sq, f, catalogue, set, listCtx, vis, today, now, ct);
+            (cq, sq) = await ApplyFilterAsync(cq, sq, f, catalogue, set, taxReadable, listCtx, vis, today, now, ct);
 
         var rows = from c in cq
                    join s in sq on new { c.TenantId, Id = c.SupplierId } equals new { s.TenantId, s.Id }
@@ -238,15 +241,15 @@ internal sealed partial class RegisterQueryEngine(
             var custom = SearchableMatches(set, catalogue, t, vis);
             rows = custom is null
                 ? rows.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
-                    || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)))
+                    || (r.S.TaxIdentifier != null && taxReadable.Contains(r.C.OrganisationId) && r.S.TaxIdentifier.Contains(upper)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)))
                 : rows.Where(r => r.C.AgreementReference.Contains(upper) || r.C.ContractTitle.ToUpper().Contains(upper) || r.S.NormalisedName.Contains(upper) || (r.S.VendorNumber != null && r.S.VendorNumber.ToUpper().Contains(upper))
-                    || (r.S.Abn != null && r.S.Abn.Contains(t)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)) || custom.Contains(r.C.Id));
+                    || (r.S.TaxIdentifier != null && taxReadable.Contains(r.C.OrganisationId) && r.S.TaxIdentifier.Contains(upper)) || (r.C.SapOutlineAgreementNumber != null && r.C.SapOutlineAgreementNumber.ToUpper().Contains(upper)) || custom.Contains(r.C.Id));
         }
 
         var total = await rows.CountAsync(ct);
-        var ordered = ApplySorts(rows, q.Sorts ?? [], catalogue, set, vis);
+        var ordered = ApplySorts(rows, q.Sorts ?? [], catalogue, set, taxReadable, vis);
         var pageRows = await ordered.Skip((page - 1) * size).Take(size).ToListAsync(ct);
-        var cells = await BuildRowsAsync(pageRows, columns, set, scale, vis, ct);
+        var cells = await BuildRowsAsync(pageRows, columns, set, scale, taxReadable, vis, ct);
         return new RegisterPage(columns, cells, total, page, size, notes);
     }
 

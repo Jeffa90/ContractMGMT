@@ -37,6 +37,12 @@ public interface IOrganisationStructureService
     /// </summary>
     Task SetSolutionPackAsync(Guid organisationId, string solutionPackKey, CancellationToken ct = default);
 
+    /// <summary>
+    /// Records the organisation's effective locale, time zone and default currency. A trusted operation for the regional-profile configuration kind, which has validated and authorised the change; audited with the old and new values.
+    /// Nothing stored in UTC and no existing amount changes.
+    /// </summary>
+    Task SetRegionalAsync(Guid organisationId, string timeZoneId, string cultureCode, string defaultCurrencyCode, CancellationToken ct = default);
+
     /// <summary>Creates or updates the item with this key in the organisation (idempotent; reactivates an inactive item).</summary>
     Task<Guid> UpsertLegalEntityAsync(Guid organisationId, string key, string name, string? registrationNumber, CancellationToken ct = default);
     Task<Guid> UpsertDivisionAsync(Guid organisationId, string key, string name, CancellationToken ct = default);
@@ -67,6 +73,20 @@ internal sealed class OrganisationStructureService(TenancyDbContext db, IUnitOfW
             await db.SaveChangesAsync(c);
             audit.Record(new AuditEntry("organisation.solution_pack.set", "Organisation", organisationId.ToString(), OrganisationId: organisationId,
                 OldValuesJson: System.Text.Json.JsonSerializer.Serialize(new { solutionPackKey = before }), NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { solutionPackKey })));
+        }, ct);
+    }
+
+    public async Task SetRegionalAsync(Guid organisationId, string timeZoneId, string cultureCode, string defaultCurrencyCode, CancellationToken ct = default)
+    {
+        await uow.ExecuteAsync(async c =>
+        {
+            var org = await db.Organisations.FirstOrDefaultAsync(o => o.Id == organisationId, c) ?? throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
+            var before = new { timeZoneId = org.TimeZoneId, cultureCode = org.CultureCode, defaultCurrencyCode = org.DefaultCurrencyCode };
+            org.SetRegional(timeZoneId, cultureCode, defaultCurrencyCode);
+            if (before.timeZoneId == org.TimeZoneId && before.cultureCode == org.CultureCode && before.defaultCurrencyCode == org.DefaultCurrencyCode) return;
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("organisation.regional.set", "Organisation", organisationId.ToString(), OrganisationId: organisationId,
+                OldValuesJson: System.Text.Json.JsonSerializer.Serialize(before), NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { timeZoneId = org.TimeZoneId, cultureCode = org.CultureCode, defaultCurrencyCode = org.DefaultCurrencyCode })));
         }, ct);
     }
 

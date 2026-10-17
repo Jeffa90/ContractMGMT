@@ -11,6 +11,8 @@ namespace Ecp.DataMigration.Planning;
 /// <summary>A supplier as the planner sees it: an existing one, or one an earlier row of the same batch will create.</summary>
 internal sealed class WorkingSupplier(Guid? id, string name, string normalised, string? vendorNumber)
 {
+    /// <summary>The tax identifier the first row that creates this counterparty carries (as the source gave it, already checked against the organisation's primary identifier type).</summary>
+    public string? TaxIdentifier { get; set; }
     public Guid? Id { get; set; } = id;
     public string Name { get; } = name;
     public string Normalised { get; } = normalised;
@@ -77,6 +79,8 @@ internal sealed class PlanContext
     public required DateTime NowUtc { get; init; }
     /// <summary>Checks additional field values against the published definitions; null when the batch maps none.</summary>
     public IMigrationCustomChecker? CustomChecker { get; init; }
+    /// <summary>Checks the tax identifier column against the organisation's primary identifier type; null when the batch maps none.</summary>
+    public IMigrationIdentifierChecker? IdentifierChecker { get; init; }
     public List<WorkingSupplier> Suppliers { get; } = [];
     public List<WorkingCategory> Categories { get; } = [];
     public Dictionary<string, ExistingContractRef> ExistingBySource { get; } = new(StringComparer.Ordinal);
@@ -393,6 +397,14 @@ internal static class RowPlanner
         var vendor = mapped.Values.GetValueOrDefault("supplier.vendorNumber")?.Trim();
         if (vendor is { Length: > 50 }) { plan.Messages.Add(new(true, "MIG-E009", "supplier.vendorNumber", "The [[supplier.number]] is longer than 50 characters. It is not shortened.")); return; }
         var normalised = Supplier.NormaliseName(name);
+        var taxIdentifier = mapped.Values.GetValueOrDefault("supplier.taxIdentifier")?.Trim();
+        if (!string.IsNullOrEmpty(taxIdentifier))
+        {
+            // A structural check against the organisation's own identifier profile; nothing is looked up anywhere and a valid format proves nothing about registration.
+            if (ctx.IdentifierChecker is not { TypeKey: not null } checker) { plan.Messages.Add(new(true, "MIG-E028", "supplier.taxIdentifier", "No [[supplier.tax.id]] type is set up for this [[organisation|lower]], so the column cannot be loaded.")); return; }
+            var check = checker.Check(taxIdentifier);
+            if (!check.Valid) { plan.Messages.Add(new(true, "MIG-E027", "supplier.taxIdentifier", $"The {checker.Label ?? "identifier"} '{taxIdentifier}' does not fit its type: {check.Message}")); return; }
+        }
 
         WorkingSupplier? chosen = null;
         if (!string.IsNullOrEmpty(vendor))
@@ -422,7 +434,7 @@ internal static class RowPlanner
         }
         if (chosen is null)
         {
-            chosen = new WorkingSupplier(null, name, normalised, string.IsNullOrEmpty(vendor) ? null : vendor);
+            chosen = new WorkingSupplier(null, name, normalised, string.IsNullOrEmpty(vendor) ? null : vendor) { TaxIdentifier = string.IsNullOrEmpty(taxIdentifier) ? null : taxIdentifier };
             ctx.Suppliers.Add(chosen); // later rows in this batch find it
         }
         plan.Supplier = chosen;

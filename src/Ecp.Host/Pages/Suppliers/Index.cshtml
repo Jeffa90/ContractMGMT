@@ -12,7 +12,7 @@
     <caption class="visually-hidden">@L["[[supplier|plural]]"]</caption>
     <thead><tr><th scope="col">@L["Name"]</th><th scope="col">@L["[[supplier.number]]"]</th><th scope="col">@L["[[supplier.tax.id]]"]</th><th scope="col">@L["[[organisation]]"]</th></tr></thead>
     <tbody>
-    @foreach (var s in Model.Suppliers) { <tr><th scope="row"><a href="/Suppliers/Details/@s.Id">@s.Name</a></th><td>@s.VendorNumber</td><td>@s.Abn</td><td>@Model.OrganisationName(s.OrganisationId)</td></tr> }
+    @foreach (var s in Model.Suppliers) { <tr><th scope="row"><a href="/Suppliers/Details/@s.Id">@s.Name</a></th><td>@s.VendorNumber</td><td>@s.TaxIdentifier</td><td>@Model.OrganisationName(s.OrganisationId)</td></tr> }
     @if (Model.Suppliers.Count == 0) { <tr><td colspan="4">@L["No [[supplier|plural|lower]] are visible to you."]</td></tr> }
     </tbody>
 </table>

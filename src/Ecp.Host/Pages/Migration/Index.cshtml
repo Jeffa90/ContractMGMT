@@ -2,15 +2,15 @@
 @model Ecp.Host.Pages.Migration.IndexModel
 @{ ViewData["Title"] = L["Data migration"].Value; }
 <h1>@L["Data migration"]</h1>
-<p class="lede">@L["Move suppliers, contracts and documents from a previous system. You load a contracts file, an attachment manifest and an attachment archive, run a dry run that changes nothing, review the errors, commit in checked stages, reconcile the totals, and record the business owner's acceptance. Until acceptance a batch can be rolled back."]</p>
+<p class="lede">@L["Move [[supplier|plural|lower]], [[contract|plural|lower]] and [[document|plural|lower]] from a previous system. You load a [[contract|plural|lower]] file, an attachment manifest and an attachment archive, run a dry run that changes nothing, review the errors, commit in checked stages, reconcile the totals, and record the business owner's acceptance. Until acceptance [[migration.batch|lower|a]] can be rolled back."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <p><a class="button secondary" href="/Migration/Profiles">@L["Mapping profiles"]</a></p>
 
-<h2>@L["Migration projects"]</h2>
+<h2>@L["[[migration.project|plural|sentence]]"]</h2>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Migration projects"]</caption>
-    <thead><tr><th scope="col">@L["Project"]</th><th scope="col">@L["Source system"]</th><th scope="col">@L["Data owner"]</th><th scope="col">@L["Extracted"]</th><th scope="col">@L["Batches"]</th><th scope="col">@L["Status"]</th></tr></thead>
+    <caption class="visually-hidden">@L["[[migration.project|plural|sentence]]"]</caption>
+    <thead><tr><th scope="col">@L["[[migration.project]]"]</th><th scope="col">@L["Source system"]</th><th scope="col">@L["Data owner"]</th><th scope="col">@L["Extracted"]</th><th scope="col">@L["[[migration.batch|plural]]"]</th><th scope="col">@L["Status"]</th></tr></thead>
     <tbody>
     @foreach (var p in Model.Projects)
     {
@@ -19,21 +19,21 @@
             <td>@p.SourceSystem @p.SourceSystemVersion</td><td>@p.DataOwner</td><td>@p.ExtractionUtc.ToString("yyyy-MM-dd") UTC</td><td>@p.BatchCount</td><td>@p.Status</td>
         </tr>
     }
-    @if (Model.Projects.Count == 0) { <tr><td colspan="6">@L["There are no migration projects yet."]</td></tr> }
+    @if (Model.Projects.Count == 0) { <tr><td colspan="6">@L["There are no [[migration.project|plural|lower]] yet."]</td></tr> }
     </tbody>
 </table>
 </div>
 
-<h2>@L["Start a migration project"]</h2>
+<h2>@L["Start [[migration.project|lower|a]]"]</h2>
 <form method="post" class="card">
-    <div class="field"><label for="OrganisationId">@L["Organisation"]</label>
+    <div class="field"><label for="OrganisationId">@L["[[organisation]]"]</label>
         <select id="OrganisationId" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
-    <div class="field"><label for="Name">@L["Project name"]</label><input id="Name" name="Name" type="text" value="@Model.Name" maxlength="200" required /></div>
+    <div class="field"><label for="Name">@L["[[migration.project]] name"]</label><input id="Name" name="Name" type="text" value="@Model.Name" maxlength="200" required /></div>
     <div class="field"><label for="SourceSystem">@L["Source system"]</label><input id="SourceSystem" name="SourceSystem" type="text" value="@Model.SourceSystem" maxlength="100" required aria-describedby="ss-hint" />
         <p class="hint" id="ss-hint">@L["The name of the system the data comes from. It is part of each record's identity, so a record loaded twice is recognised."]</p></div>
     <div class="field"><label for="SourceSystemVersion">@L["Source system version (optional)"]</label><input id="SourceSystemVersion" name="SourceSystemVersion" type="text" value="@Model.SourceSystemVersion" maxlength="100" /></div>
     <div class="field"><label for="DataOwner">@L["Data owner"]</label><input id="DataOwner" name="DataOwner" type="text" value="@Model.DataOwner" maxlength="200" required />
         <p class="hint">@L["The person accountable for the source data and for accepting the result."]</p></div>
     <div class="field"><label for="ExtractionDate">@L["Date the data was extracted (UTC)"]</label><input id="ExtractionDate" name="ExtractionDate" type="date" value="@Model.ExtractionDate.ToString("yyyy-MM-dd")" required /></div>
-    <div class="actions"><button type="submit">@L["Create project"]</button></div>
+    <div class="actions"><button type="submit">@L["Create [[migration.project|lower]]"]</button></div>
 </form>

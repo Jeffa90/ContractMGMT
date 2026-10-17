@@ -22,9 +22,9 @@ public sealed class CreateModel(ISecuredSupplierService suppliers, IOrganisation
         await LoadAsync(ct);
         return await RunAsync(async () =>
         {
-            if (OrganisationId is null || string.IsNullOrWhiteSpace(Name)) { ModelState.AddModelError(nameof(Name), "Enter the supplier name."); return Page(); }
+            if (OrganisationId is null || string.IsNullOrWhiteSpace(Name)) { ModelState.AddModelError(nameof(Name), "Enter the [[supplier|lower]] name."); return Page(); }
             var id = await suppliers.CreateAsync(new CreateSupplierRequest(OrganisationId.Value, Name, string.IsNullOrWhiteSpace(Abn) ? null : Abn, string.IsNullOrWhiteSpace(VendorNumber) ? null : VendorNumber), ct);
-            Flash("Supplier added.");
+            Flash("[[supplier]] added.");
             return RedirectToPage("Details", new { id });
         });
     }

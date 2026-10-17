@@ -97,7 +97,7 @@ internal sealed class ApprovalMatrixStore(IServiceProvider services) : IApproval
         => Parsed.GetOrAdd(hash, _ =>
         {
             var (set, messages) = MatrixParser.Parse(json);
-            return set ?? throw new DomainException("matrix_unreadable", "The approval matrix could not be read: " + string.Join("; ", messages.Select(x => x.Message)));
+            return set ?? throw new DomainException("matrix_unreadable", "The [[approval|lower]] matrix could not be read: " + string.Join("; ", messages.Select(x => x.Message)));
         });
 
     public async Task<LoadedMatrices?> TryLoadPublishedAsync(Guid organisationId, CancellationToken ct = default)
@@ -113,18 +113,18 @@ internal sealed class ApprovalMatrixStore(IServiceProvider services) : IApproval
         {
             case MatrixSourceKind.Published:
                 return await TryLoadPublishedAsync(organisationId, ct)
-                    ?? throw new DomainException("matrix_not_published", "No approval matrix has been published for this organisation. An administrator must publish one before it can be used.");
+                    ?? throw new DomainException("matrix_not_published", "No [[approval|lower]] matrix has been published for this [[organisation|lower]]. An administrator must publish one before it can be used.");
             case MatrixSourceKind.Release:
             {
                 var n = source.ReleaseNumber ?? throw new DomainException("release_required", "Give the release number to use.");
                 var r = (await configuration.ReleasesAsync(ApprovalsModule.MatrixKind, organisationId, ct)).FirstOrDefault(x => x.Number == n)
-                    ?? throw new DomainException("release_not_found", $"There is no release {n} of the approval matrix.");
+                    ?? throw new DomainException("release_not_found", $"There is no release {n} of the [[approval|lower]] matrix.");
                 return new LoadedMatrices(Read(r.ContentJson, r.ContentHash), r.Number, r.Id, r.ContentHash, $"release {r.Number} (history)", r.ContentJson);
             }
             default:
             {
                 var d = await configuration.FindOpenDraftAsync(ApprovalsModule.MatrixKind, organisationId, ct)
-                    ?? throw new DomainException("no_draft", "There is no open draft of the approval matrix.");
+                    ?? throw new DomainException("no_draft", "There is no open draft of the [[approval|lower]] matrix.");
                 var (set, messages) = MatrixParser.Parse(d.ContentJson);
                 if (set is null) throw new DomainException("draft_unreadable", "The draft cannot be read: " + string.Join("; ", messages.Select(x => x.Message)));
                 return new LoadedMatrices(set, null, null, Hash(d.ContentJson), "your open draft (not published)", d.ContentJson);

@@ -11,7 +11,7 @@
     <tbody>
     @foreach (var u in Model.People)
     {
-        <tr><th scope="row"><a href="/Admin/Users/Details/@u.Id">@u.DisplayName</a></th><td>@u.Email</td><td>@u.Status</td><td>@(u.Roles.Count == 0 ? "-" : string.Join(", ", u.Roles))</td></tr>
+        <tr><th scope="row"><a href="/Admin/Users/Details/@u.Id">@u.DisplayName</a></th><td>@u.Email</td><td>@u.Status</td><td>@(u.Roles.Count == 0 ? "-" : string.Join(", ", u.Roles.Select(Terms.Role)))</td></tr>
     }
     </tbody>
 </table>

@@ -1,9 +1,9 @@
 @page "/Migration/Batches/{id:guid}/Reconciliation"
 @model Ecp.Host.Pages.Migration.ReconciliationModel
 @{ ViewData["Title"] = L["Reconciliation"].Value; var r = Model.Report; }
-<p><a href="/Migration/Batches/@Model.BatchId#reconcile">&larr; @L["Back to the batch"]</a></p>
+<p><a href="/Migration/Batches/@Model.BatchId#reconcile">&larr; @L["Back to the [[migration.batch|lower]]"]</a></p>
 <h1>@L["Reconciliation report"]</h1>
-<p class="lede">@L["A batch is not complete until the totals balance, or the exceptions are approved and recorded."]</p>
+<p class="lede">@L["[[migration.batch|lower|a|cap]] is not complete until the totals balance, or the exceptions are approved and recorded."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <p><span class="badge @(r.Balanced ? "ok" : "bad")">@(r.Balanced ? L["Balanced"].Value : L["Does not balance"].Value)</span>
 @if (r.ExceptionsApproved) { <span class="badge warn">@L["Exceptions approved by"] @r.ApprovedBy</span> }
@@ -40,7 +40,7 @@
         <tr><th scope="row">@L["duplicates handled"]</th><td>@r.Files.DuplicateHandled</td></tr>
         <tr><th scope="row">@L["unmatched (still in the queue)"]</th><td>@r.Files.Unmatched</td></tr>
         <tr><th scope="row">@L["discarded"]</th><td>@r.Files.Discarded</td></tr>
-        <tr><th scope="row">@L["Documents created"]</th><td>@r.Files.DocumentsCreated</td></tr>
+        <tr><th scope="row">@L["[[document|plural]] created"]</th><td>@r.Files.DocumentsCreated</td></tr>
     </tbody>
 </table>
 <p class="hint">@L["Manifest rows = paired + orphan + invalid. Files = imported + failed + invalid + duplicates handled + unmatched + discarded."]</p>
@@ -51,7 +51,7 @@
     <thead><tr><th scope="col">@L["Measure"]</th><th scope="col">@L["Key"]</th><th scope="col">@L["Source"]</th><th scope="col">@L["Target"]</th></tr></thead>
     <tbody>
     @foreach (var k in r.Distributions.SourceStatus.Keys.Union(r.Distributions.TargetStatus.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["Status"]</th><td>@k</td><td>@r.Distributions.SourceStatus.GetValueOrDefault(k)</td><td>@r.Distributions.TargetStatus.GetValueOrDefault(k)</td></tr> }
-    @foreach (var k in r.Distributions.SourceCategory.Keys.Union(r.Distributions.TargetCategory.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["Category"]</th><td>@k</td><td>@r.Distributions.SourceCategory.GetValueOrDefault(k)</td><td>@r.Distributions.TargetCategory.GetValueOrDefault(k)</td></tr> }
+    @foreach (var k in r.Distributions.SourceCategory.Keys.Union(r.Distributions.TargetCategory.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["[[category]]"]</th><td>@k</td><td>@r.Distributions.SourceCategory.GetValueOrDefault(k)</td><td>@r.Distributions.TargetCategory.GetValueOrDefault(k)</td></tr> }
     @foreach (var k in r.Distributions.SourceValueByCurrency.Keys.Union(r.Distributions.TargetValueByCurrency.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["Estimated value"]</th><td>@k</td><td>@r.Distributions.SourceValueByCurrency.GetValueOrDefault(k).ToString("N2")</td><td>@r.Distributions.TargetValueByCurrency.GetValueOrDefault(k).ToString("N2")</td></tr> }
     </tbody>
 </table></div>

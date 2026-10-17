@@ -6,7 +6,7 @@
     <dt>@L["Deployment"]</dt><dd>@(Model.Deployment ?? "-")</dd>
     <dt>@L["Version"]</dt><dd>@Model.Version</dd>
     <dt>@L["Setup complete"]</dt><dd>@(Model.SetupComplete ? "Yes (" + Model.CompletedUtc?.ToString("yyyy-MM-dd HH:mm") + " UTC)" : "No")</dd>
-    <dt>@L["Solution pack"]</dt><dd>@(Model.SolutionPack ?? "-")</dd>
+    <dt>@L["[[solution.pack|sentence]]"]</dt><dd>@(Model.SolutionPack ?? "-")</dd>
     <dt>@L["Administrators"]</dt><dd>@(Model.Administrators.Count == 0 ? "-" : string.Join(", ", Model.Administrators))</dd>
 </dl>
 @foreach (var n in Model.Notes) { <p class="flash warn" role="note">@n</p> }

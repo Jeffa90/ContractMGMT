@@ -32,7 +32,7 @@ else
         <form method="post" asp-page-handler="Rollback" class="card">
             <input type="hidden" name="organisationId" value="@Model.OrganisationId" /><input type="hidden" name="kind" value="@Model.Kind" />
             <h2>@L["Restore an earlier version"]</h2>
-            <p class="hint">@L["The earlier content is published again as a new release; nothing is erased. A restore is refused if it would remove a field or choice that contracts now use."]</p>
+            <p class="hint">@L["The earlier content is published again as a new release; nothing is erased. A restore is refused if it would remove a field or choice that [[contract|plural|lower]] now use."]</p>
             <div class="field"><label for="ToRelease">@L["Release to restore"]</label><select id="ToRelease" name="ToRelease">@foreach (var (r, _) in Model.Releases.Where(x => x.Release.Number != Model.Current)) { <option value="@r.Number">@r.Number</option> }</select></div>
             <div class="field"><label for="Reason">@L["Reason"]</label><input id="Reason" name="Reason" type="text" maxlength="500" required /></div>
             <button type="submit">@L["Restore"]</button>

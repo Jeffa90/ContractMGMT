@@ -35,11 +35,11 @@ public sealed class AddDocumentModel(ISecuredContractService contracts, ISecured
             await documents.AddVersionAsync(new AddContractDocumentVersionRequest(existing, name, file.ContentType, stream, VersionLabel), ct);
         else
         {
-            if (!(await lifecycle.StateAsync(id, ct)).UploadTypes.Contains(DocumentType)) throw new Ecp.SharedKernel.DomainException("document_type", "Choose one of the document types listed.");
+            if (!(await lifecycle.StateAsync(id, ct)).UploadTypes.Contains(DocumentType)) throw new Ecp.SharedKernel.DomainException("document_type", "Choose one of the [[document|lower]] types listed.");
             await documents.AddAsync(new AddContractDocumentRequest(id, DocumentType, string.IsNullOrWhiteSpace(Title) ? Path.GetFileNameWithoutExtension(name) : Title!, name, file.ContentType, stream,
                 string.IsNullOrWhiteSpace(Classification) ? null : Classification, VersionLabel), ct);
         }
-        Flash("The document is added. It is scanned first and can be downloaded once it has passed.");
+        Flash("The [[document|lower]] is added. It is scanned first and can be downloaded once it has passed.");
         return RedirectToPage(new { id });
     }, () => LoadAsync(id, ct));
 }

@@ -8,6 +8,6 @@ public static class PackKinds
 {
     public static readonly IReadOnlyList<string> Packable =
     [
-        "WorkflowContractLifecycle", "WorkflowVariation", "NotificationPolicy", "ApprovalMatrix", "ClassificationPolicy", "CustomField", "ContractListView", "Branding"
+        "WorkflowContractLifecycle", "WorkflowVariation", "NotificationPolicy", "ApprovalMatrix", "ClassificationPolicy", "CustomField", "ContractListView", "Branding", "Terminology"
     ];
 }

@@ -150,7 +150,7 @@ public sealed class TestApp : IAsyncDisposable
         services.AddAuditModule();
         services.AddTenancyModule();
         services.AddIdentityModule(o => o.Mode = setupMode);
-        services.AddConfigurationModule(packs: o =>
+        services.AddConfigurationModule(o => o.DefaultPackId = TestPacks.Reference, packs: o =>
         {
             // Shipped packs are external files, built from the pack sources. Production hosts see the copy signed by a throw-away key that only this process knows and trusts.
             var production = setupMode == EcpMode.Production;

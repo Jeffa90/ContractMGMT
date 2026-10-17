@@ -2,7 +2,7 @@
 @model IndexModel
 @{ ViewData["Title"] = L["Home"].Value; }
 <h1>@L["Home"]</h1>
-<p class="lede">@L["Your view of the contract register is limited to the organisations, categories, business units, sites and classifications assigned to you."]</p>
+<p class="lede">@L["Your view of the [[contract.register|lower]] is limited to the [[organisation|plural|lower]], [[category|plural|lower]], [[business.unit|plural|lower]], [[site|plural|lower]] and classifications assigned to you."]</p>
 
 @if (Model.Roles.Count > 0)
 {
@@ -15,7 +15,7 @@
                 <tbody>
                 @foreach (var r in Model.Roles)
                 {
-                    <tr><td>@r.Role</td><td>@r.Scope</td><td>@r.Ceiling</td></tr>
+                    <tr><td>@Terms.Role(r.Role)</td><td>@r.Scope</td><td>@r.Ceiling</td></tr>
                 }
                 </tbody>
             </table>
@@ -30,8 +30,8 @@ else
 @if (Model.CanReadContracts)
 {
     <section aria-labelledby="counts-h">
-        <h2 id="counts-h">@L["Contracts you can see"]</h2>
-        @if (Model.StatusCounts.Count == 0) { <p>@L["No contracts are visible to you."]</p> }
+        <h2 id="counts-h">@L["[[contract|plural]] you can see"]</h2>
+        @if (Model.StatusCounts.Count == 0) { <p>@L["No [[contract|plural|lower]] are visible to you."]</p> }
         else
         {
             <div class="grid">
@@ -41,6 +41,6 @@ else
                 }
             </div>
         }
-        <p><a class="button" href="/Contracts">@L["Open the contract register"]</a></p>
+        <p><a class="button" href="/Contracts">@L["Open the [[contract.register|lower]]"]</a></p>
     </section>
 }

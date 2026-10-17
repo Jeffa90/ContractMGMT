@@ -90,10 +90,10 @@ internal sealed class OnboardingApplier(
         // --- people -------------------------------------------------------------------------------------------------------------------------
         async Task<Guid> UserAsync(string email)
             => (await users.FindByEmailAsync(email, ct))?.Id ?? throw new DomainException("user_not_found", $"No user with the address '{email.Trim()}' exists in this tenant.");
-        Guid Category_(string code) => categoryIds.TryGetValue(OnboardingDocument.Key(code), out var id) ? id : throw new DomainException("category_not_found", $"Category '{code}' was not found.");
+        Guid Category_(string code) => categoryIds.TryGetValue(OnboardingDocument.Key(code), out var id) ? id : throw new DomainException("category_not_found", $"[[category]] '{code}' was not found.");
         var structureNow = await structure.GetAsync(organisationId, ct);
-        Guid Unit_(string key) => structureNow.BusinessUnits.FirstOrDefault(x => x.Key == StructureKey.Normalise(key))?.Id ?? throw new DomainException("business_unit_not_found", $"Business unit '{key}' was not found.");
-        Guid Site_(string key) => structureNow.Sites.FirstOrDefault(x => x.Key == StructureKey.Normalise(key))?.Id ?? throw new DomainException("site_not_found", $"Site '{key}' was not found.");
+        Guid Unit_(string key) => structureNow.BusinessUnits.FirstOrDefault(x => x.Key == StructureKey.Normalise(key))?.Id ?? throw new DomainException("business_unit_not_found", $"[[business.unit|sentence]] '{key}' was not found.");
+        Guid Site_(string key) => structureNow.Sites.FirstOrDefault(x => x.Key == StructureKey.Normalise(key))?.Id ?? throw new DomainException("site_not_found", $"[[site]] '{key}' was not found.");
 
         // category owners
         foreach (var o in next.CategoryOwners)

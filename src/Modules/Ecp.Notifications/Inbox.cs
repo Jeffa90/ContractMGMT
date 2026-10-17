@@ -101,7 +101,7 @@ internal sealed class NotificationInbox(
 
     private async Task AcknowledgeCoreAsync(Notification source, Guid me, CancellationToken ct)
     {
-        if (!source.RequiresAcknowledgement) throw new DomainException("not_acknowledgeable", "This notification does not need acknowledging.");
+        if (!source.RequiresAcknowledgement) throw new DomainException("not_acknowledgeable", "This [[notification|lower]] does not need acknowledging.");
         var name = await directory.DisplayNameAsync(me, ct) ?? me.ToString();
         await uow.ExecuteAsync(async c =>
         {

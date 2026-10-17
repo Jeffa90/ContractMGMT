@@ -137,7 +137,7 @@ internal sealed class ContractLifecyclePort(
     }
 
     private async Task<Contract> LoadTrackedAsync(Guid id, CancellationToken ct)
-        => await db.Contracts.FirstOrDefaultAsync(c => c.Id == id, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+        => await db.Contracts.FirstOrDefaultAsync(c => c.Id == id, ct) ?? throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
 
     private static async Task SaveAsync(ContractsDbContext db, CancellationToken ct)
     {
@@ -150,7 +150,7 @@ internal sealed class ContractLifecyclePort(
         {
             var contract = await LoadTrackedAsync(contractId, c);
             if (!string.Equals(contract.Status, expectedStatus, StringComparison.Ordinal))
-                throw new DomainException("state_changed", "The contract has moved on since you opened it. Reload it to see its current state.");
+                throw new DomainException("state_changed", "The [[contract|lower]] has moved on since you opened it. Reload it to see its current state.");
             var wasLocked = contract.RecordLocked;
             contract.ApplyWorkflowState(newStatus, effects, actor, clock.UtcNow);
             await SaveAsync(db, c);
@@ -233,7 +233,7 @@ internal sealed class ContractLifecyclePort(
         if (coreChanges.Count > 0)
         {
             // An untracked copy takes the change, so the rules run exactly as they would on apply but nothing is stored.
-            var copy = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+            var copy = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
             try { result.AddRange(copy.ApplyControlledFields(coreChanges, allowed.Where(a => !a.StartsWith(CustomPrefix, StringComparison.Ordinal)).ToList(), "preview", clock.UtcNow)); }
             catch (FormatException) { throw new DomainException("invalid_value", "One of the values is not in a recognised format."); }
             catch (OverflowException) { throw new DomainException("invalid_value", "One of the values is out of range."); }
@@ -244,7 +244,7 @@ internal sealed class ContractLifecyclePort(
 
     public async Task<IReadOnlyDictionary<string, string?>> CurrentValuesAsync(Guid contractId, IReadOnlyCollection<string> fields, CancellationToken ct = default)
     {
-        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+        var c = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
         var result = new Dictionary<string, string?>(c.CaptureFields(fields.Where(f => !f.StartsWith(CustomPrefix, StringComparison.Ordinal))), StringComparer.Ordinal);
         var customKeys = fields.Where(f => f.StartsWith(CustomPrefix, StringComparison.Ordinal)).Select(f => f[CustomPrefix.Length..]).ToList();
         if (customKeys.Count > 0)
@@ -290,7 +290,7 @@ internal sealed class ContractLifecyclePort(
             predecessor.LinkSuccessor(successor.Id, actor, now);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The record was changed by someone else at the same time. Reload it and try again."); }
-            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("agreement_reference_in_use", "That agreement reference is already in use."); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("agreement_reference_in_use", "That [[contract.reference|lower]] is already in use."); }
             audit.Record(new AuditEntry("contract.created", nameof(Contract), successor.Id.ToString(), OrganisationId: successor.OrganisationId, Classification: successor.Classification,
                 NewValuesJson: AuditJson.Of(new { successor.AgreementReference, successor.ContractTitle, successor.Status, successor.Classification, renewalOf = predecessor.AgreementReference })));
             audit.Record(new AuditEntry("contract.successor_linked", nameof(Contract), predecessorId.ToString(), OrganisationId: predecessor.OrganisationId, Classification: predecessor.Classification,

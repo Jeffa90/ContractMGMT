@@ -50,7 +50,7 @@ public sealed class DelegationsModel(IApprovalDelegations delegations, IAccessDi
     public Task<IActionResult> OnPostCreateAsync(CancellationToken ct) => RunAsync(async () =>
     {
         if (OrganisationId is not { } org || string.IsNullOrWhiteSpace(GroupKey) || ToUserId is not { } to || FromDate is not { } from || ToDate is not { } until)
-            throw new DomainException("delegation_incomplete", "Choose the organisation, the group, the person and both dates.");
+            throw new DomainException("delegation_incomplete", "Choose the [[organisation|lower]], the group, the person and both dates.");
         var start = DateTime.SpecifyKind(from.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         var begins = start < clock.UtcNow ? clock.UtcNow : start;
         var ends = DateTime.SpecifyKind(until.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);       // the last day is included

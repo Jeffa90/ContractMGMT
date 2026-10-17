@@ -5,7 +5,7 @@
 <p><a class="badge" href="/Contracts/Details/@c.Id">@c.AgreementReference</a> <span class="badge">@c.Status</span>
    @if (c.RecordLocked) { <span class="badge warn">@L["Locked"]</span> }</p>
 <partial name="_Errors" model="ViewData.ModelState" />
-<p class="lede">@L["An Effective agreement changes through a Variation. An emergency unlock is the audited exception: it needs the permission, a recent sign-in, a written reason and a time limit, opens only the fields you name, and records every change. It never changes the status, the Registered Date or the original approval."]</p>
+<p class="lede">@L["An Effective [[agreement|lower]] changes through [[variation|a]]. An emergency unlock is the audited exception: it needs the permission, a recent sign-in, a written reason and a time limit, opens only the fields you name, and records every change. It never changes the status, the [[registered.date]] or the original [[approval|lower]]."]</p>
 
 @if (Model.Current is { } cur)
 {
@@ -40,8 +40,8 @@ else if (c.RecordLocked && Model.Policy.Enabled)
         </form>
     </section>
 }
-else if (!Model.Policy.Enabled) { <p class="flash warn" role="status">@L["Emergency unlock is not enabled by this organisation's policy."]</p> }
-else { <p class="flash" role="status">@L["This agreement is not locked."]</p> }
+else if (!Model.Policy.Enabled) { <p class="flash warn" role="status">@L["Emergency unlock is not enabled by this [[organisation|lower]]'s policy."]</p> }
+else { <p class="flash" role="status">@L["This [[agreement|lower]] is not locked."]</p> }
 
 <h2>@L["Unlock history"]</h2>
 <div class="table-wrap"><table>

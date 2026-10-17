@@ -76,3 +76,8 @@ packs.assign,"Assign an installed pack to an organisation and create configurati
 packs.retire,"Retire an installed pack version so it is no longer offered for new assignments","Tenant scope",High,S7 owner decision
 packs.trust.manage,"Register and revoke trusted publisher keys (public keys only)","Tenant scope; step-up authentication",Critical,S7 owner decision
 packs.audit.read,"Read the solution-pack audit history","Tenant scope",High,S7 owner decision
+terminology.read,"Read the organisation's terminology drafts, releases and the pack defaults beneath them (resolving labels for display needs no permission)","Organisation scope",Business,S4 owner decision
+terminology.draft,"Create and edit terminology drafts, validate and preview them (labels only; changes no permission, workflow or record)","Organisation scope; tenant administrator for any organisation",Business,S4 owner decision
+terminology.publish,"Publish a validated terminology draft as the organisation's terminology release","Organisation scope; step-up authentication; second-person policy applies",High,S4 owner decision
+terminology.rollback,"Publish an earlier terminology release as a new release","Same as terminology.publish",High,S4 owner decision
+terminology.audit.read,"Read the terminology change history","Organisation scope",Business,S4 owner decision

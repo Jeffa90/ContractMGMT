@@ -79,7 +79,7 @@ internal sealed class DocumentService(
             var found = false;
             foreach (var parent in parents) // sequential: all module contexts share one connection
                 if (await parent.ParentExistsAsync(contractId, ct)) { found = true; break; }
-            if (!found) throw new DomainException("contract_not_found", "The contract was not found.");
+            if (!found) throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
         }
 
         var stored = await storage.PutAsync(tenantId, r.Content, options.Value.MaxFileBytes, ct);
@@ -105,11 +105,11 @@ internal sealed class DocumentService(
         var scan = await ScanAsync(stored.StorageKey, ct);
         return await uow.ExecuteAsync(async c =>
         {
-            var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == r.DocumentId, c) ?? throw new DomainException("document_not_found", "The document was not found.");
+            var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == r.DocumentId, c) ?? throw new DomainException("document_not_found", "The [[document|lower]] was not found.");
             var version = document.AddVersion(r.FileName, r.MimeType, stored.SizeBytes, stored.Sha256, storage.ProviderKey, stored.StorageKey, r.VersionLabel, r.DocumentDate, actor.ActorId ?? "system", clock.UtcNow, scan: scan);
             db.Versions.Add(version);
             try { await db.SaveChangesAsync(c); }
-            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The document was changed by someone else at the same time. Reload it and try again."); }
+            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The [[document|lower]] was changed by someone else at the same time. Reload it and try again."); }
             audit.Record(new AuditEntry("document.version_added", nameof(Document), document.Id.ToString(), OrganisationId: document.OrganisationId, Classification: document.Classification,
                 NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { version.VersionNumber, version.FileName, version.Sha256, version.SizeBytes })));
             return new DocumentVersionDto(document.Id, version.Id, version.VersionNumber, version.FileName, version.SizeBytes, version.Sha256, version.ScanStatus, version.IsDownloadable(options.Value.AllowSkippedScan));
@@ -122,8 +122,8 @@ internal sealed class DocumentService(
         var source = await (from d in db.Documents.AsNoTracking()
                             join v in db.Versions.AsNoTracking() on d.CurrentVersionId equals v.Id
                             where d.Id == r.SourceDocumentId && d.Status == DocumentStatus.Active
-                            select new { Document = d, Version = v }).FirstOrDefaultAsync(ct) ?? throw new DomainException("document_not_found", "The document was not found.");
-        if (!source.Version.IsDownloadable(options.Value.AllowSkippedScan)) throw new DomainException("document_not_copyable", "Only a document that has passed its scan can be copied.");
+                            select new { Document = d, Version = v }).FirstOrDefaultAsync(ct) ?? throw new DomainException("document_not_found", "The [[document|lower]] was not found.");
+        if (!source.Version.IsDownloadable(options.Value.AllowSkippedScan)) throw new DomainException("document_not_copyable", "Only [[document|lower|a]] that has passed its scan can be copied.");
         await using var content = await storage.OpenReadAsync(tenantId, source.Version.StorageKey, ct);
         var copy = await AddAsync(new AddDocumentRequest(r.OrganisationId, r.TargetContractId, source.Document.DocumentTypeCode, source.Document.Title, source.Version.FileName, source.Version.MimeType, content,
             r.Classification, false, source.Version.VersionLabel, source.Version.DocumentDate), ct);
@@ -169,7 +169,7 @@ internal sealed class DocumentClassificationService(DocumentsDbContext db, IUnit
     public Task ChangeDocumentClassificationAsync(Guid documentId, string level, string? reason, CancellationToken ct = default)
         => uow.ExecuteAsync(async c =>
         {
-            var d = await db.Documents.FirstOrDefaultAsync(x => x.Id == documentId, c) ?? throw new DomainException("document_not_found", "The document was not found.");
+            var d = await db.Documents.FirstOrDefaultAsync(x => x.Id == documentId, c) ?? throw new DomainException("document_not_found", "The [[document|lower]] was not found.");
             var old = d.Classification;
             if (string.Equals(old, level, StringComparison.Ordinal)) return;
             d.SetClassification(level);

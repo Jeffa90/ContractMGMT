@@ -1,12 +1,12 @@
 @page "/Admin/Packs/Assign"
 @model Ecp.Host.Pages.Admin.Packs.AssignModel
-@{ ViewData["Title"] = L["Organisation packs"].Value; }
-<h1>@L["Organisation packs"]</h1>
-<p class="lede">@L["Each organisation works from one solution pack, or from the Blank configuration. Giving an organisation a pack prepares drafts of its lifecycle, Variation workflow and notification policy. It never replaces anything already published, and nothing takes effect until an administrator validates and publishes the drafts."]</p>
+@{ ViewData["Title"] = L["[[organisation]] packs"].Value; }
+<h1>@L["[[organisation]] packs"]</h1>
+<p class="lede">@L["Each [[organisation|lower]] works from one [[solution.pack|lower]], or from the Blank configuration. Giving [[organisation|lower|a]] a pack prepares drafts of its lifecycle, [[variation]] workflow and [[notification|lower]] policy. It never replaces anything already published, and nothing takes effect until an administrator validates and publishes the drafts."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <div class="table-wrap"><table>
-    <caption class="visually-hidden">@L["Organisations and their solution packs"]</caption>
-    <thead><tr><th scope="col">@L["Organisation"]</th><th scope="col">@L["Pack"]</th><th scope="col">@L["Version"]</th><th scope="col">@L["Where it came from"]</th><th scope="col">@L["Assigned (UTC)"]</th><th scope="col">@L["Status"]</th></tr></thead>
+    <caption class="visually-hidden">@L["[[organisation|plural]] and their [[solution.pack|plural|lower]]"]</caption>
+    <thead><tr><th scope="col">@L["[[organisation]]"]</th><th scope="col">@L["Pack"]</th><th scope="col">@L["Version"]</th><th scope="col">@L["Where it came from"]</th><th scope="col">@L["Assigned (UTC)"]</th><th scope="col">@L["Status"]</th></tr></thead>
     <tbody>
     @foreach (var o in Model.Organisations)
     {
@@ -18,10 +18,10 @@
     </tbody>
 </table></div>
 <form method="get" class="card" aria-labelledby="pick-h">
-    <h2 id="pick-h">@L["Give an organisation a pack"]</h2>
-    <div class="field"><label for="OrganisationId">@L["Organisation"]</label>
+    <h2 id="pick-h">@L["Give [[organisation|lower|a]] a pack"]</h2>
+    <div class="field"><label for="OrganisationId">@L["[[organisation]]"]</label>
         <select id="OrganisationId" name="OrganisationId" required>
-            <option value="">@L["Choose an organisation"]</option>
+            <option value="">@L["Choose [[organisation|lower|a]]"]</option>
             @foreach (var o in Model.Organisations) { <option value="@o.OrganisationId" selected="@(o.OrganisationId == Model.OrganisationId)">@o.Name</option> }
         </select></div>
     <div class="field"><label for="Choice">@L["Pack and version"]</label>

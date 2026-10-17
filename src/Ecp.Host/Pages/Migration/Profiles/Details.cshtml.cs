@@ -42,7 +42,7 @@ public sealed class DetailsModel(IMappingProfiles profiles) : MigrationPageModel
     public Task<IActionResult> OnPostPublishAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
     {
         await profiles.PublishAsync(VersionId!.Value, PublishNote, ct);
-        Flash("The version was published. It can no longer be changed; a batch can now use it.");
+        Flash("The version was published. It can no longer be changed; [[migration.batch|lower|a]] can now use it.");
         return RedirectToPage(new { id, versionId = VersionId });
     }, () => LoadAsync(id, ct));
 

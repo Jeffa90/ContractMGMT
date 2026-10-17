@@ -2,7 +2,7 @@
 @model Ecp.Host.Pages.Migration.MessagesModel
 @using Ecp.DataMigration.Domain
 @{ ViewData["Title"] = L["Errors and warnings"].Value; }
-<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the batch"]</a></p>
+<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the [[migration.batch|lower]]"]</a></p>
 <h1>@L["Errors and warnings"]</h1>
 <p class="lede">@L["Each message has a stable code. An error rejects the row or file it concerns; a warning is information. The error report downloads every message together with the source values of rejected rows."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />

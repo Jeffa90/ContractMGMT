@@ -28,14 +28,14 @@ internal sealed class MigrationService(MigrationDbContext db, IUnitOfWork uow, I
         var tenantId = tenant.RequireTenantId();
         // Cross-tenant and cross-organisation references are rejected (INV-48): other tenants' organisations are invisible.
         if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
-            throw new DomainException("organisation_not_found", "The organisation was not found.");
+            throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         var project = MigrationProject.Create(tenantId, r.OrganisationId, r.Name, r.SourceSystem, r.SourceSystemVersion, r.DataOwner, r.ExtractionUtc, clock.UtcNow, "system");
         return await uow.ExecuteAsync(async c =>
         {
             db.Projects.Add(project);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
-            { throw new DomainException("project_name_in_use", "A migration project with that name already exists."); }
+            { throw new DomainException("project_name_in_use", "[[migration.project|lower|a|cap]] with that name already exists."); }
             audit.Record(new AuditEntry("migration.project.created", nameof(MigrationProject), project.Id.ToString(), OrganisationId: project.OrganisationId,
                 NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { project.SourceSystem, project.DataOwner })));
             return project.Id;
@@ -45,7 +45,7 @@ internal sealed class MigrationService(MigrationDbContext db, IUnitOfWork uow, I
     public async Task<Guid> CreateBatchAsync(CreateBatchRequest r, CancellationToken ct = default)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == r.ProjectId, ct)
-            ?? throw new DomainException("project_not_found", "The migration project was not found.");
+            ?? throw new DomainException("project_not_found", "The [[migration.project|lower]] was not found.");
         var batch = project.CreateBatch(r.Kind, r.DuplicateStrategy, r.DocumentOption, r.IsLegacyLoad, null, null, clock.UtcNow);
         return await uow.ExecuteAsync(async c =>
         {

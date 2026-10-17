@@ -1,7 +1,7 @@
 {
   "packageId": "platform.pack.blank",
   "packKey": "blank",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "displayName": {
     "en-AU": "Blank (no business defaults)"
   },
@@ -56,6 +56,14 @@
       "scope": "organisation",
       "schemaVersion": 1,
       "required": true
+    },
+    {
+      "source": "terminology/terminology.json",
+      "path": "content/terminology.json",
+      "kind": "Terminology",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
     }
   ]
 }

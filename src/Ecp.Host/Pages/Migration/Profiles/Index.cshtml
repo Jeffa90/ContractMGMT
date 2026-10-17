@@ -17,7 +17,7 @@
 </div>
 <h2>@L["Create a profile"]</h2>
 <form method="post" class="card">
-    <div class="field"><label for="OrganisationId">@L["Organisation"]</label>
+    <div class="field"><label for="OrganisationId">@L["[[organisation]]"]</label>
         <select id="OrganisationId" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
     <div class="field"><label for="Name">@L["Profile name"]</label><input id="Name" name="Name" type="text" maxlength="200" value="@Model.Name" required /></div>
     <div class="field"><label for="SourceSystem">@L["Source system"]</label><input id="SourceSystem" name="SourceSystem" type="text" maxlength="100" value="@Model.SourceSystem" required /></div>

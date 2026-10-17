@@ -1,17 +1,17 @@
 @using Ecp.Host.Pages.Variations
 @model (VariationForm Form, IReadOnlyList<string> Fields, IReadOnlyDictionary<string, string?> Current, IReadOnlyDictionary<string, string?> Proposed)
 <div class="field"><label for="Form_Title">@L["Title"]</label><input id="Form_Title" name="Form.Title" type="text" required maxlength="300" value="@Model.Form.Title" /></div>
-<div class="field"><label for="Form_Reason">@L["Reason for the Variation"]</label><textarea id="Form_Reason" name="Form.Reason" rows="3" required maxlength="2000">@Model.Form.Reason</textarea></div>
+<div class="field"><label for="Form_Reason">@L["Reason for the [[variation]]"]</label><textarea id="Form_Reason" name="Form.Reason" rows="3" required maxlength="2000">@Model.Form.Reason</textarea></div>
 <div class="field"><label for="Form_Description">@L["Description"]</label><textarea id="Form_Description" name="Form.Description" rows="3" maxlength="4000">@Model.Form.Description</textarea></div>
 <div class="field"><label for="Form_ProposedDate">@L["Proposed effective date"]</label><input id="Form_ProposedDate" name="Form.ProposedDate" type="date" value="@Model.Form.ProposedDate?.ToString("yyyy-MM-dd")" /></div>
-<div class="field"><label><input type="checkbox" name="Form.LegalReviewRequired" value="true" checked="@Model.Form.LegalReviewRequired" /> @L["Needs Legal review (if the workflow leaves it optional)"]</label></div>
+<div class="field"><label><input type="checkbox" name="Form.LegalReviewRequired" value="true" checked="@Model.Form.LegalReviewRequired" /> @L["Needs [[legal.review|sentence]] (if the workflow leaves it optional)"]</label></div>
 <fieldset class="card"><legend>@L["Financial impact (optional)"]</legend>
     <div class="field"><label for="Form_FinancialImpactAmount">@L["Amount"]</label><input id="Form_FinancialImpactAmount" name="Form.FinancialImpactAmount" type="number" step="0.01" value="@Model.Form.FinancialImpactAmount" /></div>
     <div class="field"><label for="Form_FinancialImpactCurrency">@L["Currency (3 letters)"]</label><input id="Form_FinancialImpactCurrency" name="Form.FinancialImpactCurrency" type="text" maxlength="3" value="@Model.Form.FinancialImpactCurrency" /></div>
     <div class="field"><label for="Form_FinancialImpactNote">@L["Note"]</label><input id="Form_FinancialImpactNote" name="Form.FinancialImpactNote" type="text" maxlength="1000" value="@Model.Form.FinancialImpactNote" /></div>
 </fieldset>
-<fieldset class="card"><legend>@L["Proposed changes to the agreement"]</legend>
-    <p class="hint">@L["Tick each field to change and give its new value. Only the fields listed can be changed by a Variation; nothing changes until the Variation is approved and applied."]</p>
+<fieldset class="card"><legend>@L["Proposed changes to the [[agreement|lower]]"]</legend>
+    <p class="hint">@L["Tick each field to change and give its new value. Only the fields listed can be changed by [[variation|a]]; nothing changes until the [[variation]] is approved and applied."]</p>
     @foreach (var f in Model.Fields)
     {
         var label = (ViewData["Labels"] as IReadOnlyDictionary<string, string>)?.GetValueOrDefault(f) ?? f;

@@ -2,7 +2,7 @@
 @model Ecp.Host.Pages.Admin.Packs.TrustKeysModel
 @{ ViewData["Title"] = L["Trusted publishers"].Value; }
 <h1>@L["Trusted publishers"]</h1>
-<p class="lede">@L["A pack is signed with a private key that only its publisher holds. You trust a publisher by registering the matching public key here. Anyone holding this permission can decide which packs this organisation's tenant will accept, so grant it sparingly. Production accepts only packs signed by a key listed here or set by the installation operator."]</p>
+<p class="lede">@L["A pack is signed with a private key that only its publisher holds. You trust a publisher by registering the matching public key here. Anyone holding this permission can decide which packs this [[organisation|lower]]'s tenant will accept, so grant it sparingly. Production accepts only packs signed by a key listed here or set by the installation operator."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <div class="table-wrap"><table>
     <caption class="visually-hidden">@L["Trusted publisher keys"]</caption>
@@ -41,4 +41,4 @@
     <div class="field"><label for="NotAfterUtc">@L["Valid until (UTC, optional)"]</label><input id="NotAfterUtc" name="NotAfterUtc" type="datetime-local" /></div>
     <div class="actions"><button type="submit">@L["Register this key"]</button></div>
 </form>
-<p><a href="/Admin/Packs">@L["Back to solution packs"]</a></p>
+<p><a href="/Admin/Packs">@L["Back to [[solution.pack|plural|lower]]"]</a></p>

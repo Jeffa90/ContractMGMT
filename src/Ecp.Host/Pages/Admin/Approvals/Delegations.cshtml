@@ -1,12 +1,12 @@
 @page "/Admin/Approvals/Delegations"
 @model Ecp.Host.Pages.Admin.Approvals.DelegationsModel
-@{ ViewData["Title"] = L["Approval delegations"].Value; }
-<h1>@L["Approval delegations"]</h1>
-<p class="lede">@L["Hand your approval authority to another member of your group while you are away. It lasts at most 90 days, is recorded and audited, shows as 'on behalf of' on whatever the person approves, and cannot be passed on again. A circle of delegations is refused."]</p>
+@{ ViewData["Title"] = L["[[approval]] delegations"].Value; }
+<h1>@L["[[approval]] delegations"]</h1>
+<p class="lede">@L["Hand your [[approval|lower]] authority to another member of your group while you are away. It lasts at most 90 days, is recorded and audited, shows as 'on behalf of' on whatever the person approves, and cannot be passed on again. A circle of delegations is refused."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 @if (Model.OrganisationId is not null)
 {
-<nav class="tabs" aria-label="@L["Approval matrix pages"]">
+<nav class="tabs" aria-label="@L["[[approval]] matrix pages"]">
     <a href="/Admin/Approvals?organisationId=@Model.OrganisationId">@L["Matrices"]</a>
     <a href="/Admin/Approvals/Simulate?organisationId=@Model.OrganisationId">@L["Simulator"]</a>
     <a href="/Admin/Approvals/Delegations?organisationId=@Model.OrganisationId" aria-current="page">@L["Delegations"]</a>
@@ -65,10 +65,10 @@
 @if (Model.All is { } all)
 {
     <section aria-labelledby="all-h">
-        <h2 id="all-h">@L["All delegations in this organisation"]</h2>
-        <form method="get" class="card"><div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div><button type="submit" class="secondary">@L["Show"]</button></form>
+        <h2 id="all-h">@L["All delegations in this [[organisation|lower]]"]</h2>
+        <form method="get" class="card"><div class="field"><label for="org">@L["[[organisation]]"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div><button type="submit" class="secondary">@L["Show"]</button></form>
         <div class="table-wrap"><table>
-            <caption class="visually-hidden">@L["All delegations in this organisation"]</caption>
+            <caption class="visually-hidden">@L["All delegations in this [[organisation|lower]]"]</caption>
             <thead><tr><th scope="col">@L["Group"]</th><th scope="col">@L["From"]</th><th scope="col">@L["To"]</th><th scope="col">@L["Period (UTC)"]</th><th scope="col">@L["Reason"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Actions"]</th></tr></thead>
             <tbody>
             @foreach (var d in all.Items)

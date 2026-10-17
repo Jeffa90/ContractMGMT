@@ -16,14 +16,14 @@ public sealed class DetailsModel(IRegisterAuthorisationService approvals) : EcpP
     public Task<IActionResult> OnPostApproveAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
     {
         await approvals.ApproveAsync(id, Comment, ClientRequestId, ct);
-        Flash("Approved. The agreement is registered, Effective and locked.");
+        Flash("Approved. The [[agreement|lower]] is registered, Effective and locked.");
         return RedirectToPage(new { id });
     }, async () => { Approval = await approvals.GetAsync(id, ct); });
 
     public Task<IActionResult> OnPostRejectAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
     {
         await approvals.RejectAsync(id, Comment ?? "", ClientRequestId, ct);
-        Flash("Rejected. The agreement returns to Initial Creation with your comment.");
+        Flash("Rejected. The [[agreement|lower]] returns to Initial Creation with your comment.");
         return RedirectToPage(new { id });
     }, async () => { Approval = await approvals.GetAsync(id, ct); });
 }

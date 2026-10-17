@@ -93,15 +93,15 @@ internal sealed class VariationService(
     private async Task<(string ProposedJson, string BeforeJson)> ValidateAsync(Guid contractId, VariationInput input, WorkflowDefinition variationDef, CancellationToken ct)
     {
         var allowed = variationDef.Settings.Variation.ChangeableFields;
-        if (input.ProposedChanges.Count == 0) throw new DomainException("changes_required", "Name at least one change the Variation proposes.");
+        if (input.ProposedChanges.Count == 0) throw new DomainException("changes_required", "Name at least one change the [[variation]] proposes.");
         var outside = input.ProposedChanges.Keys.Where(k => !allowed.Contains(k) && !(k.StartsWith("cf.", StringComparison.Ordinal) && AllowsCustom(allowed, k[3..]))).ToList();
-        if (outside.Count > 0) throw new DomainException("field_not_changeable", $"A Variation cannot change: {string.Join(", ", outside)}.");
+        if (outside.Count > 0) throw new DomainException("field_not_changeable", $"[[variation|a|cap]] cannot change: {string.Join(", ", outside)}.");
         // A configured field is also judged by what this person may see and propose: a restricted or role-limited field cannot be changed by someone who cannot see it.
         if (input.ProposedChanges.Keys.Any(k => k.StartsWith("cf.", StringComparison.Ordinal)))
         {
             var mine = (await customFieldForms.ProposableAsync(contractId, ct)).Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var refused = input.ProposedChanges.Keys.Where(k => k.StartsWith("cf.", StringComparison.Ordinal) && !mine.Contains(k[3..])).ToList();
-            if (refused.Count > 0) throw new DomainException("field_not_changeable", $"A Variation cannot change: {string.Join(", ", refused)}.");
+            if (refused.Count > 0) throw new DomainException("field_not_changeable", $"[[variation|a|cap]] cannot change: {string.Join(", ", refused)}.");
         }
         // The proposed values are checked against the same rules that will apply them, so an invalid Variation is refused when it is drafted rather than when it is approved.
         await port.PreviewControlledChangesAsync(contractId, input.ProposedChanges, allowed, ct);
@@ -116,7 +116,7 @@ internal sealed class VariationService(
         var subject = await engine.LoadSubjectAsync(SubjectKinds.Contract, contractId, ct);
         var contractDef = await engine.DefinitionForAsync(subject, ct);
         var transition = contractDef.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "openVariation")
-            ?? throw new DomainException("invalid_transition", $"A Variation can be started only on an Effective agreement; this one is {contractDef.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"[[variation|a|cap]] can be started only on an Effective [[agreement|lower]]; this one is {contractDef.Definition.DisplayOf(subject.Status)}.");
         var variationDef = await definitions.CurrentAsync(WorkflowKinds.Variation, subject.OrganisationId, ct);
         var (proposedJson, beforeJson) = await ValidateAsync(contractId, input, variationDef.Definition, ct);
         Guid id = Guid.Empty;
@@ -149,7 +149,7 @@ internal sealed class VariationService(
         var resolved = await engine.DefinitionForAsync(subject, ct);
         await access.RequireAsync("variations.create", await engine.DescribeAsync(subject, null, ct), ct);
         if (!subject.Variation!.IsOpen || !EditableRoles.Contains(resolved.Definition.State(subject.Status)?.Role ?? ""))
-            throw new DomainException("variation_not_editable", "A Variation can be edited while it is a draft or after Legal returns it for rework.");
+            throw new DomainException("variation_not_editable", "[[variation|a|cap]] can be edited while it is a draft or after [[reviewer]] returns it for rework.");
         var (proposedJson, beforeJson) = await ValidateAsync(subject.ContractId, input, resolved.Definition, ct);
         await uow.ExecuteAsync(async c =>
         {
@@ -260,8 +260,8 @@ internal sealed class VariationService(
         var descriptor = await engine.DescribeAsync(subject, null, ct);
         await access.RequireAsync("variations.create", descriptor, ct);
         if (!subject.Variation!.IsOpen || !DocumentRoles.Contains(resolved.Definition.State(subject.Status)?.Role ?? ""))
-            throw new DomainException("documents_closed", "Documents are added to a Variation while it is being prepared.");
-        if (r.Role is not ("Final" or "Supporting")) throw new DomainException("invalid_role", "A document is Final or Supporting.");
+            throw new DomainException("documents_closed", "[[document|plural]] are added to [[variation|a]] while it is being prepared.");
+        if (r.Role is not ("Final" or "Supporting")) throw new DomainException("invalid_role", "[[document|lower|a|cap]] is Final or Supporting.");
         var scale = await access.ClassificationScaleAsync(ct);
         var requested = scale.Canonical(r.Classification) ?? (string.IsNullOrWhiteSpace(r.Classification) ? null : throw new DomainException("invalid_classification", $"Classification '{r.Classification}' is not recognised."));
         var level = requested is not null && scale.Rank(requested) >= scale.Rank(subject.Classification) ? requested : subject.Classification;
@@ -287,7 +287,7 @@ internal sealed class VariationService(
         var subject = await engine.LoadSubjectAsync(SubjectKinds.Variation, variationId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "cancel")
-            ?? throw new DomainException("invalid_transition", $"This Variation cannot be cancelled while it is {resolved.Definition.DisplayOf(subject.Status)}. Recall it from Legal first, or have it rejected.");
+            ?? throw new DomainException("invalid_transition", $"This [[variation]] cannot be cancelled while it is {resolved.Definition.DisplayOf(subject.Status)}. Recall it from [[reviewer]] first, or have it rejected.");
         await engine.ExecuteAsync(new TransitionCommand(SubjectKinds.Variation, variationId, transition.Code, reason, reason, subject.Status, AllowManaged: true), async (scope, c) =>
         {
             await legalReviews.WithdrawOpenAsync(scope, reason, c); // a review still open is withdrawn with it (and kept)
@@ -314,7 +314,7 @@ internal sealed class VariationService(
         var parentDef = await engine.DefinitionForAsync(parent, c);
         var role = outcome switch { VariationOutcome.Applied => "applyVariation", VariationOutcome.Rejected => "rejectVariation", _ => "cancelVariation" };
         var parentTransition = parentDef.Definition.From(parent.Status).FirstOrDefault(t => t.Role == role)
-            ?? throw new DomainException("invalid_transition", $"The agreement is {parentDef.Definition.DisplayOf(parent.Status)}, so this Variation cannot be completed. Reload the agreement to see where it stands.");
+            ?? throw new DomainException("invalid_transition", $"The [[agreement|lower]] is {parentDef.Definition.DisplayOf(parent.Status)}, so this [[variation]] cannot be completed. Reload the [[agreement|lower]] to see where it stands.");
         string? appliedBefore = null, appliedAfter = null;
 
         await engine.ExecuteAsync(new TransitionCommand(SubjectKinds.Contract, parent.Id, parentTransition.Code, reason, reason, parent.Status, AllowManaged: true, Inputs: new GuardInputs(outcome), Approval: approval), async (scope, cc) =>
@@ -325,7 +325,7 @@ internal sealed class VariationService(
             IReadOnlyList<FieldChange> applied;
             try { applied = await port.ApplyControlledChangesAsync(parent.Id, proposed, variationDef.Definition.Settings.Variation.ChangeableFields, engine.ActorLabel, "variation", variation.Id, $"Variation {variation.Reference}", cc); }
             catch (DomainException ex) when (ex.Code is not ("concurrency_conflict" or "state_changed"))
-            { throw new DomainException("variation_cannot_apply", $"The Variation cannot be applied to the agreement as it stands: {ex.Message}"); }
+            { throw new DomainException("variation_cannot_apply", $"The [[variation]] cannot be applied to the [[agreement|lower]] as it stands: {ex.Message}"); }
             appliedBefore = JsonSerializer.Serialize(applied.ToDictionary(f => f.Field, f => f.Before));
             appliedAfter = JsonSerializer.Serialize(applied.ToDictionary(f => f.Field, f => f.After));
         }, c);

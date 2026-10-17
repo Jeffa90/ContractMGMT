@@ -120,5 +120,19 @@ Recorded in `decisions/ADR-0026-external-solution-packs.md`. The owner confirmed
 | `packs.trust.manage` | Tenant Administrator |
 | `packs.audit.read` | Tenant Administrator, Auditor |
 
+### D7b Terminology permissions (S4)
+
+Terminology (labels for business concepts) has its own least-privilege permissions so it can be delegated without the general configuration permissions. A label never changes what anyone may do.
+
+| Permission | Granted to |
+|---|---|
+| `terminology.read` | Tenant Administrator, Organisation Administrator, Business Configuration Administrator, Auditor |
+| `terminology.draft` | Tenant Administrator (any organisation), Organisation Administrator (own organisation), Business Configuration Administrator |
+| `terminology.publish` | Tenant Administrator (any organisation), Organisation Administrator (own organisation), Business Configuration Administrator; step-up authentication and second-person publication apply |
+| `terminology.rollback` | Same as `terminology.publish` |
+| `terminology.audit.read` | Tenant Administrator, Organisation Administrator, Business Configuration Administrator, Auditor |
+
+Persisted role codes (`ProcurementAdministrator`, `CategoryOwner`, `Legal`, `Approver`, `BackupApprover`), permission codes, workflow state codes, audit action codes, configuration-kind keys and pack identifiers are stable machine identifiers and are not renamed. Terminology supplies what users read. The owner's brief named `GroupHeadApprover` among the stable identifiers; no identifier of that name exists in the repository (the persisted names are the role `Approver` and the approver group key `GroupHeadProcurement`), so both are kept unchanged. This is recorded as a contradiction in the brief, resolved by keeping what exists.
+
 Trust-key administration is deliberately not held by ordinary business configuration administrators. Install, retire, assign and trust changes also need a recent sign-in. (`requirements/02-reference/role-permission-matrix.csv` is the machine-readable source and the tests read it.)
 

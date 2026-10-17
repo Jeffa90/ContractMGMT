@@ -1,7 +1,7 @@
 @page "/Admin/Packs/Audit"
 @model Ecp.Host.Pages.Admin.Packs.AuditModel
-@{ ViewData["Title"] = L["Solution pack history"].Value; }
-<h1>@L["Solution pack history"]</h1>
+@{ ViewData["Title"] = L["[[solution.pack|sentence]] history"].Value; }
+<h1>@L["[[solution.pack|sentence]] history"]</h1>
 <p class="lede">@L["Every upload, check, install, retirement, assignment and change to trusted publishers, with who did it and what happened. Entries cannot be edited."]</p>
 <div class="table-wrap"><table>
     <caption class="visually-hidden">@L["Pack Manager history"]</caption>
@@ -23,4 +23,4 @@
         @if (Model.Items.Page < pages) { <a href="/Admin/Packs/Audit?page=@(Model.Items.Page + 1)">@L["Next"]</a> }
     </nav>
 }
-<p><a href="/Admin/Packs">@L["Back to solution packs"]</a></p>
+<p><a href="/Admin/Packs">@L["Back to [[solution.pack|plural|lower]]"]</a></p>

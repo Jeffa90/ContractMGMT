@@ -111,7 +111,7 @@ internal sealed class DocumentMigrationPort(
             db.Documents.Add(document);
             db.Versions.Add(version);
             try { await db.SaveChangesAsync(c); }
-            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("document_source_in_use", "A document with that source identifier already exists."); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("document_source_in_use", "[[document|lower|a|cap]] with that source identifier already exists."); }
             audit.Record(new AuditEntry("migration.document.imported", nameof(Document), document.Id.ToString(), OrganisationId: m.OrganisationId, MigrationBatchId: m.BatchId,
                 NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { version.FileName, version.Sha256, version.SizeBytes, document.DocumentTypeCode, m.ContractId, m.DocumentSourceId, ScanStatus = version.ScanStatus.ToString() })));
         }, ct);
@@ -124,7 +124,7 @@ internal sealed class DocumentMigrationPort(
         await RequireBlobAsync(tenantId, m.StorageKey, ct);
         return await uow.ExecuteAsync(async c =>
         {
-            var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == documentId, c) ?? throw new DomainException("document_not_found", "The document was not found.");
+            var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == documentId, c) ?? throw new DomainException("document_not_found", "The [[document|lower]] was not found.");
             var version = document.AddVersion(m.FileName, m.MimeType, m.SizeBytes, m.Sha256, storage.ProviderKey, m.StorageKey, m.VersionLabel, m.DocumentDate, actor.ActorId ?? "system", clock.UtcNow, m.BatchId, m.Scan);
             db.Versions.Add(version);
             await db.SaveChangesAsync(c);
@@ -148,7 +148,7 @@ internal sealed class DocumentMigrationPort(
             var d = await db.Documents.FirstOrDefaultAsync(x => x.Id == documentId && x.MigrationBatchId == batchId, c);
             if (d is null) return (IReadOnlyList<string>)[];
             var versions = await db.Versions.Where(v => v.DocumentId == documentId).ToListAsync(c);
-            if (versions.Any(v => v.MigrationBatchId != batchId)) throw new DomainException("document_changed", "A version was added after the batch, so the document cannot be removed.");
+            if (versions.Any(v => v.MigrationBatchId != batchId)) throw new DomainException("document_changed", "A version was added after the batch, so the [[document|lower]] cannot be removed.");
             db.Versions.RemoveRange(versions);
             await db.SaveChangesAsync(c); // versions first: the document row is the foreign-key parent
             db.Documents.Remove(d);
@@ -203,11 +203,11 @@ internal sealed class DocumentMigrationPort(
     {
         foreach (var parent in parents) // sequential: all module contexts share one connection
             if (await parent.ParentExistsAsync(contractId, ct)) return;
-        throw new DomainException("contract_not_found", "The contract was not found.");
+        throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
     }
 
     private async Task RequireBlobAsync(Guid tenantId, string key, CancellationToken ct)
     {
-        if (!await storage.ExistsAsync(tenantId, key, ct)) throw new DomainException("content_not_found", "The document content was not found in this tenant's store.");
+        if (!await storage.ExistsAsync(tenantId, key, ct)) throw new DomainException("content_not_found", "The [[document|lower]] content was not found in this tenant's store.");
     }
 }

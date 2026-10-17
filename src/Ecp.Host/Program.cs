@@ -38,6 +38,9 @@ builder.Configuration.GetSection("Ecp:Localisation").Bind(localisation);
 localisation.Validate();
 builder.Services.AddSingleton(localisation);
 builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+// Page text goes through the terminology-aware localiser: [[term]] tokens become the organisation's own words (see docs/TERMINOLOGY.md).
+builder.Services.AddScoped<Ecp.Host.Terminology.TermContext>();
+builder.Services.AddScoped<Microsoft.Extensions.Localization.IStringLocalizer<SharedResource>, Ecp.Host.Terminology.TermLocalizer>();
 
 builder.Services.AddSingleton<ISecretProvider>(secrets);
 builder.Services.AddSingleton(resolved.Host);
@@ -50,7 +53,7 @@ builder.Services.AddEcpPersistence(resolved.Database);
 builder.Services.AddAuditModule();
 builder.Services.AddTenancyModule();
 builder.Services.AddIdentityModule(o => { o.Mode = resolved.Host.Mode; o.RequireEmergencyConfirmation = production; });
-builder.Services.AddConfigurationModule(o => o.RequireSecondPersonPublish = production, packs: o =>
+builder.Services.AddConfigurationModule(o => { o.RequireSecondPersonPublish = production; o.DefaultPackId = builder.Configuration["Ecp:DefaultPackId"]; }, packs: o =>
 {
     builder.Configuration.GetSection("Ecp:Packs").Bind(o);
     o.Mode = resolved.Host.Mode;                                                       // the host decides the mode; configuration cannot override it
@@ -238,6 +241,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseMiddleware<SessionMiddleware>();
 app.UseAuthorization();
+app.UseMiddleware<Ecp.Host.Terminology.TermMiddleware>();
 
 var version = hostVersion;
 

@@ -48,12 +48,12 @@ public sealed class ProjectModel(IMigrationProjects projects, IMigrationBatches 
         Flash(TargetFreeze ? "The freeze window was saved and the target freeze is ON: people cannot create contracts in this organisation during the window." : "The freeze window was saved; the target freeze is off.");
     });
 
-    public Task<IActionResult> OnPostCloseProjectAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await projects.CloseProjectAsync(id, ct); Flash("The project was closed."); });
+    public Task<IActionResult> OnPostCloseProjectAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await projects.CloseProjectAsync(id, ct); Flash("The [[migration.project|lower]] was closed."); });
 
     public Task<IActionResult> OnPostCreateBatchAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
     {
         var batchId = await batches.CreateAsync(new CreateBatchInput(id, BatchName, Kind, Strategy, DocumentOption, IsLegacyLoad, ProfileVersionId), ct);
-        Flash("The batch was created. Load the source files next.");
+        Flash("The [[migration.batch|lower]] was created. Load the source files next.");
         return RedirectToPage("Batch", new { id = batchId });
     }, () => LoadAsync(id, ct));
 

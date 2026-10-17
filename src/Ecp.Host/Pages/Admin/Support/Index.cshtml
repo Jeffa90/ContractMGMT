@@ -6,7 +6,7 @@
 <p class="lede">@L["Time-limited access to one tenant, for a stated reason. You act as yourself with only the permissions listed; nothing impersonates a person or reveals a password. The tenant's administrators can see this access while it is active and afterwards, and every action carries its identifier in the audit trail."]</p>
 @if (!ViewData.ModelState.IsValid)
 {
-    <div class="error-summary" role="alert"><ul>@foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors)) { <li>@e.ErrorMessage</li> }</ul></div>
+    <div class="error-summary" role="alert"><ul>@foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors)) { <li>@Terms.Expand(e.ErrorMessage)</li> }</ul></div>
 }
 <section class="card" aria-labelledby="open-h">
     <h2 id="open-h">@L["Request access"]</h2>
@@ -15,7 +15,7 @@
             <select id="tenantId" name="tenantId" required>@foreach (var t in Model.Tenants) { <option value="@t.Id">@t.Name</option> }</select></div>
         <div class="field"><label for="kind">@L["Kind of access"]</label>
             <select id="kind" name="kind"><option value="Support">@L["Support: read-only"]</option><option value="Emergency">@L["Emergency: read-only plus account and role recovery"]</option></select>
-            <p class="hint">@L["Neither kind can change a contract, approve, unlock a record or publish configuration."]</p></div>
+            <p class="hint">@L["Neither kind can change [[contract|lower|a]], approve, unlock a record or publish configuration."]</p></div>
         <div class="field"><label for="reason">@L["Reason"]</label><textarea id="reason" name="reason" rows="3" required minlength="10" maxlength="1000"></textarea></div>
         <div class="field"><label for="minutes">@L["Minutes (most @Model.MaxMinutes)"]</label><input id="minutes" name="minutes" type="number" min="5" max="@Model.MaxMinutes" value="60" required /></div>
         <div class="field"><label for="ceiling">@L["Classification ceiling (optional; never above Confidential)"]</label><input id="ceiling" name="ceiling" type="text" /></div>

@@ -108,7 +108,7 @@ public sealed class MigrationProject : ITenantOwned
 
     private void EnsureActive()
     {
-        if (Status != ProjectStatus.Active) throw new DomainException("project_closed", "The migration project is closed.");
+        if (Status != ProjectStatus.Active) throw new DomainException("project_closed", "The [[migration.project|lower]] is closed.");
     }
 
     public MigrationBatch CreateBatch(BatchKind kind, DuplicateStrategy strategy, DocumentDuplicateOption documentOption, bool isLegacyLoad,

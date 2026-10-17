@@ -9,7 +9,7 @@
 
 <section class="card">
     <h2>@L["Sections"]</h2>
-    <p class="hint">@L["Sections group fields on the contract forms and details page, in the order given. The section general always exists."]</p>
+    <p class="hint">@L["Sections group fields on the [[contract|lower]] forms and details page, in the order given. The section general always exists."]</p>
     <ul>@foreach (var s in Model.State.Working.OrderedSections) { <li><code>@s.Key</code> @s.Label (@s.Order)</li> }</ul>
     <form method="post" asp-page-handler="Section">
         <input type="hidden" name="organisationId" value="@Model.OrganisationId" />

@@ -1,7 +1,7 @@
 @page "/Contracts/Edit/{id:guid}"
 @model Ecp.Host.Pages.Contracts.EditModel
-@{ ViewData["Title"] = L["Edit contract"].Value; }
-<h1>@L["Edit contract"] <small>@Model.Reference</small></h1>
+@{ ViewData["Title"] = L["Edit [[contract|lower]]"].Value; }
+<h1>@L["Edit [[contract|lower]]"] <small>@Model.Reference</small></h1>
 <partial name="_Errors" model="ViewData.ModelState" />
 <form method="post">
     <div class="field">

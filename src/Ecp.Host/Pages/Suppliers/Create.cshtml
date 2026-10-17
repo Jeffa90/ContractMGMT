@@ -1,11 +1,11 @@
 @page "/Suppliers/Create"
 @model Ecp.Host.Pages.Suppliers.CreateModel
-@{ ViewData["Title"] = L["Add a supplier"].Value; }
-<h1>@L["Add a supplier"]</h1>
+@{ ViewData["Title"] = L["Add [[supplier|lower|a]]"].Value; }
+<h1>@L["Add [[supplier|lower|a]]"]</h1>
 <partial name="_Errors" model="ViewData.ModelState" />
 <form method="post">
     <div class="field">
-        <label for="OrganisationId">@L["Organisation"]</label>
+        <label for="OrganisationId">@L["[[organisation]]"]</label>
         <select id="OrganisationId" name="OrganisationId" required aria-required="true">
             @foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }
         </select>
@@ -13,5 +13,5 @@
     <div class="field"><label for="Name">@L["Name"]</label><input id="Name" name="Name" type="text" required aria-required="true" maxlength="300" value="@Model.Name" /></div>
     <div class="field"><label for="VendorNumber">@L["Vendor number"]</label><input id="VendorNumber" name="VendorNumber" type="text" maxlength="50" value="@Model.VendorNumber" /></div>
     <div class="field"><label for="Abn">@L["ABN"]</label><input id="Abn" name="Abn" type="text" inputmode="numeric" maxlength="14" value="@Model.Abn" aria-describedby="abn-hint" /><p id="abn-hint" class="hint">@L["Eleven digits. The format is checked; a registry lookup is not performed."]</p></div>
-    <div class="actions"><button type="submit">@L["Add supplier"]</button> <a class="button secondary" href="/Suppliers">@L["Cancel"]</a></div>
+    <div class="actions"><button type="submit">@L["Add [[supplier|lower]]"]</button> <a class="button secondary" href="/Suppliers">@L["Cancel"]</a></div>
 </form>

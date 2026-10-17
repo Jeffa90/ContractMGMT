@@ -101,7 +101,7 @@ internal sealed class SignatureRequestService(
         await access.RequireAsync(OwnerPermission(subject), descriptor, ct);
         var current = await db.SignatureRequests.FirstOrDefaultAsync(x => x.SubjectKind == r.SubjectKind && x.SubjectId == r.SubjectId && x.IsCurrent, ct);
         if (current is null || resolved.Definition.State(subject.Status)?.Role != "signature")
-            throw new DomainException("not_out_for_signature", $"The executed copy is attached while the {subject.Noun} is out for signature.");
+            throw new DomainException("not_out_for_signature", $"The [[executed.document|lower]] is attached while the {subject.Noun} is out for signature.");
         var scale = await access.ClassificationScaleAsync(ct);
         var requested = scale.Canonical(r.Classification) ?? (string.IsNullOrWhiteSpace(r.Classification) ? null : throw new DomainException("invalid_classification", $"Classification '{r.Classification}' is not recognised."));
         var level = requested is not null && scale.Rank(requested) >= scale.Rank(subject.Classification) ? requested : subject.Classification;

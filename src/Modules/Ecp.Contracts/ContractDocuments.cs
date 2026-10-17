@@ -90,7 +90,7 @@ internal sealed class SecuredContractDocuments(ContractsDbContext db, IAccessSer
         {
             case DocumentPolicies.Open: await access.RequireAsync("documents.upload", descriptor, ct); break;
             case DocumentPolicies.LegalOnly: await access.RequireAsync("legal.markup", descriptor, ct); break;
-            default: throw new DomainException("documents_closed", "Documents cannot be added to this contract in its current state. A change to an Effective contract goes through a Variation.");
+            default: throw new DomainException("documents_closed", "[[document|plural]] cannot be added to this [[contract|lower]] in its current state. A change to an Effective [[contract|lower]] goes through [[variation|a]].");
         }
         return (contract, descriptor, scale);
     }

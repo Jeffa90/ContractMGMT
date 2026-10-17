@@ -76,7 +76,7 @@ public sealed class ViewModel(IOrganisationStructureService organisations, IAcce
         {
             try { Trial = await studio.PreviewAsync(OrganisationId!.Value, def, ct); }
             catch (RegisterQueryException ex) { foreach (var issue in ex.Issues) ModelState.AddModelError(string.Empty, issue.Message); }
-            catch (Ecp.SharedKernel.ForbiddenException) { ModelState.AddModelError(string.Empty, "Your role cannot open the contract register, so a trial run is not available. The view is still checked when you validate the draft."); }
+            catch (Ecp.SharedKernel.ForbiddenException) { ModelState.AddModelError(string.Empty, "Your role cannot open the [[contract.register|lower]], so a trial run is not available. The view is still checked when you validate the draft."); }
         }
         return Page();
     });

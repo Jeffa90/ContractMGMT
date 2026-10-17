@@ -238,8 +238,8 @@ internal sealed class MigrationBatchService(MigrationKernel k, IConfigurationSer
         var file = await k.Db.StagedFiles.FirstOrDefaultAsync(x => x.Id == fileId && x.BatchId == batchId, ct) ?? throw new ResourceNotFoundException();
         // F015: the target must be a contract row of this batch (another batch's or tenant's rows are not visible here).
         var row = await k.Db.StagingRows.AsNoTracking().FirstOrDefaultAsync(r => r.Id == contractRowId && r.BatchId == batchId, ct)
-            ?? throw new DomainException("target_not_found", "MIG-F015: The target contract was not found in this batch.");
-        if (row.Outcome == RowOutcome.Rejected) throw new DomainException("target_rejected", "MIG-F015: That contract row was rejected, so a file cannot be attached to it.");
+            ?? throw new DomainException("target_not_found", "MIG-F015: The target [[contract|lower]] was not found in this batch.");
+        if (row.Outcome == RowOutcome.Rejected) throw new DomainException("target_rejected", "MIG-F015: That [[contract|lower]] row was rejected, so a file cannot be attached to it.");
         var by = await k.ActorLabelAsync(ct);
         file.ResolveManually(contractRowId, by, k.Clock.UtcNow);
         var now = k.Clock.UtcNow;

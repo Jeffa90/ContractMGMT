@@ -7,10 +7,10 @@
     <dt>@L["ABN"]</dt><dd>@(Model.Supplier.Abn ?? "-")</dd>
     <dt>@L["Status"]</dt><dd>@Model.Supplier.Status</dd>
 </dl>
-<h2>@L["Contracts you can see for this supplier"]</h2>
+<h2>@L["[[contract|plural]] you can see for this [[supplier|lower]]"]</h2>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Contracts"]</caption>
+    <caption class="visually-hidden">@L["[[contract|plural]]"]</caption>
     <thead><tr><th scope="col">@L["Reference"]</th><th scope="col">@L["Title"]</th><th scope="col">@L["Status"]</th></tr></thead>
     <tbody>
     @foreach (var c in Model.Contracts) { <tr><th scope="row"><a href="/Contracts/Details/@c.Id">@c.AgreementReference</a></th><td>@c.Title</td><td>@c.Status</td></tr> }
@@ -18,4 +18,4 @@
     </tbody>
 </table>
 </div>
-<p><a href="/Suppliers">@L["Back to suppliers"]</a></p>
+<p><a href="/Suppliers">@L["Back to [[supplier|plural|lower]]"]</a></p>

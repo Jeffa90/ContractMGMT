@@ -7,7 +7,7 @@
 <partial name="_Errors" model="ViewData.ModelState" />
 @if (Model.Organisations.Count > 1)
 {
-    <form method="get" class="card"><div class="field"><label for="organisationId">@L["Organisation"]</label>
+    <form method="get" class="card"><div class="field"><label for="organisationId">@L["[[organisation]]"]</label>
         <select id="organisationId" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
         <button type="submit">@L["Choose"]</button></form>
 }

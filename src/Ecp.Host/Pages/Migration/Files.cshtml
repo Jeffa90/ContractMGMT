@@ -2,9 +2,9 @@
 @model Ecp.Host.Pages.Migration.FilesModel
 @using Ecp.DataMigration.Domain
 @{ ViewData["Title"] = L["Attachments"].Value; }
-<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the batch"]</a></p>
+<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the [[migration.batch|lower]]"]</a></p>
 <h1>@L["Attachments and the unmatched queue"]</h1>
-<p class="lede">@L["Each file is matched to a contract in a fixed order: the manifest's SourceRecordId, the manifest's AgreementReference, the profile's naming rule, then the exact folder name. The reason for each match is shown. If more than one contract fits, or none does, the file waits here for a person: the platform never guesses. Files in the queue are never lost; discarding one is recorded."]</p>
+<p class="lede">@L["Each file is matched to [[contract|lower|a]] in a fixed order: the manifest's SourceRecordId, the manifest's AgreementReference, the profile's naming rule, then the exact folder name. The reason for each match is shown. If more than one [[contract|lower]] fits, or none does, the file waits here for a person: the platform never guesses. Files in the queue are never lost; discarding one is recorded."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <form method="get" class="card">
     <div class="field"><label for="state">@L["State"]</label>
@@ -30,13 +30,13 @@
         {
             <form method="post" asp-page-handler="Match" class="actions">
                 <input type="hidden" name="FileId" value="@f.Id" />
-                <label for="c-@f.Id" class="visually-hidden">@L["Contract for"] @f.RelativePath</label>
+                <label for="c-@f.Id" class="visually-hidden">@L["[[contract]] for"] @f.RelativePath</label>
                 <select id="c-@f.Id" name="ContractRowId">@foreach (var c in Model.Choices) { <option value="@c.RowId" selected="@(f.Proposals.Count == 1 && f.Proposals[0].ContractRowId == c.RowId)">@(c.AgreementReference ?? c.SourceRecordId) (@L["row"] @c.Sequence)</option> }</select>
-                <button type="submit" class="secondary">@L["Match to this contract"]</button>
+                <button type="submit" class="secondary">@L["Match to this [[contract|lower]]"]</button>
             </form>
             @if (f.State == FileState.Unmatched && f.QueueReason == QueueReason.DuplicateReview)
             {
-                <form method="post" asp-page-handler="Release"><input type="hidden" name="FileId" value="@f.Id" /><button type="submit" class="secondary">@L["Import it as a separate document"]</button></form>
+                <form method="post" asp-page-handler="Release"><input type="hidden" name="FileId" value="@f.Id" /><button type="submit" class="secondary">@L["Import it as a separate [[document|lower]]"]</button></form>
             }
             <form method="post" asp-page-handler="Discard" class="actions">
                 <input type="hidden" name="FileId" value="@f.Id" />
@@ -60,7 +60,7 @@
 <h2>@L["Attachment manifest"]</h2>
 <div class="table-wrap"><table>
     <caption class="visually-hidden">@L["Manifest rows"]</caption>
-    <thead><tr><th scope="col">@L["Row"]</th><th scope="col">@L["Source record"]</th><th scope="col">@L["Agreement reference"]</th><th scope="col">@L["Path"]</th><th scope="col">@L["Document type"]</th><th scope="col">@L["State"]</th></tr></thead>
+    <thead><tr><th scope="col">@L["Row"]</th><th scope="col">@L["Source record"]</th><th scope="col">@L["[[contract.reference|sentence]]"]</th><th scope="col">@L["Path"]</th><th scope="col">@L["[[document]] type"]</th><th scope="col">@L["State"]</th></tr></thead>
     <tbody>
     @foreach (var m in Model.Manifest) { <tr><th scope="row">@m.RowNumber</th><td>@m.SourceRecordId</td><td>@m.AgreementReference</td><td>@m.RelativePath</td><td>@(m.DocumentTypeCode ?? m.DocumentTypeRaw)</td><td>@m.State</td></tr> }
     @if (Model.Manifest.Count == 0) { <tr><td colspan="6">@L["No manifest loaded."]</td></tr> }

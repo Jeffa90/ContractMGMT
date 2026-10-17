@@ -1,16 +1,16 @@
 @page "/Admin/Approvals/History"
 @model Ecp.Host.Pages.Admin.Approvals.HistoryModel
-@{ ViewData["Title"] = L["Approval matrix history"].Value; }
-<h1>@L["Approval matrix history and audit"]</h1>
+@{ ViewData["Title"] = L["[[approval]] matrix history"].Value; }
+<h1>@L["[[approval]] matrix history and audit"]</h1>
 <p class="lede">@L["Every published version of the matrix is kept, with who published it and what changed row by row. Delegations, simulations and blocked submissions are recorded too. History is never edited."]</p>
-<nav class="tabs" aria-label="@L["Approval matrix pages"]">
+<nav class="tabs" aria-label="@L["[[approval]] matrix pages"]">
     <a href="/Admin/Approvals?organisationId=@Model.OrganisationId">@L["Matrices"]</a>
     <a href="/Admin/Approvals/Simulate?organisationId=@Model.OrganisationId">@L["Simulator"]</a>
     <a href="/Admin/Approvals/Delegations?organisationId=@Model.OrganisationId">@L["Delegations"]</a>
     <a href="/Admin/Approvals/History?organisationId=@Model.OrganisationId" aria-current="page">@L["History and audit"]</a>
 </nav>
 <form method="get" class="card">
-    <div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <div class="field"><label for="org">@L["[[organisation]]"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
     <div class="field"><label for="show">@L["Show"]</label><select id="show" name="show">@foreach (var f in Ecp.Host.Pages.Admin.Approvals.HistoryModel.Filters) { <option value="@f.Key" selected="@(f.Key == Model.Show)">@L[f.Title]</option> }</select></div>
     <button type="submit" class="secondary">@L["Apply"]</button>
 </form>

@@ -1,19 +1,19 @@
 @page "/Admin/Approvals/Simulate"
 @model Ecp.Host.Pages.Admin.Approvals.SimulateModel
 @using Ecp.Approvals.Domain
-@{ ViewData["Title"] = L["Approval matrix simulator"].Value; }
-<h1>@L["Approval matrix simulator"]</h1>
+@{ ViewData["Title"] = L["[[approval]] matrix simulator"].Value; }
+<h1>@L["[[approval]] matrix simulator"]</h1>
 <p class="lede">@L["Try a matrix on a sample submission. Nothing is submitted or changed. The result shows which rows matched, the steps and the people, and why each person was included or left out. Each run is recorded in the audit history because it shows who the approvers are."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
-<nav class="tabs" aria-label="@L["Approval matrix pages"]">
+<nav class="tabs" aria-label="@L["[[approval]] matrix pages"]">
     <a href="/Admin/Approvals?organisationId=@Model.OrganisationId">@L["Matrices"]</a>
     <a href="/Admin/Approvals/Simulate?organisationId=@Model.OrganisationId" aria-current="page">@L["Simulator"]</a>
     <a href="/Admin/Approvals/Delegations?organisationId=@Model.OrganisationId">@L["Delegations"]</a>
     <a href="/Admin/Approvals/History?organisationId=@Model.OrganisationId">@L["History and audit"]</a>
 </nav>
 
-<form method="get" class="card" aria-label="@L["Choose organisation"]">
-    <div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+<form method="get" class="card" aria-label="@L["Choose [[organisation|lower]]"]">
+    <div class="field"><label for="org">@L["[[organisation]]"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
     <button type="submit" class="secondary">@L["Show"]</button>
 </form>
 
@@ -34,14 +34,14 @@
     <fieldset><legend>@L["The submission"]</legend>
         <div class="field"><label for="Value">@L["Value"]</label><input id="Value" name="Value" type="number" step="0.01" min="0" value="@Model.Value" /></div>
         <div class="field"><label for="Currency">@L["Currency (three letters)"]</label><input id="Currency" name="Currency" maxlength="3" value="@Model.Currency" /></div>
-        <div class="field"><label for="CategoryId">@L["Category"]</label><select id="CategoryId" name="CategoryId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Code &ndash; @c.Name</option> }</select></div>
-        <div class="field"><label for="BusinessUnitId">@L["Business unit"]</label><select id="BusinessUnitId" name="BusinessUnitId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.BusinessUnits) { <option value="@c.Id" selected="@(c.Id == Model.BusinessUnitId)">@c.Code &ndash; @c.Name</option> }</select></div>
-        <div class="field"><label for="SiteId">@L["Site"]</label><select id="SiteId" name="SiteId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.Sites) { <option value="@c.Id" selected="@(c.Id == Model.SiteId)">@c.Code &ndash; @c.Name</option> }</select></div>
-        <div class="field"><label for="LegalEntityId">@L["Legal entity"]</label><select id="LegalEntityId" name="LegalEntityId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.LegalEntities) { <option value="@c.Id" selected="@(c.Id == Model.LegalEntityId)">@c.Code &ndash; @c.Name</option> }</select></div>
+        <div class="field"><label for="CategoryId">@L["[[category]]"]</label><select id="CategoryId" name="CategoryId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Code &ndash; @c.Name</option> }</select></div>
+        <div class="field"><label for="BusinessUnitId">@L["[[business.unit|sentence]]"]</label><select id="BusinessUnitId" name="BusinessUnitId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.BusinessUnits) { <option value="@c.Id" selected="@(c.Id == Model.BusinessUnitId)">@c.Code &ndash; @c.Name</option> }</select></div>
+        <div class="field"><label for="SiteId">@L["[[site]]"]</label><select id="SiteId" name="SiteId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.Sites) { <option value="@c.Id" selected="@(c.Id == Model.SiteId)">@c.Code &ndash; @c.Name</option> }</select></div>
+        <div class="field"><label for="LegalEntityId">@L["[[legal.entity|sentence]]"]</label><select id="LegalEntityId" name="LegalEntityId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.LegalEntities) { <option value="@c.Id" selected="@(c.Id == Model.LegalEntityId)">@c.Code &ndash; @c.Name</option> }</select></div>
         <div class="field"><label for="Classification">@L["Classification"]</label><select id="Classification" name="Classification">@foreach (var c in Model.Choices.Classifications) { <option selected="@(c == Model.Classification)">@c</option> }</select></div>
-        <div class="field"><label for="ContractType">@L["Contract type"]</label><input id="ContractType" name="ContractType" maxlength="100" value="@Model.ContractType" /></div>
+        <div class="field"><label for="ContractType">@L["[[contract.type|sentence]]"]</label><input id="ContractType" name="ContractType" maxlength="100" value="@Model.ContractType" /></div>
         <div class="field"><label for="RiskLevel">@L["Risk level"]</label><input id="RiskLevel" name="RiskLevel" maxlength="100" value="@Model.RiskLevel" /></div>
-        <div class="field"><label for="SupplierType">@L["Supplier type"]</label><input id="SupplierType" name="SupplierType" maxlength="100" value="@Model.SupplierType" /></div>
+        <div class="field"><label for="SupplierType">@L["[[supplier]] type"]</label><input id="SupplierType" name="SupplierType" maxlength="100" value="@Model.SupplierType" /></div>
         <div class="field"><label for="CustomFields">@L["Custom fields (one per line, code=value)"]</label><textarea id="CustomFields" name="CustomFields" rows="3" maxlength="2000">@Model.CustomFields</textarea></div>
         @if (Model.People.Count > 0)
         {

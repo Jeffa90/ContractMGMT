@@ -2,13 +2,13 @@
 @model Ecp.Host.Pages.Admin.Studio.FieldsModel
 @using Ecp.Metadata
 @using Ecp.Configuration
-@{ ViewData["Title"] = L["Additional contract fields"].Value; }
-<h1>@L["Additional contract fields"]</h1>
+@{ ViewData["Title"] = L["Additional [[contract|lower]] fields"].Value; }
+<h1>@L["Additional [[contract|lower]] fields"]</h1>
 <p><a href="/Admin/Studio?organisationId=@Model.OrganisationId">@L["Configuration Studio"]</a></p>
 <partial name="_Errors" model="ViewData.ModelState" />
 @if (Model.Organisations.Count > 1)
 {
-    <form method="get" class="card"><div class="field"><label for="organisationId">@L["Organisation"]</label>
+    <form method="get" class="card"><div class="field"><label for="organisationId">@L["[[organisation]]"]</label>
         <select id="organisationId" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
         <button type="submit">@L["Choose"]</button></form>
 }
@@ -80,7 +80,7 @@
                         @if (f.Filterable) { <span class="badge">@L["Filter"]</span> }
                         @if (f.Sortable) { <span class="badge">@L["Sort"]</span> }
                         @if (f.Reportable) { <span class="badge">@L["Export"]</span> }
-                        @if (f.UsableInApprovals) { <span class="badge">@L["Approvals"]</span> }
+                        @if (f.UsableInApprovals) { <span class="badge">@L["[[approval|plural]]"]</span> }
                         <span class="badge">@f.Classification</span>
                     </td>
                     <td>@st.Usage.Of(f.Key)</td>

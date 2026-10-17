@@ -1,7 +1,7 @@
-@{ ViewData["Title"] = L["Organisation onboarding"].Value; }
-<h1>@L["Organisation onboarding"]</h1>
+@{ ViewData["Title"] = L["[[organisation]] onboarding"].Value; }
+<h1>@L["[[organisation]] onboarding"]</h1>
 <div class="error-summary" role="alert" tabindex="-1">
-    <h2>@L["You cannot change this organisation's configuration"]</h2>
-    <p>@L["Onboarding changes organisation-level configuration. Your roles let you open onboarding, but the configuration rights it needs are held by Organisation Administrators and Business Configuration Administrators. A Tenant Administrator's configuration rights cover tenant-level definitions only."]</p>
-    <p>@L["Ask an Organisation Administrator to do this, or grant yourself that role in user administration (this is audited)."]</p>
+    <h2>@L["You cannot change this [[organisation|lower]]'s configuration"]</h2>
+    <p>@L["Onboarding changes [[organisation|lower]]-level configuration. Your roles let you open onboarding, but the configuration rights it needs are held by [[organisation]] Administrators and Business Configuration Administrators. A Tenant Administrator's configuration rights cover tenant-level definitions only."]</p>
+    <p>@L["Ask [[organisation|a]] Administrator to do this, or grant yourself that role in user administration (this is audited)."]</p>
 </div>

@@ -76,3 +76,8 @@ packs.assign,,Y,Y,,Y,,,,,,,,S7 owner decision
 packs.retire,,Y,,,,,,,,,,,S7 owner decision
 packs.trust.manage,,Y,,,,,,,,,,,S7 owner decision
 packs.audit.read,,Y,,,,,,,,,Y,,S7 owner decision
+terminology.read,,Y,Y,,Y,,,,,,Y,,S4 owner decision
+terminology.draft,,S,Y,,Y,,,,,,,,S4 owner decision
+terminology.publish,,S,S,,Y,,,,,,,,S4 owner decision
+terminology.rollback,,S,S,,Y,,,,,,,,S4 owner decision
+terminology.audit.read,,Y,Y,,Y,,,,,,Y,,S4 owner decision

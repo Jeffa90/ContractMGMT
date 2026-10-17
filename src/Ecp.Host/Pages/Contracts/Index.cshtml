@@ -1,9 +1,9 @@
 @page "/Contracts"
 @model Ecp.Host.Pages.Contracts.IndexModel
 @using Ecp.Contracts.Register
-@{ ViewData["Title"] = L["Contract register"].Value; }
-<h1>@L["Contract register"]</h1>
-<p class="lede">@L["Only contracts inside your assigned organisations, categories, business units, sites and classification ceiling are listed."]</p>
+@{ ViewData["Title"] = L["[[contract.register|sentence]]"].Value; }
+<h1>@L["[[contract.register|sentence]]"]</h1>
+<p class="lede">@L["Only [[contract|plural|lower]] inside your assigned [[organisation|plural|lower]], [[category|plural|lower]], [[business.unit|plural|lower]], [[site|plural|lower]] and classification ceiling are listed."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 
 <form method="get" class="card" aria-label="@L["Choose a view"]">
@@ -12,7 +12,7 @@
         <select id="view" name="view">
             @foreach (var group in Model.Views.GroupBy(v => v.Scope))
             {
-                <optgroup label="@(group.Key == ViewScope.System ? L["Standard views"] : group.Key == ViewScope.Shared ? L["Shared by your organisation"] : L["My views"])">
+                <optgroup label="@(group.Key == ViewScope.System ? L["Standard views"] : group.Key == ViewScope.Shared ? L["Shared by your [[organisation|lower]]"] : L["My views"])">
                     @foreach (var v in group) { <option value="@v.Ref" selected="@(v.Ref == Model.View)">@v.Name</option> }
                 </optgroup>
             }
@@ -22,15 +22,15 @@
     <button type="submit">@L["Open the view"]</button>
 </form>
 
-<form method="get" class="card" aria-label="@L["Filter contracts"]">
+<form method="get" class="card" aria-label="@L["Filter [[contract|plural|lower]]"]">
     <input type="hidden" name="view" value="@Model.View" />
-    <div class="field"><label for="q">@L["Search by reference, title, supplier or searchable details"]</label><input id="q" name="q" type="text" maxlength="200" value="@Model.Q" /></div>
+    <div class="field"><label for="q">@L["Search by reference, title, [[supplier|lower]] or searchable details"]</label><input id="q" name="q" type="text" maxlength="200" value="@Model.Q" /></div>
     @if (Model.Organisations.Count > 1)
     {
         <div class="field">
-            <label for="org">@L["Organisation"]</label>
+            <label for="org">@L["[[organisation]]"]</label>
             <select id="org" name="org"><option value="">@L["All I can reach"]</option>@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.Org)">@o.Name</option> }</select>
-            <p class="hint">@L["Choose one organisation to filter and sort on its additional fields."]</p>
+            <p class="hint">@L["Choose one [[organisation|lower]] to filter and sort on its additional fields."]</p>
         </div>
     }
     <fieldset>
@@ -68,12 +68,12 @@
     </nav>
 }
 
-<div class="actions"><a class="button" href="/Contracts/Create">@L["Create a contract"]</a></div>
-<p role="status">@Model.Result.Total @L["contract(s) found"]</p>
+<div class="actions"><a class="button" href="/Contracts/Create">@L["Create [[contract|lower|a]]"]</a></div>
+<p role="status">@Model.Result.Total @L["[[contract|lower]](s) found"]</p>
 @foreach (var note in Model.Result.Notes) { <p class="hint" role="note">@note</p> }
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Contracts"]</caption>
+    <caption class="visually-hidden">@L["[[contract|plural]]"]</caption>
     <thead>
         <tr>
         @foreach (var col in Model.Result.Columns)
@@ -100,7 +100,7 @@
         }
         </tr>
     }
-    @if (Model.Result.Rows.Count == 0) { <tr><td colspan="@Math.Max(1, Model.Result.Columns.Count)">@L["No contracts match."]</td></tr> }
+    @if (Model.Result.Rows.Count == 0) { <tr><td colspan="@Math.Max(1, Model.Result.Columns.Count)">@L["No [[contract|plural|lower]] match."]</td></tr> }
     </tbody>
 </table>
 </div>

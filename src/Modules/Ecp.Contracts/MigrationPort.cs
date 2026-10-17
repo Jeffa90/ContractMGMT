@@ -143,14 +143,14 @@ internal sealed class ContractMigrationPort(
     {
         await RequireOrganisationAsync(organisationId, ct);
         if (parentId is { } p && !await db.Categories.AnyAsync(x => x.Id == p && x.OrganisationId == organisationId, ct))
-            throw new DomainException("category_not_found", "The parent category was not found.");
+            throw new DomainException("category_not_found", "The parent [[category|lower]] was not found.");
         var category = Category.Create(tenant.RequireTenantId(), organisationId, code, name, parentId);
         category.MarkMigrated(sourceSystem, sourceRecordId, batchId);
         await uow.ExecuteAsync(async c =>
         {
             db.Categories.Add(category);
             try { await db.SaveChangesAsync(c); }
-            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("category_code_in_use", "That category code is already in use."); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("category_code_in_use", "That [[category|lower]] code is already in use."); }
             audit.Record(new AuditEntry("migration.category.created", nameof(Category), category.Id.ToString(), OrganisationId: organisationId, MigrationBatchId: batchId,
                 NewValuesJson: AuditJson.Of(new { category.Code, category.Name, sourceSystem, sourceRecordId })));
         }, ct);
@@ -162,8 +162,8 @@ internal sealed class ContractMigrationPort(
         var tenantId = tenant.RequireTenantId();
         await RequireOrganisationAsync(m.OrganisationId, ct);
         // Supplier and category must belong to this tenant and organisation (other tenants' rows are invisible through the filter): INV-48.
-        if (!await db.Suppliers.AnyAsync(s => s.Id == m.SupplierId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("supplier_not_found", "The supplier was not found.");
-        if (!await db.Categories.AnyAsync(s => s.Id == m.CategoryId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("category_not_found", "The category was not found.");
+        if (!await db.Suppliers.AnyAsync(s => s.Id == m.SupplierId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("supplier_not_found", "The [[supplier|lower]] was not found.");
+        if (!await db.Categories.AnyAsync(s => s.Id == m.CategoryId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("category_not_found", "The [[category|lower]] was not found.");
         var by = actor.ActorId ?? "system";
         var n = new NewContract(tenantId, m.OrganisationId, m.AgreementReference, m.Title, m.SupplierId, m.CategoryId, await InitialStatusAsync(m.OrganisationId, ct), by, clock.UtcNow, m.Description,
             m.Classification, m.CurrencyCode, m.EstimatedValue, m.ExtensionType, m.LegalReviewRequired, m.StartDate, m.EffectiveDate, m.ReviewDate, m.EndDate,
@@ -177,7 +177,7 @@ internal sealed class ContractMigrationPort(
         {
             db.Contracts.Add(contract);
             try { await db.SaveChangesAsync(c); }
-            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("agreement_reference_in_use", "That agreement reference or source record is already in use."); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("agreement_reference_in_use", "That [[contract.reference|lower]] or source record is already in use."); }
             // Configured field values are stored with the batch and the value as the source gave it. The record's last-changed stamp is left alone, so an untouched migrated record can still be rolled back by removal.
             if (m.CustomValues is { Count: > 0 })
                 await customFields.ApplyMigratedAsync(contract.Id, m.CustomValues, m.BatchId, m.SourceSystem, m.CustomSourceValues ?? new Dictionary<string, string>(), by, touch: false, c);
@@ -207,7 +207,7 @@ internal sealed class ContractMigrationPort(
     {
         return await uow.ExecuteAsync(async c =>
         {
-            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, c) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, c) ?? throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
             var by = actor.ActorId ?? "system";
             // Configured fields travel under the "cf." prefix in the same dictionary, so the before-image a rollback restores covers them too.
             var core = fields.Where(kv => !kv.Key.StartsWith(CustomPrefix, StringComparison.Ordinal)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
@@ -234,7 +234,7 @@ internal sealed class ContractMigrationPort(
 
     public async Task<IReadOnlyDictionary<string, string?>> CaptureFieldsAsync(Guid contractId, IEnumerable<string> fieldNames, CancellationToken ct = default)
     {
-        var contract = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+        var contract = await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct) ?? throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
         var names = fieldNames.ToList();
         var result = new Dictionary<string, string?>(contract.CaptureFields(names.Where(n => !n.StartsWith(CustomPrefix, StringComparison.Ordinal))), StringComparer.Ordinal);
         var custom = names.Where(n => n.StartsWith(CustomPrefix, StringComparison.Ordinal)).Select(n => n[CustomPrefix.Length..]).ToList();
@@ -340,7 +340,7 @@ internal sealed class ContractMigrationPort(
 
     private async Task RequireOrganisationAsync(Guid organisationId, CancellationToken ct)
     {
-        if (!await tenants.OrganisationExistsAsync(organisationId, ct)) throw new DomainException("organisation_not_found", "The organisation was not found.");
+        if (!await tenants.OrganisationExistsAsync(organisationId, ct)) throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
     }
 }
 

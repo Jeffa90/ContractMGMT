@@ -8,7 +8,7 @@
             {
                 foreach (var err in e.Value!.Errors)
                 {
-                    <li>@if (!string.IsNullOrEmpty(e.Key)) { <a href="#@e.Key">@err.ErrorMessage</a> } else { @err.ErrorMessage }</li>
+                    <li>@if (!string.IsNullOrEmpty(e.Key)) { <a href="#@e.Key">@Terms.Expand(err.ErrorMessage)</a> } else { @Terms.Expand(err.ErrorMessage) }</li>
                 }
             }
         </ul>

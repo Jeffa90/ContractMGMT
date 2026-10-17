@@ -12,7 +12,7 @@ internal sealed class ReferenceAllocator(ContractsDbContext db, IOrganisationStr
     /// <summary>Takes the next number atomically inside the caller's unit of work and formats it with the organisation's rule.</summary>
     public async Task<string> AllocateAsync(Guid organisationId, bool consume, CancellationToken ct)
     {
-        var org = await organisations.GetOrganisationAsync(organisationId, ct) ?? throw new DomainException("organisation_not_found", "The organisation was not found.");
+        var org = await organisations.GetOrganisationAsync(organisationId, ct) ?? throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         var rule = Ecp.Tenancy.Domain.ReferenceNumberingRule.Create(org.ReferencePrefix);
         var next = consume ? await TakeAsync(organisationId, ct) : (await db.ReferenceCounters.AsNoTracking().Where(r => r.OrganisationId == organisationId).Select(r => (long?)r.LastValue).FirstOrDefaultAsync(ct) ?? 0) + 1;
         return rule.Format(next);

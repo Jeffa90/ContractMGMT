@@ -27,7 +27,7 @@ public sealed class CategoriesModel(ISecuredCategoryService categories, IOrganis
     {
         // The parent's code is resolved server-side; the trusted upsert is not used so authorisation applies.
         await categories.CreateAsync(new CreateCategoryRequest(organisationId, code, name, parentCategoryId), ct);
-        Flash("Category added.");
+        Flash("[[category]] added.");
         return RedirectToPage();
     }, reload: () => LoadAsync(CancellationToken.None));
 
@@ -48,7 +48,7 @@ public sealed class CategoriesModel(ISecuredCategoryService categories, IOrganis
     public Task<IActionResult> OnPostDeactivateAsync(Guid categoryId, CancellationToken ct) => RunAsync(async () =>
     {
         await categories.DeactivateAsync(categoryId, ct);
-        Flash("Category deactivated.");
+        Flash("[[category]] deactivated.");
         return RedirectToPage();
     });
 

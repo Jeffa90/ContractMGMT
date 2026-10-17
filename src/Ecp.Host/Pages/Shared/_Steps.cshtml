@@ -22,15 +22,15 @@
                 case "submitLegal": case "resubmitLegal": case "returnToLegal":
                     <form method="post" asp-page-handler="LegalSubmit">
                         <input type="hidden" name="ClientRequestId" value="@requestId" />
-                        <div class="field"><label for="n-@s.Code">@L["Note for Legal"]</label><input id="n-@s.Code" name="Comment" type="text" maxlength="4000" /></div>
+                        <div class="field"><label for="n-@s.Code">@L["Note for [[reviewer]]"]</label><input id="n-@s.Code" name="Comment" type="text" maxlength="4000" /></div>
                         <button type="submit">@s.Display</button>
                     </form>
                     break;
                 case "recallLegal":
-                    if (v.Legal is { } rl) { <p><a href="/Legal/Review/@rl.ReviewId">@L["Recall it from the Legal review page"]</a></p> }
+                    if (v.Legal is { } rl) { <p><a href="/Legal/Review/@rl.ReviewId">@L["Recall it from the [[legal.review|sentence]] page"]</a></p> }
                     break;
                 case "beginLegal": case "returnLegal": case "clearLegal":
-                    if (v.Legal is { } lr) { <p><a href="/Legal/Review/@lr.ReviewId">@L["Legal does this from the Legal review page"]</a></p> }
+                    if (v.Legal is { } lr) { <p><a href="/Legal/Review/@lr.ReviewId">@L["[[reviewer]] does this from the [[legal.review|sentence]] page"]</a></p> }
                     break;
                 case "sendSignature":
                     <form method="post" asp-page-handler="SendSignature">
@@ -39,7 +39,7 @@
                             <select id="prov-@s.Code" name="provider">
                                 @foreach (var p in v.Providers.Where(p => p.Available)) { <option value="@p.Key">@p.Label (@p.Status)</option> }
                             </select></div>
-                        <p class="hint">@L["Signing and the Delegation of Authority belong to the external signature service. Manual execution means you sign outside the platform and upload the executed copy."]</p>
+                        <p class="hint">@L["Signing and the Delegation of Authority belong to the external signature service. Manual execution means you sign outside the platform and upload the [[executed.document|lower]]."]</p>
                         <button type="submit">@s.Display</button>
                     </form>
                     break;
@@ -51,7 +51,7 @@
                     </form>
                     break;
                 case "approve": case "reject":
-                    if (v.Approval is { } ap) { <p><a href="/Approvals/Details/@ap.RequestId">@L["The approver decides from the approval page"]</a></p> }
+                    if (v.Approval is { } ap) { <p><a href="/Approvals/Details/@ap.RequestId">@L["The approver decides from the [[approval|lower]] page"]</a></p> }
                     break;
                 case "cancel":
                     <form method="post" asp-page-handler="Step">
@@ -91,14 +91,14 @@
             @if (ex.ProviderStatus is { Length: > 0 } native) { <dt>@L["Provider status"]</dt><dd>@native</dd> }
             @if (ex.FailureMessage is { Length: > 0 } failure) { <dt>@L["Problem"]</dt><dd>@failure</dd> }
             <dt>@L["Requested"]</dt><dd>@ex.RequestedBy, @ex.RequestedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-            @if (ex.CompletedUtc is { } done) { <dt>@L["Executed copy attached"]</dt><dd>@done.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+            @if (ex.CompletedUtc is { } done) { <dt>@L["[[executed.document|sentence]] attached"]</dt><dd>@done.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
         </dl>
-        <p class="hint">@L["A completed signature never approves, registers or locks the agreement. It only lets the executed copy be submitted for register authorisation."]</p>
+        <p class="hint">@L["A completed signature never approves, registers or locks the [[agreement|lower]]. It only lets the [[executed.document|lower]] be submitted for [[registration.approval|lower]]."]</p>
         @if (ex.Status != SignatureRequestStatus.Completed && v.Steps.Any(s => s.Role is "submitRegister" or "returnToDrafting"))
         {
             <form method="post" asp-page-handler="ExecutedCopy" enctype="multipart/form-data">
-                <div class="field"><label for="ec">@L["Upload the executed copy"]</label><input id="ec" name="file" type="file" required /></div>
-                <button type="submit" class="secondary">@L["Attach the executed copy"]</button>
+                <div class="field"><label for="ec">@L["Upload the [[executed.document|lower]]"]</label><input id="ec" name="file" type="file" required /></div>
+                <button type="submit" class="secondary">@L["Attach the [[executed.document|lower]]"]</button>
             </form>
         }
         @if (ex.Provider == "mock" && v.IsMockEnvironment && ex.Status != SignatureRequestStatus.Completed)
@@ -117,9 +117,9 @@
 }
 @if (v.Legal is { } legal)
 {
-    <p>@L["Legal review"]: <a href="/Legal/Review/@legal.ReviewId">@legal.StatusDisplay (@L["round"] @legal.CurrentRound)</a></p>
+    <p>@L["[[legal.review|sentence]]"]: <a href="/Legal/Review/@legal.ReviewId">@legal.StatusDisplay (@L["round"] @legal.CurrentRound)</a></p>
 }
 @if (v.Approval is { } approval)
 {
-    <p>@L["Register authorisation"]: <a href="/Approvals/Details/@approval.RequestId">@approval.Status</a></p>
+    <p>@L["[[registration.approval|sentence]]"]: <a href="/Approvals/Details/@approval.RequestId">@approval.Status</a></p>
 }

@@ -38,7 +38,7 @@ internal sealed class BatchRuntime(MigrationKernel k, IContractMigrationPort con
         MappingProfileVersion? version = null;
         if (batch.MappingProfileVersionId is { } vid) version = await k.Db.ProfileVersions.AsNoTracking().FirstOrDefaultAsync(v => v.Id == vid, ct);
         var sources = await k.Db.SourceFiles.AsNoTracking().Where(s => s.BatchId == batch.Id).ToListAsync(ct);
-        var org = await orgs.GetOrganisationAsync(batch.OrganisationId, ct) ?? throw new DomainException("organisation_not_found", "The organisation was not found.");
+        var org = await orgs.GetOrganisationAsync(batch.OrganisationId, ct) ?? throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         return new Loaded(batch, project, version, version is null ? MappingDefinition.Empty : MappingDefinition.FromJson(version.DefinitionJson),
             sources.FirstOrDefault(s => s.Role == SourceFileRole.Contracts), sources.FirstOrDefault(s => s.Role == SourceFileRole.Manifest), sources.FirstOrDefault(s => s.Role == SourceFileRole.Archive), org);
     }
@@ -100,7 +100,7 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
         var (batch, project) = await k.BatchAsync(batchId, MigrationPermissions.Stage, track: false, ct);
         var l = await runtime.LoadAsync(batch, project, ct);
         if (l.Version is null) throw new DomainException("profile_required", "Choose a published mapping profile version first.");
-        if (l.ContractsFile is null) throw new DomainException("source_required", "Upload the contracts file first.");
+        if (l.ContractsFile is null) throw new DomainException("source_required", "Upload the [[contract|plural|lower]] file first.");
         var stats = new Dictionary<(string, string), int[]>(); var sample = new List<PreviewRow>(); var rows = 0;
         var mctx = BatchRuntime.MappingContextFor(l);
         await foreach (var r in k.Db.StagingRows.AsNoTracking().Where(x => x.BatchId == batchId).OrderBy(x => x.Sequence).AsAsyncEnumerable().WithCancellation(ct))

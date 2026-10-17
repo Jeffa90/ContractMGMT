@@ -466,7 +466,7 @@ internal sealed class RoleAssignmentService(
         if (scope.Level != ScopeLevel.Organisation) return;
         var orgs = (await structure.ListOrganisationsAsync(ct)).Select(o => o.Id).ToHashSet();
         foreach (var org in scope.OrganisationIds)
-            if (!orgs.Contains(org)) throw new DomainException("organisation_not_found", "A named organisation was not found.");
+            if (!orgs.Contains(org)) throw new DomainException("organisation_not_found", "A named [[organisation|lower]] was not found.");
         if (!scope.NarrowsBusinessUnit && !scope.NarrowsDivision && !scope.NarrowsSite) return;
         var bus = new HashSet<Guid>(); var divs = new HashSet<Guid>(); var sites = new HashSet<Guid>();
         foreach (var org in scope.OrganisationIds)
@@ -476,9 +476,9 @@ internal sealed class RoleAssignmentService(
             foreach (var x in s.Divisions) divs.Add(x.Id);
             foreach (var x in s.Sites) sites.Add(x.Id);
         }
-        if (scope.BusinessUnitIds.Any(x => !bus.Contains(x))) throw new DomainException("business_unit_not_found", "A named business unit was not found in the named organisations.");
-        if (scope.DivisionIds.Any(x => !divs.Contains(x))) throw new DomainException("division_not_found", "A named division was not found in the named organisations.");
-        if (scope.SiteIds.Any(x => !sites.Contains(x))) throw new DomainException("site_not_found", "A named site was not found in the named organisations.");
+        if (scope.BusinessUnitIds.Any(x => !bus.Contains(x))) throw new DomainException("business_unit_not_found", "A named [[business.unit|lower]] was not found in the named [[organisation|plural|lower]].");
+        if (scope.DivisionIds.Any(x => !divs.Contains(x))) throw new DomainException("division_not_found", "A named [[division|lower]] was not found in the named [[organisation|plural|lower]].");
+        if (scope.SiteIds.Any(x => !sites.Contains(x))) throw new DomainException("site_not_found", "A named [[site|lower]] was not found in the named [[organisation|plural|lower]].");
     }
 }
 

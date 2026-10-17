@@ -128,7 +128,7 @@ internal sealed class CustomFieldStudio(IConfigurationService configuration, ISe
         var (draft, set) = await OpenAsync(organisationId, ct);
         var latest = await configuration.LatestReleaseAsync(Kind, organisationId, ct);
         if (latest is not null && ParseOrEmpty(latest.ContentJson).Find(key) is not null)
-            throw new Ecp.SharedKernel.DomainException("field_published", "A published field cannot be deleted because agreements may hold values for it. Retire it instead; every stored value is kept.");
+            throw new Ecp.SharedKernel.DomainException("field_published", "A published field cannot be deleted because [[agreement|plural|lower]] may hold values for it. Retire it instead; every stored value is kept.");
         await SaveAsync(draft, With(set, set.Fields.Where(f => !string.Equals(f.Key, key, StringComparison.OrdinalIgnoreCase)).ToList()), ct);
     }
 

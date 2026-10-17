@@ -13,34 +13,34 @@
     <li aria-current="@(step.IsCurrent ? "step" : null)" class="@(step.IsCurrent ? "current" : "")">@step.Display</li>
 }
 </ol>
-<p class="hint">@L["Workflow"]: <code>@Model.State.WorkflowRef</code> @(Model.State.IsPinned ? L["(this agreement is pinned to that release)"] : L["(it will be pinned on its first step)"])</p>
+<p class="hint">@L["Workflow"]: <code>@Model.State.WorkflowRef</code> @(Model.State.IsPinned ? L["(this [[agreement|lower]] is pinned to that release)"] : L["(it will be pinned on its first step)"])</p>
 
 <partial name="_Steps" model="Model.Steps" />
 
 @if (Model.Steps.Steps.Any(s => s.Role == "startRenewal" && s.Allowed))
 {
-    <section class="card"><h2>@L["Renewal"]</h2>
+    <section class="card"><h2>@L["[[renewal]]"]</h2>
         <form method="post" asp-page-handler="StartRenewal">
             <div class="field"><label for="rn">@L["Note"]</label><input id="rn" name="Note" type="text" maxlength="1000" /></div>
-            <p class="hint">@L["A successor draft is created with only the configured fields and document types. This agreement, its dates and its history are not changed."]</p>
-            <button type="submit">@L["Start a renewal"]</button>
+            <p class="hint">@L["A successor draft is created with only the configured fields and [[document|lower]] types. This [[agreement|lower]], its dates and its history are not changed."]</p>
+            <button type="submit">@L["Start [[renewal|lower|a]]"]</button>
         </form></section>
 }
 @if (Model.Steps.Steps.Any(s => s.Role is "completeRenewal" or "cancelRenewal"))
 {
-    <section class="card"><h2>@L["Renewal in progress"]</h2>
-        <form method="post" asp-page-handler="CompleteRenewal"><div class="field"><label for="cn">@L["Note"]</label><input id="cn" name="Note" type="text" maxlength="1000" /></div><button type="submit">@L["Complete the renewal"]</button></form>
-        <form method="post" asp-page-handler="CancelRenewal"><div class="field"><label for="cr">@L["Reason for cancelling (required)"]</label><input id="cr" name="Note" type="text" required maxlength="1000" /></div><button type="submit" class="secondary">@L["Cancel the renewal"]</button></form>
+    <section class="card"><h2>@L["[[renewal]] in progress"]</h2>
+        <form method="post" asp-page-handler="CompleteRenewal"><div class="field"><label for="cn">@L["Note"]</label><input id="cn" name="Note" type="text" maxlength="1000" /></div><button type="submit">@L["Complete the [[renewal|lower]]"]</button></form>
+        <form method="post" asp-page-handler="CancelRenewal"><div class="field"><label for="cr">@L["Reason for cancelling (required)"]</label><input id="cr" name="Note" type="text" required maxlength="1000" /></div><button type="submit" class="secondary">@L["Cancel the [[renewal|lower]]"]</button></form>
     </section>
 }
 @if (Model.Steps.Steps.Any(s => s.Role == "openVariation" && s.Allowed))
 {
-    <section class="card"><h2>@L["Variation"]</h2><p><a class="button" href="/Variations/Create?contractId=@c.Id">@L["Start a Variation"]</a></p></section>
+    <section class="card"><h2>@L["[[variation]]"]</h2><p><a class="button" href="/Variations/Create?contractId=@c.Id">@L["Start [[variation|a]]"]</a></p></section>
 }
 
 @if (Model.Renewals.Count > 0)
 {
-    <h2>@L["Renewals"]</h2>
+    <h2>@L["[[renewal|plural]]"]</h2>
     <ul class="plain">
     @foreach (var r in Model.Renewals)
     {
@@ -52,7 +52,7 @@
 }
 @if (Model.VariationList.Count > 0)
 {
-    <h2>@L["Variations"]</h2>
+    <h2>@L["[[variation|plural]]"]</h2>
     <ul class="plain">@foreach (var v in Model.VariationList) { <li><a href="/Variations/Details/@v.Id">@v.Reference</a>: @v.Title <span class="badge">@v.StatusDisplay</span> @if (v.Outcome is { } o) { <span class="badge">@o</span> }</li> }</ul>
 }
 
@@ -64,10 +64,10 @@
     <tbody>
     @foreach (var h in Model.History.OrderByDescending(x => x.OccurredUtc))
     {
-        <tr><td>@h.OccurredUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><th scope="row">@h.TransitionDisplay @if (h.SubjectKind == "Variation") { <span class="badge">@L["Variation"]</span> }</th><td>@h.FromDisplay</td><td>@h.ToDisplay</td><td>@h.Actor</td><td>@h.Comment</td></tr>
+        <tr><td>@h.OccurredUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><th scope="row">@h.TransitionDisplay @if (h.SubjectKind == "Variation") { <span class="badge">@L["[[variation]]"]</span> }</th><td>@h.FromDisplay</td><td>@h.ToDisplay</td><td>@h.Actor</td><td>@h.Comment</td></tr>
     }
     @if (Model.History.Count == 0) { <tr><td colspan="6">@L["No steps taken yet."]</td></tr> }
     </tbody>
 </table>
 </div>
-<p><a href="/Contracts/Details/@c.Id">&larr; @L["Back to the agreement"]</a></p>
+<p><a href="/Contracts/Details/@c.Id">&larr; @L["Back to the [[agreement|lower]]"]</a></p>

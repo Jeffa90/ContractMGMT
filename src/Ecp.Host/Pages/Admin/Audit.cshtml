@@ -7,7 +7,7 @@
     <div class="field"><label for="action">@L["Action starts with"]</label><input id="action" name="action" type="text" value="@Model.Action" /></div>
     <div class="field"><label for="entityType">@L["Entity type"]</label><input id="entityType" name="entityType" type="text" value="@Model.EntityType" /></div>
     <div class="field"><label for="actor">@L["Actor id"]</label><input id="actor" name="actor" type="text" value="@Model.Actor" /></div>
-    <div class="field"><label for="batch">@L["Migration batch id"]</label><input id="batch" name="batch" type="text" value="@Model.Batch" /></div>
+    <div class="field"><label for="batch">@L["[[migration.batch|sentence]] id"]</label><input id="batch" name="batch" type="text" value="@Model.Batch" /></div>
     <div class="actions"><button type="submit">@L["Filter"]</button> <a class="button secondary" href="/Admin/Audit">@L["Clear"]</a></div>
 </form>
 @if (Model.CanExport)

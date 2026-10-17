@@ -1,20 +1,20 @@
 @page "/Variations"
 @model Ecp.Host.Pages.Variations.IndexModel
-@{ ViewData["Title"] = L["Variations in progress"].Value; }
-<h1>@L["Variations in progress"]</h1>
-<p class="lede">@L["Open changes to Effective agreements. The agreement stays locked while a Variation is open."]</p>
-<p role="status">@Model.Result.Total @L["open Variation(s)"]</p>
+@{ ViewData["Title"] = L["[[variation|plural]] in progress"].Value; }
+<h1>@L["[[variation|plural]] in progress"]</h1>
+<p class="lede">@L["Open changes to Effective [[agreement|plural|lower]]. The [[agreement|lower]] stays locked while [[variation|a]] is open."]</p>
+<p role="status">@Model.Result.Total @L["open [[variation]](s)"]</p>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Variations in progress"]</caption>
-    <thead><tr><th scope="col">@L["Variation"]</th><th scope="col">@L["Agreement"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Stage"]</th><th scope="col">@L["Proposed date"]</th><th scope="col">@L["Raised by"]</th><th scope="col">@L["Last change (UTC)"]</th></tr></thead>
+    <caption class="visually-hidden">@L["[[variation|plural]] in progress"]</caption>
+    <thead><tr><th scope="col">@L["[[variation]]"]</th><th scope="col">@L["[[agreement]]"]</th><th scope="col">@L["[[supplier]]"]</th><th scope="col">@L["Stage"]</th><th scope="col">@L["Proposed date"]</th><th scope="col">@L["Raised by"]</th><th scope="col">@L["Last change (UTC)"]</th></tr></thead>
     <tbody>
     @foreach (var v in Model.Result.Items)
     {
         <tr><th scope="row"><a href="/Variations/Details/@v.Id">@v.Reference</a> <span class="hint">@v.Title</span></th><td><a href="/Contracts/Details/@v.ContractId">@v.AgreementReference</a></td><td>@v.SupplierName</td><td>@v.StatusDisplay</td>
             <td>@v.ProposedDate?.ToString("yyyy-MM-dd")</td><td>@v.CreatedBy</td><td>@v.UpdatedUtc.ToString("yyyy-MM-dd HH:mm")</td></tr>
     }
-    @if (Model.Result.Items.Count == 0) { <tr><td colspan="7">@L["No Variation is open."]</td></tr> }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="7">@L["No [[variation]] is open."]</td></tr> }
     </tbody>
 </table>
 </div>

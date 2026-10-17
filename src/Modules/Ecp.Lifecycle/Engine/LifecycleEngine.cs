@@ -137,7 +137,7 @@ internal sealed class LifecycleEngine(
         if (cmd.ExpectedStatus is not null && !string.Equals(cmd.ExpectedStatus, subject.Status, StringComparison.Ordinal))
             throw new DomainException("state_changed", $"The {subject.Noun} has moved on since you opened it: it is now {def.DisplayOf(subject.Status)}. Reload it to see its current state.");
         if (transition.Managed && !cmd.AllowManaged)
-            throw new DomainException("managed_transition", $"'{transition.Display}' is taken from its own page (Legal review, approval, Variation or renewal), not directly.");
+            throw new DomainException("managed_transition", $"'{transition.Display}' is taken from its own page ([[legal.review|sentence]], [[approval|lower]], [[variation]] or [[renewal|lower]]), not directly.");
 
         var failures = await guards.EvaluateAsync(new GuardContext(subject, resolved, transition, cmd, ActorUserId, pending), forAvailability: false, ct);
         if (failures.Count > 0)
@@ -158,7 +158,7 @@ internal sealed class LifecycleEngine(
             {
                 var variation = await db.Variations.FirstAsync(v => v.Id == subject.Id, c);
                 if (!string.Equals(variation.Status, subject.Status, StringComparison.Ordinal))
-                    throw new DomainException("state_changed", "The Variation has moved on since you opened it. Reload it to see its current state.");
+                    throw new DomainException("state_changed", "The [[variation]] has moved on since you opened it. Reload it to see its current state.");
                 if (target.Terminal) { /* the owning service completes the Variation with its outcome inside `within` */ }
                 else variation.MoveTo(transition.To, now);
             }

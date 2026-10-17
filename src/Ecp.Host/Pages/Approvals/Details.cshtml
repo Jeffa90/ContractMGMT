@@ -1,8 +1,8 @@
 @page "/Approvals/Details/{id:guid}"
 @model Ecp.Host.Pages.Approvals.DetailsModel
 @using Ecp.Lifecycle
-@{ ViewData["Title"] = L["Register authorisation"].Value + " " + Model.Approval.AgreementReference; var r = Model.Approval; var s = r.Snapshot; }
-<h1>@L["Register authorisation"]: @r.Title</h1>
+@{ ViewData["Title"] = L["[[registration.approval|sentence]]"].Value + " " + Model.Approval.AgreementReference; var r = Model.Approval; var s = r.Snapshot; }
+<h1>@L["[[registration.approval|sentence]]"]: @r.Title</h1>
 <p><span class="badge">@r.AgreementReference</span> <span class="badge @(r.Status == Ecp.Lifecycle.Domain.ApprovalStatus.Pending ? "warn" : r.Status == Ecp.Lifecycle.Domain.ApprovalStatus.Approved ? "ok" : "")">@r.Status</span> <span class="badge">@s.Classification</span></p>
 <partial name="_Errors" model="ViewData.ModelState" />
 
@@ -19,7 +19,7 @@
                     <button type="submit" asp-page-handler="Approve">@L["Approve"]</button>
                     <button type="submit" asp-page-handler="Reject" class="secondary">@L["Reject"]</button>
                 </div>
-                <p class="hint">@L["Approving stamps the Registered Date (UTC), makes the agreement Effective and locks it. Whoever responds first decides; the second response is refused."]</p>
+                <p class="hint">@L["Approving stamps the [[registered.date]] (UTC), makes the [[agreement|lower]] Effective and locks it. Whoever responds first decides; the second response is refused."]</p>
             </form>
         }
         else { <p class="flash warn" role="status">@r.CannotBecause</p> }
@@ -41,13 +41,13 @@ else if (r.Decision is { } d)
 @if (r.Plan is { } plan)
 {
     <section class="card" aria-labelledby="plan-h">
-        <h2 id="plan-h">@L["Approval steps"]</h2>
-        <p>@L["This request is approved through the approval matrix"] <code>@plan.MatrixCode</code> (@plan.MatrixName, @L["release"] @plan.Release, @L["resolved for"] @plan.EffectiveDate.ToString("yyyy-MM-dd")). <span class="badge @(plan.Status == "Approved" ? "ok" : plan.Status == "Rejected" ? "" : "warn")">@plan.Status</span>
+        <h2 id="plan-h">@L["[[approval]] steps"]</h2>
+        <p>@L["This request is approved through the [[approval|lower]] matrix"] <code>@plan.MatrixCode</code> (@plan.MatrixName, @L["release"] @plan.Release, @L["resolved for"] @plan.EffectiveDate.ToString("yyyy-MM-dd")). <span class="badge @(plan.Status == "Approved" ? "ok" : plan.Status == "Rejected" ? "" : "warn")">@plan.Status</span>
             <span class="hint">@L["The steps and people were fixed when it was submitted; later changes to the matrix do not alter it."]</span></p>
         @if (plan.YourPart is { } part) { <p class="flash" role="status">@L["Your part"]: <strong>@part</strong></p> }
         else if (r.Status == Ecp.Lifecycle.Domain.ApprovalStatus.Pending && plan.YourPartNote is { } note) { <p class="hint">@note</p> }
         <div class="table-wrap"><table>
-            <caption class="visually-hidden">@L["Approval steps"]</caption>
+            <caption class="visually-hidden">@L["[[approval]] steps"]</caption>
             <thead><tr><th scope="col">@L["Stage"]</th><th scope="col">@L["Step"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Group"]</th><th scope="col">@L["How they respond"]</th><th scope="col">@L["Who can respond"]</th><th scope="col">@L["Responses"]</th><th scope="col">@L["Still waiting on"]</th></tr></thead>
             <tbody>
             @foreach (var st in plan.Steps.OrderBy(x => x.Stage))
@@ -83,12 +83,12 @@ else if (r.Decision is { } d)
     <h2 id="snap-h">@L["What was submitted"]</h2>
     <p class="hint">@L["This is a frozen record of what the approver relied on at submission. It does not change afterwards."] @if (!r.SnapshotIntact) { <strong class="error">@L["The stored snapshot does not match its checksum."]</strong> }</p>
     <dl class="facts">
-        <dt>@L["Agreement"]</dt><dd>@s.AgreementReference @if (s.VariationReference is { } v) { <span>(@L["Variation"] @v)</span> }</dd>
-        <dt>@L["Supplier"]</dt><dd>@s.SupplierName</dd><dt>@L["Category"]</dt><dd>@s.CategoryName</dd>
+        <dt>@L["[[agreement]]"]</dt><dd>@s.AgreementReference @if (s.VariationReference is { } v) { <span>(@L["[[variation]]"] @v)</span> }</dd>
+        <dt>@L["[[supplier]]"]</dt><dd>@s.SupplierName</dd><dt>@L["[[category]]"]</dt><dd>@s.CategoryName</dd>
         <dt>@L["Value"]</dt><dd>@(s.EstimatedValue is { } val ? $"{val:N2} {s.CurrencyCode}" : "-")</dd>
         <dt>@L["Start / End"]</dt><dd>@(s.StartDate ?? "-") / @(s.EndDate ?? "-")</dd>
         <dt>@L["Review date"]</dt><dd>@(s.ReviewDate ?? "-")</dd>
-        <dt>@L["Legal review"]</dt><dd>@(s.LegalStatus ?? (s.LegalReviewRequired ? "Required" : "Not required")) @if (s.LegalRounds > 0) { <span>(@s.LegalRounds @L["round(s)"]@(s.LegalClearedBy is { } cb ? ", " + L["cleared by"].Value + " " + cb : ""))</span> }</dd>
+        <dt>@L["[[legal.review|sentence]]"]</dt><dd>@(s.LegalStatus ?? (s.LegalReviewRequired ? "Required" : "Not required")) @if (s.LegalRounds > 0) { <span>(@s.LegalRounds @L["round(s)"]@(s.LegalClearedBy is { } cb ? ", " + L["cleared by"].Value + " " + cb : ""))</span> }</dd>
         <dt>@L["Execution"]</dt><dd>@(s.ExecutionProvider ?? "-") @(s.ProviderRequestId is { } req ? $"· request {req}" : "") @(s.ExecutionStatus is { } es ? $"· {es}" : "")</dd>
         <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @r.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
         <dt>@L["Workflow"]</dt><dd><code>@s.WorkflowRef</code></dd>
@@ -103,12 +103,12 @@ else if (r.Decision is { } d)
 </section>
 
 <section class="card" aria-labelledby="doc-h">
-    <h2 id="doc-h">@L["Executed copy"]</h2>
+    <h2 id="doc-h">@L["[[executed.document|sentence]]"]</h2>
     @if (r.ExecutedDocument is { } doc)
     {
         <p>@if (doc.CanDownload) { <a href="/Documents/Download/@doc.DocumentId">@doc.Title</a> } else { @doc.Title } <span class="hint">@doc.FileName &middot; SHA-256 <code>@doc.Sha256</code></span></p>
     }
-    else { <p class="hint">@L["The executed copy is not available to you."]</p> }
+    else { <p class="hint">@L["The [[executed.document|lower]] is not available to you."]</p> }
 </section>
 
 @if (r.Plan is null)
@@ -121,7 +121,7 @@ else if (r.Decision is { } d)
 }
 
 <section aria-labelledby="hist-h">
-    <h2 id="hist-h">@L["Decision history for this agreement"]</h2>
+    <h2 id="hist-h">@L["Decision history for this [[agreement|lower]]"]</h2>
     <div class="table-wrap"><table>
         <thead><tr><th scope="col">@L["Submitted"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Decided by"]</th><th scope="col">@L["Comment"]</th></tr></thead>
         <tbody>
@@ -132,4 +132,4 @@ else if (r.Decision is { } d)
         </tbody>
     </table></div>
 </section>
-<p><a href="/Contracts/Details/@r.ContractId">@L["Open the agreement"]</a> &middot; <a href="/Approvals">&larr; @L["Pending approvals"]</a></p>
+<p><a href="/Contracts/Details/@r.ContractId">@L["Open the [[agreement|lower]]"]</a> &middot; <a href="/Approvals">&larr; @L["Pending [[approval|plural|lower]]"]</a></p>

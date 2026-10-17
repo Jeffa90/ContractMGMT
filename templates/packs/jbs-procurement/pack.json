@@ -1,7 +1,7 @@
 {
   "packId": "jbs-procurement",
   "name": "JBS Procurement Reference",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "synthetic": true,
   "publisher": "Platform (built-in)",
   "description": "Reference configuration: read-all/edit-assigned-category ownership, Legal review, register authorisation by the Group Head of Procurement or backup, Australian English. A shipped example of a solution pack, not hard-coded platform behaviour; every value is editable. Contract types and categories are synthetic illustrations.",

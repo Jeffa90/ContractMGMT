@@ -1,20 +1,20 @@
 @page "/Contracts/Documents/{id:guid}"
 @model Ecp.Host.Pages.Contracts.AddDocumentModel
-@{ ViewData["Title"] = L["Add a document"].Value; var c = Model.Contract; }
-<h1>@L["Add a document"]: @c.Title</h1>
+@{ ViewData["Title"] = L["Add [[document|lower|a]]"].Value; var c = Model.Contract; }
+<h1>@L["Add [[document|lower|a]]"]: @c.Title</h1>
 <p><a class="badge" href="/Contracts/Details/@c.Id">@c.AgreementReference</a> <span class="badge">@c.Status</span> <span class="badge">@c.Classification</span></p>
 <partial name="_Errors" model="ViewData.ModelState" />
 @if (c.Protection is { } p && (p.DocumentPolicy != "Open"))
 {
-    <p class="flash warn" role="status">@(p.DocumentPolicy == "LegalOnly" ? L["Only Legal can add documents while the review is under way."] : L["Documents cannot be added in this state. A change to an Effective agreement goes through a Variation."])</p>
+    <p class="flash warn" role="status">@(p.DocumentPolicy == "LegalOnly" ? L["Only [[reviewer]] can add [[document|plural|lower]] while the review is under way."] : L["[[document|plural]] cannot be added in this state. A change to an Effective [[agreement|lower]] goes through [[variation|a]]."])</p>
 }
 <form method="post" enctype="multipart/form-data" class="card">
     <div class="field"><label for="file">@L["File"]</label><input id="file" name="file" type="file" required /></div>
     <div class="field"><label for="DocumentType">@L["Type"]</label><select id="DocumentType" name="DocumentType">@foreach (var t in Model.Types) { <option value="@t">@t</option> }</select></div>
     <div class="field"><label for="Title">@L["Title"]</label><input id="Title" name="Title" type="text" maxlength="300" /></div>
-    <div class="field"><label for="Classification">@L["Classification (never lower than the agreement's)"]</label><input id="Classification" name="Classification" type="text" maxlength="30" placeholder="@c.Classification" /></div>
+    <div class="field"><label for="Classification">@L["Classification (never lower than the [[agreement|lower]]'s)"]</label><input id="Classification" name="Classification" type="text" maxlength="30" placeholder="@c.Classification" /></div>
     <div class="field"><label for="VersionLabel">@L["Version label (optional)"]</label><input id="VersionLabel" name="VersionLabel" type="text" maxlength="50" /></div>
     <div class="field"><label for="NewVersionOf">@L["Or add it as a new version of"]</label>
-        <select id="NewVersionOf" name="NewVersionOf"><option value="">@L["(a new document)"]</option>@foreach (var d in Model.Existing.Where(d => d.Status == "Active")) { <option value="@d.DocumentId">@d.Title</option> }</select></div>
+        <select id="NewVersionOf" name="NewVersionOf"><option value="">@L["(a new [[document|lower]])"]</option>@foreach (var d in Model.Existing.Where(d => d.Status == "Active")) { <option value="@d.DocumentId">@d.Title</option> }</select></div>
     <div class="actions"><button type="submit">@L["Add"]</button> <a class="button secondary" href="/Contracts/Details/@c.Id">@L["Back"]</a></div>
 </form>

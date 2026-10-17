@@ -63,7 +63,7 @@ Exit codes: 0 success, 1 the package or request is not acceptable, 2 usage error
 dotnet build src/Ecp.Host -c Release          # builds packs into src/Ecp.Host/bin/Release/net10.0/packs
 dotnet run --project src/Ecp.PackTool -- build-all --source templates/packs --out /tmp/packs-a
 dotnet run --project src/Ecp.PackTool -- build-all --source templates/packs --out /tmp/packs-b
-dotnet run --project src/Ecp.PackTool -- compare --a /tmp/packs-a/blank-1.1.0.ecpkg --b /tmp/packs-b/blank-1.1.0.ecpkg
+dotnet run --project src/Ecp.PackTool -- compare --a /tmp/packs-a/blank-1.2.0.ecpkg --b /tmp/packs-b/blank-1.2.0.ecpkg
 ```
 
 Building twice from the same sources gives byte-identical packages (the ZIP is deterministic and the manifest canonical). Signatures are not deterministic (ECDSA), so reproducibility is defined on the **unsigned** package and its content digest; `compare` ignores the signature.

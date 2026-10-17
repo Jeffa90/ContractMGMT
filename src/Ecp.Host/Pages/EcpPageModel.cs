@@ -1,6 +1,7 @@
 using Ecp.SharedKernel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Ecp.Host.Pages;
 
@@ -10,7 +11,13 @@ namespace Ecp.Host.Pages;
 /// </summary>
 public abstract class EcpPageModel : PageModel
 {
-    protected void Flash(string message) => TempData["Flash"] = message;
+    /// <summary>The terminology in force for this request (organisation, then solution pack, then neutral wording). Presentation only.</summary>
+    protected Ecp.Host.Terminology.TermContext Terms => HttpContext.RequestServices.GetRequiredService<Ecp.Host.Terminology.TermContext>();
+
+    /// <summary>Replaces <c>[[term]]</c> tokens in a message with the organisation's own words.</summary>
+    protected string T(string message) => Terms.Expand(message);
+
+    protected void Flash(string message) => TempData["Flash"] = T(message);
 
     /// <summary>Runs a handler body; maps service exceptions to HTTP results and domain errors to ModelState on <paramref name="page"/>.</summary>
     protected async Task<IActionResult> RunAsync(Func<Task<IActionResult>> body, Func<Task>? reload = null)
@@ -20,7 +27,7 @@ public abstract class EcpPageModel : PageModel
         catch (ForbiddenException) { return Forbid(); }
         catch (DomainException ex)
         {
-            ModelState.AddModelError(string.Empty, ex.Message);
+            ModelState.AddModelError(string.Empty, ex.RawMessage);   // tokens are expanded when the message is shown
             if (reload is not null) await reload(); // redisplay the page with fresh data and the message
             return Page();
         }

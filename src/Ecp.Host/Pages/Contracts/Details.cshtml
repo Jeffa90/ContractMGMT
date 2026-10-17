@@ -3,11 +3,11 @@
 @{ ViewData["Title"] = Model.Contract.AgreementReference; }
 <h1>@Model.Contract.Title</h1>
 <p><span class="badge">@Model.Contract.AgreementReference</span> <span class="badge">@Model.StatusDisplay</span> <span class="badge">@Model.Contract.Classification</span>
-@if (Model.Contract.RecordLocked) { <span class="badge warn">@L["Locked: changes need an authorised Variation or an audited unlock"]</span> }</p>
+@if (Model.Contract.RecordLocked) { <span class="badge warn">@L["Locked: changes need an authorised [[variation]] or an audited unlock"]</span> }</p>
 <partial name="_Errors" model="ViewData.ModelState" />
-<nav class="tabs" aria-label="@L["This agreement"]">
-    <a href="#details">@L["Details"]</a> <a href="#documents">@L["Documents"]</a> <a href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Lifecycle and history"]</a> <a href="#variations">@L["Variations"] (@Model.VariationList.Count)</a> <a href="#reminders">@L["Reminders"]</a>
-    @if (Model.Review is { } rv) { <a href="/Legal/Review/@rv.ReviewId">@L["Legal review"]</a> }
+<nav class="tabs" aria-label="@L["This [[agreement|lower]]"]">
+    <a href="#details">@L["Details"]</a> <a href="#documents">@L["[[document|plural]]"]</a> <a href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Lifecycle and history"]</a> <a href="#variations">@L["[[variation|plural]]"] (@Model.VariationList.Count)</a> <a href="#reminders">@L["Reminders"]</a>
+    @if (Model.Review is { } rv) { <a href="/Legal/Review/@rv.ReviewId">@L["[[legal.review|sentence]]"]</a> }
 </nav>
 @if (Model.Contract.Protection is { } prot)
 {
@@ -20,7 +20,7 @@
     {
         <div class="flash warn" role="status"><strong>@L["Locked."]</strong> @prot.LockReason
             @if (prot.LockedBy is { } lb) { <span class="hint">(@L["by"] @lb, @prot.LockedUtc?.ToString("yyyy-MM-dd HH:mm") UTC)</span> }
-            @L["Metadata changes need an authorised Variation."]
+            @L["Metadata changes need an authorised [[variation]]."]
             @if (Model.CanUnlock) { <a href="/Contracts/Unlock/@Model.Contract.Id">@L["Emergency unlock"]</a> }</div>
     }
     else if (prot.ContentFrozen) { <div class="flash" role="status"><strong>@L["Content frozen."]</strong> @L["This stage does not allow the details to be edited; the record can be edited again if it is returned to its owner."]</div> }
@@ -28,11 +28,11 @@
 <div class="actions"><a class="button" href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Open the lifecycle: next steps and history"]</a></div>
 
 <dl class="facts card" id="details">
-    <dt>@L["Supplier"]</dt><dd><a href="/Suppliers/Details/@Model.Contract.SupplierId">@Model.Contract.SupplierName</a></dd>
-    <dt>@L["Category"]</dt><dd>@Model.Contract.CategoryName</dd>
-    <dt>@L["Organisation"]</dt><dd>@Model.OrganisationName</dd>
-    <dt>@L["Business unit"]</dt><dd>@(Model.BusinessUnitName ?? "-")</dd>
-    <dt>@L["Site"]</dt><dd>@(Model.SiteName ?? "-")</dd>
+    <dt>@L["[[supplier]]"]</dt><dd><a href="/Suppliers/Details/@Model.Contract.SupplierId">@Model.Contract.SupplierName</a></dd>
+    <dt>@L["[[category]]"]</dt><dd>@Model.Contract.CategoryName</dd>
+    <dt>@L["[[organisation]]"]</dt><dd>@Model.OrganisationName</dd>
+    <dt>@L["[[business.unit|sentence]]"]</dt><dd>@(Model.BusinessUnitName ?? "-")</dd>
+    <dt>@L["[[site]]"]</dt><dd>@(Model.SiteName ?? "-")</dd>
     <dt>@L["Estimated value"]</dt><dd>@(Model.Value ?? "-")</dd>
     <dt>@L["Start date"]</dt><dd>@(Model.Start ?? "-")</dd>
     <dt>@L["End date"]</dt><dd>@(Model.End ?? "-")</dd>
@@ -40,20 +40,20 @@
     <dt>@L["Created"]</dt><dd>@Model.Created @L["by"] @Model.Contract.CreatedBy</dd>
     @if (Model.Contract.Classifiers is { } cl)
     {
-        <dt>@L["Legal entity"]</dt><dd>@(Model.LegalEntityName ?? "-")</dd>
-        <dt>@L["Contract type"]</dt><dd>@(cl.ContractType ?? "-")</dd>
-        <dt>@L["Agreement type"]</dt><dd>@(cl.AgreementType ?? "-")</dd>
+        <dt>@L["[[legal.entity|sentence]]"]</dt><dd>@(Model.LegalEntityName ?? "-")</dd>
+        <dt>@L["[[contract.type|sentence]]"]</dt><dd>@(cl.ContractType ?? "-")</dd>
+        <dt>@L["[[agreement]] type"]</dt><dd>@(cl.AgreementType ?? "-")</dd>
         <dt>@L["Risk level"]</dt><dd>@(cl.RiskLevel ?? "-")</dd>
         <dt>@L["Function"]</dt><dd>@(cl.FunctionCode ?? "-")</dd>
-        <dt>@L["SAP outline agreement number"]</dt><dd>@(cl.SapOutlineAgreementNumber ?? "-")</dd>
-        <dt>@L["Supplier type"]</dt><dd>@(cl.SupplierType ?? "-")</dd>
-        <dt>@L["Supplier ABN"]</dt><dd>@(cl.SupplierAbn ?? "-")</dd>
-        <dt>@L["Supplier vendor number"]</dt><dd>@(cl.SupplierVendorNumber ?? "-")</dd>
+        <dt>@L["SAP outline [[agreement|lower]] number"]</dt><dd>@(cl.SapOutlineAgreementNumber ?? "-")</dd>
+        <dt>@L["[[supplier]] type"]</dt><dd>@(cl.SupplierType ?? "-")</dd>
+        <dt>@L["[[supplier]] ABN"]</dt><dd>@(cl.SupplierAbn ?? "-")</dd>
+        <dt>@L["[[supplier]] vendor number"]</dt><dd>@(cl.SupplierVendorNumber ?? "-")</dd>
     }
     <dt>@L["Extension type"]</dt><dd>@(Model.Contract.ExtensionType ?? "-")</dd>
     <dt>@L["Effective date"]</dt><dd>@(Model.Contract.EffectiveDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
     <dt>@L["Review date"]</dt><dd>@(Model.Contract.ReviewDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
-    <dt>@L["Legal review required"]</dt><dd>@(Model.Contract.LegalReviewRequired ? L["Yes"] : L["No"])</dd>
+    <dt>@L["[[legal.review|sentence]] required"]</dt><dd>@(Model.Contract.LegalReviewRequired ? L["Yes"] : L["No"])</dd>
 </dl>
 @if (Model.Fields is { } extra && extra.Fields.Count > 0)
 {
@@ -69,7 +69,7 @@
 @if (Model.Changes.Count > 0)
 {
     <h2 id="changes">@L["Change history"]</h2>
-    <p class="hint">@L["Changes to the details of this agreement, newest first. Changes to details you are not cleared to see are not shown."]</p>
+    <p class="hint">@L["Changes to the details of this [[agreement|lower]], newest first. Changes to details you are not cleared to see are not shown."]</p>
     <ul class="plain">
     @foreach (var ch in Model.Changes)
     {
@@ -83,25 +83,25 @@
     </ul>
 }
 
-<h2 id="documents">@L["Documents"]</h2>
-<p><a href="/Contracts/Documents/@Model.Contract.Id">@L["Add a document or a new version"]</a></p>
+<h2 id="documents">@L["[[document|plural]]"]</h2>
+<p><a href="/Contracts/Documents/@Model.Contract.Id">@L["Add [[document|lower|a]] or a new version"]</a></p>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Documents"]</caption>
-    <thead><tr><th scope="col">@L["Document"]</th><th scope="col">@L["Type"]</th><th scope="col">@L["Versions"]</th><th scope="col">@L["Size"]</th><th scope="col">@L["Scan"]</th><th scope="col">@L["Source"]</th></tr></thead>
+    <caption class="visually-hidden">@L["[[document|plural]]"]</caption>
+    <thead><tr><th scope="col">@L["[[document]]"]</th><th scope="col">@L["Type"]</th><th scope="col">@L["Versions"]</th><th scope="col">@L["Size"]</th><th scope="col">@L["Scan"]</th><th scope="col">@L["Source"]</th></tr></thead>
     <tbody>
     @foreach (var d in Model.Documents)
     {
         <tr>
             <th scope="row">@if (d.CanDownload) { <a href="/Documents/Download/@d.DocumentId">@d.Title</a> } else { @d.Title }
-                @if (d.IsExecutedCopy) { <span class="badge">@L["Executed copy"]</span> } @if (d.Status != "Active") { <span class="badge warn">@d.Status</span> }
+                @if (d.IsExecutedCopy) { <span class="badge">@L["[[executed.document|sentence]]"]</span> } @if (d.Status != "Active") { <span class="badge warn">@d.Status</span> }
                 <span class="hint">@d.FileName@(d.VersionLabel is null ? "" : " · version " + d.VersionLabel)@(d.DocumentDate is { } dd ? " · " + dd.ToString("yyyy-MM-dd") : "")</span></th>
             <td>@d.DocumentType</td><td>@d.Versions</td><td>@(d.SizeBytes / 1024 + 1) KB</td>
             <td>@d.ScanStatus @if (!d.CanDownload) { <span class="hint">(@L["download not available"])</span> }</td>
             <td>@if (d.MigrationBatchId is { } mb) { if (Model.CanSeeMigration) { <a href="/Migration/Batches/@mb/Provenance">@L["Migrated"] @d.SourceSystem</a> } else { <span>@L["Migrated"] @d.SourceSystem</span> } } else { <span>-</span> }</td>
         </tr>
     }
-    @if (Model.Documents.Count == 0) { <tr><td colspan="6">@L["No documents."]</td></tr> }
+    @if (Model.Documents.Count == 0) { <tr><td colspan="6">@L["No [[document|plural|lower]]."]</td></tr> }
     </tbody>
 </table>
 </div>
@@ -109,28 +109,28 @@
 <section id="renewal">
 @if (Model.Contract.Renewal is { } ren && (ren.PredecessorId is not null || ren.SuccessorId is not null))
 {
-    <h2>@L["Renewal"]</h2>
+    <h2>@L["[[renewal]]"]</h2>
     <ul class="plain">
-        @if (ren.PredecessorId is { } pid) { <li>@L["Renews"] @if (ren.PredecessorReference is { } pr) { <a href="/Contracts/Details/@pid">@pr</a> } else { <span class="hint">@L["an agreement you cannot open"]</span> }</li> }
-        @if (ren.SuccessorId is { } sid) { <li>@L["Succeeded by"] @if (ren.SuccessorReference is { } sr) { <a href="/Contracts/Details/@sid">@sr</a> } else { <span class="hint">@L["an agreement you cannot open"]</span> }</li> }
+        @if (ren.PredecessorId is { } pid) { <li>@L["Renews"] @if (ren.PredecessorReference is { } pr) { <a href="/Contracts/Details/@pid">@pr</a> } else { <span class="hint">@L["[[agreement|lower|a]] you cannot open"]</span> }</li> }
+        @if (ren.SuccessorId is { } sid) { <li>@L["Succeeded by"] @if (ren.SuccessorReference is { } sr) { <a href="/Contracts/Details/@sid">@sr</a> } else { <span class="hint">@L["[[agreement|lower|a]] you cannot open"]</span> }</li> }
     </ul>
 }
 </section>
 
-<h2 id="variations">@L["Variations"]</h2>
+<h2 id="variations">@L["[[variation|plural]]"]</h2>
 <ul class="plain">
 @foreach (var v in Model.VariationList)
 {
     <li><a href="/Variations/Details/@v.Id">@v.Reference</a>: @v.Title <span class="badge">@v.StatusDisplay</span> @if (v.Outcome is { } o) { <span class="badge">@o</span> } <span class="hint">@v.CreatedUtc.ToString("yyyy-MM-dd")</span></li>
 }
-@if (Model.VariationList.Count == 0) { <li class="hint">@L["No Variation has been raised."]</li> }
+@if (Model.VariationList.Count == 0) { <li class="hint">@L["No [[variation]] has been raised."]</li> }
 </ul>
-<p><a class="button secondary" href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Start a Variation, renewal or other step"]</a></p>
+<p><a class="button secondary" href="/Contracts/Lifecycle/@Model.Contract.Id">@L["Start [[variation|a]], [[renewal|lower]] or other step"]</a></p>
 
 <h2 id="reminders">@L["Reminders"]</h2>
 <section class="card">
     <dl class="facts">
-        <dt>@L["Lead time"]</dt><dd>@Model.Reminder.LeadDays @L["days"] @if (Model.Reminder.LeadIsDefault) { <span class="hint">(@L["the organisation's default"])</span> }</dd>
+        <dt>@L["Lead time"]</dt><dd>@Model.Reminder.LeadDays @L["days"] @if (Model.Reminder.LeadIsDefault) { <span class="hint">(@L["the [[organisation|lower]]'s default"])</span> }</dd>
         <dt>@L["Notice period"]</dt><dd>@(Model.Reminder.NoticePeriodDays is { } np ? np + " " + L["days"].Value : "-") @if (Model.Reminder.CriticalNotice) { <span class="badge warn">@L["Critical Notice"]</span> } @if (Model.Reminder.Evergreen) { <span class="badge">@L["Evergreen"]</span> }</dd>
         <dt>@L["Last reminder"]</dt><dd>@(Model.Reminder.LastReminderSentUtc is { } lr ? lr.ToString("yyyy-MM-dd HH:mm") + " UTC (" + Model.Reminder.LastReminderKind + ", " + Model.Reminder.LastWindowDays + " " + L["day window"].Value + ")" : L["None sent yet"].Value)</dd>
         @if (Model.Reminder.LastReminderSentUtc is not null)
@@ -159,10 +159,10 @@
     <dl class="facts card">
         <dt>@L["Source system"]</dt><dd>@prov.SourceSystem</dd>
         <dt>@L["Source record"]</dt><dd>@prov.SourceRecordId</dd>
-        <dt>@L["Source agreement reference"]</dt><dd>@(prov.SourceAgreementReference ?? "-")</dd>
+        <dt>@L["Source [[contract.reference|lower]]"]</dt><dd>@(prov.SourceAgreementReference ?? "-")</dd>
         <dt>@L["Source status"]</dt><dd>@(prov.SourceStatus ?? "-")</dd>
         <dt>@L["Source extracted"]</dt><dd>@(Model.SourceExtracted ?? "-")</dd>
-        <dt>@L["Registered Date came from"]</dt><dd>@(prov.RegisteredDateProvenance is null ? "-" : prov.RegisteredDateProvenance == "Migration" ? $"the source system (value {prov.SourceRegisteredValue})" : "this platform")</dd>
+        <dt>@L["[[registered.date]] came from"]</dt><dd>@(prov.RegisteredDateProvenance is null ? "-" : prov.RegisteredDateProvenance == "Migration" ? $"the source system (value {prov.SourceRegisteredValue})" : "this platform")</dd>
         <dt>@L["Loaded by batch"]</dt><dd>@if (prov.MigrationBatchId is { } batch) { if (Model.CanSeeMigration) { <a href="/Migration/Batches/@batch">@batch</a> } else { <code>@batch</code> } } else { <span>-</span> }</dd>
         <dt>@L["Legacy load"]</dt><dd>@(Model.Contract.IsLegacyLoad ? L["Yes: loaded locked from a previous system"].Value : L["No"].Value)</dd>
     </dl>

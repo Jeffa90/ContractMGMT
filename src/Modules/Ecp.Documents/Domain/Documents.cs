@@ -130,11 +130,11 @@ public sealed class Document : ITenantOwned
         bool isExecutedCopy, string? documentSourceId = null, string? sourceSystem = null, Guid? migrationBatchId = null, Guid? parentDocumentId = null) => new()
     {
         Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
-        ContractId = contractId, DocumentTypeCode = Guard.NotBlank(documentTypeCode, "Document type", 100), Title = Guard.NotBlank(title, "Title", 300),
+        ContractId = contractId, DocumentTypeCode = Guard.NotBlank(documentTypeCode, "[[document]] type", 100), Title = Guard.NotBlank(title, "Title", 300),
         Classification = Guard.NotBlank(classification, "Classification", 30), IsExecutedCopy = isExecutedCopy,
         // A document with no contract waits in restricted staging until resolved (INV-35).
         Status = contractId is null ? DocumentStatus.Quarantined : DocumentStatus.Active,
-        DocumentSourceId = Guard.OptionalBounded(documentSourceId, "Document source id", 400), SourceSystem = Guard.OptionalBounded(sourceSystem, "Source system", 100),
+        DocumentSourceId = Guard.OptionalBounded(documentSourceId, "[[document]] source id", 400), SourceSystem = Guard.OptionalBounded(sourceSystem, "Source system", 100),
         MigrationBatchId = migrationBatchId, ParentDocumentId = parentDocumentId
     };
 
@@ -142,7 +142,7 @@ public sealed class Document : ITenantOwned
         string? label, DateOnly? documentDate, string uploadedBy, DateTime nowUtc, Guid? migrationBatchId = null, ScanStatus scan = ScanStatus.Pending)
     {
         if (Status is DocumentStatus.Archived or DocumentStatus.Discarded)
-            throw new DomainException("document_closed", "Versions cannot be added to an archived or discarded document.");
+            throw new DomainException("document_closed", "Versions cannot be added to an archived or discarded [[document|lower]].");
         var version = DocumentVersion.Create(TenantId, Id, VersionCount + 1, fileName, mimeType, size, sha256, provider, storageKey, label, documentDate, uploadedBy, nowUtc, migrationBatchId, scan);
         VersionCount++;
         CurrentVersionId = version.Id;

@@ -1,15 +1,15 @@
 @page "/Approvals"
 @model Ecp.Host.Pages.Approvals.IndexModel
-@{ ViewData["Title"] = L["Register authorisation"].Value; }
-<h1>@L["Register authorisation"]</h1>
-<p class="lede">@L["Executed agreements waiting for the Group Head of Procurement or a backup. Whoever responds first decides, and nobody can decide their own submission."]</p>
+@{ ViewData["Title"] = L["[[registration.approval|sentence]]"].Value; }
+<h1>@L["[[registration.approval|sentence]]"]</h1>
+<p class="lede">@L["Executed [[agreement|plural|lower]] waiting for the [[primary.approver]] or a backup. Whoever responds first decides, and nobody can decide their own submission."]</p>
 <form method="get" class="card"><label><input type="checkbox" name="Everything" value="true" checked="@Model.Everything" /> @L["Show every pending request I can see, not only those waiting on me"]</label>
     <div class="actions"><button type="submit">@L["Apply"]</button></div></form>
 <p role="status">@Model.Result.Total @L["request(s) pending"]</p>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Pending approvals"]</caption>
-    <thead><tr><th scope="col">@L["Agreement"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Category"]</th><th scope="col">@L["Submitted by"]</th><th scope="col">@L["Waiting"]</th><th scope="col">@L["Group"]</th><th scope="col">@L["For you"]</th></tr></thead>
+    <caption class="visually-hidden">@L["Pending [[approval|plural|lower]]"]</caption>
+    <thead><tr><th scope="col">@L["[[agreement]]"]</th><th scope="col">@L["[[supplier]]"]</th><th scope="col">@L["[[category]]"]</th><th scope="col">@L["Submitted by"]</th><th scope="col">@L["Waiting"]</th><th scope="col">@L["Group"]</th><th scope="col">@L["For you"]</th></tr></thead>
     <tbody>
     @foreach (var r in Model.Result.Items)
     {
@@ -29,4 +29,4 @@
     <ul class="plain">@foreach (var e in Model.Eligible) { <li>@e.DisplayName <span class="badge">@(e.IsBackup ? L["Backup"] : L["Primary"])</span></li> }</ul>
 }
 
-<p class="hint">@L["Going away? You can hand your approval authority to a colleague in your group for a while."] <a href="/Admin/Approvals/Delegations">@L["Delegate my authority"]</a></p>
+<p class="hint">@L["Going away? You can hand your [[approval|lower]] authority to a colleague in your group for a while."] <a href="/Admin/Approvals/Delegations">@L["Delegate my authority"]</a></p>

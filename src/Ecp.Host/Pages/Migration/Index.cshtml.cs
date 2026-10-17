@@ -21,7 +21,7 @@ public sealed class IndexModel(IMigrationProjects projects) : MigrationPageModel
     public Task<IActionResult> OnPostAsync(CancellationToken ct) => RunAsync(async () =>
     {
         var id = await projects.CreateAsync(new CreateProjectInput(OrganisationId, Name, SourceSystem, SourceSystemVersion, DataOwner, DateTime.SpecifyKind(ExtractionDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)), ct);
-        Flash("The migration project was created. Next, set the reference policy and, if needed, the legacy-load policy, then create a batch.");
+        Flash("The [[migration.project|lower]] was created. Next, set the reference policy and, if needed, the legacy-load policy, then create [[migration.batch|lower|a]].");
         return RedirectToPage("Project", new { id });
     }, () => LoadAsync(ct));
 

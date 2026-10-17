@@ -65,7 +65,7 @@ internal sealed class CategoryService(ContractsDbContext db, IUnitOfWork uow, IA
     {
         var tenantId = tenant.RequireTenantId();
         if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
-            throw new DomainException("organisation_not_found", "The organisation was not found.");
+            throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         var category = Category.Create(tenantId, r.OrganisationId, r.Code, r.Name, r.ParentCategoryId);
         return await uow.ExecuteAsync(async c =>
         {
@@ -81,7 +81,7 @@ internal sealed class CategoryService(ContractsDbContext db, IUnitOfWork uow, IA
     {
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
-        { throw new DomainException("category_code_in_use", "That category code is already in use."); }
+        { throw new DomainException("category_code_in_use", "That [[category|lower]] code is already in use."); }
     }
 }
 
@@ -91,7 +91,7 @@ internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IA
     {
         var tenantId = tenant.RequireTenantId();
         if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
-            throw new DomainException("organisation_not_found", "The organisation was not found.");
+            throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         var supplier = Supplier.Create(tenantId, r.OrganisationId, r.Name, r.Abn, r.VendorNumber, clock.UtcNow, r.SupplierType);
         return await uow.ExecuteAsync(async c =>
         {
@@ -114,7 +114,7 @@ internal sealed class ContractService(
     {
         var tenantId = tenant.RequireTenantId();
         if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct))
-            throw new DomainException("organisation_not_found", "The organisation was not found.");
+            throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         // The workflow definition decides the initial state and pins the contract to the definition in force; without a lifecycle module the configured code is used.
         var policy = policies.FirstOrDefault();
         var setup = policy is null ? null : await policy.ResolveAsync(r.OrganisationId, ct);
@@ -135,19 +135,19 @@ internal sealed class ContractService(
 
         // Tenant-wide uniqueness (D3). The message never says where a colliding reference lives.
         if (await db.Contracts.AnyAsync(c => c.AgreementReference == contract.AgreementReference, ct))
-            throw new DomainException("agreement_reference_in_use", "That agreement reference is already in use.");
+            throw new DomainException("agreement_reference_in_use", "That [[contract.reference|lower]] is already in use.");
         // Supplier and category must be visible in this tenant (other tenants' rows are invisible through the filter).
         if (!await db.Suppliers.AnyAsync(s => s.Id == r.SupplierId && s.OrganisationId == r.OrganisationId, ct))
-            throw new DomainException("supplier_not_found", "The supplier was not found.");
+            throw new DomainException("supplier_not_found", "The [[supplier|lower]] was not found.");
         if (!await db.Categories.AnyAsync(s => s.Id == r.CategoryId && s.OrganisationId == r.OrganisationId, ct))
-            throw new DomainException("category_not_found", "The category was not found.");
+            throw new DomainException("category_not_found", "The [[category|lower]] was not found.");
 
         return await uow.ExecuteAsync(async c =>
         {
             db.Contracts.Add(contract);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
-            { throw new DomainException("agreement_reference_in_use", "That agreement reference is already in use."); }
+            { throw new DomainException("agreement_reference_in_use", "That [[contract.reference|lower]] is already in use."); }
             audit.Record(new AuditEntry("contract.created", nameof(Contract), contract.Id.ToString(), OrganisationId: contract.OrganisationId, Classification: contract.Classification,
                 NewValuesJson: AuditJson.Of(new { contract.AgreementReference, contract.ContractTitle, contract.Status, contract.Classification })));
             // Configured fields: values given at creation, and the defaults of the fields that have one. They commit with the contract or not at all.
@@ -166,7 +166,7 @@ internal sealed class ContractService(
         await uow.ExecuteAsync(async c =>
         {
             var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == id, c)
-                ?? throw new DomainException("contract_not_found", "The contract was not found.");
+                ?? throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
             var old = AuditJson.Of(new { contract.ContractTitle, contract.Description });
             contract.UpdateDetails(title, description, actor.ActorId ?? "system", clock.UtcNow);
             try { await db.SaveChangesAsync(c); }

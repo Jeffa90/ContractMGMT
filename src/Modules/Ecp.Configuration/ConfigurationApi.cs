@@ -40,6 +40,12 @@ public interface IConfigurationKind
     /// <paramref name="previousContentJson"/> is the content of the release that was current before this one (null for the first release), so a kind can end what the previous release introduced.
     /// </summary>
     Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct);
+
+    /// <summary>The permissions the lifecycle asks for on this kind. Most kinds share the general configuration permissions; a kind whose content is low-risk and separately administered (terminology) names its own, so it can be delegated without handing out the general ones.</summary>
+    string DraftPermission => "config.draft";
+    string PublishPermission => "config.publish";
+    string RollbackPermission => "config.rollback";
+    string HistoryPermission => "config.history.read";
 }
 
 public interface IConfigurationService
@@ -75,6 +81,8 @@ public sealed class ConfigurationOptions
 {
     /// <summary>Second-person publish: the publisher must differ from the last editor of the draft (tenant setting; on by default in Production).</summary>
     public bool RequireSecondPersonPublish { get; set; }
+    /// <summary>The installation default solution pack (<c>Ecp:DefaultPackId</c>), used only for an organisation that has none of its own; unset unless the installer sets it. Terminology reads the pack's wording through it.</summary>
+    public string? DefaultPackId { get; set; }
 }
 
 internal sealed class ConfigurationService(
@@ -84,6 +92,7 @@ internal sealed class ConfigurationService(
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private IConfigurationKind KindOf(string kind) => kinds.FirstOrDefault(k => k.Kind == kind) ?? throw new DomainException("unknown_configuration_kind", $"Configuration kind '{kind}' is not recognised.");
+    private string DraftPermissionOf(string kind) => (kinds.FirstOrDefault(k => k.Kind == kind)?.DraftPermission) ?? "config.draft";
 
     private ResourceDescriptor Describe(Guid organisationId, string kind)
         => organisationId == Guid.Empty
@@ -95,7 +104,7 @@ internal sealed class ConfigurationService(
 
     public async Task<DraftDto?> FindOpenDraftAsync(string kind, Guid organisationId, CancellationToken ct = default)
     {
-        await access.RequireAsync("config.draft", Describe(organisationId, kind), ct);
+        await access.RequireAsync(DraftPermissionOf(kind), Describe(organisationId, kind), ct);
         var d = await db.Drafts.AsNoTracking().Where(x => x.OrganisationId == organisationId && x.Kind == kind && (x.Status == DraftStatus.Draft || x.Status == DraftStatus.Validated))
             .OrderByDescending(x => x.UpdatedUtc).FirstOrDefaultAsync(ct);
         return d is null ? null : ToDto(d);
@@ -104,7 +113,7 @@ internal sealed class ConfigurationService(
     public async Task<DraftDto> GetOrCreateDraftAsync(string kind, Guid organisationId, string? initialJson = null, CancellationToken ct = default)
     {
         KindOf(kind);
-        await access.RequireAsync("config.draft", Describe(organisationId, kind), ct);
+        await access.RequireAsync(DraftPermissionOf(kind), Describe(organisationId, kind), ct);
         var existing = await db.Drafts.Where(x => x.OrganisationId == organisationId && x.Kind == kind && (x.Status == DraftStatus.Draft || x.Status == DraftStatus.Validated))
             .OrderByDescending(x => x.UpdatedUtc).FirstOrDefaultAsync(ct);
         if (existing is not null) return ToDto(existing);
@@ -127,7 +136,7 @@ internal sealed class ConfigurationService(
     public async Task<DraftDto> SaveDraftAsync(Guid draftId, string contentJson, CancellationToken ct = default)
     {
         var draft = await db.Drafts.FirstOrDefaultAsync(d => d.Id == draftId, ct) ?? throw new ResourceNotFoundException();
-        await access.RequireAsync("config.draft", Describe(draft.OrganisationId, draft.Kind), ct);
+        await access.RequireAsync(DraftPermissionOf(draft.Kind), Describe(draft.OrganisationId, draft.Kind), ct);
         EnsureJsonObject(contentJson);
         var editor = await EditorLabelAsync(ct);
         await uow.ExecuteAsync(async c =>
@@ -144,7 +153,7 @@ internal sealed class ConfigurationService(
     public async Task<DraftDto> ValidateAsync(Guid draftId, CancellationToken ct = default)
     {
         var draft = await db.Drafts.FirstOrDefaultAsync(d => d.Id == draftId, ct) ?? throw new ResourceNotFoundException();
-        await access.RequireAsync("config.draft", Describe(draft.OrganisationId, draft.Kind), ct);
+        await access.RequireAsync(DraftPermissionOf(draft.Kind), Describe(draft.OrganisationId, draft.Kind), ct);
         return await ValidateCoreAsync(draft, ct);
     }
 
@@ -166,7 +175,7 @@ internal sealed class ConfigurationService(
     public async Task<ReleaseDto> PublishAsync(Guid draftId, string note, CancellationToken ct = default)
     {
         var draft = await db.Drafts.FirstOrDefaultAsync(d => d.Id == draftId, ct) ?? throw new ResourceNotFoundException();
-        await access.RequireAsync("config.publish", Describe(draft.OrganisationId, draft.Kind), ct);
+        await access.RequireAsync(KindOf(draft.Kind).PublishPermission, Describe(draft.OrganisationId, draft.Kind), ct);
         var publisher = await EditorLabelAsync(ct);
         if (options.RequireSecondPersonPublish && string.Equals(draft.LastEditedBy, publisher, StringComparison.Ordinal))
             throw new DomainException("second_person_required", "A second person must publish this configuration; the last editor cannot publish it.");
@@ -201,7 +210,7 @@ internal sealed class ConfigurationService(
 
     public async Task<ReleaseDto> RollbackAsync(string kind, Guid organisationId, int toReleaseNumber, string reason, CancellationToken ct = default)
     {
-        await access.RequireAsync("config.rollback", Describe(organisationId, kind), ct);
+        await access.RequireAsync(KindOf(kind).RollbackPermission, Describe(organisationId, kind), ct);
         var why = Guard.NotBlank(reason, "Reason", 1000);
         var target = await db.Releases.AsNoTracking().FirstOrDefaultAsync(r => r.OrganisationId == organisationId && r.Kind == kind && r.Number == toReleaseNumber, ct)
             ?? throw new DomainException("release_not_found", "That release was not found.");
@@ -260,14 +269,14 @@ internal sealed class ConfigurationService(
 
     public async Task<IReadOnlyList<ReleaseDto>> ReleasesAsync(string kind, Guid organisationId, CancellationToken ct = default)
     {
-        await access.RequireAsync("config.history.read", Describe(organisationId, kind), ct);
+        await access.RequireAsync(KindOf(kind).HistoryPermission, Describe(organisationId, kind), ct);
         return (await db.Releases.AsNoTracking().Where(x => x.OrganisationId == organisationId && x.Kind == kind).OrderByDescending(x => x.Number).ToListAsync(ct)).Select(ToDto).ToList();
     }
 
     public async Task DiscardDraftAsync(Guid draftId, CancellationToken ct = default)
     {
         var draft = await db.Drafts.FirstOrDefaultAsync(d => d.Id == draftId, ct) ?? throw new ResourceNotFoundException();
-        await access.RequireAsync("config.draft", Describe(draft.OrganisationId, draft.Kind), ct);
+        await access.RequireAsync(DraftPermissionOf(draft.Kind), Describe(draft.OrganisationId, draft.Kind), ct);
         await uow.ExecuteAsync(async c =>
         {
             draft.Discard(clock.UtcNow);
@@ -370,6 +379,9 @@ public static class ConfigurationModule
         AddSolutionPacks(services, packs);
         services.AddScoped<IConfigurationKind, BrandingKind>();
         services.AddScoped<IBrandingProvider, ConfiguredBrandingProvider>();
+        services.TryAddSingleton<ITerminologyCache>(_ => new TerminologyCache());
+        services.AddScoped<IConfigurationKind, TerminologyKind>();
+        services.AddScoped<ITerminologyResolver, TerminologyResolver>();
         // Replace the default scale with the configured one (registered after the Identity module).
         services.AddScoped<IClassificationScaleProvider, ConfiguredClassificationScaleProvider>();
         return services;

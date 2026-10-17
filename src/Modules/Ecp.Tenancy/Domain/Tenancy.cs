@@ -80,7 +80,7 @@ public sealed class Organisation : ITenantOwned
     public ReferenceNumberingRule ReferenceRule => new(ReferencePrefix, ReferenceSeparator, ReferenceDigits);
 
     /// <summary>Records which solution pack the organisation works from (the pack's stable key). It changes no configuration; published releases and pinned contracts are untouched.</summary>
-    public void AssignSolutionPack(string solutionPackKey) => SolutionPackKey = Guard.NotBlank(solutionPackKey, "Solution pack", 100);
+    public void AssignSolutionPack(string solutionPackKey) => SolutionPackKey = Guard.NotBlank(solutionPackKey, "[[solution.pack|sentence]]", 100);
 
     public static Organisation Create(Guid tenantId, string name, string timeZoneId, string cultureCode, string defaultCurrencyCode,
         ReferenceNumberingRule referenceRule, string? solutionPackKey, DateTime nowUtc)
@@ -98,10 +98,10 @@ public sealed class Organisation : ITenantOwned
 
         return new Organisation
         {
-            Id = Ids.New(), TenantId = tenantId, Name = Guard.NotBlank(name, "Organisation name", 200), TimeZoneId = tz,
+            Id = Ids.New(), TenantId = tenantId, Name = Guard.NotBlank(name, "[[organisation]] name", 200), TimeZoneId = tz,
             CultureCode = culture, DefaultCurrencyCode = currency, ReferencePrefix = referenceRule.Prefix,
             ReferenceSeparator = referenceRule.Separator, ReferenceDigits = referenceRule.Digits,
-            SolutionPackKey = Guard.OptionalBounded(solutionPackKey, "Solution pack", 100), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+            SolutionPackKey = Guard.OptionalBounded(solutionPackKey, "[[solution.pack|sentence]]", 100), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
         };
     }
 }

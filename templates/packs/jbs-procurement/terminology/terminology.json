@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 1,
+  "mode": "complete",
+  "terms": [
+    {
+      "key": "application.name",
+      "locale": "en",
+      "singular": "Enterprise Contract Platform",
+      "plural": "Enterprise Contract Platform",
+      "description": "The name of the application shown in the header and in messages."
+    },
+    {
+      "key": "contract",
+      "locale": "en",
+      "singular": "Contract",
+      "plural": "Contracts",
+      "description": "The record this application manages."
+    },
+    {
+      "key": "contract.register",
+      "locale": "en",
+      "singular": "Procurement Contract Register",
+      "plural": "Procurement Contract Registers",
+      "description": "The searchable list of procurement contracts a person may see."
+    },
+    {
+      "key": "contract.reference",
+      "locale": "en",
+      "singular": "Agreement Reference",
+      "plural": "Agreement References",
+      "description": "The reference number assigned to a contract."
+    },
+    {
+      "key": "contract.type",
+      "locale": "en",
+      "singular": "Contract Type",
+      "plural": "Contract Types",
+      "description": "The kind of contract, chosen from a list the organisation configures."
+    },
+    {
+      "key": "contract.portfolio",
+      "locale": "en",
+      "singular": "Contract Portfolio",
+      "plural": "Contract Portfolios",
+      "description": "A grouping of contracts that share an owner."
+    },
+    {
+      "key": "agreement",
+      "locale": "en",
+      "singular": "Agreement",
+      "plural": "Agreements",
+      "description": "The legal instrument itself, where a page distinguishes it from the record that manages it."
+    },
+    {
+      "key": "registered.date",
+      "locale": "en",
+      "singular": "Registered Date",
+      "plural": "Registered Dates",
+      "description": "The date a contract was registered (stamped when registration is approved)."
+    },
+    {
+      "key": "executed.document",
+      "locale": "en",
+      "singular": "Executed Copy",
+      "plural": "Executed Copies",
+      "description": "The signed copy of an agreement."
+    },
+    {
+      "key": "document",
+      "locale": "en",
+      "singular": "Document",
+      "plural": "Documents",
+      "description": "A file attached to a contract."
+    },
+    {
+      "key": "contract.owner",
+      "locale": "en",
+      "singular": "Category Owner",
+      "plural": "Category Owners",
+      "description": "The person who owns a procurement category and edits the contracts in it."
+    },
+    {
+      "key": "contract.administrator",
+      "locale": "en",
+      "singular": "Procurement Administrator",
+      "plural": "Procurement Administrators",
+      "description": "Reads and administers all contracts in the organisation."
+    },
+    {
+      "key": "reviewer",
+      "locale": "en",
+      "singular": "Legal",
+      "plural": "Legal",
+      "description": "Legal, which reviews agreements before signature."
+    },
+    {
+      "key": "review.team",
+      "locale": "en",
+      "singular": "Legal",
+      "plural": "Legal",
+      "description": "The group that carries out reviews, where a page names the group rather than a person."
+    },
+    {
+      "key": "primary.approver",
+      "locale": "en",
+      "singular": "Group Head of Procurement",
+      "plural": "Group Heads of Procurement",
+      "description": "Approves registration of an executed agreement."
+    },
+    {
+      "key": "backup.approver",
+      "locale": "en",
+      "singular": "Backup Approver",
+      "plural": "Backup Approvers",
+      "description": "A person who may approve in place of the primary approver."
+    },
+    {
+      "key": "role.system.administrator",
+      "locale": "en",
+      "singular": "System Administrator",
+      "plural": "System Administrators",
+      "description": "Looks after the installation; has no access to contract data."
+    },
+    {
+      "key": "role.tenant.administrator",
+      "locale": "en",
+      "singular": "Tenant Administrator",
+      "plural": "Tenant Administrators",
+      "description": "Administers organisations and tenant-wide settings."
+    },
+    {
+      "key": "role.organisation.administrator",
+      "locale": "en",
+      "singular": "Organisation Administrator",
+      "plural": "Organisation Administrators",
+      "description": "Administers one organisation."
+    },
+    {
+      "key": "role.division.site.administrator",
+      "locale": "en",
+      "singular": "Division or Site Administrator",
+      "plural": "Division or Site Administrators",
+      "description": "Administers a division or site."
+    },
+    {
+      "key": "role.configuration.administrator",
+      "locale": "en",
+      "singular": "Business Configuration Administrator",
+      "plural": "Business Configuration Administrators",
+      "description": "Configures fields, workflows, terminology and similar settings."
+    },
+    {
+      "key": "role.auditor",
+      "locale": "en",
+      "singular": "Auditor",
+      "plural": "Auditors",
+      "description": "Reads audit evidence."
+    },
+    {
+      "key": "role.viewer",
+      "locale": "en",
+      "singular": "Viewer",
+      "plural": "Viewers",
+      "description": "Reads within the scope granted."
+    },
+    {
+      "key": "counterparty",
+      "locale": "en",
+      "singular": "Counterparty",
+      "plural": "Counterparties",
+      "description": "The other party to a contract."
+    },
+    {
+      "key": "supplier",
+      "locale": "en",
+      "singular": "Supplier",
+      "plural": "Suppliers",
+      "description": "The organisation that supplies goods or services under a contract."
+    },
+    {
+      "key": "category",
+      "locale": "en",
+      "singular": "Category",
+      "plural": "Categories",
+      "description": "A grouping of contracts, usually with an owner."
+    },
+    {
+      "key": "subcategory",
+      "locale": "en",
+      "singular": "Subcategory",
+      "plural": "Subcategories",
+      "description": "A grouping inside a category."
+    },
+    {
+      "key": "legal.review",
+      "locale": "en",
+      "singular": "Legal Review",
+      "plural": "Legal Reviews",
+      "description": "The review an agreement goes through before signature."
+    },
+    {
+      "key": "approval",
+      "locale": "en",
+      "singular": "Approval",
+      "plural": "Approvals",
+      "description": "A decision that lets work continue."
+    },
+    {
+      "key": "registration.approval",
+      "locale": "en",
+      "singular": "Register Authorisation",
+      "plural": "Register Authorisations",
+      "description": "The approval that registers an executed agreement and makes it effective."
+    },
+    {
+      "key": "external.execution",
+      "locale": "en",
+      "singular": "External Execution",
+      "plural": "External Executions",
+      "description": "Signature outside the platform."
+    },
+    {
+      "key": "variation",
+      "locale": "en",
+      "singular": "Variation",
+      "plural": "Variations",
+      "description": "A controlled change to an effective contract."
+    },
+    {
+      "key": "renewal",
+      "locale": "en",
+      "singular": "Renewal",
+      "plural": "Renewals",
+      "description": "A successor contract that replaces one that is ending."
+    },
+    {
+      "key": "notification",
+      "locale": "en",
+      "singular": "Notification",
+      "plural": "Notifications",
+      "description": "A message about work waiting or a date approaching."
+    },
+    {
+      "key": "organisation",
+      "locale": "en",
+      "singular": "Organisation",
+      "plural": "Organisations",
+      "description": "A legal or operating organisation inside the tenant."
+    },
+    {
+      "key": "legal.entity",
+      "locale": "en",
+      "singular": "Legal Entity",
+      "plural": "Legal Entities",
+      "description": "A company or other legal person."
+    },
+    {
+      "key": "business.unit",
+      "locale": "en",
+      "singular": "Business Unit",
+      "plural": "Business Units",
+      "description": "A unit of the business."
+    },
+    {
+      "key": "division",
+      "locale": "en",
+      "singular": "Division",
+      "plural": "Divisions",
+      "description": "A division of the organisation."
+    },
+    {
+      "key": "site",
+      "locale": "en",
+      "singular": "Site",
+      "plural": "Sites",
+      "description": "A place where the business operates."
+    },
+    {
+      "key": "solution.pack",
+      "locale": "en",
+      "singular": "Solution Pack",
+      "plural": "Solution Packs",
+      "description": "A ready-made starting configuration for a kind of business."
+    },
+    {
+      "key": "migration.project",
+      "locale": "en",
+      "singular": "Migration Project",
+      "plural": "Migration Projects",
+      "description": "A planned load of records from a previous system."
+    },
+    {
+      "key": "migration.batch",
+      "locale": "en",
+      "singular": "Migration Batch",
+      "plural": "Migration Batches",
+      "description": "One load inside a migration project."
+    },
+    {
+      "key": "organisation",
+      "locale": "en-US",
+      "singular": "Organization",
+      "plural": "Organizations"
+    }
+  ]
+}

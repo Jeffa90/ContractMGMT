@@ -23,7 +23,7 @@ public sealed class DetailsModel(IPackManager packs, IAuthorizationService autho
     public Task<IActionResult> OnPostRetireAsync(CancellationToken ct) => StepUpAsync(async () =>
     {
         await packs.RetireAsync(Key, Version, Reason, ct);
-        Flash("The pack version was retired. Organisations already using it are not changed.");
+        Flash("The pack version was retired. [[organisation|plural]] already using it are not changed.");
         return RedirectToPage(new { key = Key, version = Version });
     }, () => LoadAsync(ct));
 

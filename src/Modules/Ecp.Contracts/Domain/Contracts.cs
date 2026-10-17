@@ -62,12 +62,12 @@ public sealed class Category : ITenantOwned
     public static Category Create(Guid tenantId, Guid organisationId, string code, string name, Guid? parentCategoryId = null) => new()
     {
         Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
-        Code = Guard.NotBlank(code, "Category code", 100).ToUpperInvariant(), Name = Guard.NotBlank(name, "Category name", 200), ParentCategoryId = parentCategoryId
+        Code = Guard.NotBlank(code, "[[category]] code", 100).ToUpperInvariant(), Name = Guard.NotBlank(name, "[[category]] name", 200), ParentCategoryId = parentCategoryId
     };
 
     public void Deactivate() => IsActive = false;
     public void Activate() => IsActive = true;
-    public void Rename(string name) => Name = Guard.NotBlank(name, "Category name", 200);
+    public void Rename(string name) => Name = Guard.NotBlank(name, "[[category]] name", 200);
     public void SetDivision(Guid? divisionId) => DivisionId = divisionId;
 
     /// <summary>Records that a migration batch created this category (INV-41).</summary>
@@ -144,14 +144,14 @@ public sealed partial class Supplier : ITenantOwned
 
     public void SetSupplierType(string? supplierType)
     {
-        var v = Guard.OptionalBounded(supplierType, "Supplier type", 100);
-        if (v is not null && v.Any(char.IsControl)) throw new DomainException("invalid_value", "Supplier type must not contain control characters.");
+        var v = Guard.OptionalBounded(supplierType, "[[supplier]] type", 100);
+        if (v is not null && v.Any(char.IsControl)) throw new DomainException("invalid_value", "[[supplier]] type must not contain control characters.");
         SupplierType = v;
     }
 
     public static Supplier Create(Guid tenantId, Guid organisationId, string name, string? abn, string? vendorNumber, DateTime nowUtc, string? supplierType = null)
     {
-        var cleanName = Guard.NotBlank(name, "Supplier name", 300);
+        var cleanName = Guard.NotBlank(name, "[[supplier]] name", 300);
         return new Supplier
         {
             Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
@@ -350,7 +350,7 @@ public sealed class Contract : ITenantOwned
     }
 
     public static string NormaliseReference(string? reference)
-        => Guard.NotBlank(reference, "Agreement reference", 100).ToUpperInvariant();
+        => Guard.NotBlank(reference, "[[contract.reference|sentence]]", 100).ToUpperInvariant();
 
     public static Contract CreateDraft(NewContract n)
     {
@@ -373,7 +373,7 @@ public sealed class Contract : ITenantOwned
         var admin = Guard.NotBlank(authorisation.ActingAdministrator, "Acting migration administrator", 200);
         c.SourceSystem = Guard.NotBlank(source.SourceSystem, "Source system", 100);
         c.SourceRecordId = Guard.NotBlank(source.SourceRecordId, "Source record id", 200);
-        c.SourceAgreementReference = Guard.OptionalBounded(source.SourceAgreementReference, "Source agreement reference", 200);
+        c.SourceAgreementReference = Guard.OptionalBounded(source.SourceAgreementReference, "Source [[contract.reference|lower]]", 200);
         c.SourceStatus = Guard.OptionalBounded(source.SourceStatus, "Source status", 200);
         c.SourceExtractedUtc = source.SourceExtractedUtc;
         c.RecordLocked = true;
@@ -383,7 +383,7 @@ public sealed class Contract : ITenantOwned
         c.DocumentPolicy = DocumentPolicies.Closed;
         if (authorisation.AllowRegisteredDateImport && sourceRegisteredUtc.HasValue)
         {
-            c.RegisteredDateUtc = Guard.Utc(sourceRegisteredUtc.Value, "Registered date");
+            c.RegisteredDateUtc = Guard.Utc(sourceRegisteredUtc.Value, "[[registered.date|sentence]]");
             c.RegisteredBy = admin; // the acting migration administrator; the original approver is not fabricated
             c.RegisteredDateProvenance = Domain.RegisteredDateProvenance.Migration;
             c.SourceRegisteredValue = Guard.OptionalBounded(sourceRegisteredValue, "Source registered value", 200);
@@ -402,7 +402,7 @@ public sealed class Contract : ITenantOwned
         c.MigrationBatchId = Guard.NotEmpty(migrationBatchId, nameof(migrationBatchId));
         c.SourceSystem = Guard.NotBlank(source.SourceSystem, "Source system", 100);
         c.SourceRecordId = Guard.NotBlank(source.SourceRecordId, "Source record id", 200);
-        c.SourceAgreementReference = Guard.OptionalBounded(source.SourceAgreementReference, "Source agreement reference", 200);
+        c.SourceAgreementReference = Guard.OptionalBounded(source.SourceAgreementReference, "Source [[contract.reference|lower]]", 200);
         c.SourceStatus = Guard.OptionalBounded(source.SourceStatus, "Source status", 200);
         c.SourceExtractedUtc = source.SourceExtractedUtc;
         return c;
@@ -480,7 +480,7 @@ public sealed class Contract : ITenantOwned
     {
         switch (name)
         {
-            case "contractTitle": w.Title = Guard.NotBlank(raw, "Contract title", 500); break;
+            case "contractTitle": w.Title = Guard.NotBlank(raw, "[[contract]] title", 500); break;
             case "description": w.Description = Guard.OptionalBounded(raw, "Description", 4000); break;
             case "status": w.Status = Guard.NotBlank(raw, "Status", 100); break;
             case "supplierId": w.Supplier = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Supplier"); break;
@@ -646,7 +646,7 @@ public sealed class Contract : ITenantOwned
         return new Contract
         {
             Id = Ids.New(), TenantId = Guard.NotEmpty(n.TenantId, nameof(n.TenantId)), OrganisationId = Guard.NotEmpty(n.OrganisationId, nameof(n.OrganisationId)),
-            AgreementReference = NormaliseReference(n.AgreementReference), ContractTitle = Guard.NotBlank(n.Title, "Contract title", 500),
+            AgreementReference = NormaliseReference(n.AgreementReference), ContractTitle = Guard.NotBlank(n.Title, "[[contract]] title", 500),
             Description = Guard.OptionalBounded(n.Description, "Description", 4000), SupplierId = Guard.NotEmpty(n.SupplierId, nameof(n.SupplierId)),
             CategoryId = Guard.NotEmpty(n.CategoryId, nameof(n.CategoryId)), Classification = n.Classification, CurrencyCode = currency,
             EstimatedValue = n.EstimatedValue, ExtensionType = Guard.OptionalBounded(n.ExtensionType, "Extension type", 50),
@@ -663,7 +663,7 @@ public sealed class Contract : ITenantOwned
     public void UpdateDetails(string title, string? description, string updatedBy, DateTime nowUtc)
     {
         EnsureEditable(nowUtc);
-        ContractTitle = Guard.NotBlank(title, "Contract title", 500);
+        ContractTitle = Guard.NotBlank(title, "[[contract]] title", 500);
         Description = Guard.OptionalBounded(description, "Description", 4000);
         Touch(updatedBy, nowUtc);
     }
@@ -678,7 +678,7 @@ public sealed class Contract : ITenantOwned
     public void ApplyWorkflowState(string statusCode, StateEffects effects, string actor, DateTime nowUtc, bool keepProtection = false)
     {
         Status = Guard.NotBlank(statusCode, "Status", 100);
-        if (!DocumentPolicies.IsKnown(effects.DocumentPolicy)) throw new DomainException("invalid_document_policy", "The state's document policy is not recognised.");
+        if (!DocumentPolicies.IsKnown(effects.DocumentPolicy)) throw new DomainException("invalid_document_policy", "The state's [[document|lower]] policy is not recognised.");
         if (effects.Lock && !RecordLocked) { RecordLocked = true; LockedUtc = nowUtc; LockedBy = Guard.NotBlank(actor, "Locked by", 200); LockReason = Guard.OptionalBounded(effects.LockReason, "Lock reason", 200); }
         else if (effects.Lock && RecordLocked && effects.LockReason is not null) LockReason = effects.LockReason;
         if (!keepProtection) { ContentFrozen = effects.FreezeContent; DocumentPolicy = effects.DocumentPolicy; }
@@ -713,7 +713,7 @@ public sealed class Contract : ITenantOwned
     /// <summary>Records the renewal link to the agreement that succeeds this one.</summary>
     public void LinkSuccessor(Guid successorId, string actor, DateTime nowUtc)
     {
-        if (SuccessorContractId is { } existing && existing != successorId) throw new DomainException("successor_exists", "This agreement already has a successor.");
+        if (SuccessorContractId is { } existing && existing != successorId) throw new DomainException("successor_exists", "This [[agreement|lower]] already has a successor.");
         SuccessorContractId = successorId;
         Touch(actor, nowUtc);
     }
@@ -732,7 +732,7 @@ public sealed class Contract : ITenantOwned
     public void StampRegistration(string registeredBy, DateTime nowUtc)
     {
         if (RegisteredDateUtc.HasValue)
-            throw new DomainException("already_registered", "Registered Date has already been stamped and cannot be changed.");
+            throw new DomainException("already_registered", "[[registered.date]] has already been stamped and cannot be changed.");
         RegisteredDateUtc = Guard.Utc(nowUtc, nameof(nowUtc));
         RegisteredBy = Guard.NotBlank(registeredBy, "Registered by", 200);
         RegisteredDateProvenance = Domain.RegisteredDateProvenance.Platform;
@@ -755,9 +755,9 @@ public sealed class Contract : ITenantOwned
     {
         // An open unlock does not make the ordinary edit path available: it is used only through the unlock service, which names the fields and carries the unlock id into the audit.
         if (RecordLocked)
-            throw new DomainException("record_locked", "This record is locked. Changes to an Effective record require an authorised Variation or an audited emergency unlock.");
+            throw new DomainException("record_locked", "This record is locked. Changes to an Effective record require an authorised [[variation]] or an audited emergency unlock.");
         if (ContentFrozen)
-            throw new DomainException("content_frozen", "The contract is in a stage where its content is frozen. It can be edited again if it is returned to its owner.");
+            throw new DomainException("content_frozen", "The [[contract|lower]] is in a stage where its content is frozen. It can be edited again if it is returned to its owner.");
     }
 
     private void Touch(string by, DateTime nowUtc) { UpdatedBy = Guard.NotBlank(by, "Updated by", 200); UpdatedUtc = nowUtc; }

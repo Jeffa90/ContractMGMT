@@ -42,12 +42,12 @@ public sealed record ScopeSet(
             case ScopeLevel.Organisation when OrganisationIds.Count == 0:
                 throw new DomainException("organisation_scope_required", "An assignment without an organisational scope is refused.");
             case ScopeLevel.Tenant or ScopeLevel.Installation when OrganisationIds.Count > 0:
-                throw new DomainException("invalid_scope", "Tenant-level and installation-level assignments do not name organisations.");
+                throw new DomainException("invalid_scope", "Tenant-level and installation-level assignments do not name [[organisation|plural|lower]].");
         }
         if (Level == ScopeLevel.Installation && (NarrowsBusinessUnit || NarrowsDivision || NarrowsSite || NarrowsCategory))
             throw new DomainException("invalid_scope", "Installation-level assignments cannot be narrowed.");
         if (CategoryIds is { Count: 0 })
-            throw new DomainException("invalid_scope", "A category scope must name at least one category; use no category scope for all categories.");
+            throw new DomainException("invalid_scope", "[[category|lower|a|cap]] scope must name at least one [[category|lower]]; use no [[category|lower]] scope for all [[category|plural|lower]].");
     }
 
     /// <summary>True when every element of <paramref name="inner"/> lies within this scope (used to stop a grantor granting above their own scope). <paramref name="categoryAncestry"/> returns a category and its ancestors.</summary>

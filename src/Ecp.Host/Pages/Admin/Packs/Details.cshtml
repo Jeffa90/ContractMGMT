@@ -2,7 +2,7 @@
 @model Ecp.Host.Pages.Admin.Packs.DetailsModel
 @{
     var p = Model.Pack;
-    ViewData["Title"] = (p is null ? L["Solution pack"].Value : p.Entry.Name());
+    ViewData["Title"] = (p is null ? L["[[solution.pack|sentence]]"].Value : p.Entry.Name());
 }
 @if (p is not null)
 {
@@ -39,11 +39,11 @@
             <thead><tr><th scope="col">@L["Kind"]</th><th scope="col">@L["Applies to"]</th><th scope="col">@L["Required"]</th><th scope="col">@L["Format version"]</th></tr></thead>
             <tbody>@foreach (var c in e.Content) { <tr><td>@c.Kind</td><td>@c.Scope</td><td>@(c.Required ? L["Yes"] : L["No"])</td><td>@c.SchemaVersion</td></tr> }</tbody>
         </table></div>
-        @if (e.Info is { } info) { <p>@info.Defaults.Categories.Count @L["starting categories and"] @info.Defaults.ContractTypes.Count @L["starting contract types."]</p> }
+        @if (e.Info is { } info) { <p>@info.Defaults.Categories.Count @L["starting [[category|plural|lower]] and"] @info.Defaults.ContractTypes.Count @L["starting [[contract.type|plural|lower]]."]</p> }
     </section>
     <section class="card" aria-labelledby="use-h">
-        <h2 id="use-h">@L["Organisations using this pack"]</h2>
-        @if (p.Organisations.Count == 0) { <p>@L["No organisation uses this pack."]</p> }
+        <h2 id="use-h">@L["[[organisation|plural]] using this pack"]</h2>
+        @if (p.Organisations.Count == 0) { <p>@L["No [[organisation|lower]] uses this pack."]</p> }
         else { <ul>@foreach (var o in p.Organisations) { <li>@o.Name @if (o.Version is not null) { <span class="hint">(v@(o.Version))</span> }</li> }</ul> }
         @if (p.OtherVersions.Count > 0)
         {
@@ -52,8 +52,8 @@
         }
     </section>
     <div class="actions">
-        @if (e.IsUsable) { <a class="button" href="/Admin/Packs/Assign?key=@Uri.EscapeDataString(e.PackKey)&amp;version=@Uri.EscapeDataString(e.Version)">@L["Use for an organisation"]</a> }
-        <a class="button secondary" href="/Admin/Packs">@L["Back to solution packs"]</a>
+        @if (e.IsUsable) { <a class="button" href="/Admin/Packs/Assign?key=@Uri.EscapeDataString(e.PackKey)&amp;version=@Uri.EscapeDataString(e.Version)">@L["Use for [[organisation|lower|a]]"]</a> }
+        <a class="button secondary" href="/Admin/Packs">@L["Back to [[solution.pack|plural|lower]]"]</a>
     </div>
     @if (!e.IsShipped)
     {
@@ -63,7 +63,7 @@
                 <input type="hidden" name="Key" value="@e.PackKey" /><input type="hidden" name="Version" value="@e.Version" />
                 @if (!e.Retired)
                 {
-                    <p class="hint">@L["A retired version cannot be given to more organisations. Organisations already using it keep it."]</p>
+                    <p class="hint">@L["A retired version cannot be given to more [[organisation|plural|lower]]. [[organisation|plural]] already using it keep it."]</p>
                     <div class="field"><label for="Reason">@L["Reason (kept in the history)"]</label><input id="Reason" name="Reason" type="text" maxlength="500" /></div>
                 }
                 <div class="actions"><button type="submit">@(e.Retired ? L["Make this version available again"] : L["Retire this version"])</button></div>

@@ -96,7 +96,7 @@ public sealed class LocalFileSystemStorageProvider : IDocumentStorageProvider
             throw new DomainException("invalid_storage_key", "The storage key is not valid for this tenant.");
         var path = Path.GetFullPath(Path.Combine(_root, storageKey.Replace('/', Path.DirectorySeparatorChar)));
         if (!path.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            throw new DomainException("invalid_storage_key", "The storage key resolves outside the document store.");
+            throw new DomainException("invalid_storage_key", "The storage key resolves outside the [[document|lower]] store.");
         return path;
     }
 }

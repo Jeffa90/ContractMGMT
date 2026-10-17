@@ -60,7 +60,7 @@
 {
     <section class="card" aria-labelledby="trial">
         <h2 id="trial">@L["Trial run"]</h2>
-        <p>@t.Total @L["contract(s) match for you."] @L["Everyone sees only what their own access allows."]</p>
+        <p>@t.Total @L["[[contract|lower]](s) match for you."] @L["Everyone sees only what their own access allows."]</p>
         @foreach (var n in t.Notes) { <p class="hint">@n</p> }
         <div class="table-wrap"><table><thead><tr>@foreach (var c in t.Columns) { <th scope="col">@c.Label</th> }</tr></thead>
         <tbody>@foreach (var r in t.Rows.Take(10)) { <tr>@foreach (var c in t.Columns) { <td>@r.Cells.GetValueOrDefault(c.Key)</td> }</tr> }</tbody></table></div>

@@ -1,9 +1,9 @@
 @page "/Migration/Batches/{id:guid}/Provenance"
 @model Ecp.Host.Pages.Migration.ProvenanceModel
 @{ ViewData["Title"] = L["Provenance"].Value; }
-<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the batch"]</a></p>
+<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the [[migration.batch|lower]]"]</a></p>
 <h1>@L["Provenance"]</h1>
-<p class="lede">@L["What this batch created, updated or linked, and the source record each came from. Rollback uses only this list, so records that were there before, or that belong to another batch, are never touched."]</p>
+<p class="lede">@L["What this [[migration.batch|lower]] created, updated or linked, and the source record each came from. Rollback uses only this list, so records that were there before, or that belong to another [[migration.batch|lower]], are never touched."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <p><a class="button secondary" href="/Migration/Batches/@Model.BatchId/Provenance?handler=Export">@L["Download Excel"]</a></p>
 <p role="status">@Model.Result.Total @L["record(s)"]</p>
@@ -14,7 +14,7 @@
     @foreach (var p in Model.Result.Items)
     {
         <tr>
-            <th scope="row">@(p.EntityType == "Contract" ? Html.Raw($"<a href=\"/Contracts/Details/{p.EntityId}\">Contract</a>") : Html.Raw(p.EntityType))</th>
+            <th scope="row">@if (p.EntityType == "Contract") { <a href="/Contracts/Details/@p.EntityId">@L["[[contract]]"]</a> } else if (p.EntityType == "Supplier") { @L["[[supplier]]"] } else if (p.EntityType == "Document") { @L["[[document]]"] } else { @p.EntityType }</th>
             <td>@p.Action</td><td>@p.SourceSystem</td><td>@p.SourceRecordId</td><td>@(p.Sha256 is null ? "" : p.Sha256[..12] + "…")</td><td>@p.ReversalState @p.ReversalNote</td>
         </tr>
     }

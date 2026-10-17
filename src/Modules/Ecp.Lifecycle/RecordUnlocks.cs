@@ -70,8 +70,8 @@ internal sealed class RecordUnlockService(
         // Sign in again first: a stolen idle session must not be able to open a locked agreement.
         reauth.Require(now, options.Value.ReauthenticationWindow);
         var user = currentUser.UserId ?? throw new ForbiddenException("A signed-in person is required.");
-        if (!settings.Enabled) throw new DomainException("unlock_disabled", "Emergency unlock is not enabled by this organisation's policy.");
-        if (!facts.RecordLocked) throw new DomainException("not_locked", "This agreement is not locked, so there is nothing to unlock.");
+        if (!settings.Enabled) throw new DomainException("unlock_disabled", "Emergency unlock is not enabled by this [[organisation|lower]]'s policy.");
+        if (!facts.RecordLocked) throw new DomainException("not_locked", "This [[agreement|lower]] is not locked, so there is nothing to unlock.");
         if (r.Minutes < 5 || r.Minutes > settings.MaxMinutes) throw new DomainException("invalid_duration", $"An unlock lasts between 5 and {settings.MaxMinutes} minutes.");
         var fields = r.Fields.Distinct(StringComparer.Ordinal).ToList();
         if (fields.Count == 0) throw new DomainException("fields_required", "Choose at least one field to unlock.");
@@ -103,7 +103,7 @@ internal sealed class RecordUnlockService(
         var user = currentUser.UserId ?? throw new ForbiddenException("A signed-in person is required.");
         var now = clock.UtcNow;
         var unlock = await db.Unlocks.FirstOrDefaultAsync(u => u.ContractId == contractId && u.ClosedUtc == null && u.ExpiresUtc > now, ct)
-            ?? throw new DomainException("no_open_unlock", "There is no open unlock on this agreement, or its time limit has passed.");
+            ?? throw new DomainException("no_open_unlock", "There is no open unlock on this [[agreement|lower]], or its time limit has passed.");
         if (unlock.OpenedByUserId != user) throw new ForbiddenException("Only the person who opened the unlock can make changes under it.");
         if (changes.Count == 0) throw new DomainException("nothing_to_change", "No changes were given.");
         var allowed = JsonSerializer.Deserialize<List<string>>(unlock.FieldsJson) ?? [];

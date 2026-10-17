@@ -437,7 +437,7 @@ internal sealed class ContractCustomFieldService(
     private async Task<(Contract Contract, CustomFieldSet Set, Plan Plan)> TrustedPlanAsync(Guid contractId, IReadOnlyDictionary<string, string?> changes, bool tracked, CancellationToken ct)
     {
         var c = tracked ? await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, ct) : await db.Contracts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == contractId, ct);
-        if (c is null) throw new DomainException("contract_not_found", "The contract was not found.");
+        if (c is null) throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
         var set = await catalogue.PublishedAsync(c.OrganisationId, ct);
         var (_, _, today) = await LocaleAsync(c.OrganisationId, ct);
         var stored = await StoredAsync(contractId, set, ct);
@@ -501,7 +501,7 @@ internal sealed class ContractCustomFieldService(
         var scale = await access.ClassificationScaleAsync(ct);
         await uow.ExecuteAsync(async cx =>
         {
-            var c = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, cx) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+            var c = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, cx) ?? throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
             var set = await catalogue.PublishedAsync(c.OrganisationId, cx);
             var plan = await PlanAsync(set, [], input, d => !d.IsCalculated, enforceRequired: false, applyDefaults: true, cx, contractId);
             if (plan.Errors.Count > 0) throw new CustomFieldValidationException(plan.Errors);

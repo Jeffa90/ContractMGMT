@@ -43,7 +43,8 @@ public sealed class LocalisationApiTests
         var (factory, keeper) = Start();
         using var _ = factory; using var __ = keeper;
         using var client = factory.CreateClient();
-        var localizer = factory.Services.GetRequiredService<IStringLocalizer<SharedResource>>();
+        using var scope = factory.Services.CreateScope();
+        var localizer = scope.ServiceProvider.GetRequiredService<IStringLocalizer<SharedResource>>();
         var previous = CultureInfo.CurrentUICulture;
         try
         {

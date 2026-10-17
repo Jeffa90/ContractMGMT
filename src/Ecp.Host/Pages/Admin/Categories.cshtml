@@ -1,14 +1,14 @@
 @page "/Admin/Categories"
 @model Ecp.Host.Pages.Admin.CategoriesModel
-@{ ViewData["Title"] = L["Categories"].Value; }
-<h1>@L["Categories"]</h1>
-<p class="lede">@L["Category ownership decides who can edit contracts. Owners edit only the categories they currently own; ending an ownership removes edit rights immediately."]</p>
+@{ ViewData["Title"] = L["[[category|plural]]"].Value; }
+<h1>@L["[[category|plural]]"]</h1>
+<p class="lede">@L["[[category]] ownership decides who can edit [[contract|plural|lower]]. Owners edit only the [[category|plural|lower]] they currently own; ending an ownership removes edit rights immediately."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 
 <div class="table-wrap">
 <table>
-    <caption>@L["Category tree"]</caption>
-    <thead><tr><th scope="col">@L["Category"]</th><th scope="col">@L["Organisation"]</th><th scope="col">@L["Current owners"]</th><th scope="col">@L["Status"]</th>@if (Model.CanAssign || Model.CanManage) { <th scope="col">@L["Actions"]</th> }</tr></thead>
+    <caption>@L["[[category]] tree"]</caption>
+    <thead><tr><th scope="col">@L["[[category]]"]</th><th scope="col">@L["[[organisation]]"]</th><th scope="col">@L["Current owners"]</th><th scope="col">@L["Status"]</th>@if (Model.CanAssign || Model.CanManage) { <th scope="col">@L["Actions"]</th> }</tr></thead>
     <tbody>
     @foreach (var row in Model.Rows)
     {
@@ -51,21 +51,21 @@
             }
         </tr>
     }
-    @if (Model.Rows.Count == 0) { <tr><td colspan="5">@L["No categories are visible to you."]</td></tr> }
+    @if (Model.Rows.Count == 0) { <tr><td colspan="5">@L["No [[category|plural|lower]] are visible to you."]</td></tr> }
     </tbody>
 </table>
 </div>
 
 @if (Model.CanManage)
 {
-    <h2>@L["Add a category"]</h2>
+    <h2>@L["Add [[category|lower|a]]"]</h2>
     <form method="post" asp-page-handler="Create">
-        <div class="field"><label for="OrganisationId">@L["Organisation"]</label>
+        <div class="field"><label for="OrganisationId">@L["[[organisation]]"]</label>
             <select id="OrganisationId" name="OrganisationId" required aria-required="true">@foreach (var o in Model.ManageOrganisations) { <option value="@o.Id">@o.Name</option> }</select></div>
         <div class="field"><label for="Code">@L["Code"]</label><input id="Code" name="Code" type="text" required aria-required="true" maxlength="100" /></div>
         <div class="field"><label for="Name">@L["Name"]</label><input id="Name" name="Name" type="text" required aria-required="true" maxlength="200" /></div>
-        <div class="field"><label for="ParentCategoryId">@L["Parent category"]</label>
+        <div class="field"><label for="ParentCategoryId">@L["Parent [[category|lower]]"]</label>
             <select id="ParentCategoryId" name="ParentCategoryId"><option value="">@L["None (top level)"]</option>@foreach (var r in Model.Rows.Where(r => r.Category.IsActive)) { <option value="@r.Category.Id">@r.Category.Name (@Model.OrganisationName(r.Category.OrganisationId))</option> }</select></div>
-        <button type="submit">@L["Add category"]</button>
+        <button type="submit">@L["Add [[category|lower]]"]</button>
     </form>
 }

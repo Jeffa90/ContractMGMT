@@ -11,10 +11,10 @@ public static class PackSelection
 {
     public static async Task<string> ResolveAsync(this IOrganisationStructureService organisations, Guid organisationId, string? installationDefault, CancellationToken ct = default)
     {
-        var organisation = await organisations.GetOrganisationAsync(organisationId, ct) ?? throw new DomainException("organisation_not_found", "The organisation was not found.");
+        var organisation = await organisations.GetOrganisationAsync(organisationId, ct) ?? throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         if (!string.IsNullOrWhiteSpace(organisation.SolutionPackKey)) return organisation.SolutionPackKey;
         if (!string.IsNullOrWhiteSpace(installationDefault)) return installationDefault.Trim();
         throw new DomainException("no_solution_pack",
-            $"The organisation '{organisation.Name}' has no solution pack and no installation default pack is configured (Ecp:DefaultPackId). Choose a solution pack for the organisation.");
+            $"The [[organisation|lower]] '{organisation.Name}' has no [[solution.pack|lower]] and no installation default pack is configured (Ecp:DefaultPackId). Choose [[solution.pack|lower|a]] for the [[organisation|lower]].");
     }
 }

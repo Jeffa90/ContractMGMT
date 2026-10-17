@@ -62,10 +62,10 @@
         <form method="post" asp-page-handler="Options" class="card">
             <h3>@L["Options"]</h3>
             <input type="hidden" name="VersionId" value="@v.Version.Id" />
-            <div class="check field"><input id="CreateMissingCategories" name="CreateMissingCategories" type="checkbox" value="true" checked="@Model.CreateMissingCategories" /><label for="CreateMissingCategories">@L["Create categories that do not exist yet (otherwise an unknown category is an error)"]</label></div>
+            <div class="check field"><input id="CreateMissingCategories" name="CreateMissingCategories" type="checkbox" value="true" checked="@Model.CreateMissingCategories" /><label for="CreateMissingCategories">@L["Create [[category|plural|lower]] that do not exist yet (otherwise an unknown [[category|lower]] is an error)"]</label></div>
             <div class="field"><label for="OpenEndedTypes">@L["Extension types that legitimately have no end date (comma separated)"]</label><input id="OpenEndedTypes" name="OpenEndedTypes" type="text" value="@Model.OpenEndedTypes" /></div>
             <div class="field"><label for="NamingRule">@L["Attachment naming rule (optional pattern)"]</label><input id="NamingRule" name="NamingRule" type="text" value="@Model.NamingRule" maxlength="300" aria-describedby="rule-hint" />
-                <p class="hint" id="rule-hint">@L["A pattern with a group called agreementReference or sourceRecordId, applied to each file's path when the manifest does not say which contract it belongs to. It runs on a safe engine with a time limit."]</p></div>
+                <p class="hint" id="rule-hint">@L["A pattern with a group called agreementReference or sourceRecordId, applied to each file's path when the manifest does not say which [[contract|lower]] it belongs to. It runs on a safe engine with a time limit."]</p></div>
             <button type="submit">@L["Save options"]</button>
         </form>
         <form method="post" asp-page-handler="Publish" class="card">

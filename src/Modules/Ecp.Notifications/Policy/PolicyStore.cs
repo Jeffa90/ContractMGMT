@@ -62,7 +62,7 @@ internal sealed class NotificationPolicyStore(IConfigurationReleases releases, I
         return Parsed.GetOrAdd(latest!.Id, _ =>
         {
             var (policy, messages) = NotificationPolicyParser.Parse(latest.ContentJson);
-            return policy ?? throw new DomainException("policy_unreadable", "The published notification policy could not be read: " + string.Join("; ", messages.Select(x => x.Message)));
+            return policy ?? throw new DomainException("policy_unreadable", "The published [[notification|lower]] policy could not be read: " + string.Join("; ", messages.Select(x => x.Message)));
         });
     }
 }

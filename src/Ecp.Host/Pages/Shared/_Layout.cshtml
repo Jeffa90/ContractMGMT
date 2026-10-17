@@ -8,7 +8,7 @@
 @inject Ecp.Notifications.INotificationInbox Inbox
 @{
     var branding = await Brand.GetAsync();
-    var productName = branding.ProductName == Ecp.Configuration.Branding.Default.ProductName ? L["App.Name"].Value : branding.ProductName;
+    var productName = branding.ProductName == Ecp.Configuration.Branding.Default.ProductName ? Terms.Singular("application.name") : branding.ProductName;
     var title = ViewData["Title"] as string ?? productName;
     var path = Context.Request.Path.Value ?? "/";
     var signedIn = User.Identity?.IsAuthenticated == true;
@@ -18,28 +18,28 @@
     {
         items.Add(("/", L["Home"].Value, "/"));
         items.Add(("/Dashboards", L["Dashboards"].Value, "/Dashboards"));
-        if (await Can("contracts.read")) items.Add(("/Contracts", L["Contracts"].Value, "/Contracts"));
-        if (await Can("legal.review", "legal.respond", "contracts.submit_legal")) items.Add(("/Legal", L["Legal review"].Value, "/Legal"));
-        if (await Can("approvals.action", "contracts.submit_approval")) items.Add(("/Approvals", L["Approvals"].Value, "/Approvals"));
-        if (await Can("variations.create")) items.Add(("/Variations", L["Variations"].Value, "/Variations"));
-        if (await Can("renewals.create")) items.Add(("/Renewals", L["Renewals"].Value, "/Renewals"));
+        if (await Can("contracts.read")) items.Add(("/Contracts", L["[[contract|plural]]"].Value, "/Contracts"));
+        if (await Can("legal.review", "legal.respond", "contracts.submit_legal")) items.Add(("/Legal", L["[[legal.review|sentence]]"].Value, "/Legal"));
+        if (await Can("approvals.action", "contracts.submit_approval")) items.Add(("/Approvals", L["[[approval|plural]]"].Value, "/Approvals"));
+        if (await Can("variations.create")) items.Add(("/Variations", L["[[variation|plural]]"].Value, "/Variations"));
+        if (await Can("renewals.create")) items.Add(("/Renewals", L["[[renewal|plural]]"].Value, "/Renewals"));
         var unread = 0;
         try { unread = await Inbox.UnreadCountAsync(); } catch (Exception) { /* a session without a person (an installation administrator) has no inbox */ }
-        items.Add(("/Notifications", unread > 0 ? L["Notifications"].Value + " (" + unread + ")" : L["Notifications"].Value, "/Notifications"));
-        if (await Can("suppliers.read")) items.Add(("/Suppliers", L["Suppliers"].Value, "/Suppliers"));
-        if (await Can("categories.manage", "contracts.read")) items.Add(("/Admin/Categories", L["Categories"].Value, "/Admin/Categories"));
+        items.Add(("/Notifications", unread > 0 ? L["[[notification|plural]]"].Value + " (" + unread + ")" : L["[[notification|plural]]"].Value, "/Notifications"));
+        if (await Can("suppliers.read")) items.Add(("/Suppliers", L["[[supplier|plural]]"].Value, "/Suppliers"));
+        if (await Can("categories.manage", "contracts.read")) items.Add(("/Admin/Categories", L["[[category|plural]]"].Value, "/Admin/Categories"));
         if (await Can("users.manage")) items.Add(("/Admin/Users", L["Users and roles"].Value, "/Admin/Users"));
         if (await Can("audit.read", "audit.read_admin")) items.Add(("/Admin/Audit", L["Audit events"].Value, "/Admin/Audit"));
-        if (await Can("onboarding.run")) items.Add(("/Onboarding", L["Organisation onboarding"].Value, "/Onboarding"));
+        if (await Can("onboarding.run")) items.Add(("/Onboarding", L["[[organisation]] onboarding"].Value, "/Onboarding"));
         if (await Can("migration.stage")) items.Add(("/Migration", L["Data migration"].Value, "/Migration"));
         if (await Can("support.elevate")) items.Add(("/Admin/Support", L["Support access"].Value, "/Admin/Support"));
         if (await Can("audit.read_admin")) items.Add(("/Admin/Elevations", L["Access to this tenant"].Value, "/Admin/Elevations"));
-        if (await Can("notifications.administer")) items.Add(("/Admin/Notifications", L["Notification delivery"].Value, "/Admin/Notifications"));
-        if (await Can("approvals.matrix.read", "approvals.simulate", "approvals.delegate")) items.Add(("/Admin/Approvals", L["Approval matrices"].Value, "/Admin/Approvals"));
+        if (await Can("notifications.administer")) items.Add(("/Admin/Notifications", L["[[notification]] delivery"].Value, "/Admin/Notifications"));
+        if (await Can("approvals.matrix.read", "approvals.simulate", "approvals.delegate")) items.Add(("/Admin/Approvals", L["[[approval]] matrices"].Value, "/Admin/Approvals"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Configuration", L["Workflow configuration"].Value, "/Admin/Configuration"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Studio", L["Configuration Studio"].Value, "/Admin/Studio"));
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
-        if (await Can("packs.read")) items.Add(("/Admin/Packs", L["Solution packs"].Value, "/Admin/Packs"));
+        if (await Can("packs.read")) items.Add(("/Admin/Packs", L["[[solution.pack|plural|sentence]]"].Value, "/Admin/Packs"));
         if (await Can("setup.run")) items.Add(("/Admin/Setup", L["Installation setup"].Value, "/Admin/Setup"));
     }
 }

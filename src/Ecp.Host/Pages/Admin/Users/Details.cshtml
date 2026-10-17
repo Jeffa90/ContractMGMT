@@ -14,7 +14,7 @@
     @foreach (var a in Model.Assignments)
     {
         <tr>
-            <th scope="row">@a.RoleCode@if (a.ViewerKind is { } k) { <text> (@k)</text> }@if (a.ApproverGroupKey is { } g) { <br /><span class="hint">@L["Approver group"]: @g</span> }</th>
+            <th scope="row">@Terms.Role(a.RoleCode) <code class="id" title="@L["Stable role identifier"]">@a.RoleCode</code>@if (a.ViewerKind is { } k) { <text> (@k)</text> }@if (a.ApproverGroupKey is { } g) { <br /><span class="hint">@L["Approver group"]: @g</span> }</th>
             <td>@Model.Describe(a)</td><td>@a.Scope.ClassificationCeiling</td>
             <td>@Model.Period(a)</td><td>@a.GrantedByLabel (@a.Source)</td>
             <td>
@@ -22,7 +22,7 @@
                 {
                     <form method="post" asp-page-handler="Revoke">
                         <input type="hidden" name="assignmentId" value="@a.Id" />
-                        <label for="reason-@a.Id" class="visually-hidden">@L["Reason for ending"] @a.RoleCode</label>
+                        <label for="reason-@a.Id" class="visually-hidden">@L["Reason for ending"] @Terms.Role(a.RoleCode)</label>
                         <input id="reason-@a.Id" name="reason" type="text" required aria-required="true" placeholder="@L["Reason"]" maxlength="1000" />
                         <button class="secondary" type="submit">@L["End assignment"]</button>
                     </form>
@@ -45,21 +45,21 @@ else
 {
 <form method="post" asp-page-handler="Grant">
     <div class="field"><label for="role">@L["Role"]</label>
-        <select id="role" name="role" required aria-required="true">@foreach (var r in Model.GrantableRoles) { <option value="@r">@r</option> }</select></div>
+        <select id="role" name="role" required aria-required="true">@foreach (var r in Model.GrantableRoles) { <option value="@r">@Terms.Role(r) (@r)</option> }</select></div>
     <div class="field"><label for="viewerKind">@L["Viewer kind (Viewer role only)"]</label>
         <select id="viewerKind" name="viewerKind" aria-describedby="vk-hint"><option value="">@L["Not a viewer"]</option>@foreach (var k in Enum.GetValues<Ecp.Identity.Domain.ViewerKind>()) { <option value="@k">@k</option> }</select>
-        <p id="vk-hint" class="hint">@L["A Viewer is never a global read role: choose All Contracts, Category, Business Unit, Site or Restricted, with the matching scope below."]</p></div>
+        <p id="vk-hint" class="hint">@L["A Viewer is never a global read role: choose All [[contract|plural]], [[category]], [[business.unit]], [[site]] or Restricted, with the matching scope below."]</p></div>
     <div class="field"><label for="level">@L["Applies to"]</label>
-        <select id="level" name="level"><option value="Organisation">@L["Selected organisations"]</option><option value="Tenant">@L["Whole tenant (Tenant Administrator and tenant-wide Auditor)"]</option><option value="Installation">@L["Installation (System Administrator)"]</option></select></div>
-    <div class="field"><label for="organisations">@L["Organisations"]</label>
+        <select id="level" name="level"><option value="Organisation">@L["Selected [[organisation|plural|lower]]"]</option><option value="Tenant">@L["Whole tenant (Tenant Administrator and tenant-wide Auditor)"]</option><option value="Installation">@L["Installation (System Administrator)"]</option></select></div>
+    <div class="field"><label for="organisations">@L["[[organisation|plural]]"]</label>
         <select id="organisations" name="organisations" multiple size="4">@foreach (var o in Model.Organisations) { <option value="@o.Id">@o.Name</option> }</select></div>
-    <div class="field"><label for="divisions">@L["Divisions (narrowing)"]</label>
+    <div class="field"><label for="divisions">@L["[[division|plural]] (narrowing)"]</label>
         <select id="divisions" name="divisions" multiple size="3">@foreach (var d in Model.Divisions) { <option value="@d.Id">@d.Name</option> }</select></div>
-    <div class="field"><label for="businessUnits">@L["Business units (narrowing)"]</label>
+    <div class="field"><label for="businessUnits">@L["[[business.unit|plural|sentence]] (narrowing)"]</label>
         <select id="businessUnits" name="businessUnits" multiple size="3">@foreach (var b in Model.BusinessUnits) { <option value="@b.Id">@b.Name</option> }</select></div>
-    <div class="field"><label for="sites">@L["Sites (narrowing)"]</label>
+    <div class="field"><label for="sites">@L["[[site|plural]] (narrowing)"]</label>
         <select id="sites" name="sites" multiple size="3">@foreach (var s in Model.Sites) { <option value="@s.Id">@s.Name</option> }</select></div>
-    <div class="field"><label for="categories">@L["Categories (narrowing; a parent covers its subcategories)"]</label>
+    <div class="field"><label for="categories">@L["[[category|plural]] (narrowing; a parent covers its [[subcategory|plural|lower]])"]</label>
         <select id="categories" name="categories" multiple size="4">@foreach (var c in Model.Categories) { <option value="@c.Id">@c.Name</option> }</select></div>
     <div class="field"><label for="ceiling">@L["Classification ceiling"]</label>
         <select id="ceiling" name="ceiling">@foreach (var l in Model.Levels) { <option value="@l" selected="@(l == Model.DefaultLevel)">@l</option> }</select></div>

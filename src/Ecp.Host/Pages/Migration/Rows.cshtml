@@ -2,9 +2,9 @@
 @model Ecp.Host.Pages.Migration.RowsModel
 @using Ecp.DataMigration.Domain
 @{ ViewData["Title"] = L["Source rows"].Value; }
-<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the batch"]</a></p>
+<p><a href="/Migration/Batches/@Model.BatchId#review">&larr; @L["Back to the [[migration.batch|lower]]"]</a></p>
 <h1>@L["Source rows"]</h1>
-<p class="lede">@L["Every row of the contracts file, with its original values and what the dry run decided to do with it. Rejected rows are never loaded."]</p>
+<p class="lede">@L["Every row of the [[contract|plural|lower]] file, with its original values and what the dry run decided to do with it. Rejected rows are never loaded."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <form method="get" class="card">
     <div class="field"><label for="outcome">@L["Outcome"]</label>
@@ -15,7 +15,7 @@
 <p role="status">@Model.Result.Total @L["row(s)"]</p>
 <div class="table-wrap"><table>
     <caption class="visually-hidden">@L["Rows"]</caption>
-    <thead><tr><th scope="col">@L["Row"]</th><th scope="col">@L["Source record"]</th><th scope="col">@L["Agreement reference"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["What will happen"]</th><th scope="col">@L["Problems"]</th><th scope="col">@L["Decision"]</th></tr></thead>
+    <thead><tr><th scope="col">@L["Row"]</th><th scope="col">@L["Source record"]</th><th scope="col">@L["[[contract.reference|sentence]]"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["What will happen"]</th><th scope="col">@L["Problems"]</th><th scope="col">@L["Decision"]</th></tr></thead>
     <tbody>
     @foreach (var r in Model.Result.Items)
     {

@@ -67,7 +67,7 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
         if (batch.IsLegacyLoad) await k.Access.RequireAsync(MigrationPermissions.LegacyLoad, MigrationKernel.Describe(project.TenantId, project.OrganisationId, project.Id.ToString()), ct);
         if (batch.Status is BatchStatus.Committed or BatchStatus.Reconciled or BatchStatus.Accepted) return Progress(batch, null, 0, 0); // idempotent
         if (batch.Kind == BatchKind.DryRun) throw new DomainException("dry_run_cannot_commit", "A dry run performs no target writes and cannot be committed.");
-        if (project.Status != ProjectStatus.Active) throw new DomainException("project_closed", "The migration project is closed.");
+        if (project.Status != ProjectStatus.Active) throw new DomainException("project_closed", "The [[migration.project|lower]] is closed.");
         if (batch.IsLegacyLoad && !project.LegacyLoadAllowedAt(k.Clock.UtcNow)) throw new DomainException("legacy_policy_inactive", "MIG-E012: The legacy-load policy has expired or been closed.");
         if (await k.Db.StagingRows.AnyAsync(r => r.BatchId == batchId && r.ReviewDecision == ReviewDecision.Required, ct))
             throw new DomainException("review_required", "Some rows are waiting for a decision. Decide each one (skip, update, create with a new reference, or reject) and validate again.");
@@ -113,7 +113,7 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
         var batch = await k.Db.Batches.AsNoTracking().FirstAsync(b => b.Id == batchId, ct);
         var project = await k.Db.Projects.AsNoTracking().FirstAsync(p => p.Id == batch.ProjectId, ct);
         var loaded = await runtime.LoadAsync(batch, project, ct);
-        if (loaded.ContractsFile is null || loaded.Version is null) throw new DomainException("source_required", "The batch has no contracts file or mapping profile.");
+        if (loaded.ContractsFile is null || loaded.Version is null) throw new DomainException("source_required", "The batch has no [[contract|plural|lower]] file or mapping profile.");
         var ctx = await runtime.BuildContextAsync(loaded, ct);
         var rawStatusColumn = loaded.Definition.Fields.FirstOrDefault(f => f.TargetField == "status")?.SourceColumn;
         var rawRegisteredColumn = loaded.Definition.Fields.FirstOrDefault(f => f.TargetField == "registeredDate")?.SourceColumn;
@@ -442,7 +442,7 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
         var (batch, _) = await k.BatchAsync(batchId, MigrationPermissions.Accept, track: true, ct);
         if (batch.Status != BatchStatus.Reconciled) throw new DomainException("invalid_batch_transition", $"A batch in state {batch.Status} cannot be accepted. Reconcile it first.");
         if (string.IsNullOrWhiteSpace(input.Note) || input.Note.Trim().Length < 10)
-            throw new DomainException("acceptance_note_required", "Record what you checked (at least a sentence): the sample of records and documents the business owner verified.");
+            throw new DomainException("acceptance_note_required", "Record what you checked (at least a sentence): the sample of records and [[document|plural|lower]] the business owner verified.");
         var outstanding = await k.Db.StagedFiles.CountAsync(f => f.BatchId == batchId && (f.State == FileState.Unmatched || f.State == FileState.Failed), ct)
             + await k.Db.StagingRows.CountAsync(r => r.BatchId == batchId && r.Outcome == RowOutcome.Rejected, ct);
         if (outstanding > 0 && !input.OutstandingAcknowledged)

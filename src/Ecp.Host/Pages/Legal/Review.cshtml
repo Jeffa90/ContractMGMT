@@ -1,8 +1,8 @@
 @page "/Legal/Review/{id:guid}"
 @model Ecp.Host.Pages.Legal.ReviewModel
 @using Ecp.Lifecycle.Domain
-@{ ViewData["Title"] = L["Legal review"].Value + " " + Model.Review.AgreementReference; var r = Model.Review; var a = r.Actions; }
-<h1>@L["Legal review"]: @r.ContractTitle</h1>
+@{ ViewData["Title"] = L["[[legal.review|sentence]]"].Value + " " + Model.Review.AgreementReference; var r = Model.Review; var a = r.Actions; }
+<h1>@L["[[legal.review|sentence]]"]: @r.ContractTitle</h1>
 <p><a href="/Contracts/Details/@r.ContractId" class="badge">@r.AgreementReference</a>
    @if (r.VariationReference is { } vr) { <a class="badge" href="/Variations/Details/@r.SubjectId">@vr</a> }
    <span class="badge">@r.StatusDisplay</span> <span class="badge">@L["Round"] @r.CurrentRound</span> <span class="badge">@r.Classification</span></p>
@@ -15,7 +15,7 @@
         <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @r.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
         @if (r.ClearedBy is not null) { <dt>@L["Cleared by"]</dt><dd>@r.ClearedBy, @r.ClearedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
     </dl>
-    <p class="hint">@L["Clearance records Legal's view only. It does not register the agreement, lock it or make it Effective."]</p>
+    <p class="hint">@L["Clearance records [[reviewer]]'s view only. It does not register the [[agreement|lower]], lock it or make it Effective."]</p>
 </section>
 
 <section class="card" aria-labelledby="act-h">
@@ -42,21 +42,21 @@
     {
         <form method="post" asp-page-handler="Clear">
             <div class="field"><label for="clr">@L["Note (optional)"]</label><input id="clr" name="Text" type="text" maxlength="1000" /></div>
-            <button type="submit">@L["Clear: Legal is satisfied"]</button>
+            <button type="submit">@L["Clear: [[reviewer]] is satisfied"]</button>
         </form>
     }
     @if (a.CanResubmit || a.CanSubmit)
     {
         <form method="post" asp-page-handler="Resubmit">
             <div class="field"><label for="res">@L["Your response and what changed"]</label><textarea id="res" name="Text" rows="3" maxlength="4000"></textarea></div>
-            <button type="submit">@(a.CanResubmit ? L["Respond and resubmit to Legal"] : L["Submit to Legal"])</button>
+            <button type="submit">@(a.CanResubmit ? L["Respond and resubmit to [[reviewer]]"] : L["Submit to [[reviewer]]"])</button>
         </form>
     }
     @if (a.CanRecall)
     {
         <form method="post" asp-page-handler="Recall">
             <div class="field"><label for="rec">@L["Reason for recalling (required)"]</label><input id="rec" name="Text" type="text" required maxlength="1000" /></div>
-            <button type="submit" class="secondary">@L["Recall from Legal"]</button>
+            <button type="submit" class="secondary">@L["Recall from [[reviewer]]"]</button>
         </form>
     }
     @if (a.CanComment || a.CanReply)
@@ -70,14 +70,14 @@
     @if (a.CanAttachMarkup || a.CanAttachSupporting)
     {
         <form method="post" asp-page-handler="Attach" enctype="multipart/form-data">
-            <div class="field"><label for="att">@L["Document"]</label><input id="att" name="file" type="file" required /></div>
+            <div class="field"><label for="att">@L["[[document]]"]</label><input id="att" name="file" type="file" required /></div>
             <div class="field"><label for="ttl">@L["Title"]</label><input id="ttl" name="Title" type="text" maxlength="300" /></div>
             <div class="field"><label for="kind">@L["This is"]</label>
                 <select id="kind" name="Kind">
                     @if (a.CanAttachMarkup) { <option value="@LegalAttachmentKind.Markup">@L["A mark-up (classified version)"]</option> }
-                    @if (a.CanAttachSupporting) { <option value="@LegalAttachmentKind.Response">@L["A response"]</option><option value="@LegalAttachmentKind.Supporting">@L["A supporting document"]</option> }
+                    @if (a.CanAttachSupporting) { <option value="@LegalAttachmentKind.Response">@L["A response"]</option><option value="@LegalAttachmentKind.Supporting">@L["A supporting [[document|lower]]"]</option> }
                 </select></div>
-            <div class="field"><label for="cls">@L["Classification (never lower than the agreement's)"]</label><input id="cls" name="Classification" type="text" placeholder="@r.Classification" maxlength="30" /></div>
+            <div class="field"><label for="cls">@L["Classification (never lower than the [[agreement|lower]]'s)"]</label><input id="cls" name="Classification" type="text" placeholder="@r.Classification" maxlength="30" /></div>
             <button type="submit" class="secondary">@L["Attach"]</button>
         </form>
     }
@@ -102,10 +102,10 @@
         }
         @if (round.Attachments.Count > 0 || round.HiddenAttachments > 0)
         {
-            <h4>@L["Documents added in this round"]</h4>
+            <h4>@L["[[document|plural]] added in this round"]</h4>
             <ul class="plain">
                 @foreach (var at in round.Attachments) { <li><a href="/Documents/Download/@at.DocumentId">@at.FileName</a> <span class="badge">@at.Kind</span> <span class="hint">@L["version"] @at.VersionNumber &middot; @at.AddedBy &middot; @at.AddedUtc.ToString("yyyy-MM-dd HH:mm") UTC</span></li> }
-                @if (round.HiddenAttachments > 0) { <li class="hint">@round.HiddenAttachments @L["document(s) are classified above your access and are not shown."]</li> }
+                @if (round.HiddenAttachments > 0) { <li class="hint">@round.HiddenAttachments @L["[[document|lower]](s) are classified above your access and are not shown."]</li> }
             </ul>
         }
         @{ var top = round.Comments.Where(c => c.ParentCommentId is null).ToList(); }
@@ -142,4 +142,4 @@
     <li><span class="hint">@t.OccurredUtc.ToString("yyyy-MM-dd HH:mm") UTC</span> <strong>@t.Kind</strong> @if (t.Round is { } n) { <span class="badge">@L["Round"] @n</span> } &middot; @t.Actor @if (t.Detail is { Length: > 0 }) { <span class="hint">&mdash; @t.Detail</span> }</li>
 }
 </ol>
-<p><a href="/Legal">&larr; @L["Legal review queue"]</a></p>
+<p><a href="/Legal">&larr; @L["[[legal.review|sentence]] queue"]</a></p>

@@ -207,8 +207,8 @@ internal sealed class PackStage : SetupStageBase
     public override Task<StageResult> ExecuteAsync(StageContext c)
     {
         var id = c.Required("packId", "Solution pack");
-        var pack = _catalogue.Find(id) ?? throw new DomainException("unknown_pack", "That solution pack is not in the catalogue.");
-        if (c.Doc.OrganisationId is not null && c.Doc.PackId != id) throw new DomainException("pack_locked", "The organisation already exists; change its configuration through onboarding instead.");
+        var pack = _catalogue.Find(id) ?? throw new DomainException("unknown_pack", "That [[solution.pack|lower]] is not in the catalogue.");
+        if (c.Doc.OrganisationId is not null && c.Doc.PackId != id) throw new DomainException("pack_locked", "The [[organisation|lower]] already exists; change its configuration through onboarding instead.");
         c.Doc.PackId = pack.PackId;
         c.Remember("packId", pack.PackId);
         return Task.FromResult(StageResult.Ok($"{pack.Name} selected."));
@@ -377,7 +377,7 @@ internal sealed class OrganisationStage : SetupStageBase
         if (!LocaleFormatter.TryGetCulture(culture, out _)) throw new DomainException("culture", "That locale is not recognised.");
         if (!TimeZones.TryFind(zone, out _)) throw new DomainException("time_zone", "That time zone is not recognised.");
         LocaleFormatter.ValidateCurrency(currency);
-        var packId = c.Doc.PackId ?? throw new DomainException("pack", "Choose a solution pack first.");
+        var packId = c.Doc.PackId ?? throw new DomainException("pack", "Choose [[solution.pack|lower|a]] first.");
 
         using var tenantScope = c.UseTenant();
         var structure = c.Get<IOrganisationStructureService>();

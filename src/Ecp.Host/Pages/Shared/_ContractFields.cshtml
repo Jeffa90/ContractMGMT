@@ -26,29 +26,29 @@
     </div>
 }
 <div class="field">
-    <label for="Input_LegalEntityId">@L["Legal entity"]</label>
+    <label for="Input_LegalEntityId">@L["[[legal.entity|sentence]]"]</label>
     <select id="Input_LegalEntityId" name="Input.LegalEntityId">
         <option value="">@L["Not set"]</option>
         @foreach (var e in o.LegalEntities.Where(x => x.IsActive || x.Id == i.LegalEntityId)) { <option value="@e.Id" selected="@(e.Id == i.LegalEntityId)">@e.Name</option> }
     </select>
 </div>
 <div class="field">
-    <label for="Input_BusinessUnitId">@L["Business unit"]</label>
+    <label for="Input_BusinessUnitId">@L["[[business.unit|sentence]]"]</label>
     <select id="Input_BusinessUnitId" name="Input.BusinessUnitId">
         <option value="">@L["None"]</option>
         @foreach (var b in o.BusinessUnits.Where(x => x.IsActive || x.Id == i.BusinessUnitId)) { <option value="@b.Id" selected="@(b.Id == i.BusinessUnitId)">@b.Name</option> }
     </select>
 </div>
 <div class="field">
-    <label for="Input_SiteId">@L["Site"]</label>
+    <label for="Input_SiteId">@L["[[site]]"]</label>
     <select id="Input_SiteId" name="Input.SiteId">
         <option value="">@L["None"]</option>
         @foreach (var s in o.Sites.Where(x => x.IsActive || x.Id == i.SiteId)) { <option value="@s.Id" selected="@(s.Id == i.SiteId)">@s.Name</option> }
     </select>
 </div>
-<div class="field"><label for="Input_SapOutlineAgreementNumber">@L["SAP outline agreement number"]</label><input id="Input_SapOutlineAgreementNumber" name="Input.SapOutlineAgreementNumber" type="text" maxlength="100" value="@i.SapOutlineAgreementNumber" /></div>
+<div class="field"><label for="Input_SapOutlineAgreementNumber">@L["SAP outline [[agreement|lower]] number"]</label><input id="Input_SapOutlineAgreementNumber" name="Input.SapOutlineAgreementNumber" type="text" maxlength="100" value="@i.SapOutlineAgreementNumber" /></div>
 <div class="field"><label for="Input_CurrencyCode">@L["Currency"]</label><input id="Input_CurrencyCode" name="Input.CurrencyCode" type="text" maxlength="3" value="@i.CurrencyCode" aria-describedby="cur-hint" /><p id="cur-hint" class="hint">@L["Three-letter ISO 4217 code, for example AUD."]</p></div>
-<div class="field"><label for="Input_EstimatedValue">@L["Estimated agreement value"]</label><input id="Input_EstimatedValue" name="Input.EstimatedValue" type="text" inputmode="decimal" value="@i.EstimatedValue" aria-describedby="val-hint" /><p id="val-hint" class="hint">@L["Digits with an optional decimal point, for example 125000.50."]</p></div>
+<div class="field"><label for="Input_EstimatedValue">@L["Estimated [[agreement|lower]] value"]</label><input id="Input_EstimatedValue" name="Input.EstimatedValue" type="text" inputmode="decimal" value="@i.EstimatedValue" aria-describedby="val-hint" /><p id="val-hint" class="hint">@L["Digits with an optional decimal point, for example 125000.50."]</p></div>
 <div class="field">
     <label for="Input_ExtensionType">@L["Extension type"]</label>
     <select id="Input_ExtensionType" name="Input.ExtensionType">
@@ -56,7 +56,7 @@
         @foreach (var x in o.ExtensionTypes) { <option value="@x" selected="@string.Equals(x, i.ExtensionType, StringComparison.OrdinalIgnoreCase)">@x</option> }
         @if (!string.IsNullOrEmpty(i.ExtensionType) && o.ExtensionTypes.All(x => !string.Equals(x, i.ExtensionType, StringComparison.OrdinalIgnoreCase))) { <option value="@i.ExtensionType" selected>@i.ExtensionType</option> }
     </select>
-    <p class="hint">@L["Evergreen agreements have no End Date to expire."]</p>
+    <p class="hint">@L["Evergreen [[agreement|plural|lower]] have no End Date to expire."]</p>
 </div>
 <div class="field"><label for="Input_StartDate">@L["Start date"]</label><input id="Input_StartDate" name="Input.StartDate" type="date" value="@i.StartDate" /></div>
 <div class="field"><label for="Input_EffectiveDate">@L["Effective date"]</label><input id="Input_EffectiveDate" name="Input.EffectiveDate" type="date" value="@i.EffectiveDate" /></div>
@@ -74,4 +74,4 @@
     <p class="hint">@L["Give both the length and the unit, or neither."]</p>
 </fieldset>
 <div class="field"><label><input type="checkbox" name="Input.CriticalNotice" value="true" checked="@i.CriticalNotice" /> @L["Critical Notice"]</label><input type="hidden" name="Input.CriticalNotice" value="false" /></div>
-<div class="field"><label><input type="checkbox" name="Input.LegalReviewRequired" value="true" checked="@i.LegalReviewRequired" /> @L["Legal review required"]</label><input type="hidden" name="Input.LegalReviewRequired" value="false" /></div>
+<div class="field"><label><input type="checkbox" name="Input.LegalReviewRequired" value="true" checked="@i.LegalReviewRequired" /> @L["[[legal.review|sentence]] required"]</label><input type="hidden" name="Input.LegalReviewRequired" value="false" /></div>

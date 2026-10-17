@@ -2,7 +2,7 @@
 @model Ecp.Host.Pages.Dashboards.IndexModel
 @{ ViewData["Title"] = L["Dashboards"].Value; }
 <h1>@L["Dashboards"]</h1>
-<p class="lede">@L["Lists and counts of the agreements that need attention. They show only what you could open yourself, within your organisations, categories and classification ceiling. For analysis, use the external reporting views."]</p>
+<p class="lede">@L["Lists and counts of the [[agreement|plural|lower]] that need attention. They show only what you could open yourself, within your [[organisation|plural|lower]], [[category|plural|lower]] and classification ceiling. For analysis, use the external reporting views."]</p>
 @if (Model.Selected is { } card)
 {
     <p><a href="/Dashboards">&larr; @L["All dashboards"]</a></p>

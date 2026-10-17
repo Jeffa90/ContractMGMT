@@ -1,15 +1,15 @@
 @page "/Admin/Packs/Upload"
 @model Ecp.Host.Pages.Admin.Packs.UploadModel
-@{ ViewData["Title"] = L["Upload a solution pack"].Value; }
-<h1>@L["Upload a solution pack"]</h1>
+@{ ViewData["Title"] = L["Upload [[solution.pack|lower|a]]"].Value; }
+<h1>@L["Upload [[solution.pack|lower|a]]"]</h1>
 <ol class="wizard-steps" aria-label="@L["Progress"]">
     <li aria-current="step"><span class="visually-hidden">@L["Current step: "]</span>1. @L["Choose the file"]</li><li>2. @L["Check and review"]</li><li>3. @L["Install"]</li>
 </ol>
 <partial name="_Errors" model="ViewData.ModelState" />
-<p class="lede">@L["Choose a solution pack file (.ecpkg) supplied by a publisher you trust. It is checked in a safe holding area first. Nothing is installed and nothing in your organisation changes until you review the result and confirm."]</p>
+<p class="lede">@L["Choose [[solution.pack|lower|a]] file (.ecpkg) supplied by a publisher you trust. It is checked in a safe holding area first. Nothing is installed and nothing in your [[organisation|lower]] changes until you review the result and confirm."]</p>
 <form method="post" enctype="multipart/form-data" class="card">
     <div class="field">
-        <label for="file">@L["Solution pack file (.ecpkg)"]</label>
+        <label for="file">@L["[[solution.pack|sentence]] file (.ecpkg)"]</label>
         <input id="file" name="file" type="file" accept=".ecpkg" required aria-describedby="file-hint" />
         <p id="file-hint" class="hint">@L["Up to"] @Model.MaxMegabytes @L["MB. A pack contains configuration only: it never contains programs, scripts or database commands, and the platform would refuse it if it did."]</p>
     </div>

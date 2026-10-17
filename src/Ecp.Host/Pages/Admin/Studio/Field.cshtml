@@ -13,7 +13,7 @@
     <fieldset class="card">
         <legend>@L["Identity"]</legend>
         <div class="field"><label for="Edit_Key">@L["Key"]</label><input id="Edit_Key" name="Edit.Key" type="text" maxlength="63" value="@e.Key" readonly="@(!Model.IsNew)" aria-describedby="key-hint" />
-            <p id="key-hint" class="hint">@L["Lower-case letters, digits and underscores, starting with a letter. It identifies the field in views, exports and approvals and cannot change once published."]</p></div>
+            <p id="key-hint" class="hint">@L["Lower-case letters, digits and underscores, starting with a letter. It identifies the field in views, exports and [[approval|plural|lower]] and cannot change once published."]</p></div>
         <div class="field"><label for="Edit_Label">@L["Label"]</label><input id="Edit_Label" name="Edit.Label" type="text" maxlength="100" required value="@e.Label" /></div>
         <div class="field"><label for="Edit_Type">@L["Type"]</label>
             <select id="Edit_Type" name="Edit.Type">@foreach (var t in FieldTypes.All) { <option value="@t" selected="@(t == e.Type)">@FieldTypes.Label(t)</option> }</select></div>
@@ -27,7 +27,7 @@
         <div class="field"><label for="Edit_HelpText">@L["Help text shown beside the field"]</label><input id="Edit_HelpText" name="Edit.HelpText" type="text" maxlength="300" value="@e.HelpText" /></div>
         <div class="field"><label for="Edit_Placeholder">@L["Placeholder"]</label><input id="Edit_Placeholder" name="Edit.Placeholder" type="text" maxlength="100" value="@e.Placeholder" /></div>
         <div class="field"><label><input type="checkbox" name="Edit.Required" value="true" checked="@e.Required" /> @L["Required"]</label><input type="hidden" name="Edit.Required" value="false" />
-            <p class="hint">@L["Required fields are asked for on new contracts and the next time an existing contract is edited. Nothing is changed in bulk."]</p></div>
+            <p class="hint">@L["Required fields are asked for on new [[contract|plural|lower]] and the next time an existing [[contract|lower]] is edited. Nothing is changed in bulk."]</p></div>
         <div class="field"><label for="Edit_Default">@L["Default value (one per line for multiple choice)"]</label><textarea id="Edit_Default" name="Edit.Default" maxlength="1000">@e.Default</textarea></div>
     </fieldset>
 
@@ -35,7 +35,7 @@
         <legend>@L["Choices"]</legend>
         <div class="field"><label for="Edit_Choices">@L["Single and multiple choice: one choice per line"]</label>
             <textarea id="Edit_Choices" name="Edit.Choices" rows="6" aria-describedby="choices-hint">@e.Choices</textarea>
-            <p id="choices-hint" class="hint">@L["Write CODE | Label. Add | inactive to stop a choice being offered; contracts that already hold it keep it."]</p></div>
+            <p id="choices-hint" class="hint">@L["Write CODE | Label. Add | inactive to stop a choice being offered; [[contract|plural|lower]] that already hold it keep it."]</p></div>
         <div class="field"><label for="Edit_Lookup">@L["Lookup: the list to choose from"]</label>
             <select id="Edit_Lookup" name="Edit.Lookup"><option value="">@L["None"]</option>@foreach (var l in Model.State.Working.Lookups) { <option value="@l.Name" selected="@(l.Name == e.Lookup)">@l.Label (@l.Name)</option> }</select>
             <p class="hint"><a href="/Admin/Studio/Lists?organisationId=@Model.OrganisationId">@L["Edit the lists"]</a></p></div>
@@ -72,11 +72,11 @@
         <legend>@L["Who sees and changes it"]</legend>
         <div class="field"><label for="Edit_Classification">@L["Classification of the values"]</label>
             <select id="Edit_Classification" name="Edit.Classification">@foreach (var l in Model.Levels) { <option value="@l" selected="@(l == e.Classification)">@l</option> }</select>
-            <p class="hint">@L["A value is held at the more sensitive of this level and the contract's own. Nobody without access at that level sees it, not in the register, an export or an approval."]</p></div>
-        <fieldset><legend>@L["Visible to roles (none ticked: everyone who can read the contract)"]</legend>
-            @foreach (var r in Model.Roles) { <label><input type="checkbox" name="Edit.VisibleToRoles" value="@r" checked="@e.VisibleToRoles.Contains(r)" /> @r</label> }</fieldset>
-        <fieldset><legend>@L["Editable by roles (none ticked: anyone who can edit the contract)"]</legend>
-            @foreach (var r in Model.Roles) { <label><input type="checkbox" name="Edit.EditableByRoles" value="@r" checked="@e.EditableByRoles.Contains(r)" /> @r</label> }</fieldset>
+            <p class="hint">@L["A value is held at the more sensitive of this level and the [[contract|lower]]'s own. Nobody without access at that level sees it, not in the register, an export or [[approval|lower|a]]."]</p></div>
+        <fieldset><legend>@L["Visible to roles (none ticked: everyone who can read the [[contract|lower]])"]</legend>
+            @foreach (var r in Model.Roles) { <label><input type="checkbox" name="Edit.VisibleToRoles" value="@r" checked="@e.VisibleToRoles.Contains(r)" /> @Terms.Role(r)</label> }</fieldset>
+        <fieldset><legend>@L["Editable by roles (none ticked: anyone who can edit the [[contract|lower]])"]</legend>
+            @foreach (var r in Model.Roles) { <label><input type="checkbox" name="Edit.EditableByRoles" value="@r" checked="@e.EditableByRoles.Contains(r)" /> @Terms.Role(r)</label> }</fieldset>
         @if (Model.KnownStates is { } states)
         {
             <fieldset><legend>@L["Visible in states (none ticked: all)"]</legend>@foreach (var s in states.Order()) { <label><input type="checkbox" name="Edit.VisibleInStates" value="@s" checked="@e.VisibleInStates.Contains(s)" /> @s</label> }</fieldset>
@@ -87,7 +87,7 @@
             <div class="field"><label for="Edit_VisibleInStates">@L["Visible in states (codes, comma separated; blank: all)"]</label><input id="Edit_VisibleInStates" name="Edit.VisibleInStates" type="text" value="@string.Join(", ", e.VisibleInStates)" /></div>
             <div class="field"><label for="Edit_EditableInStates">@L["Editable in states (codes, comma separated; blank: all)"]</label><input id="Edit_EditableInStates" name="Edit.EditableInStates" type="text" value="@string.Join(", ", e.EditableInStates)" /></div>
         }
-        <div class="field"><label for="Edit_ContractTypes">@L["Applies to contract types (comma separated; blank: all)"]</label><input id="Edit_ContractTypes" name="Edit.ContractTypes" type="text" value="@string.Join(", ", e.ContractTypes)" /></div>
+        <div class="field"><label for="Edit_ContractTypes">@L["Applies to [[contract.type|plural|lower]] (comma separated; blank: all)"]</label><input id="Edit_ContractTypes" name="Edit.ContractTypes" type="text" value="@string.Join(", ", e.ContractTypes)" /></div>
         <div class="field"><label for="Edit_EffectiveFrom">@L["Effective from"]</label><input id="Edit_EffectiveFrom" name="Edit.EffectiveFrom" type="date" value="@e.EffectiveFrom" /></div>
         <div class="field"><label for="Edit_EffectiveTo">@L["Effective to"]</label><input id="Edit_EffectiveTo" name="Edit.EffectiveTo" type="date" value="@e.EffectiveTo" /></div>
         <div class="field"><label for="Edit_Status">@L["Status"]</label>
@@ -100,7 +100,7 @@
         <label><input type="checkbox" name="Edit.Filterable" value="true" checked="@e.Filterable" /> @L["Can be filtered on"]</label><input type="hidden" name="Edit.Filterable" value="false" />
         <label><input type="checkbox" name="Edit.Sortable" value="true" checked="@e.Sortable" /> @L["Can be sorted on"]</label><input type="hidden" name="Edit.Sortable" value="false" />
         <label><input type="checkbox" name="Edit.Reportable" value="true" checked="@e.Reportable" /> @L["Included in exports and the reporting projection"]</label><input type="hidden" name="Edit.Reportable" value="false" />
-        <label><input type="checkbox" name="Edit.UsableInApprovals" value="true" checked="@e.UsableInApprovals" /> @L["Can be used in approval matrices (an approval explanation then shows the values it judged)"]</label><input type="hidden" name="Edit.UsableInApprovals" value="false" />
+        <label><input type="checkbox" name="Edit.UsableInApprovals" value="true" checked="@e.UsableInApprovals" /> @L["Can be used in [[approval|lower]] matrices ([[approval|lower|a]] explanation then shows the values it judged)"]</label><input type="hidden" name="Edit.UsableInApprovals" value="false" />
     </fieldset>
 
     <div class="actions">
@@ -123,7 +123,7 @@
         <partial name="~/Pages/Shared/_CustomFieldInputs.cshtml" model="createForm" />
         <h3>2. @L["Edit form (with a stored value)"]</h3>
         <partial name="~/Pages/Shared/_CustomFieldInputs.cshtml" model="editForm" />
-        <h3>3. @L["Contract details page"]</h3>
+        <h3>3. @L["[[contract]] details page"]</h3>
         <partial name="~/Pages/Shared/_CustomFieldValues.cshtml" model="detailsForm" />
         <h3>4. @L["Register: column and filter"]</h3>
         <p><strong>@p.Label</strong>@if (p.Sortable) { <span class="hint"> (@L["sortable"])</span> }</p>

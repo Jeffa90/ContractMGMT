@@ -21,8 +21,8 @@ public sealed class FilesModel(IMigrationBatches batches) : MigrationPageModel
 
     public Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct) => RunAsync(async () => { await LoadAsync(id, ct); return Page(); });
 
-    public Task<IActionResult> OnPostMatchAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await batches.ResolveFileAsync(id, FileId, ContractRowId, ct); Flash("The file was matched to the contract you chose. Run the dry run again to apply it."); });
-    public Task<IActionResult> OnPostReleaseAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await batches.ReleaseHeldFileAsync(id, FileId, ct); Flash("The file was released and will be imported as a separate document. Run the dry run again to apply it."); });
+    public Task<IActionResult> OnPostMatchAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await batches.ResolveFileAsync(id, FileId, ContractRowId, ct); Flash("The file was matched to the [[contract|lower]] you chose. Run the dry run again to apply it."); });
+    public Task<IActionResult> OnPostReleaseAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await batches.ReleaseHeldFileAsync(id, FileId, ct); Flash("The file was released and will be imported as a separate [[document|lower]]. Run the dry run again to apply it."); });
     public Task<IActionResult> OnPostDiscardAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await batches.DiscardFileAsync(id, FileId, Reason ?? "", ct); Flash("The file was discarded. The discard is recorded; the file stays in staging, marked discarded."); });
 
     private Task<IActionResult> Act(Guid id, CancellationToken ct, Func<Task> action) => RunAsync(async () => { await action(); return RedirectToPage(new { id, queueOnly = true }); }, () => LoadAsync(id, ct));

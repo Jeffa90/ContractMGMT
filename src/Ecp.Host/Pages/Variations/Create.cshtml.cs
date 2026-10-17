@@ -36,7 +36,7 @@ public sealed class CreateModel(IVariationService variations, ISecuredContractSe
     public Task<IActionResult> OnPostAsync(CancellationToken ct) => RunAsync(async () =>
     {
         var id = await variations.CreateAsync(ContractId, Form.ToInput(Request.Form), ct);
-        Flash("The Variation is drafted. The agreement stays locked until it is applied, rejected or cancelled.");
+        Flash("The [[variation]] is drafted. The [[agreement|lower]] stays locked until it is applied, rejected or cancelled.");
         return Redirect("/Variations/Details/" + id);
     }, () => LoadAsync(ct));
 }

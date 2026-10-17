@@ -55,7 +55,7 @@ public sealed class Notification : ITenantOwned
 
     public void Acknowledge(string by, DateTime nowUtc)
     {
-        if (!RequiresAcknowledgement) throw new DomainException("not_acknowledgeable", "This notification does not need acknowledging.");
+        if (!RequiresAcknowledgement) throw new DomainException("not_acknowledgeable", "This [[notification|lower]] does not need acknowledging.");
         if (AcknowledgedUtc is not null) return;
         AcknowledgedUtc = nowUtc; AcknowledgedBy = Guard.NotBlank(by, "Acknowledged by", 200); ReadUtc ??= nowUtc;
     }

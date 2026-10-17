@@ -63,7 +63,7 @@ internal sealed class ApprovalResolver(IApprovalMatrixStore store, IOrganisation
     public async Task<StepParticipation> ParticipantsAsync(ApprovalPlan plan, string stepKey, ResourceDescriptor resource, Guid? submitterUserId, DateTime asOfUtc, CancellationToken ct = default)
     {
         var step = plan.Step(stepKey) ?? throw new DomainException("step_unknown", "That step is not part of this plan.");
-        var org = resource.OrganisationId ?? throw new DomainException("organisation_required", "The record's organisation is required.");
+        var org = resource.OrganisationId ?? throw new DomainException("organisation_required", "The record's [[organisation|lower]] is required.");
         return await participants.ForStepAsync(new ApprovalParticipants.StepSpec(step.Key, step.Display, step.ApproverGroup, step.BackupGroup, step.Mode, step.AllowBackup), org, resource, submitterUserId, asOfUtc, null, ct);
     }
 }

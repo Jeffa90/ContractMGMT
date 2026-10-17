@@ -2,7 +2,7 @@
 @model Ecp.Host.Pages.Migration.ProjectModel
 @using Ecp.DataMigration.Domain
 @{ ViewData["Title"] = Model.Project.Name; var p = Model.Project; }
-<p><a href="/Migration">&larr; @L["Migration projects"]</a></p>
+<p><a href="/Migration">&larr; @L["[[migration.project|plural|sentence]]"]</a></p>
 <h1>@p.Name</h1>
 <partial name="_Errors" model="ViewData.ModelState" />
 <dl class="facts card">
@@ -10,16 +10,16 @@
     <dt>@L["Data owner"]</dt><dd>@p.DataOwner</dd>
     <dt>@L["Extracted"]</dt><dd>@p.ExtractionUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
     <dt>@L["Status"]</dt><dd>@p.Status</dd>
-    <dt>@L["Reference policy"]</dt><dd>@(p.ReferencePolicy == ReferencePolicy.KeepSource ? L["Keep the source agreement reference where it is free"].Value : L["Generate a new reference from the numbering rule"].Value)</dd>
+    <dt>@L["Reference policy"]</dt><dd>@(p.ReferencePolicy == ReferencePolicy.KeepSource ? L["Keep the source [[contract.reference|lower]] where it is free"].Value : L["Generate a new reference from the numbering rule"].Value)</dd>
     <dt>@L["Legacy-load policy"]</dt><dd>@if (p.LegacyLoadEnabled) { <span class="badge ok">@L["Active until"] @p.LegacyPolicyExpiresUtc?.ToString("yyyy-MM-dd") UTC</span> <span>@L["Allowed states"]: @string.Join(", ", p.LegacyAllowedStatuses)</span> } else { <span class="badge">@L["None"]</span> }</dd>
     <dt>@L["Cutover freeze"]</dt><dd>@if (p.FreezeStartUtc is { } fs) { <span>@fs.ToString("yyyy-MM-dd HH:mm") @L["to"] @p.FreezeEndUtc?.ToString("yyyy-MM-dd HH:mm") UTC</span> <span class="badge @(p.TargetFreezeEnabled ? "warn" : "")">@(p.TargetFreezeEnabled ? L["Target freeze ON"].Value : L["Target freeze off"].Value)</span> } else { <span>@L["Not recorded"]</span> }</dd>
 </dl>
 
-<h2>@L["Batches"]</h2>
+<h2>@L["[[migration.batch|plural]]"]</h2>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Batches"]</caption>
-    <thead><tr><th scope="col">@L["Batch"]</th><th scope="col">@L["Kind"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Created"]</th><th scope="col">@L["Rows"]</th><th scope="col">@L["Created / updated"]</th></tr></thead>
+    <caption class="visually-hidden">@L["[[migration.batch|plural]]"]</caption>
+    <thead><tr><th scope="col">@L["[[migration.batch]]"]</th><th scope="col">@L["Kind"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Created"]</th><th scope="col">@L["Rows"]</th><th scope="col">@L["Created / updated"]</th></tr></thead>
     <tbody>
     @foreach (var b in p.Batches)
     {
@@ -29,7 +29,7 @@
             <td>@b.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC by @b.CreatedBy</td><td>@b.SourceRows</td><td>@b.Created / @b.Updated</td>
         </tr>
     }
-    @if (p.Batches.Count == 0) { <tr><td colspan="6">@L["No batches yet."]</td></tr> }
+    @if (p.Batches.Count == 0) { <tr><td colspan="6">@L["No [[migration.batch|plural|lower]] yet."]</td></tr> }
     </tbody>
 </table>
 </div>
@@ -41,30 +41,30 @@
 
 @if (p.Can.CanStage)
 {
-    <h2>@L["Create a batch"]</h2>
+    <h2>@L["Create [[migration.batch|lower|a]]"]</h2>
     <form method="post" asp-page-handler="CreateBatch" class="card">
-        <div class="field"><label for="BatchName">@L["Batch name"]</label><input id="BatchName" name="BatchName" type="text" maxlength="200" /></div>
+        <div class="field"><label for="BatchName">@L["[[migration.batch]] name"]</label><input id="BatchName" name="BatchName" type="text" maxlength="200" /></div>
         <div class="field"><label for="Kind">@L["Kind"]</label>
             <select id="Kind" name="Kind" aria-describedby="kind-hint">@foreach (var k in new[] { BatchKind.DryRun, BatchKind.Mock, BatchKind.Final }) { <option value="@k" selected="@(k == Model.Kind)">@Ecp.Host.Pages.Migration.MigrationPageModel.Label(k)</option> }</select>
             <p class="hint" id="kind-hint">@L["A dry run never writes to the platform. A mock load is a rehearsal that does write and can be rolled back. A final load is the cutover itself."]</p></div>
         <div class="field"><label for="ProfileVersionId">@L["Mapping profile version"]</label>
             <select id="ProfileVersionId" name="ProfileVersionId"><option value="">@L["Choose later"]</option>@foreach (var c in Model.ProfileChoices) { <option value="@c.VersionId">@c.Label</option> }</select>
-            <p class="hint">@L["Only published versions can be used. The batch keeps the version it is given, so later changes to the profile do not alter it."]</p></div>
+            <p class="hint">@L["Only published versions can be used. The [[migration.batch|lower]] keeps the version it is given, so later changes to the profile do not alter it."]</p></div>
         <div class="field"><label for="Strategy">@L["When a source record has been loaded before, or its reference is in use"]</label>
             <select id="Strategy" name="Strategy">@foreach (var s in Ecp.Host.Pages.Migration.MigrationPageModel.Strategies) { <option value="@s.Value" selected="@(s.Value == Model.Strategy)">@s.Label</option> }</select>
             <ul class="hint">@foreach (var s in Ecp.Host.Pages.Migration.MigrationPageModel.Strategies) { <li><strong>@s.Label.</strong> @s.Hint</li> }</ul></div>
-        <div class="field"><label for="DocumentOption">@L["When a document's content is already in the platform"]</label>
+        <div class="field"><label for="DocumentOption">@L["When [[document|lower|a]]'s content is already in the platform"]</label>
             <select id="DocumentOption" name="DocumentOption">@foreach (var o in Ecp.Host.Pages.Migration.MigrationPageModel.DocumentOptions) { <option value="@o.Value" selected="@(o.Value == Model.DocumentOption)">@o.Label</option> }</select></div>
         @if (p.LegacyLoadEnabled && p.Can.CanLegacyLoad)
         {
             <div class="check field"><input id="IsLegacyLoad" name="IsLegacyLoad" type="checkbox" value="true" /><label for="IsLegacyLoad">@L["This is a legacy load: it creates locked records in a state of Effective or later. It needs a second person's confirmation."]</label></div>
         }
-        <div class="actions"><button type="submit">@L["Create batch"]</button></div>
+        <div class="actions"><button type="submit">@L["Create [[migration.batch|lower]]"]</button></div>
     </form>
 
-    <h2>@L["Project settings"]</h2>
+    <h2>@L["[[migration.project]] settings"]</h2>
     <form method="post" asp-page-handler="Policy" class="card">
-        <div class="field"><label for="Policy">@L["Agreement reference policy"]</label>
+        <div class="field"><label for="Policy">@L["[[contract.reference|sentence]] policy"]</label>
             <select id="Policy" name="Policy">
                 <option value="@ReferencePolicy.KeepSource" selected="@(Model.Policy == ReferencePolicy.KeepSource)">@L["Keep the source reference where it is free"]</option>
                 <option value="@ReferencePolicy.GenerateNew" selected="@(Model.Policy == ReferencePolicy.GenerateNew)">@L["Generate a new reference from the numbering rule"]</option>
@@ -78,10 +78,10 @@
 {
     <form method="post" asp-page-handler="Legacy" class="card">
         <h3>@L["Legacy-load policy"]</h3>
-        <p class="hint">@L["Records in a state of Effective or later are locked. Loading them from a previous system needs a policy that says which states may be loaded, whether the source Registered Date may be kept, and until when. The policy expires on its own."]</p>
+        <p class="hint">@L["Records in a state of Effective or later are locked. Loading them from a previous system needs a policy that says which states may be loaded, whether the source [[registered.date]] may be kept, and until when. The policy expires on its own."]</p>
         <div class="field"><label for="AllowedStatuses">@L["Target states a legacy load may create (comma separated)"]</label><input id="AllowedStatuses" name="AllowedStatuses" type="text" value="@Model.AllowedStatuses" /></div>
         <div class="field"><label for="ExpiresDate">@L["Expires (UTC date)"]</label><input id="ExpiresDate" name="ExpiresDate" type="date" value="@Model.ExpiresDate.ToString("yyyy-MM-dd")" required /></div>
-        <div class="check field"><input id="AllowRegisteredDate" name="AllowRegisteredDate" type="checkbox" value="true" checked="@p.LegacyAllowRegisteredDateImport" /><label for="AllowRegisteredDate">@L["Keep the source Registered Date (it is never made up when the source has none)"]</label></div>
+        <div class="check field"><input id="AllowRegisteredDate" name="AllowRegisteredDate" type="checkbox" value="true" checked="@p.LegacyAllowRegisteredDateImport" /><label for="AllowRegisteredDate">@L["Keep the source [[registered.date]] (it is never made up when the source has none)"]</label></div>
         <div class="check field"><input id="AllowOverwrite" name="AllowOverwrite" type="checkbox" value="true" checked="@p.LegacyAllowOverwriteLocked" /><label for="AllowOverwrite">@L["Allow an update to overwrite locked records already in the platform"]</label></div>
         <div class="field"><label for="OverwriteReason">@L["Reason for allowing overwrites (needed when ticked)"]</label><input id="OverwriteReason" name="OverwriteReason" type="text" value="@p.LegacyOverwriteReason" maxlength="1000" /></div>
         <div class="actions"><button type="submit">@L["Save legacy-load policy"]</button></div>
@@ -96,15 +96,15 @@
 {
     <form method="post" asp-page-handler="Freeze" class="card">
         <h3>@L["Cutover freeze"]</h3>
-        <p class="hint">@L["Record the freeze window. When the target freeze is on, people cannot create contracts in this organisation during the window; migration batches are not affected."]</p>
+        <p class="hint">@L["Record the freeze window. When the target freeze is on, people cannot create [[contract|plural|lower]] in this [[organisation|lower]] during the window; [[migration.batch|plural|lower]] are not affected."]</p>
         <div class="field"><label for="FreezeStart">@L["Starts (UTC)"]</label><input id="FreezeStart" name="FreezeStart" type="datetime-local" value="@Model.FreezeStart.ToString("yyyy-MM-ddTHH:mm")" required /></div>
         <div class="field"><label for="FreezeEnd">@L["Ends (UTC)"]</label><input id="FreezeEnd" name="FreezeEnd" type="datetime-local" value="@Model.FreezeEnd.ToString("yyyy-MM-ddTHH:mm")" required /></div>
-        <div class="check field"><input id="TargetFreeze" name="TargetFreeze" type="checkbox" value="true" checked="@p.TargetFreezeEnabled" /><label for="TargetFreeze">@L["Block contract creation by people during the window"]</label></div>
+        <div class="check field"><input id="TargetFreeze" name="TargetFreeze" type="checkbox" value="true" checked="@p.TargetFreezeEnabled" /><label for="TargetFreeze">@L["Block [[contract|lower]] creation by people during the window"]</label></div>
         <div class="actions"><button type="submit">@L["Save freeze window"]</button></div>
     </form>
 }
 
 @if (p.Can.CanAccept && p.Status == ProjectStatus.Active)
 {
-    <form method="post" asp-page-handler="CloseProject" class="card"><p>@L["When every batch is accepted, rolled back or compensated, close the project. This also closes the legacy-load policy and lifts any freeze."]</p><button class="danger" type="submit">@L["Close the project"]</button></form>
+    <form method="post" asp-page-handler="CloseProject" class="card"><p>@L["When every [[migration.batch|lower]] is accepted, rolled back or compensated, close the [[migration.project|lower]]. This also closes the legacy-load policy and lifts any freeze."]</p><button class="danger" type="submit">@L["Close the [[migration.project|lower]]"]</button></form>
 }

@@ -1,18 +1,18 @@
 @page "/Contracts/Create"
 @model Ecp.Host.Pages.Contracts.CreateModel
-@{ ViewData["Title"] = L["Create a contract"].Value; }
-<h1>@L["Create a contract"]</h1>
+@{ ViewData["Title"] = L["Create [[contract|lower|a]]"].Value; }
+<h1>@L["Create [[contract|lower|a]]"]</h1>
 
 @if (Model.Organisations.Count == 0)
 {
-    <p class="flash warn" role="status">@L["You do not hold a role that can create contracts."]</p>
+    <p class="flash warn" role="status">@L["You do not hold a role that can create [[contract|plural|lower]]."]</p>
 }
 else if (Model.OrganisationId is null)
 {
     <form method="get">
-        <p class="lede">@L["Choose the organisation the contract belongs to. Organisation is a mandatory policy and reporting scope."]</p>
+        <p class="lede">@L["Choose the [[organisation|lower]] the [[contract|lower]] belongs to. [[organisation]] is a mandatory policy and reporting scope."]</p>
         <div class="field">
-            <label for="orgId">@L["Organisation"]</label>
+            <label for="orgId">@L["[[organisation]]"]</label>
             <select id="orgId" name="organisationId" required aria-required="true">
                 @foreach (var o in Model.Organisations) { <option value="@o.Id">@o.Name</option> }
             </select>
@@ -23,22 +23,22 @@ else if (Model.OrganisationId is null)
 else
 {
     <partial name="_Errors" model="ViewData.ModelState" />
-    <p class="lede">@L["Organisation"]: <strong>@Model.OrganisationName</strong>. @L["The agreement reference is assigned automatically using this organisation's prefix:"] <code>@Model.NextReference</code></p>
+    <p class="lede">@L["[[organisation]]"]: <strong>@Model.OrganisationName</strong>. @L["The [[contract.reference|lower]] is assigned automatically using this [[organisation|lower]]'s prefix:"] <code>@Model.NextReference</code></p>
     <form method="post">
         <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
         <div class="field"><label for="Title">@L["Title"]</label><input id="Title" name="Title" type="text" required aria-required="true" maxlength="500" value="@Model.Title" /></div>
         <div class="field">
-            <label for="SupplierId">@L["Supplier"]</label>
+            <label for="SupplierId">@L["[[supplier]]"]</label>
             <select id="SupplierId" name="SupplierId" required aria-required="true">
-                <option value="">@L["Choose a supplier"]</option>
+                <option value="">@L["Choose [[supplier|lower|a]]"]</option>
                 @foreach (var s in Model.Suppliers) { <option value="@s.Id" selected="@(s.Id == Model.SupplierId)">@s.Name</option> }
             </select>
-            <p class="hint"><a href="/Suppliers/Create?organisationId=@Model.OrganisationId">@L["Add a supplier"]</a></p>
+            <p class="hint"><a href="/Suppliers/Create?organisationId=@Model.OrganisationId">@L["Add [[supplier|lower|a]]"]</a></p>
         </div>
         <div class="field">
-            <label for="CategoryId">@L["Category"]</label>
+            <label for="CategoryId">@L["[[category]]"]</label>
             <select id="CategoryId" name="CategoryId" required aria-required="true">
-                <option value="">@L["Choose a category"]</option>
+                <option value="">@L["Choose [[category|lower|a]]"]</option>
                 @foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }
             </select>
         </div>
@@ -53,9 +53,9 @@ else
         @if (Model.Fields is { } fields && fields.Fields.Count > 0)
         {
             <h2>@L["Additional details"]</h2>
-            <p class="hint">@L["These fields are set up by your administrators. Fields that depend on the contract type appear for the type you choose; use the button below after changing it."]</p>
+            <p class="hint">@L["These fields are set up by your administrators. Fields that depend on the [[contract.type|lower]] appear for the type you choose; use the button below after changing it."]</p>
             <partial name="_CustomFieldInputs" model="fields" />
-            <button type="submit" class="secondary" asp-page-handler="Refresh" formnovalidate>@L["Show the fields for this contract type"]</button>
+            <button type="submit" class="secondary" asp-page-handler="Refresh" formnovalidate>@L["Show the fields for this [[contract.type|lower]]"]</button>
         }
         <div class="actions"><button type="submit">@L["Create draft"]</button> <a class="button secondary" href="/Contracts">@L["Cancel"]</a></div>
     </form>

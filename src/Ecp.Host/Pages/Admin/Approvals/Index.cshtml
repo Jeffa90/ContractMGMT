@@ -2,11 +2,11 @@
 @model Ecp.Host.Pages.Admin.Approvals.IndexModel
 @using Ecp.Approvals.Definitions
 @using Ecp.Host.Pages.Admin.Approvals
-@{ ViewData["Title"] = L["Approval matrices"].Value; }
-<h1>@L["Approval matrices"]</h1>
-<p class="lede">@L["A matrix decides who must approve a submission: it matches the submission against its rows (value, category, classification and so on), picks the steps, and names the approver groups. It names groups, never people. Workflows opt in by naming a matrix; a workflow that names none keeps its single approver group."]</p>
+@{ ViewData["Title"] = L["[[approval]] matrices"].Value; }
+<h1>@L["[[approval]] matrices"]</h1>
+<p class="lede">@L["A matrix decides who must approve a submission: it matches the submission against its rows (value, [[category|lower]], classification and so on), picks the steps, and names the approver groups. It names groups, never people. Workflows opt in by naming a matrix; a workflow that names none keeps its single approver group."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
-<nav class="tabs" aria-label="@L["Approval matrix pages"]">
+<nav class="tabs" aria-label="@L["[[approval]] matrix pages"]">
     <a href="/Admin/Approvals?organisationId=@Model.OrganisationId" aria-current="page">@L["Matrices"]</a>
     <a href="/Admin/Approvals/Simulate?organisationId=@Model.OrganisationId">@L["Simulator"]</a>
     <a href="/Admin/Approvals/Delegations?organisationId=@Model.OrganisationId">@L["Delegations"]</a>
@@ -14,13 +14,13 @@
     <a href="/Admin/Configuration?kind=ApprovalMatrix&organisationId=@Model.OrganisationId">@L["Edit (draft and publish)"]</a>
 </nav>
 <form method="get" class="card">
-    <div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <div class="field"><label for="org">@L["[[organisation]]"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
     <button type="submit" class="secondary">@L["Show"]</button>
 </form>
 
 @if (Model.Published is not { } published)
 {
-    <p class="flash warn" role="status">@L["No approval matrix has been published for this organisation. Workflows that name a matrix cannot be published until one is; submissions are not affected otherwise."]</p>
+    <p class="flash warn" role="status">@L["No [[approval|lower]] matrix has been published for this [[organisation|lower]]. Workflows that name a matrix cannot be published until one is; submissions are not affected otherwise."]</p>
 }
 else
 {

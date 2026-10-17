@@ -45,8 +45,8 @@ public sealed class CreateModel(ISecuredContractService contracts, ISecuredSuppl
         await LoadAsync(submitted, null, ct);
         if (OrganisationId is null) return BadRequest();
         if (string.IsNullOrWhiteSpace(Title)) ModelState.AddModelError(nameof(Title), "Enter a title.");
-        if (SupplierId is null) ModelState.AddModelError(nameof(SupplierId), "Choose a supplier.");
-        if (CategoryId is null) ModelState.AddModelError(nameof(CategoryId), "Choose a category.");
+        if (SupplierId is null) ModelState.AddModelError(nameof(SupplierId), "Choose [[supplier|lower|a]].");
+        if (CategoryId is null) ModelState.AddModelError(nameof(CategoryId), "Choose [[category|lower|a]].");
         decimal? value = null;
         if (!string.IsNullOrWhiteSpace(Input.EstimatedValue))
         {
@@ -83,7 +83,7 @@ public sealed class CreateModel(ISecuredContractService contracts, ISecuredSuppl
         }
         catch (ForbiddenException)
         {
-            ModelState.AddModelError(nameof(CategoryId), "You can create contracts only in categories you currently own, unless your role allows organisation-wide creation.");
+            ModelState.AddModelError(nameof(CategoryId), "You can create [[contract|plural|lower]] only in [[category|plural|lower]] you currently own, unless your role allows [[organisation|lower]]-wide creation.");
             return Page();
         }
         catch (CustomFieldValidationException ex)
@@ -92,7 +92,7 @@ public sealed class CreateModel(ISecuredContractService contracts, ISecuredSuppl
             foreach (var (key, message) in ex.Errors) ModelState.AddModelError("cf_" + key, message);
             return Page();
         }
-        Flash("Draft contract created.");
+        Flash("Draft [[contract|lower]] created.");
         return RedirectToPage("Details", new { id });
     });
 

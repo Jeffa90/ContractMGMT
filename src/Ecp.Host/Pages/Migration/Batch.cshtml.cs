@@ -39,7 +39,7 @@ public sealed class BatchModel(IMigrationBatches batches, IMigrationIntake intak
     public Task<IActionResult> OnPostUploadContractsAsync(Guid id, IFormFile? file, CancellationToken ct) => Upload(id, file, ct, async s =>
     {
         var dto = await intake.UploadContractsAsync(id, s, file!.FileName, Options(), ct);
-        Flash($"The contracts file was read: {dto.RowCount} row(s) are in staging with their source values kept. Next, make sure a profile is chosen and run the dry run.");
+        Flash($"The [[contract|plural|lower]] file was read: {dto.RowCount} row(s) are in staging with their source values kept. Next, make sure a profile is chosen and run the dry run.");
     });
 
     public Task<IActionResult> OnPostUploadManifestAsync(Guid id, IFormFile? file, CancellationToken ct) => Upload(id, file, ct, async s =>
@@ -79,7 +79,7 @@ public sealed class BatchModel(IMigrationBatches batches, IMigrationIntake intak
     {
         var progress = await commit.CommitAsync(id, ct);
         if (progress.Status == BatchStatus.Failed) Flash("The commit stopped: " + progress.FailureReason + " Nothing was lost or duplicated; fix the cause and commit again to resume.");
-        else Flash("The batch was committed. Reconcile the totals next.");
+        else Flash("The [[migration.batch|lower]] was committed. Reconcile the totals next.");
     });
 
     public Task<IActionResult> OnPostReconcileAsync(Guid id, CancellationToken ct) => Act(id, ct, async () =>
@@ -88,12 +88,12 @@ public sealed class BatchModel(IMigrationBatches batches, IMigrationIntake intak
         Flash(r.Balanced ? "The totals balance. The batch is reconciled." : r.ExceptionsApproved ? "The exceptions were approved and recorded. The batch is reconciled." : "The totals do not balance. See the reconciliation report.");
     });
 
-    public Task<IActionResult> OnPostAcceptAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await commit.AcceptAsync(id, new SampleCheckInput(Note ?? "", Acknowledge), ct); Flash("Business acceptance was recorded. The batch is final and can no longer be rolled back."); });
+    public Task<IActionResult> OnPostAcceptAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await commit.AcceptAsync(id, new SampleCheckInput(Note ?? "", Acknowledge), ct); Flash("Business acceptance was recorded. The [[migration.batch|lower]] is final and can no longer be rolled back."); });
 
     public Task<IActionResult> OnPostRollbackAsync(Guid id, CancellationToken ct) => Act(id, ct, async () =>
     {
         var r = await rollback.RollBackAsync(id, Reason ?? "", ct);
-        Flash($"The batch was rolled back: {r.Reversed} reversed, {r.Archived} archived, {r.Retained} kept, {r.NotReversible} could not be reversed.");
+        Flash($"The [[migration.batch|lower]] was rolled back: {r.Reversed} reversed, {r.Archived} archived, {r.Retained} kept, {r.NotReversible} could not be reversed.");
     });
 
     public Task<IActionResult> OnPostCompensateAsync(Guid id, CancellationToken ct) => Act(id, ct, async () =>

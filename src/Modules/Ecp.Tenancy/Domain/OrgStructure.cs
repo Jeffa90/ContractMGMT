@@ -42,13 +42,13 @@ public sealed class LegalEntity : StructureItem
     public static LegalEntity Create(Guid tenantId, Guid organisationId, string key, string name, string? registrationNumber, DateTime nowUtc) => new()
     {
         Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
-        Key = StructureKey.Normalise(key), Name = Guard.NotBlank(name, "Legal entity name", 200),
+        Key = StructureKey.Normalise(key), Name = Guard.NotBlank(name, "[[legal.entity|sentence]] name", 200),
         RegistrationNumber = Guard.OptionalBounded(registrationNumber, "Registration number", 50), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
     };
 
     public void Update(string name, string? registrationNumber)
     {
-        Name = Guard.NotBlank(name, "Legal entity name", 200);
+        Name = Guard.NotBlank(name, "[[legal.entity|sentence]] name", 200);
         RegistrationNumber = Guard.OptionalBounded(registrationNumber, "Registration number", 50);
     }
 }
@@ -60,10 +60,10 @@ public sealed class Division : StructureItem
     public static Division Create(Guid tenantId, Guid organisationId, string key, string name, DateTime nowUtc) => new()
     {
         Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
-        Key = StructureKey.Normalise(key), Name = Guard.NotBlank(name, "Division name", 200), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+        Key = StructureKey.Normalise(key), Name = Guard.NotBlank(name, "[[division]] name", 200), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
     };
 
-    public void Rename(string name) => Name = Guard.NotBlank(name, "Division name", 200);
+    public void Rename(string name) => Name = Guard.NotBlank(name, "[[division]] name", 200);
 }
 
 public sealed class BusinessUnit : StructureItem
@@ -74,10 +74,10 @@ public sealed class BusinessUnit : StructureItem
     public static BusinessUnit Create(Guid tenantId, Guid organisationId, string key, string name, Guid? divisionId, DateTime nowUtc) => new()
     {
         Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
-        Key = StructureKey.Normalise(key), Name = Guard.NotBlank(name, "Business unit name", 200), DivisionId = divisionId, CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+        Key = StructureKey.Normalise(key), Name = Guard.NotBlank(name, "[[business.unit|sentence]] name", 200), DivisionId = divisionId, CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
     };
 
-    public void Update(string name, Guid? divisionId) { Name = Guard.NotBlank(name, "Business unit name", 200); DivisionId = divisionId; }
+    public void Update(string name, Guid? divisionId) { Name = Guard.NotBlank(name, "[[business.unit|sentence]] name", 200); DivisionId = divisionId; }
 }
 
 public sealed class Site : StructureItem
@@ -89,11 +89,11 @@ public sealed class Site : StructureItem
     public static Site Create(Guid tenantId, Guid organisationId, string code, string name, string? timeZoneId, DateTime nowUtc) => new()
     {
         Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
-        Key = StructureKey.Normalise(code, "Site code"), Name = Guard.NotBlank(name, "Site name", 200), TimeZoneId = NormaliseZone(timeZoneId),
+        Key = StructureKey.Normalise(code, "Site code"), Name = Guard.NotBlank(name, "[[site]] name", 200), TimeZoneId = NormaliseZone(timeZoneId),
         CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
     };
 
-    public void Update(string name, string? timeZoneId) { Name = Guard.NotBlank(name, "Site name", 200); TimeZoneId = NormaliseZone(timeZoneId); }
+    public void Update(string name, string? timeZoneId) { Name = Guard.NotBlank(name, "[[site]] name", 200); TimeZoneId = NormaliseZone(timeZoneId); }
 
     private static string? NormaliseZone(string? id)
     {

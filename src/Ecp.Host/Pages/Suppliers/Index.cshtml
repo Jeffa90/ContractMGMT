@@ -1,19 +1,19 @@
 @page "/Suppliers"
 @model Ecp.Host.Pages.Suppliers.IndexModel
-@{ ViewData["Title"] = L["Suppliers"].Value; }
-<h1>@L["Suppliers"]</h1>
+@{ ViewData["Title"] = L["[[supplier|plural]]"].Value; }
+<h1>@L["[[supplier|plural]]"]</h1>
 <form method="get" class="card">
     <div class="field"><label for="q">@L["Search by name or vendor number"]</label><input id="q" name="q" type="text" value="@Model.Q" /></div>
     <button type="submit">@L["Search"]</button>
 </form>
-@if (Model.CanManage) { <p><a class="button" href="/Suppliers/Create">@L["Add a supplier"]</a></p> }
+@if (Model.CanManage) { <p><a class="button" href="/Suppliers/Create">@L["Add [[supplier|lower|a]]"]</a></p> }
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Suppliers"]</caption>
-    <thead><tr><th scope="col">@L["Name"]</th><th scope="col">@L["Vendor number"]</th><th scope="col">@L["ABN"]</th><th scope="col">@L["Organisation"]</th></tr></thead>
+    <caption class="visually-hidden">@L["[[supplier|plural]]"]</caption>
+    <thead><tr><th scope="col">@L["Name"]</th><th scope="col">@L["Vendor number"]</th><th scope="col">@L["ABN"]</th><th scope="col">@L["[[organisation]]"]</th></tr></thead>
     <tbody>
     @foreach (var s in Model.Suppliers) { <tr><th scope="row"><a href="/Suppliers/Details/@s.Id">@s.Name</a></th><td>@s.VendorNumber</td><td>@s.Abn</td><td>@Model.OrganisationName(s.OrganisationId)</td></tr> }
-    @if (Model.Suppliers.Count == 0) { <tr><td colspan="4">@L["No suppliers are visible to you."]</td></tr> }
+    @if (Model.Suppliers.Count == 0) { <tr><td colspan="4">@L["No [[supplier|plural|lower]] are visible to you."]</td></tr> }
     </tbody>
 </table>
 </div>

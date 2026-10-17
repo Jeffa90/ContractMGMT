@@ -1,20 +1,20 @@
 @page "/Admin/Configuration"
 @model Ecp.Host.Pages.Admin.Configuration.IndexModel
 @using Ecp.Configuration
-@{ ViewData["Title"] = L["Workflow and notification configuration"].Value; }
-<h1>@L["Workflow and notification configuration"]</h1>
-<p class="lede">@L["Change how agreements move, who is told and when, without code. A change is a draft first; it must validate before it can be published; every release is kept and can be published again. Agreements already in flight keep the release they started under."]</p>
+@{ ViewData["Title"] = L["Workflow and [[notification|lower]] configuration"].Value; }
+<h1>@L["Workflow and [[notification|lower]] configuration"]</h1>
+<p class="lede">@L["Change how [[agreement|plural|lower]] move, who is told and when, without code. A change is a draft first; it must validate before it can be published; every release is kept and can be published again. [[agreement|plural]] already in flight keep the release they started under."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
-<nav class="tabs" aria-label="@L["Documents"]">
+<nav class="tabs" aria-label="@L["[[document|plural]]"]">
     @foreach (var k in Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds) { <a href="/Admin/Configuration?kind=@k.Kind&organisationId=@Model.OrganisationId" aria-current="@(k.Kind == Model.Kind ? "page" : null)">@k.Title</a> }
 </nav>
 <p class="hint">@Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds.First(k => k.Kind == Model.Kind).Help</p>
 <form method="get" class="card"><input type="hidden" name="kind" value="@Model.Kind" />
-    <div class="field"><label for="org">@L["Organisation"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <div class="field"><label for="org">@L["[[organisation]]"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
     <button type="submit" class="secondary">@L["Show"]</button></form>
 
 @if (Model.Latest is { } latest) { <p>@L["In force"]: <strong>@L["release"] @latest.Number</strong> @L["published by"] @latest.PublishedBy, @latest.PublishedUtc.ToString("yyyy-MM-dd HH:mm") UTC. <span class="hint">@latest.Note</span></p> }
-else { <p class="hint">@L["Nothing has been published yet. The reference definition from the solution pack is installed the first time it is needed."]</p> }
+else { <p class="hint">@L["Nothing has been published yet. The reference definition from the [[solution.pack|lower]] is installed the first time it is needed."]</p> }
 
 @if (Model.Draft is { } draft)
 {

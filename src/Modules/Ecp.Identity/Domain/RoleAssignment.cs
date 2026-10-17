@@ -35,7 +35,7 @@ public static class AssignmentRules
             throw new DomainException("invalid_scope_level", $"Role {role} cannot be assigned at {scope.Level} level.");
 
         if (role == RoleCodes.DivisionSiteAdministrator && !scope.NarrowsDivision && !scope.NarrowsSite)
-            throw new DomainException("scope_required", "A Division/Site Administrator is limited to assigned divisions or sites and must name at least one.");
+            throw new DomainException("scope_required", "[[division|a|cap]]/Site Administrator is limited to assigned [[division|plural|lower]] or [[site|plural|lower]] and must name at least one.");
 
         if (role is RoleCodes.Approver or RoleCodes.BackupApprover)
             Guard.NotBlank(approverGroupKey, "Approver group", 100);
@@ -48,20 +48,20 @@ public static class AssignmentRules
 
     private static void ValidateViewer(ViewerKind? kind, ScopeSet scope, ClassificationScale scale, bool explicitHighCeiling)
     {
-        if (kind is null) throw new DomainException("viewer_kind_required", "A Viewer assignment must be one of: All Contracts, Category, Business Unit, Site or Restricted Viewer.");
+        if (kind is null) throw new DomainException("viewer_kind_required", "A Viewer assignment must be one of: All [[contract|plural]], [[category]], [[business.unit]], [[site]] or Restricted Viewer.");
         switch (kind)
         {
             case ViewerKind.AllContracts when scope.NarrowsCategory || scope.NarrowsBusinessUnit || scope.NarrowsDivision || scope.NarrowsSite:
-                throw new DomainException("invalid_scope", "An All Contracts Viewer covers the whole organisation; use another viewer kind to narrow it.");
+                throw new DomainException("invalid_scope", "An All [[contract|plural]] Viewer covers the whole [[organisation|lower]]; use another viewer kind to narrow it.");
             case ViewerKind.Category when !scope.NarrowsCategory:
-                throw new DomainException("scope_required", "A Category Viewer must name at least one category.");
+                throw new DomainException("scope_required", "[[category|a|cap]] Viewer must name at least one [[category|lower]].");
             case ViewerKind.BusinessUnit when !scope.NarrowsBusinessUnit && !scope.NarrowsDivision:
-                throw new DomainException("scope_required", "A Business Unit Viewer must name at least one business unit (or division).");
+                throw new DomainException("scope_required", "[[business.unit|a|cap]] Viewer must name at least one [[business.unit|lower]] (or [[division|lower]]).");
             case ViewerKind.Site when !scope.NarrowsSite:
-                throw new DomainException("scope_required", "A Site Viewer must name at least one site.");
+                throw new DomainException("scope_required", "[[site|a|cap]] Viewer must name at least one [[site|lower]].");
             case ViewerKind.Restricted:
                 if (!scope.NarrowsCategory && !scope.NarrowsBusinessUnit && !scope.NarrowsDivision && !scope.NarrowsSite)
-                    throw new DomainException("scope_required", "A Restricted Viewer must be narrowed by category, business unit, division or site.");
+                    throw new DomainException("scope_required", "A Restricted Viewer must be narrowed by [[category|lower]], [[business.unit|lower]], [[division|lower]] or [[site|lower]].");
                 if (!explicitHighCeiling && scale.Rank(scope.ClassificationCeiling) > RestrictedCeilingLimit(scale))
                     throw new DomainException("ceiling_too_high", "A Restricted Viewer's classification ceiling may not exceed Confidential unless explicitly set.");
                 break;

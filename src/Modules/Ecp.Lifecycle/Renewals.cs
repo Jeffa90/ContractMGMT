@@ -45,12 +45,12 @@ internal sealed class RenewalService(
         var subject = await engine.LoadSubjectAsync(SubjectKinds.Contract, contractId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "startRenewal")
-            ?? throw new DomainException("invalid_transition", $"A renewal can be started only on an Effective agreement; this one is {resolved.Definition.DisplayOf(subject.Status)}.");
-        if (subject.Contract.SuccessorContractId is not null) throw new DomainException("successor_exists", "This agreement already has a successor.");
+            ?? throw new DomainException("invalid_transition", $"[[renewal|lower|a|cap]] can be started only on an Effective [[agreement|lower]]; this one is {resolved.Definition.DisplayOf(subject.Status)}.");
+        if (subject.Contract.SuccessorContractId is not null) throw new DomainException("successor_exists", "This [[agreement|lower]] already has a successor.");
         var settings = resolved.Definition.Settings.Renewal;
         var current = await definitions.CurrentAsync(WorkflowKinds.ContractLifecycle, subject.OrganisationId, ct);
         var startState = current.Definition.State(settings.SuccessorInitialState)
-            ?? throw new DomainException("renewal_state", "The renewal's starting state is not part of the workflow in force. An administrator must correct the workflow definition.");
+            ?? throw new DomainException("renewal_state", "The [[renewal|lower]]'s starting state is not part of the workflow in force. An administrator must correct the workflow definition.");
         Renewal renewal = null!;
         await engine.ExecuteAsync(new TransitionCommand(SubjectKinds.Contract, contractId, transition.Code, note, null, subject.Status, AllowManaged: true), async (scope, c) =>
         {
@@ -121,7 +121,7 @@ internal sealed class RenewalService(
         var subject = await engine.LoadSubjectAsync(SubjectKinds.Contract, contractId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "completeRenewal")
-            ?? throw new DomainException("invalid_transition", $"There is no renewal to complete while the agreement is {resolved.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"There is no [[renewal|lower]] to complete while the [[agreement|lower]] is {resolved.Definition.DisplayOf(subject.Status)}.");
         await engine.ExecuteAsync(new TransitionCommand(SubjectKinds.Contract, contractId, transition.Code, note, null, subject.Status, AllowManaged: true), async (scope, c) =>
         {
             var renewal = await db.Renewals.FirstAsync(r => r.PredecessorContractId == contractId && r.Status == RenewalStatus.InProgress, c);
@@ -139,16 +139,16 @@ internal sealed class RenewalService(
         var subject = await engine.LoadSubjectAsync(SubjectKinds.Contract, contractId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "cancelRenewal")
-            ?? throw new DomainException("invalid_transition", $"There is no renewal to cancel while the agreement is {resolved.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"There is no [[renewal|lower]] to cancel while the [[agreement|lower]] is {resolved.Definition.DisplayOf(subject.Status)}.");
         var renewalRow = await db.Renewals.AsNoTracking().FirstOrDefaultAsync(r => r.PredecessorContractId == contractId && r.Status == RenewalStatus.InProgress, ct)
-            ?? throw new DomainException("no_renewal", "There is no renewal in progress.");
+            ?? throw new DomainException("no_renewal", "There is no [[renewal|lower]] in progress.");
         var successor = await engine.LoadSubjectAsync(SubjectKinds.Contract, renewalRow.SuccessorContractId, ct);
         var successorDef = await engine.DefinitionForAsync(successor, ct);
         var withdraw = successorDef.Definition.From(successor.Status).FirstOrDefault(t => t.Role == "withdraw");
         if (successor.Contract.RegisteredDateUtc is null && withdraw is null)
-            throw new DomainException("successor_in_flight", $"The successor ({successor.Contract.AgreementReference}) is {successorDef.Definition.DisplayOf(successor.Status)}. Recall it or let it finish before cancelling the renewal.");
+            throw new DomainException("successor_in_flight", $"The successor ({successor.Contract.AgreementReference}) is {successorDef.Definition.DisplayOf(successor.Status)}. Recall it or let it finish before cancelling the [[renewal|lower]].");
         if (successor.Contract.RegisteredDateUtc is not null)
-            throw new DomainException("successor_registered", "The successor is already registered, so the renewal cannot be cancelled. Complete it instead.");
+            throw new DomainException("successor_registered", "The successor is already registered, so the [[renewal|lower]] cannot be cancelled. Complete it instead.");
         await engine.ExecuteAsync(new TransitionCommand(SubjectKinds.Contract, contractId, transition.Code, reason, reason, subject.Status, AllowManaged: true), async (scope, c) =>
         {
             var renewal = await db.Renewals.FirstAsync(r => r.Id == renewalRow.Id, c);

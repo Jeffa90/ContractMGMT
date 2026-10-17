@@ -244,7 +244,7 @@ internal sealed class LegalReviewService(
         var subject = await engine.LoadSubjectAsync(r.SubjectKind, r.SubjectId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => SubmitRoles.Contains(t.Role))
-            ?? throw new DomainException("invalid_transition", $"This {subject.Noun} cannot be submitted to Legal while it is {resolved.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"This {subject.Noun} cannot be submitted to [[reviewer]] while it is {resolved.Definition.DisplayOf(subject.Status)}.");
         // What goes to Legal is fixed now: the documents the submitter can see, at the versions they are at.
         var docs = await SnapshotDocumentsAsync(subject, ct);
         Guid reviewId = Guid.Empty;
@@ -296,7 +296,7 @@ internal sealed class LegalReviewService(
         var subject = await engine.LoadSubjectAsync(subjectKind, subjectId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "recallLegal")
-            ?? throw new DomainException("invalid_transition", $"This {subject.Noun} cannot be recalled from Legal while it is {resolved.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"This {subject.Noun} cannot be recalled from [[reviewer]] while it is {resolved.Definition.DisplayOf(subject.Status)}.");
         await engine.ExecuteAsync(new TransitionCommand(subjectKind, subjectId, transition.Code, null, reason, subject.Status, AllowManaged: true), (scope, c) => WithdrawOpenAsync(scope, reason, c), ct);
     }
 
@@ -321,7 +321,7 @@ internal sealed class LegalReviewService(
         var subject = await engine.LoadSubjectAsync(review.SubjectKind, review.SubjectId, ct);
         await access.RequireAsync("legal.review", await engine.DescribeAsync(subject, null, ct), ct);
         var eligible = await directory.HoldersOfRoleAsync(RoleCodes.Legal, subject.OrganisationId, ct);
-        if (!eligible.Contains(reviewerUserId)) throw new DomainException("not_a_reviewer", "That person does not hold the Legal role for this organisation.");
+        if (!eligible.Contains(reviewerUserId)) throw new DomainException("not_a_reviewer", "That person does not hold the [[reviewer]] role for this [[organisation|lower]].");
         var name = await directory.DisplayNameAsync(reviewerUserId, ct) ?? reviewerUserId.ToString();
         await uow.ExecuteAsync(async c =>
         {
@@ -343,7 +343,7 @@ internal sealed class LegalReviewService(
         var subject = await engine.LoadSubjectAsync(review.SubjectKind, review.SubjectId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "beginLegal")
-            ?? throw new DomainException("invalid_transition", $"Legal can begin a review only when the {subject.Noun} is waiting for Legal; it is {resolved.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"[[reviewer]] can begin a review only when the {subject.Noun} is waiting for [[reviewer]]; it is {resolved.Definition.DisplayOf(subject.Status)}.");
         await engine.ExecuteAsync(new TransitionCommand(review.SubjectKind, review.SubjectId, transition.Code, ExpectedStatus: subject.Status, AllowManaged: true), async (scope, c) =>
         {
             var tracked = await db.LegalReviews.FirstAsync(x => x.Id == reviewId, c);
@@ -372,7 +372,7 @@ internal sealed class LegalReviewService(
             var owner = await access.CheckSilentAsync(subject.IsVariation ? "variations.create" : "legal.respond", descriptor, ct);
             var respond = owner.Allowed || (await access.CheckSilentAsync("legal.respond", descriptor, ct)).Allowed;
             if (!respond) throw new ForbiddenException("You cannot comment on this review.");
-            if (!review.IsOpen) throw new DomainException("review_closed", "This Legal review has finished, so it takes no more comments.");
+            if (!review.IsOpen) throw new DomainException("review_closed", "This [[legal.review|sentence]] has finished, so it takes no more comments.");
             side = "Owner";
         }
         var name = await directory.DisplayNameAsync(UserId, ct) ?? Label;
@@ -406,13 +406,13 @@ internal sealed class LegalReviewService(
         if (r.Kind == LegalAttachmentKind.Markup)
         {
             await access.RequireAsync("legal.markup", descriptor, ct);
-            if (review.Status != LegalReviewStatus.InReview) throw new DomainException("review_state", "Mark-ups are added while Legal is reviewing.");
+            if (review.Status != LegalReviewStatus.InReview) throw new DomainException("review_state", "Mark-ups are added while [[reviewer]] is reviewing.");
         }
         else
         {
             var okOwner = (await access.CheckSilentAsync(subject.IsVariation ? "variations.create" : "legal.respond", descriptor, ct)).Allowed || (await access.CheckSilentAsync("legal.respond", descriptor, ct)).Allowed;
             if (!okOwner && !(await access.CheckSilentAsync("legal.markup", descriptor, ct)).Allowed) throw new ForbiddenException("You cannot attach documents to this review.");
-            if (!review.IsOpen) throw new DomainException("review_closed", "This Legal review has finished.");
+            if (!review.IsOpen) throw new DomainException("review_closed", "This [[legal.review|sentence]] has finished.");
         }
         var scale = await access.ClassificationScaleAsync(ct);
         var requested = scale.Canonical(r.Classification) ?? (string.IsNullOrWhiteSpace(r.Classification) ? null : throw new DomainException("invalid_classification", $"Classification '{r.Classification}' is not recognised."));
@@ -457,7 +457,7 @@ internal sealed class LegalReviewService(
         var subject = await engine.LoadSubjectAsync(review.SubjectKind, review.SubjectId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "returnLegal")
-            ?? throw new DomainException("invalid_transition", $"A review can be returned only while Legal is reviewing; the {subject.Noun} is {resolved.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"A review can be returned only while [[reviewer]] is reviewing; the {subject.Noun} is {resolved.Definition.DisplayOf(subject.Status)}.");
         await engine.ExecuteAsync(new TransitionCommand(review.SubjectKind, review.SubjectId, transition.Code, reason, null, subject.Status, AllowManaged: true), async (scope, c) =>
         {
             var tracked = await db.LegalReviews.FirstAsync(x => x.Id == reviewId, c);
@@ -478,7 +478,7 @@ internal sealed class LegalReviewService(
         var subject = await engine.LoadSubjectAsync(review.SubjectKind, review.SubjectId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "clearLegal")
-            ?? throw new DomainException("invalid_transition", $"A review can be cleared only while Legal is reviewing; the {subject.Noun} is {resolved.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"A review can be cleared only while [[reviewer]] is reviewing; the {subject.Noun} is {resolved.Definition.DisplayOf(subject.Status)}.");
         await engine.ExecuteAsync(new TransitionCommand(review.SubjectKind, review.SubjectId, transition.Code, note, null, subject.Status, AllowManaged: true), async (scope, c) =>
         {
             var tracked = await db.LegalReviews.FirstAsync(x => x.Id == reviewId, c);

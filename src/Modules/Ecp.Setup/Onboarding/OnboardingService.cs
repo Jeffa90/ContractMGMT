@@ -116,7 +116,7 @@ internal sealed class OnboardingService(IConfigurationService configuration, IAc
         var d = state.Document with { PackId = string.IsNullOrWhiteSpace(packId) ? null : packId };
         if (d.PackId is not null)
         {
-            var pack = (await packs.FindAsync(d.PackId, ct: ct))?.Info ?? throw new DomainException("unknown_pack", "That solution pack is not available here. It may not be installed, may not be trusted in this environment, or may be retired.");
+            var pack = (await packs.FindAsync(d.PackId, ct: ct))?.Info ?? throw new DomainException("unknown_pack", "That [[solution.pack|lower]] is not available here. It may not be installed, may not be trusted in this environment, or may be retired.");
             if (loadDefaults)
             {
                 // Merge: anything already in the draft stays; the pack adds what is missing. Nothing is removed.

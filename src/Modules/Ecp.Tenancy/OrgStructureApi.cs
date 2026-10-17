@@ -61,7 +61,7 @@ internal sealed class OrganisationStructureService(TenancyDbContext db, IUnitOfW
     {
         await uow.ExecuteAsync(async c =>
         {
-            var org = await db.Organisations.FirstOrDefaultAsync(o => o.Id == organisationId, c) ?? throw new DomainException("organisation_not_found", "The organisation was not found.");
+            var org = await db.Organisations.FirstOrDefaultAsync(o => o.Id == organisationId, c) ?? throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
             var before = org.SolutionPackKey;
             org.AssignSolutionPack(solutionPackKey);
             await db.SaveChangesAsync(c);
@@ -104,7 +104,7 @@ internal sealed class OrganisationStructureService(TenancyDbContext db, IUnitOfW
             {
                 var dk = StructureKey.Normalise(divisionKey, "Division key");
                 divisionId = await db.Divisions.Where(d => d.OrganisationId == organisationId && d.Key == dk).Select(d => (Guid?)d.Id).FirstOrDefaultAsync(c)
-                    ?? throw new DomainException("division_not_found", $"Division '{dk}' was not found in this organisation.");
+                    ?? throw new DomainException("division_not_found", $"[[division]] '{dk}' was not found in this [[organisation|lower]].");
             }
             var existing = await db.BusinessUnits.FirstOrDefaultAsync(x => x.OrganisationId == organisationId && x.Key == k, c);
             if (existing is null) { var created = BusinessUnit.Create(tenantId, organisationId, k, name, divisionId, clock.UtcNow); db.BusinessUnits.Add(created); return (created.Id, true); }
@@ -150,7 +150,7 @@ internal sealed class OrganisationStructureService(TenancyDbContext db, IUnitOfW
             var (id, created) = await apply(key, tenantId, c);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
-            { throw new DomainException("structure_key_in_use", $"The key '{key}' is already in use in this organisation."); }
+            { throw new DomainException("structure_key_in_use", $"The key '{key}' is already in use in this [[organisation|lower]]."); }
             audit.Record(new AuditEntry($"structure.{kind.ToString().ToLowerInvariant()}.{(created ? "created" : "updated")}", kind.ToString(), id.ToString(),
                 OrganisationId: organisationId, NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { key })));
             return id;
@@ -160,6 +160,6 @@ internal sealed class OrganisationStructureService(TenancyDbContext db, IUnitOfW
     private async Task EnsureOrganisationAsync(Guid organisationId, CancellationToken ct)
     {
         if (!await db.Organisations.AsNoTracking().AnyAsync(o => o.Id == organisationId, ct))
-            throw new DomainException("organisation_not_found", "The organisation was not found.");
+            throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
     }
 }

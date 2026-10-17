@@ -61,14 +61,14 @@ internal sealed class MigrationProjectService(MigrationKernel k, ITenantDirector
     public async Task<Guid> CreateAsync(CreateProjectInput r, CancellationToken ct = default)
     {
         // Cross-tenant and cross-organisation references are rejected (INV-48): other tenants' organisations are invisible.
-        if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct)) throw new DomainException("organisation_not_found", "The organisation was not found.");
+        if (!await tenants.OrganisationExistsAsync(r.OrganisationId, ct)) throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         await k.Access.RequireAsync(MigrationPermissions.Stage, MigrationKernel.Describe(k.TenantId, r.OrganisationId, "new"), ct);
         var project = MigrationProject.Create(k.TenantId, r.OrganisationId, r.Name, r.SourceSystem, r.SourceSystemVersion, r.DataOwner, r.ExtractionUtc, k.Clock.UtcNow, await k.ActorLabelAsync(ct));
         return await k.Uow.ExecuteAsync(async c =>
         {
             k.Db.Projects.Add(project);
             try { await k.Db.SaveChangesAsync(c); }
-            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("project_name_in_use", "A migration project with that name already exists."); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("project_name_in_use", "[[migration.project|lower|a|cap]] with that name already exists."); }
             k.Record("migration.project.created", nameof(MigrationProject), project.Id.ToString(), project.OrganisationId, values: new { project.Name, project.SourceSystem, project.DataOwner });
             return project.Id;
         }, ct);
@@ -169,7 +169,7 @@ internal sealed class MappingProfileService(MigrationKernel k, ITenantDirectory 
 
     public async Task<Guid> CreateAsync(Guid organisationId, string name, string sourceSystem, string? sourceSystemVersion, CancellationToken ct = default)
     {
-        if (!await tenants.OrganisationExistsAsync(organisationId, ct)) throw new DomainException("organisation_not_found", "The organisation was not found.");
+        if (!await tenants.OrganisationExistsAsync(organisationId, ct)) throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
         await k.Access.RequireAsync(MigrationPermissions.Stage, MigrationKernel.Describe(k.TenantId, organisationId, "new-profile"), ct);
         var by = await k.ActorLabelAsync(ct);
         var profile = MappingProfile.Create(k.TenantId, organisationId, name, sourceSystem, sourceSystemVersion, by, k.Clock.UtcNow);

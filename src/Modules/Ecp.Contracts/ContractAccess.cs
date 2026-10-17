@@ -346,7 +346,7 @@ internal sealed class SecuredContractService(
         var descriptor = await context.DescribeAsync(c, ct);
         await access.RequireAsync("contracts.read", descriptor, ct);
         await access.RequireAsync("contracts.edit_owned", descriptor, ct);
-        if (c.ContentFrozen) throw new DomainException("content_frozen", "The contract is in a stage where its content is frozen.");
+        if (c.ContentFrozen) throw new DomainException("content_frozen", "The [[contract|lower]] is in a stage where its content is frozen.");
         await port.SetReminderSettingsAsync(id, leadDays, noticePeriodDays, criticalNotice, currentUser.UserId?.ToString() ?? "system", ct);
     }
 
@@ -393,9 +393,9 @@ internal sealed class SecuredContractService(
         var descriptor = await context.DescribeAsync(c, ct);
         await access.RequireAsync("contracts.edit_owned", descriptor, ct);
         var org = await structure.GetAsync(c.OrganisationId, ct);
-        if (changes.TryGetValue("businessUnitId", out var buRaw) && Guid.TryParse(buRaw, out var bu) && org.BusinessUnits.All(b => b.Id != bu)) throw new DomainException("business_unit_not_found", "The business unit was not found in this organisation.");
-        if (changes.TryGetValue("siteId", out var siteRaw) && Guid.TryParse(siteRaw, out var site) && org.Sites.All(x => x.Id != site)) throw new DomainException("site_not_found", "The site was not found in this organisation.");
-        if (changes.TryGetValue("legalEntityId", out var leRaw) && Guid.TryParse(leRaw, out var le) && org.LegalEntities.All(x => x.Id != le)) throw new DomainException("legal_entity_not_found", "The legal entity was not found in this organisation.");
+        if (changes.TryGetValue("businessUnitId", out var buRaw) && Guid.TryParse(buRaw, out var bu) && org.BusinessUnits.All(b => b.Id != bu)) throw new DomainException("business_unit_not_found", "The [[business.unit|lower]] was not found in this [[organisation|lower]].");
+        if (changes.TryGetValue("siteId", out var siteRaw) && Guid.TryParse(siteRaw, out var site) && org.Sites.All(x => x.Id != site)) throw new DomainException("site_not_found", "The [[site|lower]] was not found in this [[organisation|lower]].");
+        if (changes.TryGetValue("legalEntityId", out var leRaw) && Guid.TryParse(leRaw, out var le) && org.LegalEntities.All(x => x.Id != le)) throw new DomainException("legal_entity_not_found", "The [[legal.entity|lower]] was not found in this [[organisation|lower]].");
         // Moving a contract to another business unit or site must not take it out of the caller's own reach.
         if (changes.ContainsKey("businessUnitId") || changes.ContainsKey("siteId"))
         {
@@ -445,11 +445,11 @@ internal sealed class SecuredContractService(
         var org = await structure.GetAsync(r.OrganisationId, ct); // 422 if the organisation is not in this tenant
         // Cutover freeze (MIGRATION_SUPPLEMENT 5.6): people cannot create contracts in an organisation while its target freeze is in force; migration batches do not come through here.
         if (await freeze.CreationBlockedAsync(r.OrganisationId, ct) is { } frozen) throw new DomainException("cutover_freeze", frozen);
-        if (r.BusinessUnitId is { } bu && org.BusinessUnits.All(b => b.Id != bu)) throw new DomainException("business_unit_not_found", "The business unit was not found in this organisation.");
-        if (r.SiteId is { } site && org.Sites.All(s => s.Id != site)) throw new DomainException("site_not_found", "The site was not found in this organisation.");
-        if (r.LegalEntityId is { } le && org.LegalEntities.All(l => l.Id != le)) throw new DomainException("legal_entity_not_found", "The legal entity was not found in this organisation.");
+        if (r.BusinessUnitId is { } bu && org.BusinessUnits.All(b => b.Id != bu)) throw new DomainException("business_unit_not_found", "The [[business.unit|lower]] was not found in this [[organisation|lower]].");
+        if (r.SiteId is { } site && org.Sites.All(s => s.Id != site)) throw new DomainException("site_not_found", "The [[site|lower]] was not found in this [[organisation|lower]].");
+        if (r.LegalEntityId is { } le && org.LegalEntities.All(l => l.Id != le)) throw new DomainException("legal_entity_not_found", "The [[legal.entity|lower]] was not found in this [[organisation|lower]].");
         var category = await db.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == r.CategoryId && c.OrganisationId == r.OrganisationId, ct)
-            ?? throw new DomainException("category_not_found", "The category was not found.");
+            ?? throw new DomainException("category_not_found", "The [[category|lower]] was not found.");
 
         // Authorise against the facts of the contract that would be created, never against what the caller claims about themselves.
         var (_, _, ancestry) = await context.CategoryTreeAsync(ct);
@@ -605,14 +605,14 @@ internal sealed class CategoryAdministration(
     public async Task<Guid> UpsertCategoryAsync(Guid organisationId, string code, string name, string? parentCode, CancellationToken ct = default)
     {
         var tenantId = tenant.RequireTenantId();
-        if (await structure.GetOrganisationAsync(organisationId, ct) is null) throw new DomainException("organisation_not_found", "The organisation was not found.");
-        var normalised = Guard.NotBlank(code, "Category code", 100).ToUpperInvariant();
+        if (await structure.GetOrganisationAsync(organisationId, ct) is null) throw new DomainException("organisation_not_found", "The [[organisation|lower]] was not found.");
+        var normalised = Guard.NotBlank(code, "[[category]] code", 100).ToUpperInvariant();
         Guid? parentId = null;
         if (!string.IsNullOrWhiteSpace(parentCode))
         {
             var pc = parentCode.Trim().ToUpperInvariant();
             parentId = await db.Categories.Where(c => c.OrganisationId == organisationId && c.Code == pc).Select(c => (Guid?)c.Id).FirstOrDefaultAsync(ct)
-                ?? throw new DomainException("parent_category_not_found", $"Parent category '{pc}' was not found.");
+                ?? throw new DomainException("parent_category_not_found", $"Parent [[category|lower]] '{pc}' was not found.");
         }
         return await uow.ExecuteAsync(async c =>
         {
@@ -634,7 +634,7 @@ internal sealed class CategoryAdministration(
     public async Task<Guid> AssignOwnerTrustedAsync(Guid categoryId, Guid userId, bool isPrimary, DateTime effectiveFromUtc, DateTime? effectiveToUtc, string assignedBy, string? reason, CancellationToken ct = default)
     {
         var tenantId = tenant.RequireTenantId();
-        var category = await db.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == categoryId, ct) ?? throw new DomainException("category_not_found", "The category was not found.");
+        var category = await db.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == categoryId, ct) ?? throw new DomainException("category_not_found", "The [[category|lower]] was not found.");
         var assignment = CategoryAssignment.Create(tenantId, category.OrganisationId, categoryId, userId, isPrimary, effectiveFromUtc, effectiveToUtc, assignedBy, reason, clock.UtcNow);
         return await uow.ExecuteAsync(async c =>
         {
@@ -650,7 +650,7 @@ internal sealed class CategoryAdministration(
     {
         await uow.ExecuteAsync(async c =>
         {
-            var category = await db.Categories.FirstOrDefaultAsync(x => x.Id == categoryId, c) ?? throw new DomainException("category_not_found", "The category was not found.");
+            var category = await db.Categories.FirstOrDefaultAsync(x => x.Id == categoryId, c) ?? throw new DomainException("category_not_found", "The [[category|lower]] was not found.");
             if (!category.IsActive) return;
             category.Deactivate();
             await db.SaveChangesAsync(c);
@@ -699,7 +699,7 @@ internal sealed class ContractLifecycleService(ContractsDbContext db, IUnitOfWor
     {
         await uow.ExecuteAsync(async c =>
         {
-            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, c) ?? throw new DomainException("contract_not_found", "The contract was not found.");
+            var contract = await db.Contracts.FirstOrDefaultAsync(x => x.Id == contractId, c) ?? throw new DomainException("contract_not_found", "The [[contract|lower]] was not found.");
             var old = contract.Status;
             contract.ApplyWorkflowState(statusCode, locks, actor.ActorId ?? "system", clock.UtcNow);
             await db.SaveChangesAsync(c);

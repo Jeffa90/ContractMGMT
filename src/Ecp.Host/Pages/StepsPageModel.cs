@@ -51,7 +51,7 @@ public abstract class StepsPageModel(ILifecycleService lifecycle, IVariationServ
 
     public Task<IActionResult> OnPostExecutedCopyAsync(Guid id, IFormFile? file, CancellationToken ct) => Step(id, ct, async () =>
     {
-        if (file is null || file.Length == 0) throw new DomainException("file_required", "Choose the executed copy to upload.");
+        if (file is null || file.Length == 0) throw new DomainException("file_required", "Choose the [[executed.document|lower]] to upload.");
         await using var stream = file.OpenReadStream();
         await Execution.RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKind, id, Path.GetFileName(file.FileName), file.ContentType, stream), ct);
     }, "The executed copy is attached. It is scanned like any upload and counts only once it has passed.");

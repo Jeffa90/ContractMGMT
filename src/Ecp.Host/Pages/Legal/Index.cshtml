@@ -1,9 +1,9 @@
 @page "/Legal"
 @model Ecp.Host.Pages.Legal.IndexModel
 @using Ecp.Lifecycle.Domain
-@{ ViewData["Title"] = L["Legal review queue"].Value; }
-<h1>@L["Legal review queue"]</h1>
-<p class="lede">@L["Contracts and Variations submitted for Legal review. Only those you could open yourself are listed. Clearance by Legal is not register authorisation."]</p>
+@{ ViewData["Title"] = L["[[legal.review|sentence]] queue"].Value; }
+<h1>@L["[[legal.review|sentence]] queue"]</h1>
+<p class="lede">@L["[[contract|plural]] and [[variation|plural]] submitted for [[legal.review|sentence]]. Only those you could open yourself are listed. Clearance by [[reviewer]] is not [[registration.approval|lower]]."]</p>
 <form method="get" class="card" aria-label="@L["Filter the queue"]">
     <div class="field"><label for="status">@L["Status"]</label>
         <select id="status" name="status"><option value="">@L["Any open status"]</option>
@@ -11,10 +11,10 @@
         </select></div>
     <div class="field"><label for="owner">@L["Assigned to"]</label>
         <select id="owner" name="owner"><option value="">@L["Anyone"]</option><option value="me" selected="@(Model.Owner == "me")">@L["Me"]</option><option value="unassigned" selected="@(Model.Owner == "unassigned")">@L["Nobody yet"]</option></select></div>
-    <div class="field"><label for="categoryId">@L["Category"]</label>
-        <select id="categoryId" name="categoryId"><option value="">@L["Any category"]</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }</select></div>
-    <div class="field"><label for="supplierId">@L["Supplier"]</label>
-        <select id="supplierId" name="supplierId"><option value="">@L["Any supplier"]</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id" selected="@(s.Id == Model.SupplierId)">@s.Name</option> }</select></div>
+    <div class="field"><label for="categoryId">@L["[[category]]"]</label>
+        <select id="categoryId" name="categoryId"><option value="">@L["Any [[category|lower]]"]</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }</select></div>
+    <div class="field"><label for="supplierId">@L["[[supplier]]"]</label>
+        <select id="supplierId" name="supplierId"><option value="">@L["Any [[supplier|lower]]"]</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id" selected="@(s.Id == Model.SupplierId)">@s.Name</option> }</select></div>
     <div class="field"><label for="minAgeDays">@L["Waiting at least (days)"]</label><input id="minAgeDays" name="minAgeDays" type="number" min="0" value="@Model.MinAgeDays" /></div>
     <label><input type="checkbox" name="mine" value="true" checked="@Model.Mine" /> @L["Waiting on me"]</label>
     <label><input type="checkbox" name="all" value="true" checked="@Model.All" /> @L["Include finished reviews"]</label>
@@ -23,8 +23,8 @@
 <p role="status">@Model.Result.Total @L["review(s)"]</p>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Legal review queue"]</caption>
-    <thead><tr><th scope="col">@L["Agreement"]</th><th scope="col">@L["Supplier"]</th><th scope="col">@L["Category"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Round"]</th><th scope="col">@L["Assigned to"]</th><th scope="col">@L["Submitted by"]</th><th scope="col">@L["Waiting"]</th><th scope="col">@L["Next step"]</th></tr></thead>
+    <caption class="visually-hidden">@L["[[legal.review|sentence]] queue"]</caption>
+    <thead><tr><th scope="col">@L["[[agreement]]"]</th><th scope="col">@L["[[supplier]]"]</th><th scope="col">@L["[[category]]"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Round"]</th><th scope="col">@L["Assigned to"]</th><th scope="col">@L["Submitted by"]</th><th scope="col">@L["Waiting"]</th><th scope="col">@L["Next step"]</th></tr></thead>
     <tbody>
     @foreach (var r in Model.Result.Items)
     {

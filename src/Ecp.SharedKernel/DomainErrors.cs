@@ -1,9 +1,15 @@
 namespace Ecp.SharedKernel;
 
-/// <summary>A business rule was violated. Carries a stable code and a plain-language message.</summary>
+/// <summary>
+/// A business rule was violated. Carries a stable code and a plain-language message. The message may name a business concept with a <c>[[term]]</c> token (for example <c>[[contract|lower]]</c>): a page replaces the token
+/// with the organisation's own word (<see cref="RawMessage"/>); everywhere else (logs, API responses, tests) <see cref="Message"/> uses the platform's neutral wording, so no business's vocabulary leaks into either.
+/// </summary>
 public class DomainException(string code, string message) : Exception(message)
 {
     public string Code { get; } = code;
+    /// <summary>The message as written, tokens intact.</summary>
+    public string RawMessage { get; } = message;
+    public override string Message => TermTokens.ExpandNeutral(RawMessage);
 }
 
 public static class Guard

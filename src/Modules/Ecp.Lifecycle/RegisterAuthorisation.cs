@@ -88,7 +88,7 @@ internal sealed partial class RegisterAuthorisationService(
         var subject = await engine.LoadSubjectAsync(subjectKind, subjectId, ct);
         var resolved = await engine.DefinitionForAsync(subject, ct);
         var transition = resolved.Definition.From(subject.Status).FirstOrDefault(t => t.Role == "submitRegister")
-            ?? throw new DomainException("invalid_transition", $"This {subject.Noun} cannot be submitted for register authorisation while it is {resolved.Definition.DisplayOf(subject.Status)}.");
+            ?? throw new DomainException("invalid_transition", $"This {subject.Noun} cannot be submitted for [[registration.approval|lower]] while it is {resolved.Definition.DisplayOf(subject.Status)}.");
         var group = resolved.Definition.Settings.Approval.ApproverGroupKey;
         var me = currentUser.UserId ?? throw new ForbiddenException("A signed-in person is required.");
         IReadOnlyList<EligibleApprover> eligible;

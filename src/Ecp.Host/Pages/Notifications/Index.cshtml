@@ -1,10 +1,10 @@
 @page "/Notifications"
 @model Ecp.Host.Pages.Notifications.IndexModel
-@{ ViewData["Title"] = L["Notifications"].Value; }
-<h1>@L["Notifications"]</h1>
-<p class="lede">@L["Messages about work waiting for you and reminders about your agreements. A message about an agreement is shown only while you can open that agreement."]</p>
+@{ ViewData["Title"] = L["[[notification|plural]]"].Value; }
+<h1>@L["[[notification|plural]]"]</h1>
+<p class="lede">@L["Messages about work waiting for you and reminders about your [[agreement|plural|lower]]. A message about [[agreement|lower|a]] is shown only while you can open that [[agreement|lower]]."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
-<form method="get" class="card" aria-label="@L["Filter notifications"]">
+<form method="get" class="card" aria-label="@L["Filter [[notification|plural|lower]]"]">
     <label><input type="checkbox" name="UnreadOnly" value="true" checked="@Model.UnreadOnly" /> @L["Unread only"]</label>
     <label><input type="checkbox" name="NeedsAcknowledgement" value="true" checked="@Model.NeedsAcknowledgement" /> @L["Waiting to be acknowledged"]</label>
     <div class="actions"><button type="submit">@L["Apply"]</button></div>
@@ -13,7 +13,7 @@
 <p role="status">@Model.Result.Total @L["message(s)"]</p>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Notifications"]</caption>
+    <caption class="visually-hidden">@L["[[notification|plural]]"]</caption>
     <thead><tr><th scope="col">@L["When (UTC)"]</th><th scope="col">@L["Message"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Actions"]</th></tr></thead>
     <tbody>
     @foreach (var n in Model.Result.Items)

@@ -59,8 +59,17 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
             var scopeOrg = c.Scope == PackScopes.Tenant ? Guid.Empty : organisationId;
             var hasRelease = await db.Releases.AsNoTracking().AnyAsync(r => r.OrganisationId == scopeOrg && r.Kind == c.Kind, ct);
             var hasDraft = await db.Drafts.AsNoTracking().AnyAsync(d => d.OrganisationId == scopeOrg && d.Kind == c.Kind && (d.Status == DraftStatus.Draft || d.Status == DraftStatus.Validated), ct);
-            items.Add(new PackAssignmentPreviewItem(c.Kind, c.Scope, hasRelease, hasDraft, hasDraft ? "An open draft already exists and is kept. Nothing is created for this kind."
-                : hasRelease ? "A draft is created from the pack. The published release stays in force until you publish the draft." : "A draft is created from the pack. Nothing is in force for this kind yet."));
+            var effect = hasDraft ? "An open draft already exists and is kept. Nothing is created for this kind."
+                : hasRelease ? "A draft is created from the pack. The published release stays in force until you publish the draft." : "A draft is created from the pack. Nothing is in force for this kind yet.";
+            if (c.Kind == TerminologyKind.KindName)
+            {
+                var count = package.Document(c.Kind) is { } doc ? TerminologyDocument.Parse(doc).Terms.Count : 0;
+                effect = hasRelease
+                    ? $"The organisation already publishes its own terminology, which stays in force. The pack's {count} terms apply only to keys it does not set. No draft is created."
+                    : hasDraft ? $"A terminology draft is already open and is kept. The pack's {count} terms apply as defaults beneath it once the pack is assigned. Nothing is published."
+                    : $"The pack's {count} terms apply to this organisation as defaults as soon as the pack is assigned, and a terminology draft is prepared from them so you can review and change labels before publishing your own. Nothing is published, and no permission or workflow changes.";
+            }
+            items.Add(new PackAssignmentPreviewItem(c.Kind, c.Scope, hasRelease, hasDraft, effect));
         }
         var warnings = new List<string>();
         if (org.SolutionPackKey is not null && org.SolutionPackKey != packKey) warnings.Add($"The organisation currently works from the pack '{org.SolutionPackKey}'. Its published configuration is not changed, but its starting pack changes to '{packKey}'.");
@@ -81,6 +90,13 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
                 var open = await configuration.FindOpenDraftAsync(c.Kind, scopeOrg, ct);
                 if (open is not null) { outcomes.Add(new PackKindOutcome(c.Kind, c.Scope, "An open draft already exists and was kept", true, "Review that draft; the pack's content was not added to it.")); continue; }
                 var json = package.Document(c.Kind)!;
+                if (c.Kind == TerminologyKind.KindName)
+                {
+                    // Terminology is layered: the pack's wording already applies beneath the organisation's own. An organisation that publishes its own terminology keeps it untouched; otherwise a draft is prepared from the pack.
+                    if (await configuration.LatestReleaseAsync(c.Kind, scopeOrg, ct) is not null)
+                    { outcomes.Add(new PackKindOutcome(c.Kind, c.Scope, "Existing terminology kept", false, "This organisation publishes its own terminology; the pack's terms apply only where it has none.")); continue; }
+                    json = TerminologyDocument.Parse(json).WithSource(packKey, version, TerminologyDocument.Overrides).ToJson();
+                }
                 var draft = await configuration.GetOrCreateDraftAsync(c.Kind, scopeOrg, json, ct);
                 var validated = await configuration.ValidateAsync(draft.Id, ct);
                 var errors = validated.Validation?.Messages.Count(m => m.Severity == ValidationSeverity.Error) ?? 0;
@@ -144,11 +160,11 @@ internal sealed class OrganisationPackContent(IPackLoader loader, ConfigurationD
         var assigned = await db.PackAssignments.AsNoTracking().Where(a => a.OrganisationId == organisationId && a.PackKey == packKey && a.Status == PackAssignment.Active).Select(a => a.Version).FirstOrDefaultAsync(ct);
         var entry = assigned is not null ? await loader.FindAsync(packKey, assigned, usableOnly: false, ct) : await loader.FindAsync(packKey, null, usableOnly: true, ct);
         if (entry is null || entry.Unavailable || !entry.IsCompatible || !entry.Trust.IsAcceptable)
-            throw new DomainException("pack_not_available", $"The solution pack '{packKey}' is not available here. It may not be installed, or it may not be trusted in this environment. Ask an administrator to check Administration, Solution packs.");
+            throw new DomainException("pack_not_available", $"The [[solution.pack|lower]] '{packKey}' is not available here. It may not be installed, or it may not be trusted in this environment. Ask an administrator to check Administration, [[solution.pack|plural|sentence]].");
         if (await db.Drafts.AsNoTracking().AnyAsync(d => d.OrganisationId == organisationId && d.Kind == kind && (d.Status == DraftStatus.Draft || d.Status == DraftStatus.Validated), ct))
-            throw new DomainException("configuration_pending_publication", "This organisation's configuration from its solution pack is waiting to be reviewed and published by an administrator.");
+            throw new DomainException("configuration_pending_publication", "This [[organisation|lower]]'s configuration from its [[solution.pack|lower]] is waiting to be reviewed and published by an administrator.");
         var json = await loader.GetDocumentAsync(packKey, entry.Version, kind, ct)
-            ?? throw new DomainException("pack_content_missing", $"The solution pack '{packKey}' (version {entry.Version}) does not carry this kind of configuration ({kind}).");
+            ?? throw new DomainException("pack_content_missing", $"The [[solution.pack|lower]] '{packKey}' (version {entry.Version}) does not carry this kind of configuration ({kind}).");
         return new PackDocument(json, packKey, entry.Version, entry.PackageSha256, entry.Source);
     }
 

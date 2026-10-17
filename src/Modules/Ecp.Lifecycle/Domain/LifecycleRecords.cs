@@ -90,13 +90,13 @@ public sealed class LegalReview : ITenantOwned
 
     public void Assign(Guid userId, string name, DateTime nowUtc)
     {
-        if (Status is LegalReviewStatus.Cleared or LegalReviewStatus.Withdrawn) throw new DomainException("review_closed", "This Legal review has finished.");
+        if (Status is LegalReviewStatus.Cleared or LegalReviewStatus.Withdrawn) throw new DomainException("review_closed", "This [[legal.review|sentence]] has finished.");
         AssignedToUserId = userId; AssignedToName = Guard.NotBlank(name, "Assigned to", 200); LastActivityUtc = nowUtc;
     }
 
     public void Begin(Guid userId, string name, DateTime nowUtc)
     {
-        if (Status != LegalReviewStatus.AwaitingLegal) throw new DomainException("review_state", "Legal can begin a review only when it is waiting for Legal.");
+        if (Status != LegalReviewStatus.AwaitingLegal) throw new DomainException("review_state", "[[reviewer]] can begin a review only when it is waiting for [[reviewer]].");
         Status = LegalReviewStatus.InReview; AssignedToUserId ??= userId; AssignedToName ??= Guard.NotBlank(name, "Assigned to", 200); LastActivityUtc = nowUtc;
     }
 
@@ -108,7 +108,7 @@ public sealed class LegalReview : ITenantOwned
 
     public void Resubmit(Guid by, string byName, DateTime nowUtc)
     {
-        if (Status != LegalReviewStatus.ReworkRequired && Status != LegalReviewStatus.Cleared) throw new DomainException("review_state", "A Legal review can be resubmitted only after it was returned for rework or cleared.");
+        if (Status != LegalReviewStatus.ReworkRequired && Status != LegalReviewStatus.Cleared) throw new DomainException("review_state", "[[legal.review|sentence|a|cap]] can be resubmitted only after it was returned for rework or cleared.");
         CurrentRound++; Status = LegalReviewStatus.AwaitingLegal; SubmittedByUserId = by; SubmittedByName = Guard.NotBlank(byName, "Submitted by", 200); SubmittedUtc = nowUtc;
         ClearedBy = null; ClearedUtc = null; ClearedContractStampUtc = null; AssignedToUserId = null; AssignedToName = null; LastActivityUtc = nowUtc;
     }
@@ -121,7 +121,7 @@ public sealed class LegalReview : ITenantOwned
 
     public void Withdraw(DateTime nowUtc)
     {
-        if (!IsOpen) throw new DomainException("review_closed", "This Legal review has finished.");
+        if (!IsOpen) throw new DomainException("review_closed", "This [[legal.review|sentence]] has finished.");
         Status = LegalReviewStatus.Withdrawn; LastOutcome = "Withdrawn"; LastActivityUtc = nowUtc;
     }
 
@@ -206,7 +206,7 @@ public sealed class LegalComment : ITenantOwned
     public static LegalComment Add(Guid tenantId, Guid reviewId, Guid roundId, Guid? parent, Guid author, string authorName, string side, string body, string classification, DateTime nowUtc) => new()
     {
         Id = Ids.New(), TenantId = tenantId, ReviewId = reviewId, RoundId = roundId, ParentCommentId = parent, AuthorUserId = author, AuthorName = Guard.NotBlank(authorName, "Author", 200),
-        Side = side is "Legal" or "Owner" ? side : throw new DomainException("invalid_side", "A comment is from Legal or the owner."), Body = Guard.NotBlank(body, "Comment", 8000),
+        Side = side is "Legal" or "Owner" ? side : throw new DomainException("invalid_side", "A comment is from [[reviewer]] or the owner."), Body = Guard.NotBlank(body, "Comment", 8000),
         Classification = Guard.NotBlank(classification, "Classification", 30), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
     };
 }
@@ -461,7 +461,7 @@ public sealed class ApprovalRequest : ITenantOwned
     public void Decide(ApprovalStatus status, Guid by, string byName, string role, Guid? onBehalfOf, string? onBehalfOfName, string? comment, Guid? evidenceDocumentId, DateTime nowUtc)
     {
         if (Status != ApprovalStatus.Pending) throw new DomainException("already_decided", "This request has already been decided. The first response stands.");
-        if (status is not (ApprovalStatus.Approved or ApprovalStatus.Rejected)) throw new DomainException("invalid_decision", "A decision is an approval or a rejection.");
+        if (status is not (ApprovalStatus.Approved or ApprovalStatus.Rejected)) throw new DomainException("invalid_decision", "A decision is [[approval|lower|a]] or a rejection.");
         if (by == SubmittedByUserId) throw new DomainException("self_approval", "A submitter cannot decide their own submission.");
         if (status == ApprovalStatus.Rejected && string.IsNullOrWhiteSpace(comment)) throw new DomainException("comment_required", "A rejection needs a comment.");
         Status = status; DecidedByUserId = by; DecidedByName = Guard.NotBlank(byName, "Decided by", 200); DecidedAsRole = Guard.NotBlank(role, "Role", 50);
@@ -630,7 +630,7 @@ public sealed class Variation : ITenantOwned
         if (outcome == VariationOutcome.Applied) { AppliedBeforeJson = appliedBefore; AppliedAfterJson = appliedAfter; }
     }
 
-    private void EnsureOpen() { if (!IsOpen) throw new DomainException("variation_closed", "This Variation has finished and cannot be changed."); }
+    private void EnsureOpen() { if (!IsOpen) throw new DomainException("variation_closed", "This [[variation]] has finished and cannot be changed."); }
 }
 
 public enum RenewalStatus { InProgress, Completed, Cancelled }
@@ -663,8 +663,8 @@ public sealed class Renewal : ITenantOwned
 
     public void Close(RenewalStatus status, string by, string? reason, DateTime nowUtc)
     {
-        if (Status != RenewalStatus.InProgress) throw new DomainException("renewal_closed", "This renewal has already finished.");
-        if (status == RenewalStatus.InProgress) throw new DomainException("invalid_status", "A renewal is closed as completed or cancelled.");
+        if (Status != RenewalStatus.InProgress) throw new DomainException("renewal_closed", "This [[renewal|lower]] has already finished.");
+        if (status == RenewalStatus.InProgress) throw new DomainException("invalid_status", "[[renewal|lower|a|cap]] is closed as completed or cancelled.");
         Status = status; ClosedBy = Guard.NotBlank(by, "Closed by", 200); ClosedUtc = Guard.Utc(nowUtc, nameof(nowUtc)); CloseReason = Guard.OptionalBounded(reason, "Reason", 1000);
     }
 }
@@ -721,6 +721,6 @@ public sealed class SubjectDocument : ITenantOwned
     public static SubjectDocument Link(Guid tenantId, string subjectKind, Guid subjectId, Guid contractId, Guid documentId, string role, string by, DateTime nowUtc) => new()
     {
         Id = Ids.New(), TenantId = tenantId, SubjectKind = subjectKind, SubjectId = subjectId, ContractId = contractId, DocumentId = Guard.NotEmpty(documentId, nameof(documentId)),
-        Role = role is "Final" or "Executed" or "Supporting" ? role : throw new DomainException("invalid_role", "A document is Final, Executed or Supporting."), AddedBy = Guard.NotBlank(by, "Added by", 200), AddedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+        Role = role is "Final" or "Executed" or "Supporting" ? role : throw new DomainException("invalid_role", "[[document|lower|a|cap]] is Final, Executed or Supporting."), AddedBy = Guard.NotBlank(by, "Added by", 200), AddedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
     };
 }

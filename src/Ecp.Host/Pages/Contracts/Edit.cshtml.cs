@@ -49,7 +49,7 @@ public sealed class EditModel(ISecuredContractService contracts, IContractCustom
             foreach (var (key, message) in ex.Errors) ModelState.AddModelError("cf_" + key, message);
             return Page();
         }
-        Flash("Contract details saved.");
+        Flash("[[contract]] details saved.");
         return RedirectToPage("Details", new { id });
     }, async () => { var c = await contracts.GetAsync(id, ct); await LoadAsync(c, CustomFieldFormReader.Read(Request.Form), null, ct); });
 

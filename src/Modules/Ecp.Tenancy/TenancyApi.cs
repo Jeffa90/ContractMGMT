@@ -103,7 +103,7 @@ internal sealed class TenantProvisioningService(
             db.Organisations.Add(org);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
-            { throw new DomainException("organisation_conflict", "An organisation with that name or reference prefix already exists in this tenant."); }
+            { throw new DomainException("organisation_conflict", "[[organisation|lower|a|cap]] with that name or reference prefix already exists in this tenant."); }
             audit.Record(new AuditEntry("organisation.created", nameof(Organisation), org.Id.ToString(), OrganisationId: org.Id));
             return org.Id;
         }, ct);

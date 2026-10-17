@@ -1,11 +1,11 @@
 @page "/Admin/Packs"
 @model Ecp.Host.Pages.Admin.Packs.IndexModel
-@{ ViewData["Title"] = L["Solution packs"].Value; }
-<h1>@L["Solution packs"]</h1>
-<p class="lede">@L["A solution pack is a ready-made starting point for a business: its contract lifecycle, Variation workflow and notification policy. Packs are data only. They never run code. Installing a pack makes it available; it changes nothing until you assign it to an organisation, and even then it only prepares drafts for you to review and publish."]</p>
+@{ ViewData["Title"] = L["[[solution.pack|plural|sentence]]"].Value; }
+<h1>@L["[[solution.pack|plural|sentence]]"]</h1>
+<p class="lede">@L["[[solution.pack|lower|a|cap]] is a ready-made starting point for a business: its [[contract|lower]] lifecycle, [[variation]] workflow and [[notification|lower]] policy. Packs are data only. They never run code. Installing a pack makes it available; it changes nothing until you assign it to [[organisation|lower|a]], and even then it only prepares drafts for you to review and publish."]</p>
 <nav class="actions" aria-label="@L["Pack Manager"]">
     <a class="button" href="/Admin/Packs/Upload">@L["Upload a pack"]</a>
-    <a class="button secondary" href="/Admin/Packs/Assign">@L["Organisation packs"]</a>
+    <a class="button secondary" href="/Admin/Packs/Assign">@L["[[organisation]] packs"]</a>
     <a class="button secondary" href="/Admin/Packs/TrustKeys">@L["Trusted publishers"]</a>
     <a class="button secondary" href="/Admin/Packs/Audit">@L["History"]</a>
     <a class="button secondary" href="/Admin/Packs/Checks">@L["Checks"]</a>
@@ -18,10 +18,10 @@
 </p>
 <div class="table-wrap">
 <table>
-    <caption class="visually-hidden">@L["Solution packs"]</caption>
+    <caption class="visually-hidden">@L["[[solution.pack|plural|sentence]]"]</caption>
     <thead><tr>
         <th scope="col">@L["Pack"]</th><th scope="col">@L["Version"]</th><th scope="col">@L["Publisher"]</th><th scope="col">@L["Source"]</th><th scope="col">@L["Signature"]</th>
-        <th scope="col">@L["Compatible"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Organisations using it"]</th><th scope="col">@L["Installed (UTC)"]</th><th scope="col"><span class="visually-hidden">@L["Details"]</span></th>
+        <th scope="col">@L["Compatible"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["[[organisation|plural]] using it"]</th><th scope="col">@L["Installed (UTC)"]</th><th scope="col"><span class="visually-hidden">@L["Details"]</span></th>
     </tr></thead>
     <tbody>
     @foreach (var i in Model.Items)
@@ -49,12 +49,12 @@
             <td><a href="/Admin/Packs/Details?key=@Uri.EscapeDataString(e.PackKey)&amp;version=@Uri.EscapeDataString(e.Version)">@L["Details"]<span class="visually-hidden"> @e.PackKey @e.Version</span></a></td>
         </tr>
     }
-    @if (Model.Items.Count == 0) { <tr><td colspan="10">@L["No solution packs are available. Upload one, or continue with the Blank configuration."]</td></tr> }
+    @if (Model.Items.Count == 0) { <tr><td colspan="10">@L["No [[solution.pack|plural|lower]] are available. Upload one, or continue with the Blank configuration."]</td></tr> }
     </tbody>
 </table>
 </div>
 <details class="card"><summary>@L["Help: what do these columns mean?"]</summary>
     <p><strong>@L["Signature"]</strong>: @L["A publisher signs a pack so you can tell it has not been altered and who made it. Production only accepts packs signed by a publisher you trust."]</p>
     <p><strong>@L["Compatible"]</strong>: @L["Whether this version of the platform can use the pack."]</p>
-    <p><strong>@L["Retired"]</strong>: @L["A retired pack cannot be given to more organisations. Organisations already using it are not changed."]</p>
+    <p><strong>@L["Retired"]</strong>: @L["A retired pack cannot be given to more [[organisation|plural|lower]]. [[organisation|plural]] already using it are not changed."]</p>
 </details>

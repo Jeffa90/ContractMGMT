@@ -21,7 +21,7 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 * **Generic UI, messages, notifications, exports (Implemented).** About 460 page strings, domain and guard messages, dashboards, register and core-field labels, the eleven built-in views, notification templates (validated), migration text and reports, and the export headings and worksheet name use the resolver. Role labels come from terminology; role codes are unchanged.
 * **Guard stage B (Implemented).** `VocabularyGuardTests` scans every shipped text file for vendor names, fixed business labels, fixed Australian defaults and capitalised business words in page text, with a narrow single-file allow-list.
 * **Not done, by design:** role-catalogue replacement (S5/S8), feature flags (S6), another pack-loader slice, regional defaults (S10), live e-signature, reporting, operations, API work, AI, marketplace, visual designers.
-* **Verification.** Local: 1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED (the SQL Server wrappers). CI result: `deploy/STATUS.md`.
+* **Verification.** Local: 1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED (the SQL Server wrappers). CI run 44 (commit 6f9d862): all three jobs succeeded; SQL Server 218 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED; container build and smoke succeeded (`deploy/STATUS.md`).
 * **First incomplete remediation task:** S5 (the role-catalogue decision, an ADR with no code), then S6, S8 to S10.
 
 ### Previous pass (S3: provider-neutral signature boundary)

@@ -223,7 +223,7 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S1 pack per organisation, neutral Blank pack, guard stage A, first PRT-002 proof | **Done**, CI-verified |
 | S2 reminder fall-back and migrated initial status | **Done**, CI-verified (run 35) |
 | S3 neutral signature vocabulary with an EF migration | **Done** (ADR-0027); CI run 41 (commit 3d1597a) green: SQL Server 209 Passed, 0 Failed, 0 Skipped, including the migration test (`deploy/STATUS.md`) |
-| S4 vocabulary and terminology read side, guard stage B | **Done** (ADR-0028); local 1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED; CI result in `deploy/STATUS.md` |
+| S4 vocabulary and terminology read side, guard stage B | **Done** (ADR-0028); local 1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED; CI run 44 (commit 6f9d862) green: SQL Server 218 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`) |
 | S5 role catalogue decision (ADR) | **Design written, awaiting the owner** (`docs/ROLE_CATALOGUE_ADR.md`): recommends stable identifiers, names from terminology, retire S8 |
 | S6 feature flags that gate capabilities | Not started |
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |

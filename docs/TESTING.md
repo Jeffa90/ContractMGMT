@@ -448,7 +448,7 @@ Without `ECP_TEST_SQL`: **886 Passed, 0 Failed, 0 Skipped, 209 NOT VERIFIED** (5
 | Notifications | `tests/Ecp.UnitTests/NotificationDeliveryTests.cs` (+ token expansion by organisation; unknown token fails validation) |
 | Guard stage B | `tests/Ecp.Architecture.Tests/VocabularyGuardTests.cs` (28): the whole tree is clean outside the allow-list; every allowance is still needed; the list is narrow; each fixed spelling is detected in each file type; identifiers and tokens are not flagged; an exception covers only its own file and rule |
 
-Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locked restore): unit 629, architecture 64, API 93, integration 219 on SQLite: **1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED** (the SQL Server wrappers; CI runs them).
+Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locked restore): unit 629, architecture 64, API 93, integration 219 on SQLite: **1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED** (the SQL Server wrappers). CI run 44 (commit 6f9d862, SQL Server 2022): **218 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** on SQL Server, including the 9 terminology wrappers.
 
 ## 10. Security regression suite (`Category=Security`)
 

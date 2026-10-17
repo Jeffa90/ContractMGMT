@@ -26,7 +26,7 @@ The pack is the second business of the portability proof (`docs/SECOND_BUSINESS_
 | Notification policy | organisation | Sixteen events, lead times 14/30/60/90 days, critical-notice offsets 14/7/3/1, two-day escalation, unowned fall-back, content-withholding levels |
 | Terminology | organisation | 52 terms (all 32 required keys and the field-label keys), approver-group names and one hidden role |
 | Capabilities | organisation | Legal Review off, Renewals off, Register Authorisation on, Variations on, Signature Requests on |
-| Custom fields | organisation | Five lookups and 24 fields in five sections (project, commercial, compliance, programme, change order) |
+| Custom fields | organisation | Five lookups and 24 fields in five sections (project, commercial, compliance, programme, change order); Retention cap is classified Confidential |
 | Approval matrices | organisation | `subcontract-activation` and `change-order-approval` (section 5) |
 | Shared views | organisation | Eleven contract-list views over core and pack fields |
 | Classification policy | tenant | Four levels with no privileged level; notification content levels stated explicitly |

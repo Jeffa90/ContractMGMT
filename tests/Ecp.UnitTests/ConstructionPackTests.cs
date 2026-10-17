@@ -140,6 +140,23 @@ public sealed class ConstructionPackTests
         Assert.Equal(["OrganisationAdministrators"], policy.Reminders.UnownedFallback);
     }
 
+    [Theory]
+    [InlineData("Public", true, true)]
+    [InlineData("Internal", true, true)]
+    [InlineData("Confidential", false, true)]      // the title is withheld from Confidential, the reference stays
+    [InlineData("Restricted", false, false)]       // nothing about the record is in the message
+    public void Messages_withhold_content_at_the_levels_the_pack_states_and_the_scale_has_no_privileged_level(string level, bool titleShown, bool referenceShown)
+    {
+        var (policy, parse) = NotificationPolicyParser.Parse(Read("notifications/notification-policy.json"));
+        Assert.Empty(parse);
+        var template = new Ecp.Notifications.Policy.MessageTemplate("{{contract.reference}}: {{contract.title}}", "{{actor.name}} acted on {{contract.title}}. Open {{link}}.");
+        var context = new Ecp.Notifications.RenderContext("HBL-000001", "Foundation scope PELICAN", level, "Pat", "/Contracts/Details/1", null, null, null, null);
+        var (subject, body) = new Ecp.Notifications.NotificationRenderer().Render(policy!, template, context, Scale, TermSet.Neutral());
+        Assert.Equal(titleShown, (subject + body).Contains("PELICAN", StringComparison.Ordinal));
+        Assert.Equal(referenceShown, (subject + body).Contains("HBL-000001", StringComparison.Ordinal));
+        if (!referenceShown) Assert.DoesNotContain("Pat", subject + body);
+    }
+
     [Fact]
     public void The_classification_scale_has_four_levels_and_no_privileged_level()
     {

@@ -257,4 +257,19 @@ public sealed class SecondBusinessUiTests
         var inbox = Visible(await BodyAsync(manager, "/Notifications"));
         Assert.DoesNotMatch(@"\b(Variation|Legal|Agreement|Contract)\b", inbox);
     }
+
+    [Fact]
+    public async Task Readiness_lists_three_shipped_packs_and_finds_their_capability_defaults_coherent()
+    {
+        // SBP-AC-03: the readiness checks that read every shipped pack stay Healthy with the third pack in the folder.
+        using var app = DemoApp.Start();
+        using var client = app.NewClient();
+        var response = await client.GetAsync("/health/ready");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var checks = doc.RootElement.GetProperty("checks").EnumerateArray().ToDictionary(c => c.GetProperty("id").GetString()!, c => c);
+        Assert.Equal("Healthy", checks["capabilities"].GetProperty("status").GetString());
+        Assert.Equal("Healthy", checks["solution-packs"].GetProperty("status").GetString());
+        Assert.Contains("3 shipped solution pack", checks["solution-packs"].GetProperty("message").GetString());
+    }
 }

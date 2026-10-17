@@ -1,6 +1,6 @@
-# Second business proof (slice S9): design
+# Second business proof (slice S9): design and results
 
-Status: **Design only. Nothing in this document is implemented.** Written 2026-10-17 after slices S1 to S7. It is the plan for portability slice S9 of `docs/PORTABILITY_REMEDIATION_PLAN.md` (task PKM-04; acceptance criteria PRT-002, PRT-004, PRT-013, PRT-015). It builds, changes and approves nothing, and it does not declare production approval.
+Status: **Sections 1 to 15 are the design (written 2026-10-17 after slices S1 to S7). Section 16 records what was built and what the tests showed.** The design text below was not rewritten after the build; where the build differs, section 16 says so. It is the plan for portability slice S9 of `docs/PORTABILITY_REMEDIATION_PLAN.md` (task PKM-04; acceptance criteria PRT-002, PRT-004, PRT-013, PRT-015). It builds, changes and approves nothing, and it does not declare production approval.
 
 **Amendments from the owner decisions of 2026-10-17 (`CONFIRMED_DECISIONS.md` D8), which take precedence over the text below where they differ:**
 
@@ -9,7 +9,7 @@ Status: **Design only. Nothing in this document is implemented.** Written 2026-1
 * **D4: G2 is deferred to S10.** The proof leaves the tax identifier empty or uses an eleven-digit value and records the limit.
 * **D8.9 and D8.10:** Harborline Construction, `construction-subcontracts`, en-US, USD, America/Chicago; the pack ships in `templates/packs` as a first-class pack. **D8.7:** the neutral label of the `Approver` role is "Approval Authority", so the pack names its tiers explicitly. **D8.11:** sell-side Professional Services is the preferred next business.
 
-Everything described as a pack, a test or a page below is **Future** until a later pass builds it and records the result in `deploy/STATUS.md`. Paths that do not exist yet are written without code formatting on purpose.
+The pack, tests and pages described below are **Implemented** (section 16); the CI result is recorded in `deploy/STATUS.md`. The pack itself is documented in `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`.
 
 ## 1. What S9 has to prove
 
@@ -441,3 +441,53 @@ Documents to update when S9 is built: docs/PORTABILITY_AUDIT.md (PRT-002, 004, 0
 * It does not claim the tier values, field list or state list are final; they are design intent that the validators and the owner will refine.
 * It does not claim the construction pack is fit for a real contractor.
 * It builds, changes and approves nothing, and it does not declare production approval.
+
+## 16. Results (S9 built, 2026-10-17)
+
+**What was built.** The pack `construction-subcontracts` 1.0.0 (Harborline Construction, synthetic) under `templates/packs/construction-subcontracts` (`docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`); 15 unit test cases (`tests/Ecp.UnitTests/ConstructionPackTests.cs`, including four renderer cases); 11 integration scenarios on SQLite and the same 11 on SQL Server (`tests/Ecp.Integration.Tests/SecondBusinessScenarios.cs`, `HarborlineWorld.cs`); 4 API render tests (`tests/Ecp.Api.Tests/SecondBusinessUiTests.cs`); 6 guard tests (`tests/Ecp.Architecture.Tests/SecondBusinessGuardTests.cs`); one new stage-B rule. The design's 11-state lifecycle became 10 (owner decision D1).
+
+**Platform files changed** (the guard lists them and fails on any other): `src/Ecp.Host/Pages/Shared/_ContractFields.cshtml` (S9-discovered generic fix F1, below), `tools/check-packs.sh` (signs and verifies every shipped pack, not only the first), `.github/workflows/ci.yml` (full-history checkout so the guard can read the baseline). Nothing else under `src`, `tools`, `deploy` or `.github` changed. No schema, migration, permission, route, role or option was added.
+
+### 16.1 Acceptance criteria
+
+Evidence is on SQLite locally; the SQL Server column is the CI result recorded in `deploy/STATUS.md`.
+
+| ID | Result | Evidence and limits |
+|---|---|---|
+| SBP-AC-01 No source change | **Passed** | Journey scenario: upload, install, assign, publish and onboard through the services the pages call, with no rebuild; an absent version is refused with `pack_not_available`. Guard: no shipped platform file, project file or compiled `Ecp.*` assembly contains the pack's vocabulary; the S9 commits touch only the pack, tests, documents and the three listed platform files |
+| SBP-AC-02 Pack integrity | **Passed** | Unit tests: valid, every packable kind, identical bytes twice, signs, trusted only with the right key; `tools/check-packs.sh`: three packs built twice, identical, valid, each signed and verified, tampered, wrong-key and unsigned refused |
+| SBP-AC-03 Coherence | **Passed** | Unit test (capabilities coherent with both workflows); `/health/ready` reports `capabilities` and `solution-packs` Healthy with three packs |
+| SBP-AC-04 Separation | **Passed** | Isolation scenario: Blank, reference and Harborline organisations in one tenant see only their own states, terms, capabilities, matrices, fields, views and notification wording; the reference organisation's release hashes are unchanged by the install; a second tenant installing the same pack shares nothing |
+| SBP-AC-05 Whole lifecycle | **Passed** | Walk scenario: coverage is computed from the pack's definitions; every state and every step of both workflows is taken, including revision loop, rejection, stop work and resume, completion, termination, withdrawal and a change order applied, rejected and cancelled |
+| SBP-AC-06 Approvals | **Passed** | Unit boundary table plus the Approvals scenario (section in `docs/APPROVAL_MATRIX.md`); simulator and live plan agree |
+| SBP-AC-07 Capabilities | **Passed** (see limit) | Capabilities scenario: steps offered, built-in lists, gate refusals, refusal to switch off a capability the lifecycle uses, Legal Review on is coherent and changes nothing. Navigation absence is shown by the render sweep. Dashboard cards and register columns for the two capabilities are covered by the generic S6 suites, not re-checked for Harborline |
+| SBP-AC-08 Terminology (PRT-004) | **Passed** | Render sweep for four roles over the register, contract, lifecycle, approval, change-order, supplier, category, dashboard, notification, administration and onboarding pages; notification inbox; CSV header and XLSX sheet name; banned-vocabulary scan of every pack document. **Not covered:** platform validation-message wording as a class, and help text (the product has no pack-specific help pages) |
+| SBP-AC-09 Names are data (PRT-013) | **Passed** | Role names, approver-group names and state labels come from terminology and the definition; the hidden Legal role is not in the picker of an organisation-only administrator while existing grants still show; the frozen-identifier tests pass unchanged |
+| SBP-AC-10 Notifications | **Passed** | Notifications scenario: recipients, pack wording, no formal-review or extension events, a lead time outside the allowed list refused, the critical-notice window drawn from the pack's offsets, the escalation date two days after the reminder (the platform keeps the date; nothing is escalated automatically), acknowledgement by the owner only, the unowned fall-back. Unit test: the real renderer under the pack's policy withholds the title from Confidential and everything from Restricted |
+| SBP-AC-11 Onboarding | **Passed** (see limit) | Journey scenario (two legal entities, two regions, two divisions, two sites in different time zones, trade packages, contract types, ownership), the Onboarding scenario (preview, publish, rollback, the note that a Legal group mapping has nothing to do) and the onboarding pages in the render sweep. **Not exercised:** a group mapping used by a real sign-in (identity-provider mapping is generic and covered by the setup and identity suites) |
+| SBP-AC-12 Fields | **Passed** | Fields scenario: controlled lists, pack fields in views, exports and the reporting projection, step requirements (internal review needs a project number), a Confidential field (Retention cap) hidden from a viewer whose ceiling is Internal; Approvals scenario: a condition on a field marked usable in approvals (bond required) |
+| SBP-AC-13 Locale (PRT-012) | **Passed** (see G12) | Locale scenario and sweep: US date order and number formats, USD, America/Chicago, date-only values do not move; no AU fall-back on any page the four roles reach. Dates in notifications and some pages are ISO (G12), neutral rather than US-styled |
+| SBP-AC-14 Classification | **Passed** | Four levels and no privileged level in the resolved scale (Fields scenario), in field visibility (Retention cap), in notification content rules (renderer unit test) and in the policy validator (unit tests). Access ceilings of the Harborline users (Internal, Confidential) decide what each can open throughout the scenarios |
+| SBP-AC-15 Isolation and caches | **Passed** | Isolation scenario (a tenant administrator who reaches all organisations; a second tenant) |
+| SBP-AC-16 Publication order | **Passed** | Order scenario: a workflow before its matrix is refused until it is published; the documented order succeeds; every draft is published or reported |
+| SBP-AC-17 Guard | **Passed** | `SecondBusinessGuardTests` (six tests) and the stage-B rule `fixed-field-label-literal`; the stage-B allow-list has not grown (13 entries, unchanged) |
+| SBP-AC-18 Findings register | **Passed** | `docs/PORTABILITY_AUDIT.md` section 0.8 |
+| SBP-AC-19 Honest status | **Passed** | `docs/PORTABILITY_AUDIT.md` section 0.8, `docs/PROJECT_STATUS.md` section 9, `TASKS.md` |
+
+### 16.2 What the build found
+
+* **S9-discovered generic fix F1.** The shared contract-field partial typed four labels in a tuple literal; the rendered-page sweep found "Contract type", "Agreement type", "Risk level" and "Function" on a Harborline form. They now resolve through terminology, with a stage-B rule and tests that benefit every pack. This was the only generic platform defect found; no pack-specific change was made to fix it.
+* **G12 ISO dates in notifications.** Reminder and due dates in messages are ISO (2026-11-14), the same for every culture. Neutral and unambiguous; not US-styled. Left, recorded (S10 candidate).
+* **G13 `OrganisationAdministrators` recipient rule.** It resolves to the holders of the stable administrator role (`ProcurementAdministrator`); a business that calls that role Commercial Administrator gets the right people, but only by terminology. Left, recorded.
+* **Closed notification event list.** No event exists for entering internal review, a signature request, stop work, or for insurance, bond and defects-liability dates; custom date fields get no reminders. The pack uses the 16 events that exist and records the limit.
+* **Tenant-wide documents.** Classification policy and branding are tenant-level, so businesses sharing a tenant share one scale and one brand. The proof uses one tenant for three businesses and records the limit.
+* **Step `requiredFields` check the contract the step runs on**, not a change order being prepared (a Variation `Prepare` step cannot require a change-order field). The pack requires them at submission by field flags instead.
+* **Pack upload judges organisation-dependent documents only by warning** (by design, ADR-0031); publication is where they are judged.
+
+### 16.3 What stays NOT VERIFIED
+
+PRT-005 (deployment-model parity), PRT-006 and PRT-011 (configuration and tenant round trips), PRT-009 (pack upgrade preserving local changes) are untouched by S9 and stay NOT VERIFIED. G2 (non-Australian tax identifier formats) is deferred to S10 (D4). The proof says nothing about whether a real construction company could use the platform: no payment applications, lien waivers, schedule of values, retainage accounting or similar product features exist, and none was added.
+
+### 16.4 CI
+
+See `deploy/STATUS.md` for the run, the SQL Server result and the container smoke result.

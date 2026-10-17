@@ -134,6 +134,34 @@ Five prerequisites were implemented before the second business proof; S9 itself 
 
 **PRT-004:** the platform now offers a label key for every contract-field and supplier label, enforced by a unit test and a render and export test. The criterion is ticked at the S9 sweep, not before. **Still open:** G2 non-Australian tax identifier *formats* (S10, owner decision D4), R-01, R-02, R-04, PRT-002 as a whole (S9), PRT-006/PRT-011 round trips.
 
+## 0.8 Status after slice S9 (the second business proof; 2026-10-17)
+
+Harborline Construction (`construction-subcontracts` 1.0.0, a synthetic US general contractor) was added as a third shipped pack and walked end to end with no change to platform behaviour. Detail: `docs/SECOND_BUSINESS_PROOF.md` section 16, `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`. The only platform source file changed is `src/Ecp.Host/Pages/Shared/_ContractFields.cshtml` (finding F1); the architecture guard (`SecondBusinessGuardTests`) confines the rest of the S9 diff to the pack, tests and documents plus two tooling lines.
+
+| Criterion | State after S9 |
+|---|---|
+| **PRT-002** second business | **Met.** A non-JBS pack with its own ten-state lifecycle, change-order workflow, two approval matrices, 24 fields, terminology, capabilities, notification policy, views, classification scale and branding is uploaded, installed, assigned, published and onboarded through the product's own controls with no rebuild, and a subcontract and a change order are walked through every state and step. SQLite locally; SQL Server in CI (`deploy/STATUS.md`) |
+| **PRT-004** terminology aliases | **Met for the proof's scope.** A render sweep as four roles over the working pages, administration and onboarding pages, the notification inbox, CSV and XLSX exports and every pack document shows only the pack's words where the pack sets a term, in US formats. Limits: platform validation-message wording as a class is not swept; notification dates are ISO (G12); the Pack step lists every installed pack by name |
+| **PRT-013** no role, state or permission literals | **Met** under the amended criterion (decision D7c, ADR-0029): role names, approver-group names and state labels shown to people come from terminology and the definition; the hidden Legal role is not offered; stable identifiers are unchanged (frozen-identifier tests pass unchanged) |
+| PRT-012 per-organisation locale | Probed for a second locale (en-US, USD, America/Chicago, two zones in one organisation); the sweep found no Australian fall-back on any page the four roles reach. Installation-level fall-backs remain in the guard allow-list (S10) |
+| PRT-015 capabilities | Exercised by a business that switches two off and keeps three |
+| PRT-001 static scan | Strengthened: a construction-vocabulary scan of all shipped platform files and built assemblies, a project-file check and a git-diff confinement test join stage B |
+| PRT-005, PRT-006, PRT-009, PRT-011 | **Unchanged: NOT VERIFIED.** S9 does not touch deployment parity, round trips or pack upgrade |
+
+| ID | Finding | Disposition |
+|---|---|---|
+| **F1** (S9-discovered generic fix) | `_ContractFields.cshtml` built four labels in a Razor tuple literal ("Contract type", "Agreement type", "Risk level", "Function"); the page-literal rule could not see them, so they never reached the resolver and a business that renames them still showed the neutral words | **Fixed generically** (labels are tokens); a new stage-B rule (`fixed-field-label-literal`) and the render sweep guard it; no new allowance; benefits every pack. Found by the sweep, documented before it was fixed, not a pack-specific change |
+| G12 | Dates in notification messages and some pages are ISO 8601 for every organisation | Open, Low. Neutral and unambiguous, not US-styled. Candidate for S10 |
+| G13 | The `OrganisationAdministrators` recipient rule resolves to holders of the stable administrator role code (`ProcurementAdministrator`) | Open, Low. Correct people, named only by terminology (Commercial Administrator). Rename is forbidden (ADR-0029); a neutral alias for the rule is a candidate |
+| G14 | The notification event vocabulary is closed (28 events): nothing for entering internal review, a signature request, stop work or insurance, bond and defects-liability dates; custom date fields get no reminders | Open, Medium for a business that wants them. Not extended for the pack (no platform change merely to ease the pack) |
+| G15 | Classification policy and branding are tenant-level, so businesses sharing a tenant share one scale and one brand | Open, Medium (design limit). Recorded; the proof uses a shared tenant and does not publish the second business's tenant documents over the others' |
+| G16 | A step's `requiredFields` check the contract the step runs on, not the change order being prepared | Open, Low. Documented for pack authors; the pack enforces requirements by field flags and at submission |
+| G17 | Pack upload judges organisation-dependent documents only by warning | By design (ADR-0031, G11); publication judges them |
+| L1 | `L["Estimated value"]` in `src/Ecp.Host/Pages/Migration/Reconciliation.cshtml` is a fixed English label inside a migration reconciliation page | Open, Low (found while adding the F1 guard rule; neutral wording, not a business word) |
+| G2, R-01, R-02, R-04 | Tax-identifier formats; ABN and SAP core columns; "Legal Privileged" constant; "Evergreen" literal | Unchanged, S10 (owner decision D4). The proof leaves the tax identifier empty or an eleven-digit value; a four-level scale with no privileged level worked, so R-02 is a naming debt, not a blocker |
+
+**Closed by S9:** the "second business cannot run" objection of P-03/PRT-002; the field-label gap of PRT-004. **First incomplete remediation task:** S10 (regional defaults and tax-identifier formats).
+
 ## 1. Scope, method and classification
 
 ### 1.1 What was scanned
@@ -246,6 +274,8 @@ These were found by reading around the hits. They are not in the list of terms a
 * The classification scale, contract types and categories are pack defaults applied at setup, not code.
 
 ## 4. Test coverage of portability (what is and is not verified)
+
+*This table is the state at the time of the original audit. For the current state read sections 0.1 to 0.8.*
 
 | Criterion | State | Evidence |
 |---|---|---|

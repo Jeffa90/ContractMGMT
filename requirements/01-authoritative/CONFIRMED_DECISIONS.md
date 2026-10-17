@@ -161,3 +161,12 @@ Source: `docs/S9_READINESS.md`, reviewed and approved by the owner. These bind t
 | D8.9 | S9 uses: business **Harborline Construction**, pack key **construction-subcontracts**, locale **en-US**, currency **USD**, time zone **America/Chicago**. |
 | D8.10 | The Construction Subcontracts pack ships as a **first-class pack** in `templates/packs`, alongside Blank and JBS Procurement. |
 | D8.11 | **Sell-side Professional Services** remains the preferred candidate for the next proof business after S9. |
+
+### How the D8 decisions were applied in S9 (2026-10-17; a record, not a new decision)
+
+* D8.1 (no Defects Liability state): the lifecycle has ten states; practical completion is recorded by an Administrative Change Order (type `ADMINISTRATIVE`, Practical Completion Date field), with a single Commercial Manager approval step.
+* D8.2, D8.3 (G11 and G1b done first): all eleven pack documents uploaded with only context-dependent warnings and publish in dependency order; every field label the pack renames is a terminology key.
+* D8.4 (G2 deferred): no Harborline scenario enters a tax identifier; the pack renames the label (Tax Identifier) and the eleven-digit check is unchanged until S10.
+* D8.9, D8.10: pack key `construction-subcontracts`, en-US, USD, America/Chicago; shipped in `templates/packs` as a first-class pack.
+* D8.11: Professional Services was not started.
+* S9 owner rules (kept): no construction-specific platform code; one generic fix was needed and is recorded as "S9-discovered generic fix F1" (`docs/PORTABILITY_AUDIT.md` section 0.8, ADR-0032); Legal Review and Renewals are disabled in the pack, Register Authorisation, Variations (presented as Change Orders) and Signature Requests are enabled; the notification policy states its content levels explicitly.

@@ -488,6 +488,25 @@ CI run 52 (commit f474afc) failed one API test, `A_pack_the_repository_has_never
 
 Found by the tests and fixed: the first smoke run showed a valid pack refused at upload four ways and every organisation-dependent draft reported as a problem at assignment (see `docs/S9_READINESS.md` section 13); the locale probe found the Audit page formatting with the installation default.
 
+### 9.4 S9: the second business proof (Harborline Construction, `construction-subcontracts`)
+
+| Area | Tests |
+|---|---|
+| The pack as data | `tests/Ecp.UnitTests/ConstructionPackTests.cs` (11 facts, 4 theory cases): builds to a valid package with every packable kind and the same bytes twice; signs with an ephemeral key and is trusted only with the right key; lifecycle and change-order workflow valid, each state role used once; no formal-review, renewal or disposition step and capabilities agree; notification policy valid, states its content levels and uses no extension event; the real renderer withholds the title from Confidential and everything from Restricted; four-level scale with no privileged level; fields, lookups and views valid; approval boundary table; every required term, the groups and the hidden role; a banned-vocabulary scan of every document (no reference business, Australian identifier or tax authority); pack defaults |
+| Whole lifecycle | `SecondBusinessScenarios.Walk` (coverage computed from the pack's own definitions, so a state or step added later without a scenario fails) |
+| Journey, order, capabilities | `Journey` (upload, install, assign, publish, onboard, with no rebuild; an absent version is refused with `pack_not_available`), `Order` (a workflow before the matrix it names is refused), `Capabilities`, `Onboarding` (preview, publish, rollback; the note that a Legal group mapping has nothing to do) |
+| Approvals and change orders | `Approvals` (tiers, exclusive maxima, high-risk and bond exceptions, CAD with and without the dated rate, a currency with no rate refused, parallel all-required tier, delegation recorded, simulator and live plan agree), `ChangeOrders` (facts recorded without altering the parent until applied; the administrative change order records practical completion) |
+| Notifications, fields, locale, isolation | `Notifications` (recipients, wording, no extension events, disallowed lead refused, critical-notice window, escalation date, acknowledgement by the owner only, unowned fall-back), `Fields` (lookups, step requirements, a Confidential field hidden from an Internal viewer, views, export, reporting projection), `Locale` (US formats, zones, date-only values), `Isolation` (three businesses in one tenant plus a second tenant; the reference organisation's release hashes unchanged) |
+| Through the real host | `tests/Ecp.Api.Tests/SecondBusinessUiTests.cs` (4): a render sweep as four roles over the working pages for neutral and reference words and the Australian locale; administration, onboarding pages and the role picker; CSV and XLSX headings and the notification inbox; `/health/ready` with three shipped packs |
+| The boundary | `tests/Ecp.Architecture.Tests/SecondBusinessGuardTests.cs` (6): no construction word in any shipped platform file or built `Ecp.*` assembly; no project file names the pack; the platform paths the S9 commits touched are a short written list; added platform lines carry no construction word; the checks can fail. Stage B gained `fixed-field-label-literal` (+3 cases), with no new allowance |
+| Tooling | `tools/check-packs.sh` builds three packs twice (byte-identical), signs and verifies each with an ephemeral key, refuses tampered, wrong-key and unsigned packs |
+
+The integration scenarios run on SQLite locally and have SQL Server wrappers (`SecondBusinessScenarioTests_SqlServer`) that run in CI. The guard reads git history; CI therefore checks out full history (`fetch-depth: 0`) and the test fails, rather than passes, if the baseline commit is missing.
+
+Result: recorded in `deploy/STATUS.md` once the run completes (pending at the time of this edit).
+
+Found by the tests and fixed: the render sweep found four contract-field labels typed into a Razor tuple literal (finding F1); the first API setup made the administrator tenant-wide, which (correctly) showed the Legal role in the picker because other organisations in reach offer it, so the administrator is now organisation-scoped; many scenario-writing errors against the real services (key prefixes in plan step names, access subject cached per scope, the closed notification vocabulary) were test-side only.
+
 ## 10. Security regression suite (`Category=Security`)
 
 | ID | Test |

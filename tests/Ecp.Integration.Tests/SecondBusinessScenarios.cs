@@ -13,6 +13,7 @@ using Ecp.Lifecycle.Domain;
 using Ecp.Notifications;
 using Ecp.Notifications.Policy;
 using Microsoft.EntityFrameworkCore;
+using Ecp.Setup.Onboarding;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Ecp.Tests.Common;
@@ -375,6 +376,18 @@ internal static class SecondBusinessScenarios
         await w.ScanRemindersAsync();
         Assert.Equal(countBefore, (await w.InboxAsync("packageManagerA")).Count);                                              // a window is used once
 
+        // Critical notice: the contract ends in 20 days with 14 days' notice, so the notice deadline is 6 days away and the pack's own offsets (14, 7, 3, 1) decide the window; the alert is not acknowledged until the owner says so,
+        // and the escalation date the reports read is the pack's two days after the reminder (nothing is escalated automatically; the platform keeps the date).
+        var critical = (await w.InboxAsync("packageManagerA")).Where(n => n.Kind == "Reminder" && n.ContractId == soon && n.ReminderKind == "criticalNotice").ToList();
+        var notice = Assert.Single(critical);
+        Assert.Contains(notice.WindowDays, new int?[] { 14, 7 });
+        var status = await w.AsAsync("packageManagerA", s => s.Get<IReminderSettings>().StatusAsync(soon));
+        Assert.True(status.CriticalNotice); Assert.True(status.Unacknowledged);
+        Assert.NotNull(status.EscalationDueUtc); Assert.Equal(TimeSpan.FromDays(2), status.EscalationDueUtc!.Value - status.LastReminderSentUtc!.Value);
+        await Assert.ThrowsAsync<ResourceNotFoundException>(() => w.AsAsync("packageManagerB", s => s.Get<INotificationInbox>().AcknowledgeAsync(notice.Id)));
+        await w.AsAsync("packageManagerA", s => s.Get<INotificationInbox>().AcknowledgeAsync(notice.Id));
+        Assert.False((await w.AsAsync("packageManagerA", s => s.Get<IReminderSettings>().StatusAsync(soon))).Unacknowledged);
+
         // Nobody owns the category: the organisation's administrators are told, because this pack's policy says so.
         var orphan = await w.ToActiveAsync(value: 80_000m, trade: "FINISHES", end: w.Today.AddDays(20), lead: 30);
         await using (var scope = w.AsScopeless())
@@ -514,6 +527,12 @@ internal static class SecondBusinessScenarios
         await Assert.ThrowsAnyAsync<Exception>(() => w.NewSubcontractAsync(custom: new Dictionary<string, string?> { ["project_number"] = "lower case!" }));
         await Assert.ThrowsAnyAsync<Exception>(() => w.NewSubcontractAsync(custom: new Dictionary<string, string?> { ["project_number"] = "P-1", ["retention_percentage"] = "55" }));
 
+        // A field the pack classifies as Confidential is read by the people cleared for it and is absent for a viewer whose ceiling is Internal.
+        var capped = await w.NewSubcontractAsync(custom: new Dictionary<string, string?> { ["project_number"] = "P-2026-08", ["retention_cap"] = "25000" });
+        Assert.Equal("25000", await w.CustomValueAsync(capped, "retention_cap", "packageManagerA"));
+        Assert.Equal("", await w.CustomValueAsync(capped, "retention_cap", "projectViewer"));
+        Assert.Equal("P-2026-08", await w.CustomValueAsync(capped, "project_number", "projectViewer"));
+
         // Shared views over core and pack-provided fields find the record.
         var org = w.Org.ToString("N");
         var insurance = await w.AsAsync("packageManagerA", s => s.Get<IContractViews>().RunAsync($"shared:{org}:insurance-expiring", w.Org));
@@ -636,6 +655,37 @@ internal static class SecondBusinessScenarios
         }
     }
 
+    // ---- SBP-AC-11 (continued): the onboarding release can be previewed, published again and rolled back, and says the Legal role has nothing to do ----
+
+    public static async Task Onboarding_changes_are_previewed_published_and_rolled_back_and_a_legal_group_mapping_is_noted_as_unused(TestApp app)
+    {
+        var w = await HarborlineWorld.ReadyAsync(app);
+        var first = (await w.AsAsync("admin", s => s.Get<IConfigurationService>().LatestReleaseAsync(OrganisationOnboardingKind.KindName, w.Org)))!;
+        var doc = OnboardingDocument.Parse(first.ContentJson);
+        var changed = doc with
+        {
+            Structure = doc.Structure with { Sites = [.. doc.Structure.Sites, new StructureEntry("PRJ-HARBOUR", "Harbour Yard", null, "America/New_York")] },
+            GroupMappings = [new MappingEntry("corp-sso", "counsel", RoleCodes.Legal, null, [], [], [], "Confidential")],
+        };
+        // Preview: the draft is judged first; the Legal mapping is a note (the capability is off), not an error, so the release is publishable.
+        var draft = await w.AsAsync("admin", s => s.Get<IConfigurationService>().GetOrCreateDraftAsync(OrganisationOnboardingKind.KindName, w.Org, changed.ToJson()));
+        draft = await w.AsAsync("admin", s => s.Get<IConfigurationService>().SaveDraftAsync(draft.Id, changed.ToJson()));
+        draft = await w.AsAsync("admin", s => s.Get<IConfigurationService>().ValidateAsync(draft.Id));
+        Assert.True(draft.IsPublishable);
+        Assert.Contains(draft.Validation!.Messages, m => m.Code == "role_unused_capability" && m.Severity == ValidationSeverity.Warning);
+        Assert.DoesNotContain(draft.Validation.Messages, m => m.Severity == ValidationSeverity.Error);
+        Assert.DoesNotContain("Legal Review", string.Join(' ', draft.Validation.Messages.Select(m => m.Message)));             // it speaks in the pack's word
+        var second = await w.AsAsync("admin", s => s.Get<IConfigurationService>().PublishAsync(draft.Id, "Add the harbour yard"));
+        Assert.Equal(first.Number + 1, second.Number);
+        var withYard = await w.AsAsync("admin", s => s.Get<IOrganisationStructureService>().GetAsync(w.Org));
+        Assert.Contains(withYard.Sites, x => x.Key == "PRJ-HARBOUR");
+
+        var back = await w.AsAsync("admin", s => s.Get<IConfigurationService>().RollbackAsync(OrganisationOnboardingKind.KindName, w.Org, first.Number, "Yard not needed"));
+        Assert.Equal(first.Number, back.RollbackOfNumber);
+        Assert.Equal(first.ContentHash, back.ContentHash);                                                                        // history is never rewritten: the old content is published again as a new release
+        Assert.Equal(second.Number + 1, back.Number);
+    }
+
     // ---- SBP-AC-13: locale. US formats, the organisation's own zones, and date-only values that do not move ----
 
     public static async Task The_organisation_works_in_US_formats_and_its_own_time_zones_and_date_only_values_do_not_move(TestApp app)
@@ -681,6 +731,7 @@ public sealed class SecondBusinessScenarioTests_Sqlite
     [Fact] public Task Approvals() => ProviderRunner.SqliteAsync(SecondBusinessScenarios.Activation_approval_follows_the_value_tiers_the_exceptions_the_currency_and_the_people, LifecycleScenarios.Scanner);
     [Fact] public Task ChangeOrders() => ProviderRunner.SqliteAsync(SecondBusinessScenarios.Change_orders_record_facts_and_never_alter_the_parent_until_applied, LifecycleScenarios.Scanner);
     [Fact] public Task Notifications() => ProviderRunner.SqliteAsync(SecondBusinessScenarios.Notifications_reach_the_intended_people_in_the_packs_words_and_never_the_formal_review_or_extension_events, LifecycleScenarios.Scanner);
+    [Fact] public Task Onboarding() => ProviderRunner.SqliteAsync(SecondBusinessScenarios.Onboarding_changes_are_previewed_published_and_rolled_back_and_a_legal_group_mapping_is_noted_as_unused, LifecycleScenarios.Scanner);
     [Fact] public Task Capabilities() => ProviderRunner.SqliteAsync(SecondBusinessScenarios.Legal_review_and_renewals_are_off_by_the_packs_defaults_and_the_other_three_work, LifecycleScenarios.Scanner);
     [Fact] public Task Order() => ProviderRunner.SqliteAsync(SecondBusinessScenarios.A_draft_that_names_something_unpublished_is_refused_until_it_exists_and_every_draft_is_published_in_order, LifecycleScenarios.Scanner);
     [Fact] public Task Fields() => ProviderRunner.SqliteAsync(SecondBusinessScenarios.Pack_fields_lookups_views_exports_and_the_four_level_scale_work_together, LifecycleScenarios.Scanner);
@@ -696,6 +747,7 @@ public sealed class SecondBusinessScenarioTests_SqlServer
     [SqlServerFact] public Task Approvals() => ProviderRunner.SqlServerAsync(SecondBusinessScenarios.Activation_approval_follows_the_value_tiers_the_exceptions_the_currency_and_the_people, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task ChangeOrders() => ProviderRunner.SqlServerAsync(SecondBusinessScenarios.Change_orders_record_facts_and_never_alter_the_parent_until_applied, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Notifications() => ProviderRunner.SqlServerAsync(SecondBusinessScenarios.Notifications_reach_the_intended_people_in_the_packs_words_and_never_the_formal_review_or_extension_events, LifecycleScenarios.Scanner);
+    [SqlServerFact] public Task Onboarding() => ProviderRunner.SqlServerAsync(SecondBusinessScenarios.Onboarding_changes_are_previewed_published_and_rolled_back_and_a_legal_group_mapping_is_noted_as_unused, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Capabilities() => ProviderRunner.SqlServerAsync(SecondBusinessScenarios.Legal_review_and_renewals_are_off_by_the_packs_defaults_and_the_other_three_work, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Order() => ProviderRunner.SqlServerAsync(SecondBusinessScenarios.A_draft_that_names_something_unpublished_is_refused_until_it_exists_and_every_draft_is_published_in_order, LifecycleScenarios.Scanner);
     [SqlServerFact] public Task Fields() => ProviderRunner.SqlServerAsync(SecondBusinessScenarios.Pack_fields_lookups_views_exports_and_the_four_level_scale_work_together, LifecycleScenarios.Scanner);

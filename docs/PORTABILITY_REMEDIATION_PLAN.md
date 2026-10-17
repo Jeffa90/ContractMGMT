@@ -443,3 +443,13 @@ Implemented on the owner's instruction of 2026-10-17, in the order given. S9 has
 * It does not claim PRT-002 passes after S1; only a full second business (S9) does.
 * The difficulty sizes are relative, not estimates in days.
 * The detection query in 7.1 is described, not written or run.
+
+### 8.16 S9: the second business proof (`docs/SECOND_BUSINESS_PROOF.md` section 16)
+
+Implemented on the owner's instruction of 2026-10-17.
+
+* **Pack (Implemented).** `templates/packs/construction-subcontracts` 1.0.0, Harborline Construction, synthetic: ten-state lifecycle, change-order workflow, two approval matrices, 24 fields and five lookups, terminology (52 terms), capabilities (two off), notification policy, eleven views, four-level classification, branding. Shipped as an external `.ecpkg` beside Blank and the reference pack (`docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`).
+* **Proof (Implemented).** Unit tests, eleven integration scenarios on SQLite and SQL Server, four API render tests, six architecture-guard tests (`docs/TESTING.md` section 9.4).
+* **S9-discovered generic fix F1.** One platform source file changed (`_ContractFields.cshtml`) because four labels bypassed terminology; the stage-B guard gained a rule for that pattern.
+* **Exit criteria.** "A second business installs and runs end to end with no source change": met (PRT-002). "No default term remains where the pack sets one": met for the swept page set, exports and notifications (PRT-004). "Role, state and approver-group names shown to people come from data": met (PRT-013).
+* **Not done, by design:** S10 (regional defaults, tax-identifier formats, ISO dates in notifications), sell-side Professional Services (the preferred third business), any construction product feature, PRT-005/006/009/011. **First incomplete remediation task:** S10.

@@ -39,6 +39,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0029-stable-role-and-permission-identifiers.md`
 - `decisions/ADR-0030-configurable-capabilities.md`
 - `decisions/ADR-0031-pack-validation-of-organisation-dependent-documents.md`
+- `decisions/ADR-0032-second-business-as-configuration-only.md`
 - `docs/ARCHITECTURE.md`
 - `docs/CAPABILITIES.md`
 - `docs/DOCUMENT_INDEX.md`

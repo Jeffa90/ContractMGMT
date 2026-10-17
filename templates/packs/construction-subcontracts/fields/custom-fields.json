@@ -247,7 +247,9 @@
       "validation": {
         "currency": "USD",
         "min": 0
-      }
+      },
+      "classification": "Confidential",
+      "helpText": "Visible to people cleared for Confidential records."
     },
     {
       "key": "bond_required",

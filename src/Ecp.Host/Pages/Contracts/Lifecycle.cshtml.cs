@@ -22,6 +22,7 @@ public sealed class LifecycleModel(ILifecycleService lifecycle, IVariationServic
     protected override async Task LoadAsync(Guid id, CancellationToken ct)
     {
         Contract = await contracts.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Contract.OrganisationId, ct);
         State = await Lifecycle.StateAsync(id, ct);
         History = await Lifecycle.HistoryAsync(id, ct);
         VariationList = await Variations.ListForContractAsync(id, ct);

@@ -62,6 +62,7 @@ public sealed class ProjectModel(IMigrationProjects projects, IMigrationBatches 
     private async Task LoadAsync(Guid id, CancellationToken ct)
     {
         Project = await projects.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Project.OrganisationId, ct);
         await LoadFormatterAsync(organisations, Project.OrganisationId, ct);
         var choices = new List<(Guid, string)>();
         foreach (var p in (await profiles.ListAsync(ct)).Where(p => p.OrganisationId == Project.OrganisationId))

@@ -22,6 +22,7 @@ public sealed class AddDocumentModel(ISecuredContractService contracts, ISecured
     private async Task LoadAsync(Guid id, CancellationToken ct)
     {
         Contract = await contracts.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Contract.OrganisationId, ct);
         Types = (await lifecycle.StateAsync(id, ct)).UploadTypes;
         Existing = await documents.ListAsync(id, ct);
     }

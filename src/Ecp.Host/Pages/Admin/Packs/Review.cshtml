@@ -55,6 +55,7 @@
             @if (pv.CapabilityChanges.Count > 0) { <p>@L["New capabilities"]: @string.Join(", ", pv.CapabilityChanges)</p> }
             @if (pv.MissingDependencies.Count > 0) { <p class="alert bad">@L["Needs other packs that are not installed"]: @string.Join(", ", pv.MissingDependencies)</p> }
             <p>@L["[[organisation|plural]] currently using this pack key"]: @(pv.Organisations.Count == 0 ? "0" : string.Join(", ", pv.Organisations.Select(o => o.Name)))</p>
+            @if (pv.Terminology is { Count: > 0 } terms) { <partial name="_TermRows" model="terms" /> }
             <h3>@L["Next steps"]</h3>
             <ol>@foreach (var n in pv.NextSteps) { <li>@n</li> }</ol>
         </section>

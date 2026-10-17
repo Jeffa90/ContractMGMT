@@ -15,7 +15,8 @@ namespace Ecp.Configuration;
 public sealed record PackKindOutcome(string Kind, string Scope, string Outcome, bool NeedsAttention, string? Detail);
 public sealed record PackAssignmentResult(Guid OrganisationId, string PackKey, string Version, IReadOnlyList<PackKindOutcome> Kinds, IReadOnlyList<string> NextSteps);
 public sealed record PackAssignmentPreviewItem(string Kind, string Scope, bool HasPublishedRelease, bool HasOpenDraft, string Effect);
-public sealed record PackAssignmentPreview(Guid OrganisationId, string OrganisationName, string? CurrentPackKey, PackCatalogueEntry Entry, IReadOnlyList<PackAssignmentPreviewItem> Items, IReadOnlyList<string> Warnings);
+public sealed record PackAssignmentPreview(Guid OrganisationId, string OrganisationName, string? CurrentPackKey, PackCatalogueEntry Entry, IReadOnlyList<PackAssignmentPreviewItem> Items, IReadOnlyList<string> Warnings,
+    IReadOnlyList<TerminologyPreviewRow>? Terminology = null);
 public sealed record OrganisationPackStatus(Guid OrganisationId, string Name, string? PackKey, string? Version, string? Source, string? Origin, DateTime? AssignedUtc, bool PackUsable);
 
 /// <summary>
@@ -30,7 +31,7 @@ public interface IPackAssignments
 }
 
 internal sealed class PackAssignments(IPackLoader loader, IConfigurationService configuration, ConfigurationDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IAccessService access,
-    CurrentUser currentUser, ActorContext actor, IClock clock, IOrganisationStructureService organisations, PackKindRegistry kinds) : IPackAssignments
+    CurrentUser currentUser, ActorContext actor, IClock clock, IOrganisationStructureService organisations, PackKindRegistry kinds, ITerminologyResolver terminology) : IPackAssignments
 {
     private string Who() => currentUser.UserId?.ToString() ?? actor.ActorId ?? "system";
     private static ResourceDescriptor OrgResource(Guid tenantId, Guid organisationId) => new("SolutionPack", tenantId, organisationId, Dimensions: ScopeDimensions.OrganisationOnly);
@@ -74,7 +75,13 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
         var warnings = new List<string>();
         if (org.SolutionPackKey is not null && org.SolutionPackKey != packKey) warnings.Add($"The organisation currently works from the pack '{org.SolutionPackKey}'. Its published configuration is not changed, but its starting pack changes to '{packKey}'.");
         if (!entry.Trust.IsTrusted) warnings.Add("This pack is unsigned. It is accepted here only because this is a Demo or Test environment that allows unsigned synthetic packs.");
-        return new PackAssignmentPreview(organisationId, org.Name, org.SolutionPackKey, entry, items, warnings);
+        IReadOnlyList<TerminologyPreviewRow> terms = [];
+        if (package.Document(TerminologyKind.KindName) is { } termsJson)
+        {
+            var now = await terminology.GetAsync(organisationId, ct: ct);
+            terms = TerminologyPreview.Rows(TerminologyDocument.Parse(termsJson), now);
+        }
+        return new PackAssignmentPreview(organisationId, org.Name, org.SolutionPackKey, entry, items, warnings, terms);
     }
 
     public async Task<PackAssignmentResult> AssignAsync(Guid organisationId, string packKey, string version, CancellationToken ct = default)

@@ -23,6 +23,7 @@ public sealed class DetailsModel(ILifecycleService lifecycle, IVariationService 
     protected override async Task LoadAsync(Guid id, CancellationToken ct)
     {
         Variation = await Variations.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Variation.OrganisationId, ct);
         Steps = await BuildStepsAsync(id, Variation.Summary.StatusDisplay, Variation.Steps, host.Mode != Ecp.SharedKernel.EcpMode.Production, ct);
         ClientRequestId = Guid.NewGuid().ToString("N");
         Current = Variation.Comparison.ToDictionary(c => c.Field, c => c.Current);

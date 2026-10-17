@@ -20,6 +20,7 @@ public sealed class EditModel(ISecuredContractService contracts, IContractCustom
     public Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
     {
         var c = await contracts.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(c.OrganisationId, ct);
         if (!c.CanEdit) return Forbid();
         (Id, Reference, Title, Description) = (c.Id, c.AgreementReference, c.Title, c.Description);
         Input = ContractFieldsInput.From(c);
@@ -31,6 +32,7 @@ public sealed class EditModel(ISecuredContractService contracts, IContractCustom
     {
         Id = id;
         var c = await contracts.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(c.OrganisationId, ct);
         if (!c.CanEdit) return Forbid();
         Reference = c.AgreementReference;
         var submitted = CustomFieldFormReader.Read(Request.Form);
@@ -51,7 +53,7 @@ public sealed class EditModel(ISecuredContractService contracts, IContractCustom
         }
         Flash("[[contract]] details saved.");
         return RedirectToPage("Details", new { id });
-    }, async () => { var c = await contracts.GetAsync(id, ct); await LoadAsync(c, CustomFieldFormReader.Read(Request.Form), null, ct); });
+    }, async () => { var c = await contracts.GetAsync(id, ct); await Terms.UseOrganisationAsync(c.OrganisationId, ct); await LoadAsync(c, CustomFieldFormReader.Read(Request.Form), null, ct); });
 
     private async Task LoadAsync(ContractDetails c, CustomFieldInput? submitted, IReadOnlyDictionary<string, string>? errors, CancellationToken ct)
     {

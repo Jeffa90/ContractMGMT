@@ -21,6 +21,7 @@ public sealed class UnlockModel(IRecordUnlockService unlocks, ISecuredContractSe
     private async Task LoadAsync(Guid id, CancellationToken ct)
     {
         Contract = await contracts.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Contract.OrganisationId, ct);
         Policy = await unlocks.PolicyAsync(id, ct);
         Current = await unlocks.CurrentAsync(id, ct);
         History = await unlocks.HistoryAsync(id, ct);

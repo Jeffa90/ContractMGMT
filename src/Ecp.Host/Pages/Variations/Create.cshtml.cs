@@ -20,6 +20,7 @@ public sealed class CreateModel(IVariationService variations, ISecuredContractSe
     private async Task LoadAsync(CancellationToken ct)
     {
         Contract = await contracts.GetAsync(ContractId, ct);
+        await Terms.UseOrganisationAsync(Contract.OrganisationId, ct);
         // The workflow names the core fields a Variation may change; the configured fields it may change are added, limited to those this person can see.
         var custom = await variations.ChangeableCustomFieldsAsync(ContractId, ct);
         Fields = (await variations.ChangeableFieldsAsync(ContractId, ct)).Where(f => !f.StartsWith("cf.", StringComparison.Ordinal)).Concat(custom.Select(d => "cf." + d.Key)).ToList();

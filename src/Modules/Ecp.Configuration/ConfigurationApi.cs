@@ -382,6 +382,7 @@ public static class ConfigurationModule
         services.TryAddSingleton<ITerminologyCache>(_ => new TerminologyCache());
         services.AddScoped<IConfigurationKind, TerminologyKind>();
         services.AddScoped<ITerminologyResolver, TerminologyResolver>();
+        services.AddScoped<ITerminologyAdministration, TerminologyAdministration>();
         // Replace the default scale with the configured one (registered after the Identity module).
         services.AddScoped<IClassificationScaleProvider, ConfiguredClassificationScaleProvider>();
         return services;

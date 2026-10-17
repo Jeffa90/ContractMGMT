@@ -1,0 +1,21 @@
+@page "/Admin/Terminology/Preview"
+@model Ecp.Host.Pages.Admin.Terminology.PreviewModel
+@{ ViewData["Title"] = L["Preview terminology"].Value; }
+<h1>@L["Preview terminology"]</h1>
+<p class="lede">@L["How representative pages and messages read now, and how they would read once the draft is published. Terminology changes labels, not permissions or workflows: who may do what is decided by roles, scopes and the workflow, and none of that changes."]</p>
+<partial name="_Picker" model="Model" />
+@if (Model.Result is { } r)
+{
+    @if (!r.HasDraft) { <p class="alert" role="status">@L["There is no open draft, so \"after\" is the same as \"now\"."]</p> }
+    <div class="table-wrap"><table>
+        <caption>@L["Representative text"]</caption>
+        <thead><tr><th scope="col">@L["Where it appears"]</th><th scope="col">@L["Template"]</th><th scope="col">@L["Now"]</th><th scope="col">@L["After publishing"]</th></tr></thead>
+        <tbody>@foreach (var s in r.Samples) { <tr><th scope="row">@s.Area</th><td><code>@s.Template</code></td><td>@s.Now</td><td>@s.After</td></tr> }</tbody>
+    </table></div>
+    <div class="table-wrap"><table>
+        <caption>@L["Role names (the stable role code never changes)"]</caption>
+        <thead><tr><th scope="col">@L["Stable role code"]</th><th scope="col">@L["Now"]</th><th scope="col">@L["After publishing"]</th></tr></thead>
+        <tbody>@foreach (var x in r.Roles) { <tr><th scope="row"><code class="id">@x.Code</code></th><td>@x.Now</td><td>@x.After</td></tr> }</tbody>
+    </table></div>
+    <p><a class="button" href="/Admin/Terminology/Edit?organisationId=@r.OrganisationId&amp;locale=@Uri.EscapeDataString(r.Locale)">@L["Back to the draft"]</a> <a href="/Admin/Terminology?organisationId=@r.OrganisationId&amp;locale=@Uri.EscapeDataString(r.Locale)">@L["Overview"]</a></p>
+}

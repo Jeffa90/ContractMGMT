@@ -27,7 +27,7 @@ public sealed record VariationDocumentItem(Guid DocumentId, string Title, string
 public sealed record VariationDetail(
     VariationListItem Summary, string? Description, string Reason, bool LegalReviewRequired, string? ImpactNote, string? OutcomeReason, string ParentStatusBefore, bool ParentChangedSinceDrafted,
     IReadOnlyList<FieldComparison> Comparison, IReadOnlyList<VariationDocumentItem> Documents, IReadOnlyList<AvailableTransition> Steps, bool CanEdit, bool CanAddDocuments, IReadOnlyList<string> ChangeableFields,
-    IReadOnlyDictionary<string, string>? FieldLabels = null);
+    IReadOnlyDictionary<string, string>? FieldLabels = null, Guid OrganisationId = default);
 
 public sealed record AddVariationDocumentRequest(Guid VariationId, string Role, string Title, string FileName, string MimeType, Stream Content, string? Classification = null);
 
@@ -246,7 +246,7 @@ internal sealed class VariationService(
         var custom = mayEdit ? await ChangeableCustomFieldsAsync(v.ContractId, ct) : [];
         var changeable = resolved.Definition.Settings.Variation.ChangeableFields.Where(f => !f.StartsWith("cf.", StringComparison.Ordinal)).Concat(custom.Select(d => "cf." + d.Key)).ToList();
         return new VariationDetail(summary, v.Description, v.Reason, v.LegalReviewRequired, v.FinancialImpactNote, v.OutcomeReason, v.ParentStatusBefore, changedSince, rows, docs, steps, mayEdit, mayDocs,
-            changeable, custom.ToDictionary(d => "cf." + d.Key, d => d.Label));
+            changeable, custom.ToDictionary(d => "cf." + d.Key, d => d.Label), v.OrganisationId);
     }
 
     private static readonly string[] DocumentRoles = ["initial", "legalRework", "legalCleared", "drafting"];

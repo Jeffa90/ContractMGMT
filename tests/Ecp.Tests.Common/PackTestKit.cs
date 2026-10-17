@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Ecp.Packs;
+using Ecp.SharedKernel;
 
 namespace Ecp.Tests.Common;
 
@@ -90,6 +91,76 @@ public static class PackTestKit
     public static Dictionary<string, byte[]> Entries(byte[] package) => PackZipReader.Read(package, new PackLimits { MaxEntries = 1000 }).Entries.ToDictionary(e => e.Key, e => e.Value);
 
     public static byte[] Utf8(string s) => new UTF8Encoding(false).GetBytes(s);
+
+    /// <summary>
+    /// The terminology of the synthetic third pack: deliberately different words from the neutral wording and from the reference pack, so a page that still shows a fixed word is caught. Everything not listed
+    /// here keeps its neutral wording (a complete document is required, so the rest is written out).
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, (string Singular, string Plural)> ThirdPackWords = new Dictionary<string, (string, string)>
+    {
+        ["application.name"] = ("Agreement Hub", "Agreement Hub"),
+        ["contract"] = ("Agreement", "Agreements"),
+        ["agreement"] = ("Agreement", "Agreements"),
+        ["contract.register"] = ("Agreement Ledger", "Agreement Ledgers"),
+        ["contract.reference"] = ("Agreement Number", "Agreement Numbers"),
+        ["contract.type"] = ("Agreement Kind", "Agreement Kinds"),
+        ["supplier"] = ("Counterparty", "Counterparties"),
+        ["category"] = ("Portfolio", "Portfolios"),
+        ["subcategory"] = ("Sub-portfolio", "Sub-portfolios"),
+        ["contract.owner"] = ("Agreement Manager", "Agreement Managers"),
+        ["contract.administrator"] = ("Agreement Steward", "Agreement Stewards"),
+        ["reviewer"] = ("Formal Reviewer", "Formal Reviewers"),
+        ["review.team"] = ("Formal Review Panel", "Formal Review Panels"),
+        ["legal.review"] = ("Formal Review", "Formal Reviews"),
+        ["registration.approval"] = ("Activation Approval", "Activation Approvals"),
+        ["primary.approver"] = ("Activation Approver", "Activation Approvers"),
+        ["registered.date"] = ("Activation Date", "Activation Dates"),
+        ["executed.document"] = ("Signed Document", "Signed Documents"),
+        ["organisation"] = ("Business", "Businesses"),
+        ["site"] = ("Location", "Locations"),
+    };
+
+    /// <summary>A complete terminology document (every platform key) with the third pack's words over the neutral wording.</summary>
+    public static string ThirdPackTerminologyJson()
+    {
+        var terms = TermCatalogue.All.Select(d =>
+        {
+            var (singular, plural) = ThirdPackWords.TryGetValue(d.Key, out var w) ? w : (d.Singular, d.Plural);
+            return new { key = d.Key, locale = "en", singular, plural };
+        });
+        return System.Text.Json.JsonSerializer.Serialize(new { schemaVersion = 1, mode = "complete", terms });
+    }
+
+    /// <summary>
+    /// The content of the synthetic third pack: the Blank pack's neutral workflows with the first state renamed to one that exists nowhere in the platform or the shipped packs, and the third pack's own terminology.
+    /// A test builds a pack from it at run time, so a pack the repository has never seen is installed with no source change.
+    /// </summary>
+    public static IEnumerable<(string Source, string Path, string Kind, string Scope, int Schema, bool Required)> ThirdPackContent(out Dictionary<string, string> documents)
+    {
+        var root = Path.Combine(RepoRoot.Find(), "templates", "packs", "blank");
+        var lifecycle = File.ReadAllText(Path.Combine(root, "workflows", "contract-lifecycle.json"));
+        lifecycle = System.Text.RegularExpressions.Regex.Replace(lifecycle, "\"code\": \"Open\", \"display\": \"Open\"", "\"code\": \"Intake\", \"display\": \"Intake\"");
+        lifecycle = System.Text.RegularExpressions.Regex.Replace(lifecycle, "\"from\": \\[ \"Open\" \\]", "\"from\": [ \"Intake\" ]");
+        if (!lifecycle.Contains("\"Intake\"")) throw new InvalidOperationException("The Blank lifecycle no longer has the expected initial state.");
+        documents = new Dictionary<string, string>
+        {
+            ["lifecycle.json"] = lifecycle,
+            ["variation.json"] = File.ReadAllText(Path.Combine(root, "workflows", "variation.json")),
+            ["notifications.json"] = File.ReadAllText(Path.Combine(root, "notifications", "notification-policy.json")),
+            ["terminology.json"] = ThirdPackTerminologyJson(),
+        };
+        return
+        [
+            ("lifecycle.json", "content/contract-lifecycle.json", "WorkflowContractLifecycle", "organisation", 1, true),
+            ("variation.json", "content/variation-workflow.json", "WorkflowVariation", "organisation", 1, true),
+            ("notifications.json", "content/notification-policy.json", "NotificationPolicy", "organisation", 1, true),
+            TerminologyEntry(),
+        ];
+    }
+
+    /// <summary>The content entry that carries a terminology document in a pack.</summary>
+    public static (string Source, string Path, string Kind, string Scope, int Schema, bool Required) TerminologyEntry(string source = "terminology.json")
+        => (source, "content/terminology.json", "Terminology", "organisation", 1, false);
 }
 
 /// <summary>

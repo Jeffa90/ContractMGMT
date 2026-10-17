@@ -1,0 +1,17 @@
+@model IReadOnlyList<Ecp.Configuration.TerminologyPreviewRow>
+@if (Model.Count > 0)
+{
+    var changed = Model.Count(r => r.DiffersFromNeutral);
+    <h3>@L["Terminology this pack would introduce"]</h3>
+    <p>@L["The pack names {0} labels; {1} differ from the platform's neutral wording. Labels change what people read, never what they may do. Nothing is published.", Model.Count, changed]</p>
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Labels introduced by the pack"]</caption>
+        <thead><tr><th scope="col">@L["Stable key"]</th><th scope="col">@L["Pack label"]</th><th scope="col">@L["Plural"]</th><th scope="col">@L["Neutral wording"]</th>@if (Model.Any(r => r.Current is not null)) { <th scope="col">@L["Shown now"]</th> }</tr></thead>
+        <tbody>
+        @foreach (var r in Model)
+        {
+            <tr><th scope="row"><code class="id">@r.Key</code></th><td>@r.Singular @if (r.DiffersFromNeutral) { <span class="badge warn">@L["differs"]</span> }</td><td>@r.Plural</td><td>@r.NeutralSingular</td>@if (Model.Any(x => x.Current is not null)) { <td>@r.Current</td> }</tr>
+        }
+        </tbody>
+    </table></div>
+}

@@ -13,13 +13,13 @@ namespace Ecp.Host.Terminology;
 /// never query for a label. A page that is about one organisation's record (a contract, a supplier) calls <see cref="UseOrganisationAsync"/> so that record is described in its own organisation's words.
 /// Terminology is presentation only: nothing here decides what a person may see or do.
 /// </summary>
-public sealed class TermContext(ITerminologyResolver resolver, IAccessService access, IOrganisationStructureService organisations, ITenantContext tenant, ILogger<TermContext> logger)
+public sealed class TermContext(ITerminologyResolver resolver, IAccessService access, IOrganisationStructureService organisations, ITenantDirectory tenants, ITenantContext tenant, IClock clock, ILogger<TermContext> logger)
 {
     private bool _loaded;
     public TermSet Current { get; private set; } = TermSet.Neutral();
     public Guid? OrganisationId { get; private set; }
 
-    /// <summary>Loads the terminology for the signed-in person's home organisation: the organisation of their first active organisation-level assignment, otherwise the tenant's first organisation.</summary>
+    /// <summary>Loads the terminology for the signed-in person's home organisation: the organisation of their first active organisation-level assignment, otherwise the tenant's first organisation (see <c>docs/TERMINOLOGY.md</c>).</summary>
     public async Task InitialiseAsync(bool signedIn, CancellationToken ct)
     {
         if (_loaded) return;
@@ -48,9 +48,11 @@ public sealed class TermContext(ITerminologyResolver resolver, IAccessService ac
     private async Task<Guid?> HomeOrganisationAsync(CancellationToken ct)
     {
         var subject = await access.GetSubjectAsync(ct);
-        var now = DateTime.UtcNow;
+        var now = clock.UtcNow;
         var fromAssignment = subject?.Assignments.Where(a => a.IsActiveAt(now) && a.Scope.OrganisationIds.Count > 0).OrderBy(a => a.EffectiveFromUtc).SelectMany(a => a.Scope.OrganisationIds).FirstOrDefault();
         if (fromAssignment is { } id && id != Guid.Empty) return id;
+        // A person with a tenant-wide role has no single organisation: the tenant's first organisation (the one it was set up with) is the home organisation. Pages about one record override it.
+        if (tenant.TenantId is { } t && (await tenants.FindAsync(t, ct))?.FirstOrganisationId is { } first) return first;
         return (await organisations.ListOrganisationsAsync(ct)).OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase).Select(o => (Guid?)o.Id).FirstOrDefault();
     }
 

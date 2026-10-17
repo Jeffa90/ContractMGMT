@@ -42,6 +42,7 @@
             <thead><tr><th scope="col">@L["Kind"]</th><th scope="col">@L["Published already"]</th><th scope="col">@L["Draft waiting"]</th><th scope="col">@L["What would happen"]</th></tr></thead>
             <tbody>@foreach (var i in pv.Items) { <tr><td>@i.Kind</td><td>@(i.HasPublishedRelease ? L["Yes"] : L["No"])</td><td>@(i.HasOpenDraft ? L["Yes"] : L["No"])</td><td>@i.Effect</td></tr> }</tbody>
         </table></div>
+        @if (pv.Terminology is { Count: > 0 } terms) { <partial name="_TermRows" model="terms" /> }
         <form method="post">
             <input type="hidden" name="OrganisationId" value="@pv.OrganisationId" /><input type="hidden" name="Key" value="@pv.Entry.PackKey" /><input type="hidden" name="Version" value="@pv.Entry.Version" />
             <div class="actions"><button type="submit">@L["Assign this pack and prepare drafts"]</button></div>

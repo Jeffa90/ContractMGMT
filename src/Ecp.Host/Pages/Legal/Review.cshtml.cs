@@ -22,6 +22,7 @@ public sealed class ReviewModel(ILegalReviewService legal) : EcpPageModel
     private async Task LoadAsync(Guid id, CancellationToken ct)
     {
         Review = await legal.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Review.OrganisationId, ct);
         Reviewers = Review.Actions.CanAssign ? await legal.ReviewersAsync(Review.OrganisationId, ct) : [];
     }
 

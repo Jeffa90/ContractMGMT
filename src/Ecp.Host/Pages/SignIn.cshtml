@@ -46,7 +46,7 @@
                                 <td><button type="submit" name="pick" value="@u.TenantId:@u.UserId" aria-label="@L["Sign in as"] @u.DisplayName">@L["Sign in"]</button></td>
                                 <td>@u.DisplayName<br /><span class="hint">@u.Email</span></td>
                                 <td>@u.TenantName</td>
-                                <td>@u.Roles</td>
+                                <td>@string.Join(", ", u.Roles.Split(", ", StringSplitOptions.RemoveEmptyEntries).Select(Terms.Role))</td>
                             </tr>
                         }
                         </tbody>

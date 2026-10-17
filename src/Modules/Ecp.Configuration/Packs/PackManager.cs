@@ -22,7 +22,14 @@ public sealed record PackListItem(PackCatalogueEntry Entry, int OrganisationsUsi
 public sealed record PackDetails(PackCatalogueEntry Entry, IReadOnlyList<OrganisationUse> Organisations, IReadOnlyList<PackCatalogueEntry> OtherVersions);
 public sealed record PackInstallPreview(
     PackValidationReport Report, IReadOnlyList<PackContentSummary> Kinds, IReadOnlyList<OrganisationUse> Organisations, IReadOnlyList<string> CapabilityChanges, IReadOnlyList<string> MissingDependencies,
-    IReadOnlyList<string> NextSteps, string Statement);
+    IReadOnlyList<string> NextSteps, string Statement, IReadOnlyList<TerminologyPreviewRow>? Terminology = null);
+
+/// <summary>One term a pack would introduce, beside the platform's neutral wording, so an administrator can see what labels people would read before anything is installed or assigned.</summary>
+public sealed record TerminologyPreviewRow(string Key, string Locale, string Singular, string Plural, string NeutralSingular, string? Current = null)
+{
+    public bool DiffersFromNeutral => !string.Equals(Singular, NeutralSingular, StringComparison.Ordinal);
+}
+
 public sealed record PackInstallResult(PackCatalogueEntry? Entry, bool AlreadyAvailable, IReadOnlyList<string> NextSteps);
 public sealed record PackAuditItem(DateTime OccurredUtc, string Action, string? Actor, string Outcome, string Subject, string? Reason, string? Details);
 
@@ -160,8 +167,15 @@ internal sealed class PackManager(
             "To use it, assign it to an organisation (Administration, Solution packs, Organisation packs). Assigning creates configuration drafts; nothing is published.",
             "Review each draft, validate it, and publish it through Configuration. Publishing follows your normal rules, including second-person approval where it is required."
         };
+        IReadOnlyList<TerminologyPreviewRow> terms = [];
+        if (summary?.Content.Any(c => c.Kind == TerminologyKind.KindName) == true && report.CanInstall)
+        {
+            var bytes = await storage.ReadQuarantineAsync(tenantId, token, ".ecpkg", ct);
+            if (bytes is not null && PackReader.Open(bytes, options.Value.Limits).Document(TerminologyKind.KindName) is { } termsJson)
+                try { terms = TerminologyPreview.Rows(TerminologyDocument.Parse(termsJson), null); } catch (DomainException) { /* the validation report already says why */ }
+        }
         return new PackInstallPreview(report, summary?.Content ?? [], orgs, capabilityChanges, missing, next,
-            "Installing this pack will not publish any configuration, will not change any organisation's existing configuration, and will not change any contract.");
+            "Installing this pack will not publish any configuration, will not change any organisation's existing configuration, and will not change any contract.", terms);
     }
 
     public async Task<PackInstallResult> InstallAsync(Guid token, CancellationToken ct = default)

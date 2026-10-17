@@ -13,6 +13,7 @@ public sealed class DetailsModel(ISecuredSupplierService suppliers) : EcpPageMod
     public Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
     {
         Supplier = await suppliers.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Supplier.OrganisationId, ct);
         Contracts = await suppliers.ContractsOfAsync(id, ct);
         return Page();
     });

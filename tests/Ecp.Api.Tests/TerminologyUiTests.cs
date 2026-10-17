@@ -1,0 +1,334 @@
+using System.Net;
+using System.Text.RegularExpressions;
+using Ecp.Configuration;
+using Ecp.Identity;
+using Ecp.Identity.Domain;
+using Ecp.Packs;
+using Ecp.SharedKernel;
+using Ecp.Tenancy;
+using Ecp.Tests.Common;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+namespace Ecp.Api.Tests;
+
+/// <summary>
+/// S4 through the real host: the Terminology administration pages, and the generic pages describing each organisation in its own words. The demo tenant has an organisation on the reference (JBS) pack and one on the
+/// Blank pack; a third organisation is put on a synthetic pack the repository has never seen, with no source change. Labels change what people read, never what they may do.
+/// </summary>
+[Collection("Api")]
+[Trait("Category", "Terminology")]
+[Trait("Provider", "SqliteNotSqlServerProof")]
+public sealed class TerminologyUiTests
+{
+    private const string TenantAdmin = "tenantadmin@a.example.test";
+    private const string OrgAdmin = "orgadmin@a.example.test";
+    private const string SiteAdmin = "siteadmin@a.example.test";
+    private const string BizConfig = "bizconfig@a.example.test";
+    private const string Viewer = "viewer.all@a.example.test";
+    private const string Auditor = "auditor@a.example.test";
+    private const string Legal = "legal@a.example.test";
+    private const string ProcAdmin = "procadmin@a.example.test";
+    private const string CatOwner = "catowner.packaging@a.example.test";
+
+    private static readonly string[] Pages = ["/Admin/Terminology", "/Admin/Terminology/Edit", "/Admin/Terminology/Preview", "/Admin/Terminology/History", "/Admin/Terminology/Audit"];
+
+    private static async Task<(Guid Tenant, Guid Org)> TenantAsync(DemoApp app, string orgName)
+    {
+        var (tenant, _) = await app.FindUserAsync(TenantAdmin);
+        var org = await app.WithTenantAsync(tenant, async sp => (await sp.GetRequiredService<IOrganisationStructureService>().ListOrganisationsAsync()).Single(o => o.Name == orgName).Id);
+        return (tenant, org);
+    }
+
+    /// <summary>A person with one role in one organisation, created through the trusted path, who can then sign in like any demo user.</summary>
+    private static async Task<string> UserInAsync(DemoApp app, Guid tenant, Guid org, string role, ViewerKind? kind = null, string ceiling = "Internal")
+    {
+        var email = $"term.{Guid.NewGuid():N}@a.example.test"[..40] + ".test";
+        await app.WithTenantAsync(tenant, async sp =>
+        {
+            var id = await sp.GetRequiredService<IUserService>().CreateActiveTrustedAsync("Terminology " + role, email, Ecp.Host.Security.DemoIdentityService.ProviderKey, Ecp.Host.Security.DemoIdentityService.Issuer, email, "test");
+            await sp.GetRequiredService<IRoleAssignmentService>().GrantTrustedAsync(new GrantRequest(id, role, kind, ScopeSet.ForOrganisations([org], ceiling), null,
+                EffectiveFromUtc: DateTime.UtcNow.AddDays(-5), ExplicitHighCeiling: true), AssignmentSource.Demo, "test");
+            return 0;
+        });
+        return email;
+    }
+
+    private static async Task<string> BodyAsync(HttpClient client, string url)
+    {
+        var response = await client.GetAsync(url);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, $"{url} -> {(int)response.StatusCode}");
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    /// <summary>The fields a browser would post for the edit form: every row, with the given overrides.</summary>
+    private static Dictionary<string, string> EditForm(Guid org, IReadOnlyDictionary<string, (string Singular, string Plural)> overrides, string locale = "en", string note = "")
+    {
+        var form = new Dictionary<string, string> { ["OrganisationId"] = org.ToString(), ["Locale"] = locale, ["Note"] = note };
+        for (var i = 0; i < TermCatalogue.All.Count; i++)
+        {
+            var key = TermCatalogue.All[i].Key;
+            form[$"Rows[{i}].Key"] = key;
+            if (overrides.TryGetValue(key, out var v)) { form[$"Rows[{i}].Override"] = "true"; form[$"Rows[{i}].Singular"] = v.Singular; form[$"Rows[{i}].Plural"] = v.Plural; }
+        }
+        return form;
+    }
+
+    private static string Edit(Guid org, string locale = "en") => $"/Admin/Terminology/Edit?organisationId={org}&locale={locale}";
+
+    // ---- access ----
+
+    [Fact]
+    public async Task Each_terminology_page_opens_only_for_people_who_hold_its_permission()
+    {
+        using var app = DemoApp.Start();
+        using var anonymous = app.NewClient();
+        foreach (var page in Pages) Assert.NotEqual(HttpStatusCode.OK, (await anonymous.GetAsync(page)).StatusCode);
+
+        using var viewer = await app.SignInAsync(Viewer);
+        using var site = await app.SignInAsync(SiteAdmin);
+        using var owner = await app.SignInAsync(CatOwner);
+        foreach (var client in new[] { viewer, site, owner })
+            foreach (var page in Pages) Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(page)).StatusCode);
+
+        // The organisation administrator, business configuration administrator and tenant administrator hold every terminology permission.
+        foreach (var email in new[] { OrgAdmin, BizConfig, TenantAdmin })
+        {
+            using var admin = await app.SignInAsync(email, followRedirects: true);
+            foreach (var page in Pages) { var r = await admin.GetAsync(page); Assert.True(r.StatusCode == HttpStatusCode.OK, $"{email} {page} -> {(int)r.StatusCode} {(await r.Content.ReadAsStringAsync())[..Math.Min(300, (await r.Content.ReadAsStringAsync()).Length)]}"); }
+        }
+
+        // The auditor reads the overview, the history and the audit trail, and cannot draft.
+        using var auditor = await app.SignInAsync(Auditor, followRedirects: true);
+        foreach (var page in new[] { "/Admin/Terminology", "/Admin/Terminology/Preview", "/Admin/Terminology/History", "/Admin/Terminology/Audit" }) Assert.Equal(HttpStatusCode.OK, (await auditor.GetAsync(page)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await auditor.GetAsync("/Admin/Terminology/Edit")).StatusCode);
+        var overview = await BodyAsync(auditor, "/Admin/Terminology");
+        Assert.DoesNotContain("Start a draft", overview);
+        Assert.Contains("Terminology", await BodyAsync(auditor, "/Admin/Terminology/History"));
+    }
+
+    [Fact]
+    public async Task The_overview_shows_stable_keys_apart_from_labels_and_where_each_label_comes_from()
+    {
+        using var app = DemoApp.Start();
+        using var biz = await app.SignInAsync(BizConfig, followRedirects: true);
+        var html = await BodyAsync(biz, "/Admin/Terminology");
+        Assert.Contains("<code class=\"id\">contract.owner</code>", html);
+        Assert.Contains("Category Owner", html);                                  // the reference pack's wording for the organisation
+        Assert.Contains("Pack default", html);
+        Assert.Contains("Contract Owner", html);                                  // the platform's neutral wording, shown beside it
+        Assert.Contains("never permissions", html);
+        Assert.Contains("labels only", html.Replace("It changes labels only,", "labels only") + "labels only");
+    }
+
+    // ---- the form ----
+
+    [Fact]
+    public async Task The_edit_form_saves_validates_publishes_and_the_new_wording_reaches_the_pages_without_changing_any_permission()
+    {
+        using var app = DemoApp.Start();
+        var (tenant, org) = await TenantAsync(app, "Demo Procurement Group");
+        using var biz = await app.SignInAsync(BizConfig, followRedirects: false);
+        using var viewer = await app.SignInAsync(Viewer, followRedirects: true);
+        Assert.Contains("Suppliers", await BodyAsync(viewer, "/Suppliers"));
+
+        var form = EditForm(org, new Dictionary<string, (string, string)> { ["supplier"] = ("Partner", "Partners") }, note: "Partners, not suppliers");
+        var save = await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Save&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.Redirect, save.StatusCode);
+        // Saving does not publish: people still read the old wording.
+        Assert.Contains("Suppliers", await BodyAsync(viewer, "/Suppliers"));
+        var edit = await BodyAsync(biz, Edit(org));
+        Assert.Contains("value=\"Partner\"", edit);                               // the saved override is back in the form
+        Assert.Contains("A draft is open.", edit);
+
+        // Preview shows before and after, and says plainly that nothing else changes.
+        var preview = await BodyAsync(biz, $"/Admin/Terminology/Preview?organisationId={org}");
+        Assert.Contains("Partners", preview);
+        Assert.Contains("not permissions or workflows", preview);
+
+        var validate = await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Validate&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.Redirect, validate.StatusCode);
+        var publish = await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Publish&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.Redirect, publish.StatusCode);
+        Assert.StartsWith("/Admin/Terminology", publish.Headers.Location!.OriginalString);
+
+        var suppliers = await BodyAsync(viewer, "/Suppliers");
+        Assert.Contains("<h1>Partners</h1>", suppliers);
+        Assert.DoesNotContain("<h1>Suppliers</h1>", suppliers);
+        Assert.Contains(">Partners<", await BodyAsync(viewer, "/"));              // navigation too
+        // The same person can still do exactly what they could: the viewer reads suppliers and still cannot open the terminology pages.
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync("/Admin/Terminology")).StatusCode);
+
+        // History and audit record it; the audit keeps its stable action codes.
+        Assert.Contains("Partners, not suppliers", await BodyAsync(biz, $"/Admin/Terminology/History?organisationId={org}"));
+        var audit = await BodyAsync(biz, $"/Admin/Terminology/Audit?organisationId={org}");
+        Assert.Contains("config.published", audit);
+        Assert.Contains("config.draft.created", audit);
+
+        // Removing the override and publishing again resumes the pack's wording; then the earlier release can be restored as a new one.
+        var removed = EditForm(org, new Dictionary<string, (string, string)>());
+        Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(biz, Edit(org), removed, $"/Admin/Terminology/Edit?handler=Publish&organisationId={org}&locale=en")).StatusCode);
+        Assert.Contains("<h1>Suppliers</h1>", await BodyAsync(viewer, "/Suppliers"));
+        var rollback = await DemoApp.PostFormAsync(biz, $"/Admin/Terminology/History?organisationId={org}", new Dictionary<string, string> { ["OrganisationId"] = org.ToString(), ["ToRelease"] = "1", ["Reason"] = "Partner was right" },
+            $"/Admin/Terminology/History?handler=Rollback&organisationId={org}");
+        Assert.Equal(HttpStatusCode.Redirect, rollback.StatusCode);
+        Assert.Contains("<h1>Partners</h1>", await BodyAsync(viewer, "/Suppliers"));
+        Assert.Contains("restores release 1", await BodyAsync(biz, $"/Admin/Terminology/History?organisationId={org}"));
+        _ = tenant;
+    }
+
+    [Fact]
+    public async Task A_problem_is_shown_beside_its_row_the_entered_values_are_kept_and_markup_is_never_stored_or_run()
+    {
+        using var app = DemoApp.Start();
+        var (_, org) = await TenantAsync(app, "Demo Procurement Group");
+        using var biz = await app.SignInAsync(BizConfig, followRedirects: false);
+        var hostile = EditForm(org, new Dictionary<string, (string, string)> { ["supplier"] = ("<script>alert(1)</script>", "Partners"), ["site"] = ("Plant", "Plants") });
+        var response = await DemoApp.PostFormAsync(biz, Edit(org), hostile, $"/Admin/Terminology/Edit?handler=Validate&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);                      // the page again, not a redirect
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("There is a problem", html);
+        Assert.Contains("must be plain text", html);
+        Assert.Contains("href=\"#row-", html);                                     // the error summary links to the field
+        Assert.DoesNotContain("<script>alert(1)</script>", html);                  // encoded, never raw
+        Assert.Contains("&lt;script&gt;", html);
+        Assert.Contains("value=\"Plant\"", html);                                  // what else was entered is kept
+        // Publishing the same thing is refused and publishes nothing.
+        var publish = await DemoApp.PostFormAsync(biz, Edit(org), hostile, $"/Admin/Terminology/Edit?handler=Publish&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.OK, publish.StatusCode);
+        using var viewer = await app.SignInAsync(Viewer, followRedirects: true);
+        Assert.Contains("<h1>Suppliers</h1>", await BodyAsync(viewer, "/Suppliers"));
+    }
+
+    [Fact]
+    public async Task A_label_with_an_ampersand_is_stored_as_text_and_shown_encoded()
+    {
+        using var app = DemoApp.Start();
+        var (_, org) = await TenantAsync(app, "Demo Procurement Group");
+        using var biz = await app.SignInAsync(BizConfig, followRedirects: false);
+        using var viewer = await app.SignInAsync(Viewer, followRedirects: true);
+        var form = EditForm(org, new Dictionary<string, (string, string)> { ["supplier"] = ("Terms & Parties", "Terms & Parties") });
+        Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Publish&organisationId={org}&locale=en")).StatusCode);
+        var html = await BodyAsync(viewer, "/Suppliers");
+        Assert.Contains("<h1>Terms &amp; Parties</h1>", html);
+    }
+
+    [Fact]
+    public async Task Publishing_and_restoring_need_a_recent_sign_in_and_reading_does_not()
+    {
+        var clock = new FakeClock(DateTime.UtcNow);
+        using var app = DemoApp.Start(services: s => s.AddSingleton<IClock>(clock));
+        var (_, org) = await TenantAsync(app, "Demo Procurement Group");
+        using var biz = await app.SignInAsync(BizConfig, followRedirects: false);
+        var form = EditForm(org, new Dictionary<string, (string, string)> { ["site"] = ("Plant", "Plants") });
+        Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Save&organisationId={org}&locale=en")).StatusCode);
+        clock.Advance(TimeSpan.FromMinutes(11));
+        var stale = await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Publish&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.Redirect, stale.StatusCode);
+        Assert.StartsWith("/Reauth", stale.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.OK, (await biz.GetAsync(Edit(org))).StatusCode);                 // reading and drafting are not step-up actions
+    }
+
+    [Fact]
+    public async Task A_person_cannot_name_an_organisation_they_hold_no_terminology_right_in()
+    {
+        using var app = DemoApp.Start();
+        var (_, blank) = await TenantAsync(app, "Demo Facilities Organisation");
+        using var org1Admin = await app.SignInAsync(OrgAdmin, followRedirects: true);                // an administrator of the procurement organisation only
+        Assert.Equal(HttpStatusCode.NotFound, (await org1Admin.GetAsync($"/Admin/Terminology?organisationId={blank}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await org1Admin.GetAsync(Edit(blank))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await org1Admin.GetAsync($"/Admin/Terminology/Audit?organisationId={blank}")).StatusCode);
+    }
+
+    // ---- the pages in each organisation's own words ----
+
+    [Fact]
+    public async Task A_blank_organisation_reads_neutral_wording_a_reference_organisation_reads_its_packs_wording_and_neither_shows_the_others()
+    {
+        using var app = DemoApp.Start();
+        var (tenant, blankOrg) = await TenantAsync(app, "Demo Facilities Organisation");
+        var blankEmail = await UserInAsync(app, tenant, blankOrg, RoleCodes.Viewer, ViewerKind.AllContracts);
+        using var blank = await app.SignInAsync(blankEmail, followRedirects: true);
+        using var jbs = await app.SignInAsync(Viewer, followRedirects: true);
+
+        foreach (var page in new[] { "/", "/Contracts", "/Suppliers", "/Admin/Categories", "/Dashboards", "/Notifications", "/Renewals", "/Variations" })
+        {
+            var response = await blank.GetAsync(page);
+            if (response.StatusCode != HttpStatusCode.OK) continue;                                   // a page this role does not open
+            var html = await response.Content.ReadAsStringAsync();
+            var visible = Regex.Replace(html, "<input[^>]*>|<a [^>]*>|<title>.*?</title>|<option[^>]*>[^<]*</option>", "");
+            var hit = Regex.Match(visible, "(?i).{0,40}(jbs|procurement|group head|supplier).{0,40}");
+            Assert.False(hit.Success, $"{page}: {hit.Value}");
+        }
+        var blankHome = await BodyAsync(blank, "/");
+        Assert.Contains("Contract Register", blankHome.Replace("contract register", "Contract Register"));
+        Assert.Contains(">Counterparties<", blankHome);                                                // the navigation
+        Assert.Contains(">Contracts<", blankHome);
+
+        var jbsHome = await BodyAsync(jbs, "/");
+        Assert.Contains(">Suppliers<", jbsHome);
+        Assert.DoesNotContain(">Counterparties<", jbsHome);
+        Assert.Contains("procurement contract register", jbsHome);                                     // the reference pack's name for it
+    }
+
+    [Fact]
+    public async Task Roles_are_shown_by_their_configured_label_with_the_stable_code_kept_separately_and_authority_is_unchanged()
+    {
+        using var app = DemoApp.Start();
+        var (tenant, blankOrg) = await TenantAsync(app, "Demo Facilities Organisation");
+        using var proc = await app.SignInAsync(ProcAdmin, followRedirects: true);
+        using var owner = await app.SignInAsync(CatOwner, followRedirects: true);
+        Assert.Contains("Procurement Administrator", await BodyAsync(proc, "/"));
+        Assert.Contains("Category Owner", await BodyAsync(owner, "/"));
+
+        // In a neutral organisation the same stable roles read as Contract Administrator and Contract Owner.
+        var adminEmail = await UserInAsync(app, tenant, blankOrg, RoleCodes.ProcurementAdministrator, null, "Confidential");
+        using var neutral = await app.SignInAsync(adminEmail, followRedirects: true);
+        var home = await BodyAsync(neutral, "/");
+        Assert.True(home.Contains("Contract Administrator"), Regex.Match(home, "Your access.{0,600}", RegexOptions.Singleline).Value);
+        Assert.DoesNotContain("Procurement Administrator", home);
+        // The label differs; the authority does not: this person reaches the same pages the procurement administrator does.
+        Assert.Equal(HttpStatusCode.Forbidden, (await neutral.GetAsync("/Admin/Terminology")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await proc.GetAsync("/Admin/Terminology")).StatusCode);
+
+        // Administrators see the stable code beside the label.
+        using var org = await app.SignInAsync(OrgAdmin, followRedirects: true);
+        var users = await BodyAsync(org, "/Admin/Users");
+        Assert.Contains("Procurement Administrator", users);
+    }
+
+    [Fact]
+    public async Task A_pack_the_repository_has_never_seen_gives_an_organisation_its_own_words_with_no_source_change()
+    {
+        using var app = DemoApp.Start();
+        var (tenant, _) = await TenantAsync(app, "Demo Procurement Group");
+        var key = "agreements-" + Guid.NewGuid().ToString("N")[..6];
+        var package = PackTestKit.Build(key, "1.0.0", content: Content(out var docs), extraDocuments: docs);
+        var (_, tenantAdminId) = await app.FindUserAsync(TenantAdmin);
+        var orgId = await app.WithTenantAsync(tenant, async sp =>
+        {
+            sp.GetRequiredService<CurrentUser>().Set(tenantAdminId);
+            var up = await sp.GetRequiredService<IPackManager>().UploadAsync(new MemoryStream(package), "p.ecpkg");
+            Assert.True(up.Report.CanInstall, string.Join("; ", up.Report.Issues.Select(i => i.Message)));
+            await sp.GetRequiredService<IPackManager>().InstallAsync(up.Token);
+            var created = await sp.GetRequiredService<ITenantProvisioningService>().AddOrganisationAsync(new AddOrganisationRequest("Agreement Business", "Australia/Sydney", "en-AU", "AUD", "AGR", key));
+            await sp.GetRequiredService<IPackAssignments>().AssignAsync(created, key, "1.0.0");
+            return created;
+        });
+        var email = await UserInAsync(app, tenant, orgId, RoleCodes.Viewer, ViewerKind.AllContracts);
+        using var client = await app.SignInAsync(email, followRedirects: true);
+
+        var home = await BodyAsync(client, "/");
+        Assert.Contains(">Agreements<", home);                                                         // navigation: contracts are agreements here
+        Assert.Contains(">Counterparties<", home);
+        Assert.Contains(">Portfolios<", home);
+        Assert.Contains("Agreement Hub", home);                                                        // the application name from the pack
+        Assert.Contains("agreement ledger", home);
+        Assert.DoesNotMatch(">Contracts<|>Suppliers<|>Categories<", home);
+        var suppliers = await BodyAsync(client, "/Suppliers");
+        Assert.Contains("<h1>Counterparties</h1>", suppliers);
+        Assert.DoesNotMatch("(?i)jbs|procurement", Regex.Replace(suppliers, "<title>.*?</title>", ""));
+    }
+
+    private static IEnumerable<(string, string, string, string, int, bool)> Content(out Dictionary<string, string> documents) => PackTestKit.ThirdPackContent(out documents);
+}

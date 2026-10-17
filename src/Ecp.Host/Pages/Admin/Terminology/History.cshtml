@@ -1,0 +1,36 @@
+@page "/Admin/Terminology/History"
+@model Ecp.Host.Pages.Admin.Terminology.HistoryModel
+@{ ViewData["Title"] = L["Terminology history"].Value; }
+<h1>@L["Terminology history"]</h1>
+<p class="lede">@L["Every published release, newest first. A restored release is published again as a new one; earlier releases are never changed or removed."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<form method="get" class="card inline-form" aria-label="@L["Choose the organisation"]">
+    <div class="field"><label for="OrganisationId">@L["[[organisation]]"]</label>
+        <select id="OrganisationId" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+    <div class="actions"><button type="submit" class="secondary">@L["Show"]</button></div>
+</form>
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Published terminology releases"]</caption>
+    <thead><tr><th scope="col">@L["Release"]</th><th scope="col">@L["Published (UTC)"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Note"]</th><th scope="col">@L["Terms added / changed / removed"]</th><th scope="col">@L["Content hash"]</th></tr></thead>
+    <tbody>
+    @foreach (var v in Model.Releases)
+    {
+        <tr><th scope="row">@v.Release.Number@if (v.Release.RollbackOfNumber is { } rb) { <span class="hint"> (@L["restores release {0}", rb])</span> }</th><td>@v.Release.PublishedUtc.ToString("u")</td><td>@v.Release.PublishedBy</td><td>@v.Release.Note</td>
+            <td>@v.Added / @v.Changed / @v.Removed</td><td><code>@v.Release.ContentHash[..Math.Min(12, v.Release.ContentHash.Length)]</code></td></tr>
+    }
+    @if (Model.Releases.Count == 0) { <tr><td colspan="6">@L["Nothing has been published yet."]</td></tr> }
+    </tbody>
+</table></div>
+@if (Model.CanRollback && Model.Releases.Count > 0)
+{
+    <form method="post" asp-page-handler="Rollback" class="card" aria-labelledby="rb-h">
+        <h2 id="rb-h">@L["Restore an earlier release"]</h2>
+        <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+        <div class="field"><label for="ToRelease">@L["Release to publish again"]</label>
+            <select id="ToRelease" name="ToRelease">@foreach (var v in Model.Releases) { <option value="@v.Release.Number">@v.Release.Number</option> }</select></div>
+        <div class="field"><label for="Reason">@L["Reason (recorded)"]</label><input id="Reason" name="Reason" type="text" required aria-required="true" maxlength="1000" value="@Model.Reason" /></div>
+        <div class="actions"><button type="submit">@L["Publish it again"]</button></div>
+        <p class="hint">@L["Needs a recent sign-in. Where your installation requires it, another person must publish the restored wording."]</p>
+    </form>
+}
+<p><a href="/Admin/Terminology?organisationId=@Model.OrganisationId">@L["Back to terminology"]</a></p>

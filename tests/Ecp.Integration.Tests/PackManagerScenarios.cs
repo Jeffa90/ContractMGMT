@@ -46,6 +46,7 @@ internal static class PackManagerScenarios
         return key;
     }
 
+    internal const string TerminologyKindName = "Terminology";
     private static string Unique(string prefix) => prefix + "-" + Guid.NewGuid().ToString("N")[..8];
 
     public static async Task A_pack_is_uploaded_checked_previewed_installed_and_repeat_uploads_are_harmless(TestApp app)
@@ -222,26 +223,7 @@ internal static class PackManagerScenarios
     }
 
     /// <summary>The Blank pack's lifecycle, Variation workflow and notification policy with the initial state renamed: a pack that no source file in the repository knows about.</summary>
-    internal static IEnumerable<(string, string, string, string, int, bool)> ThirdPackContent(out Dictionary<string, string> documents)
-    {
-        var root = Path.Combine(RepoRoot.Find(), "templates", "packs", "blank");
-        var lifecycle = File.ReadAllText(Path.Combine(root, "workflows", "contract-lifecycle.json"));
-        lifecycle = Regex.Replace(lifecycle, "\"code\": \"Open\", \"display\": \"Open\"", "\"code\": \"Intake\", \"display\": \"Intake\"");
-        lifecycle = Regex.Replace(lifecycle, "\"from\": \\[ \"Open\" \\]", "\"from\": [ \"Intake\" ]");
-        Assert.Contains("\"Intake\"", lifecycle);
-        documents = new Dictionary<string, string>
-        {
-            ["lifecycle.json"] = lifecycle,
-            ["variation.json"] = File.ReadAllText(Path.Combine(root, "workflows", "variation.json")),
-            ["notifications.json"] = File.ReadAllText(Path.Combine(root, "notifications", "notification-policy.json")),
-        };
-        return
-        [
-            ("lifecycle.json", "content/contract-lifecycle.json", "WorkflowContractLifecycle", "organisation", 1, true),
-            ("variation.json", "content/variation-workflow.json", "WorkflowVariation", "organisation", 1, true),
-            ("notifications.json", "content/notification-policy.json", "NotificationPolicy", "organisation", 1, true),
-        ];
-    }
+    internal static IEnumerable<(string, string, string, string, int, bool)> ThirdPackContent(out Dictionary<string, string> documents) => PackTestKit.ThirdPackContent(out documents);
 
     public static async Task A_third_pack_the_repository_has_never_seen_runs_a_contract_with_no_source_change(TestApp app)
     {
@@ -256,7 +238,7 @@ internal static class PackManagerScenarios
         Assert.All(assigned.Kinds, k => Assert.False(k.NeedsAttention, k.Kind + ": " + k.Outcome + " " + k.Detail));
 
         // The administrator reviews and publishes each draft, as the product requires. Only then does the organisation run on the pack.
-        foreach (var kind in new[] { WorkflowKinds.ContractLifecycle, WorkflowKinds.Variation, Ecp.Notifications.Policy.NotificationPolicyKinds.Policy })
+        foreach (var kind in new[] { WorkflowKinds.ContractLifecycle, WorkflowKinds.Variation, Ecp.Notifications.Policy.NotificationPolicyKinds.Policy, TerminologyKindName })
         {
             var draft = await w.W.AsAsync(admin, s => s.Get<IConfigurationService>().FindOpenDraftAsync(kind, org.Org));
             Assert.NotNull(draft);

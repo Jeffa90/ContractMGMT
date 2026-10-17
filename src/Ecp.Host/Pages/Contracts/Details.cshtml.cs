@@ -38,6 +38,7 @@ public sealed class DetailsModel(ISecuredContractService contracts, ISecuredCont
     public Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct) => RunAsync(async () =>
     {
         Contract = await contracts.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Contract.OrganisationId, ct);
         var fmt = await OrgLocale.ForAsync(organisations, Contract.OrganisationId, ct);
         var structure = await organisations.GetAsync(Contract.OrganisationId, ct);
         OrganisationName = (await organisations.GetOrganisationAsync(Contract.OrganisationId, ct))?.Name ?? "";

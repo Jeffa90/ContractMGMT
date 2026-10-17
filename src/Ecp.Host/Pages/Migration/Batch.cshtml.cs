@@ -114,6 +114,7 @@ public sealed class BatchModel(IMigrationBatches batches, IMigrationIntake intak
     private async Task LoadAsync(Guid id, CancellationToken ct)
     {
         Batch = await batches.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Batch.OrganisationId, ct);
         await LoadFormatterAsync(organisations, Batch.OrganisationId, ct);
         var choices = new List<(Guid, string)>();
         foreach (var p in (await profiles.ListAsync(ct)).Where(p => p.OrganisationId == Batch.OrganisationId))

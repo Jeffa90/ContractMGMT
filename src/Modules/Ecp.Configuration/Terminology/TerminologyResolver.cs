@@ -158,7 +158,7 @@ internal sealed class TerminologyResolver(IConfigurationReleases releases, IOrga
 /// <summary>The terminology configuration kind: versioned, validated, previewed, published, rolled back and audited by the ordinary configuration lifecycle. It has its own permissions so it can be delegated on its own.</summary>
 internal sealed class TerminologyKind(ITerminologyCache cache, ITenantContext tenant) : IConfigurationKind
 {
-    public const string KindName = "Terminology";
+    public const string KindName = TerminologyKinds.Name;
     public string Kind => KindName;
     public string DraftPermission => "terminology.draft";
     public string PublishPermission => "terminology.publish";

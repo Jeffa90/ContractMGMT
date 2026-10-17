@@ -1,0 +1,47 @@
+@page "/Admin/Terminology"
+@model Ecp.Host.Pages.Admin.Terminology.IndexModel
+@{ ViewData["Title"] = L["Terminology"].Value; }
+<h1>@L["Terminology"]</h1>
+<p class="lede">@L["Terminology is the wording people read: what a [[contract|lower]], a [[supplier|lower]] or a review is called. It changes labels only, never permissions, workflows or records. Each label has a stable key that never changes."]</p>
+<partial name="_Picker" model="Model" />
+@if (Model.Overview is { } o)
+{
+    <section class="card" aria-labelledby="state-h">
+        <h2 id="state-h">@o.OrganisationName</h2>
+        <dl class="facts">
+            <dt>@L["Locale"]</dt><dd>@o.Locale</dd>
+            <dt>@L["[[solution.pack]]"]</dt><dd>@if (o.PackKey is null) { @L["None: the platform's neutral wording applies"] } else { <span>@o.PackKey v@(o.PackVersion) @(o.PackHasTerminology ? "" : L["(carries no terminology)"].Value)</span> }</dd>
+            <dt>@L["Published terminology"]</dt><dd>@(o.ReleaseNumber is { } n ? L["Release {0}", n].Value : L["None yet: the pack's and the platform's wording apply"].Value)</dd>
+            <dt>@L["Draft"]</dt><dd>@if (o.Draft is { } d) { <span>@L["Open"]: @(d.IsPublishable ? L["validated"] : L["not yet validated"]), @L["last edited"] @d.UpdatedUtc.ToString("u")</span> } else { @L["No draft"] }</dd>
+        </dl>
+        <p class="actions">
+            @if (o.CanDraft) { <a class="button" href="/Admin/Terminology/Edit?organisationId=@o.OrganisationId&amp;locale=@Uri.EscapeDataString(o.Locale)">@(o.Draft is null ? L["Start a draft"] : L["Edit the draft"])</a> }
+            <a class="button secondary" href="/Admin/Terminology/Preview?organisationId=@o.OrganisationId&amp;locale=@Uri.EscapeDataString(o.Locale)">@L["Preview"]</a>
+            @if (o.CanReadHistory) { <a class="button secondary" href="/Admin/Terminology/History?organisationId=@o.OrganisationId">@L["Version history"]</a> }
+            @if (o.CanReadAudit) { <a class="button secondary" href="/Admin/Terminology/Audit?organisationId=@o.OrganisationId">@L["Audit history"]</a> }
+        </p>
+    </section>
+    <section aria-labelledby="terms-h">
+        <h2 id="terms-h">@L["Wording in force"]</h2>
+        <p>@L["The order is: this organisation's published terminology, then its pack's wording, then the platform's neutral wording."]</p>
+        @foreach (var group in o.Rows.GroupBy(r => r.Group))
+        {
+            <div class="table-wrap"><table>
+                <caption>@group.Key</caption>
+                <thead><tr><th scope="col">@L["Stable key"]</th><th scope="col">@L["Label shown"]</th><th scope="col">@L["Plural"]</th><th scope="col">@L["Source"]</th><th scope="col">@L["Pack wording"]</th><th scope="col">@L["Neutral wording"]</th><th scope="col">@L["In the draft"]</th></tr></thead>
+                <tbody>
+                @foreach (var r in group)
+                {
+                    <tr>
+                        <th scope="row"><code class="id">@r.Key</code>@if (r.Required) { <span class="visually-hidden"> (@L["required"])</span> }</th>
+                        <td>@r.Singular</td><td>@r.Plural</td>
+                        <td>@switch (r.Layer) { case Ecp.SharedKernel.TermLayer.Organisation: <span class="badge ok">@(r.IsPackCopy ? L["Copied from pack"] : L["Organisation override"])</span> break; case Ecp.SharedKernel.TermLayer.Pack: <span class="badge">@L["Pack default"]</span> break; default: <span class="badge">@L["Platform neutral"]</span> break; }</td>
+                        <td>@(r.PackSingular ?? "-")</td><td>@r.NeutralSingular</td>
+                        <td>@if (r.Draft is { } dr) { <span>@dr.Singular / @dr.Plural</span> } else if (o.Draft is not null) { <span class="hint">@L["inherits"]</span> } else { <span>-</span> }</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        }
+    </section>
+}

@@ -52,7 +52,7 @@ public sealed record ApprovalQueueItem(
 public sealed record ApprovalDetail(
     Guid RequestId, string SubjectKind, Guid SubjectId, Guid ContractId, string AgreementReference, string Title, string? VariationReference, ApprovalStatus Status, string ApproverGroupKey, string SubmittedByName,
     DateTime SubmittedUtc, RegisterSnapshot Snapshot, string SnapshotSha256, bool SnapshotIntact, ExecutedDocumentInfo? ExecutedDocument, IReadOnlyList<EligibleApprover> Eligible, ApprovalDecisionInfo? Decision,
-    IReadOnlyList<ApprovalDecisionInfo> History, bool CanApprove, bool CanReject, string? CannotBecause, PlanView? Plan = null);
+    IReadOnlyList<ApprovalDecisionInfo> History, bool CanApprove, bool CanReject, string? CannotBecause, PlanView? Plan = null, Guid OrganisationId = default);
 
 /// <summary>
 /// Register authorisation: the Group Head of Procurement (or a configured backup) approves or rejects an executed agreement. Whoever responds first decides; the actor is the signed-in person, never a
@@ -280,7 +280,7 @@ internal sealed partial class RegisterAuthorisationService(
             if (request.Status == ApprovalStatus.Pending && canApprove && planView.YourPart is null) { canApprove = false; canReject = false; why = planView.YourPartNote ?? "It is not your turn to respond."; }
         }
         return new ApprovalDetail(request.Id, request.SubjectKind, request.SubjectId, request.ContractId, snapshot.AgreementReference, title, snapshot.VariationReference, request.Status, request.ApproverGroupKey,
-            request.SubmittedByName, request.SubmittedUtc, snapshot, request.SnapshotSha256, intact, doc, current.Count > 0 ? current : eligible, decision, history, canApprove, canReject, why, planView);
+            request.SubmittedByName, request.SubmittedUtc, snapshot, request.SnapshotSha256, intact, doc, current.Count > 0 ? current : eligible, decision, history, canApprove, canReject, why, planView, request.OrganisationId);
     }
 
     private static ApprovalDecisionInfo ToInfo(ApprovalRequest r)

@@ -39,6 +39,7 @@
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Configuration", L["Workflow configuration"].Value, "/Admin/Configuration"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Studio", L["Configuration Studio"].Value, "/Admin/Studio"));
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
+        if (await Can("terminology.read", "terminology.draft")) items.Add(("/Admin/Terminology", L["Terminology"].Value, "/Admin/Terminology"));
         if (await Can("packs.read")) items.Add(("/Admin/Packs", L["[[solution.pack|plural|sentence]]"].Value, "/Admin/Packs"));
         if (await Can("setup.run")) items.Add(("/Admin/Setup", L["Installation setup"].Value, "/Admin/Setup"));
     }

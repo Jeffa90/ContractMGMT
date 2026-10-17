@@ -13,6 +13,7 @@ public sealed class ReconciliationModel(IMigrationReports reports, IMigrationBat
     {
         BatchId = id;
         Batch = await batches.GetAsync(id, ct);
+        await Terms.UseOrganisationAsync(Batch.OrganisationId, ct);
         Report = await reports.GetReconciliationAsync(id, ct);
         return Page();
     });

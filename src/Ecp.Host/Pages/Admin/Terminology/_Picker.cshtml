@@ -1,0 +1,11 @@
+@model Ecp.Host.Pages.Admin.Terminology.TerminologyPage
+<form method="get" class="card inline-form" aria-label="@L["Choose what to show"]">
+    <div class="field"><label for="OrganisationId">@L["[[organisation]]"]</label>
+        <select id="OrganisationId" name="OrganisationId">
+            @foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }
+        </select></div>
+    <div class="field"><label for="Locale">@L["Locale"]</label><input id="Locale" name="Locale" type="text" value="@Model.Locale" maxlength="20" list="locales" aria-describedby="locale-hint" />
+        <datalist id="locales"><option value="en"></option><option value="en-AU"></option><option value="en-US"></option><option value="en-GB"></option></datalist>
+        <span id="locale-hint" class="hint">@L["A language code such as en, or a language and region such as en-AU."]</span></div>
+    <div class="actions"><button type="submit" class="secondary">@L["Show"]</button></div>
+</form>

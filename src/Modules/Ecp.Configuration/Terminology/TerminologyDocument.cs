@@ -77,7 +77,7 @@ public sealed record TerminologyDocument(string Mode, IReadOnlyList<TermEntry> T
         for (var i = 0; i < Terms.Count && i < MaxTerms; i++)
         {
             var t = Terms[i];
-            var p = $"$.terms[{i}]";
+            var p = $"$.terms['{Trim(t.Key)}','{Trim(t.Locale)}']";   // named by key and locale, so a person reads which term, not a position
             if (!KeyPattern.IsMatch(t.Key)) { Err(p + ".key", "term_key", "A term key is lower-case words separated by dots, for example 'contract.type'."); continue; }
             if (!LocalePattern.IsMatch(t.Locale)) Err(p + ".locale", "term_locale", $"'{Trim(t.Locale)}' is not a locale such as 'en' or 'en-AU'.");
             if (!seen.Add((t.Key, t.Locale))) Err(p, "term_duplicate", $"The key '{t.Key}' appears more than once for the locale '{t.Locale}'.");

@@ -1,0 +1,64 @@
+@page "/Admin/Terminology/Edit"
+@model Ecp.Host.Pages.Admin.Terminology.EditModel
+@{ ViewData["Title"] = L["Edit the terminology draft"].Value; }
+<h1>@L["Edit the terminology draft"]</h1>
+<p class="lede">@L["Tick a row to use your own wording for it; leave it unticked to inherit the wording of the pack, then the platform. Saving never publishes. A label changes what people read, never what they may do."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Form is { } f)
+{
+    <form method="get" class="card inline-form" aria-label="@L["Choose the locale to edit"]">
+        <input type="hidden" name="OrganisationId" value="@f.OrganisationId" />
+        <div class="field"><label for="locale-pick">@L["Locale being edited"]</label>
+            <select id="locale-pick" name="Locale" aria-describedby="locale-pick-hint">@foreach (var l in f.Locales) { <option value="@l" selected="@(l == f.Locale)">@l</option> }</select>
+            <span id="locale-pick-hint" class="hint">@L["Save first: changing the locale shows another locale's rows and does not carry unsaved changes."]</span></div>
+        <div class="actions"><button type="submit" class="secondary">@L["Show this locale"]</button></div>
+    </form>
+    <p>@f.OrganisationName, @L["locale"] <strong>@f.Locale</strong>. @(f.Draft is null ? L["There is no open draft yet; saving starts one."] : L["A draft is open."])</p>
+    <form method="post" aria-label="@L["Terminology draft"]">
+        <input type="hidden" name="OrganisationId" value="@f.OrganisationId" />
+        <input type="hidden" name="Locale" value="@f.Locale" />
+        @{ var index = 0; }
+        @foreach (var group in f.Rows.GroupBy(r => r.Group))
+        {
+            <section class="card" aria-labelledby="g-@group.Key.Replace(' ', '-')">
+                <h2 id="g-@group.Key.Replace(' ', '-')">@group.Key</h2>
+                @foreach (var r in group)
+                {
+                    var i = index++;
+                    var row = Model.Rows[i];
+                    <fieldset class="term">
+                        <legend><code class="id">@r.Key</code> <span class="hint">@L["inherits"] @r.InheritedSingular / @r.InheritedPlural (@(r.InheritedFrom == Ecp.SharedKernel.TermLayer.Pack ? L["pack"] : L["platform"]))</span></legend>
+                        <input type="hidden" name="Rows[@i].Key" value="@r.Key" />
+                        <p class="hint">@r.Description</p>
+                        <div class="check field"><input id="row-@i-override" name="Rows[@i].Override" type="checkbox" value="true" checked="@row.Override" /><label for="row-@i-override">@L["Use my own wording for {0}", r.Key]</label></div>
+                        <div class="field"><label for="row-@i-singular">@L["Singular"]</label><input id="row-@i-singular" name="Rows[@i].Singular" type="text" maxlength="80" value="@row.Singular" placeholder="@r.InheritedSingular" /></div>
+                        <div class="field"><label for="row-@i-plural">@L["Plural"]</label><input id="row-@i-plural" name="Rows[@i].Plural" type="text" maxlength="80" value="@row.Plural" placeholder="@r.InheritedPlural" /></div>
+                        <details>
+                            <summary>@L["Short label, description and help text (optional)"]</summary>
+                            <div class="field"><label for="row-@i-short">@L["Short label"]</label><input id="row-@i-short" name="Rows[@i].Short" type="text" maxlength="30" value="@row.Short" /></div>
+                            <div class="field"><label for="row-@i-description">@L["Description"]</label><input id="row-@i-description" name="Rows[@i].Description" type="text" maxlength="300" value="@row.Description" /></div>
+                            <div class="field"><label for="row-@i-help">@L["Help text"]</label><textarea id="row-@i-help" name="Rows[@i].Help" maxlength="600" rows="2">@row.Help</textarea></div>
+                        </details>
+                    </fieldset>
+                }
+            </section>
+        }
+        <section class="card" aria-labelledby="act-h">
+            <h2 id="act-h">@L["Save, check and publish"]</h2>
+            <div class="field"><label for="Note">@L["Note for the history (optional)"]</label><input id="Note" name="Note" type="text" maxlength="500" value="@Model.Note" /></div>
+            <div class="actions">
+                <button type="submit" asp-page-handler="Save">@L["Save the draft"]</button>
+                <button type="submit" class="secondary" asp-page-handler="Validate">@L["Save and validate"]</button>
+                @if (Model.CanPublish) { <button type="submit" asp-page-handler="Publish">@L["Publish"]</button> }
+                <a class="button secondary" href="/Admin/Terminology/Preview?organisationId=@f.OrganisationId&amp;locale=@Uri.EscapeDataString(f.Locale)">@L["Preview"]</a>
+            </div>
+            <p class="hint">@L["Publishing needs a recent sign-in, and a second person where your installation requires it."]</p>
+        </section>
+    </form>
+    @if (f.Draft is not null)
+    {
+        <form method="post" asp-page-handler="Discard"><input type="hidden" name="OrganisationId" value="@f.OrganisationId" /><input type="hidden" name="Locale" value="@f.Locale" />
+            <div class="actions"><button type="submit" class="secondary">@L["Discard the draft"]</button></div></form>
+    }
+}
+<p><a href="/Admin/Terminology">@L["Back to terminology"]</a></p>

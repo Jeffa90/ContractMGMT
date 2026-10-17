@@ -354,7 +354,7 @@ public static class ConfigurationModule
     public const string Schema = "configuration";
     public const int Tier = 5;
 
-    public static IServiceCollection AddConfigurationModule(this IServiceCollection services, Action<ConfigurationOptions>? configure = null)
+    public static IServiceCollection AddConfigurationModule(this IServiceCollection services, Action<ConfigurationOptions>? configure = null, Action<PackOptions>? packs = null)
     {
         var options = new ConfigurationOptions();
         configure?.Invoke(options);
@@ -366,12 +366,34 @@ public static class ConfigurationModule
         services.AddScoped<IConfigurationBootstrap>(sp => sp.GetRequiredService<ConfigurationService>());
         services.AddScoped<IConfigurationReleases>(sp => sp.GetRequiredService<ConfigurationService>());
         services.AddScoped<IConfigurationKind, ClassificationPolicyKind>();
-        services.AddSingleton<ISolutionPackCatalogue, EmbeddedPackCatalogue>();
         services.AddScoped<IConfigurationKind, SolutionPackKind>();
+        AddSolutionPacks(services, packs);
         services.AddScoped<IConfigurationKind, BrandingKind>();
         services.AddScoped<IBrandingProvider, ConfiguredBrandingProvider>();
         // Replace the default scale with the configured one (registered after the Identity module).
         services.AddScoped<IClassificationScaleProvider, ConfiguredClassificationScaleProvider>();
         return services;
+    }
+
+    /// <summary>External solution packs: the unified loader over shipped and tenant-installed packages, verification and trust, the pack store, and the pack manager services.</summary>
+    private static void AddSolutionPacks(IServiceCollection services, Action<PackOptions>? packs)
+    {
+        services.AddOptions<PackOptions>();
+        if (packs is not null) services.Configure(packs);
+        services.TryAddSingleton<ShippedPackSource>();
+        services.TryAddSingleton<PlatformKeyResolver>();
+        services.TryAddSingleton<PackPackageCache>();
+        services.TryAddSingleton<IPackageStorage, FileSystemPackageStorage>();
+        services.TryAddSingleton<ISolutionPackCatalogue, ShippedSolutionPackCatalogue>();
+        services.AddScoped<TenantKeyResolver>();
+        services.AddScoped<PackKindRegistry>();
+        services.AddScoped<PackTrustEvaluator>();
+        services.AddScoped<IPackLoader, PackLoader>();
+        services.AddScoped<PackValidationService>();
+        services.AddScoped<IPackManager, PackManager>();
+        services.AddScoped<IPackAssignments, PackAssignments>();
+        services.AddScoped<IPackTrustKeys, PackTrustKeys>();
+        services.AddScoped<IOrganisationPackContent, OrganisationPackContent>();
+        services.AddScoped<IPackDiagnostics, PackDiagnostics>();
     }
 }

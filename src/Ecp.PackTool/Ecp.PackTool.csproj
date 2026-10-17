@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- Not published with the host: it is a build and release tool (docs/PACK_AUTHORING.md, docs/PACK_SIGNING.md). -->
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Ecp.Packs/Ecp.Packs.csproj" />
+  </ItemGroup>
+</Project>

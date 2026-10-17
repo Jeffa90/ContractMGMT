@@ -1,0 +1,61 @@
+{
+  "packageId": "platform.pack.blank",
+  "packKey": "blank",
+  "version": "1.1.0",
+  "displayName": {
+    "en-AU": "Blank (no business defaults)"
+  },
+  "description": {
+    "en-AU": "Starts with no categories, contract types or reference prefix, and a neutral starting lifecycle, Variation workflow and notification policy that name no business. Everything is configured by the organisation."
+  },
+  "publisher": {
+    "id": "platform.builtin",
+    "name": "Platform (built-in)"
+  },
+  "createdUtc": "2026-10-20T00:00:00Z",
+  "compatibility": {
+    "minPlatformVersion": "1.0.0",
+    "maxPlatformVersion": null,
+    "ignoreUnknownOptionalKinds": false
+  },
+  "signature": {
+    "requirement": "AllowUnsignedSynthetic"
+  },
+  "synthetic": true,
+  "capabilities": [],
+  "dependencies": [],
+  "content": [
+    {
+      "source": "pack.json",
+      "path": "content/solution-pack.json",
+      "kind": "SolutionPack",
+      "scope": "catalogue",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "workflows/contract-lifecycle.json",
+      "path": "content/contract-lifecycle.json",
+      "kind": "WorkflowContractLifecycle",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "workflows/variation.json",
+      "path": "content/variation-workflow.json",
+      "kind": "WorkflowVariation",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "notifications/notification-policy.json",
+      "path": "content/notification-policy.json",
+      "kind": "NotificationPolicy",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    }
+  ]
+}

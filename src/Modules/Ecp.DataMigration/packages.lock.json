@@ -460,8 +460,10 @@
         "dependencies": {
           "Ecp.Audit": "[1.0.0, )",
           "Ecp.Identity": "[1.0.0, )",
+          "Ecp.Packs": "[1.0.0, )",
           "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.Tenancy": "[1.0.0, )"
         }
       },
       "ecp.contracts": {
@@ -507,6 +509,9 @@
           "Ecp.Persistence": "[1.0.0, )",
           "Ecp.SharedKernel": "[1.0.0, )"
         }
+      },
+      "ecp.packs": {
+        "type": "Project"
       },
       "ecp.persistence": {
         "type": "Project",

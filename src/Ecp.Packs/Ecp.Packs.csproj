@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Tier 0, no dependencies beyond the base class library: the package format, its safe reader and builder, signing and the trust abstractions. Used by the host, the tests and the ecp-pack tool. -->
+    <Description>Enterprise Contract Platform solution-pack package format (.ecpkg)</Description>
+  </PropertyGroup>
+</Project>

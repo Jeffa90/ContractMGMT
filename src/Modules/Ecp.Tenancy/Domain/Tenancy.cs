@@ -79,6 +79,9 @@ public sealed class Organisation : ITenantOwned
 
     public ReferenceNumberingRule ReferenceRule => new(ReferencePrefix, ReferenceSeparator, ReferenceDigits);
 
+    /// <summary>Records which solution pack the organisation works from (the pack's stable key). It changes no configuration; published releases and pinned contracts are untouched.</summary>
+    public void AssignSolutionPack(string solutionPackKey) => SolutionPackKey = Guard.NotBlank(solutionPackKey, "Solution pack", 100);
+
     public static Organisation Create(Guid tenantId, string name, string timeZoneId, string cultureCode, string defaultCurrencyCode,
         ReferenceNumberingRule referenceRule, string? solutionPackKey, DateTime nowUtc)
     {

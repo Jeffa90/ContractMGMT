@@ -35,7 +35,7 @@ public interface INotificationPolicyStore
     Task<NotificationPolicy> CurrentAsync(Guid organisationId, CancellationToken ct = default);
 }
 
-internal sealed class NotificationPolicyStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, Ecp.Tenancy.IOrganisationStructureService organisations, IOptions<NotificationsOptions> options) : INotificationPolicyStore
+internal sealed class NotificationPolicyStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, Ecp.Tenancy.IOrganisationStructureService organisations, IOrganisationPackContent packContent, IOptions<NotificationsOptions> options) : INotificationPolicyStore
 {
     private static readonly ConcurrentDictionary<Guid, NotificationPolicy> Parsed = new();
 
@@ -45,8 +45,14 @@ internal sealed class NotificationPolicyStore(IConfigurationReleases releases, I
         if (latest is null)
         {
             var packId = await organisations.ResolveAsync(organisationId, options.Value.DefaultPackId, ct);
-            var json = ReadPackPolicy(packId);
-            try { latest = await bootstrap.DraftValidatePublishAsync(NotificationPolicyKinds.Policy, organisationId, json, "system", $"Installed the {packId} reference notification policy", ct); }
+            // The starting policy comes from the organisation's pack through the unified pack loader; the release records which pack version and package it came from.
+            var document = await packContent.GetStartingDocumentAsync(organisationId, packId, NotificationPolicyKinds.Policy, ct);
+            try
+            {
+                latest = await bootstrap.DraftValidatePublishAsync(NotificationPolicyKinds.Policy, organisationId, document.Json, "system",
+                    $"Installed the {document.PackKey} {document.Version} reference notification policy (package {document.PackageSha256[..12]})", ct);
+                await packContent.RecordStartAsync(organisationId, document, ct);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 latest = await releases.LatestAsync(NotificationPolicyKinds.Policy, organisationId, ct);
@@ -58,13 +64,5 @@ internal sealed class NotificationPolicyStore(IConfigurationReleases releases, I
             var (policy, messages) = NotificationPolicyParser.Parse(latest.ContentJson);
             return policy ?? throw new DomainException("policy_unreadable", "The published notification policy could not be read: " + string.Join("; ", messages.Select(x => x.Message)));
         });
-    }
-
-    internal static string ReadPackPolicy(string packId)
-    {
-        using var stream = typeof(NotificationPolicyStore).Assembly.GetManifestResourceStream($"Ecp.Notifications.{packId}.notification-policy.json")
-            ?? throw new DomainException("policy_pack_missing", $"The solution pack '{packId}' does not carry a notification policy.");
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
     }
 }

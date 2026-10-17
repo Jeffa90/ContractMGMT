@@ -31,7 +31,6 @@ public static class WorkflowKinds
     public const string Variation = "WorkflowVariation";
 
     public static string ExpectedSubject(string kind) => kind == Variation ? "Variation" : "Contract";
-    public static string ResourceName(string packId, string kind) => $"Ecp.Workflow.{packId}.{(kind == Variation ? "variation" : "contract-lifecycle")}.json";
 }
 
 /// <summary>Configuration kind for a workflow definition: gives it draft, validate, preview, publish, version history, rollback and audit like any other configuration.</summary>
@@ -68,7 +67,7 @@ public interface IWorkflowDefinitions
     Task<ResolvedDefinition> CurrentAsync(string kind, Guid organisationId, CancellationToken ct = default);
 }
 
-internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, Ecp.Tenancy.IOrganisationStructureService organisations, IOptions<LifecycleOptions> options) : IWorkflowDefinitions
+internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, IConfigurationBootstrap bootstrap, Ecp.Tenancy.IOrganisationStructureService organisations, IOrganisationPackContent packContent, IOptions<LifecycleOptions> options) : IWorkflowDefinitions
 {
     // A published release is immutable, so parsing it once per release id is safe for the life of the process.
     private static readonly ConcurrentDictionary<Guid, WorkflowDefinition> Parsed = new();
@@ -89,8 +88,14 @@ internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, I
         if (latest is null)
         {
             var packId = await organisations.ResolveAsync(organisationId, options.Value.DefaultPackId, ct);
-            var json = ReadPackDefinition(packId, kind);
-            try { latest = await bootstrap.DraftValidatePublishAsync(kind, organisationId, json, "system", $"Installed the {packId} reference definition", ct); }
+            // The starting definition comes from the organisation's pack through the unified pack loader; the release records which pack version and package it came from.
+            var document = await packContent.GetStartingDocumentAsync(organisationId, packId, kind, ct);
+            try
+            {
+                latest = await bootstrap.DraftValidatePublishAsync(kind, organisationId, document.Json, "system",
+                    $"Installed the {document.PackKey} {document.Version} reference definition (package {document.PackageSha256[..12]})", ct);
+                await packContent.RecordStartAsync(organisationId, document, ct);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Another request may have installed it first (the release number is unique); use theirs. Anything else is a real failure.
@@ -109,14 +114,5 @@ internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, I
             return parsed ?? throw new DomainException("workflow_unreadable", "The published workflow definition could not be read: " + string.Join("; ", messages.Select(m => m.Message)));
         });
         return new ResolvedDefinition(definition, $"{definition.Workflow}@{release.Number}", release.Id, release.Number, release.Kind);
-    }
-
-    internal static string ReadPackDefinition(string packId, string kind)
-    {
-        var name = WorkflowKinds.ResourceName(packId, kind);
-        using var stream = typeof(WorkflowDefinitionStore).Assembly.GetManifestResourceStream(name)
-            ?? throw new DomainException("workflow_pack_missing", $"The solution pack '{packId}' does not carry a {(kind == WorkflowKinds.Variation ? "Variation" : "contract lifecycle")} workflow definition.");
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
     }
 }

@@ -464,6 +464,9 @@
           "Ecp.Tenancy": "[1.0.0, )"
         }
       },
+      "ecp.packs": {
+        "type": "Project"
+      },
       "ecp.persistence": {
         "type": "Project",
         "dependencies": {

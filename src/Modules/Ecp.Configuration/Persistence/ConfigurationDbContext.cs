@@ -9,6 +9,9 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
 {
     public DbSet<ConfigurationDraft> Drafts => Set<ConfigurationDraft>();
     public DbSet<ConfigurationRelease> Releases => Set<ConfigurationRelease>();
+    public DbSet<InstalledPack> InstalledPacks => Set<InstalledPack>();
+    public DbSet<PackAssignment> PackAssignments => Set<PackAssignment>();
+    public DbSet<TrustedPublisherKey> TrustedKeys => Set<TrustedPublisherKey>();
     protected override string SchemaName => ConfigurationModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
@@ -41,6 +44,79 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             e.Property(x => x.PublishedBy).HasMaxLength(200).IsRequired();
             // Release numbers are unique per tenant, scope and kind: concurrent publishers cannot both take the same number.
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.Kind, x.Number }).IsUnique();
+        });
+
+        mb.Entity<InstalledPack>(e =>
+        {
+            e.ToTable("InstalledPack");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.PackKey).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Version).HasMaxLength(40).IsRequired();
+            e.Property(x => x.PackageId).HasMaxLength(120).IsRequired();
+            e.Property(x => x.PublisherId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.PublisherName).HasMaxLength(120).IsRequired();
+            e.Property(x => x.DisplayName).HasMaxLength(120).IsRequired();
+            e.Property(x => x.PackageSha256).HasMaxLength(64).IsFixedLength().IsRequired();
+            e.Property(x => x.ContentDigest).HasMaxLength(64).IsFixedLength().IsRequired();
+            e.Property(x => x.ManifestJson).IsRequired();
+            e.Property(x => x.SignatureStatus).HasMaxLength(40).IsRequired();
+            e.Property(x => x.SignatureAlgorithm).HasMaxLength(20);
+            e.Property(x => x.TrustKeyId).HasMaxLength(80);
+            e.Property(x => x.VerificationStatus).HasMaxLength(40).IsRequired();
+            e.Property(x => x.SourceType).HasMaxLength(30).IsRequired();
+            e.Property(x => x.StorageReference).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ValidationOutcome).HasMaxLength(40).IsRequired();
+            e.Property(x => x.ValidationJson).IsRequired();
+            e.Property(x => x.CompatibilityJson).IsRequired();
+            e.Property(x => x.UploadedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.InstalledBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.Property(x => x.RetiredBy).HasMaxLength(200);
+            e.Property(x => x.RetiredReason).HasMaxLength(500);
+            e.Property(x => x.CorrelationId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.RowVersion);
+            // A pack key and version name one immutable package in a tenant; two uploads racing to install it cannot both succeed.
+            e.HasIndex(x => new { x.TenantId, x.PackKey, x.Version }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.PackageSha256 });
+        });
+
+        mb.Entity<PackAssignment>(e =>
+        {
+            e.ToTable("PackAssignment");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.PackKey).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Version).HasMaxLength(40).IsRequired();
+            e.Property(x => x.PackageSha256).HasMaxLength(64).IsFixedLength().IsRequired();
+            e.Property(x => x.SourceType).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Origin).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.Property(x => x.AssignedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.OutcomeJson).IsRequired();
+            e.Property(x => x.CorrelationId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.RowVersion);
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.PackKey, x.Version });
+        });
+
+        mb.Entity<TrustedPublisherKey>(e =>
+        {
+            e.ToTable("TrustedPublisherKey");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.KeyId).HasMaxLength(80).IsRequired();
+            e.Property(x => x.Algorithm).HasMaxLength(20).IsRequired();
+            e.Property(x => x.PublicKeyBase64).HasMaxLength(512).IsRequired();
+            e.Property(x => x.Fingerprint).HasMaxLength(32).IsRequired();
+            e.Property(x => x.Label).HasMaxLength(120).IsRequired();
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.Property(x => x.RegisteredBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RevokedBy).HasMaxLength(200);
+            e.Property(x => x.RevokedReason).HasMaxLength(500);
+            e.Ignore(x => x.PublicKey);
+            e.Property(x => x.RowVersion);
+            e.HasIndex(x => new { x.TenantId, x.KeyId }).IsUnique();
         });
     }
 }

@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Ecp.Configuration.Persistence;
@@ -18,47 +17,36 @@ public sealed record PackDefaults(string? Culture, string? TimeZoneId, string? C
 public sealed record SolutionPackInfo(string PackId, string Name, string Version, string Description, bool Synthetic, string Publisher,
     IReadOnlyList<string> Features, string OwnershipModel, string ApprovalModel, PackDefaults Defaults);
 
-/// <summary>Built-in solution packs shipped with the platform (trusted by construction). A pack is data: nothing in it is executed.</summary>
+/// <summary>
+/// The packs a first-run setup can offer: the shipped, read-only packages that are usable in this environment (compatible, and trusted or explicitly allowed as unsigned synthetic packs in Demo and Test).
+/// It is synchronous because setup runs before any tenant has installed anything. Anything tenant-aware goes through <see cref="IPackLoader"/>.
+/// </summary>
 public interface ISolutionPackCatalogue
 {
     IReadOnlyList<SolutionPackInfo> List();
     SolutionPackInfo? Find(string packId);
+    /// <summary>The same packs with their version, publisher, capabilities, signature and trust status, for display.</summary>
+    IReadOnlyList<PackCatalogueEntry> ListEntries();
 }
 
-internal sealed class EmbeddedPackCatalogue : ISolutionPackCatalogue
-{
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private readonly List<SolutionPackInfo> _packs;
-
-    public EmbeddedPackCatalogue()
-    {
-        var assembly = typeof(EmbeddedPackCatalogue).Assembly;
-        _packs = assembly.GetManifestResourceNames().Where(n => n.StartsWith("Ecp.Pack.", StringComparison.Ordinal) && n.EndsWith(".json", StringComparison.Ordinal))
-            .Select(n => { using var s = assembly.GetManifestResourceStream(n)!; return JsonSerializer.Deserialize<SolutionPackInfo>(s, Json)!; })
-            .OrderBy(p => p.PackId, StringComparer.Ordinal).ToList();
-    }
-
-    public IReadOnlyList<SolutionPackInfo> List() => _packs;
-    public SolutionPackInfo? Find(string packId) => _packs.FirstOrDefault(p => p.PackId == packId);
-}
-
-/// <summary>Tenant-level record of the applied solution pack (version-controlled like any configuration).</summary>
-internal sealed class SolutionPackKind(ISolutionPackCatalogue catalogue) : IConfigurationKind
+/// <summary>Tenant-level record of the applied solution pack (version-controlled like any configuration). The pack must exist and be usable here.</summary>
+internal sealed class SolutionPackKind(IPackLoader packs) : IConfigurationKind
 {
     public const string KindName = "SolutionPack";
     public string Kind => KindName;
 
-    public Task<ValidationReport> ValidateAsync(Guid organisationId, string contentJson, CancellationToken ct)
+    public async Task<ValidationReport> ValidateAsync(Guid organisationId, string contentJson, CancellationToken ct)
     {
         var messages = new List<ValidationMessage>();
         try
         {
             using var doc = JsonDocument.Parse(contentJson);
             var id = doc.RootElement.TryGetProperty("packId", out var p) ? p.GetString() : null;
-            if (id is null || catalogue.Find(id) is null) messages.Add(new(ValidationSeverity.Error, "$.packId", "unknown_pack", $"Solution pack '{id}' is not in the catalogue."));
+            if (id is null || await packs.FindAsync(id, null, usableOnly: true, ct) is null)
+                messages.Add(new(ValidationSeverity.Error, "$.packId", "unknown_pack", $"Solution pack '{id}' is not available. It may not be installed, may not be trusted in this environment, or may be retired."));
         }
         catch (JsonException) { messages.Add(new(ValidationSeverity.Error, "$", "invalid_json", "Not valid JSON.")); }
-        return Task.FromResult(new ValidationReport(messages));
+        return new ValidationReport(messages);
     }
 
     public Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct) => Task.CompletedTask;

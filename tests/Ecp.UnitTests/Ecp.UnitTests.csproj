@@ -12,6 +12,7 @@
     <ProjectReference Include="../Ecp.Tests.Common/Ecp.Tests.Common.csproj" />
     <ProjectReference Include="../../src/Ecp.SharedKernel/Ecp.SharedKernel.csproj" />
     <ProjectReference Include="../../src/Ecp.Persistence/Ecp.Persistence.csproj" />
+    <ProjectReference Include="../../src/Ecp.Packs/Ecp.Packs.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.Tenancy/Ecp.Tenancy.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.Identity/Ecp.Identity.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.Configuration/Ecp.Configuration.csproj" />

@@ -68,3 +68,11 @@ approvals.matrix.read,Y,Y,Y,,Y,Y,,,S,,Y,,DR-2026-10-16 (approval matrix permissi
 approvals.simulate,Y,Y,Y,,Y,Y,,,,,Y,,DR-2026-10-16 (approval matrix permissions) owner confirmation of the approval matrix permission allocation
 approvals.delegate,,,,,,,,,Y,Y,,,DR-2026-10-16 (approval matrix permissions) owner confirmation of the approval matrix permission allocation (own authority only)
 approvals.delegate.administer,Y,Y,Y,,,,,,,,,,DR-2026-10-16 (approval matrix permissions) owner confirmation of the approval matrix permission allocation (Procurement Administrator only by explicit assignment; no default grants it)
+packs.read,,Y,Y,,Y,,,,,,Y,,S7 owner decision
+packs.upload,,Y,,,Y,,,,,,,,S7 owner decision
+packs.validate,,Y,Y,,Y,,,,,,,,S7 owner decision
+packs.install,,Y,,,Y,,,,,,,,S7 owner decision
+packs.assign,,Y,Y,,Y,,,,,,,,S7 owner decision
+packs.retire,,Y,,,,,,,,,,,S7 owner decision
+packs.trust.manage,,Y,,,,,,,,,,,S7 owner decision
+packs.audit.read,,Y,,,,,,,,,Y,,S7 owner decision

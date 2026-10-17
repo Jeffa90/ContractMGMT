@@ -1,0 +1,66 @@
+{
+  "packageId": "platform.pack.jbs-procurement",
+  "packKey": "jbs-procurement",
+  "version": "2.1.0",
+  "displayName": {
+    "en-AU": "JBS Procurement Reference"
+  },
+  "description": {
+    "en-AU": "Reference configuration for a procurement business: read-all/edit-assigned-category ownership, Legal review, register authorisation by the Group Head of Procurement or backup, Australian English. An optional solution pack, not hard-coded platform behaviour; every value is editable. Contract types and categories are synthetic illustrations."
+  },
+  "publisher": {
+    "id": "platform.builtin",
+    "name": "Platform (built-in)"
+  },
+  "createdUtc": "2026-10-20T00:00:00Z",
+  "compatibility": {
+    "minPlatformVersion": "1.0.0",
+    "maxPlatformVersion": null,
+    "ignoreUnknownOptionalKinds": false
+  },
+  "signature": {
+    "requirement": "AllowUnsignedSynthetic"
+  },
+  "synthetic": true,
+  "capabilities": [
+    "LegalReview",
+    "Variations",
+    "QlikExternalReporting",
+    "CriticalNotice"
+  ],
+  "dependencies": [],
+  "content": [
+    {
+      "source": "pack.json",
+      "path": "content/solution-pack.json",
+      "kind": "SolutionPack",
+      "scope": "catalogue",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "workflows/contract-lifecycle.json",
+      "path": "content/contract-lifecycle.json",
+      "kind": "WorkflowContractLifecycle",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "workflows/variation.json",
+      "path": "content/variation-workflow.json",
+      "kind": "WorkflowVariation",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "notifications/notification-policy.json",
+      "path": "content/notification-policy.json",
+      "kind": "NotificationPolicy",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    }
+  ]
+}

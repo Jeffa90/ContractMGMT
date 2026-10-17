@@ -31,6 +31,12 @@ public interface IOrganisationStructureService
     Task<OrganisationSummary?> GetOrganisationAsync(Guid organisationId, CancellationToken ct = default);
     Task<OrganisationStructure> GetAsync(Guid organisationId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Records the solution pack the organisation works from. A trusted operation: the caller (the pack assignment service) has already authorised it. It changes no configuration, so published releases
+    /// and contracts pinned to them are untouched; only where the organisation's starting definitions come from for anything it has not published yet.
+    /// </summary>
+    Task SetSolutionPackAsync(Guid organisationId, string solutionPackKey, CancellationToken ct = default);
+
     /// <summary>Creates or updates the item with this key in the organisation (idempotent; reactivates an inactive item).</summary>
     Task<Guid> UpsertLegalEntityAsync(Guid organisationId, string key, string name, string? registrationNumber, CancellationToken ct = default);
     Task<Guid> UpsertDivisionAsync(Guid organisationId, string key, string name, CancellationToken ct = default);
@@ -50,6 +56,19 @@ internal sealed class OrganisationStructureService(TenancyDbContext db, IUnitOfW
     public Task<OrganisationSummary?> GetOrganisationAsync(Guid organisationId, CancellationToken ct = default)
         => db.Organisations.AsNoTracking().Where(o => o.Id == organisationId)
             .Select(o => new OrganisationSummary(o.Id, o.Name, o.TimeZoneId, o.CultureCode, o.DefaultCurrencyCode, o.ReferencePrefix, o.SolutionPackKey)).FirstOrDefaultAsync(ct);
+
+    public async Task SetSolutionPackAsync(Guid organisationId, string solutionPackKey, CancellationToken ct = default)
+    {
+        await uow.ExecuteAsync(async c =>
+        {
+            var org = await db.Organisations.FirstOrDefaultAsync(o => o.Id == organisationId, c) ?? throw new DomainException("organisation_not_found", "The organisation was not found.");
+            var before = org.SolutionPackKey;
+            org.AssignSolutionPack(solutionPackKey);
+            await db.SaveChangesAsync(c);
+            audit.Record(new AuditEntry("organisation.solution_pack.set", "Organisation", organisationId.ToString(), OrganisationId: organisationId,
+                OldValuesJson: System.Text.Json.JsonSerializer.Serialize(new { solutionPackKey = before }), NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { solutionPackKey })));
+        }, ct);
+    }
 
     public async Task<OrganisationStructure> GetAsync(Guid organisationId, CancellationToken ct = default)
     {

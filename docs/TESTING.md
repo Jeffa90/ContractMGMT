@@ -401,7 +401,7 @@ Not covered: a live provider (none exists), the callback HTTP endpoint (not buil
 
 ### 8.11 Totals at the end of the S3 pass
 
-Without `ECP_TEST_SQL`: **886 Passed, 0 Failed, 0 Skipped, 209 NOT VERIFIED** (563 unit, 36 architecture, 80 API, 207 integration on SQLite). The 209 are the SQL Server wrappers (203 existing, 5 new signature scenarios and the migration test `SignatureVocabularyMigrationTests`), reported NOT VERIFIED rather than passed. The CI result is recorded in `deploy/STATUS.md` once the run has finished.
+Without `ECP_TEST_SQL`: **886 Passed, 0 Failed, 0 Skipped, 209 NOT VERIFIED** (563 unit, 36 architecture, 80 API, 207 integration on SQLite). The 209 are the SQL Server wrappers (203 existing, 5 new signature scenarios and the migration test `SignatureVocabularyMigrationTests`), reported NOT VERIFIED rather than passed. CI (commit 3d1597a, run 41): all three jobs succeeded and the SQL Server job reported **209 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED**, including the migration test and the five signature scenarios (`deploy/STATUS.md`).
 
 ## 9. No-code, packages and portability suite
 

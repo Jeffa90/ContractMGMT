@@ -220,7 +220,7 @@ Remaining high-severity portability violation: **none** from the original audit 
 |---|---|
 | S1 pack per organisation, neutral Blank pack, guard stage A, first PRT-002 proof | **Done**, CI-verified |
 | S2 reminder fall-back and migrated initial status | **Done**, CI-verified (run 35) |
-| S3 neutral signature vocabulary with an EF migration | **Done** (ADR-0027); SQL Server migration test and CI result in `deploy/STATUS.md` |
+| S3 neutral signature vocabulary with an EF migration | **Done** (ADR-0027); CI run 41 (commit 3d1597a) green: SQL Server 209 Passed, 0 Failed, 0 Skipped, including the migration test (`deploy/STATUS.md`) |
 | S4 vocabulary and terminology read side, guard stage B | **First incomplete** |
 | S5 role catalogue decision (ADR) | Not started |
 | S6 feature flags that gate capabilities | Not started |

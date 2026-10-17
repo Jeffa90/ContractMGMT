@@ -20,6 +20,7 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 * **Migration `SignatureRequestVocabulary` (Implemented; SQL Server verification is CI-only).** Renames the table, four columns, indexes and primary key in place, re-creates the filtered index and the row-level-security policy, adds empty columns and the inbox table. No value, contract state, approval record, executed-document reference or audit record is rewritten. Frozen register-authorisation snapshots under the old key still read.
 * **Guard.** An architecture test fails the build if a signature-vendor word appears anywhere under `src/` (one compatibility line allowed; applied migrations are history).
 * **Not done, by design:** a live DocuSign adapter, the callback HTTP endpoint, a provider configuration page, reporting, operations, role-catalogue replacement, feature flags, another pack slice.
+* **CI.** Commit 3d1597a, run 41: all three jobs succeeded; SQL Server 209 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, including `SignatureVocabularyMigrationTests` and the five signature scenarios (`deploy/STATUS.md`).
 * **Brief note.** The owner's S3 brief was cut off in its database-migration section ("Add compatibility handling where existing configuration or"); everything after that point was not visible. The compatibility handling above (snapshots, audit text, workflow guard and pack names, action codes) is the reading of that sentence; sections 6 onwards of the brief, if there were any, were not applied.
 
 Tests (`docs/TESTING.md` sections 8.10 and 8.11): without `ECP_TEST_SQL` **886 Passed, 0 Failed, 0 Skipped, 209 NOT VERIFIED** (563 unit, 36 architecture, 80 API, 207 integration on SQLite). The 209 are SQL Server wrappers and the migration test; they are not claimed as passed locally. CI result: `deploy/STATUS.md`.
@@ -41,7 +42,7 @@ Tests (`docs/TESTING.md` sections 8.10 and 8.11): without `ECP_TEST_SQL` **886 P
 
 Tests (`docs/TESTING.md` sections 8.8 and 8.9): without `ECP_TEST_SQL` **854 Passed, 0 Failed, 0 Skipped, 203 NOT VERIFIED** (545 unit, 27 architecture, 80 API, 202 integration on SQLite). The 203 are SQL Server wrappers and are not claimed as passed locally. **CI run 39 (commit 3c78a29, SQL Server 2022): 203 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED; all three jobs, including the container image build and smoke test, succeeded** (`deploy/STATUS.md`). The container engine cannot be started in this workspace, so the container smoke is verified on CI only.
 
-**First incomplete product task: INT-03's live e-signature adapter. First incomplete portability remediation task: S3 (R6, neutral signature-request vocabulary with an EF migration).** Remaining high-severity portability findings: none from the original audit (P-02b is Medium); PRT-002 as a whole is NOT VERIFIED (S9).
+**First incomplete product task: INT-03's live e-signature adapter. First incomplete portability remediation task: S4.** Remaining high-severity portability findings: none from the original audit (P-02b is Medium); PRT-002 as a whole is NOT VERIFIED (S9).
 
 ### Previous pass: portability remediation S2 (2026-10-17), kept for context
 

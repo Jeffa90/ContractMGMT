@@ -10,7 +10,19 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-17, end of portability slice S4: terminology and guard stage B)
+## Current state (2026-10-17, end of portability slice S5: stable role and permission identifiers)
+
+**Slice S5 (this pass; `decisions/ADR-0029-stable-role-and-permission-identifiers.md`, `docs/ROLE_CATALOGUE_ADR.md`, `docs/PORTABILITY_AUDIT.md` section 0.5, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.13).** The owner approved Option A+. P-02b is closed by policy; S8 (rename with aliases) is retired, superseded by S4 and ADR-0029.
+
+* **Decisions (Implemented as policy and tests).** Role codes, permission codes and approver-group keys are permanent identifiers. PRT-013 is satisfied by terminology and display-layer abstraction (requirement text amended; decision D7c). No identifier was renamed and no alias migration exists.
+* **Frozen-identifier tests (Implemented).** `FrozenIdentifierTests` (10): the twelve role codes and their order, the matrix header, all 82 permission codes (no removal, no silent addition), the role-to-terminology mapping, the shipped approver-group keys, the free-text group-key rule, role audit action codes, no label accepted as a role code, no Identity migration rewriting role data.
+* **Approver-group display names (Implemented).** Optional `groups` section of the terminology document; organisation over pack over the key; name with key on administrator pages; form section on the Terminology edit page; Overview and Preview. Blank 1.3.0 and JBS 2.3.0 name their groups.
+* **Role visibility for S6 (Implemented as support).** Optional `roles` section; hides a role from the role picker only; never revokes access; the system, tenant and organisation administrator roles cannot be hidden. No flag mechanism was built; S6 will feed the same decision point.
+* **Verification.** Local: 1,034 Passed, 0 Failed, 0 Skipped, 219 NOT VERIFIED (the SQL Server wrappers). CI: `deploy/STATUS.md`.
+* **Not done, by design:** a feature-flag mechanism (S6), a data-driven role catalogue (Future), the neutral `Approver` label wording and the raw role code in one onboarding warning (small owner wording items), regional defaults (S10).
+* **First incomplete remediation task:** S6 (feature flags that gate capabilities), then S9 and S10.
+
+### Previous pass (S4: terminology and guard stage B)
 
 **Slice S4 (this pass; `decisions/ADR-0028-configurable-terminology.md`, `docs/TERMINOLOGY.md`, `docs/PORTABILITY_AUDIT.md` section 0.4, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.12).** Findings P-05, P-06, P-07 and P-09 stage B are fixed. Stable keys are never renamed; labels are data.
 

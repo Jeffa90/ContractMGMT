@@ -44,6 +44,7 @@ public sealed class SimulateModel(IApprovalSimulator simulator, IApprovalSimulat
         Organisations = await OrganisationChoices.AllowedAsync(organisations, access, ct, "approvals.simulate");
         OrganisationId ??= Organisations.FirstOrDefault()?.Id;
         if (OrganisationId is not { } org) return;
+        await Terms.UseOrganisationAsync(org, ct);
         Choices = await inputs.ChoicesAsync(org, ct);
         try { Matrices = await simulator.MatricesAsync(org, MatrixSource.Published, ct); } catch (Ecp.SharedKernel.ForbiddenException) { Matrices = []; }
         try { People = await people.ManageableUsersAsync(ct); } catch (Ecp.SharedKernel.ForbiddenException) { People = []; }

@@ -45,6 +45,15 @@ public sealed class TermContext(ITerminologyResolver resolver, ITenantContext te
         Current = await resolver.GetAsync(organisationId, CultureInfo.CurrentUICulture.Name, ct);   // never throws: falls back to the neutral wording
     }
 
+    /// <summary>The display name of an approver group for ordinary pages: the name the organisation or its pack gave it, otherwise the key.</summary>
+    public string Group(string key) => Current.Group(key);
+
+    /// <summary>For administrator pages: the name with the stable key beside it, so nobody has to guess what the key is. An unnamed group is just its key.</summary>
+    public string GroupLabel(string key) => Current.HasGroupName(key) ? $"{Current.Group(key)} ({key})" : key;
+
+    /// <summary>Whether a role is offered in assignment pickers (presentation only; see docs/TERMINOLOGY.md).</summary>
+    public bool IsRoleOffered(string roleCode) => Current.IsRoleOffered(roleCode);
+
     public string Singular(string key) => Current.Singular(key);
     public string Plural(string key) => Current.Plural(key);
     public string Expand(string? text) => text is null ? "" : Current.Expand(text);

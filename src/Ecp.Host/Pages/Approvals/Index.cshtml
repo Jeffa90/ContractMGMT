@@ -15,7 +15,7 @@
     {
         <tr>
             <th scope="row"><a href="/Approvals/Details/@r.RequestId">@r.AgreementReference</a> @if (r.VariationReference is { } v) { <span class="badge">@v</span> }<span class="hint">@r.Title</span> <span class="badge">@r.Classification</span></th>
-            <td>@r.SupplierName</td><td>@r.CategoryName</td><td>@r.SubmittedByName</td><td>@r.AgeDays @L["day(s)"]</td><td>@r.ApproverGroupKey</td>
+            <td>@r.SupplierName</td><td>@r.CategoryName</td><td>@r.SubmittedByName</td><td>@r.AgeDays @L["day(s)"]</td><td>@Terms.Group(r.ApproverGroupKey)</td>
             <td>@if (r.CanDecide) { <span class="badge warn">@(r.ActingAsBackup ? L["You may decide (as backup)"] : L["You may decide"])</span> } else if (r.IsSubmitter) { <span class="hint">@L["You submitted this"]</span> } else { <span class="hint">@L["View only"]</span> }</td>
         </tr>
     }

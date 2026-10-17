@@ -423,5 +423,88 @@ public sealed class TerminologyUiTests
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync("/Admin/Terminology")).StatusCode);
     }
 
+    // ---- approver-group names and role visibility (A+ follow-ups, ADR-0029) ----
+
+    /// <summary>Adds the approver-group rows and the role rows an edit-form post carries. Roles not named are posted as "inherit".</summary>
+    private static Dictionary<string, string> WithExtras(Dictionary<string, string> form, IReadOnlyList<(string Key, string Name)> groups, IReadOnlyDictionary<string, string> roleChoices)
+    {
+        for (var i = 0; i < groups.Count; i++) { form[$"GroupRows[{i}].Key"] = groups[i].Key; form[$"GroupRows[{i}].Name"] = groups[i].Name; }
+        for (var i = 0; i < RoleCodes.All.Count; i++) { form[$"RoleRows[{i}].Code"] = RoleCodes.All[i]; form[$"RoleRows[{i}].Choice"] = roleChoices.GetValueOrDefault(RoleCodes.All[i], "inherit"); }
+        return form;
+    }
+
+    [Fact]
+    public async Task Group_names_and_role_visibility_are_set_in_the_form_shown_beside_their_stable_keys_and_change_no_access()
+    {
+        using var app = DemoApp.Start();
+        var (_, org) = await TenantAsync(app, "Demo Procurement Group");
+        var (_, headId) = await app.FindUserAsync("grouphead@a.example.test");
+        var (_, legalId) = await app.FindUserAsync(Legal);
+        using var biz = await app.SignInAsync(BizConfig, followRedirects: false);
+        using var admin = await app.SignInAsync(OrgAdmin, followRedirects: true);
+        using var legal = await app.SignInAsync(Legal, followRedirects: true);
+
+        // Before: the pack names the group; every role is offered.
+        var before = await BodyAsync(admin, $"/Admin/Users/Details/{headId}");
+        Assert.Contains("Group Head of Procurement (GroupHeadProcurement)", before);
+        Assert.Contains("<option value=\"Legal\"", before);
+        Assert.Contains("<option value=\"DivisionSiteAdministrator\"", before);
+
+        // The form: a new name for the group, and Legal not offered. Saving and validating publish nothing.
+        var form = WithExtras(EditForm(org, new Dictionary<string, (string, string)>()), [("GroupHeadProcurement", "Head of Group Procurement"), ("Local-Panel", "Local panel")], new Dictionary<string, string> { [RoleCodes.Legal] = "hidden" });
+        var save = await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Save&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.Redirect, save.StatusCode);
+        Assert.Contains("Group Head of Procurement (GroupHeadProcurement)", await BodyAsync(admin, $"/Admin/Users/Details/{headId}"));    // still the old name: not published
+        var edit = await BodyAsync(biz, Edit(org));
+        Assert.Contains("value=\"Head of Group Procurement\"", edit);                                                                    // the saved name is back in the form
+        Assert.Matches("<option value=\"hidden\" selected[^>]*>Not offered</option>", edit);
+        Assert.DoesNotMatch("(?s)value=\"RoleRows\\[(0|1|2)\\]\\.Choice\".{0,300}value=\"hidden\"", edit);                                // no hidden option for an administrative role
+        var preview = await BodyAsync(biz, $"/Admin/Terminology/Preview?organisationId={org}");
+        Assert.Contains("Head of Group Procurement", preview);
+        Assert.Contains("Legal", preview);
+
+        Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Validate&organisationId={org}&locale=en")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Publish&organisationId={org}&locale=en")).StatusCode);
+
+        // After: the key is shown with its new name; Legal is no longer offered but its holders are still listed and keep their access.
+        var after = await BodyAsync(admin, $"/Admin/Users/Details/{headId}");
+        Assert.Contains("Head of Group Procurement (GroupHeadProcurement)", after);
+        Assert.DoesNotContain("<option value=\"Legal\"", after);
+        Assert.Contains("<option value=\"CategoryOwner\"", after);
+        Assert.Contains("Not offered here", after);
+        var legalPage = await BodyAsync(admin, $"/Admin/Users/Details/{legalId}");
+        Assert.Contains("title=\"Stable role identifier\">Legal</code>", legalPage);                                                    // the assignment is still there
+        Assert.Equal(HttpStatusCode.OK, (await legal.GetAsync("/Legal")).StatusCode);                                                    // and so is what it allows
+        var overview = await BodyAsync(biz, $"/Admin/Terminology?organisationId={org}");
+        Assert.Contains("Head of Group Procurement", overview);
+        Assert.Contains("Local-Panel", overview);
+        Assert.Contains("Not offered in pickers", overview);
+    }
+
+    [Fact]
+    public async Task A_group_key_or_role_choice_that_is_not_allowed_is_shown_beside_its_row_with_the_entered_values_kept()
+    {
+        using var app = DemoApp.Start();
+        var (_, org) = await TenantAsync(app, "Demo Procurement Group");
+        using var biz = await app.SignInAsync(BizConfig, followRedirects: false);
+        var form = WithExtras(EditForm(org, new Dictionary<string, (string, string)>()), [("bad key!", "Some name"), ("Fine-Key", "<b>bold</b>")],
+            new Dictionary<string, string> { [RoleCodes.OrganisationAdministrator] = "hidden", [RoleCodes.Viewer] = "hidden" });
+        var response = await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Validate&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("There is a problem", html);
+        Assert.Contains("href=\"#group-0-key\"", html);                                          // the summary links to the field it is about
+        Assert.Contains("cannot be hidden", html);
+        Assert.Contains("must be plain text", html);
+        Assert.Contains("value=\"bad key!\"", html);                                              // what was typed is kept
+        Assert.DoesNotContain("<b>bold</b>", html);                                               // markup is encoded, never raw
+        // Nothing was published by a failed publish.
+        var publish = await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Publish&organisationId={org}&locale=en");
+        Assert.Equal(HttpStatusCode.OK, publish.StatusCode);
+        using var admin = await app.SignInAsync(OrgAdmin, followRedirects: true);
+        var (_, headId) = await app.FindUserAsync("grouphead@a.example.test");
+        Assert.Contains("<option value=\"Viewer\"", await BodyAsync(admin, $"/Admin/Users/Details/{headId}"));
+    }
+
     private static IEnumerable<(string, string, string, string, int, bool)> Content(out Dictionary<string, string> documents) => PackTestKit.ThirdPackContent(out documents);
 }

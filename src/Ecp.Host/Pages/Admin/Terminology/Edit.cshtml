@@ -43,6 +43,39 @@
                 }
             </section>
         }
+        <section class="card" aria-labelledby="groups-h">
+            <h2 id="groups-h">@L["Approver group names"]</h2>
+            <p class="hint">@L["A group key such as the one a workflow names is a stable identifier and is never changed here. Give it a name people can read; leave the name empty to inherit the pack's name, or to show the key. The three empty rows are for groups not listed yet: type the key exactly as the workflow and the role assignments write it."]</p>
+            @for (var gi = 0; gi < Model.GroupRows.Count; gi++)
+            {
+                var g = Model.GroupRows[gi];
+                var known = string.IsNullOrEmpty(g.Key) ? null : f.Groups.FirstOrDefault(x => x.Key == g.Key);
+                <fieldset class="term">
+                    <legend>@(known is null ? L["A group not listed yet"].Value : known.Key)@if (known?.InheritedName is { } inh) { <span class="hint"> @L["inherits"] @inh (@L["pack"])</span> }</legend>
+                    @if (known is not null) { <input type="hidden" name="GroupRows[@gi].Key" value="@known.Key" /> }
+                    else { <div class="field"><label for="group-@gi-key">@L["Stable group key"]</label><input id="group-@gi-key" name="GroupRows[@gi].Key" type="text" maxlength="100" value="@g.Key" /></div> }
+                    <div class="field"><label for="group-@gi-name">@L["Name shown"]</label><input id="group-@gi-name" name="GroupRows[@gi].Name" type="text" maxlength="80" value="@g.Name" placeholder="@known?.InheritedName" /></div>
+                    <div class="field"><label for="group-@gi-description">@L["Description (optional)"]</label><input id="group-@gi-description" name="GroupRows[@gi].Description" type="text" maxlength="300" value="@g.Description" /></div>
+                </fieldset>
+            }
+        </section>
+        <section class="card" aria-labelledby="roles-h">
+            <h2 id="roles-h">@L["Roles offered when assigning"]</h2>
+            <p class="hint">@L["Choose which roles appear when someone assigns a role. This only tidies the pickers: nobody loses access, people who hold a hidden role are still listed, and the administrative roles are always offered."]</p>
+            @for (var ri = 0; ri < Model.RoleRows.Count; ri++)
+            {
+                var role = f.Roles.First(x => x.Code == Model.RoleRows[ri].Code);
+                <div class="field">
+                    <input type="hidden" name="RoleRows[@ri].Code" value="@role.Code" />
+                    <label for="role-@ri">@Terms.Role(role.Code) <code class="id">@role.Code</code></label>
+                    <select id="role-@ri" name="RoleRows[@ri].Choice">
+                        <option value="inherit" selected="@(Model.RoleRows[ri].Choice == "inherit")">@L["Inherit"] (@(role.InheritedOffered ? L["offered"] : L["not offered"]))</option>
+                        <option value="offered" selected="@(Model.RoleRows[ri].Choice == "offered")">@L["Offered"]</option>
+                        @if (role.Hideable) { <option value="hidden" selected="@(Model.RoleRows[ri].Choice == "hidden")">@L["Not offered"]</option> }
+                    </select>
+                </div>
+            }
+        </section>
         <section class="card" aria-labelledby="act-h">
             <h2 id="act-h">@L["Save, check and publish"]</h2>
             <div class="field"><label for="Note">@L["Note for the history (optional)"]</label><input id="Note" name="Note" type="text" maxlength="500" value="@Model.Note" /></div>

@@ -302,5 +302,13 @@
       "singular": "Organization",
       "plural": "Organizations"
     }
+  ],
+  "groups": [
+    {
+      "key": "GroupHeadProcurement",
+      "locale": "en",
+      "name": "Group Head of Procurement",
+      "description": "Approves registration of an executed agreement, or the configured backup does."
+    }
   ]
 }

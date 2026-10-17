@@ -48,13 +48,22 @@ A solution pack may carry an optional pack document terminology/terminology.json
 * **Installed as a draft only.** Assigning a pack to an organisation seeds an organisation `Terminology` *draft* from the pack's document (every entry stamped with the pack and version it came from). It never publishes, and never overwrites a published release or an open draft. Until the organisation publishes, it reads the pack's wording directly (layer 2).
 * **Previewed.** The pack review and assign pages list the terminology the pack introduces and how each label differs from what the organisation reads today. Setup and onboarding show the selected pack's wording and example labels before assignment.
 
-Pack versions in this slice: Blank **1.2.0**, JBS reference **2.2.0** (both rebuilt; `docs/PACK_AUTHORING.md` §4 describes the document and how a new pack provides terminology).
+Pack versions: Blank **1.3.0**, JBS reference **2.3.0** (S4 introduced the document at 1.2.0 and 2.2.0; the A+ follow-up of ADR-0029 added approver-group names) (both rebuilt; `docs/PACK_AUTHORING.md` §4 describes the document and how a new pack provides terminology).
 
 ## 6. The `Terminology` configuration kind
 
 Organisation terminology uses the existing lifecycle: **draft → validate → preview → publish → version history → rollback → audit**, with second-person publication where `ConfigurationOptions.RequireSecondPersonPublish` is on (the person who drafted cannot publish) and the same recent-sign-in rule for publish and rollback. It is tenant- and organisation-scoped: a release belongs to one organisation, and one organisation can never read or change another's.
 
 Content is an *overrides* document: only what the organisation changes. Validation errors (publication is blocked): unknown mode; more than 600 terms; a key not shaped like `contract.type`; a locale not like `en` or `en-AU`; a duplicate (key, locale); a missing singular or plural; limits (label 80, short 30, description 300, help 600 characters); leading or trailing space; line breaks in a single-line field; control characters; and **any markup, script, template or expression syntax** (`<`, `>`, `&entity;`, `javascript:`, `onclick=`, `{{ }}`, `${ }`, `<% %>`, `@(`, `expr:`). A key this version does not know is a warning (no effect), not an error, so a newer pack stays compatible with an older platform. A *complete* document (a pack's) must additionally carry every required key.
+
+### 6a. Approver-group names and role visibility (ADR-0029)
+
+The same document (a pack's, or an organisation's overrides) may carry two more optional sections. They are written only when present, so documents and packs without them are unchanged.
+
+* **`groups`: approver-group display names.** `{ "key": "GroupHeadProcurement", "locale": "en", "name": "Group Head of Procurement", "description": "..." }`. The key is the stable identifier stored on role assignments and named in workflows (letters, digits, dot, hyphen, underscore; at most 100 characters; free text chosen by a pack or an administrator, which the platform gives no meaning). The name is plain text of at most 80 characters. Resolution: the organisation's name, then the pack's, then the key itself. Ordinary pages show the name (`Terms.Group`); administrator pages show the name with the key beside it (`Terms.GroupLabel`). Used by the approvals queue and detail, the approval matrix and simulator pages, delegations and user administration. Blank names `Approvers` *Registration Approvers*; the JBS pack names `GroupHeadProcurement` *Group Head of Procurement*.
+* **`roles`: role visibility.** `{ "code": "Legal", "offered": false }`. A role that is not offered does not appear in the role picker when people assign roles (user administration lists which roles are not offered). It is **presentation only**: no grant is revoked, holders of the role are still listed, the trusted grant path and every permission check are unchanged, and `SystemAdministrator`, `TenantAdministrator` and `OrganisationAdministrator` can never be hidden (a document that tries is refused). The organisation's choice wins over the pack's; with neither, every role is offered. The picker offers a role when at least one organisation the grantor can delegate in offers it. This is the decision point that S6 (capabilities) will feed, for example a pack without Legal review hiding the Legal role.
+
+Validation: a group key that is not shaped like a key, a duplicate (key, locale), a missing or over-long name, markup in a name, more than 200 groups, a role code that is not one of the twelve (a *label* is not a role code), a duplicate role entry, and hiding an administrative role are all errors and block publication. Both sections are edited on the Edit page ("Approver group names", "Roles offered when assigning"), appear on the Overview and Preview pages, and need the same `terminology.*` permissions as everything else on those pages.
 
 ## 7. The resolver and its cache
 
@@ -110,7 +119,7 @@ Not granted to: System Administrator (installation-level; no tenant data), Divis
 
 * Authorisation is evaluated from role *codes*, permission *codes*, scopes and record facts. No evaluator, handler, route or query takes a label as input.
 * Labels pass through `Terms.Expand` at the edge of a response. They are not read back from a request: a form posts keys and ids, never labels.
-* Renaming `Procurement Administrator` to `Contract Administrator` (or the reverse) changes no grant, no scope, no workflow and no audit action. A test signs in as the same role in a JBS organisation and a Blank organisation and asserts the label differs while the pages reachable are identical.
+* Renaming `Procurement Administrator` to `Contract Administrator` (or the reverse) changes no grant, no scope, no workflow and no audit action. Naming an approver group or hiding a role from the picker changes none either; the role code, the permission code and the group key remain the permanent identifiers (ADR-0029, `tests/Ecp.UnitTests/FrozenIdentifierTests.cs`). A test signs in as the same role in a JBS organisation and a Blank organisation and asserts the label differs while the pages reachable are identical.
 * Label text is plain text, HTML-encoded on output, validated for markup on write, and never evaluated as a template other than by the constrained token expander.
 * Expansion never crosses tenants: the cache key and the release lookup carry tenant and organisation; the tests prove one organisation's wording never reaches another.
 

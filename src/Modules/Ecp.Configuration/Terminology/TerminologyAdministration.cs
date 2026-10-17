@@ -2,6 +2,7 @@ using System.Globalization;
 using Ecp.Audit;
 using Ecp.Identity;
 using Ecp.Identity.Access;
+using Ecp.Identity.Domain;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -17,17 +18,42 @@ public sealed record TermRowView(string Key, string Group, string Description, b
 }
 
 public sealed record TerminologyOverview(Guid OrganisationId, string OrganisationName, string Locale, string? PackKey, string? PackVersion, bool PackHasTerminology, int? ReleaseNumber, DraftDto? Draft,
-    IReadOnlyList<TermRowView> Rows, bool CanDraft, bool CanPublish, bool CanRollback, bool CanReadHistory, bool CanReadAudit);
+    IReadOnlyList<TermRowView> Rows, bool CanDraft, bool CanPublish, bool CanRollback, bool CanReadHistory, bool CanReadAudit)
+{
+    /// <summary>The approver-group display names in force and which layer gave each.</summary>
+    public IReadOnlyList<(string Key, string Name, TermLayer Layer)> Groups { get; init; } = [];
+    /// <summary>Roles hidden from assignment pickers in force (presentation only).</summary>
+    public IReadOnlyList<string> RolesNotOffered { get; init; } = [];
+}
 
 /// <summary>What the edit form shows for one locale: every platform key, with the organisation's current draft (or published) entry if it has one, and the wording it would otherwise inherit.</summary>
 public sealed record TermEditRow(string Key, string Group, string Description, string InheritedSingular, string InheritedPlural, TermLayer InheritedFrom, TermEntry? Entry);
-public sealed record TerminologyEditModel(Guid OrganisationId, string OrganisationName, string Locale, DraftDto? Draft, int? ReleaseNumber, IReadOnlyList<TermEditRow> Rows, IReadOnlyList<string> Locales);
+public sealed record TerminologyEditModel(Guid OrganisationId, string OrganisationName, string Locale, DraftDto? Draft, int? ReleaseNumber, IReadOnlyList<TermEditRow> Rows, IReadOnlyList<string> Locales)
+{
+    /// <summary>Approver groups the form already knows a name for (the organisation's own or its pack's), for the locale being edited.</summary>
+    public IReadOnlyList<GroupEditRow> Groups { get; init; } = [];
+    /// <summary>One row per platform role: whether it is offered when people assign roles, and the organisation's own choice if it has one.</summary>
+    public IReadOnlyList<RoleEditRow> Roles { get; init; } = [];
+}
+
+/// <summary>An approver group's display name for the locale being edited. The key is the stable identifier written in workflows and on role assignments and is never changed here.</summary>
+public sealed record GroupEditRow(string Key, string? InheritedName, string? InheritedDescription, TermLayer InheritedFrom, GroupDisplayName? Entry);
+/// <summary><see cref="Choice"/> null means the organisation has no choice of its own (it inherits the pack's, otherwise the role is offered).</summary>
+public sealed record RoleEditRow(string Code, string Label, bool Hideable, bool InheritedOffered, TermLayer InheritedFrom, bool? Choice);
+public sealed record GroupInput(string Key, string? Name, string? Description);
+/// <summary><see cref="Choice"/> is <c>inherit</c>, <c>offered</c> or <c>hidden</c>.</summary>
+public sealed record RoleInput(string Code, string Choice);
 
 /// <summary>A row submitted by the edit form. <see cref="Override"/> false means "inherit": no entry is kept for that key.</summary>
 public sealed record TermInput(string Key, bool Override, string? Singular, string? Plural, string? Short, string? Description, string? Help);
 
 public sealed record TermSample(string Area, string Template, string Now, string After);
-public sealed record TerminologyPreviewResult(Guid OrganisationId, string Locale, bool HasDraft, IReadOnlyList<TermSample> Samples, IReadOnlyList<(string Role, string Code, string Now, string After)> Roles);
+public sealed record TerminologyPreviewResult(Guid OrganisationId, string Locale, bool HasDraft, IReadOnlyList<TermSample> Samples, IReadOnlyList<(string Role, string Code, string Now, string After)> Roles)
+{
+    public IReadOnlyList<(string Key, string Now, string After)> Groups { get; init; } = [];
+    public IReadOnlyList<string> RolesNotOfferedNow { get; init; } = [];
+    public IReadOnlyList<string> RolesNotOfferedAfter { get; init; } = [];
+}
 public sealed record TerminologyReleaseView(ReleaseDto Release, int Added, int Changed, int Removed);
 /// <summary>What happened when an organisation's pack wording was prepared as a draft.</summary>
 public enum PackWordingOutcome { DraftCreated, DraftAlreadyOpen, OrganisationKeepsItsOwn, PackHasNoWording, PackNotAvailable }
@@ -45,6 +71,11 @@ public interface ITerminologyAdministration
     Task<TerminologyEditModel> EditModelAsync(Guid organisationId, string? locale = null, CancellationToken ct = default);
     /// <summary>Replaces the organisation's entries for one locale in its open draft (creating the draft from the published release if there is none). Other locales are kept. Nothing is published.</summary>
     Task<DraftDto> SaveAsync(Guid organisationId, string locale, IReadOnlyList<TermInput> inputs, CancellationToken ct = default);
+    /// <summary>
+    /// As above, and also replaces the approver-group display names for the locale and the role visibility choices in the same draft. A null list keeps what the draft already holds. Role visibility hides a role from pickers
+    /// only: it revokes nothing, and the administrative roles cannot be hidden.
+    /// </summary>
+    Task<DraftDto> SaveAsync(Guid organisationId, string locale, IReadOnlyList<TermInput> inputs, IReadOnlyList<GroupInput>? groups, IReadOnlyList<RoleInput>? roles, CancellationToken ct = default);
     Task<TerminologyPreviewResult> PreviewAsync(Guid organisationId, string? locale = null, CancellationToken ct = default);
     /// <summary>
     /// Prepares a terminology draft from a solution pack for an organisation: the pack's wording, stamped with the pack and version it came from. Never publishes, never replaces a draft that is open and never touches terminology
@@ -154,9 +185,12 @@ internal sealed class TerminologyAdministration(IConfigurationService configurat
                 packSet?.Find(def.Key) is { Layer: TermLayer.Pack } p ? p.Singular : null, packSet?.Find(def.Key) is { Layer: TermLayer.Pack } p2 ? p2.Plural : null,
                 neutral.Singular(def.Key), neutral.Plural(def.Key), Pick(published, def.Key, loc), Pick(draftDoc, def.Key, loc)));
         }
+        var groups = effective.GroupNames.Values.OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => (g.Key, g.Name, published?.Groups?.Any(x => x.Key == g.Key) == true ? TermLayer.Organisation : TermLayer.Pack)).ToList();
         return new TerminologyOverview(organisationId, org.Name, loc, pack?.PackKey, pack?.PackVersion, pack is not null, release?.Number, draft, rows,
             await HoldsAsync("terminology.draft", organisationId, ct), await HoldsAsync("terminology.publish", organisationId, ct), await HoldsAsync("terminology.rollback", organisationId, ct),
-            await HoldsAsync("terminology.read", organisationId, ct), await HoldsAsync("terminology.audit.read", organisationId, ct));
+            await HoldsAsync("terminology.read", organisationId, ct), await HoldsAsync("terminology.audit.read", organisationId, ct))
+        { Groups = groups, RolesNotOffered = effective.HiddenRoles.Order(StringComparer.Ordinal).ToList() };
     }
 
     public async Task<TerminologyEditModel> EditModelAsync(Guid organisationId, string? locale = null, CancellationToken ct = default)
@@ -180,12 +214,24 @@ internal sealed class TerminologyAdministration(IConfigurationService configurat
             var entry = doc?.Terms.FirstOrDefault(t => t.Key == def.Key && t.Locale == loc);
             return new TermEditRow(def.Key, def.Group, def.Description, inheritedTerm?.Singular ?? def.Singular, inheritedTerm?.Plural ?? def.Plural, inheritedTerm?.Layer ?? TermLayer.Platform, entry);
         }).ToList();
-        return new TerminologyEditModel(organisationId, org.Name, loc, draft, release?.Number, rows, locales.ToList());
+        var packExtras = pack?.Document.Extras;
+        var inheritedGroups = TermSet.Build(loc, null, null, null, null, null, packExtras);
+        var groupKeys = new SortedSet<string>((doc?.Groups ?? []).Where(g => g.Locale == loc).Select(g => g.Key).Concat((pack?.Document.Groups ?? []).Select(g => g.Key)), StringComparer.Ordinal);
+        foreach (var l in locales) foreach (var g in doc?.Groups ?? []) if (g.Locale == l) groupKeys.Add(g.Key);
+        var groups = groupKeys.Select(k => new GroupEditRow(k, inheritedGroups.HasGroupName(k) ? inheritedGroups.Group(k) : null, inheritedGroups.GroupDescription(k), inheritedGroups.HasGroupName(k) ? TermLayer.Pack : TermLayer.Platform,
+            doc?.Groups?.FirstOrDefault(g => g.Key == k && g.Locale == loc))).ToList();
+        var inheritedRoles = TermSet.Build(loc, null, null, null, null, null, packExtras);
+        var roleRows = RoleCodes.All.Select(code => new RoleEditRow(code, inherited.Singular(TermCatalogue.KeyForRole(code)), !TermSet.RolesNeverHidden.Contains(code), inheritedRoles.IsRoleOffered(code),
+            pack?.Document.Roles?.Any(r => r.Code == code) == true ? TermLayer.Pack : TermLayer.Platform, doc?.Roles?.FirstOrDefault(r => r.Code == code)?.Offered)).ToList();
+        return new TerminologyEditModel(organisationId, org.Name, loc, draft, release?.Number, rows, locales.ToList()) { Groups = groups, Roles = roleRows };
     }
 
     private static TerminologyDocument? SafeParse(string json) { try { return TerminologyDocument.Parse(json); } catch (DomainException) { return null; } }
 
-    public async Task<DraftDto> SaveAsync(Guid organisationId, string locale, IReadOnlyList<TermInput> inputs, CancellationToken ct = default)
+    public Task<DraftDto> SaveAsync(Guid organisationId, string locale, IReadOnlyList<TermInput> inputs, CancellationToken ct = default)
+        => SaveAsync(organisationId, locale, inputs, null, null, ct);
+
+    public async Task<DraftDto> SaveAsync(Guid organisationId, string locale, IReadOnlyList<TermInput> inputs, IReadOnlyList<GroupInput>? groupInputs, IReadOnlyList<RoleInput>? roleInputs, CancellationToken ct = default)
     {
         await access.RequireAsync("terminology.draft", Resource(organisationId), ct);
         _ = await OrganisationAsync(organisationId, ct);
@@ -208,7 +254,12 @@ internal sealed class TerminologyAdministration(IConfigurationService configurat
             if (previousByKey.TryGetValue(input.Key, out var old) && old.Source is not null && SameWording(old, entry)) entry = entry with { Source = old.Source };
             entries.Add(entry);
         }
-        var document = new TerminologyDocument(TerminologyDocument.Overrides, entries);
+        // Approver-group names: other locales are kept; this locale is replaced by what the form sent (a blank name means "inherit", so no entry). Role choices are not per locale.
+        var groups = groupInputs is null ? existing.Groups : (existing.Groups ?? []).Where(g => g.Locale != loc)
+            .Concat(groupInputs.Where(g => !string.IsNullOrWhiteSpace(g.Key) || !string.IsNullOrWhiteSpace(g.Name))
+                .Select(g => new GroupDisplayName((g.Key ?? "").Trim(), loc, (g.Name ?? "").Trim(), Blank(g.Description)))).ToList();
+        var roles = roleInputs is null ? existing.Roles : roleInputs.Where(r => r.Choice is "offered" or "hidden").Select(r => new RoleOffer(r.Code.Trim(), r.Choice == "offered")).ToList();
+        var document = new TerminologyDocument(TerminologyDocument.Overrides, entries, groups is { Count: > 0 } ? groups : null, roles is { Count: > 0 } ? roles : null);
         var json = document.ToJson();
         var draft = open ?? await configuration.GetOrCreateDraftAsync(Kind, organisationId, json, ct);
         return await configuration.SaveDraftAsync(draft.Id, json, ct);
@@ -228,7 +279,13 @@ internal sealed class TerminologyAdministration(IConfigurationService configurat
         var after = doc is null ? now : await resolver.PreviewAsync(organisationId, doc, loc, ct);
         var samples = Samples.Select(s => new TermSample(s.Area, s.Template, now.Expand(s.Template), after.Expand(s.Template))).ToList();
         var roles = SampleRoles.Select(r => (Role: TermCatalogue.KeyForRole(r), Code: r)).Select(r => (r.Role, r.Code, now.Singular(r.Role), after.Singular(r.Role))).ToList();
-        return new TerminologyPreviewResult(organisationId, loc, draft is not null, samples, roles);
+        var groupKeys = now.GroupNames.Keys.Union(after.GroupNames.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        return new TerminologyPreviewResult(organisationId, loc, draft is not null, samples, roles)
+        {
+            Groups = groupKeys.Select(k => (k, now.Group(k), after.Group(k))).ToList(),
+            RolesNotOfferedNow = now.HiddenRoles.Order(StringComparer.Ordinal).ToList(),
+            RolesNotOfferedAfter = after.HiddenRoles.Order(StringComparer.Ordinal).ToList()
+        };
     }
 
     public async Task<IReadOnlyList<TerminologyReleaseView>> HistoryAsync(Guid organisationId, CancellationToken ct = default)

@@ -302,5 +302,13 @@
       "singular": "Organization",
       "plural": "Organizations"
     }
+  ],
+  "groups": [
+    {
+      "key": "Approvers",
+      "locale": "en",
+      "name": "Registration Approvers",
+      "description": "The people who approve registration of an executed contract."
+    }
   ]
 }

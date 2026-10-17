@@ -114,6 +114,69 @@ internal static class TerminologyScenarios
         Assert.Equal("Contract", (await TermsAsync(w, "tenantAdmin", Guid.NewGuid())).Singular("contract"));
     }
 
+    public static async Task Approver_group_names_and_role_visibility_follow_the_layers_and_never_touch_authority(TestApp app)
+    {
+        var w = await LifecycleWorld.CreateAsync(app);
+        var key = Unique("agreements");
+        await InstallAsync(w, key, PackTestKit.Build(key, "1.0.0", content: PackManagerScenarios.ThirdPackContent(out var docs), extraDocuments: docs));
+        var jbs = await PackResolutionScenarios.AddOrganisationAsync(w, "Group Ref Org", "TGJ", TestPacks.Reference);
+        var blank = await PackResolutionScenarios.AddOrganisationAsync(w, "Group Blank Org", "TGB", "blank");
+        var third = await PackResolutionScenarios.AddOrganisationAsync(w, "Group Third Org", "TGT", key);
+
+        // Layer 2: each pack names its own approver group; the key itself is what is stored and compared.
+        var forJbs = await TermsAsync(w, "tenantAdmin", jbs.Org);
+        var forBlank = await TermsAsync(w, "tenantAdmin", blank.Org);
+        var forThird = await TermsAsync(w, "tenantAdmin", third.Org);
+        Assert.Equal("Group Head of Procurement", forJbs.Group("GroupHeadProcurement"));
+        Assert.Equal("Registration Approvers", forBlank.Group("Approvers"));
+        Assert.Equal("Activation Approvers", forThird.Group("Approvers"));
+        Assert.Equal("GroupHeadProcurement", forBlank.Group("GroupHeadProcurement"));          // no leak from the other pack: an unnamed group is its own key
+        Assert.Equal("Approvers", forJbs.Group("Approvers"));
+        // Role visibility: nothing is hidden by default; the third pack hides one administrative role for a business with no divisions or sites.
+        Assert.Empty(forJbs.HiddenRoles);
+        Assert.Empty(forBlank.HiddenRoles);
+        Assert.Equal([RoleCodes.DivisionSiteAdministrator], forThird.HiddenRoles.ToArray());
+
+        // Layer 1: the organisation's own published choice wins over its pack, in that organisation only.
+        var admin = await AdminForAsync(w, blank.Org, "groupAdmin");
+        var json = new TerminologyDocument(TerminologyDocument.Overrides, [], [new GroupDisplayName("Approvers", "en", "Contract Approvers")], [new RoleOffer(RoleCodes.Legal, false)]).ToJson();
+        await PublishAsync(w, admin, blank.Org, json);
+        forBlank = await TermsAsync(w, "tenantAdmin", blank.Org);
+        Assert.Equal("Contract Approvers", forBlank.Group("Approvers"));
+        Assert.False(forBlank.IsRoleOffered(RoleCodes.Legal));
+        Assert.Equal("Group Head of Procurement", (await TermsAsync(w, "tenantAdmin", jbs.Org)).Group("GroupHeadProcurement"));
+        Assert.True((await TermsAsync(w, "tenantAdmin", jbs.Org)).IsRoleOffered(RoleCodes.Legal));
+        Assert.Equal("Activation Approvers", (await TermsAsync(w, "tenantAdmin", third.Org)).Group("Approvers"));
+
+        // The organisation brings back the role its pack hid.
+        var thirdAdmin = await AdminForAsync(w, third.Org, "thirdAdmin");
+        await PublishAsync(w, thirdAdmin, third.Org, new TerminologyDocument(TerminologyDocument.Overrides, [], null, [new RoleOffer(RoleCodes.DivisionSiteAdministrator, true)]).ToJson());
+        Assert.True((await TermsAsync(w, "tenantAdmin", third.Org)).IsRoleOffered(RoleCodes.DivisionSiteAdministrator));
+
+        // Hiding changes no authority: the trusted path still grants the hidden role, its holder is found, and the grant evaluates as before.
+        var legal = await AdminForAsync(w, blank.Org, "hiddenLegal", RoleCodes.Legal);
+        var holders = await w.W.AsAsync("tenantAdmin", s => s.Get<IAccessDirectory>().HoldersOfRoleAsync(RoleCodes.Legal, blank.Org));
+        Assert.Contains(w.W.Users[legal], holders);
+        Assert.NotEqual(Ecp.Identity.Access.Grant.None, Ecp.Identity.Access.PermissionMatrix.Instance.Of(RoleCodes.Legal, "legal.clear"));
+
+        // A draft that names a role that does not exist, hides an administrative role, or carries markup in a group name cannot be published.
+        foreach (var bad in new[]
+        {
+            new TerminologyDocument(TerminologyDocument.Overrides, [], null, [new RoleOffer("ContractAdministrator", false)]),
+            new TerminologyDocument(TerminologyDocument.Overrides, [], null, [new RoleOffer(RoleCodes.OrganisationAdministrator, false)]),
+            new TerminologyDocument(TerminologyDocument.Overrides, [], [new GroupDisplayName("Approvers", "en", "<script>x</script>")], null),
+            new TerminologyDocument(TerminologyDocument.Overrides, [], [new GroupDisplayName("not a key", "en", "Name")], null),
+        })
+        {
+            var draft = await w.W.AsAsync(admin, s => s.Get<IConfigurationService>().GetOrCreateDraftAsync(Kind, blank.Org, bad.ToJson()));
+            if (draft.ContentJson != bad.ToJson()) draft = await w.W.AsAsync(admin, s => s.Get<IConfigurationService>().SaveDraftAsync(draft.Id, bad.ToJson()));
+            var checkedDraft = await w.W.AsAsync(admin, s => s.Get<IConfigurationService>().ValidateAsync(draft.Id));
+            Assert.False(checkedDraft.IsPublishable);
+            await w.W.AsAsync(admin, s => s.Get<IConfigurationService>().DiscardDraftAsync(draft.Id));
+        }
+        Assert.Equal("Contract Approvers", (await TermsAsync(w, "tenantAdmin", blank.Org)).Group("Approvers"));   // nothing changed
+    }
+
     // ---- 2. lifecycle ----
 
     public static async Task An_override_is_drafted_validated_previewed_published_removed_rolled_back_and_audited(TestApp app)
@@ -473,6 +536,7 @@ public sealed class TerminologyScenarioTests_Sqlite
     [Fact] public Task Faulty_cache() => ProviderRunner.SqliteAsync(TerminologyScenarios.When_the_cache_fails_terminology_is_resolved_from_persistence, s => s.AddSingleton<ITerminologyCache>(new TerminologyScenarios.FaultyCache()));
     [Fact] public Task Assignment() => ProviderRunner.SqliteAsync(TerminologyScenarios.Assigning_a_pack_prepares_a_terminology_draft_and_never_publishes_or_overwrites_published_terminology);
     [Fact] public Task Pack_validation() => ProviderRunner.SqliteAsync(TerminologyScenarios.A_pack_with_an_invalid_terminology_document_cannot_be_installed_and_a_valid_one_previews_its_words);
+    [Fact] public Task Groups_and_roles() => ProviderRunner.SqliteAsync(TerminologyScenarios.Approver_group_names_and_role_visibility_follow_the_layers_and_never_touch_authority);
     [Fact] public Task Many() => ProviderRunner.SqliteAsync(TerminologyScenarios.Several_terms_are_resolved_in_one_operation_and_an_unknown_key_is_a_diagnostic_only);
 }
 
@@ -487,5 +551,6 @@ public sealed class TerminologyScenarioTests_SqlServer
     [SqlServerFact] public Task Isolation() => ProviderRunner.SqlServerAsync(TerminologyScenarios.Terminology_never_crosses_a_tenant_or_an_organisation_and_the_cache_is_keyed_by_both);
     [SqlServerFact] public Task Cache() => ProviderRunner.SqlServerAsync(TerminologyScenarios.The_cache_is_used_invalidated_by_publish_and_rollback_and_never_required);
     [SqlServerFact] public Task Pack_validation() => ProviderRunner.SqlServerAsync(TerminologyScenarios.A_pack_with_an_invalid_terminology_document_cannot_be_installed_and_a_valid_one_previews_its_words);
+    [SqlServerFact] public Task Groups_and_roles() => ProviderRunner.SqlServerAsync(TerminologyScenarios.Approver_group_names_and_role_visibility_follow_the_layers_and_never_touch_authority);
     [SqlServerFact] public Task Assignment() => ProviderRunner.SqlServerAsync(TerminologyScenarios.Assigning_a_pack_prepares_a_terminology_draft_and_never_publishes_or_overwrites_published_terminology);
 }

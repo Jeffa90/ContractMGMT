@@ -1,6 +1,6 @@
 # Role catalogue: should the persisted role identifiers change? (S5 design, no implementation)
 
-Status: **Proposed. Design only. Awaiting the owner's decision.** Nothing in `src/`, the schema, the packs or the requirements was changed to produce this document. If accepted it becomes ADR-0029 and the numbering below is the decision table to copy.
+Status: **Accepted by the owner (2026-10-17): Option A+.** Recorded as `decisions/ADR-0029-stable-role-and-permission-identifiers.md`. The design sections below (1 to 12) are kept as written when the document was Proposed; section 13 records the decision and what was built. Production approval remains external governance.
 
 Scope: remediation slice S5 of `docs/PORTABILITY_REMEDIATION_PLAN.md` (R8 step 1, finding P-02b of `docs/PORTABILITY_AUDIT.md`). It decides whether S8 (R8 step 2, "implement the ADR") is still needed.
 
@@ -219,3 +219,28 @@ Estimates are for the code and tests; SQL Server verification is CI-only in this
 ## 12. What this document did not do
 
 It did not change source, schema, packs, requirements or tests. It did not touch the permission matrix. It does not decide S6, S9 or S10. It does not declare production approval.
+
+## 13. Decision and what was built (2026-10-17)
+
+The owner approved **Option A+** with these decisions, which supersede the "owner decisions required" table in section 11:
+
+| # | Decision |
+|---|---|
+| 1 | Stable role codes are permanent identifiers. |
+| 2 | Stable permission codes are permanent identifiers. |
+| 3 | Stable approver-group keys are permanent identifiers. |
+| 4 | PRT-013 is satisfied by terminology and display-layer abstraction (the requirement text was amended; `requirements/08-portability/PORTABILITY_ACCEPTANCE_CRITERIA.md`). |
+| 5 | **S8 (rename with aliases) is retired.** |
+| 6 | S8 is recorded as **superseded by S4 (ADR-0028) and this ADR**. |
+| 7 | The A+ follow-ups are implemented: frozen-identifier tests; approver-group display names; role-visibility support for S6. |
+| 8 | No persisted identifier is renamed. |
+| 9 | No alias migrations are created. |
+
+**Built (no schema change, no migration, no new table):**
+
+* **Frozen identifiers.** `tests/Ecp.UnitTests/FrozenIdentifierTests.cs` (10 tests) freezes the twelve role codes and their order, the matrix header, the 82 permission codes (a removal or rename fails; an addition must be added on purpose), the role-to-terminology mapping, the shipped approver-group keys, the free-text rule for a group key, the audit action codes for role changes, and the role columns' names and sizes. It also asserts that no label is accepted as a role code (no alias) and that no Identity migration rewrites role data.
+* **Approver-group display names.** The terminology document gained an optional `groups` section (`key`, `locale`, `name`, optional `description`). The key is the stable identifier, validated as a key (letters, digits, dot, hyphen, underscore, at most 100 characters); the name is plain text of at most 80 characters. Resolution is organisation, then pack, then the key itself. `TermSet.Group(key)` and the page helpers `Terms.Group` (ordinary pages: the name) and `Terms.GroupLabel` (administrator pages: the name with the key beside it) are used on the approvals queue and detail, the approval matrix and simulator pages, delegations and user administration. The Edit page has an "Approver group names" section (listed groups plus three empty rows for groups not listed yet), and the Overview and Preview pages show them. The JBS pack (2.3.0) names `GroupHeadProcurement` *Group Head of Procurement*; the Blank pack (1.3.0) names `Approvers` *Registration Approvers*.
+* **Role visibility (S6 support).** The same document gained an optional `roles` section (`code`, `offered`). Hiding a role removes it from the **role picker only**: nobody loses access, the role's holders are still listed, the trusted grant path and every permission check are unchanged, and the three administrative roles (`SystemAdministrator`, `TenantAdministrator`, `OrganisationAdministrator`) can never be hidden, so nobody can be locked out. The organisation's choice wins over the pack's; with neither, every role is offered. The user-administration picker offers a role when at least one organisation the grantor can delegate in offers it, and says which roles are not offered. When S6 adds capabilities, it can feed the same `TermSet.IsRoleOffered` decision (for example, a pack without Legal review hiding the Legal role); no further S5/S8 work is needed. No flag mechanism was built here.
+* **Existing documents are unaffected.** The new sections are written only when present, so packs and releases without them serialise byte-for-byte as before; the older pack versions still load.
+
+**Left as written in section 10:** follow-up 4 (the neutral `Approver` label) and follow-up 5 (the onboarding warning printing a raw role code) are small wording items for the owner and were not part of the decision.

@@ -379,5 +379,6 @@ flowchart LR
 | 0026 | Solution packs are external, signed, tenant-scoped data (S7) | Accepted (owner, 2026-10-17) |
 | 0027 | The signature boundary is provider-neutral (S3) | Accepted (owner, 2026-10-17) |
 | 0028 | Terminology is data: stable keys, layered labels, no label ever decides authority (S4) | Accepted (owner, 2026-10-17) |
+| 0029 | Role codes, permission codes and approver-group keys are permanent identifiers (S5) | Accepted (owner, 2026-10-17) |
 
 ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.

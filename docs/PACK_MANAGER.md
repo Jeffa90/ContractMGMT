@@ -59,7 +59,7 @@ An unsigned pack is shown with a red **NOT SIGNED** warning wherever it appears.
 
 ### Terminology in a pack (S4)
 
-A pack may carry a terminology document. The upload and review pages list it under the pack's documents and show **Terminology introduced**: each label the pack would give, beside what the organisation reads today. Assigning the pack creates an organisation Terminology draft (never published, never overwriting published wording or an open draft). Terminology is edited under Admin → Terminology with its own permissions (`terminology.*`; see `docs/TERMINOLOGY.md` §11); the `packs.*` permissions neither grant nor need them. Pack versions in this slice: Blank 1.2.0, JBS reference 2.2.0.
+A pack may carry a terminology document. The upload and review pages list it under the pack's documents and show **Terminology introduced**: each label the pack would give, beside what the organisation reads today. Assigning the pack creates an organisation Terminology draft (never published, never overwriting published wording or an open draft). Terminology is edited under Admin → Terminology with its own permissions (`terminology.*`; see `docs/TERMINOLOGY.md` §11); the `packs.*` permissions neither grant nor need them. Pack versions: Blank 1.3.0, JBS reference 2.3.0.
 
 ## 3. Organisations that need attention (report only)
 

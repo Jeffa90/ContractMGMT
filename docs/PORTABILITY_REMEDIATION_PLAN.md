@@ -151,10 +151,10 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 | **S2, done** | R2 and R3 | S1 | Migrated contracts take the workflow's initial status; unowned-category reminder fall-back comes from the policy; JBS pack states the same recipient it has today |
 | S3 | R6 | none (can run in parallel with S2) | Signature request vocabulary neutral; EF migration renames the column and filtered index; no data loss. **Done 2026-10-17 (section 8.11, ADR-0027).** |
 | S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions. **Done 2026-10-17 (section 8.12, ADR-0028).** |
-| S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013. **Design written 2026-10-17, awaiting the owner's decision: `docs/ROLE_CATALOGUE_ADR.md` recommends stable identifiers with names from terminology (option A+) and retiring S8.** |
+| S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013. **Done 2026-10-17: Option A+ accepted (section 8.13, ADR-0029, `docs/ROLE_CATALOGUE_ADR.md`).** |
 | S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged |
 | S7 | R7 pack loader and store (CFG-04, PKM-01); remove embedded JBS resources; R4 stage C | S1, S5, S6 | A pack installs from the store with no rebuild; the three `.csproj` embeds are gone. **Done 2026-10-17 for S7a to S7c plus the Pack Manager, setup and onboarding integration (section 8.10); S7d to S7f are future.** The order dependency on S5 and S6 was waived by the owner's instruction. |
-| S8 | R8 step 2: implement the ADR | S5, S7 | Section 6.2 |
+| S8 | R8 step 2: implement the ADR | S5, S7 | **Retired 2026-10-17, superseded by S4 (ADR-0028) and ADR-0029.** The accepted decision needs no rename; its follow-ups were delivered in section 8.13. |
 | S9 | R11: second pack (PKM-04) with PRT-002, PRT-004, PRT-013 end-to-end | S1 to S8 | PRT-002 passes |
 | S10 | R10 cleanup (neutral fall-backs; validation as rule; field relocation only if justified) | any | Section 6.3 |
 
@@ -385,11 +385,21 @@ Delivered on the owner's instruction (R5, R4 stage B; findings P-05, P-06, P-07,
 
 **Not done:** role-catalogue replacement (S5/S8), feature flags (S6), another pack-loader slice, regional defaults (S10), live e-signature, reporting, operations, API work, AI, marketplace, visual designers. **First incomplete remediation task after S4:** S5 (the role-catalogue decision), then S6, S8 to S10.
 
+### 8.13 Slice S5: stable role and permission identifiers (ADR-0029)
+
+Delivered on the owner's decision (Option A+): design in `docs/ROLE_CATALOGUE_ADR.md`, decision in `decisions/ADR-0029-stable-role-and-permission-identifiers.md`.
+
+* **Decisions.** Role codes, permission codes and approver-group keys are permanent identifiers; PRT-013 is satisfied by terminology and display-layer abstraction (requirement text amended; decision D7c); S8 retired and recorded as superseded; no identifier renamed; no alias migration.
+* **Follow-ups built (no schema change).** Frozen-identifier tests (`FrozenIdentifierTests`, 10); approver-group display names (optional `groups` section of the terminology document, resolved organisation over pack over key, shown beside the key on administrator pages, edited on the Terminology edit form; Blank 1.3.0 and JBS 2.3.0 name their groups); role visibility support for S6 (optional `roles` section, hides a role from the role picker only, never the system, tenant or organisation administrator roles, never revokes access).
+* **Exit criteria.** "ADR accepted, D1 reconciled with PRT-013": met. "A business can show its own role and group names, and hide a role it does not use, with no rename": met (tests through the real host on SQLite; SQL Server in CI).
+
+**Not done:** a capability or feature-flag mechanism (S6), a data-driven role catalogue (Future), regional defaults (S10), another pack slice. **First incomplete remediation task after S5:** S6 (feature flags that gate capabilities), then S9 and S10.
+
 ## 9. Open decisions for the owner
 
 | Decision | Needed by | Recommendation |
 |---|---|---|
-| Role catalogue: Option A (names from terminology, codes stay) or Option B (rename with alias) | S5 | Option A now; B only if a business cannot accept the identifier |
+| Role catalogue: Option A (names from terminology, codes stay) or Option B (rename with alias) | S5 | **Decided 2026-10-17: Option A+ (ADR-0029).** B and a data-driven catalogue are not pursued |
 | Is Legal review a platform capability (flag-gated) or a JBS pack feature (removable)? | S6 | A flag-gated platform capability: the data model and pages stay, the pack chooses whether to use them |
 | `org-a2` in the Demonstration seed: keep on Blank (and accept the neutral lifecycle) or move to the JBS pack | S1 | Keep on Blank; it is the cheapest permanent test of a non-JBS organisation |
 | Move ABN and SAP number into fields? | S10 | No; make the validation a rule |

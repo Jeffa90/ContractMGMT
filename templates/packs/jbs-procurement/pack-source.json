@@ -1,7 +1,7 @@
 {
   "packageId": "platform.pack.jbs-procurement",
   "packKey": "jbs-procurement",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "displayName": {
     "en-AU": "JBS Procurement Reference"
   },

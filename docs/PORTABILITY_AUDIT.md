@@ -86,6 +86,17 @@ New classes used in this section: **Stable machine identifier** (a role, permiss
 
 **The guard.** `VocabularyGuardTests` scans every shipped text file case-insensitively for `JBS`, `JBSAUS`, `Medius`, `Qlik`, `DocuSign`, `Group Procurement`, `Group Head of Procurement`, `Procurement Administrator`, `Procurement Contract Register`, `Category Owner`, `en-AU`, an Australian time-zone identifier, `Brisbane`, `AUD` (as a currency code), and for capitalised business words in page text. Its allow-list names single files with a reason, rejects stale entries, is capped, and is proved narrow by tests. Scan result at the end of S4: no hit outside the allow-list; every allowance is exercised.
 
+## 0.5 Status after slice S5 (stable role and permission identifiers; ADR-0029)
+
+**P-02b is closed by policy, not by rename.** The registers in sections 3 to 10 still describe the repository as first audited and are not regenerated. The owner decided (Option A+) that role codes, permission codes and approver-group keys are permanent identifiers (`docs/ROLE_CATALOGUE_ADR.md`).
+
+| Class | Where it remains | Why it is acceptable |
+|---|---|---|
+| **Stable machine identifier** | `RoleCodes.ProcurementAdministrator`, `CategoryOwner`, `Legal`, `Approver`, `BackupApprover` and the other seven; permission codes such as `categories.manage`, `suppliers.manage`; the approver-group key `GroupHeadProcurement` in the JBS pack | Frozen by `FrozenIdentifierTests`; persisted in assignments, mappings, audit and immutable configuration; the label people read comes from terminology; the guard matches words, not these identifiers |
+| **Presentation of identifiers** | Approver-group display names and role visibility in the terminology document | Presentation only; no authority change |
+
+**Closed:** P-02b. **Superseded:** the plan's slice S8 (rename with aliases). **Still open:** P-04 (pack feature flags, S6), regional defaults (S10), R-01 to R-04.
+
 ## 1. Scope, method and classification
 
 ### 1.1 What was scanned

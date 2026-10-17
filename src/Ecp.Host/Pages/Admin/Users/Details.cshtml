@@ -14,7 +14,7 @@
     @foreach (var a in Model.Assignments)
     {
         <tr>
-            <th scope="row">@Terms.Role(a.RoleCode) <code class="id" title="@L["Stable role identifier"]">@a.RoleCode</code>@if (a.ViewerKind is { } k) { <text> (@k)</text> }@if (a.ApproverGroupKey is { } g) { <br /><span class="hint">@L["Approver group"]: @g</span> }</th>
+            <th scope="row">@Terms.Role(a.RoleCode) <code class="id" title="@L["Stable role identifier"]">@a.RoleCode</code>@if (a.ViewerKind is { } k) { <text> (@k)</text> }@if (a.ApproverGroupKey is { } g) { <br /><span class="hint">@L["Approver group"]: @Terms.GroupLabel(g)</span> }</th>
             <td>@Terms.Expand(Model.Describe(a))</td><td>@a.Scope.ClassificationCeiling</td>
             <td>@Model.Period(a)</td><td>@a.GrantedByLabel (@a.Source)</td>
             <td>
@@ -45,7 +45,8 @@ else
 {
 <form method="post" asp-page-handler="Grant">
     <div class="field"><label for="role">@L["Role"]</label>
-        <select id="role" name="role" required aria-required="true">@foreach (var r in Model.GrantableRoles) { <option value="@r">@Terms.Role(r) (@r)</option> }</select></div>
+        <select id="role" name="role" required aria-required="true" aria-describedby="role-hint">@foreach (var r in Model.GrantableRoles) { <option value="@r">@Terms.Role(r) (@r)</option> }</select>
+        @if (Model.RolesNotOffered.Count > 0) { <p id="role-hint" class="hint">@L["Not offered here: {0}. Their holders are still listed above and keep their access.", string.Join(", ", Model.RolesNotOffered.Select(Terms.Role))]</p> }</div>
     <div class="field"><label for="viewerKind">@L["Viewer kind (Viewer role only)"]</label>
         <select id="viewerKind" name="viewerKind" aria-describedby="vk-hint"><option value="">@L["Not a viewer"]</option>@foreach (var k in Enum.GetValues<Ecp.Identity.Domain.ViewerKind>()) { <option value="@k">@k</option> }</select>
         <p id="vk-hint" class="hint">@L["A Viewer is never a global read role: choose All [[contract|plural]], [[category]], [[business.unit]], [[site]] or Restricted, with the matching scope below."]</p></div>

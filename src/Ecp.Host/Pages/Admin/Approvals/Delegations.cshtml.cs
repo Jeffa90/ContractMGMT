@@ -32,6 +32,7 @@ public sealed class DelegationsModel(IApprovalDelegations delegations, IAccessDi
     {
         Organisations = await OrganisationChoices.AllowedAsync(organisations, access, ct, "approvals.delegate", "approvals.matrix.read");
         OrganisationId ??= Organisations.FirstOrDefault()?.Id;
+        if (OrganisationId is { } shown) await Terms.UseOrganisationAsync(shown, ct);
         CanDelegate = await access.HoldsAnywhereAsync("approvals.delegate", ct);
         CanAdminister = await access.HoldsAnywhereAsync("approvals.delegate.administer", ct);
         if (CanDelegate) Mine = await delegations.MineAsync(ct);

@@ -52,7 +52,7 @@ else if (r.Decision is { } d)
             <tbody>
             @foreach (var st in plan.Steps.OrderBy(x => x.Stage))
             {
-                <tr><td>@st.Stage</td><th scope="row">@st.Display</th><td><span class="badge @(st.Status == "Satisfied" ? "ok" : st.Status == "Open" ? "warn" : "")">@st.Status</span></td><td>@st.ApproverGroup@(st.BackupGroup is { } bg ? $" + {bg}" : "")</td>
+                <tr><td>@st.Stage</td><th scope="row">@st.Display</th><td><span class="badge @(st.Status == "Satisfied" ? "ok" : st.Status == "Open" ? "warn" : "")">@st.Status</span></td><td>@Terms.Group(st.ApproverGroup)@(st.BackupGroup is { } bg ? $" + {Terms.Group(bg)}" : "")</td>
                     <td>@(st.Mode == "AllRequired" ? L["Every named approver"] : L["First response wins"])</td>
                     <td><ul class="plain">@foreach (var a in st.Approvers) { <li>@a.Name <span class="badge">@a.Role</span>@if (a.OnBehalfOfName is { } ob) { <span class="hint"> @L["for"] @ob</span> }</li> }</ul></td>
                     <td><ul class="plain">@foreach (var rs in st.Responses) { <li>@(rs.Approved ? L["Approved"] : L["Rejected"]) @L["by"] @rs.Name@(rs.OnBehalfOfName is { } rob ? $" ({L["for"]} {rob})" : "") @rs.RespondedUtc.ToString("yyyy-MM-dd HH:mm") UTC@(rs.Comment is { Length: > 0 } c ? ": " + c : "")</li> }</ul></td>

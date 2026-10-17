@@ -63,7 +63,7 @@ Exit codes: 0 success, 1 the package or request is not acceptable, 2 usage error
 dotnet build src/Ecp.Host -c Release          # builds packs into src/Ecp.Host/bin/Release/net10.0/packs
 dotnet run --project src/Ecp.PackTool -- build-all --source templates/packs --out /tmp/packs-a
 dotnet run --project src/Ecp.PackTool -- build-all --source templates/packs --out /tmp/packs-b
-dotnet run --project src/Ecp.PackTool -- compare --a /tmp/packs-a/blank-1.2.0.ecpkg --b /tmp/packs-b/blank-1.2.0.ecpkg
+dotnet run --project src/Ecp.PackTool -- compare --a /tmp/packs-a/blank-1.3.0.ecpkg --b /tmp/packs-b/blank-1.3.0.ecpkg
 ```
 
 Building twice from the same sources gives byte-identical packages (the ZIP is deterministic and the manifest canonical). Signatures are not deterministic (ECDSA), so reproducibility is defined on the **unsigned** package and its content digest; `compare` ignores the signature.
@@ -77,7 +77,7 @@ Optional pack file terminology/terminology.json, content type `Terminology`, mod
   "terms": [ { "key": "supplier", "locale": "en", "singular": "Counterparty", "plural": "Counterparties" } ] }
 ```
 
-Every one of the 32 required keys (`docs/TERMINOLOGY.md` §4) needs a singular and plural for each base locale you declare (`en`; a regional locale such as `en-AU` needs only what differs). Optional per term: `short`, `description`, `help`. Plain text only; the builder and the content scan refuse markup, script and template syntax. Add it to the recipe in `pack-source.json` with content type `Terminology`; it is hashed and signed with the other documents. A pack without it is valid: its organisations read the neutral wording. Notification templates in a pack may use tokens such as `[[contract|lower]]`; unknown keys fail validation. To build a pack with different wording, copy templates/packs/blank/terminology/terminology.json, change labels, rebuild and sign.
+Every one of the 32 required keys (`docs/TERMINOLOGY.md` §4) needs a singular and plural for each base locale you declare (`en`; a regional locale such as `en-AU` needs only what differs). Optional per term: `short`, `description`, `help`. The document may also carry an optional `groups` section naming approver groups (`key`, `locale`, `name`, optional `description`; the key is the stable approver-group key your workflow uses) and a `roles` section choosing which roles are offered in pickers (`code`, `offered`); see docs/TERMINOLOGY.md section 6a. Neither section changes any permission. Plain text only; the builder and the content scan refuse markup, script and template syntax. Add it to the recipe in `pack-source.json` with content type `Terminology`; it is hashed and signed with the other documents. A pack without it is valid: its organisations read the neutral wording. Notification templates in a pack may use tokens such as `[[contract|lower]]`; unknown keys fail validation. To build a pack with different wording, copy templates/packs/blank/terminology/terminology.json, change labels, rebuild and sign.
 
 ## 4. Versioning
 

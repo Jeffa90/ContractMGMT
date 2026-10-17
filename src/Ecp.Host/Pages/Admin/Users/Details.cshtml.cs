@@ -11,11 +11,13 @@ namespace Ecp.Host.Pages.Admin.Users;
 
 [Authorize(Policy = "perm:users.manage")]
 public sealed class DetailsModel(IPeopleDirectory people, IUserAdministration admin, IRoleAssignmentService roles, IAccessService access,
-    IOrganisationStructureService structure, ISecuredCategoryService categories) : EcpPageModel
+    IOrganisationStructureService structure, ISecuredCategoryService categories, Ecp.Configuration.ITerminologyResolver terminology) : EcpPageModel
 {
     public PersonItem Person { get; private set; } = null!;
     public IReadOnlyList<AssignmentDto> Assignments { get; private set; } = [];
     public IReadOnlyList<string> GrantableRoles { get; private set; } = [];
+    /// <summary>Roles the administrator could grant but that every organisation they administer has chosen not to offer. Presentation only: nothing is revoked, and the assignments below still list them.</summary>
+    public IReadOnlyList<string> RolesNotOffered { get; private set; } = [];
     public IReadOnlyList<OrganisationSummary> Organisations { get; private set; } = [];
     public IReadOnlyList<DivisionDto> Divisions { get; private set; } = [];
     public IReadOnlyList<BusinessUnitDto> BusinessUnits { get; private set; } = [];
@@ -73,6 +75,20 @@ public sealed class DetailsModel(IPeopleDirectory people, IUserAdministration ad
         GrantableRoles = subject is null ? [] : subject.Assignments.Where(a => a.IsActiveAt(now) && AccessEvaluator.Default.Matrix.Of(a.RoleCode, "roles.delegate") != Grant.None)
             .SelectMany(a => DelegationPolicy.GrantableBy(a.RoleCode)).Distinct().Order().ToList();
         Organisations = await structure.ListOrganisationsAsync(ct);
+        // A role is offered when at least one organisation the grantor can delegate in offers it; a role every such organisation hides drops out of the picker.
+        var delegating = subject is null ? [] : subject.Assignments.Where(a => a.IsActiveAt(now) && AccessEvaluator.Default.Matrix.Of(a.RoleCode, "roles.delegate") != Grant.None).ToList();
+        var inReach = delegating.Any(a => a.Scope.Level != ScopeLevel.Organisation) ? Organisations : Organisations.Where(o => delegating.Any(a => a.Scope.OrganisationIds.Contains(o.Id))).ToList();
+        var offeredAnywhere = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var o in inReach)
+        {
+            var words = await terminology.GetAsync(o.Id, null, ct);
+            foreach (var r in GrantableRoles.Where(words.IsRoleOffered)) offeredAnywhere.Add(r);
+        }
+        if (inReach.Count > 0)
+        {
+            RolesNotOffered = GrantableRoles.Where(r => !offeredAnywhere.Contains(r)).ToList();
+            GrantableRoles = GrantableRoles.Where(offeredAnywhere.Contains).ToList();
+        }
         _names = Organisations.ToDictionary(o => o.Id, o => o.Name);
         var divs = new List<DivisionDto>(); var bus = new List<BusinessUnitDto>(); var sites = new List<SiteDto>();
         foreach (var o in Organisations) { var s = await structure.GetAsync(o.Id, ct); divs.AddRange(s.Divisions); bus.AddRange(s.BusinessUnits); sites.AddRange(s.Sites); foreach (var x in s.Divisions) _names[x.Id] = x.Name; foreach (var x in s.BusinessUnits) _names[x.Id] = x.Name; foreach (var x in s.Sites) _names[x.Id] = x.Name; }

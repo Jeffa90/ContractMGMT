@@ -16,6 +16,6 @@ Turns `requirements/01-authoritative/PORTABILITY_AND_NO_CODE.md` into measurable
 | PRT-010 | Branding, terminology, workflow, rules and approval changes can be completed by a Business Configuration Administrator using only the UI | Browser test with that role only; no SQL or file access |
 | PRT-011 | Full tenant export imports into an empty tenant with matching counts and hashes | Round-trip test (`DATA_EXPORT_SPEC.md` section 3) |
 | PRT-012 | Different culture, time zone and currency per organisation behave correctly (display, reminders due times, approvals) | Parameterised tests across en-AU, en-NZ, a UTC+10 and a UTC-8 zone |
-| PRT-013 | Role names, state names and permission codes are never hard-coded in domain logic; they come from definitions and the catalogue | Static scan plus test with renamed roles and states |
+| PRT-013 | Role names, state names and permission codes shown to people are never hard-coded in domain logic; they come from definitions, the catalogue, terminology and packs. Role codes, state codes, permission codes and approver-group keys are stable identifiers (decision D7c, ADR-0029), not business wording | Static scan (guard stage B) plus test with renamed roles and states; frozen-identifier tests |
 | PRT-014 | Tenant isolation holds for every package, export and import path | Tenant-isolation suite includes package/export/import (TEN-0xx) |
 | PRT-015 | Feature flags only enable existing capabilities and are tenant/organisation scoped | Flag tests |

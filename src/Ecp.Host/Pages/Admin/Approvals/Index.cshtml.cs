@@ -24,6 +24,7 @@ public sealed class IndexModel(IApprovalSimulator simulator, IApprovalMatrixStor
         Organisations = await OrganisationChoices.AllowedAsync(organisations, access, ct, "approvals.matrix.read");
         OrganisationId ??= Organisations.FirstOrDefault()?.Id;
         if (OrganisationId is not { } org) return Page();
+        await Terms.UseOrganisationAsync(org, ct);
         try { Summaries = await simulator.MatricesAsync(org, MatrixSource.Published, ct); }     // checks approvals.matrix.read for this organisation
         catch (Ecp.SharedKernel.ForbiddenException)
         {

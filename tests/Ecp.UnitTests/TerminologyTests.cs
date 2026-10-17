@@ -1,4 +1,6 @@
 using Ecp.Configuration;
+using Ecp.Identity.Access;
+using Ecp.Identity.Domain;
 using Ecp.SharedKernel;
 using Ecp.Tests.Common;
 using Xunit;
@@ -319,5 +321,134 @@ public sealed class TerminologyTests
     {
         foreach (var pack in new[] { "blank", "jbs-procurement" })
             Assert.All(Pack(pack).Terms, t => Assert.True(TermCatalogue.IsKnown(t.Key), $"{pack}: {t.Key}"));
+    }
+}
+
+/// <summary>
+/// A+ follow-ups (ADR-0029): approver-group display names and role visibility live in the terminology document next to the labels. The group key and the role code stay the identifiers; names and visibility are presentation.
+/// </summary>
+[Trait("Category", "Unit")]
+public sealed class GroupNamesAndRoleVisibilityTests
+{
+    private static GroupDisplayName G(string key, string name, string locale = "en", string? description = null) => new(key, locale, name, description);
+    private static TerminologyDocument Doc(IReadOnlyList<GroupDisplayName>? groups = null, IReadOnlyList<RoleOffer>? roles = null) => new(TerminologyDocument.Overrides, [], groups, roles);
+    private static string[] Errors(TerminologyDocument d) => d.Check().Where(m => m.Severity == ValidationSeverity.Error).Select(m => m.Code).ToArray();
+
+    [Fact]
+    public void A_document_without_the_new_sections_serialises_exactly_as_before_so_pack_hashes_do_not_move()
+    {
+        var json = new TerminologyDocument(TerminologyDocument.Complete, [new TermEntry("contract", "en", "Contract", "Contracts")]).ToJson();
+        Assert.DoesNotContain("groups", json);
+        Assert.DoesNotContain("roles", json);
+        foreach (var pack in new[] { "blank", "jbs-procurement" })
+        {
+            var raw = File.ReadAllText(Path.Combine(RepoRoot.Find(), "templates", "packs", pack, "terminology", "terminology.json"));
+            Assert.Empty(Errors(TerminologyDocument.Parse(raw)));
+        }
+    }
+
+    [Fact]
+    public void Groups_and_role_choices_round_trip_and_serialise_deterministically()
+    {
+        var doc = Doc([G("Zeta", "Last"), G("Approvers", "Registration Approvers", description: "Who approves.")], [new RoleOffer("Legal", false), new RoleOffer("Viewer", true)]);
+        var json = doc.ToJson();
+        var back = TerminologyDocument.Parse(json);
+        Assert.Equal(["Approvers", "Zeta"], back.Groups!.Select(g => g.Key));
+        Assert.Equal("Who approves.", back.Groups![0].Description);
+        Assert.Equal([("Legal", false), ("Viewer", true)], back.Roles!.Select(r => (r.Code, r.Offered)));
+        Assert.Equal(json, back.ToJson());
+    }
+
+    [Theory]
+    [InlineData("", "Name", "group_key")]
+    [InlineData("bad key", "Name", "group_key")]
+    [InlineData("-leading", "Name", "group_key")]
+    [InlineData("Key", "", "group_name_missing")]
+    [InlineData("Key", "<b>bold</b>", "group_name_markup")]
+    [InlineData("Key", "{{ template }}", "group_name_markup")]
+    [InlineData("Key", " padded ", "group_name_space")]
+    public void A_group_name_must_be_plain_text_for_a_well_formed_key(string key, string name, string code)
+        => Assert.Contains(code, Errors(Doc([G(key, name)])));
+
+    [Fact]
+    public void Group_limits_and_duplicates_are_refused_and_a_valid_group_passes()
+    {
+        Assert.Empty(Errors(Doc([G("GroupHeadProcurement", "Group Head of Procurement", description: "Approves registration."), G("GroupHeadProcurement", "Chef du groupe", "fr")])));
+        Assert.Contains("group_duplicate", Errors(Doc([G("A", "One"), G("A", "Two")])));
+        Assert.Contains("group_name_length", Errors(Doc([G("A", new string('x', 81))])));
+        Assert.Contains("group_key", Errors(Doc([G(new string('k', 101), "Name")])));
+        Assert.Contains("group_locale", Errors(Doc([G("A", "Name", "not a locale")])));
+        Assert.Contains("group_count", Errors(Doc(Enumerable.Range(0, TerminologyDocument.MaxGroups + 1).Select(i => G("K" + i, "N")).ToList())));
+    }
+
+    [Fact]
+    public void Role_choices_are_validated_against_the_catalogue_and_the_administrative_roles_cannot_be_hidden()
+    {
+        Assert.Empty(Errors(Doc(roles: [new RoleOffer("Legal", false), new RoleOffer("DivisionSiteAdministrator", false), new RoleOffer("OrganisationAdministrator", true)])));
+        Assert.Contains("role_unknown", Errors(Doc(roles: [new RoleOffer("ContractAdministrator", false)])));      // a label is not a role code
+        Assert.Contains("role_duplicate", Errors(Doc(roles: [new RoleOffer("Legal", false), new RoleOffer("Legal", true)])));
+        foreach (var role in TermSet.RolesNeverHidden) Assert.Contains("role_not_hideable", Errors(Doc(roles: [new RoleOffer(role, false)])));
+        Assert.Equal(["SystemAdministrator", "TenantAdministrator", "OrganisationAdministrator"], TermSet.RolesNeverHidden);
+    }
+
+    [Fact]
+    public void An_unnamed_group_shows_its_key_and_a_named_one_shows_its_name_the_organisation_over_the_pack_and_the_locale_chain_applies()
+    {
+        var pack = new TermExtras([G("Approvers", "Pack name"), G("Approvers", "Nom du paquet", "fr"), G("OnlyPack", "Only the pack")]);
+        var org = new TermExtras([G("Approvers", "Org name")]);
+        var set = TermSet.Build("en-AU", null, null, null, null, org, pack);
+        Assert.Equal("Org name", set.Group("Approvers"));
+        Assert.Equal("Only the pack", set.Group("OnlyPack"));
+        Assert.Equal("Unnamed", set.Group("Unnamed"));              // the key itself: a diagnostic, never an error
+        Assert.False(set.HasGroupName("Unnamed"));
+        Assert.Equal("Pack name", TermSet.Build("en", null, null, null, null, null, pack).Group("Approvers"));
+        Assert.Equal("Nom du paquet", TermSet.Build("fr", null, null, null, null, null, pack).Group("Approvers"));
+        Assert.Equal("Approvers", TermSet.Neutral().Group("Approvers"));
+    }
+
+    [Fact]
+    public void Role_visibility_the_organisations_choice_wins_over_the_packs_and_nothing_is_hidden_by_default()
+    {
+        Assert.Empty(TermSet.Neutral().HiddenRoles);
+        Assert.True(TermSet.Neutral().IsRoleOffered("Legal"));
+        var pack = new TermExtras(null, [new RoleOffer("Legal", false), new RoleOffer("Auditor", false)]);
+        var packOnly = TermSet.Build("en", null, null, null, null, null, pack);
+        Assert.False(packOnly.IsRoleOffered("Legal"));
+        Assert.True(packOnly.IsRoleOffered("Viewer"));
+        var org = new TermExtras(null, [new RoleOffer("Legal", true), new RoleOffer("Viewer", false)]);
+        var both = TermSet.Build("en", null, null, null, null, org, pack);
+        Assert.True(both.IsRoleOffered("Legal"));                    // the organisation brings it back
+        Assert.False(both.IsRoleOffered("Auditor"));                 // the pack's choice stands where the organisation says nothing
+        Assert.False(both.IsRoleOffered("Viewer"));
+    }
+
+    [Fact]
+    public void The_resolver_ignores_an_attempt_to_hide_an_administrative_role_even_if_a_document_somehow_carries_one()
+    {
+        var set = TermSet.Build("en", null, null, null, null, new TermExtras(null, TermSet.RolesNeverHidden.Select(r => new RoleOffer(r, false)).ToList()));
+        Assert.Empty(set.HiddenRoles);
+        foreach (var role in TermSet.RolesNeverHidden) Assert.True(set.IsRoleOffered(role));
+    }
+
+    [Fact]
+    public void Hiding_a_role_or_naming_a_group_changes_no_permission()
+    {
+        var before = PermissionMatrix.Instance.Of(RoleCodes.Legal, "legal.clear");
+        _ = TermSet.Build("en", null, null, null, null, new TermExtras([G("Approvers", "Whatever")], [new RoleOffer("Legal", false)]));
+        Assert.Equal(before, PermissionMatrix.Instance.Of(RoleCodes.Legal, "legal.clear"));
+        Assert.NotEqual(Grant.None, before);
+    }
+
+    [Fact]
+    public void The_shipped_packs_name_their_approver_group_and_hide_no_role()
+    {
+        var jbs = TerminologyDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot.Find(), "templates", "packs", "jbs-procurement", "terminology", "terminology.json")));
+        var blank = TerminologyDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot.Find(), "templates", "packs", "blank", "terminology", "terminology.json")));
+        Assert.Equal("Group Head of Procurement", TermSet.Build("en", null, null, null, null, null, jbs.Extras).Group("GroupHeadProcurement"));
+        Assert.Equal("Registration Approvers", TermSet.Build("en", null, null, null, null, null, blank.Extras).Group("Approvers"));
+        Assert.Empty(TermSet.Build("en", null, null, null, null, null, jbs.Extras).HiddenRoles);
+        Assert.Empty(TermSet.Build("en", null, null, null, null, null, blank.Extras).HiddenRoles);
+        // The group key stays out of the other pack: no leak of one business's group into the neutral pack.
+        Assert.False(TermSet.Build("en", null, null, null, null, null, blank.Extras).HasGroupName("GroupHeadProcurement"));
     }
 }

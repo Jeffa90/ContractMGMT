@@ -76,7 +76,7 @@
                 <tbody>
                 @foreach (var s in plan.Steps.OrderBy(x => x.Stage))
                 {
-                    <tr><td>@(s.Stage + 1)</td><th scope="row">@s.Display</th><td>@s.RowCode</td><td>@s.ApproverGroup@(s.BackupGroup is { } bg ? $" + {bg}" : "")</td>
+                    <tr><td>@(s.Stage + 1)</td><th scope="row">@s.Display</th><td>@s.RowCode</td><td>@Terms.GroupLabel(s.ApproverGroup)@(s.BackupGroup is { } bg ? $" + {Terms.GroupLabel(bg)}" : "")</td>
                         <td>@(s.Mode == "AllRequired" ? L["Every named approver"] : L["First response wins"])@(s.TimeoutDays is { } t ? $" · {t} days" : "")</td>
                         <td><ul class="plain">@foreach (var a in s.Approvers) { <li>@a.Name <span class="badge">@a.Role</span>@if (a.OnBehalfOfName is { } ob) { <span class="hint"> @L["for"] @ob</span> }</li> }</ul></td></tr>
                 }

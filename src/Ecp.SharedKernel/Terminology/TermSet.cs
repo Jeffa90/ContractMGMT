@@ -10,6 +10,22 @@ public sealed record TermSource(string PackKey, string PackVersion);
 /// <summary>One labelled concept in one locale. The key is a stable machine identifier; every other member is data an administrator may change.</summary>
 public sealed record TermEntry(string Key, string Locale, string Singular, string Plural, string? Short = null, string? Description = null, string? Help = null, TermSource? Source = null, bool Active = true);
 
+/// <summary>
+/// A display name for an approver-group key, in one locale. The key (for example <c>GroupHeadProcurement</c>) is a stable identifier stored on role assignments and named in workflow definitions; the name is only what
+/// a person reads. A key with no name is shown as the key.
+/// </summary>
+public sealed record GroupDisplayName(string Key, string Locale, string Name, string? Description = null);
+
+/// <summary>Whether a role is offered when someone assigns roles. <c>Offered = false</c> hides the role from pickers only: it removes no grant, blocks no assignment made another way and changes no authority.</summary>
+public sealed record RoleOffer(string Code, bool Offered);
+
+/// <summary>The parts of a terminology document that are not term labels: approver-group display names and the role visibility choice.</summary>
+public sealed record TermExtras(IReadOnlyList<GroupDisplayName>? Groups = null, IReadOnlyList<RoleOffer>? Roles = null)
+{
+    public static readonly TermExtras None = new();
+    public bool IsEmpty => (Groups is null || Groups.Count == 0) && (Roles is null || Roles.Count == 0);
+}
+
 /// <summary>Which layer supplied a label. A label's layer is informative only: it never changes what a person is allowed to do.</summary>
 public enum TermLayer { Organisation, Pack, Platform, Unknown }
 
@@ -26,12 +42,25 @@ public sealed record ResolvedTerm(string Key, string Singular, string Plural, st
 public sealed class TermSet
 {
     private readonly IReadOnlyDictionary<string, ResolvedTerm> _terms;
+    private readonly IReadOnlyDictionary<string, GroupDisplayName> _groups;
+    private readonly IReadOnlySet<string> _hiddenRoles;
 
     public string Locale { get; }
     /// <summary>Identifies exactly which organisation release and pack version this set was built from (used in cache keys and diagnostics).</summary>
     public string Fingerprint { get; }
 
-    private TermSet(string locale, string fingerprint, IReadOnlyDictionary<string, ResolvedTerm> terms) { Locale = locale; Fingerprint = fingerprint; _terms = terms; }
+    private TermSet(string locale, string fingerprint, IReadOnlyDictionary<string, ResolvedTerm> terms, IReadOnlyDictionary<string, GroupDisplayName> groups, IReadOnlySet<string> hiddenRoles)
+    { Locale = locale; Fingerprint = fingerprint; _terms = terms; _groups = groups; _hiddenRoles = hiddenRoles; }
+
+    /// <summary>The display name of an approver group, or the key itself when nobody has named it. Presentation only: the key is what is stored and compared.</summary>
+    public string Group(string key) => _groups.TryGetValue(key, out var g) ? g.Name : key;
+    public string? GroupDescription(string key) => _groups.TryGetValue(key, out var g) ? g.Description : null;
+    public bool HasGroupName(string key) => _groups.ContainsKey(key);
+    public IReadOnlyDictionary<string, GroupDisplayName> GroupNames => _groups;
+
+    /// <summary>Roles an administrator chose not to offer in assignment pickers (never an administrative role that would lock people out).</summary>
+    public IReadOnlySet<string> HiddenRoles => _hiddenRoles;
+    public bool IsRoleOffered(string roleCode) => !_hiddenRoles.Contains(roleCode);
 
     public IReadOnlyDictionary<string, ResolvedTerm> Terms => _terms;
     public bool Has(string key) => _terms.ContainsKey(key);
@@ -49,11 +78,15 @@ public sealed class TermSet
 
     private static readonly Lazy<TermSet> NeutralEnglish = new(() => Build("en", null, null, null, null));
 
+    /// <summary>The roles that can never be hidden from pickers: hiding them could leave an installation, tenant or organisation with nobody able to administer it.</summary>
+    public static readonly IReadOnlyList<string> RolesNeverHidden = ["SystemAdministrator", "TenantAdministrator", "OrganisationAdministrator"];
+
     /// <summary>Only the platform's neutral wording; used where no organisation is known and as the safe fall-back when configuration cannot be read.</summary>
     public static TermSet Neutral(string? locale = null)
         => string.IsNullOrEmpty(locale) || string.Equals(locale, "en", StringComparison.OrdinalIgnoreCase) ? NeutralEnglish.Value : Build(locale, null, null, null, null);
 
-    public static TermSet Build(string locale, IEnumerable<TermEntry>? organisation, IEnumerable<TermEntry>? pack, string? organisationFingerprint, string? packFingerprint)
+    public static TermSet Build(string locale, IEnumerable<TermEntry>? organisation, IEnumerable<TermEntry>? pack, string? organisationFingerprint, string? packFingerprint,
+        TermExtras? organisationExtras = null, TermExtras? packExtras = null)
     {
         var chain = LocaleChain(locale);
         var keys = new HashSet<string>(TermCatalogue.ByKey.Keys, StringComparer.Ordinal);
@@ -74,7 +107,32 @@ public sealed class TermSet
             result[key] = new ResolvedTerm(key, first.Entry.Singular, first.Entry.Plural, first.Entry.Short ?? (layers.Where(x => x.Layer == first.Layer).Select(x => x.Entry.Short).FirstOrDefault(v => v is not null)),
                 Field(x => x.Description), Field(x => x.Help), first.Layer, first.Entry.Source);
         }
-        return new TermSet(locale, $"{locale}|{organisationFingerprint ?? "-"}|{packFingerprint ?? "-"}", result);
+        return new TermSet(locale, $"{locale}|{organisationFingerprint ?? "-"}|{packFingerprint ?? "-"}", result, BuildGroups(chain, organisationExtras, packExtras), BuildHidden(organisationExtras, packExtras));
+    }
+
+    private static Dictionary<string, GroupDisplayName> BuildGroups(IReadOnlyList<string> chain, TermExtras? organisation, TermExtras? pack)
+    {
+        var groups = new Dictionary<string, GroupDisplayName>(StringComparer.Ordinal);
+        foreach (var layer in new[] { organisation?.Groups, pack?.Groups })
+        {
+            if (layer is null) continue;
+            foreach (var key in layer.Select(g => g.Key).Distinct(StringComparer.Ordinal))
+            {
+                if (groups.ContainsKey(key)) continue;                                  // the organisation's layer is read first and wins
+                foreach (var l in chain)
+                    if (layer.FirstOrDefault(g => g.Key == key && g.Locale == l) is { } found) { groups[key] = found; break; }
+            }
+        }
+        return groups;
+    }
+
+    /// <summary>The organisation's choice for a role wins over the pack's; with neither, every role is offered.</summary>
+    private static HashSet<string> BuildHidden(TermExtras? organisation, TermExtras? pack)
+    {
+        var decided = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var layer in new[] { organisation?.Roles, pack?.Roles })
+            if (layer is not null) foreach (var r in layer) decided.TryAdd(r.Code, r.Offered);
+        return decided.Where(kv => !kv.Value && !RolesNeverHidden.Contains(kv.Key)).Select(kv => kv.Key).ToHashSet(StringComparer.Ordinal);
     }
 
     /// <summary>'en-AU' resolves as en-AU, then en. A locale with no region resolves as itself only.</summary>

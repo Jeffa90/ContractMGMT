@@ -44,4 +44,23 @@
             </table></div>
         }
     </section>
+    <section aria-labelledby="groups-h">
+        <h2 id="groups-h">@L["Approver group names"]</h2>
+        <p>@L["The stable group key is what workflows and role assignments store. The name is what people read."]</p>
+        @if (o.Groups.Count == 0) { <p class="hint">@L["No approver group has a display name, so people see the key."]</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption>@L["Approver groups with a display name"]</caption>
+                <thead><tr><th scope="col">@L["Stable group key"]</th><th scope="col">@L["Name shown"]</th><th scope="col">@L["Source"]</th></tr></thead>
+                <tbody>@foreach (var g in o.Groups) { <tr><th scope="row"><code class="id">@g.Key</code></th><td>@g.Name</td><td>@(g.Layer == Ecp.SharedKernel.TermLayer.Organisation ? L["Organisation override"] : L["Pack"])</td></tr> }</tbody>
+            </table></div>
+        }
+    </section>
+    <section aria-labelledby="roles-h">
+        <h2 id="roles-h">@L["Roles offered when assigning"]</h2>
+        @if (o.RolesNotOffered.Count == 0) { <p>@L["Every role is offered."]</p> }
+        else { <p>@L["Not offered in pickers"]: @string.Join(", ", o.RolesNotOffered.Select(Terms.Role)). @L["Hiding a role changes only the pickers: nobody loses access, and people who hold the role are still listed."]</p> }
+    </section>
 }
+

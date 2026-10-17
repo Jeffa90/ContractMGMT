@@ -17,5 +17,14 @@
         <thead><tr><th scope="col">@L["Stable role code"]</th><th scope="col">@L["Now"]</th><th scope="col">@L["After publishing"]</th></tr></thead>
         <tbody>@foreach (var x in r.Roles) { <tr><th scope="row"><code class="id">@x.Code</code></th><td>@x.Now</td><td>@x.After</td></tr> }</tbody>
     </table></div>
+    @if (r.Groups.Count > 0)
+    {
+        <div class="table-wrap"><table>
+            <caption>@L["Approver group names (the stable group key never changes)"]</caption>
+            <thead><tr><th scope="col">@L["Stable group key"]</th><th scope="col">@L["Now"]</th><th scope="col">@L["After publishing"]</th></tr></thead>
+            <tbody>@foreach (var g in r.Groups) { <tr><th scope="row"><code class="id">@g.Key</code></th><td>@g.Now</td><td>@g.After</td></tr> }</tbody>
+        </table></div>
+    }
+    <p>@L["Roles not offered in pickers now"]: @(r.RolesNotOfferedNow.Count == 0 ? L["none"].Value : string.Join(", ", r.RolesNotOfferedNow.Select(Terms.Role))). @L["After publishing"]: @(r.RolesNotOfferedAfter.Count == 0 ? L["none"].Value : string.Join(", ", r.RolesNotOfferedAfter.Select(Terms.Role))).</p>
     <p><a class="button" href="/Admin/Terminology/Edit?organisationId=@r.OrganisationId&amp;locale=@Uri.EscapeDataString(r.Locale)">@L["Back to the draft"]</a> <a href="/Admin/Terminology?organisationId=@r.OrganisationId&amp;locale=@Uri.EscapeDataString(r.Locale)">@L["Overview"]</a></p>
 }

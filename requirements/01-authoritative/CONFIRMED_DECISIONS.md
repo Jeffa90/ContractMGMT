@@ -136,3 +136,6 @@ Persisted role codes (`ProcurementAdministrator`, `CategoryOwner`, `Legal`, `App
 
 Trust-key administration is deliberately not held by ordinary business configuration administrators. Install, retire, assign and trust changes also need a recent sign-in. (`requirements/02-reference/role-permission-matrix.csv` is the machine-readable source and the tests read it.)
 
+### D7c Stable role, permission and approver-group identifiers (S5)
+
+Owner decision of 2026-10-17 (Option A+; `decisions/ADR-0029-stable-role-and-permission-identifiers.md`, `docs/ROLE_CATALOGUE_ADR.md`): role codes, permission codes and approver-group keys are permanent identifiers and are never renamed, aliased or reused. What people read comes from terminology and packs. Approver groups may carry display names and roles may be hidden from assignment pickers; both are presentation only and change no authority. The administrative roles System, Tenant and Organisation Administrator can never be hidden. The plan's slice S8 (rename with aliases) is retired, superseded by S4 and this decision.

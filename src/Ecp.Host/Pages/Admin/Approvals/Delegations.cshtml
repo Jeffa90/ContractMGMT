@@ -48,7 +48,7 @@
                 <tbody>
                 @foreach (var d in Model.Mine)
                 {
-                    <tr><th scope="row">@d.GroupKey</th><td>@d.FromName</td><td>@d.ToName</td><td>@d.ValidFromUtc.ToString("yyyy-MM-dd HH:mm") &ndash; @d.ValidToUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@d.Reason</td>
+                    <tr><th scope="row">@Terms.GroupLabel(d.GroupKey)</th><td>@d.FromName</td><td>@d.ToName</td><td>@d.ValidFromUtc.ToString("yyyy-MM-dd HH:mm") &ndash; @d.ValidToUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@d.Reason</td>
                         <td>@(d.RevokedUtc is not null ? L["Ended"] : d.IsActive ? L["In force"] : d.ValidFromUtc > DateTime.UtcNow ? L["Not started"] : L["Finished"])</td>
                         <td>@if (d.FromUserId == Model.Me && d.RevokedUtc is null && d.ValidToUtc > DateTime.UtcNow)
                             {
@@ -73,7 +73,7 @@
             <tbody>
             @foreach (var d in all.Items)
             {
-                <tr><th scope="row">@d.GroupKey</th><td>@d.FromName</td><td>@d.ToName</td><td>@d.ValidFromUtc.ToString("yyyy-MM-dd HH:mm") &ndash; @d.ValidToUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@d.Reason</td>
+                <tr><th scope="row">@Terms.GroupLabel(d.GroupKey)</th><td>@d.FromName</td><td>@d.ToName</td><td>@d.ValidFromUtc.ToString("yyyy-MM-dd HH:mm") &ndash; @d.ValidToUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@d.Reason</td>
                     <td>@(d.RevokedUtc is not null ? $"{L["Ended"]} ({d.RevokedBy}: {d.RevokeReason})" : d.IsActive ? L["In force"] : d.ValidFromUtc > DateTime.UtcNow ? L["Not started"] : L["Finished"])</td>
                     <td>@if (Model.CanAdminister && d.RevokedUtc is null && d.ValidToUtc > DateTime.UtcNow)
                         {

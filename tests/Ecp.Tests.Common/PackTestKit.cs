@@ -128,7 +128,10 @@ public static class PackTestKit
             var (singular, plural) = ThirdPackWords.TryGetValue(d.Key, out var w) ? w : (d.Singular, d.Plural);
             return new { key = d.Key, locale = "en", singular, plural };
         });
-        return System.Text.Json.JsonSerializer.Serialize(new { schemaVersion = 1, mode = "complete", terms });
+        // The third pack also names its approver group and runs a business with no divisions or sites, so it hides that administrator role from pickers (it removes no access).
+        var groups = new[] { new { key = "Approvers", locale = "en", name = "Activation Approvers", description = "The people who approve activation of an executed agreement." } };
+        var roles = new[] { new { code = "DivisionSiteAdministrator", offered = false } };
+        return System.Text.Json.JsonSerializer.Serialize(new { schemaVersion = 1, mode = "complete", terms, groups, roles });
     }
 
     /// <summary>

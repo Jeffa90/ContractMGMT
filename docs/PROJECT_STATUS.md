@@ -110,6 +110,7 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| Workspace after S5, no SQL Server: unit 655, architecture 64, API 95, integration on SQLite 220 | 1,034 | 0 | 0 | 219 (the SQL Server wrappers, including 1 new group-and-role wrapper) |
 | Workspace after S4, no SQL Server: unit 629, architecture 64, API 93, integration on SQLite 219 | 1,005 | 0 | 0 | 218 (the SQL Server wrappers, including 9 new terminology wrappers) |
 | Workspace after S3, no SQL Server: unit 563, architecture 36, API 80, integration on SQLite 207 | 886 | 0 | 0 | 209 (the SQL Server wrappers, including the S3 migration test) |
 | Workspace after S7, no SQL Server: unit 545, architecture 27, API 80, integration on SQLite 202 | 854 | 0 | 0 | 203 (the SQL Server wrappers, including 10 new Pack Manager scenarios) |
@@ -164,7 +165,7 @@ Known shortcuts and gaps in what is built, each with where it is tracked. None i
 |---|---|---|
 | Production key custody for pack signing is external: the shipped packs are built unsigned, so a Production installation needs operator-signed packs and a trusted key before any pack is usable (readiness: Degraded until then) | First Production start needs an operator step | `docs/PACK_SIGNING.md`; by design (ADR-0026 D7) |
 | Pack upgrade across versions, per-item merge, pack and tenant export, marketplace | A new pack version is installed and assigned (drafts) manually | S7d/e/f; Future |
-| The 12-role catalogue (including `ProcurementAdministrator`) is compiled; the new reminder rule `OrganisationAdministrators` still resolves to it | Roles cannot be renamed or replaced per business | P-02b; slices S5, S8 |
+| The 12-role catalogue (including `ProcurementAdministrator`) is compiled; the new reminder rule `OrganisationAdministrators` still resolves to it | Role *codes* are permanent identifiers by decision (ADR-0029); their names, approver-group names and role visibility are configurable. A different role set or authority model is Future | P-02b closed by policy; S5 done, S8 retired |
 | Legal review and register authorisation (with Registered Date stamping) are compiled capabilities that are always on; pack `features` switches are read and ignored | A business without them cannot switch them off | R-05, P-04; slice S6 |
 | Labels, dashboard titles and help text were resource strings that named JBS roles and states | **Fixed in S4 (ADR-0028)**: terminology keys, a resolver, a versioned configuration kind, pack terminology; role *codes* remain compiled (P-02b, S5/S8) | P-05 to P-07, R-06; slice S4 |
 | The signature boundary was shaped like one vendor | **Fixed in S3 (ADR-0027)**: provider-neutral vocabulary, interfaces, status mapper, event inbox and a renaming migration. A live adapter and the callback endpoint remain Future | P-10; slice S3 |
@@ -195,7 +196,7 @@ Portability means a second business can run on the platform by configuration, pa
 | P-08 migrated contracts started in a host-configured JBS state | Medium | **Fixed (S2, ADR-0025)**: from the organisation's lifecycle |
 | P-09 the architecture guard was too narrow | Medium | **Stage A done (S1)**; stages B and C open |
 | P-03 packs embedded by project files, no loader | **High** | **Fixed (S7, ADR-0026)**: external signed-or-allowed packs, one loader, Pack Manager; evidence in `docs/PORTABILITY_AUDIT.md` section 0.2 |
-| P-02b compiled role catalogue | Medium | **Open** (S5, S8) |
+| P-02b compiled role catalogue | Medium | **Closed by policy (S5, ADR-0029)**: permanent identifiers, names from terminology; a data-driven catalogue is Future |
 | P-10 the signature boundary shaped like one vendor | Low | **Fixed (S3, ADR-0027)**: provider-neutral vocabulary and interfaces, status mapper, idempotent event inbox, renaming migration, guard over all of `src/` |
 | P-04, P-05 compiled capabilities and JBS vocabulary in code and pages | Medium | **Open** (S4, S6) |
 | P-06, P-07, R-03, R-04 | Low | **Open** (S4, S10) |
@@ -224,10 +225,10 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S2 reminder fall-back and migrated initial status | **Done**, CI-verified (run 35) |
 | S3 neutral signature vocabulary with an EF migration | **Done** (ADR-0027); CI run 41 (commit 3d1597a) green: SQL Server 209 Passed, 0 Failed, 0 Skipped, including the migration test (`deploy/STATUS.md`) |
 | S4 vocabulary and terminology read side, guard stage B | **Done** (ADR-0028); local 1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED; CI run 44 (commit 6f9d862) green: SQL Server 218 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`) |
-| S5 role catalogue decision (ADR) | **Design written, awaiting the owner** (`docs/ROLE_CATALOGUE_ADR.md`): recommends stable identifiers, names from terminology, retire S8 |
-| S6 feature flags that gate capabilities | Not started |
+| S5 role catalogue decision (ADR) | **Done** (ADR-0029, Option A+): identifiers permanent, frozen by tests; approver-group names and role visibility built |
+| S6 feature flags that gate capabilities | **First incomplete** (not started); role-visibility support is ready for it to use |
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |
-| S8 implement the role decision | Not started |
+| S8 implement the role decision | **Retired**: superseded by S4 and ADR-0029 |
 | S9 second pack end to end (PRT-002, PRT-004, PRT-013) | Not started |
 | S10 cleanup of country, ERP and locale defaults | Not started |
 

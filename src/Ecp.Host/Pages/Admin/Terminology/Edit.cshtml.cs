@@ -26,7 +26,24 @@ public sealed class EditModel(ITerminologyAdministration terminology, IConfigura
         public string? Help { get; set; }
     }
 
+    public sealed class GroupRowInput
+    {
+        public string? Key { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+    }
+
+    public sealed class RoleRowInput
+    {
+        public string Code { get; set; } = "";
+        public string Choice { get; set; } = "inherit";
+    }
+
+    public const int ExtraGroupRows = 3;
+
     [BindProperty] public List<RowInput> Rows { get; set; } = [];
+    [BindProperty] public List<GroupRowInput> GroupRows { get; set; } = [];
+    [BindProperty] public List<RoleRowInput> RoleRows { get; set; } = [];
     [BindProperty] public string? Note { get; set; }
     public TerminologyEditModel? Form { get; private set; }
     public IReadOnlyList<ValidationMessage> Problems { get; private set; } = [];
@@ -44,9 +61,18 @@ public sealed class EditModel(ITerminologyAdministration terminology, IConfigura
             {
                 Key = r.Key, Override = r.Entry is not null, Singular = r.Entry?.Singular, Plural = r.Entry?.Plural, Short = r.Entry?.Short, Description = r.Entry?.Description, Help = r.Entry?.Help
             }).ToList();
+        if (!fromPost || (GroupRows.Count == 0 && RoleRows.Count == 0))
+        {
+            GroupRows = Form.Groups.Select(g => new GroupRowInput { Key = g.Key, Name = g.Entry?.Name, Description = g.Entry?.Description }).ToList();
+            for (var n = 0; n < ExtraGroupRows; n++) GroupRows.Add(new GroupRowInput());
+            RoleRows = Form.Roles.Select(r => new RoleRowInput { Code = r.Code, Choice = r.Choice is null ? "inherit" : r.Choice.Value ? "offered" : "hidden" }).ToList();
+        }
         CanPublish = await HoldsAsync("terminology.publish");
         if (Form.Draft?.Validation is { } report) Problems = report.Messages;
     }
+
+    private IReadOnlyList<GroupInput> GroupInputs() => GroupRows.Select(g => new GroupInput(g.Key ?? "", g.Name, g.Description)).ToList();
+    private IReadOnlyList<RoleInput> RoleInputs() => RoleRows.Select(r => new RoleInput(r.Code, r.Choice ?? "inherit")).ToList();
 
     private IReadOnlyList<TermInput> Inputs() => Rows.Select(r => new TermInput(r.Key, r.Override, r.Singular, r.Plural, r.Short, r.Description, r.Help)).ToList();
 
@@ -56,6 +82,19 @@ public sealed class EditModel(ITerminologyAdministration terminology, IConfigura
         for (var i = 0; i < Rows.Count; i++) { }
         foreach (var m in messages.Where(m => m.Severity == ValidationSeverity.Error))
         {
+            if (m.Path.StartsWith("$.groups[", StringComparison.Ordinal))
+            {
+                var gi = GroupRows.FindIndex(g => !string.IsNullOrEmpty(g.Key) ? m.Path.Contains($"['{g.Key}',", StringComparison.Ordinal) : m.Path.Contains("['',", StringComparison.Ordinal));
+                var gf = m.Path.Contains(".description", StringComparison.Ordinal) ? "description" : m.Path.Contains(".name", StringComparison.Ordinal) ? "name" : "key";
+                ModelState.AddModelError(gi >= 0 ? $"group-{gi}-{gf}" : string.Empty, "Approver group: " + m.Message);
+                continue;
+            }
+            if (m.Path.StartsWith("$.roles[", StringComparison.Ordinal))
+            {
+                var ri = RoleRows.FindIndex(r => m.Path.Contains($"['{r.Code}']", StringComparison.Ordinal));
+                ModelState.AddModelError(ri >= 0 ? $"role-{ri}" : string.Empty, "Role: " + m.Message);
+                continue;
+            }
             var row = Rows.FindIndex(r => m.Path.Contains($"['{r.Key}',", StringComparison.Ordinal));
             var field = m.Path.EndsWith(".singular", StringComparison.Ordinal) ? "singular" : m.Path.EndsWith(".plural", StringComparison.Ordinal) ? "plural" : m.Path.EndsWith(".short", StringComparison.Ordinal) ? "short"
                 : m.Path.EndsWith(".description", StringComparison.Ordinal) ? "description" : m.Path.EndsWith(".help", StringComparison.Ordinal) ? "help" : "singular";
@@ -65,14 +104,14 @@ public sealed class EditModel(ITerminologyAdministration terminology, IConfigura
 
     private async Task<DraftDto> SaveAndValidateAsync(Guid org, CancellationToken ct)
     {
-        var saved = await terminology.SaveAsync(org, Locale ?? "en", Inputs(), ct);
+        var saved = await terminology.SaveAsync(org, Locale ?? "en", Inputs(), GroupInputs(), RoleInputs(), ct);
         return await configuration.ValidateAsync(saved.Id, ct);
     }
 
     public Task<IActionResult> OnPostSaveAsync(CancellationToken ct) => RunAsync(async () =>
     {
         var org = await ResolveOrganisationAsync(ct);
-        await terminology.SaveAsync(org, Locale ?? "en", Inputs(), ct);
+        await terminology.SaveAsync(org, Locale ?? "en", Inputs(), GroupInputs(), RoleInputs(), ct);
         Flash("The draft is saved. Nothing is published. Validate it, then preview it.");
         return RedirectToPage(new { organisationId = org, locale = Locale });
     }, () => LoadAsync(ct, fromPost: true));

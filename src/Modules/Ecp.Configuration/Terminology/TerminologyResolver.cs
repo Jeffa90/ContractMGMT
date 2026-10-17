@@ -121,7 +121,8 @@ internal sealed class TerminologyResolver(IConfigurationReleases releases, IOrga
             var version = $"{release?.Id.ToString("N") ?? "-"}|{pack?.PackKey ?? "-"}@{pack?.PackVersion ?? "-"}";
             try { if (cache.TryGet(tenantId, org, loc, version, out var hit) && hit is not null) return hit; }
             catch (Exception ex) { cache.CountFallback(); logger.LogWarning(ex, "The terminology cache could not be read; resolving from persistence."); }
-            var set = TermSet.Build(loc, release is null ? null : TerminologyDocument.Parse(release.ContentJson).Terms, pack?.Document.Terms, release is null ? null : $"r{release.Number}", pack is null ? null : $"{pack.PackKey}@{pack.PackVersion}");
+            var published = release is null ? null : TerminologyDocument.Parse(release.ContentJson);
+            var set = TermSet.Build(loc, published?.Terms, pack?.Document.Terms, release is null ? null : $"r{release.Number}", pack is null ? null : $"{pack.PackKey}@{pack.PackVersion}", published?.Extras, pack?.Document.Extras);
             try { cache.Store(tenantId, org, loc, version, set); }
             catch (Exception ex) { cache.CountFallback(); logger.LogWarning(ex, "The terminology cache could not be written; the set was resolved from persistence."); }
             return set;
@@ -147,7 +148,7 @@ internal sealed class TerminologyResolver(IConfigurationReleases releases, IOrga
     {
         var loc = LocaleOrCurrent(locale);
         var pack = await PackLayerAsync(organisationId, ct);
-        return TermSet.Build(loc, draft.Terms, pack?.Document.Terms, "preview", pack is null ? null : $"{pack.PackKey}@{pack.PackVersion}");
+        return TermSet.Build(loc, draft.Terms, pack?.Document.Terms, "preview", pack is null ? null : $"{pack.PackKey}@{pack.PackVersion}", draft.Extras, pack?.Document.Extras);
     }
 
     public async Task<PackTerminology?> PackLayerAsync(Guid? organisationId, CancellationToken ct = default)

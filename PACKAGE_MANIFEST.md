@@ -36,6 +36,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0026-external-solution-packs.md`
 - `decisions/ADR-0027-provider-neutral-signature-boundary.md`
 - `decisions/ADR-0028-configurable-terminology.md`
+- `decisions/ADR-0029-stable-role-and-permission-identifiers.md`
 - `docs/ARCHITECTURE.md`
 - `docs/DOCUMENT_INDEX.md`
 - `docs/DOMAIN_MODEL.md`

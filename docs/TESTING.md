@@ -353,6 +353,33 @@ Without `ECP_TEST_SQL`: **730 Passed, 0 Failed, 0 Skipped, 189 NOT VERIFIED** (4
 
 Without `ECP_TEST_SQL`: **738 Passed, 0 Failed, 0 Skipped, 193 NOT VERIFIED** (455 unit, 20 architecture, 72 API, 191 integration on SQLite). CI with SQL Server 2022 (run 35, commit 3245079): **193 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** (192 SQL Server tests plus the performance baseline); the other two jobs also succeeded.
 
+### 8.8 External solution packs (slice S7, ADR-0026; PKG-001 to PKG-012 in part, PRT-002 first mechanism, PRT-007, PRT-008)
+
+| Area | Where it is covered |
+|---|---|
+| Package format: safe archive (traversal, absolute paths, backslashes, duplicates, bombs, ratio, entry count, unlisted and disallowed files), canonical JSON, manifest strictness, hash verification, content scan, compatibility (platform range, unknown required/optional kinds, schema versions), deterministic build | unit `PackFormatTests` |
+| Signing and trust: ES256 round trip, tamper detection, wrong key, unknown, revoked, expired and not-yet-valid keys, unsupported algorithm, Production versus Demo/Test policy, unsigned synthetic only when marked, allowed by the manifest **and** enabled by the environment, a manifest cannot weaken the policy, command line (build, validate, hash, sign, verify, inspect, compare, keygen) with no key material in output | unit `PackSigningTests` |
+| Upload, check, preview, install; idempotent re-upload; same key and version with different bytes refused; spent token; audit of upload, install and rejection | integration `PackManagerScenarios` `Install_flow` (SQLite; SQL Server wrapper in CI) |
+| Permissions follow the confirmed matrix; trust-key administration not held by the business configuration administrator | `Permissions`; UI `Only_people_who_hold_the_pack_permissions_can_open_each_page` |
+| Tenant isolation of packs, keys and uploads; an upload is usable only by its uploader; the package cache is keyed by tenant and package | `Isolation`, `Cache` |
+| Assignment creates drafts only, never overwrites a published release, keeps an open draft, refuses a retired pack | `Assignment` |
+| **Third pack the repository has never seen** installed from bytes and run end to end with no source change | `Third_pack` |
+| Production refuses unsigned and unknown-key packs; trusting a publisher key admits the same file; revocation withdraws it; key administration audited with no key material | `Production_trust` (hosts built in Production mode with the process-local test key) |
+| Concurrent uploads and installs of one pack leave exactly one copy | `Concurrency` |
+| Hostile packages (not a zip, empty, traversal, unexpected file, tampered content) give plain messages, no server path, no stack trace, and store nothing | `Hostile` |
+| CSV report defuses formulas | `Csv` |
+| Report-only diagnostics for unresolved packs and fallback definitions change nothing | `Diagnostics` |
+| Pages: access by role, shipped catalogue and unsigned warnings, upload/check/install with confirmation and CSRF refusal, other person's upload not found, step-up after ten minutes, XSS encoding of pack text, private key refused and never echoed, readiness (healthy, missing folder unhealthy, unsigned-in-Production degraded) | API `PackManagerUiTests` |
+| Onboarding offers loader packs with publisher and signature, allows staying on Blank, refuses an unavailable pack plainly | API `OnboardingHostTests` |
+| Architecture: no embedded pack documents (projects and assemblies); the reader only in the pack library, tool and loader folder; the loader names no pack; sources and built packages separate; every shipped source builds reproducibly; no private key in the working tree; `Ecp.Packs` at tier 0 | `PackRuleTests` and `ModuleDependencyTests` |
+| CI (`tools/check-packs.sh`): two builds are byte-identical, every pack validates, the host output carries the packs, signing and verifying with an ephemeral key works, unsigned, wrong-key and tampered packs are refused as Production would, no embedded pack and no tracked private key | CI step "Solution packs" |
+
+Not covered: a browser accessibility audit of the new pages (ACC-01), SQL Server row-level security of the three new tables beyond the existing "every mapped table has a policy" test (verified in CI only), a penetration test, and the container smoke of the new `solution-packs` readiness line (run by CI; the container engine cannot be started in this workspace).
+
+### 8.9 Totals at the end of the S7 pass
+
+Without `ECP_TEST_SQL`: **854 Passed, 0 Failed, 0 Skipped, 203 NOT VERIFIED** (545 unit, 27 architecture, 80 API, 202 integration on SQLite). The 203 are the SQL Server wrappers, reported NOT VERIFIED rather than passed. The S7 CI result is recorded in `deploy/STATUS.md`.
+
 ## 9. No-code, packages and portability suite
 
 | ID | Test |

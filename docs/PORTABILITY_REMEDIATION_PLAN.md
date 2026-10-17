@@ -153,7 +153,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 | S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions |
 | S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013 |
 | S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged |
-| S7 | R7 pack loader and store (CFG-04, PKM-01); remove embedded JBS resources; R4 stage C | S1, S5, S6 | A pack installs from the store with no rebuild; the three `.csproj` embeds are gone |
+| S7 | R7 pack loader and store (CFG-04, PKM-01); remove embedded JBS resources; R4 stage C | S1, S5, S6 | A pack installs from the store with no rebuild; the three `.csproj` embeds are gone. **Done 2026-10-17 for S7a to S7c plus the Pack Manager, setup and onboarding integration (section 8.10); S7d to S7f are future.** The order dependency on S5 and S6 was waived by the owner's instruction. |
 | S8 | R8 step 2: implement the ADR | S5, S7 | Section 6.2 |
 | S9 | R11: second pack (PKM-04) with PRT-002, PRT-004, PRT-013 end-to-end | S1 to S8 | PRT-002 passes |
 | S10 | R10 cleanup (neutral fall-backs; validation as rule; field relocation only if justified) | any | Section 6.3 |
@@ -338,6 +338,21 @@ Deviation to note: the plan said an absent field must read as today's behaviour 
 | ARC-010 and the rest of the architecture tests | Passed (20) |
 | Remaining high-severity findings | **P-03** only (packs embedded by project files, no loader). P-02a is fixed; P-02b (compiled role catalogue, including the role that `OrganisationAdministrators` resolves to) remains Medium |
 | First incomplete remediation task | **S3** (R6: neutral signature-request vocabulary, with an EF migration), then S4 to S10 |
+
+### 8.10 Slice S7: external solution packs (ADR-0026)
+
+Delivered, as one slice, on the owner's instruction (the Enterprise Platform path; JBS is one optional pack):
+
+* **S7a external pack loading.** `Ecp.Packs` (tier 0, no dependencies): the `.ecpkg` format (closed ZIP, canonical manifest, SHA-256 per document), safe reader and deterministic writer, content scan, compatibility check, builder and `ecp-pack` tool (`src/Ecp.PackTool`). `IPackLoader` in `Ecp.Configuration` reads shipped files and tenant-installed packs alike. The eight embedded entries, the resource-name conventions and the reader classes are removed; `IOrganisationPackContent` replaces them in the lifecycle and notification stores.
+* **S7b verification and signing.** ES256 (ECDSA P-256), `IPackageSigner`, `IPackageSignatureVerifier`, `IPackTrustStore`/`IPackKeyResolver`, Production trust policy, unsigned synthetic packs only in Demo and Test behind `Ecp:Packs:AllowUnsignedSyntheticPacks`. No private key in the repository.
+* **S7c tenant storage and installation.** Tables `InstalledPack`, `PackAssignment`, `TrustedPublisherKey` (migration `AddSolutionPacks`, row-level security), a storage-provider abstraction (file system implementation, outside any public path), quarantine, idempotent re-upload, conflict on different bytes, audit of upload, validation, install, retire, assign and trust changes.
+* **Pack Manager** (form-based, accessible), eight `packs.*` permissions with a documented role allocation, setup and onboarding integration, readiness check, report-only organisation diagnostics, CI checks.
+
+**Exit criteria.** "A pack installs from the store with no rebuild": met (third-pack scenario). "The embeds are gone": met (architecture tests). **Rollback**: the migration is additive; restore the pre-upgrade database backup and the matching application version. Pack files are inert without the loader.
+
+**Deferred (not started, by design):** S7d upgrade workflow across versions and per-item merge, S7e pack and tenant export, S7f marketplace and catalogue, billing, graphical designer, AI-generated packs; the other packable kinds in shipped packs; the Razor and JSON stages (B, C) of the ARC-010 guard (P-09) which belong to later slices.
+
+**First incomplete remediation task after S7:** S3 (R6, neutral signature-request vocabulary with an EF migration), then S4, S5, S6, S8 to S10. **Remaining high-severity portability findings:** none from the original audit's High list; P-02b (compiled role catalogue) remains Medium.
 
 ## 9. Open decisions for the owner
 

@@ -1,6 +1,6 @@
 # Project Status
 
-Status date: **2026-10-17** (after PER-002, portability remediation S1 and S2, and CI run 35). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
+Status date: **2026-10-17** (after PER-002, portability remediation S1, S2 and S7 external solution packs; the S7 CI result is recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
 
 **Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 10 and 11 are an engineering assessment of evidence, not an approval.
 
@@ -18,6 +18,7 @@ All modules are .NET 10 projects in a modular monolith whose dependency tiers ar
 |---|---|---|---|
 | `Ecp.SharedKernel` (0) | Guards, ids, errors, clock, localisation (`en-AU` reference locale, IANA zones, UTC storage) | Implemented | workspace, CI |
 | `Ecp.Formats` (0) | CSV and XLSX reading and writing, safe ZIP intake | Implemented | workspace, CI |
+| `Ecp.Packs` (0) and `Ecp.PackTool` | The `.ecpkg` solution-pack format: safe archive, canonical manifest, content scan, compatibility, builder, ES256 signing and trust policy, `ecp-pack` command line | Implemented (S7; ADR-0026) | workspace; CI |
 | `Ecp.Persistence` | Tenant-scoped `DbContext`, global filters, `SESSION_CONTEXT` interceptor, unit of work, ordered migrations | Implemented | workspace, CI (SQL Server) |
 | `Ecp.Audit` | Append-only, gap-free, hash-chained audit written in the business transaction; verify command | Implemented | CI (SQL Server) |
 | `Ecp.Tenancy` | Tenants, organisations, legal entities, divisions, business units, sites | Implemented | workspace, CI |
@@ -51,6 +52,7 @@ Each is a slice that runs end to end from the page through the services to the d
 | PER-002 query-plan review | Plans captured on SQL Server; one optimisation retained and one tried and reverted on same-runner evidence; configured-field text search 599 to 417 ms median (target below 500 ms met on the benchmark operation); regression guards | `docs/PERFORMANCE_REVIEW.md`, `docs/PERFORMANCE.md` |
 | Portability audit and remediation plan | Where JBS and vendor names appear, classified; ordered remediation actions | `docs/PORTABILITY_AUDIT.md`, `docs/PORTABILITY_REMEDIATION_PLAN.md` |
 | Portability remediation S2 | The reminder fall-back for an unowned category is a notification-policy rule (JBS states today's recipient, Blank states none); migrated contracts start in their own organisation's initial state; `Contracts:InitialStatusCode` removed from host configuration. Role identifiers untouched | ADR-0025, `docs/PORTABILITY_REMEDIATION_PLAN.md` sections 8.8 and 8.9 |
+| Portability remediation S7: external solution packs | The eight embedded pack resources are gone; Blank and JBS are external `.ecpkg` files built from `templates/packs`; one product-neutral loader over shipped and tenant-installed packs; ES256 signing and trust (Production refuses unsigned and untrusted); tenant-scoped pack store, quarantine, drafts-only assignment, trust-key store, audit; form-based Pack Manager (catalogue, details, upload, validation report with CSV, preview, install, organisation packs, history, trusted publishers, checks); `solution-packs` readiness check; report-only organisation diagnostics; setup and onboarding use the loader | Implemented (ADR-0026, `docs/PACK_MANAGER.md`, `docs/PACK_SECURITY.md`) |
 | Portability remediation S1 | Solution pack resolved by organisation; neutral Blank lifecycle, Variation workflow and notification policy; no compiled default pack (installation default is host configuration, unset); stronger ARC-010; first PRT-002 proof test. Role identifiers untouched | ADR-0024, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.6 |
 
 ## 4. Open tasks
@@ -64,7 +66,7 @@ Each is a slice that runs end to end from the page through the services to the d
 | T0.3, T0.5 | ADRs exist; the repository checker runs in CI | ADR acceptance pass not recorded; checker row not ticked |
 | TNC-02, SCR-01 | Row-Level Security, composite keys, layer-off tests (SQL Server); CSRF, cookies, CSP, Production guard | Full TEN and SEC catalogues; XSS/SQLi corpora |
 | SET-03, SET-04, SET-05, SET-06 | Readiness checks, wizard, onboarding | Full readiness catalogue; automated accessibility tests; delegated-administrator journey; pack selection and taxonomy import with dry run |
-| CFG-01, CFG-04 | Configuration kernel, pack installation of the two shipped packs (resolved per organisation since S1) | Schema-validation framework; a pack loader (audit P-03: packs are still embedded in assemblies by the project files) |
+| CFG-01, CFG-04 | Configuration kernel, external pack loader and Pack Manager (S7; both shipped packs are external files) | Schema-validation framework; pack upgrade workflow, per-item merge and pack export (S7d/e, Future) |
 | WFE-01 | Lifecycle module delivers the runtime | Rules-engine integration (RUL-01), designer |
 | DOM-01, DOM-02, DOM-03, DCM-01, INT-01 | Suppliers, categories, contracts, register, documents, outbox | JSON API for contracts and search; some acceptance tests |
 | MGR-02, MGR-05, MGR-11, DOCS-MIG | Intake, attachments, scripted end-to-end run | Runbook from the template; remaining acceptance tests |
@@ -85,7 +87,7 @@ Each is a slice that runs end to end from the page through the services to the d
 
 ### 4.3 First incomplete task
 
-The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. CFG-03 was ticked once the PER-002 plan check was done (section 3). The first incomplete **portability remediation** task is **S3** (`docs/PORTABILITY_REMEDIATION_PLAN.md` section 5: the signature-request vocabulary, with an EF migration). P-01 is fixed by S1, P-02a and P-08 by S2; P-03 (packs embedded by project files; High) and P-02b (compiled role catalogue; Medium) remain open and block onboarding a second business without a rebuild.
+The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. CFG-03 was ticked once the PER-002 plan check was done (section 3). The first incomplete **portability remediation** task is **S3** (`docs/PORTABILITY_REMEDIATION_PLAN.md` section 5: the signature-request vocabulary, with an EF migration). P-01 is fixed by S1, P-02a and P-08 by S2; P-03 is closed by S7 (packs are external; a second business is a file, not a release). P-02b (compiled role catalogue; Medium) remains open.
 
 ## 5. Deferred tasks
 
@@ -95,7 +97,7 @@ Deferred means decided not to build yet, recorded in `TASKS.md` and the ADRs; th
 |---|---|
 | Visual designers (forms, rules, workflow, approval matrix: STU-03 to STU-06) and drag-and-drop | Form-based Studio first; designers depend on RUL-01, WFE-01 and CFG-02 |
 | AI assistance (AIX-01) and supplier intelligence (SUP-01) | Interfaces and mocks only, disabled by default; no model or vendor call is made |
-| Solution-pack marketplace and catalogue | Depends on PKM-01 to PKM-04 |
+| Solution-pack marketplace and catalogue | Future; the loader, signing and Pack Manager it depends on exist (S7), upgrade and export (PKM-03) do not |
 | Qlik or other BI integration beyond the neutral projection | No integration built; the `cf_<key>` projection is the extension point |
 | Keyset paging, full-text or search service | Not justified by the 10,000-contract baseline; offset paging only |
 | Second-person confirmation of an emergency unlock; escalation messages; migrating pinned contracts to a newer workflow release; daylight-saving tests for reminders | Recorded as Future in the lifecycle slice |
@@ -103,10 +105,11 @@ Deferred means decided not to build yet, recorded in `TASKS.md` and the ADRs; th
 
 ## 6. Verified capabilities
 
-Test totals at the end of this pass (details and history in `docs/TESTING.md`; CI figures are from run 35, commit `3245079`, the S2 code; later commits are documentation only):
+Test totals at the end of this pass (details and history in `docs/TESTING.md`; the S7 CI figures are recorded in `deploy/STATUS.md` once the run has finished, and are **not claimed here until then**; the S2 CI row is kept for comparison):
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| Workspace after S7, no SQL Server: unit 545, architecture 27, API 80, integration on SQLite 202 | 854 | 0 | 0 | 203 (the SQL Server wrappers, including 10 new Pack Manager scenarios) |
 | Workspace after S2, no SQL Server: unit 455, architecture 20, API 72, integration on SQLite 191 | 738 | 0 | 0 | 193 (the SQL Server wrappers) |
 | CI after S2 (run 35), SQL Server 2022 container (192 `SqlServer` tests plus the performance baseline, run as separate steps) | 193 | 0 | 0 | 0 |
 
@@ -155,7 +158,8 @@ Known shortcuts and gaps in what is built, each with where it is tracked. None i
 
 | Debt | Effect | Tracked as |
 |---|---|---|
-| Solution packs are embedded in module assemblies by project files and looked up by resource name; there is no pack loader or store | A new business's pack needs a rebuild | Portability P-03; CFG-04, PKM-01; slice S7 |
+| Production key custody for pack signing is external: the shipped packs are built unsigned, so a Production installation needs operator-signed packs and a trusted key before any pack is usable (readiness: Degraded until then) | First Production start needs an operator step | `docs/PACK_SIGNING.md`; by design (ADR-0026 D7) |
+| Pack upgrade across versions, per-item merge, pack and tenant export, marketplace | A new pack version is installed and assigned (drafts) manually | S7d/e/f; Future |
 | The 12-role catalogue (including `ProcurementAdministrator`) is compiled; the new reminder rule `OrganisationAdministrators` still resolves to it | Roles cannot be renamed or replaced per business | P-02b; slices S5, S8 |
 | Legal review and register authorisation (with Registered Date stamping) are compiled capabilities that are always on; pack `features` switches are read and ignored | A business without them cannot switch them off | R-05, P-04; slice S6 |
 | Labels, dashboard titles and help text are resource strings that name JBS roles and states; no terminology service | Terminology aliases (PRT-004) cannot work | P-05 to P-07, R-06; CFG-02, slice S4 |
@@ -186,14 +190,14 @@ Portability means a second business can run on the platform by configuration, pa
 | P-02a the reminder fall-back named a JBS role | High | **Fixed (S2, ADR-0025)**: a notification-policy rule; Blank states none |
 | P-08 migrated contracts started in a host-configured JBS state | Medium | **Fixed (S2, ADR-0025)**: from the organisation's lifecycle |
 | P-09 the architecture guard was too narrow | Medium | **Stage A done (S1)**; stages B and C open |
-| P-03 packs embedded by project files, no loader | **High** | **Open** (S7) |
+| P-03 packs embedded by project files, no loader | **High** | **Fixed (S7, ADR-0026)**: external signed-or-allowed packs, one loader, Pack Manager; evidence in `docs/PORTABILITY_AUDIT.md` section 0.2 |
 | P-02b compiled role catalogue | Medium | **Open** (S5, S8) |
 | P-04, P-05 compiled capabilities and JBS vocabulary in code and pages | Medium | **Open** (S4, S6) |
 | P-06, P-07, P-10, R-03, R-04 | Low | **Open** (S3, S4, S10) |
 | R-01, R-02, R-05 | Medium | **Open** (S6, S10) |
 | R-06 | Info | **Open** |
 
-Remaining high-severity portability violation: **P-03** only.
+Remaining high-severity portability violation: **none** from the original audit (P-02b is Medium). PRT-002 as a whole is still NOT VERIFIED (S9).
 
 ### 9.2 Acceptance criteria
 
@@ -217,7 +221,7 @@ Remaining high-severity portability violation: **P-03** only.
 | S4 vocabulary and terminology read side, guard stage B | Not started |
 | S5 role catalogue decision (ADR) | Not started |
 | S6 feature flags that gate capabilities | Not started |
-| S7 pack loader and store; remove embedded packs | Not started |
+| S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); local totals below, CI result in `deploy/STATUS.md` |
 | S8 implement the role decision | Not started |
 | S9 second pack end to end (PRT-002, PRT-004, PRT-013) | Not started |
 | S10 cleanup of country, ERP and locale defaults | Not started |
@@ -237,7 +241,7 @@ A **pilot** here means a time-boxed, supervised use by one organisation, on non-
 | Accessibility | **Unknown** | Pages follow accessible patterns (labels, error summaries, keyboard operation) but no audit was run |
 | Performance | **Probably adequate at pilot scale** | 10,000 contracts: register pages 40 to 75 ms; configured-field text search was the slowest operation and now measures about 0.4 s (selective second words about 0.8 s; `docs/PERFORMANCE_REVIEW.md`); larger scale is unmeasured |
 | Business configuration without code | **Partly** | Fields, shared views, approval matrices, workflows and notification policy are configuration with draft, publish and rollback; workflows and policies are edited as JSON, not in a designer; terminology, branding and feature flags are not built |
-| A second, non-JBS business | **Partly possible; not ready** | S1 fixed P-01 (pack per organisation, neutral Blank pack) and S2 fixed P-02a and P-08 (reminder fall-back, initial status). P-03 (packs embedded by project files, no loader) and P-02b (role catalogue) are open |
+| A second, non-JBS business | **Partly possible; not ready** | S1 fixed P-01 (pack per organisation, neutral Blank pack), S2 fixed P-02a and P-08 (reminder fall-back, initial status) and S7 fixed P-03 (a pack is installed from a file without a rebuild; proved by a third pack built in a test). Still open: and P-02b (role catalogue) are open |
 
 Conditions a pilot should set: an external SQL Server with backups owned by the pilot organisation; a real identity provider configured and Demo sign-in disabled; Production guard on; a named support owner; and the open items above accepted in writing. `docs/PRODUCTION_READINESS_CHECKLIST.md` lists the formal items.
 
@@ -251,7 +255,7 @@ Conditions a pilot should set: an external SQL Server with backups owned by the 
 | Tenant provisioning and lifecycle (sign-up, suspend, offboard, delete) | Not built; a tenant is created by first-run setup |
 | Operator control plane (fleet health, per-tenant limits, support tooling beyond audited elevation) | Not built |
 | Billing, metering, plans, quotas | Not built |
-| Business portability (a second business without source change) | P-01 fixed; blocked by P-03 and P-02b; no pack loader, no package import and export (PKM-01), no tenant export (EXP-01) |
+| Business portability (a second business without source change) | P-01 and P-03 fixed (packs import as drafts through the Pack Manager); P-02b open; no pack upgrade workflow or pack export (S7d/e), no tenant export (EXP-01) |
 | Scale, concurrency and noisy-neighbour protection | Unmeasured beyond 10,000 contracts; per-tenant rate and size limits are not built |
 | Availability, backup, restore, disaster recovery, upgrade without downtime | Not built; forward-only migrations with rollback by restore are planned (OPS-02) |
 | Observability (metrics, tracing, SIEM sinks) | Structured logging with redaction exists; sinks not built (INT-04) |

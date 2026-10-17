@@ -115,7 +115,8 @@ flowchart TB
 | Integrations | Adapters, outbox, inbox, webhook endpoints, egress guard | Provider interfaces from `ADAPTER_CATALOGUE.md` |
 | Retention | Policies, legal holds, disposition | `IRetentionService` |
 | Reporting | Projections and curated views, export endpoints | `IReportingService` |
-| SolutionPacks | Pack loader/catalogue, shipped Blank and JBS packs as data | `ISolutionPackCatalogue` |
+| Packs (`Ecp.Packs`, tier 0; implemented, S7) | The `.ecpkg` format: safe archive reader and deterministic writer, canonical JSON, manifest, builder, content scan, compatibility, ES256 signing and trust policy, command-line tool library | `PackReader`, `PackBuilder`, `PackTrustPolicy`, `IPackKeyResolver`, `IPackageSigner`, `IPackageSignatureVerifier`, `PackCli` |
+| Solution packs in Configuration (implemented, S7) | The unified loader over the shipped read-only directory and the tenant's installed packs, trust and compatibility on every read, tenant package cache, storage provider, validation, Pack Manager services, assignment (drafts only), trust-key store, diagnostics | `IPackLoader`, `IPackManager`, `IPackAssignments`, `IPackTrustKeys`, `IPackDiagnostics`, `ISolutionPackCatalogue`, `IOrganisationPackContent` |
 | Setup (tier 9; implemented) | Wizard state (protected bootstrap file mirrored to `setup.SetupRecord`), 14 idempotent stages, setup readiness checks, sanitised report, organisation onboarding (the `OrganisationOnboarding` configuration kind, ledger `setup.OnboardingItem`, CSV import, synthetic preview) | `ISetupService`, `IOnboardingService` |
 | Operations | Health, maintenance mode, backup/restore tooling, support bundle, upgrade pre-flight | `IOperationsService` |
 
@@ -126,8 +127,9 @@ src/Ecp.sln
 src/Ecp.SharedKernel/
 src/Modules/<Module>/            one project per module (+ <Module>.Tests under tests/)
 src/Ecp.Host/                    web UI, API, hosted services, composition root
-templates/packs/blank/           shipped packs as data
+templates/packs/blank/           shipped pack SOURCES (JSON + pack-source.json); the host build writes read-only .ecpkg files to <output>/packs
 templates/packs/jbs-procurement/
+src/Ecp.Packs/  src/Ecp.PackTool/  pack format library and the ecp-pack command-line tool
 templates/demo/                  demo data packages, document templates
 deploy/docker/  deploy/iis/  deploy/azure/
 tests/<Module>.Tests/  tests/Ecp.Architecture.Tests/  tests/Ecp.E2E.Tests/
@@ -151,7 +153,7 @@ flowchart LR
 - **Workflow and approval versions are pinned** on instances (RISK-06). The rules engine records the release id it used.
 - **Custom field values** are stored as typed rows (ADR-0009): one row per entity/field with typed columns (`string`, `decimal`+currency, `date`, `datetime`, `bool`, `guid`) and child rows for multi-choice. Static composite indexes `(TenantId, FieldDefinitionId, <typed value>)` serve search for every field; no DDL is ever issued when fields change. Reporting projections flatten values by view or job.
 - **Interpreters, not compilers.** Rules, calculated-display fields and templates are evaluated by small purpose-built interpreters over typed ASTs with node, depth and time limits. No Roslyn, Jint, Liquid, Scriban or expression-tree compilation of administrator input.
-- **Packs are data.** JBS names, states, roles-to-permission defaults, approval tiers and terminology exist only under `templates/packs/` (PRT-001).
+- **Packs are data.** JBS names, states, roles-to-permission defaults, approval tiers and terminology exist only in pack sources under `templates/packs/` and the `.ecpkg` files built from them; no pack is an embedded resource, and the loader names no pack (PRT-001, ADR-0026, architecture tests `PackRuleTests`).
 - **Draft collaboration:** drafts carry the base release id and a row version; publish performs a three-way check and requires rebase when the base changed (RISK-19).
 
 ## 6. Tenant-isolation architecture (ASM-04; RISK-02; ADR-0003)
@@ -358,7 +360,7 @@ flowchart LR
 | 0011 | Audit immutability | Proposed |
 | 0012 | Document storage and content addressing | Proposed |
 | 0013 | UI technology and API style | Proposed |
-| 0014 | Supply chain: dependencies, SBOM, licences, pack signing | Proposed |
+| 0014 | Supply chain: dependencies, SBOM, licences, pack signing | Proposed (signature algorithm amended by 0026) |
 | 0015 | Bulk-migration module name (`Ecp.DataMigration`) | Proposed |
 | 0016 | Setup state and first-run protection | Proposed |
 | 0017 | Organisation onboarding as a configuration kind with a provenance ledger | Proposed |
@@ -367,5 +369,6 @@ flowchart LR
 | 0019 | Five-level classification, privileged access and support/emergency elevation | Accepted (lifecycle slice) |
 | 0020 | Lifecycle engine, workflow definitions as configuration, execution boundary | Accepted (lifecycle slice) |
 | 0021 | Notifications, reminders and operational dashboards | Accepted (lifecycle slice) |
+| 0026 | Solution packs are external, signed, tenant-scoped data (S7) | Accepted (owner, 2026-10-17) |
 
 ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.

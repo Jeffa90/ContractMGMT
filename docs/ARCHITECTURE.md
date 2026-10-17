@@ -288,6 +288,13 @@ flowchart LR
 * Definitions are configuration; values are typed rows; a hidden field is absent from every read path; one fact service serves live approvals and the simulator; every configured-field condition is an uncorrelated `IN` subquery.
 * SQL Server behaviour of the new tables and indexes is exercised by the 183 `SqlServer` tests on CI (run 22), and a 10,000-contract SQL Server baseline is in `PERFORMANCE.md`. The PER-002 query-plan review is not done (see `TESTING.md` section 8.2).
 
+### 9.4 Terminology (as implemented in S4; ADR-0028, `docs/TERMINOLOGY.md`)
+
+* **Model** in `Ecp.SharedKernel` (tier 0, no business wording): `TermCatalogue` (42 keys, neutral wording), `TermSet` (layered, locale-aware), `TermTokens` (the `[[key|modifier]]` language). `DomainException.RawMessage` keeps tokenised text; `Message` is neutral.
+* **Resolver and kind** in `Ecp.Configuration` (tier 5): `ITerminologyResolver`, `ITerminologyCache` (tenant, organisation, locale, published version), the `Terminology` configuration kind with `terminology.*` permissions, `ITerminologyAdministration` (form-based pages' read/write model). Pack terminology is read through `IPackLoader` only.
+* **Consumers** (higher tiers) take `ITerminologyResolver`: register query engine and change history (Contracts), notification dispatcher, reminders, inbox and dashboards (Notifications), migration reports, exports, view service. The Host adds `TermContext` (per request), `TermLocalizer` (every `L["…"]` expands tokens) and `TermMiddleware`.
+* **Dependency direction** is unchanged and enforced by the architecture tests: no module references a pack or a business; wording flows from data to the edge of a response.
+
 ## 10. Migration architecture (ADR-0004; `MIGRATION_SUPPLEMENT.md`)
 
 ```mermaid
@@ -371,5 +378,6 @@ flowchart LR
 | 0021 | Notifications, reminders and operational dashboards | Accepted (lifecycle slice) |
 | 0026 | Solution packs are external, signed, tenant-scoped data (S7) | Accepted (owner, 2026-10-17) |
 | 0027 | The signature boundary is provider-neutral (S3) | Accepted (owner, 2026-10-17) |
+| 0028 | Terminology is data: stable keys, layered labels, no label ever decides authority (S4) | Accepted (owner, 2026-10-17) |
 
 ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.

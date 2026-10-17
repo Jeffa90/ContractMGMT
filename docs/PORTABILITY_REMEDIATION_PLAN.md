@@ -150,7 +150,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 | **S1 (first), done** | R1, R4 stage A, a minimal PRT-002 test | none | section 8.6 |
 | **S2, done** | R2 and R3 | S1 | Migrated contracts take the workflow's initial status; unowned-category reminder fall-back comes from the policy; JBS pack states the same recipient it has today |
 | S3 | R6 | none (can run in parallel with S2) | Signature request vocabulary neutral; EF migration renames the column and filtered index; no data loss. **Done 2026-10-17 (section 8.11, ADR-0027).** |
-| S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions |
+| S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions. **Done 2026-10-17 (section 8.12, ADR-0028).** |
 | S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013 |
 | S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged |
 | S7 | R7 pack loader and store (CFG-04, PKM-01); remove embedded JBS resources; R4 stage C | S1, S5, S6 | A pack installs from the store with no rebuild; the three `.csproj` embeds are gone. **Done 2026-10-17 for S7a to S7c plus the Pack Manager, setup and onboarding integration (section 8.10); S7d to S7f are future.** The order dependency on S5 and S6 was waived by the owner's instruction. |
@@ -368,6 +368,22 @@ Delivered on the owner's instruction (R6, finding P-10):
 **Exit criteria.** "No vendor word in the platform": met (architecture test). "No data loss": proved by a SQL Server migration test that runs in CI; **NOT VERIFIED in this workspace**. **Rollback**: restore the pre-upgrade backup; a development `Down` exists.
 
 **Not done:** live adapter, callback endpoint, provider configuration page, reporting, operations, role catalogue, feature flags, another pack slice. **First incomplete remediation task after S3:** S4 (vocabulary and terminology read side, guard stage B), then S5, S6, S8 to S10.
+
+### 8.12 Slice S4: terminology and guard stage B (ADR-0028)
+
+Delivered on the owner's instruction (R5, R4 stage B; findings P-05, P-06, P-07, P-09 stage B):
+
+* **Model.** Stable key versus label; resolution order organisation, pack, neutral, key as diagnostic; 42 catalogue keys (32 required); neutral wording names no business. Role codes, permission codes, state codes, audit action codes, configuration-kind keys, routes, form fields, database objects and pack ids are not renamed.
+* **Configuration.** The `Terminology` kind uses the existing lifecycle (draft, validate, preview, publish, history, rollback, audit, second person, step-up); plain text only; limits; duplicate prevention; tenant and organisation isolation; five `terminology.*` permissions (decision D7b).
+* **Resolver and cache.** One `ITerminologyResolver`; cache key tenant, organisation, locale and published version; invalidated on publish and rollback; falls back to persistence if the cache fails; fails safe to neutral wording; no label values in diagnostics.
+* **Packs.** Optional signed pack terminology document (content type `Terminology`); installed as a draft only; never overwrites published terminology; preview on review and assign pages; older packs stay compatible. Blank 1.2.0 neutral; JBS 2.2.0 procurement wording; a synthetic third pack with different wording.
+* **Read side.** Pages through `TermLocalizer` and `[[token]]` strings; domain messages through `DomainException.RawMessage`; notification templates validated and expanded per record organisation; dashboards, register labels, built-in views, migration text and reports, export headings and worksheet name.
+* **Administration.** Form-based Overview, Edit, Preview, History and Audit; setup and onboarding show pack wording and prepare a draft.
+* **Guard stage B.** `VocabularyGuardTests` over every shipped text file, with a single-file allow-list for S10 locale defaults, the demo seeder and the Medius demonstration script.
+
+**Exit criteria.** "A renamed vocabulary shows no JBS term": met (Blank organisation pages, onboarding and exports; a third pack's pages). "The guard passes on all source extensions": met. **Compatibility.** No migration: terminology is a new configuration kind in the existing release tables. Contracts, documents, workflow state, approvals, audit entries and action codes, saved views, release hashes and user access are unchanged; stored migration text written before S4 is plain and is left as written. **Rollback.** Unpublish by rolling the terminology back or deleting the organisation's draft; revert the application version; no data to restore.
+
+**Not done:** role-catalogue replacement (S5/S8), feature flags (S6), another pack-loader slice, regional defaults (S10), live e-signature, reporting, operations, API work, AI, marketplace, visual designers. **First incomplete remediation task after S4:** S5 (the role-catalogue decision), then S6, S8 to S10.
 
 ## 9. Open decisions for the owner
 

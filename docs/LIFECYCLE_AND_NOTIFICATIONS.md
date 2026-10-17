@@ -119,3 +119,9 @@ An Effective contract is locked: no edit, no document upload, no ownership-depen
 | LIF-ASM-08 | A dashboard spanning organisations uses the first organisation's time zone and lead time for "today". |
 | LIF-ASM-09 | Existing contracts stay on the workflow release they were created under; there is no bulk migration to a newer release. |
 | LIF-ASM-10 | No real mail server was available: the SMTP provider is unit-tested against a fake sender (configuration checks, send, fail-closed) and delegates the wire protocol to the platform sender from the Operations module; nothing was sent to a real server, so it is labelled Not Verified. Escalation data defaults to 3 days after an unacknowledged reminder. |
+
+## 10. Terminology in notifications, dashboards and registers (S4)
+
+* Notification templates (policy documents) may use terminology tokens, for example `[[contract|lower]]` or `[[legal.review]]`. Policy validation refuses an unknown key, an unknown modifier or a stray `[[` (`term_token`). At send time the renderer expands tokens in the words of the **record's organisation** (dispatcher, reminder scanner and inbox resolve it once per organisation), then fills `{placeholders}`, so values that came from people are never read as tokens. The JBS pack's policy was tokenised (37 strings) with its resolved text unchanged for JBS organisations.
+* Dashboard card titles, descriptions and row statuses, register sets and the eleven built-in list views are tokenised and shown in the words of the person's home organisation (or the organisation requested).
+* Notification action keys, event codes, state codes and audit actions are stable and are not tokenised. Historical notifications keep the text they were sent with.

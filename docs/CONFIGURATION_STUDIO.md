@@ -36,6 +36,10 @@ Organisations are offered only where the person holds one of these rights; namin
 
 `config.draft.created/saved/validated`, `config.published`, `config.rolled_back`, `customfield.definitions.published` (added, changed and retired keys) and `contracts.views.published` are recorded with the release id. The Studio links to the audit browser filtered by entity type.
 
+## Terminology (S4)
+
+Wording for business concepts is a configuration kind of its own, `Terminology`, edited under **Admin → Terminology** (`/Admin/Terminology`, `/Edit`, `/Preview`, `/History`, `/Audit`) with its own permissions (`terminology.read`, `.draft`, `.publish`, `.rollback`, `.audit.read`) so wording can be delegated without the general `config.*` rights. It uses the same configuration service as the Studio, so draft, validation, preview, publication (re-authentication and second person), version history, rollback and audit are the same. The edit page is a form with one row per catalogue key; there is no JSON. See `docs/TERMINOLOGY.md`. The Studio itself shows field labels in the organisation's words: the platform's core fields, section names and the shipped list views are written with terminology tokens and expanded for the organisation being looked at. Field and view definitions the organisation authors are its own text and are shown as written.
+
 ## Not in this release
 
 * Graphical form, workflow or approval-matrix designers; conditional required/visible rules beyond role, state and contract type; per-section ordering controls other than the numeric order; bulk import of definitions (a package import is a later capability).

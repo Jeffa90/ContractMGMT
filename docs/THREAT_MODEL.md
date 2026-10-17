@@ -193,3 +193,15 @@ At every milestone exit: re-run the abuse cases as automated tests; add threats 
 | 2026-10-16 | Lifecycle slice: section 2.8 added (T-080 to T-089) with the tests that exercise each mitigation; abuse cases 11 to 14; limitation for unverified external providers and scaffolded retention. | Claude Code session |
 | 2026-10-16 | CFG-03/DOM-03/STU-01: section 2.9 added (T-100 to T-108) for configurable metadata, search, views, exports and the Studio; measurement found and fixed a per-row lookup that made configured-field search quadratic (T-105) | Claude Code session |
 | 2026-10-17 | S7 external solution packs: T-045 updated and T-046 added (hostile pack upload); the pack trust boundary is now implemented (ADR-0026, `docs/PACK_SECURITY.md`) | Claude Code session |
+
+### 2.10 Terminology (added with S4)
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| Stored XSS or template injection through a label | Plain-text validation (no `<`, `>`, entities, `javascript:`, event handlers, `{{ }}`, `${ }`, `<% %>`, `@(`), encoded output, constrained token language | `TerminologyTests` (unsafe content), `TerminologyUiTests` (markup never stored or run) |
+| A label used to confuse an approver (impersonating a role) | Role codes are shown beside labels on administrator pages; authority never depends on a label; publish needs second person and recent sign-in; every change is audited and reversible | `TerminologyUiTests`, `TerminologyScenarios` |
+| Cross-tenant or cross-organisation label leak | Release lookup, cache key and draft are tenant- and organisation-scoped; named organisation checked against the grant | `TerminologyScenarios` isolation, cache isolation |
+| Stale cache after publish or rollback | Release id in the cache key plus explicit invalidation | `TerminologyScenarios` cache invalidation |
+| Poisoned pack terminology | Hashed and signed with the manifest; content scan; installs as draft only | `PackTerminologyTests` |
+| User data read as a token | Expansion before argument formatting | `TerminologyTests`, `NotificationDeliveryTests` |
+| Denial of service by a huge document | 600-term and field-length limits, bounded cache | `TerminologyTests` |

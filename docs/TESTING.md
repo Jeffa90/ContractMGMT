@@ -437,6 +437,19 @@ Without `ECP_TEST_SQL`: **886 Passed, 0 Failed, 0 Skipped, 209 NOT VERIFIED** (5
 | REF-001 | Unique `(TenantId, AgreementReference)`: a duplicate in another organisation of the same tenant is refused without disclosing that record; the same reference in another tenant is allowed; numbering allocation is concurrent-safe and never reuses numbers; `sourceAgreementReference` is not unique-constrained |
 | PRT-001 … PRT-015 | As defined in `requirements/08-portability/PORTABILITY_ACCEPTANCE_CRITERIA.md`; PRT-002 uses a second, non-JBS pack |
 
+### 9.1 Terminology and guard stage B (S4)
+
+| Area | Tests |
+|---|---|
+| Model, tokens, validation, resolution | `tests/Ecp.UnitTests/TerminologyTests.cs` (56): neutral fallback; singular and plural; locale chain; removal and inheritance; the 32 required keys; duplicates; unsafe content (markup, script, template, expression syntax); length limits; token language (unknown key, unknown modifier, stray `[[`); role mapping; machine ids unchanged |
+| Pack terminology | `tests/Ecp.UnitTests/PackTerminologyTests.cs` (8): the document is hashed and signed; tampering fails; unsafe content refused; an old pack stays compatible; the Blank pack is neutral |
+| Lifecycle, isolation, cache, second person, audit | `tests/Ecp.Integration.Tests/TerminologyScenarios.cs` (SQLite, and 9 SQL Server wrappers: layers, lifecycle, validation, permissions, second person, isolation, cache, pack validation, assignment): publish and rollback; second-person rule; audit actions; tenant and organisation isolation; cache isolation, invalidation and fall-back when the cache fails; a pack assigned as a draft only and never overwriting published wording |
+| Pages through the real host | `tests/Ecp.Api.Tests/TerminologyUiTests.cs` (13): each page opens only for its permission; stable keys apart from labels; edit, validate, publish and the new wording reaching the pages; problems beside rows with values kept; markup never stored or run; publish and restore need a recent sign-in; a person cannot name an organisation outside their grant; Blank reads neutral wording, JBS keeps its own, a third pack the repository has never seen reads its own; roles show label and code with authority unchanged; export headings and the worksheet name; Blank onboarding free of JBS wording; machine identifiers, URLs and form fields unchanged |
+| Notifications | `tests/Ecp.UnitTests/NotificationDeliveryTests.cs` (+ token expansion by organisation; unknown token fails validation) |
+| Guard stage B | `tests/Ecp.Architecture.Tests/VocabularyGuardTests.cs` (28): the whole tree is clean outside the allow-list; every allowance is still needed; the list is narrow; each fixed spelling is detected in each file type; identifiers and tokens are not flagged; an exception covers only its own file and rule |
+
+Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locked restore): unit 629, architecture 64, API 93, integration 219 on SQLite: **1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED** (the SQL Server wrappers; CI runs them).
+
 ## 10. Security regression suite (`Category=Security`)
 
 | ID | Test |

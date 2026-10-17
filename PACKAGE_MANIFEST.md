@@ -35,6 +35,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0014-supply-chain-and-pack-signing.md`
 - `decisions/ADR-0026-external-solution-packs.md`
 - `decisions/ADR-0027-provider-neutral-signature-boundary.md`
+- `decisions/ADR-0028-configurable-terminology.md`
 - `docs/ARCHITECTURE.md`
 - `docs/DOCUMENT_INDEX.md`
 - `docs/DOMAIN_MODEL.md`
@@ -50,6 +51,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `docs/PACK_ARCHITECTURE.md`
 - `docs/REPOSITORY_REVIEW.md`
 - `docs/SECURITY.md`
+- `docs/TERMINOLOGY.md`
 - `docs/TESTING.md`
 - `docs/THREAT_MODEL.md`
 - `migration-samples/attachment-manifest.csv`

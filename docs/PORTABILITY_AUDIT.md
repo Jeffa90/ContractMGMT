@@ -65,6 +65,27 @@ Also checked and clean: pack sources under `templates/packs` (no occurrence), `a
 
 What S3 does **not** claim: no live adapter exists, so nothing provider-specific has been verified against a real service; the callback endpoint is not built; the S3 migration has not been run against SQL Server in this workspace (no SQL Server is available here); see `docs/TESTING.md` section 8.10 for what is proved where.
 
+## 0.4 Status after slice S4 (terminology and guard stage B; ADR-0028)
+
+**P-05, P-06 and P-07 are fixed; P-09 stage B is done.** The registers in sections 3 to 10 still describe the repository as first audited and are not regenerated. This section re-searches `src/`, `deploy/`, `.github/`, `tools/` and the root props files (C#, Razor, resources, JSON, project and props files, appsettings, deployment files, workflows, scripts, CSS and JavaScript), case-insensitively, for the business and vendor names, the fixed business labels and the fixed regional defaults listed below.
+
+New classes used in this section: **Stable machine identifier** (a role, permission, state, audit-action, configuration-kind or pack code, a route, a form field, a database object: not renamed, not a label), **Terminology key** (a catalogue key whose label is data), **Neutral label** (the platform's own wording, naming no business), **Pack-provided label** (wording in a pack's terminology document), **Regional default** (a locale, time zone or currency default: S10, not terminology).
+
+| Class | Where it remains (after S4) | Why it is acceptable |
+|---|---|---|
+| **Generic platform violation** | **None** for business labels. Before S4 the pages, messages, notifications, dashboards, register sets, built-in views, exports and role names spoke procurement in every organisation (P-05, P-06, P-07, R-05, R-06) | Replaced by terminology keys and tokens (`docs/TERMINOLOGY.md`). Guard stage B fails the build on a fixed label or a capitalised business word in page text |
+| **Stable machine identifier** | `RoleCodes.ProcurementAdministrator`, `RoleCodes.CategoryOwner`, `RoleCodes.Legal`, `Approver`, `BackupApprover`; permission codes such as `suppliers.manage`, `categories.manage`; workflow state codes; routes `/Suppliers`, `/Admin/Categories`; form fields `supplierId`, `categoryId`; database tables `Supplier`, `Category`; the legacy contract CSV header | Renaming them is a migration with risk and no benefit (owner decision, ADR-0028 D2). Labels shown to people come from terminology; administrator pages show the code beside the label. The guard matches words, not these identifiers |
+| **Pack-provided label** | `templates/packs/jbs-procurement/terminology/terminology.json` (Supplier, Category, Subcategory, Legal Review, Procurement Administrator, Category Owner, Group Head of Procurement, Procurement Contract Register) and the tokenised notification policy | The only place the procurement wording lives; a pack, not platform code. The Blank pack is neutral |
+| **Neutral label** | `src/Ecp.SharedKernel/Terminology/TermCatalogue.cs` (Counterparty, Contract Administrator, Contract Owner, Reviewer, Registration Approver, Backup Approver, Contract Type, Contract Portfolio, Contract Register, External Execution, Review, Approval, Organisation, Business Unit, Site) | Names no business |
+| **Regional default (S10)** | `appsettings.json` (`en-AU`, Brisbane, `AUD`), `LocaleFormatter` defaults, `OrgLocale`/`MigrationPageModel` fallbacks, `CustomFields` fallback culture, `GlobalisationProbe` | Locale, time zone and currency are not terminology. They are named, per file, in the guard's allow-list with reason "S10" and are the only fixed regional defaults left |
+| **Demo and tool data** | `src/Ecp.Host/DemoSeeder.cs` (role names in the sample CSV), `tools/migration-demo.py` (the Medius migration demonstration) | Sample-data loading and a demonstration of a migration compatibility profile; allowed by name |
+| **Documentation example, historical finding** | This audit, the remediation plan, ADRs, `docs/TERMINOLOGY.md` | Describe the findings; not scanned |
+| **Provider-adapter vocabulary** | `requirements/07-integrations/DOCUSIGN_ADAPTER_NOTES.md` | Unchanged from S3 |
+
+**Fixed in S4:** P-05 (dashboards, register sets, legal-review labels, built-in views), P-06 (the approvals page text naming the Group Head of Procurement), P-07 (onboarding and setup examples: now neutral), the label parts of R-05 and R-06, and P-09 stage B. **Still open:** P-02b (compiled role catalogue, S5/S8), P-04 (pack feature flags, S6), the regional defaults (S10), R-01 to R-04.
+
+**The guard.** `VocabularyGuardTests` scans every shipped text file case-insensitively for `JBS`, `JBSAUS`, `Medius`, `Qlik`, `DocuSign`, `Group Procurement`, `Group Head of Procurement`, `Procurement Administrator`, `Procurement Contract Register`, `Category Owner`, `en-AU`, an Australian time-zone identifier, `Brisbane`, `AUD` (as a currency code), and for capitalised business words in page text. Its allow-list names single files with a reason, rejects stale entries, is capped, and is proved narrow by tests. Scan result at the end of S4: no hit outside the allow-list; every allowance is exercised.
+
 ## 1. Scope, method and classification
 
 ### 1.1 What was scanned

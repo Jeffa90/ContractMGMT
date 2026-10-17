@@ -57,6 +57,10 @@ An unsigned pack is shown with a red **NOT SIGNED** warning wherever it appears.
 
 **Checks** reports whether the shipped packs were found and are usable, which shipped files were not accepted and why, and which organisations point at a pack that cannot be used. It only reports.
 
+### Terminology in a pack (S4)
+
+A pack may carry a terminology document. The upload and review pages list it under the pack's documents and show **Terminology introduced**: each label the pack would give, beside what the organisation reads today. Assigning the pack creates an organisation Terminology draft (never published, never overwriting published wording or an open draft). Terminology is edited under Admin → Terminology with its own permissions (`terminology.*`; see `docs/TERMINOLOGY.md` §11); the `packs.*` permissions neither grant nor need them. Pack versions in this slice: Blank 1.2.0, JBS reference 2.2.0.
+
 ## 3. Organisations that need attention (report only)
 
 Before this change an organisation with no pack, or whose pack could not be found, silently received the reference definitions. Nothing is rewritten now. **Checks** lists:

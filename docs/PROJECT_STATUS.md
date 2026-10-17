@@ -1,6 +1,6 @@
 # Project Status
 
-Status date: **2026-10-17** (after PER-002, portability remediation S1, S2 and S7 external solution packs; the S7 CI result is recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
+Status date: **2026-10-17** (after PER-002, portability remediation S1, S2, S3, S4 and S7 external solution packs; the S7 CI result is recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
 
 **Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 10 and 11 are an engineering assessment of evidence, not an approval.
 
@@ -52,6 +52,7 @@ Each is a slice that runs end to end from the page through the services to the d
 | PER-002 query-plan review | Plans captured on SQL Server; one optimisation retained and one tried and reverted on same-runner evidence; configured-field text search 599 to 417 ms median (target below 500 ms met on the benchmark operation); regression guards | `docs/PERFORMANCE_REVIEW.md`, `docs/PERFORMANCE.md` |
 | Portability audit and remediation plan | Where JBS and vendor names appear, classified; ordered remediation actions | `docs/PORTABILITY_AUDIT.md`, `docs/PORTABILITY_REMEDIATION_PLAN.md` |
 | Portability remediation S2 | The reminder fall-back for an unowned category is a notification-policy rule (JBS states today's recipient, Blank states none); migrated contracts start in their own organisation's initial state; `Contracts:InitialStatusCode` removed from host configuration. Role identifiers untouched | ADR-0025, `docs/PORTABILITY_REMEDIATION_PLAN.md` sections 8.8 and 8.9 |
+| Portability remediation S4: terminology and guard stage B | Business wording is data: a stable key per concept, labels from the organisation's published terminology, then its pack, then neutral platform wording; one resolver with a tenant-keyed cache; a versioned `Terminology` configuration kind with form-based pages and `terminology.*` permissions; an optional signed pack terminology document installed as a draft only; generic pages, messages, notifications, dashboards, built-in views, migration text and exports speak the organisation's words; the guard now scans every shipped text file | `docs/TERMINOLOGY.md`, `decisions/ADR-0028-configurable-terminology.md`, `docs/PORTABILITY_AUDIT.md` section 0.4 |
 | Portability remediation S7: external solution packs | The eight embedded pack resources are gone; Blank and JBS are external `.ecpkg` files built from `templates/packs`; one product-neutral loader over shipped and tenant-installed packs; ES256 signing and trust (Production refuses unsigned and untrusted); tenant-scoped pack store, quarantine, drafts-only assignment, trust-key store, audit; form-based Pack Manager (catalogue, details, upload, validation report with CSV, preview, install, organisation packs, history, trusted publishers, checks); `solution-packs` readiness check; report-only organisation diagnostics; setup and onboarding use the loader | Implemented (ADR-0026, `docs/PACK_MANAGER.md`, `docs/PACK_SECURITY.md`) |
 | Portability remediation S1 | Solution pack resolved by organisation; neutral Blank lifecycle, Variation workflow and notification policy; no compiled default pack (installation default is host configuration, unset); stronger ARC-010; first PRT-002 proof test. Role identifiers untouched | ADR-0024, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.6 |
 
@@ -109,6 +110,7 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| Workspace after S4, no SQL Server: unit 629, architecture 64, API 93, integration on SQLite 219 | 1,005 | 0 | 0 | 218 (the SQL Server wrappers, including 9 new terminology wrappers) |
 | Workspace after S3, no SQL Server: unit 563, architecture 36, API 80, integration on SQLite 207 | 886 | 0 | 0 | 209 (the SQL Server wrappers, including the S3 migration test) |
 | Workspace after S7, no SQL Server: unit 545, architecture 27, API 80, integration on SQLite 202 | 854 | 0 | 0 | 203 (the SQL Server wrappers, including 10 new Pack Manager scenarios) |
 | CI after S7 (run 39), SQL Server 2022 container (203 `SqlServer` tests including the performance baseline) | 203 | 0 | 0 | 0 |
@@ -164,10 +166,10 @@ Known shortcuts and gaps in what is built, each with where it is tracked. None i
 | Pack upgrade across versions, per-item merge, pack and tenant export, marketplace | A new pack version is installed and assigned (drafts) manually | S7d/e/f; Future |
 | The 12-role catalogue (including `ProcurementAdministrator`) is compiled; the new reminder rule `OrganisationAdministrators` still resolves to it | Roles cannot be renamed or replaced per business | P-02b; slices S5, S8 |
 | Legal review and register authorisation (with Registered Date stamping) are compiled capabilities that are always on; pack `features` switches are read and ignored | A business without them cannot switch them off | R-05, P-04; slice S6 |
-| Labels, dashboard titles and help text are resource strings that name JBS roles and states; no terminology service | Terminology aliases (PRT-004) cannot work | P-05 to P-07, R-06; CFG-02, slice S4 |
+| Labels, dashboard titles and help text were resource strings that named JBS roles and states | **Fixed in S4 (ADR-0028)**: terminology keys, a resolver, a versioned configuration kind, pack terminology; role *codes* remain compiled (P-02b, S5/S8) | P-05 to P-07, R-06; slice S4 |
 | The signature boundary was shaped like one vendor | **Fixed in S3 (ADR-0027)**: provider-neutral vocabulary, interfaces, status mapper, event inbox and a renaming migration. A live adapter and the callback endpoint remain Future | P-10; slice S3 |
 | Country and ERP specifics in core fields and validation (ABN, SAP outline agreement number), the compiled classification name `Legal Privileged`, `en-AU` and Brisbane defaults | Another country or ERP needs source changes | R-01 to R-04; slice S10 |
-| The architecture guard ARC-010 scans C# only (stage A); Razor, JSON and project files are not scanned | A business name could return in a page or data file unseen | P-09; slices S4, S7 |
+| The architecture guard scanned C# only (stage A) | **Stage B done in S4**: every shipped text file is scanned, with a narrow written allow-list (S10 locale defaults, demo seeder, migration demo script) | P-09; slice S4 |
 | Configured-field text search: a selective second word costs about 0.8 s, every statement scans the contract table once, the missing-index suggestion is unapplied, small tenancy reads repeat, offset paging only | Fine at 10,000 contracts, unknown at 100,000 | `docs/PERFORMANCE_REVIEW.md` section 10; PRF-01 |
 | `RegisterFilters` keeps two copies of the sort lambda (open and closed access) | Two places to keep in step | PER-002 follow-up, no ID |
 | Workflows, notification policies and approval matrices are edited as JSON; no schema-validation framework; no designers | Usable by an administrator who can edit JSON, not by a business user | CFG-01, STU-03 to STU-06, WFE-01 |
@@ -221,8 +223,8 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S1 pack per organisation, neutral Blank pack, guard stage A, first PRT-002 proof | **Done**, CI-verified |
 | S2 reminder fall-back and migrated initial status | **Done**, CI-verified (run 35) |
 | S3 neutral signature vocabulary with an EF migration | **Done** (ADR-0027); CI run 41 (commit 3d1597a) green: SQL Server 209 Passed, 0 Failed, 0 Skipped, including the migration test (`deploy/STATUS.md`) |
-| S4 vocabulary and terminology read side, guard stage B | **First incomplete** |
-| S5 role catalogue decision (ADR) | Not started |
+| S4 vocabulary and terminology read side, guard stage B | **Done** (ADR-0028); local 1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED; CI result in `deploy/STATUS.md` |
+| S5 role catalogue decision (ADR) | **First incomplete** (not started) |
 | S6 feature flags that gate capabilities | Not started |
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |
 | S8 implement the role decision | Not started |

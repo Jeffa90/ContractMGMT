@@ -191,3 +191,12 @@ Production refuses: Demo identity, default credentials, ephemeral storage, expos
 | Dependency/SBOM/licence scan | Every build |
 | Skill-based reviews (`.claude/skills/security-review`, `tenant-isolation-review`, `portability-review`, `deployment-review`) | Each milestone exit |
 | Penetration test, formal security review, accreditation | External governance, before any production use; **not** performed or implied by this project |
+
+## 17. Terminology (S4; ADR-0028, `docs/TERMINOLOGY.md`)
+
+* A label is presentation only. No evaluator, route, query or workflow reads a label; forms post keys and ids. Renaming a label changes no permission, scope, state or audit action.
+* Label text is plain text: markup, script, template and expression syntax are refused on write, output is HTML-encoded, and the only expansion is the constrained `[[key|modifier]]` token language (no expressions, members or nesting). Tokens expand before argument formatting, so user data is never interpreted.
+* Tenant and organisation isolation: releases, cache keys and drafts carry tenant and organisation; an administrator can name only organisations their grant covers (a plain not-found otherwise). Cross-tenant and cross-organisation tests cover read, draft, publish and cache.
+* Administration is least-privilege (`terminology.*`), publish and rollback need recent authentication and follow second-person rules, every step is audited under stable action codes, and diagnostics never log label values.
+* Pack terminology is inside the signed manifest: tampering fails verification; the content scan rejects unsafe text; installation creates a draft only.
+* The resolver fails safe to the neutral wording; a cache failure falls back to persistence. No secret or live confidential data is part of terminology.

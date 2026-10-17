@@ -10,7 +10,21 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-17, end of portability slice S3: provider-neutral signature boundary)
+## Current state (2026-10-17, end of portability slice S4: terminology and guard stage B)
+
+**Slice S4 (this pass; `decisions/ADR-0028-configurable-terminology.md`, `docs/TERMINOLOGY.md`, `docs/PORTABILITY_AUDIT.md` section 0.4, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.12).** Findings P-05, P-06, P-07 and P-09 stage B are fixed. Stable keys are never renamed; labels are data.
+
+* **Terminology model and resolver (Implemented).** 42 catalogue keys (32 required), neutral wording that names no business, layered resolution (organisation, pack, neutral, key as diagnostic), a constrained `[[key|modifier]]` token language, one `ITerminologyResolver` with a tenant-organisation-locale-version cache that invalidates on publish and rollback and falls back to persistence.
+* **`Terminology` configuration kind (Implemented).** Draft, validate, preview, publish, history, rollback, audit, second person and step-up as for every kind; plain text only; limits; duplicates refused. Permissions terminology.read, .draft, .publish, .rollback and .audit.read (82 permissions in total; decision D7b).
+* **Pack terminology (Implemented).** Optional signed document; installed as a draft only; never overwrites a published release; preview on review and assign pages. Blank 1.2.0 is neutral; JBS 2.2.0 carries the procurement wording; a synthetic third pack proves a pack the repository has never seen works with no source change.
+* **Administration (Implemented).** Form-based Overview, Edit, Preview, History and Audit under Admin, Terminology; setup and onboarding show the selected pack's wording before assignment and prepare a draft; never silently published.
+* **Generic UI, messages, notifications, exports (Implemented).** About 460 page strings, domain and guard messages, dashboards, register and core-field labels, the eleven built-in views, notification templates (validated), migration text and reports, and the export headings and worksheet name use the resolver. Role labels come from terminology; role codes are unchanged.
+* **Guard stage B (Implemented).** `VocabularyGuardTests` scans every shipped text file for vendor names, fixed business labels, fixed Australian defaults and capitalised business words in page text, with a narrow single-file allow-list.
+* **Not done, by design:** role-catalogue replacement (S5/S8), feature flags (S6), another pack-loader slice, regional defaults (S10), live e-signature, reporting, operations, API work, AI, marketplace, visual designers.
+* **Verification.** Local: 1,005 Passed, 0 Failed, 0 Skipped, 218 NOT VERIFIED (the SQL Server wrappers). CI result: `deploy/STATUS.md`.
+* **First incomplete remediation task:** S5 (the role-catalogue decision, an ADR with no code), then S6, S8 to S10.
+
+### Previous pass (S3: provider-neutral signature boundary)
 
 **Slice S3 (this pass; `decisions/ADR-0027-provider-neutral-signature-boundary.md`, `requirements/07-integrations/ESIGNATURE_PROVIDER_SPEC.md`, `docs/PORTABILITY_AUDIT.md` section 0.3, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.11).** Finding P-10 (R6) is fixed. DocuSign is one optional future provider and none of its words define a platform entity, column, interface, route, configuration key or label.
 

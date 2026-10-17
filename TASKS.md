@@ -18,7 +18,7 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 * **Proof (Implemented).** Unit, eleven integration scenarios (SQLite and SQL Server), four API render tests, six architecture-guard tests: upload to published, onboarded organisation with no rebuild; every state and step of both workflows; approvals by tier, boundary, exception, currency, delegation; capabilities; notifications; fields; locale; three businesses in one tenant plus a second tenant.
 * **S9-discovered generic fix F1.** `_ContractFields.cshtml` typed four labels outside the terminology resolver; fixed as tokens with a new stage-B rule. Only platform source change. Findings G12 to G16 and L1 recorded, none fixed by pack-specific code.
 * **PRT-002, PRT-004, PRT-013: Met** on the evidence in `docs/PORTABILITY_AUDIT.md` section 0.8. **PKM-04: ticked** (below). PRT-005, PRT-006, PRT-009, PRT-011 stay NOT VERIFIED.
-* **Verification.** Local and CI results are recorded in `deploy/STATUS.md` once the run completes (pending at the time of this edit).
+* **Verification.** Local: **1,145 Passed, 0 Failed, 0 Skipped, 244 NOT VERIFIED** (the SQL Server wrappers; unit 713, architecture 80, API 107, integration 245 on SQLite). CI [run 56](https://github.com/Jeffa90/ContractMGMT/actions/runs/39035069299) (commit 626877d) green: SQL Server 244 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED; container build and smoke test passed (`deploy/STATUS.md`).
 * **Not done, by design:** S10 (regional defaults, tax-identifier formats, ISO dates in messages), sell-side Professional Services, any construction product feature, PRT-005/006/009/011, a PR.
 * **First incomplete remediation task:** S10. **First incomplete product task:** INT-03's live e-signature adapter (unchanged).
 

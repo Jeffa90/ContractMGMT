@@ -503,7 +503,7 @@ Found by the tests and fixed: the first smoke run showed a valid pack refused at
 
 The integration scenarios run on SQLite locally and have SQL Server wrappers (`SecondBusinessScenarioTests_SqlServer`) that run in CI. The guard reads git history; CI therefore checks out full history (`fetch-depth: 0`) and the test fails, rather than passes, if the baseline commit is missing.
 
-Result: recorded in `deploy/STATUS.md` once the run completes (pending at the time of this edit).
+Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locked restore): unit 713, architecture 80, API 107, integration 245 on SQLite: **1,145 Passed, 0 Failed, 0 Skipped, 244 NOT VERIFIED locally** (the SQL Server wrappers, 11 of them new). `tools/check-repo.py` and `tools/check-packs.sh` (three packs) pass. CI [run 56](https://github.com/Jeffa90/ContractMGMT/actions/runs/39035069299) (commit 626877d): all three jobs green, SQL Server **244 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED**, container build and smoke test passed.
 
 Found by the tests and fixed: the render sweep found four contract-field labels typed into a Razor tuple literal (finding F1); the first API setup made the administrator tenant-wide, which (correctly) showed the Legal role in the picker because other organisations in reach offer it, so the administrator is now organisation-scoped; many scenario-writing errors against the real services (key prefixes in plan step names, access subject cached per scope, the closed notification vocabulary) were test-side only.
 

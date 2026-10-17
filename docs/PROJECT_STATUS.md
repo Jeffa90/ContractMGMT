@@ -110,6 +110,8 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| CI after S9 (run 56, commit 626877d), SQL Server 2022 container | 244 | 0 | 0 | 0 |
+| Workspace after S9, no SQL Server: unit 713, architecture 80, API 107, integration on SQLite 245 | 1,145 | 0 | 0 | 244 (the SQL Server wrappers, including 11 new Harborline wrappers) |
 | CI after the S9 readiness prerequisites (run 53), SQL Server 2022 container | 233 | 0 | 0 | 0 |
 | Workspace after the S9 readiness prerequisites, no SQL Server: unit 698, architecture 71, API 103, integration on SQLite 234 | 1,106 | 0 | 0 | 233 (the SQL Server wrappers, including 3 new smoke-test wrappers) |
 | Workspace after S6, no SQL Server: unit 695, architecture 71, API 101, integration on SQLite 231 | 1,098 | 0 | 0 | 230 (the SQL Server wrappers, including 11 new capability wrappers) |
@@ -156,7 +158,7 @@ Never reported as passed:
 | Scale: 100,000 contracts, concurrency, cold start, HTTP and rendering time | Only the 10,000-contract in-process baseline exists |
 | Backup, restore and disaster recovery | OPS-01 to OPS-04 not built |
 | Penetration test and external security review | Not performed |
-| PRT-002 as a whole (a second business end to end), terminology aliases (PRT-004), configuration and tenant export round trips (PRT-006, PRT-011), renamed roles and states (PRT-013) | Only the first PRT-002 step is proved (S1: a Blank organisation resolves its own pack and opens a Variation); the rest of the features or tests do not exist yet (`docs/PORTABILITY_AUDIT.md` section 4) |
+| Deployment-model parity (PRT-005), configuration and tenant export round trips (PRT-006, PRT-011), pack upgrade preserving local changes (PRT-009) | Not built or not tested; S9 did not touch them. Real-world fitness of the Harborline pack for a construction company is not claimed |
 | Performance at 100,000 contracts, selective multi-word configured-field text search | Not measured; the second word of a text search still costs about 0.8 s when it is selective (`docs/PERFORMANCE_REVIEW.md` section 10) |
 | Mermaid diagram rendering | Structure is checked; rendering needs `mmdc` |
 
@@ -208,19 +210,19 @@ Portability means a second business can run on the platform by configuration, pa
 | R-05 compiled Legal-review and register steps | Medium | **On/off closed (S6)**; the capabilities remain compiled, with a switch |
 | R-06 | Info | **Open** |
 
-Remaining high-severity portability violation: **none** from the original audit (P-02b is Medium). PRT-002 as a whole is still NOT VERIFIED (S9).
+Remaining high-severity portability violation: **none** from the original audit (P-02b is Medium). S9 recorded findings G12 to G16 and L1 (Low or Medium, none a blocker) and one generic fix, F1 (`docs/PORTABILITY_AUDIT.md` section 0.8).
 
 ### 9.2 Acceptance criteria
 
 | Criterion | State |
 |---|---|
 | PRT-001 static scan | Partly verified: ARC-010 passes with every spelling in C#; no business or vendor name in `src` C#; the only `jbs-procurement` text in `src` is two project-file embedding lines (P-03) |
-| PRT-002 a second business | **NOT VERIFIED** as a whole. Its first step passes on SQLite and SQL Server: a Blank organisation gets its own states, Variation workflow, notification policy and reminder behaviour and opens a Variation, and no JBS state or reminder recipient appears |
+| PRT-002 a second business | **Met (S9).** Harborline Construction (`construction-subcontracts` 1.0.0, synthetic) installs, assigns, publishes and runs a subcontract and a change order through every state and step with no source change; SQLite locally and SQL Server in CI (run 56). Not a claim of fitness for a real construction business |
 | PRT-003 no schema change per field | Verified |
-| PRT-004 terminology aliases | **Implemented, tick pending S9.** Terminology (S4) covers business nouns; the S9 readiness work (G1a, G1b) made every contract-field and supplier label a key (73 keys). Enforced by a unit test and a render and export test. Ticked only when the S9 sweep passes |
+| PRT-004 terminology aliases | **Met for the proof's scope (S9).** Render sweep as four roles, exports, notification inbox and every pack document show only the pack's words where it sets a term, in US formats. Limits: platform validation-message wording is not swept as a class; notification dates are ISO (G12) |
 | PRT-006 and PRT-011 export and import round trips | **NOT VERIFIED** (not built) |
 | PRT-012 locale per organisation | Partly verified: the en-US, USD, America/Chicago probe (27 page addresses, one export) found and fixed one leak (the Audit page); installation-level fall-backs remain (S10) |
-| PRT-013 renamed roles and states | **NOT VERIFIED** (roles compiled) |
+| PRT-013 renamed roles and states | **Met (S9)** under the amended criterion (ADR-0029): role, approver-group and state names shown to people come from terminology and definitions; identifiers are frozen by tests |
 
 ### 9.3 Slices
 
@@ -234,9 +236,9 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S6 feature flags that gate capabilities | **Done** (ADR-0030): catalogue, `Capabilities` kind, pack defaults, organisation overrides, resolver, engine gate, capability-aware navigation, onboarding and setup, compatibility and readiness checks, guard; local 1,098 Passed, 0 Failed, 0 Skipped, 230 NOT VERIFIED; CI run 48 (commit c88295c) green: SQL Server 230 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`) |
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |
 | S8 implement the role decision | **Retired**: superseded by S4 and ADR-0029 |
-| S9 second pack end to end (PRT-002, PRT-004, PRT-013) | **Designed, ready to start, not built**: `docs/SECOND_BUSINESS_PROOF.md` (Harborline Construction, `construction-subcontracts`, en-US, USD, America/Chicago; 19 acceptance criteria; amended by owner decisions D8); the readiness prerequisites are implemented, no known blocker |
+| S9 second pack end to end (PRT-002, PRT-004, PRT-013) | **Done** (ADR-0032, `docs/SECOND_BUSINESS_PROOF.md` section 16, `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`); local 1,145 Passed, 0 Failed, 0 Skipped; CI run 56 (commit 626877d) green: SQL Server 244 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke test passed (`deploy/STATUS.md`) |
 | S9 readiness prerequisites (G11, content-kind smoke test, G1a, G1b, locale probe; owner decisions D1 to D4) | **Done** (`docs/S9_READINESS.md` section 13); local 1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED; CI run 53 (commit c5d9ce2) green: SQL Server 233 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`). S9 itself has not started |
-| S10 cleanup of country, ERP and locale defaults | Not started. Includes G2 (non-Australian tax identifier formats; owner decision D4), R-01, R-02, R-04 |
+| S10 cleanup of country, ERP and locale defaults | Not started (first incomplete remediation task). Includes G2 (non-Australian tax identifier formats; owner decision D4), R-01, R-02, R-04 |
 
 ## 10. Pilot readiness assessment
 

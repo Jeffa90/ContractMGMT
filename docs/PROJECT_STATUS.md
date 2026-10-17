@@ -105,11 +105,12 @@ Deferred means decided not to build yet, recorded in `TASKS.md` and the ADRs; th
 
 ## 6. Verified capabilities
 
-Test totals at the end of this pass (details and history in `docs/TESTING.md`; the S7 CI figures are recorded in `deploy/STATUS.md` once the run has finished, and are **not claimed here until then**; the S2 CI row is kept for comparison):
+Test totals at the end of this pass (details and history in `docs/TESTING.md`; CI figures are from run 39, commit `3c78a29`, the S7 code; the S2 CI row is kept for comparison):
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
 | Workspace after S7, no SQL Server: unit 545, architecture 27, API 80, integration on SQLite 202 | 854 | 0 | 0 | 203 (the SQL Server wrappers, including 10 new Pack Manager scenarios) |
+| CI after S7 (run 39), SQL Server 2022 container (203 `SqlServer` tests including the performance baseline) | 203 | 0 | 0 | 0 |
 | Workspace after S2, no SQL Server: unit 455, architecture 20, API 72, integration on SQLite 191 | 738 | 0 | 0 | 193 (the SQL Server wrappers) |
 | CI after S2 (run 35), SQL Server 2022 container (192 `SqlServer` tests plus the performance baseline, run as separate steps) | 193 | 0 | 0 | 0 |
 
@@ -221,7 +222,7 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S4 vocabulary and terminology read side, guard stage B | Not started |
 | S5 role catalogue decision (ADR) | Not started |
 | S6 feature flags that gate capabilities | Not started |
-| S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); local totals below, CI result in `deploy/STATUS.md` |
+| S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |
 | S8 implement the role decision | Not started |
 | S9 second pack end to end (PRT-002, PRT-004, PRT-013) | Not started |
 | S10 cleanup of country, ERP and locale defaults | Not started |

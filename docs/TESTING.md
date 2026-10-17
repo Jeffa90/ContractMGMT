@@ -378,7 +378,7 @@ Not covered: a browser accessibility audit of the new pages (ACC-01), SQL Server
 
 ### 8.9 Totals at the end of the S7 pass
 
-Without `ECP_TEST_SQL`: **854 Passed, 0 Failed, 0 Skipped, 203 NOT VERIFIED** (545 unit, 27 architecture, 80 API, 202 integration on SQLite). The 203 are the SQL Server wrappers, reported NOT VERIFIED rather than passed. The S7 CI result is recorded in `deploy/STATUS.md`.
+Without `ECP_TEST_SQL`: **854 Passed, 0 Failed, 0 Skipped, 203 NOT VERIFIED** (545 unit, 27 architecture, 80 API, 202 integration on SQLite). The 203 are the SQL Server wrappers, reported NOT VERIFIED rather than passed. CI run 39 (commit `3c78a29`, SQL Server 2022): **203 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED**; build, repository, supply-chain, solution-pack and container-image checks succeeded (`deploy/STATUS.md`).
 
 ## 9. No-code, packages and portability suite
 

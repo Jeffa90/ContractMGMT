@@ -110,6 +110,7 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| CI after the S9 readiness prerequisites (run 53), SQL Server 2022 container | 233 | 0 | 0 | 0 |
 | Workspace after the S9 readiness prerequisites, no SQL Server: unit 698, architecture 71, API 103, integration on SQLite 234 | 1,106 | 0 | 0 | 233 (the SQL Server wrappers, including 3 new smoke-test wrappers) |
 | Workspace after S6, no SQL Server: unit 695, architecture 71, API 101, integration on SQLite 231 | 1,098 | 0 | 0 | 230 (the SQL Server wrappers, including 11 new capability wrappers) |
 | Workspace after S5, no SQL Server: unit 655, architecture 64, API 95, integration on SQLite 220 | 1,034 | 0 | 0 | 219 (the SQL Server wrappers, including 1 new group-and-role wrapper) |
@@ -234,7 +235,7 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |
 | S8 implement the role decision | **Retired**: superseded by S4 and ADR-0029 |
 | S9 second pack end to end (PRT-002, PRT-004, PRT-013) | **Designed, ready to start, not built**: `docs/SECOND_BUSINESS_PROOF.md` (Harborline Construction, `construction-subcontracts`, en-US, USD, America/Chicago; 19 acceptance criteria; amended by owner decisions D8); the readiness prerequisites are implemented, no known blocker |
-| S9 readiness prerequisites (G11, content-kind smoke test, G1a, G1b, locale probe; owner decisions D1 to D4) | **Done** (`docs/S9_READINESS.md` section 13); local 1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED; CI result in `deploy/STATUS.md`. S9 itself has not started |
+| S9 readiness prerequisites (G11, content-kind smoke test, G1a, G1b, locale probe; owner decisions D1 to D4) | **Done** (`docs/S9_READINESS.md` section 13); local 1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED; CI run 53 (commit c5d9ce2) green: SQL Server 233 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`). S9 itself has not started |
 | S10 cleanup of country, ERP and locale defaults | Not started. Includes G2 (non-Australian tax identifier formats; owner decision D4), R-01, R-02, R-04 |
 
 ## 10. Pilot readiness assessment

@@ -19,7 +19,7 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 * **G1a and G1b (Implemented).** 31 field-label terminology keys (73 in the catalogue, 32 required): Tax Identifier, Vendor Number and ERP Reference as neutral wording; every contract-field label and group heading; the reference pack 2.5.0 keeps today's words; Blank 1.5.0. PRT-004 is ticked at the S9 sweep.
 * **Locale probe (Implemented).** An en-US, USD, America/Chicago organisation; one leak (the Audit page) fixed.
 * **Owner items (Implemented).** "Approval Authority" as the neutral Approver label; the onboarding warning prints the role's label.
-* **Verification.** Local: **1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED** (the SQL Server wrappers). CI: see `deploy/STATUS.md`.
+* **Verification.** Local: **1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED** (the SQL Server wrappers). CI run 53 (commit c5d9ce2) green: SQL Server 233 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED (`deploy/STATUS.md`).
 * **Not done, by design:** S9 (the Construction Subcontracts pack and the PRT-002, PRT-004, PRT-013 sweeps), G2 non-Australian tax identifier formats (S10, D4), R-01, R-02, R-04.
 * **First incomplete remediation task:** S9, then S10.
 

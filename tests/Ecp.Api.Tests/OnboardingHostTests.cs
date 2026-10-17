@@ -40,6 +40,26 @@ public sealed class OnboardingHostTests
     }
 
     [Fact]
+    public async Task The_pack_step_offers_the_packs_the_loader_finds_with_their_publisher_and_signature_and_allows_staying_on_blank()
+    {
+        using var app = DemoApp.Start();
+        var (_, orgId) = await TenantAOrgAsync(app);
+        using var admin = await app.SignInAsync("orgadmin@a.example.test");
+        var page = await admin.GetStringAsync($"/Onboarding/Step/pack?org={orgId}");
+        Assert.Contains("Blank (no business defaults)", page);
+        Assert.Contains("Publisher", page);
+        Assert.Contains("NOT signed", page);                                    // unsigned demonstration packs say so
+        Assert.Contains("None (start from the Blank configuration)", page);     // staying on the Blank configuration is always possible
+        Assert.Contains("Nothing takes effect until you validate and publish", page);
+
+        // Choosing a pack that is not available here is refused with an explanation, not a stack trace.
+        var bad = await DemoApp.PostFormAsync(admin, $"/Onboarding/Step/pack?org={orgId}", new Dictionary<string, string> { ["Org"] = orgId.ToString(), ["PackId"] = "no-such-pack" }, $"/Onboarding/Step/pack?org={orgId}");
+        var body = await bad.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("   at ", body);
+        Assert.Contains("not available here", body);
+    }
+
+    [Fact]
     public async Task An_organisation_administrator_drafts_validates_previews_publishes_and_rolls_back_through_the_wizard()
     {
         using var app = DemoApp.Start();

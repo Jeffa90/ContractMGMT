@@ -214,3 +214,100 @@ public class SourceRuleTests
     public void Secrets_are_not_hard_coded_in_source()
         => AssertNone(new Regex(@"(?i)(password|pwd|secret|apikey|token)\s*=\s*[""'][^""']{4,}[""']"), "Possible hard-coded secret");
 }
+
+/// <summary>
+/// Solution packs are external, read-only data (docs/PACK_ARCHITECTURE.md). These rules keep it that way: no pack document becomes an embedded resource again, the pack reader has a small set of homes, the loader
+/// names no pack, the sources and built packages stay separate, and no signing key is ever committed.
+/// </summary>
+[Trait("Category", "Architecture")]
+public class PackRuleTests
+{
+    private static string Root => RepoRoot.Find();
+
+    private static IEnumerable<string> Files(string relativeDirectory, string pattern)
+        => Directory.EnumerateFiles(Path.Combine(Root, relativeDirectory), pattern, SearchOption.AllDirectories)
+            .Select(f => f.Replace('\\', '/')).Where(f => !f.Contains("/obj/") && !f.Contains("/bin/"));
+
+    [Fact]
+    public void No_project_embeds_a_solution_pack_document()
+    {
+        var hits = Files("src", "*.csproj").Concat(Files("tests", "*.csproj"))
+            .SelectMany(f => File.ReadAllLines(f).Select(line => (f, line)))
+            .Where(x => x.line.Contains("EmbeddedResource", StringComparison.Ordinal) && Regex.IsMatch(x.line, @"templates[/\\]packs|pack\.json|contract-lifecycle|variation\.json|notification-policy", RegexOptions.IgnoreCase))
+            .Select(x => x.f).Distinct().ToList();
+        Assert.True(hits.Count == 0, "Pack documents must be shipped as external .ecpkg packages, not embedded resources: " + string.Join(", ", hits));
+    }
+
+    [Fact]
+    public void No_compiled_assembly_carries_a_pack_document_as_a_resource()
+    {
+        foreach (var (name, assembly, _) in Modules.All)
+        {
+            var resources = assembly.GetManifestResourceNames().Where(r => Regex.IsMatch(r, @"\.(pack|packs)\b|contract-lifecycle|variation|notification-policy|ecpkg", RegexOptions.IgnoreCase) && r.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+                || r.EndsWith(".ecpkg", StringComparison.OrdinalIgnoreCase)).ToList();
+            Assert.True(resources.Count == 0, $"{name} embeds pack documents: {string.Join(", ", resources)}");
+        }
+    }
+
+    [Fact]
+    public void Packages_are_opened_only_by_the_pack_library_the_tool_and_the_loader_folder()
+    {
+        var allowed = new[] { "/src/Ecp.Packs/", "/src/Ecp.PackTool/", "/src/Modules/Ecp.Configuration/Packs/" };
+        var hits = Files("src", "*.cs").Where(f => !allowed.Any(a => f.Contains(a, StringComparison.Ordinal)))
+            .Where(f => Regex.IsMatch(File.ReadAllText(f), @"PackReader\.Open\s*\(|PackZipReader\.Read\s*\("))
+            .ToList();
+        Assert.True(hits.Count == 0, "Reading a package belongs to the pack loader only: " + string.Join(", ", hits));
+    }
+
+    [Fact]
+    public void The_pack_loader_names_no_pack_and_makes_no_decision_by_pack_key()
+    {
+        var offenders = Files("src/Modules/Ecp.Configuration/Packs", "*.cs").Concat(Files("src/Ecp.Packs", "*.cs"))
+            .Where(f => Regex.IsMatch(File.ReadAllText(f), "\"(blank|jbs[a-z-]*|reference|default)\"", RegexOptions.IgnoreCase))
+            .ToList();
+        Assert.True(offenders.Count == 0, "The loader and library must not name any pack: " + string.Join(", ", offenders));
+    }
+
+    [Fact]
+    public void Pack_sources_and_built_packages_stay_separate_and_the_host_builds_the_shipped_packs()
+    {
+        Assert.Empty(Files("templates", "*.ecpkg"));
+        var sources = Directory.EnumerateDirectories(Path.Combine(Root, "templates", "packs")).Where(d => File.Exists(Path.Combine(d, "pack-source.json"))).ToList();
+        Assert.True(sources.Count >= 2, "The Blank and reference pack sources are expected under templates/packs.");
+        var host = File.ReadAllText(Path.Combine(Root, "src", "Ecp.Host", "Ecp.Host.csproj"));
+        Assert.Contains("BuildShippedPacks", host);
+        Assert.Contains("CopyShippedPacksToPublish", host);
+        Assert.Contains("build-all", host);
+    }
+
+    [Fact]
+    public void Every_shipped_pack_source_builds_and_verifies()
+    {
+        foreach (var dir in Directory.EnumerateDirectories(Path.Combine(Root, "templates", "packs")).Where(d => File.Exists(Path.Combine(d, Ecp.Packs.PackBuilder.RecipeFile))))
+        {
+            var built = Ecp.Packs.PackBuilder.Build(dir);
+            Assert.True(built.Succeeded, Path.GetFileName(dir) + ": " + string.Join("; ", built.Issues.Select(i => i.Code + " " + i.Message)));
+            var again = Ecp.Packs.PackBuilder.Build(dir);
+            Assert.Equal(built.Opened!.Sha256, again.Opened!.Sha256);   // reproducible: the same sources give the same bytes
+        }
+    }
+
+    [Fact]
+    public void No_private_signing_key_is_committed()
+    {
+        var pattern = new Regex(@"-----BEGIN [A-Z ]*PRIVATE KEY-----\s*[A-Za-z0-9+/=]{40,}");
+        var hits = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories))
+        {
+            var f = file.Replace('\\', '/');
+            if (f.Contains("/.git/") || f.Contains("/obj/") || f.Contains("/bin/") || f.Contains("/TestResults/") || f.Contains("/artifacts/") || f.Contains("/node_modules/")) continue;
+            if (new FileInfo(file).Length > 2_000_000) continue;
+            var ext = Path.GetExtension(f).ToLowerInvariant();
+            if (ext is ".dll" or ".pdb" or ".png" or ".ico" or ".zip" or ".ecpkg" or ".xlsx" or ".woff" or ".woff2") continue;
+            string text;
+            try { text = File.ReadAllText(file); } catch (Exception) { continue; }
+            if (pattern.IsMatch(text)) hits.Add(f);
+        }
+        Assert.True(hits.Count == 0, "A private key is present in the working tree: " + string.Join(", ", hits));
+    }
+}

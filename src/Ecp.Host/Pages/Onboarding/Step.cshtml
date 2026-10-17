@@ -33,12 +33,30 @@
         <input type="hidden" name="Org" value="@Model.OrganisationId" />
         <div class="field">
             <label for="PackId">@L["Solution pack"]</label>
-            <select id="PackId" name="PackId">
-                <option value="" selected="@(Model.PackId is null)">@L["None"]</option>
-                @foreach (var p in Model.Packs) { <option value="@p.PackId" selected="@(p.PackId == Model.PackId)">@p.Name (v@(p.Version))</option> }
+            <select id="PackId" name="PackId" aria-describedby="pack-notes">
+                <option value="" selected="@(Model.PackId is null)">@L["None (start from the Blank configuration)"]</option>
+                @foreach (var p in Model.Packs) { <option value="@p.PackKey" selected="@(p.PackKey == Model.PackId)">@p.Name() (v@(p.Version))</option> }
             </select>
         </div>
-        @foreach (var p in Model.Packs) { <p class="hint">@p.Name: @p.Description</p> }
+        <div id="pack-notes">
+            @if (Model.Packs.Count == 0) { <p class="hint">@L["No solution packs are available here. Continue with the Blank configuration, or ask an administrator to install a pack in the Pack Manager."]</p> }
+            @foreach (var p in Model.Packs)
+            {
+                <section class="card" aria-labelledby="pack-@p.PackKey">
+                    <h3 id="pack-@p.PackKey">@p.Name() <span class="hint">v@(p.Version)</span></h3>
+                    <p>@p.DescriptionText()</p>
+                    <dl>
+                        <dt>@L["Publisher"]</dt><dd>@p.PublisherName</dd>
+                        <dt>@L["Signature"]</dt><dd>@(p.Trust.IsTrusted ? L["Signed by a trusted key"] : L["NOT signed: accepted only because this is a demonstration or test environment"])</dd>
+                        <dt>@L["Includes"]</dt><dd>@string.Join(", ", p.Content.Select(c => c.Kind))</dd>
+                        @if (p.Capabilities.Count > 0) { <dt>@L["Capabilities"]</dt><dd>@string.Join(", ", p.Capabilities)</dd> }
+                        <dt>@L["Starting categories"]</dt><dd>@p.Info!.Defaults.Categories.Count</dd>
+                        <dt>@L["Starting contract types"]</dt><dd>@p.Info.Defaults.ContractTypes.Count</dd>
+                    </dl>
+                </section>
+            }
+            <p class="hint">@L["Choosing a pack only prepares drafts for you to review. Nothing takes effect until you validate and publish."]</p>
+        </div>
         <div class="check field"><input id="loadDefaults" name="loadDefaults" type="checkbox" value="true" /><label for="loadDefaults">@L["Also add the pack's categories and contract types to this draft"]</label></div>
         <div class="actions"><button type="submit">@L["Save"]</button></div>
     </form>

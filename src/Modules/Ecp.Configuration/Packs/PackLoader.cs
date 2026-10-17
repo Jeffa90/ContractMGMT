@@ -4,15 +4,20 @@ using Ecp.Configuration.Persistence;
 using Ecp.Packs;
 using Ecp.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Ecp.Configuration;
 
 /// <summary>The configuration kinds this host can install from a pack: the platform's packable kinds that a module has actually registered.</summary>
-internal sealed class PackKindRegistry(IEnumerable<IConfigurationKind> kinds)
+internal sealed class PackKindRegistry(IServiceProvider services)
 {
-    public IReadOnlySet<string> Known { get; } = PackKinds.Packable.Where(k => kinds.Any(x => x.Kind == k)).ToHashSet(StringComparer.Ordinal);
-    public IConfigurationKind? Find(string kind) => kinds.FirstOrDefault(k => k.Kind == kind);
+    // Resolved on first use, not at construction: the solution-pack kind itself depends on the loader, which depends on this registry.
+    private IReadOnlyList<IConfigurationKind>? _kinds;
+    private IReadOnlyList<IConfigurationKind> Kinds => _kinds ??= services.GetServices<IConfigurationKind>().ToList();
+    private IReadOnlySet<string>? _known;
+    public IReadOnlySet<string> Known => _known ??= PackKinds.Packable.Where(k => Kinds.Any(x => x.Kind == k)).ToHashSet(StringComparer.Ordinal);
+    public IConfigurationKind? Find(string kind) => Kinds.FirstOrDefault(k => k.Kind == kind);
 }
 
 /// <summary>Builds the trust policy for the current tenant: platform keys first, then the tenant's own registered keys.</summary>
@@ -153,7 +158,9 @@ internal sealed class ShippedSolutionPackCatalogue(ShippedPackSource shipped, Pl
         return list;
     }
 
-    public IReadOnlyList<PackCatalogueEntry> ListEntries() => Entries().Where(e => e.IsUsable).OrderBy(e => e.PackKey, StringComparer.Ordinal).ToList();
+    public IReadOnlyList<PackCatalogueEntry> ListEntries()
+        => Entries().Where(e => e.IsUsable).GroupBy(e => e.PackKey, StringComparer.Ordinal)
+            .Select(g => g.OrderByDescending(e => SemVer.TryParse(e.Version, out var v) ? v : new SemVer(0, 0, 0, null)).First()).OrderBy(e => e.PackKey, StringComparer.Ordinal).ToList();
     public IReadOnlyList<SolutionPackInfo> List() => ListEntries().Select(e => e.Info!).ToList();
     public SolutionPackInfo? Find(string packId) => ListEntries().Where(e => e.PackKey == packId).OrderByDescending(e => SemVer.TryParse(e.Version, out var v) ? v : new SemVer(0, 0, 0, null)).Select(e => e.Info).FirstOrDefault();
     public IReadOnlyList<PackCatalogueEntry> Rejected() => [];

@@ -50,7 +50,13 @@ builder.Services.AddEcpPersistence(resolved.Database);
 builder.Services.AddAuditModule();
 builder.Services.AddTenancyModule();
 builder.Services.AddIdentityModule(o => { o.Mode = resolved.Host.Mode; o.RequireEmergencyConfirmation = production; });
-builder.Services.AddConfigurationModule(o => o.RequireSecondPersonPublish = production);
+builder.Services.AddConfigurationModule(o => o.RequireSecondPersonPublish = production, packs: o =>
+{
+    builder.Configuration.GetSection("Ecp:Packs").Bind(o);
+    o.Mode = resolved.Host.Mode;                                                       // the host decides the mode; configuration cannot override it
+    if (string.IsNullOrWhiteSpace(o.StorageDirectory)) o.StorageDirectory = Path.Combine(resolved.Host.DataDirectory, "packs");
+    if (production) o.AllowUnsignedSyntheticPacks = false;                              // Production never accepts unsigned packs, whatever the setting says
+});
 builder.Services.AddContractsModule(o => builder.Configuration.GetSection("Contracts").Bind(o));
 builder.Services.AddDocumentsModule(o => builder.Configuration.GetSection("Documents").Bind(o),
     new LocalFileSystemOptions { RootPath = Path.Combine(resolved.Host.DataDirectory, "documents") });

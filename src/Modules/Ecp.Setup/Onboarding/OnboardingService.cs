@@ -10,7 +10,7 @@ namespace Ecp.Setup.Onboarding;
 
 /// <summary>Loads what already exists, as keys, for validation and preview.</summary>
 internal sealed class OnboardingFactsLoader(IOrganisationStructureService structure, ICategoryAdministration categories, IUserService users, IProviderRegistry providers,
-    ISolutionPackCatalogue packs, IClassificationScaleProvider scales)
+    IPackLoader packs, IClassificationScaleProvider scales)
 {
     public async Task<OnboardingFacts> LoadAsync(Guid organisationId, CancellationToken ct)
     {
@@ -18,7 +18,7 @@ internal sealed class OnboardingFactsLoader(IOrganisationStructureService struct
         var cats = (await categories.ListAllAsync(ct)).Where(c => c.OrganisationId == organisationId);
         var emails = (await users.ListAsync(ct)).Select(u => u.Email.Trim().ToLowerInvariant()).ToHashSet();
         return new OnboardingFacts(organisationId, Set(s.LegalEntities.Select(x => x.Key)), Set(s.Divisions.Select(x => x.Key)), Set(s.BusinessUnits.Select(x => x.Key)),
-            Set(s.Sites.Select(x => x.Key)), Set(cats.Select(c => c.Code)), emails, Set((await providers.ListAsync(ct)).Select(p => p.Key)), Set(packs.List().Select(p => p.PackId)),
+            Set(s.Sites.Select(x => x.Key)), Set(cats.Select(c => c.Code)), emails, Set((await providers.ListAsync(ct)).Select(p => p.Key)), Set((await packs.ListAsync(ct)).Where(p => p.IsUsable && p.Info is not null).Select(p => p.PackKey)),
             await scales.GetAsync(ct));
     }
 
@@ -71,7 +71,7 @@ public interface IOnboardingService
 }
 
 internal sealed class OnboardingService(IConfigurationService configuration, IAccessService access, ITenantContext tenant, OnboardingFactsLoader facts, IClassificationScaleProvider scales,
-    ISolutionPackCatalogue packs) : IOnboardingService
+    IPackLoader packs) : IOnboardingService
 {
     private const string Kind = OrganisationOnboardingKind.KindName;
 
@@ -116,7 +116,7 @@ internal sealed class OnboardingService(IConfigurationService configuration, IAc
         var d = state.Document with { PackId = string.IsNullOrWhiteSpace(packId) ? null : packId };
         if (d.PackId is not null)
         {
-            var pack = packs.Find(d.PackId) ?? throw new DomainException("unknown_pack", "That solution pack is not in the catalogue.");
+            var pack = (await packs.FindAsync(d.PackId, ct: ct))?.Info ?? throw new DomainException("unknown_pack", "That solution pack is not available here. It may not be installed, may not be trusted in this environment, or may be retired.");
             if (loadDefaults)
             {
                 // Merge: anything already in the draft stays; the pack adds what is missing. Nothing is removed.

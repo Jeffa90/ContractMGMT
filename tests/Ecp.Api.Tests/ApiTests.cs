@@ -30,12 +30,28 @@ public sealed class EcpFactory : WebApplicationFactory<Program>
     public EcpFactory(Dictionary<string, string?> settings, Action<IServiceCollection>? services = null)
     {
         _services = services;
+        settings = WithShippedPacks(settings);
         foreach (var (key, value) in settings)
         {
             var name = key.Replace(":", "__");
             _previous[name] = Environment.GetEnvironmentVariable(name);
             Environment.SetEnvironmentVariable(name, value);
         }
+    }
+
+    /// <summary>Test hosts read the shipped packs built from templates/packs for this process (the application build does the same into its own output folder). Production hosts get the signed copy and trust only the process-local test key.</summary>
+    private static Dictionary<string, string?> WithShippedPacks(Dictionary<string, string?> settings)
+    {
+        var copy = new Dictionary<string, string?>(settings);
+        var production = copy.TryGetValue("Ecp:Mode", out var mode) && string.Equals(mode, "Production", StringComparison.OrdinalIgnoreCase);
+        copy.TryAdd("Ecp:Packs:ShippedDirectory", production ? Ecp.Tests.Common.TestShippedPacks.SignedDirectory : Ecp.Tests.Common.TestShippedPacks.UnsignedDirectory);
+        if (production)
+        {
+            copy.TryAdd("Ecp:Packs:TrustedKeys:0:KeyId", Ecp.Tests.Common.TestShippedPacks.KeyId);
+            copy.TryAdd("Ecp:Packs:TrustedKeys:0:PublicKeyPem", Ecp.Tests.Common.TestShippedPacks.PublicKeyPem);
+        }
+        else copy.TryAdd("Ecp:Packs:AllowUnsignedSyntheticPacks", "true");
+        return copy;
     }
 
     public static Dictionary<string, string?> DemoSqlite(string? dataDir = null) => new()

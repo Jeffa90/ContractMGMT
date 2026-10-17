@@ -181,12 +181,28 @@ internal sealed class PackStage : SetupStageBase
     private readonly ISolutionPackCatalogue _catalogue;
     public PackStage(ISolutionPackCatalogue catalogue) => _catalogue = catalogue;
 
+    private static string Label(Ecp.Configuration.PackCatalogueEntry e)
+        => $"{e.Name()} (version {e.Version}) from {e.PublisherName}" + (e.Trust.IsTrusted ? ", signed" : ", UNSIGNED (Demo and Test only)");
+
+    // Nothing is chosen for the administrator: the starting pack is an explicit decision, and the choices come from the pack catalogue (external, verified packages), never from a name in code.
     public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)
-        => [new("packId", "Solution pack", FieldKind.Select, true, "Blank starts with nothing. The reference pack is a synthetic example of a procurement organisation.",
-            [.. _catalogue.List().Select(p => new FieldOption(p.PackId, $"{p.Name} (v{p.Version})"))], doc.PackId ?? "blank")];
+        => [new("packId", "Solution pack", FieldKind.Select, true,
+            "Choose the starting configuration for this organisation. A pack is data only and you can change everything it sets. More packs can be installed later under Administration, Solution packs.",
+            [new FieldOption("", "Choose a starting pack"), .. _catalogue.ListEntries().Select(p => new FieldOption(p.PackKey, Label(p)))], doc.PackId ?? "")];
 
     public override IReadOnlyList<string> Notes(SetupDocument doc, SetupEnvironment env)
-        => [.. _catalogue.List().Select(p => $"{p.Name}: {p.Description}" + (p.Synthetic ? " Contains synthetic example data only." : ""))];
+    {
+        var entries = _catalogue.ListEntries();
+        var notes = new List<string>();
+        if (entries.Count == 0)
+            notes.Add("No solution pack is available. Packs ship as signed packages next to the application; in Production only packs signed by a trusted publisher are offered. Ask the person who installed the application to check Administration, Solution packs, or see docs/PACK_SIGNING.md.");
+        else if (entries.Count == 1)
+            notes.Add("Only one pack is available. Additional packs can be installed later under Administration, Solution packs.");
+        foreach (var p in entries)
+            notes.Add($"{p.Name()}: {p.DescriptionText()}" + (p.Synthetic ? " Contains synthetic example data only." : "") + (p.Capabilities.Count > 0 ? $" Capabilities: {string.Join(", ", p.Capabilities)}." : "")
+                + (p.Trust.IsTrusted ? "" : " This package is unsigned and is accepted only because this is a Demo or Test environment."));
+        return notes;
+    }
 
     public override Task<StageResult> ExecuteAsync(StageContext c)
     {

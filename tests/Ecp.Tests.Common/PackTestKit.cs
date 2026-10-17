@@ -89,3 +89,37 @@ public static class PackTestKit
 
     public static byte[] Utf8(string s) => new UTF8Encoding(false).GetBytes(s);
 }
+
+/// <summary>
+/// The shipped packs for test hosts: built once per test process from the pack sources under templates/packs, exactly as the build builds them for the application. Two folders: the plain build (unsigned, for Demo
+/// and Test hosts that allow unsigned synthetic packs) and a copy signed by a throw-away key (for Production hosts, which trust only that key). The key exists only in this process and is never written to the repository.
+/// </summary>
+public static class TestShippedPacks
+{
+    private static readonly Lazy<(string Unsigned, string Signed, TestSigningKey Key, string PublicPem)> Built = new(Build, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    public static string UnsignedDirectory => Built.Value.Unsigned;
+    public static string SignedDirectory => Built.Value.Signed;
+    public static TestSigningKey SigningKey => Built.Value.Key;
+    public static string PublicKeyPem => Built.Value.PublicPem;
+    public const string KeyId = "test-process-key";
+
+    private static (string, string, TestSigningKey, string) Build()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ecp-test-packs-" + Guid.NewGuid().ToString("N"));
+        var plain = Path.Combine(root, "unsigned"); var signed = Path.Combine(root, "signed");
+        Directory.CreateDirectory(plain); Directory.CreateDirectory(signed);
+        var key = new TestSigningKey(KeyId);
+        foreach (var source in Directory.EnumerateDirectories(Path.Combine(RepoRoot.Find(), "templates", "packs")).Where(d => File.Exists(Path.Combine(d, PackBuilder.RecipeFile))))
+        {
+            var result = PackBuilder.Build(source);
+            if (!result.Succeeded) throw new InvalidOperationException($"Shipped pack source '{Path.GetFileName(source)}' did not build: " + string.Join("; ", result.Issues.Select(i => i.Code + " " + i.Message)));
+            var m = result.Opened!.Manifest!;
+            var name = $"{m.PackKey}-{m.Version}.ecpkg";
+            File.WriteAllBytes(Path.Combine(plain, name), result.Package!);
+            File.WriteAllBytes(Path.Combine(signed, name), PackBuilder.Sign(result.Opened, key.Signer, new DateTime(2026, 10, 20, 0, 0, 0, DateTimeKind.Utc)));
+        }
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { Directory.Delete(root, true); } catch { } };
+        return (plain, signed, key, PackKeys.ToPublicPem(key.PublicSpki));
+    }
+}

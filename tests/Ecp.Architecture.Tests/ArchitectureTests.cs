@@ -26,6 +26,7 @@ internal static class Modules
         ("Ecp.SharedKernel", typeof(Ids).Assembly, 0),
         ("Ecp.Persistence", typeof(TenantDbContext).Assembly, 0),
         ("Ecp.Formats", typeof(Ecp.Formats.CsvReader).Assembly, 0),
+        ("Ecp.Packs", typeof(Ecp.Packs.PackReader).Assembly, 0),
         ("Ecp.Audit", typeof(AuditModule).Assembly, 1),
         ("Ecp.Tenancy", typeof(TenancyModule).Assembly, 2),
         ("Ecp.Identity", typeof(IdentityModule).Assembly, 3),

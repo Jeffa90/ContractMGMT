@@ -28,7 +28,7 @@ public sealed record PackValidationReport(PackValidationOutcome Outcome, IReadOn
 /// Dry-run validation of a package before anything is stored or installed: archive safety, manifest, hashes, compatibility, signature and trust, the pack's own documents through the owning modules'
 /// validators, dependencies, and duplicates. It writes nothing. The configuration validators stay the authority on what a document may say.
 /// </summary>
-public sealed class PackValidationService
+internal sealed class PackValidationService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     /// <summary>Validator messages that depend on the organisation the document is applied to. Without an organisation they are warnings, and become errors when the draft is validated for one.</summary>
@@ -42,7 +42,7 @@ public sealed class PackValidationService
     private readonly IOptions<PackOptions> _options;
     private readonly IPackLoader _loader;
 
-    internal PackValidationService(PackKindRegistry kinds, PackTrustEvaluator trust, ShippedPackSource shipped, ConfigurationDbContext db, ITenantContext tenant, IOptions<PackOptions> options, IPackLoader loader)
+    public PackValidationService(PackKindRegistry kinds, PackTrustEvaluator trust, ShippedPackSource shipped, ConfigurationDbContext db, ITenantContext tenant, IOptions<PackOptions> options, IPackLoader loader)
     { _kinds = kinds; _trust = trust; _shipped = shipped; _db = db; _tenant = tenant; _options = options; _loader = loader; }
 
     public async Task<PackValidationReport> ValidateAsync(byte[] bytes, CancellationToken ct = default)

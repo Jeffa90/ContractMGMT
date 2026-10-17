@@ -21,6 +21,10 @@
     <ProjectReference Include="../Modules/Ecp.Setup/Ecp.Setup.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Build-time tool only: it builds the shipped solution packs into the output folder. Nothing from it is referenced by the host. -->
+    <ProjectReference Include="../Ecp.PackTool/Ecp.PackTool.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
@@ -32,4 +36,21 @@
     <EmbeddedResource Include="../../sample-data/demo-categories-and-assignments.json" LogicalName="Ecp.Demo.categories-and-assignments.json" />
     <EmbeddedResource Include="../../sample-data/demo-contracts.json" LogicalName="Ecp.Demo.contracts.json" />
   </ItemGroup>
+  <!--
+    Shipped solution packs are external, read-only .ecpkg packages, never embedded resources (docs/PACK_ARCHITECTURE.md). The pack tool builds them from templates/packs into <output>/packs on build and publish.
+    They are built unsigned. An operator who runs Production signs them with their own key (docs/PACK_SIGNING.md); no private key is held in this repository.
+  -->
+  <PropertyGroup>
+    <PackSourceDirectory>$(MSBuildThisFileDirectory)../../templates/packs</PackSourceDirectory>
+    <PackToolDll>$(MSBuildThisFileDirectory)../Ecp.PackTool/bin/$(Configuration)/$(TargetFramework)/Ecp.PackTool.dll</PackToolDll>
+  </PropertyGroup>
+  <Target Name="BuildShippedPacks" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet &quot;$(PackToolDll)&quot; build-all --source &quot;$(PackSourceDirectory)&quot; --out &quot;$(OutDir)packs&quot;" />
+  </Target>
+  <Target Name="CopyShippedPacksToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <ShippedPackFile Include="$(OutDir)packs/*.ecpkg" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ShippedPackFile)" DestinationFolder="$(PublishDir)packs" />
+  </Target>
 </Project>

@@ -150,7 +150,16 @@ public sealed class TestApp : IAsyncDisposable
         services.AddAuditModule();
         services.AddTenancyModule();
         services.AddIdentityModule(o => o.Mode = setupMode);
-        services.AddConfigurationModule();
+        services.AddConfigurationModule(packs: o =>
+        {
+            // Shipped packs are external files, built from the pack sources. Production hosts see the copy signed by a throw-away key that only this process knows and trusts.
+            var production = setupMode == EcpMode.Production;
+            o.Mode = setupMode;
+            o.ShippedDirectory = production ? TestShippedPacks.SignedDirectory : TestShippedPacks.UnsignedDirectory;
+            o.StorageDirectory = Path.Combine(root, "packs");
+            o.AllowUnsignedSyntheticPacks = !production;
+            if (production) o.TrustedKeys.Add(new ConfiguredTrustKey { KeyId = TestShippedPacks.KeyId, PublicKeyPem = TestShippedPacks.PublicKeyPem, Label = "test process key" });
+        });
         services.AddContractsModule(o => o.InitialStatusCode = "Draft");
         services.AddDocumentsModule(_ => { }, new LocalFileSystemOptions { RootPath = Path.Combine(root, "documents") });
         services.AddMigrationModule();

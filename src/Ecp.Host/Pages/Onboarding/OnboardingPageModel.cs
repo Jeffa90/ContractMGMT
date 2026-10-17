@@ -33,6 +33,7 @@ public abstract class OnboardingPageModel(IOnboardingService onboarding, IOrgani
         var chosen = Org is { } id ? Organisations.FirstOrDefault(o => o.Id == id) : Organisations.FirstOrDefault();
         if (chosen is null) return false;
         OrganisationId = chosen.Id;
+        await Terms.UseOrganisationAsync(chosen.Id, ct);      // the pages describe this organisation in its own words
         return true;
     }
 }

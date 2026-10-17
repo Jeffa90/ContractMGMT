@@ -232,7 +232,7 @@ app.UseRequestLocalization(o =>
 {
     o.SetDefaultCulture(localisation.DefaultCulture).AddSupportedCultures([.. localisation.SupportedCultures]).AddSupportedUICultures([.. localisation.SupportedCultures]);
     // Culture comes from the organisation default or an explicit cookie, not from browser Accept-Language (an en-US browser must not
-    // silently switch an Australian organisation to month-first dates).
+    // silently switch an organisation to another date order).
     o.RequestCultureProviders = [new Microsoft.AspNetCore.Localization.CookieRequestCultureProvider()];
     o.ApplyCurrentCultureToResponseHeaders = true;
 });

@@ -178,6 +178,8 @@ public static partial class NotificationPolicyParser
                 // Unknown placeholders and anything that looks like logic are found when the policy is published, never when a message is sent.
                 foreach (Match match in PlaceholderPattern().Matches(text))
                     if (!PolicyVocabulary.Placeholders.Contains(match.Groups[1].Value)) Error(path, "placeholder_unknown", $"Placeholder '{{{{{match.Groups[1].Value}}}}}' is not allowed. Allowed: {string.Join(", ", PolicyVocabulary.Placeholders)}.");
+                // [[term]] tokens are the only other thing a template may contain: a closed vocabulary of business terms, checked here so an unknown one fails at publication and never at send time.
+                foreach (var problem in TermTokens.Problems(PlaceholderPattern().Replace(text, ""))) Error(path, "term_token", problem);
                 var stripped = PlaceholderPattern().Replace(text, "");
                 if (stripped.Contains("{{", StringComparison.Ordinal) || stripped.Contains("}}", StringComparison.Ordinal) || stripped.Contains("{%", StringComparison.Ordinal) || stripped.Contains("<script", StringComparison.OrdinalIgnoreCase))
                     Error(path, "template_syntax", "A template holds plain text and {{placeholders}} only: no expressions, conditions, loops, includes or markup.");

@@ -163,7 +163,7 @@ internal static class RowPlanner
         // 4. Supplier and category (find, or plan to create).
         ResolveSupplier(mapped, ctx, plan);
         ResolveCategory(mapped, ctx, plan);
-        if (plan.HasErrors) return Reject(plan, "Supplier or category could not be resolved.");
+        if (plan.HasErrors) return Reject(plan, "[[supplier]] or [[category|lower]] could not be resolved.");
 
         // 5. Agreement Reference, existing records and the duplicate strategy.
         ctx.ExistingBySource.TryGetValue(v.SourceRecordId, out var byKey);
@@ -239,7 +239,7 @@ internal static class RowPlanner
         if (!plan.GenerateReference) ctx.ReferenceOwners.TryAdd(normalisedRef, v.SourceRecordId);
 
         plan.Action = PlannedAction.Create; plan.Outcome = RowOutcome.Accepted;
-        plan.Summary = $"Create contract {(plan.GenerateReference ? "(new reference generated)" : plan.TargetReference)}; {Describe(plan.Supplier)}; {Describe(plan.Category)}"
+        plan.Summary = $"Create [[contract|lower]] {(plan.GenerateReference ? "(new reference generated)" : plan.TargetReference)}; {Describe(plan.Supplier)}; {Describe(plan.Category)}"
             + (plan.LockAsLegacy ? "; loaded as a locked legacy record" : "");
         return plan;
     }
@@ -257,8 +257,8 @@ internal static class RowPlanner
         plan.CustomSourceValues = raw.Where(kv => check.Canonical.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => (kv.Value ?? "").Length > 450 ? kv.Value![..450] : kv.Value ?? "", StringComparer.OrdinalIgnoreCase);
     }
 
-    private static string Describe(WorkingSupplier? s) => s is null ? "" : s.IsNew ? $"create supplier '{s.Name}'" : $"link supplier '{s.Name}'";
-    private static string Describe(WorkingCategory? c) => c is null ? "" : c.IsNew ? $"create category {c.Code}" : $"link category {c.Code}";
+    private static string Describe(WorkingSupplier? s) => s is null ? "" : s.IsNew ? $"create [[supplier|lower]] '{s.Name}'" : $"link [[supplier|lower]] '{s.Name}'";
+    private static string Describe(WorkingCategory? c) => c is null ? "" : c.IsNew ? $"create [[category|lower]] {c.Code}" : $"link [[category|lower]] {c.Code}";
 
     private static RowPlan Reject(RowPlan plan, string summary) { plan.Outcome = RowOutcome.Rejected; plan.Action = PlannedAction.None; plan.Summary = summary; return plan; }
     private static RowPlan Skip(RowPlan plan, string summary) { plan.Outcome = RowOutcome.Skipped; plan.Action = PlannedAction.Skip; plan.Summary = summary; return plan; }
@@ -334,7 +334,7 @@ internal static class RowPlanner
         }
         var id = Limit(Need("sourceRecordId", "The source record id"), "sourceRecordId", 200);
         var reference = Limit(Need("agreementReference", "The agreement reference"), "agreementReference", 100);
-        var title = Limit(Need("contractTitle", "The contract title"), "contractTitle", 500);
+        var title = Limit(Need("contractTitle", "The [[contract|lower]] title"), "contractTitle", 500);
         var status = Limit(Need("status", "The status"), "status", 100);
         var description = Limit(Get("description"), "description", 4000);
         var extension = Limit(Get("extensionType"), "extensionType", 50);
@@ -388,8 +388,8 @@ internal static class RowPlanner
     private static void ResolveSupplier(MappedRow mapped, PlanContext ctx, RowPlan plan)
     {
         var name = mapped.Values.GetValueOrDefault("supplier.name")?.Trim();
-        if (string.IsNullOrEmpty(name)) { plan.Messages.Add(new(true, "MIG-E001", "supplier.name", "The supplier name is required.")); return; }
-        if (name.Length > 300) { plan.Messages.Add(new(true, "MIG-E009", "supplier.name", $"The supplier name is {name.Length} characters; the most allowed is 300. It is not shortened.")); return; }
+        if (string.IsNullOrEmpty(name)) { plan.Messages.Add(new(true, "MIG-E001", "supplier.name", "The [[supplier|lower]] name is required.")); return; }
+        if (name.Length > 300) { plan.Messages.Add(new(true, "MIG-E009", "supplier.name", $"The [[supplier|lower]] name is {name.Length} characters; the most allowed is 300. It is not shortened.")); return; }
         var vendor = mapped.Values.GetValueOrDefault("supplier.vendorNumber")?.Trim();
         if (vendor is { Length: > 50 }) { plan.Messages.Add(new(true, "MIG-E009", "supplier.vendorNumber", "The vendor number is longer than 50 characters. It is not shortened.")); return; }
         var normalised = Supplier.NormaliseName(name);
@@ -402,22 +402,22 @@ internal static class RowPlanner
             {
                 chosen = byVendor[0];
                 if (chosen.Normalised != normalised)
-                    plan.Messages.Add(new(false, "MIG-W006", "supplier.name", $"The supplier name differs from the existing supplier '{chosen.Name}' that has vendor number {vendor}. The existing supplier is used."));
+                    plan.Messages.Add(new(false, "MIG-W006", "supplier.name", $"The [[supplier|lower]] name differs from the existing [[supplier|lower]] '{chosen.Name}' that has vendor number {vendor}. The existing [[supplier|lower]] is used."));
             }
-            else if (byVendor.Count > 1) { plan.Messages.Add(new(true, "MIG-E010", "supplier.vendorNumber", $"More than one supplier has vendor number {vendor}. A person must resolve this.")); return; }
+            else if (byVendor.Count > 1) { plan.Messages.Add(new(true, "MIG-E010", "supplier.vendorNumber", $"More than one [[supplier|lower]] has vendor number {vendor}. A person must resolve this.")); return; }
         }
         if (chosen is null)
         {
             var byName = ctx.Suppliers.Where(s => s.Normalised == normalised).ToList();
-            if (byName.Count > 1) { plan.Messages.Add(new(true, "MIG-E010", "supplier.name", $"More than one supplier is named '{name}'. A person must resolve this.")); return; }
+            if (byName.Count > 1) { plan.Messages.Add(new(true, "MIG-E010", "supplier.name", $"More than one [[supplier|lower]] is named '{name}'. A person must resolve this.")); return; }
             if (byName.Count == 1)
             {
                 var s = byName[0];
                 if (!string.IsNullOrEmpty(vendor) && !string.IsNullOrEmpty(s.VendorNumber) && !string.Equals(s.VendorNumber, vendor, StringComparison.OrdinalIgnoreCase))
-                { plan.Messages.Add(new(true, "MIG-E010", "supplier.vendorNumber", $"A supplier named '{name}' exists with a different vendor number. A person must resolve this.")); return; }
+                { plan.Messages.Add(new(true, "MIG-E010", "supplier.vendorNumber", $"[[supplier|lower|a|cap]] named '{name}' exists with a different vendor number. A person must resolve this.")); return; }
                 chosen = s;
                 if (!string.IsNullOrEmpty(vendor) && string.IsNullOrEmpty(s.VendorNumber))
-                    plan.Messages.Add(new(false, "MIG-W006", "supplier.name", $"The existing supplier '{s.Name}' has no vendor number; it was matched on its exact name."));
+                    plan.Messages.Add(new(false, "MIG-W006", "supplier.name", $"The existing [[supplier|lower]] '{s.Name}' has no vendor number; it was matched on its exact name."));
             }
         }
         if (chosen is null)
@@ -432,7 +432,7 @@ internal static class RowPlanner
     {
         var categoryValue = mapped.Values.GetValueOrDefault("category.name")?.Trim();
         var subcategoryValue = mapped.Values.GetValueOrDefault("subcategory.name")?.Trim();
-        if (string.IsNullOrEmpty(categoryValue)) { plan.Messages.Add(new(true, "MIG-E001", "category.name", "The category is required.")); return; }
+        if (string.IsNullOrEmpty(categoryValue)) { plan.Messages.Add(new(true, "MIG-E001", "category.name", "The [[category|lower]] is required.")); return; }
         var category = FindCategory(categoryValue, null, ctx, plan, "category.name");
         if (category is null) return;
         var chosen = category;
@@ -451,21 +451,21 @@ internal static class RowPlanner
         var normalised = Supplier.NormaliseName(value);
         var matches = ctx.Categories.Where(c => c.Code == code).ToList();
         if (matches.Count == 0) matches = ctx.Categories.Where(c => c.Normalised == normalised && (parent is null ? c.Parent is null : ReferenceEquals(c.Parent, parent))).ToList();
-        if (matches.Count > 1) { plan.Messages.Add(new(true, "MIG-E011", field, $"'{value}' matches more than one category.")); return null; }
+        if (matches.Count > 1) { plan.Messages.Add(new(true, "MIG-E011", field, $"'{value}' matches more than one [[category|lower]].")); return null; }
         if (matches.Count == 1)
         {
             var found = matches[0];
-            if (!found.IsActive) { plan.Messages.Add(new(true, "MIG-E011", field, $"The category {found.Code} is inactive.")); return null; }
-            if (parent is not null && !ReferenceEquals(found.Parent, parent)) { plan.Messages.Add(new(true, "MIG-E011", field, $"{found.Code} is not a subcategory of {parent.Code}.")); return null; }
+            if (!found.IsActive) { plan.Messages.Add(new(true, "MIG-E011", field, $"The [[category|lower]] {found.Code} is inactive.")); return null; }
+            if (parent is not null && !ReferenceEquals(found.Parent, parent)) { plan.Messages.Add(new(true, "MIG-E011", field, $"{found.Code} is not [[subcategory|lower|a]] of {parent.Code}.")); return null; }
             return found;
         }
         if (!ctx.Definition.Options.CreateMissingCategories)
-        { plan.Messages.Add(new(true, "MIG-E011", field, $"'{value}' is not a category in this organisation. Add a category lookup or let the profile create missing categories.")); return null; }
+        { plan.Messages.Add(new(true, "MIG-E011", field, $"'{value}' is not [[category|lower|a]] in this organisation. Add [[category|lower|a]] lookup or let the profile create missing [[category|plural|lower]].")); return null; }
         var newCode = DeriveCode(value);
-        if (ctx.Categories.Any(c => c.Code == newCode)) { plan.Messages.Add(new(true, "MIG-E011", field, $"A category with the derived code {newCode} already exists under a different name.")); return null; }
+        if (ctx.Categories.Any(c => c.Code == newCode)) { plan.Messages.Add(new(true, "MIG-E011", field, $"[[category|lower|a|cap]] with the derived code {newCode} already exists under a different name.")); return null; }
         var created = new WorkingCategory(null, newCode, value, normalised, parent, active: true);
         ctx.Categories.Add(created);
-        plan.Messages.Add(new(false, "MIG-W002", field, $"The category '{value}' will be created with code {newCode}."));
+        plan.Messages.Add(new(false, "MIG-W002", field, $"The [[category|lower]] '{value}' will be created with code {newCode}."));
         return created;
     }
 

@@ -134,6 +134,7 @@ public static class FieldRules
 }
 
 /// <summary>The core contract fields, by stable key. Custom fields may not reuse these keys; list views, exports and calculations refer to them.</summary>
+/// <remarks>Labels and groups may carry <c>[[term]]</c> tokens; whoever shows one expands it with the organisation's terminology (the register catalogue and the exports do).</remarks>
 public sealed record CoreField(string Key, string Label, string Type, bool Sortable, bool Filterable, string Group)
 {
     public bool IsNumeric => FieldTypes.IsNumeric(Type);
@@ -144,37 +145,37 @@ public static class CoreFields
 {
     public static readonly IReadOnlyList<CoreField> All =
     [
-        new("agreementReference", "Agreement Reference", FieldTypes.Text, true, true, "Identity"),
-        new("contractTitle", "Contract Title", FieldTypes.Text, true, true, "Identity"),
+        new("agreementReference", "[[contract.reference]]", FieldTypes.Text, true, true, "Identity"),
+        new("contractTitle", "[[contract]] Title", FieldTypes.Text, true, true, "Identity"),
         new("description", "Description", FieldTypes.LongText, false, false, "Identity"),
-        new("supplier", "Supplier", FieldTypes.Text, true, true, "Supplier"),
-        new("supplierVendorNumber", "Vendor Number", FieldTypes.Text, true, true, "Supplier"),
-        new("supplierAbn", "ABN", FieldTypes.Text, true, true, "Supplier"),
-        new("supplierType", "Supplier Type", FieldTypes.SingleChoice, true, true, "Supplier"),
-        new("category", "Category", FieldTypes.Lookup, true, true, "Ownership"),
+        new("supplier", "[[supplier]]", FieldTypes.Text, true, true, "[[supplier]]"),
+        new("supplierVendorNumber", "Vendor Number", FieldTypes.Text, true, true, "[[supplier]]"),
+        new("supplierAbn", "ABN", FieldTypes.Text, true, true, "[[supplier]]"),
+        new("supplierType", "[[supplier]] Type", FieldTypes.SingleChoice, true, true, "[[supplier]]"),
+        new("category", "[[category]]", FieldTypes.Lookup, true, true, "Ownership"),
         new("owner", "Owner", FieldTypes.Person, false, true, "Ownership"),
         new("status", "Status", FieldTypes.SingleChoice, true, true, "Lifecycle"),
-        new("legalReviewStatus", "Legal Review Status", FieldTypes.SingleChoice, false, true, "Lifecycle"),
+        new("legalReviewStatus", "[[legal.review]] Status", FieldTypes.SingleChoice, false, true, "Lifecycle"),
         new("classification", "Data Classification", FieldTypes.SingleChoice, true, true, "Governance"),
-        new("contractType", "Contract Type", FieldTypes.SingleChoice, true, true, "Classification"),
-        new("agreementType", "Agreement Type", FieldTypes.SingleChoice, true, true, "Classification"),
+        new("contractType", "[[contract.type]]", FieldTypes.SingleChoice, true, true, "Classification"),
+        new("agreementType", "[[agreement]] Type", FieldTypes.SingleChoice, true, true, "Classification"),
         new("riskLevel", "Risk Level", FieldTypes.SingleChoice, true, true, "Classification"),
         new("functionCode", "Function", FieldTypes.SingleChoice, true, true, "Classification"),
-        new("legalEntity", "Legal Entity", FieldTypes.Lookup, true, true, "Structure"),
-        new("businessUnit", "Business Unit", FieldTypes.Lookup, true, true, "Structure"),
-        new("site", "Site or Plant", FieldTypes.Lookup, true, true, "Structure"),
+        new("legalEntity", "[[legal.entity]]", FieldTypes.Lookup, true, true, "Structure"),
+        new("businessUnit", "[[business.unit]]", FieldTypes.Lookup, true, true, "Structure"),
+        new("site", "[[site]]", FieldTypes.Lookup, true, true, "Structure"),
         new("currencyCode", "Currency", FieldTypes.Text, true, true, "Commercial"),
-        new("estimatedValue", "Estimated Agreement Value", FieldTypes.Currency, true, true, "Commercial"),
+        new("estimatedValue", "Estimated [[agreement]] Value", FieldTypes.Currency, true, true, "Commercial"),
         new("extensionType", "Extension Type", FieldTypes.SingleChoice, true, true, "Commercial"),
         new("evergreen", "Evergreen", FieldTypes.Boolean, false, true, "Commercial"),
         new("noticePeriodValue", "Notice Period", FieldTypes.Integer, true, true, "Commercial"),
         new("noticePeriodUnit", "Notice Period Unit", FieldTypes.SingleChoice, false, false, "Commercial"),
         new("criticalNotice", "Critical Notice", FieldTypes.Boolean, true, true, "Commercial"),
-        new("legalReviewRequired", "Legal Review Required", FieldTypes.Boolean, true, true, "Lifecycle"),
-        new("sapOutlineAgreementNumber", "SAP Outline Agreement Number", FieldTypes.Text, true, true, "Commercial"),
+        new("legalReviewRequired", "[[legal.review]] Required", FieldTypes.Boolean, true, true, "Lifecycle"),
+        new("sapOutlineAgreementNumber", "SAP Outline [[agreement]] Number", FieldTypes.Text, true, true, "Commercial"),
         new("startDate", "Start Date", FieldTypes.Date, true, true, "Dates"),
         new("effectiveDate", "Effective Date", FieldTypes.Date, true, true, "Dates"),
-        new("registeredDate", "Registered Date", FieldTypes.DateTime, true, true, "Dates"),
+        new("registeredDate", "[[registered.date]]", FieldTypes.DateTime, true, true, "Dates"),
         new("reviewDate", "Review Date", FieldTypes.Date, true, true, "Dates"),
         new("endDate", "End Date", FieldTypes.Date, true, true, "Dates"),
         new("recordLocked", "Locked", FieldTypes.Boolean, false, true, "Lifecycle"),

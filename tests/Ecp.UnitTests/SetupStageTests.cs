@@ -137,5 +137,6 @@ public class SetupStageTests
         public IReadOnlyList<Ecp.Configuration.SolutionPackInfo> List() => [];
         public Ecp.Configuration.SolutionPackInfo? Find(string packId) => null;
         public IReadOnlyList<Ecp.Configuration.PackCatalogueEntry> ListEntries() => [];
+        public string? TerminologyOf(string packKey) => null;
     }
 }

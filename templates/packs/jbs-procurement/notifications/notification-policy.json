@@ -1,499 +1,499 @@
 {
- "schemaVersion": 1,
- "description": "Reference notification policy of the JBS Procurement pack. Data, not code: every event, recipient rule, template and reminder window here is editable configuration.",
- "reminders": {
-  "defaultLeadDays": 90,
-  "allowedLeadDays": [
-   30,
-   60,
-   90,
-   120
+  "schemaVersion": 1,
+  "description": "Reference notification policy of the JBS Procurement pack. Data, not code: every event, recipient rule, template and reminder window here is editable configuration.",
+  "reminders": {
+    "defaultLeadDays": 90,
+    "allowedLeadDays": [
+      30,
+      60,
+      90,
+      120
+    ],
+    "reviewDate": true,
+    "endDate": true,
+    "criticalNotice": {
+      "enabled": true,
+      "offsetsDays": [
+        30,
+        14,
+        7,
+        1
+      ],
+      "earlierLeadDays": 30
+    },
+    "evergreen": {
+      "suppressEndDate": true,
+      "keepReviewDate": true
+    },
+    "escalateUnacknowledgedAfterDays": 3,
+    "unownedFallback": [
+      "OrganisationAdministrators"
+    ]
+  },
+  "content": {
+    "withholdTitleFromLevel": "Restricted",
+    "withholdEverythingFromLevel": "Legal Privileged"
+  },
+  "delivery": {
+    "maxAttempts": 5,
+    "backoffMinutes": [
+      1,
+      5,
+      30,
+      120,
+      720
+    ]
+  },
+  "events": [
+    {
+      "event": "legal.submitted",
+      "recipients": [
+        "LegalPool"
+      ],
+      "template": "legalSubmitted",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "legal.resubmitted",
+      "recipients": [
+        "LegalPool",
+        "AssignedLegal"
+      ],
+      "template": "legalResubmitted",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "legal.assigned",
+      "recipients": [
+        "AssignedLegal"
+      ],
+      "template": "legalAssigned",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "legal.started",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "legalStarted",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "legal.returned",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "legalReturned",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "legal.cleared",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "legalCleared",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "legal.withdrawn",
+      "recipients": [
+        "AssignedLegal"
+      ],
+      "template": "legalWithdrawn",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "legal.commented",
+      "recipients": [
+        "Counterpart"
+      ],
+      "template": "legalCommented",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "approval.submitted",
+      "recipients": [
+        "ApproverGroup"
+      ],
+      "template": "approvalSubmitted",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "approval.approved",
+      "recipients": [
+        "Submitter",
+        "CategoryOwners"
+      ],
+      "template": "approvalApproved",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "approval.rejected",
+      "recipients": [
+        "Submitter",
+        "CategoryOwners"
+      ],
+      "template": "approvalRejected",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "contract.registered",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "contractRegistered",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "variation.raised",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "variationRaised",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "variation.applied",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "variationApplied",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "variation.rejected",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "variationRejected",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "variation.cancelled",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "variationCancelled",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "renewal.started",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "renewalStarted",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "renewal.completed",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "renewalCompleted",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "renewal.cancelled",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "renewalCancelled",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "disposition.requested",
+      "recipients": [
+        "ApproverGroup"
+      ],
+      "template": "dispositionRequested",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "unlock.opened",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "unlockOpened",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "unlock.closed",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "unlockClosed",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "ownership.assigned",
+      "recipients": [
+        "AffectedUser"
+      ],
+      "template": "ownershipAssigned",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "ownership.ended",
+      "recipients": [
+        "AffectedUser"
+      ],
+      "template": "ownershipEnded",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "reminder.reviewDate",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "reminderReview",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "reminder.endDate",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "reminderEnd",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "reminder.criticalNotice",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "reminderCritical",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "reminder.acknowledged",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "reminderAcknowledged",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    }
   ],
-  "reviewDate": true,
-  "endDate": true,
-  "criticalNotice": {
-   "enabled": true,
-   "offsetsDays": [
-    30,
-    14,
-    7,
-    1
-   ],
-   "earlierLeadDays": 30
-  },
-  "evergreen": {
-   "suppressEndDate": true,
-   "keepReviewDate": true
-  },
-  "escalateUnacknowledgedAfterDays": 3,
-  "unownedFallback": [
-   "OrganisationAdministrators"
-  ]
- },
- "content": {
-  "withholdTitleFromLevel": "Restricted",
-  "withholdEverythingFromLevel": "Legal Privileged"
- },
- "delivery": {
-  "maxAttempts": 5,
-  "backoffMinutes": [
-   1,
-   5,
-   30,
-   120,
-   720
-  ]
- },
- "events": [
-  {
-   "event": "legal.submitted",
-   "recipients": [
-    "LegalPool"
-   ],
-   "template": "legalSubmitted",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "legal.resubmitted",
-   "recipients": [
-    "LegalPool",
-    "AssignedLegal"
-   ],
-   "template": "legalResubmitted",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "legal.assigned",
-   "recipients": [
-    "AssignedLegal"
-   ],
-   "template": "legalAssigned",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "legal.started",
-   "recipients": [
-    "CategoryOwners",
-    "Submitter"
-   ],
-   "template": "legalStarted",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "legal.returned",
-   "recipients": [
-    "CategoryOwners",
-    "Submitter"
-   ],
-   "template": "legalReturned",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "legal.cleared",
-   "recipients": [
-    "CategoryOwners",
-    "Submitter"
-   ],
-   "template": "legalCleared",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "legal.withdrawn",
-   "recipients": [
-    "AssignedLegal"
-   ],
-   "template": "legalWithdrawn",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "legal.commented",
-   "recipients": [
-    "Counterpart"
-   ],
-   "template": "legalCommented",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "approval.submitted",
-   "recipients": [
-    "ApproverGroup"
-   ],
-   "template": "approvalSubmitted",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "approval.approved",
-   "recipients": [
-    "Submitter",
-    "CategoryOwners"
-   ],
-   "template": "approvalApproved",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "approval.rejected",
-   "recipients": [
-    "Submitter",
-    "CategoryOwners"
-   ],
-   "template": "approvalRejected",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "contract.registered",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "contractRegistered",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "variation.raised",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "variationRaised",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "variation.applied",
-   "recipients": [
-    "CategoryOwners",
-    "Submitter"
-   ],
-   "template": "variationApplied",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "variation.rejected",
-   "recipients": [
-    "CategoryOwners",
-    "Submitter"
-   ],
-   "template": "variationRejected",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "variation.cancelled",
-   "recipients": [
-    "CategoryOwners",
-    "Submitter"
-   ],
-   "template": "variationCancelled",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "renewal.started",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "renewalStarted",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "renewal.completed",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "renewalCompleted",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "renewal.cancelled",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "renewalCancelled",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "disposition.requested",
-   "recipients": [
-    "ApproverGroup"
-   ],
-   "template": "dispositionRequested",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "unlock.opened",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "unlockOpened",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "unlock.closed",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "unlockClosed",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "ownership.assigned",
-   "recipients": [
-    "AffectedUser"
-   ],
-   "template": "ownershipAssigned",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "ownership.ended",
-   "recipients": [
-    "AffectedUser"
-   ],
-   "template": "ownershipEnded",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": false
-  },
-  {
-   "event": "reminder.reviewDate",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "reminderReview",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "reminder.endDate",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "reminderEnd",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "reminder.criticalNotice",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "reminderCritical",
-   "channels": [
-    "InApp",
-    "Email"
-   ],
-   "mandatory": true
-  },
-  {
-   "event": "reminder.acknowledged",
-   "recipients": [
-    "CategoryOwners"
-   ],
-   "template": "reminderAcknowledged",
-   "channels": [
-    "InApp"
-   ],
-   "mandatory": false
+  "templates": {
+    "legalSubmitted": {
+      "subject": "[[legal.review|sentence]] requested: {{contract.reference}}",
+      "body": "{{actor.name}} has submitted {{contract.reference}} ({{contract.title}}) for [[legal.review|sentence]]. Open it here: {{link}}"
+    },
+    "legalResubmitted": {
+      "subject": "Resubmitted for [[legal.review|sentence]]: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) was resubmitted for the next [[legal.review|sentence]] round. Open it here: {{link}}"
+    },
+    "legalAssigned": {
+      "subject": "[[legal.review|sentence]] assigned to you: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) has been assigned to you for [[legal.review|sentence]]. Open it here: {{link}}"
+    },
+    "legalStarted": {
+      "subject": "[[legal.review|sentence]] started: {{contract.reference}}",
+      "body": "[[reviewer]] has begun reviewing {{contract.reference}} ({{contract.title}}). {{link}}"
+    },
+    "legalReturned": {
+      "subject": "Returned for rework: {{contract.reference}}",
+      "body": "[[reviewer]] returned {{contract.reference}} ({{contract.title}}) for rework. Respond and resubmit here: {{link}}"
+    },
+    "legalCleared": {
+      "subject": "[[reviewer]] cleared: {{contract.reference}}",
+      "body": "[[reviewer]] cleared {{contract.reference}} ({{contract.title}}). Clearance is not [[registration.approval|lower]]. {{link}}"
+    },
+    "legalWithdrawn": {
+      "subject": "[[legal.review|sentence]] withdrawn: {{contract.reference}}",
+      "body": "The [[legal.review|sentence]] of {{contract.reference}} ({{contract.title}}) was withdrawn. {{link}}"
+    },
+    "legalCommented": {
+      "subject": "New comment on the [[legal.review|sentence]]: {{contract.reference}}",
+      "body": "{{actor.name}} commented on the [[legal.review|sentence]] of {{contract.reference}} ({{contract.title}}). {{link}}"
+    },
+    "approvalSubmitted": {
+      "subject": "[[registration.approval|sentence]] needed: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) is waiting for [[registration.approval|lower]]. Whoever responds first decides. Open it here: {{link}}"
+    },
+    "approvalApproved": {
+      "subject": "Approved and registered: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) was approved and is now Effective and locked. {{link}}"
+    },
+    "approvalRejected": {
+      "subject": "[[registration.approval|sentence]] rejected: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) was rejected and returned to Initial Creation. {{link}}"
+    },
+    "contractRegistered": {
+      "subject": "Registered: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) has been registered. {{link}}"
+    },
+    "variationRaised": {
+      "subject": "[[variation]] raised: {{contract.reference}}",
+      "body": "[[variation|a|cap]] was raised on {{contract.reference}} ({{contract.title}}). {{link}}"
+    },
+    "variationApplied": {
+      "subject": "[[variation]] applied: {{contract.reference}}",
+      "body": "[[variation|a|cap]] was approved and applied to {{contract.reference}} ({{contract.title}}). {{link}}"
+    },
+    "variationRejected": {
+      "subject": "[[variation]] rejected: {{contract.reference}}",
+      "body": "[[variation|a|cap]] on {{contract.reference}} ({{contract.title}}) was rejected. {{link}}"
+    },
+    "variationCancelled": {
+      "subject": "[[variation]] cancelled: {{contract.reference}}",
+      "body": "[[variation|a|cap]] on {{contract.reference}} ({{contract.title}}) was cancelled. The [[agreement|lower]] is unchanged. {{link}}"
+    },
+    "renewalStarted": {
+      "subject": "[[renewal]] started: {{contract.reference}}",
+      "body": "[[renewal|lower|a|cap]] of {{contract.reference}} ({{contract.title}}) was started. {{link}}"
+    },
+    "renewalCompleted": {
+      "subject": "[[renewal]] completed: {{contract.reference}}",
+      "body": "The [[renewal|lower]] of {{contract.reference}} ({{contract.title}}) was completed. {{link}}"
+    },
+    "renewalCancelled": {
+      "subject": "[[renewal]] cancelled: {{contract.reference}}",
+      "body": "The [[renewal|lower]] of {{contract.reference}} ({{contract.title}}) was cancelled. {{link}}"
+    },
+    "dispositionRequested": {
+      "subject": "Disposition requested: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) was flagged for disposition and needs a decision. {{link}}"
+    },
+    "unlockOpened": {
+      "subject": "Emergency unlock opened: {{contract.reference}}",
+      "body": "A locked [[agreement|lower]], {{contract.reference}} ({{contract.title}}), was temporarily unlocked by {{actor.name}}. {{link}}"
+    },
+    "unlockClosed": {
+      "subject": "Emergency unlock closed: {{contract.reference}}",
+      "body": "The unlock on {{contract.reference}} ({{contract.title}}) has ended and the record is locked again. {{link}}"
+    },
+    "ownershipAssigned": {
+      "subject": "You now own [[category|lower|a]]",
+      "body": "[[category]] ownership was assigned to you. [[agreement|plural]] in the [[category|lower]] now appear under My [[contract|plural]]. {{link}}"
+    },
+    "ownershipEnded": {
+      "subject": "[[category]] ownership ended",
+      "body": "Your ownership of [[category|lower|a]] has ended. {{link}}"
+    },
+    "reminderReview": {
+      "subject": "Review due in {{days.remaining}} days: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) is due for review on {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}"
+    },
+    "reminderEnd": {
+      "subject": "Ends in {{days.remaining}} days: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) ends on {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}"
+    },
+    "reminderCritical": {
+      "subject": "Critical notice deadline in {{days.remaining}} days: {{contract.reference}}",
+      "body": "The notice deadline for {{contract.reference}} ({{contract.title}}) is {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}"
+    },
+    "reminderAcknowledged": {
+      "subject": "Reminder acknowledged: {{contract.reference}}",
+      "body": "{{actor.name}} acknowledged the reminder for {{contract.reference}} ({{contract.title}}). {{link}}"
+    }
   }
- ],
- "templates": {
-  "legalSubmitted": {
-   "subject": "Legal review requested: {{contract.reference}}",
-   "body": "{{actor.name}} has submitted {{contract.reference}} ({{contract.title}}) for Legal review. Open it here: {{link}}"
-  },
-  "legalResubmitted": {
-   "subject": "Resubmitted for Legal review: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) was resubmitted for the next Legal review round. Open it here: {{link}}"
-  },
-  "legalAssigned": {
-   "subject": "Legal review assigned to you: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) has been assigned to you for Legal review. Open it here: {{link}}"
-  },
-  "legalStarted": {
-   "subject": "Legal review started: {{contract.reference}}",
-   "body": "Legal has begun reviewing {{contract.reference}} ({{contract.title}}). {{link}}"
-  },
-  "legalReturned": {
-   "subject": "Returned for rework: {{contract.reference}}",
-   "body": "Legal returned {{contract.reference}} ({{contract.title}}) for rework. Respond and resubmit here: {{link}}"
-  },
-  "legalCleared": {
-   "subject": "Legal cleared: {{contract.reference}}",
-   "body": "Legal cleared {{contract.reference}} ({{contract.title}}). Clearance is not register authorisation. {{link}}"
-  },
-  "legalWithdrawn": {
-   "subject": "Legal review withdrawn: {{contract.reference}}",
-   "body": "The Legal review of {{contract.reference}} ({{contract.title}}) was withdrawn. {{link}}"
-  },
-  "legalCommented": {
-   "subject": "New comment on the Legal review: {{contract.reference}}",
-   "body": "{{actor.name}} commented on the Legal review of {{contract.reference}} ({{contract.title}}). {{link}}"
-  },
-  "approvalSubmitted": {
-   "subject": "Register authorisation needed: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) is waiting for register authorisation. Whoever responds first decides. Open it here: {{link}}"
-  },
-  "approvalApproved": {
-   "subject": "Approved and registered: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) was approved and is now Effective and locked. {{link}}"
-  },
-  "approvalRejected": {
-   "subject": "Register authorisation rejected: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) was rejected and returned to Initial Creation. {{link}}"
-  },
-  "contractRegistered": {
-   "subject": "Registered: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) has been registered. {{link}}"
-  },
-  "variationRaised": {
-   "subject": "Variation raised: {{contract.reference}}",
-   "body": "A Variation was raised on {{contract.reference}} ({{contract.title}}). {{link}}"
-  },
-  "variationApplied": {
-   "subject": "Variation applied: {{contract.reference}}",
-   "body": "A Variation was approved and applied to {{contract.reference}} ({{contract.title}}). {{link}}"
-  },
-  "variationRejected": {
-   "subject": "Variation rejected: {{contract.reference}}",
-   "body": "A Variation on {{contract.reference}} ({{contract.title}}) was rejected. {{link}}"
-  },
-  "variationCancelled": {
-   "subject": "Variation cancelled: {{contract.reference}}",
-   "body": "A Variation on {{contract.reference}} ({{contract.title}}) was cancelled. The agreement is unchanged. {{link}}"
-  },
-  "renewalStarted": {
-   "subject": "Renewal started: {{contract.reference}}",
-   "body": "A renewal of {{contract.reference}} ({{contract.title}}) was started. {{link}}"
-  },
-  "renewalCompleted": {
-   "subject": "Renewal completed: {{contract.reference}}",
-   "body": "The renewal of {{contract.reference}} ({{contract.title}}) was completed. {{link}}"
-  },
-  "renewalCancelled": {
-   "subject": "Renewal cancelled: {{contract.reference}}",
-   "body": "The renewal of {{contract.reference}} ({{contract.title}}) was cancelled. {{link}}"
-  },
-  "dispositionRequested": {
-   "subject": "Disposition requested: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) was flagged for disposition and needs a decision. {{link}}"
-  },
-  "unlockOpened": {
-   "subject": "Emergency unlock opened: {{contract.reference}}",
-   "body": "A locked agreement, {{contract.reference}} ({{contract.title}}), was temporarily unlocked by {{actor.name}}. {{link}}"
-  },
-  "unlockClosed": {
-   "subject": "Emergency unlock closed: {{contract.reference}}",
-   "body": "The unlock on {{contract.reference}} ({{contract.title}}) has ended and the record is locked again. {{link}}"
-  },
-  "ownershipAssigned": {
-   "subject": "You now own a category",
-   "body": "Category ownership was assigned to you. Agreements in the category now appear under My Contracts. {{link}}"
-  },
-  "ownershipEnded": {
-   "subject": "Category ownership ended",
-   "body": "Your ownership of a category has ended. {{link}}"
-  },
-  "reminderReview": {
-   "subject": "Review due in {{days.remaining}} days: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) is due for review on {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}"
-  },
-  "reminderEnd": {
-   "subject": "Ends in {{days.remaining}} days: {{contract.reference}}",
-   "body": "{{contract.reference}} ({{contract.title}}) ends on {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}"
-  },
-  "reminderCritical": {
-   "subject": "Critical notice deadline in {{days.remaining}} days: {{contract.reference}}",
-   "body": "The notice deadline for {{contract.reference}} ({{contract.title}}) is {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}"
-  },
-  "reminderAcknowledged": {
-   "subject": "Reminder acknowledged: {{contract.reference}}",
-   "body": "{{actor.name}} acknowledged the reminder for {{contract.reference}} ({{contract.title}}). {{link}}"
-  }
- }
 }

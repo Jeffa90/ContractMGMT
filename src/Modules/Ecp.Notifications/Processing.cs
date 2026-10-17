@@ -24,13 +24,17 @@ internal sealed class NotificationRenderer
 {
     public const string WithheldTitle = "(title withheld)";
 
-    public (string Subject, string Body) Render(NotificationPolicy policy, MessageTemplate template, RenderContext c, ClassificationScale scale)
+    /// <summary>
+    /// Renders a message. The template's <c>[[term]]</c> tokens become the organisation's own words first (the template is the organisation's published configuration, so this is safe); only then are the <c>{{placeholders}}</c>
+    /// filled from record data, so a title or name that happens to contain brackets is never treated as a token.
+    /// </summary>
+    public (string Subject, string Body) Render(NotificationPolicy policy, MessageTemplate template, RenderContext c, ClassificationScale scale, TermSet terms)
     {
         var rank = scale.Rank(c.Classification);
         var everything = scale.IsKnown(policy.Content.WithholdEverythingFromLevel) && rank >= scale.Rank(policy.Content.WithholdEverythingFromLevel);
         var titleWithheld = scale.IsKnown(policy.Content.WithholdTitleFromLevel) && rank >= scale.Rank(policy.Content.WithholdTitleFromLevel);
         if (everything)
-            return ("Action needed on a restricted record", $"A restricted record needs your attention. Sign in to open it: {Clean(c.Link, 300)}");
+            return (terms.Expand("Action needed on a restricted record"), terms.Expand($"A restricted record needs your attention. Sign in to open it: ") + Clean(c.Link, 300));
 
         string Sub(string text) => NotificationPolicyParser.PlaceholderPattern().Replace(text, m => m.Groups[1].Value switch
         {
@@ -44,7 +48,7 @@ internal sealed class NotificationRenderer
             "step.name" => Clean(c.StepName ?? "", 100),
             _ => ""
         });
-        return (Clean(Sub(template.Subject), 300), Clean(Sub(template.Body), 3000, keepNewlines: true));
+        return (Clean(Sub(terms.Expand(template.Subject)), 300), Clean(Sub(terms.Expand(template.Body)), 3000, keepNewlines: true));
     }
 
     /// <summary>Plain text only: control characters (which could split a header) are removed, markup characters are left as text, and the value is bounded.</summary>
@@ -146,7 +150,8 @@ internal sealed class NotificationWriter(NotificationsDbContext db, ITenantConte
 /// </summary>
 internal sealed class NotificationDispatcher(
     NotificationsDbContext db, IUnitOfWork uow, ITenantContext tenant, ILifecycleOutbox outbox, INotificationPolicyStore policies, NotificationRenderer renderer, RecipientResolver resolver,
-    NotificationWriter writer, IContractLifecyclePort contracts, IAccessDirectory directory, IClassificationScaleProvider scales, IAuditEventSource auditSource, IOptions<NotificationsOptions> options) : INotificationDispatcher
+    NotificationWriter writer, IContractLifecyclePort contracts, IAccessDirectory directory, IClassificationScaleProvider scales, IAuditEventSource auditSource, IOptions<NotificationsOptions> options,
+    Ecp.Configuration.ITerminologyResolver terminology) : INotificationDispatcher
 {
     private static readonly string[] OwnershipActions = ["category.ownership_assigned", "category.ownership_ended"];
     private const string AuditSource = "audit-ownership";
@@ -204,7 +209,7 @@ internal sealed class NotificationDispatcher(
             : type.StartsWith("legal.", StringComparison.Ordinal) && Guid_("reviewId") is { } rv ? $"/Legal/Review/{rv}"
             : e.SubjectKind == SubjectKinds.Variation ? $"/Variations/Details/{e.SubjectId}"
             : $"/Contracts/Details/{e.ContractId}";
-        var (subject, body) = renderer.Render(policy, template, new RenderContext(facts.AgreementReference, facts.Title, e.Classification, actorName, link), scale);
+        var (subject, body) = renderer.Render(policy, template, new RenderContext(facts.AgreementReference, facts.Title, e.Classification, actorName, link), scale, await terminology.GetAsync(e.OrganisationId, ct: ct));
 
         var made = 0;
         foreach (var person in recipients)
@@ -254,7 +259,7 @@ internal sealed class NotificationDispatcher(
         if (rule is null || !policy.Templates.TryGetValue(rule.Template, out var template)) return 0;
         var scale = await scales.GetAsync(ct);
         var link = "/Dashboards";
-        var (subject, body) = renderer.Render(policy, template, new RenderContext("", "", "Internal", "", link), scale);
+        var (subject, body) = renderer.Render(policy, template, new RenderContext("", "", "Internal", "", link), scale, await terminology.GetAsync(org, ct: ct));
         var draft = new NotificationDraft(org, userId, type, "Event", null, null, null, null, "Internal", subject, body, link, rule, false, $"own:{sequence}:{userId:N}", correlationId);
         var made = await writer.AddAsync(draft, ct) is not null ? 1 : 0;
         await db.SaveChangesAsync(ct);

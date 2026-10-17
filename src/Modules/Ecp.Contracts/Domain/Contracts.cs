@@ -27,7 +27,7 @@ public static class ExtensionTypes
 /// <summary>Who may add documents to a contract in its current state (set by the workflow state; see the state definitions in the solution pack).</summary>
 public static class DocumentPolicies
 {
-    public const string Open = "Open";        // the category owner (and administrators) may add documents
+    public const string Open = "Open";        // the category-owner role (and administrators) may add documents
     public const string LegalOnly = "LegalOnly"; // only Legal may add documents (for example during Legal review)
     public const string Closed = "Closed";    // no document may be added directly; a Variation carries any change
     public static bool IsKnown(string? p) => p is Open or LegalOnly or Closed;
@@ -483,8 +483,8 @@ public sealed class Contract : ITenantOwned
             case "contractTitle": w.Title = Guard.NotBlank(raw, "[[contract]] title", 500); break;
             case "description": w.Description = Guard.OptionalBounded(raw, "Description", 4000); break;
             case "status": w.Status = Guard.NotBlank(raw, "Status", 100); break;
-            case "supplierId": w.Supplier = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Supplier"); break;
-            case "categoryId": w.Category = Guard.NotEmpty(Guid.Parse(raw ?? ""), "Category"); break;
+            case "supplierId": w.Supplier = Guard.NotEmpty(Guid.Parse(raw ?? ""), "[[supplier]]"); break;
+            case "categoryId": w.Category = Guard.NotEmpty(Guid.Parse(raw ?? ""), "[[category]]"); break;
             case "currencyCode": w.Currency = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim().ToUpperInvariant(); break;
             case "estimatedValue": w.Value = string.IsNullOrWhiteSpace(raw) ? null : decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var d) ? d : throw new DomainException("invalid_value", "Estimated value is not a number."); break;
             case "extensionType": w.Extension = Code(raw, "Extension type", 50); break;

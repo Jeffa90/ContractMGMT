@@ -217,8 +217,12 @@ public static class SystemViews
 
 internal sealed class ContractViewService(
     ContractsDbContext db, IContractRegister register, IConfigurationReleases releases, IAccessService access, ITenantContext tenant, IClock clock, IUnitOfWork uow, IAuditWriter audit,
-    IEnumerable<IContractSetProvider> setProviders, Ecp.Tenancy.IOrganisationStructureService structure) : IContractViews
+    IEnumerable<IContractSetProvider> setProviders, Ecp.Tenancy.IOrganisationStructureService structure, Ecp.Configuration.ITerminologyResolver terminology) : IContractViews
 {
+    /// <summary>The shipped views are written with terminology tokens; they are shown in the words of the organisation being looked at (otherwise the person's home organisation).</summary>
+    private async Task<Ecp.SharedKernel.TermSet> WordsAsync(Guid? organisationId, CancellationToken ct)
+        => await terminology.GetAsync(organisationId ?? await terminology.HomeOrganisationAsync(ct), null, ct);
+
     private Guid Me => access.CurrentUserId ?? throw new ForbiddenException("A signed-in person is required.");
     private IReadOnlySet<string> SetKeys => setProviders.Select(s => s.Key).ToHashSet(StringComparer.Ordinal);
 
@@ -231,7 +235,8 @@ internal sealed class ContractViewService(
 
     public async Task<IReadOnlyList<ViewSummary>> ListAsync(Guid? organisationId = null, CancellationToken ct = default)
     {
-        var list = SystemViews.Load().Views.Select(v => new ViewSummary("system:" + v.Key, v.Name, v.Description, ViewScope.System, null, false)).ToList();
+        var words = await WordsAsync(organisationId, ct);
+        var list = SystemViews.Load().Views.Select(v => new ViewSummary("system:" + v.Key, words.Expand(v.Name), words.Expand(v.Description), ViewScope.System, null, false)).ToList();
         foreach (var org in await OrgsAsync(organisationId, ct))
             if (await releases.LatestAsync(ContractListViewKind.KindName, org, ct) is { } release && ViewParser.Parse(release.ContentJson).Set is { } shared)
                 list.AddRange(shared.Views.Select(v => new ViewSummary($"shared:{org:N}:{v.Key}", v.Name, v.Description, ViewScope.Shared, org, false)));
@@ -247,7 +252,10 @@ internal sealed class ContractViewService(
         switch (parts[0])
         {
             case "system" when parts.Length == 2 && SystemViews.Load().Find(parts[1]) is { } sys:
-                return new ResolvedView(viewRef, sys, ViewScope.System, null, [], false);
+                {
+                    var words = await WordsAsync(organisationId, ct);
+                    return new ResolvedView(viewRef, sys with { Name = words.Expand(sys.Name), Description = words.Expand(sys.Description) }, ViewScope.System, null, [], false);
+                }
             case "shared" when parts.Length == 3 && Guid.TryParseExact(parts[1], "N", out var org):
                 {
                     if (!(await OrgsAsync(null, ct)).Contains(org)) throw new ResourceNotFoundException();

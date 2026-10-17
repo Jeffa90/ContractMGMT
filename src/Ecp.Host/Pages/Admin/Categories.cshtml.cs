@@ -81,6 +81,6 @@ public sealed class CategoriesModel(ISecuredCategoryService categories, IOrganis
     public string OrganisationName(Guid id) => _orgs.TryGetValue(id, out var n) ? n : "";
     public string UserName(Guid id) => _users.TryGetValue(id, out var n) ? n : "Unknown user";
 
-    /// <summary>People who can own categories in an organisation: those holding an active Category Owner assignment that covers it.</summary>
+    /// <summary>People who can own categories in an organisation: those holding an active CategoryOwner assignment that covers it.</summary>
     public IEnumerable<PersonItem> OwnerCandidates(Guid organisationId) => _candidates.TryGetValue(organisationId, out var list) ? list : [];
 }

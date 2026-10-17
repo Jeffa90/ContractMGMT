@@ -6,19 +6,19 @@
         @if (f.Kind == FieldKind.Checkbox)
         {
             <input id="f-@f.Name" name="@f.Name" type="checkbox" value="true" checked="@(f.Value is "true")" aria-describedby="@(f.Help is null ? null : "h-" + f.Name)" />
-            <label for="f-@f.Name">@f.Label @(f.Required ? "*" : "")</label>
+            <label for="f-@f.Name">@Terms.Expand(f.Label) @(f.Required ? "*" : "")</label>
         }
         else
         {
-            <label for="f-@f.Name">@f.Label@(f.Required ? " *" : "")</label>
-            @if (f.Help is not null) { <p class="hint" id="h-@f.Name">@f.Help</p> }
+            <label for="f-@f.Name">@Terms.Expand(f.Label)@(f.Required ? " *" : "")</label>
+            @if (f.Help is not null) { <p class="hint" id="h-@f.Name">@Terms.Expand(f.Help)</p> }
             @switch (f.Kind)
             {
                 case FieldKind.Select:
                     <select id="f-@f.Name" name="@f.Name" required="@f.Required" aria-describedby="@(f.Help is null ? null : "h-" + f.Name)">
                         @foreach (var o in f.Options ?? [])
                         {
-                            <option value="@o.Value" selected="@(o.Value == f.Value)">@o.Label</option>
+                            <option value="@o.Value" selected="@(o.Value == f.Value)">@Terms.Expand(o.Label)</option>
                         }
                     </select>
                     break;

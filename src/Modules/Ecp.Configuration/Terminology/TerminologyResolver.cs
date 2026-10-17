@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using Ecp.Configuration.Domain;
 using Ecp.Configuration.Persistence;
+using Ecp.Identity;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
@@ -28,6 +29,12 @@ public interface ITerminologyResolver
 
     /// <summary>The pack-provided terminology for an organisation (the layer beneath its own), or null if the pack carries none. Used by the administration pages to show what is inherited.</summary>
     Task<PackTerminology?> PackLayerAsync(Guid? organisationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The organisation whose words describe things for the signed-in person when no particular record is in view: the organisation of their first active organisation-level assignment; for a tenant-wide role, the tenant's
+    /// first organisation. Null when there is none (an installation administrator). Presentation only.
+    /// </summary>
+    Task<Guid?> HomeOrganisationAsync(CancellationToken ct = default);
 }
 
 public sealed record PackTerminology(string PackKey, string PackVersion, TerminologyDocument Document);
@@ -80,8 +87,26 @@ public sealed class TerminologyCache(TimeProvider? time = null, TimeSpan? timeTo
 }
 
 internal sealed class TerminologyResolver(IConfigurationReleases releases, IOrganisationStructureService organisations, IPackLoader packs, ConfigurationDbContext db, ITenantContext tenant,
-    ITerminologyCache cache, ConfigurationOptions options, ILogger<TerminologyResolver> logger) : ITerminologyResolver
+    ITerminologyCache cache, ConfigurationOptions options, IAccessService access, ITenantDirectory tenants, IClock clock, ILogger<TerminologyResolver> logger) : ITerminologyResolver
 {
+    public async Task<Guid?> HomeOrganisationAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var subject = await access.GetSubjectAsync(ct);
+            var now = clock.UtcNow;
+            var own = subject?.Assignments.Where(a => a.IsActiveAt(now) && a.Scope.OrganisationIds.Count > 0).OrderBy(a => a.EffectiveFromUtc).SelectMany(a => a.Scope.OrganisationIds).FirstOrDefault();
+            if (own is { } id && id != Guid.Empty) return id;
+            if (tenant.TenantId is { } t && (await tenants.FindAsync(t, ct))?.FirstOrganisationId is { } first) return first;
+            return (await organisations.ListOrganisationsAsync(ct)).OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase).Select(o => (Guid?)o.Id).FirstOrDefault();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "The home organisation for terminology could not be determined; the installation wording is used.");
+            return null;
+        }
+    }
+
     private static string LocaleOrCurrent(string? locale) => string.IsNullOrWhiteSpace(locale) ? CultureInfo.CurrentUICulture.Name is { Length: > 0 } n ? n : "en" : locale;
 
     public async Task<TermSet> GetAsync(Guid? organisationId, string? locale = null, CancellationToken ct = default)

@@ -55,7 +55,7 @@ public sealed record ApprovalDetail(
     IReadOnlyList<ApprovalDecisionInfo> History, bool CanApprove, bool CanReject, string? CannotBecause, PlanView? Plan = null, Guid OrganisationId = default);
 
 /// <summary>
-/// Register authorisation: the Group Head of Procurement (or a configured backup) approves or rejects an executed agreement. Whoever responds first decides; the actor is the signed-in person, never a
+/// Register authorisation: the configured primary approver (or a configured backup) approves or rejects an executed agreement. Whoever responds first decides; the actor is the signed-in person, never a
 /// name supplied by a request or a callback; the submitter cannot decide their own submission; and an approval stamps Registered Date and locks the record in the same transaction.
 /// </summary>
 public interface IRegisterAuthorisationService

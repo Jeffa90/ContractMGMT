@@ -22,7 +22,7 @@ public interface IContractChangeHistory
 }
 
 internal sealed class ContractChangeHistory(ContractsDbContext db, IAuditEventSource events, IAccessService access, ContractAccessContext context, IContractCustomFields customFields, IPeopleDirectory people,
-    ICustomFieldCatalogue catalogue) : IContractChangeHistory
+    ICustomFieldCatalogue catalogue, Ecp.Configuration.ITerminologyResolver terminology) : IContractChangeHistory
 {
     private static readonly string[] Actions =
         ["contract.updated", "contract.custom_fields_updated", "contract.custom_fields_applied", "contract.fields_changed", "migration.contract.updated", "migration.contract.custom_fields", "migration.contract.created", "migration.contract.legacy_loaded"];
@@ -55,6 +55,7 @@ internal sealed class ContractChangeHistory(ContractsDbContext db, IAuditEventSo
         }
         var visibleCustom = (await customFields.ForContractAsync(contractId, ct: ct)).Fields.Select(f => f.Definition).ToDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
         var set = await catalogue.PublishedAsync(c.OrganisationId, ct);
+        var terms = await terminology.GetAsync(c.OrganisationId, ct: ct);
         var actors = raw.Select(e => Guid.TryParse(e.ActorId, out var g) ? g : (Guid?)null).Where(g => g.HasValue).Select(g => g!.Value).Distinct().ToList();
         var names = actors.Count == 0 ? new Dictionary<Guid, string>() : await people.DisplayNamesAsync(actors, ct);
 
@@ -62,7 +63,7 @@ internal sealed class ContractChangeHistory(ContractsDbContext db, IAuditEventSo
         foreach (var e in raw)
         {
             if (!await MayAsync(e.Classification)) continue;
-            var fields = Parse(e.Action, e.OldValuesJson, e.NewValuesJson).Where(f => !IsHiddenCustom(f.Field, visibleCustom, set)).Select(f => f with { Field = LabelOf(f.Field, visibleCustom) }).ToList();
+            var fields = Parse(e.Action, e.OldValuesJson, e.NewValuesJson).Where(f => !IsHiddenCustom(f.Field, visibleCustom, set)).Select(f => f with { Field = LabelOf(f.Field, visibleCustom, terms) }).ToList();
             if (fields.Count == 0 && e.Action.StartsWith("migration.contract.", StringComparison.Ordinal) && e.Action is not ("migration.contract.created" or "migration.contract.legacy_loaded")) continue;
             var who = Guid.TryParse(e.ActorId, out var g) && names.TryGetValue(g, out var n) ? n : e.ActorId is { Length: > 0 } a && !Guid.TryParse(a, out _) ? a : "the platform";
             result.Add(new ContractChange(e.OccurredUtc, who, Label(e.Action), e.Reason, fields));
@@ -74,10 +75,10 @@ internal sealed class ContractChangeHistory(ContractsDbContext db, IAuditEventSo
     private static bool IsHiddenCustom(string field, Dictionary<string, FieldDefinition> visible, CustomFieldSet set)
         => field.StartsWith("cf.", StringComparison.Ordinal) && !visible.ContainsKey(field[3..]);
 
-    private static string LabelOf(string field, Dictionary<string, FieldDefinition> visible)
+    private static string LabelOf(string field, Dictionary<string, FieldDefinition> visible, TermSet terms)
     {
         var key = field.StartsWith("cf.", StringComparison.Ordinal) ? field[3..] : field;
-        return visible.TryGetValue(key, out var d) ? d.Label : CoreFields.Find(field)?.Label ?? field switch { "ContractTitle" or "contractTitle" => "Contract Title", "Description" or "description" => "Description", _ => field };
+        return visible.TryGetValue(key, out var d) ? d.Label : terms.Expand(CoreFields.Find(field)?.Label ?? field switch { "ContractTitle" or "contractTitle" => "[[contract]] Title", "Description" or "description" => "Description", _ => field });
     }
 
     private static IEnumerable<FieldChange> Parse(string action, string? oldJson, string? newJson)

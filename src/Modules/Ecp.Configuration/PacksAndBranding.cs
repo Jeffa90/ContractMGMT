@@ -27,6 +27,8 @@ public interface ISolutionPackCatalogue
     SolutionPackInfo? Find(string packId);
     /// <summary>The same packs with their version, publisher, capabilities, signature and trust status, for display.</summary>
     IReadOnlyList<PackCatalogueEntry> ListEntries();
+    /// <summary>The pack's terminology document (its wording), or null if it carries none. Setup shows example labels from it before the pack is chosen.</summary>
+    string? TerminologyOf(string packKey);
 }
 
 /// <summary>Tenant-level record of the applied solution pack (version-controlled like any configuration). The pack must exist and be usable here.</summary>

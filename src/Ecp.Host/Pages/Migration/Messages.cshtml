@@ -19,7 +19,7 @@
     <tbody>
     @foreach (var m in Model.Result.Items)
     {
-        <tr><td><span class="badge @(m.Severity == MessageSeverity.Error ? "bad" : "warn")">@m.Severity</span></td><th scope="row">@m.Code</th><td>@m.Subject</td><td>@m.Location</td><td>@m.FieldName</td><td>@m.Message</td></tr>
+        <tr><td><span class="badge @(m.Severity == MessageSeverity.Error ? "bad" : "warn")">@m.Severity</span></td><th scope="row">@m.Code</th><td>@m.Subject</td><td>@m.Location</td><td>@m.FieldName</td><td>@Terms.Expand(m.Message)</td></tr>
     }
     @if (Model.Result.Items.Count == 0) { <tr><td colspan="6">@L["No messages."]</td></tr> }
     </tbody>

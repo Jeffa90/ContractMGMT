@@ -90,10 +90,10 @@ public sealed class DetailsModel(IPeopleDirectory people, IUserAdministration ad
         {
             a.Scope.Level switch { ScopeLevel.Installation => "Installation", ScopeLevel.Tenant => "Whole tenant", _ => Names(a.Scope.OrganisationIds) }
         };
-        if (a.Scope.NarrowsDivision) parts.Add("Divisions: " + Names(a.Scope.DivisionIds));
-        if (a.Scope.NarrowsBusinessUnit) parts.Add("Business units: " + Names(a.Scope.BusinessUnitIds));
-        if (a.Scope.NarrowsSite) parts.Add("Sites: " + Names(a.Scope.SiteIds));
-        if (a.Scope.NarrowsCategory) parts.Add("Categories: " + Names(a.Scope.CategoryIds!));
+        if (a.Scope.NarrowsDivision) parts.Add("[[division|plural]]: " + Names(a.Scope.DivisionIds));
+        if (a.Scope.NarrowsBusinessUnit) parts.Add("[[business.unit|plural]]: " + Names(a.Scope.BusinessUnitIds));
+        if (a.Scope.NarrowsSite) parts.Add("[[site|plural]]: " + Names(a.Scope.SiteIds));
+        if (a.Scope.NarrowsCategory) parts.Add("[[category|plural]]: " + Names(a.Scope.CategoryIds!));
         return string.Join("; ", parts);
     }
 

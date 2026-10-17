@@ -20,11 +20,11 @@
         <p><span class="badge @(f.State is FileState.Imported or FileState.Matched ? "ok" : f.State is FileState.Invalid or FileState.Failed ? "bad" : f.State == FileState.Unmatched ? "warn" : "")">@f.State@(f.QueueReason != QueueReason.None ? " (" + f.QueueReason + ")" : "")</span>
            <span class="hint">@(f.DocumentType ?? L["no manifest row"].Value) · @f.SizeBytes @L["bytes"] · @L["scan"]: @f.Scan@(f.Sha256 is null ? "" : " · SHA-256 " + f.Sha256[..12] + "…")</span></p>
         @if (f.MatchedBy is { } method) { <p>@L["Matched by"] <strong>@method</strong>@(f.ContractReference is null ? "" : " to " + f.ContractReference)@(f.ResolvedBy is null ? "" : " (" + f.ResolvedBy + ")")</p> }
-        @if (f.Note is { Length: > 0 }) { <p class="hint">@f.Note</p> }
+        @if (f.Note is { Length: > 0 }) { <p class="hint">@Terms.Expand(f.Note)</p> }
         @if (f.Proposals.Count > 0)
         {
             <p>@L["Why:"]</p>
-            <ul>@foreach (var p in f.Proposals) { <li>@p.Method: @p.Reason <span class="badge">@p.Status</span></li> }</ul>
+            <ul>@foreach (var p in f.Proposals) { <li>@p.Method: @Terms.Expand(p.Reason) <span class="badge">@p.Status</span></li> }</ul>
         }
         @if (Model.Can.CanStage && f.State is FileState.Unmatched or FileState.Matched or FileState.Staged)
         {

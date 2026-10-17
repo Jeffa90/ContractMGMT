@@ -39,13 +39,20 @@ public interface IContractExports
 
 internal sealed class ContractExportService(
     IContractRegister register, IAccessService access, IUnitOfWork uow, IAuditWriter audit, IClock clock, ITenantContext tenant, IPeopleDirectory people, IOptions<ContractsOptions> options,
-    IOrganisationStructureService structure) : IContractExports
+    IOrganisationStructureService structure, Ecp.Configuration.ITerminologyResolver terminology) : IContractExports
 {
     public const string SchemaVersion = "1";
 
     private async Task RequireAsync(CancellationToken ct)
     {
         if ((await access.GrantsAsync("records.export", ct)).Count == 0) throw new ForbiddenException("You cannot export records.");
+    }
+
+    /// <summary>A worksheet name obeys the spreadsheet rules: at most 31 characters and none of : \\ / ? * [ ].</summary>
+    private static string SheetName(string name)
+    {
+        var clean = new string(name.Where(c => ":\\/?*[]".IndexOf(c) < 0).ToArray()).Trim();
+        return clean.Length == 0 ? "Records" : clean.Length > 31 ? clean[..31] : clean;
     }
 
     private static string CustomName(string key) => "cf_" + key;
@@ -93,12 +100,13 @@ internal sealed class ContractExportService(
         byte[] content; string contentType, ext;
         if (request.Format == ExportFormat.Xlsx)
         {
+            var words = await terminology.GetAsync(catalogue.OrganisationId ?? await terminology.HomeOrganisationAsync(ct), null, ct);
             var meta = new List<IReadOnlyList<object?>>
             {
                 new object?[] { "Item", "Value" },
                 new object?[] { "Generated (UTC)", now.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture) },
                 new object?[] { "Tenant", tenant.RequireTenantId().ToString("D") },
-                new object?[] { "Organisation", orgName },
+                new object?[] { words.Expand("[[organisation]]"), orgName },
                 new object?[] { "Exported by", userName },
                 new object?[] { "View", request.ViewName },
                 new object?[] { "Search and filters", string.IsNullOrWhiteSpace(request.FilterSummary) ? "(none)" : request.FilterSummary },
@@ -107,7 +115,7 @@ internal sealed class ContractExportService(
                 new object?[] { "Additional field definitions release", catalogue.CustomFieldRelease },
                 new object?[] { "Note", "Values you are not permitted to see are left blank. Text that a spreadsheet could read as a formula is prefixed with an apostrophe." }
             };
-            content = XlsxWriter.Write([new WorksheetData("Contracts", table), new WorksheetData("Export details", meta)]);
+            content = XlsxWriter.Write([new WorksheetData(SheetName(words.Expand("[[contract|plural]]")), table), new WorksheetData("Export details", meta)]);
             contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"; ext = "xlsx";
         }
         else { content = CsvWriter.Write(table); contentType = "text/csv; charset=utf-8"; ext = "csv"; }

@@ -15,7 +15,7 @@
     {
         <tr>
             <th scope="row">@Terms.Role(a.RoleCode) <code class="id" title="@L["Stable role identifier"]">@a.RoleCode</code>@if (a.ViewerKind is { } k) { <text> (@k)</text> }@if (a.ApproverGroupKey is { } g) { <br /><span class="hint">@L["Approver group"]: @g</span> }</th>
-            <td>@Model.Describe(a)</td><td>@a.Scope.ClassificationCeiling</td>
+            <td>@Terms.Expand(Model.Describe(a))</td><td>@a.Scope.ClassificationCeiling</td>
             <td>@Model.Period(a)</td><td>@a.GrantedByLabel (@a.Source)</td>
             <td>
                 @if (a.IsActive)

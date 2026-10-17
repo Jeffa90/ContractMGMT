@@ -9,7 +9,7 @@ namespace Ecp.Identity.Access;
 /// </summary>
 public sealed class AccessEvaluator(PermissionMatrix matrix)
 {
-    /// <summary>Read permissions for which the Category Owner's category scope does not narrow (ACCESS_CONTROL_SPEC 2.2).</summary>
+    /// <summary>Read permissions for which the CategoryOwner role's category scope does not narrow (ACCESS_CONTROL_SPEC 2.2).</summary>
     private static readonly HashSet<string> ReadAllPermissions = ["contracts.read", "documents.download", "suppliers.read"];
     private static readonly HashSet<string> LockSensitive = ["contracts.edit_owned", "documents.upload"];
     private static readonly HashSet<string> SegregatedApprovals = ["approvals.action", "disposition.approve"];
@@ -108,7 +108,7 @@ public sealed class AccessEvaluator(PermissionMatrix matrix)
 
     /// <summary>
     /// Whether an assignment may see records at a privileged classification level: an explicit grant on the assignment, or a role whose matrix row holds
-    /// <c>records.read_privileged</c>. A role such as Category Owner or Viewer never opens a privileged record, whatever its ceiling.
+    /// <c>records.read_privileged</c>. A role such as CategoryOwner or Viewer never opens a privileged record, whatever its ceiling.
     /// </summary>
     private bool MayReadPrivileged(AssignmentView a) => a.PrivilegedAccess || matrix.Of(a.RoleCode, PrivilegedReadPermission) != Grant.None;
 

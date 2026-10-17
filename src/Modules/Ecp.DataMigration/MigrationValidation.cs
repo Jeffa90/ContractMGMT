@@ -123,12 +123,12 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
         var summary = new ValidationSummary { GeneratedUtc = k.Clock.UtcNow };
 
         // ---- preconditions: anything that makes the run meaningless is reported together and stops it -------------------------------------------------
-        if (l.ContractsFile is null) summary.Blockers.Add("Upload the contracts file first.");
+        if (l.ContractsFile is null) summary.Blockers.Add("Upload the [[contract|plural|lower]] file first.");
         if (l.Version is null) summary.Blockers.Add("Choose a mapping profile version for the batch.");
         else if (l.Version.Status != ProfileVersionStatus.Published) summary.Blockers.Add("The mapping profile version must be published before it can be used by a batch.");
         else foreach (var issue in MappingDefinitionValidator.Validate(l.Definition).Where(i => i.IsError)) summary.Blockers.Add($"Profile: {issue.Field}: {issue.Message}");
         try { await contracts.InitialStatusAsync(batch.OrganisationId, ct); }
-        catch (DomainException ex) { summary.Blockers.Add($"MIG-E026: The organisation has no lifecycle definition to take its contracts' initial state from ({ex.Message})"); }
+        catch (DomainException ex) { summary.Blockers.Add($"MIG-E026: The organisation has no lifecycle definition to take its [[contract|plural|lower]]' initial state from ({ex.Message})"); }
         if (batch.IsLegacyLoad && !project.LegacyLoadAllowedAt(k.Clock.UtcNow)) summary.Blockers.Add("MIG-E012: The legacy-load policy has expired or been closed.");
         if (l.Version is not null && l.Version.Status == ProfileVersionStatus.Published && l.Definition.Fields.Any(f => MappingCatalogue.IsCustomTarget(f.TargetField)))
         {
@@ -322,8 +322,8 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
             if (f.MatchedBy == MatchMethod.Manual && f.ContractStagingRowId is { } target && f.ResolvedBy is not null)
             {
                 if (rowById.TryGetValue(target, out var tr) && !ineligible.Contains(target) && tr.Outcome != RowOutcome.Rejected) { f.RecordMatch(FileState.Matched, QueueReason.None, f.ManifestEntryId, target, MatchMethod.Manual, f.DocumentSourceId, f.Note); continue; }
-                f.RecordMatch(FileState.Unmatched, QueueReason.TargetRejected, f.ManifestEntryId, target, MatchMethod.Manual, f.DocumentSourceId, "The contract chosen for this file was not loaded.");
-                Say(MessageSubject.File, f.Id, f.RelativePath, true, "MIG-F015", "The contract chosen for this file is rejected or missing, so the file is back in the queue.");
+                f.RecordMatch(FileState.Unmatched, QueueReason.TargetRejected, f.ManifestEntryId, target, MatchMethod.Manual, f.DocumentSourceId, "The [[contract|lower]] chosen for this file was not loaded.");
+                Say(MessageSubject.File, f.Id, f.RelativePath, true, "MIG-F015", "The [[contract|lower]] chosen for this file is rejected or missing, so the file is back in the queue.");
                 continue;
             }
             candidates.Add(f);
@@ -369,11 +369,11 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
                     k.Db.Proposals.Add(MatchProposal.Create(k.TenantId, batchId, file.Id, m.RowId!.Value, m.Method!.Value, m.Candidates[0].Reason, 1, ProposalStatus.Proposed));
                     break;
                 case MatchOutcome.Ambiguous:
-                    file.RecordMatch(FileState.Unmatched, QueueReason.Ambiguous, m.EntryId, null, null, null, "More than one contract matches.");
+                    file.RecordMatch(FileState.Unmatched, QueueReason.Ambiguous, m.EntryId, null, null, null, "More than one [[contract|lower]] matches.");
                     foreach (var cand in m.Candidates) k.Db.Proposals.Add(MatchProposal.Create(k.TenantId, batchId, file.Id, cand.RowId, cand.Method, cand.Reason, m.Candidates.Count, ProposalStatus.Proposed));
                     break;
                 default:
-                    file.RecordMatch(FileState.Unmatched, QueueReason.NoMatch, m.EntryId, null, null, null, "No contract matches.");
+                    file.RecordMatch(FileState.Unmatched, QueueReason.NoMatch, m.EntryId, null, null, null, "No [[contract|lower]] matches.");
                     break;
             }
         }
@@ -397,7 +397,7 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
         // MIG-F008: two files of one contract with the same name are allowed, but a person should know.
         foreach (var group in matched.GroupBy(f => (f.ContractStagingRowId, Name: f.FileName.ToUpperInvariant())).Where(g => g.Count() > 1))
             foreach (var f in group.OrderBy(x => x.RelativePath, StringComparer.Ordinal).Skip(1))
-                Say(MessageSubject.File, f.Id, f.RelativePath, false, "MIG-F008", $"Another file of this contract is also named '{f.FileName}'.");
+                Say(MessageSubject.File, f.Id, f.RelativePath, false, "MIG-F008", $"Another file of this [[contract|lower]] is also named '{f.FileName}'.");
         var bySource = docFiles.Count == 0 ? [] : await documents.FindBySourceAsync(l.Batch.OrganisationId, sourceSystem, docFiles.Select(d => d.DocumentSourceId).ToList(), ct);
         var byHash = docFiles.Count == 0 ? [] : await documents.FindByHashAsync(docFiles.Select(d => d.Sha256).ToList(), ct);
         var decisions = DocumentPlanner.Plan(docFiles, l.Batch.DocumentDuplicateOption,

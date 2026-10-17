@@ -22,7 +22,7 @@
         <tr>
             <th scope="row">@r.RowNumber</th><td>@r.SourceRecordId</td><td>@r.AgreementReference</td>
             <td><span class="badge @(r.Outcome is RowOutcome.Rejected ? "bad" : r.Outcome is RowOutcome.Created or RowOutcome.Updated or RowOutcome.Accepted ? "ok" : "")">@r.Outcome</span></td>
-            <td>@r.PlanSummary</td><td>@r.Errors @L["errors"], @r.Warnings @L["warnings"]</td>
+            <td>@Terms.Expand(r.PlanSummary)</td><td>@r.Errors @L["errors"], @r.Warnings @L["warnings"]</td>
             <td>
             @if (r.Review == ReviewDecision.Required && Model.Can.CanStage)
             {

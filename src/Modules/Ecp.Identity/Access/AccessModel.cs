@@ -39,7 +39,7 @@ public enum ScopeDimensions
 
 /// <summary>
 /// What the evaluator needs to know about the thing being accessed. Built by the owning module from the stored record (never from request
-/// input). Relationship facts (active category owners, assigned approvers) are supplied by the module that owns them.
+/// input). Relationship facts (active category-owner assignments, assigned approvers) are supplied by the module that owns them.
 /// </summary>
 public sealed record ResourceDescriptor(
     string Type,
@@ -91,7 +91,7 @@ public enum GrantRelationship
 {
     /// <summary>Scopes alone decide.</summary>
     None,
-    /// <summary>Only records in categories the user is currently assigned (edit-type permissions of Category Owner).</summary>
+    /// <summary>Only records in categories the user is currently assigned (edit-type permissions of the CategoryOwner role).</summary>
     ActiveCategoryOwnership,
     /// <summary>Only records with a pending approval for the assignment's approver group. The owning module supplies which records those are; with none pending, nothing is listed.</summary>
     AssignedApproval,

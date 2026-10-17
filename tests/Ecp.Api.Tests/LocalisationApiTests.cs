@@ -38,12 +38,12 @@ public sealed class LocalisationApiTests
     }
 
     [Fact]
-    public void Resources_default_to_Australian_English_and_another_locale_overrides_only_what_differs()
+    public async Task Resources_default_to_Australian_English_and_another_locale_overrides_only_what_differs()
     {
         var (factory, keeper) = Start();
         using var _ = factory; using var __ = keeper;
         using var client = factory.CreateClient();
-        using var scope = factory.Services.CreateScope();
+        await using var scope = factory.Services.CreateAsyncScope();
         var localizer = scope.ServiceProvider.GetRequiredService<IStringLocalizer<SharedResource>>();
         var previous = CultureInfo.CurrentUICulture;
         try

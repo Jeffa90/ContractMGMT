@@ -95,7 +95,7 @@ internal sealed class OnboardingApplier(
         Guid Unit_(string key) => structureNow.BusinessUnits.FirstOrDefault(x => x.Key == StructureKey.Normalise(key))?.Id ?? throw new DomainException("business_unit_not_found", $"[[business.unit|sentence]] '{key}' was not found.");
         Guid Site_(string key) => structureNow.Sites.FirstOrDefault(x => x.Key == StructureKey.Normalise(key))?.Id ?? throw new DomainException("site_not_found", $"[[site]] '{key}' was not found.");
 
-        // category owners
+        // category-owner assignments
         foreach (var o in next.CategoryOwners)
         {
             var key = Canonical.Owner(o); var userId = await UserAsync(o.Email); var categoryId = Category_(o.CategoryCode);

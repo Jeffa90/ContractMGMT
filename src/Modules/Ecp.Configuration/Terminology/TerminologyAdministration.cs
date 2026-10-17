@@ -29,6 +29,10 @@ public sealed record TermInput(string Key, bool Override, string? Singular, stri
 public sealed record TermSample(string Area, string Template, string Now, string After);
 public sealed record TerminologyPreviewResult(Guid OrganisationId, string Locale, bool HasDraft, IReadOnlyList<TermSample> Samples, IReadOnlyList<(string Role, string Code, string Now, string After)> Roles);
 public sealed record TerminologyReleaseView(ReleaseDto Release, int Added, int Changed, int Removed);
+/// <summary>What happened when an organisation's pack wording was prepared as a draft.</summary>
+public enum PackWordingOutcome { DraftCreated, DraftAlreadyOpen, OrganisationKeepsItsOwn, PackHasNoWording, PackNotAvailable }
+public sealed record PackWordingResult(PackWordingOutcome Outcome, string Message, string? PackKey = null, string? PackVersion = null, int Terms = 0);
+public sealed record PackWordingExample(string PackKey, string PackVersion, IReadOnlyList<(string Key, string Label)> Examples, int TermCount);
 public sealed record TerminologyAuditItem(DateTime OccurredUtc, string Action, string? Actor, string Outcome, string Subject, string? Reason, string? Details);
 
 /// <summary>
@@ -42,13 +46,51 @@ public interface ITerminologyAdministration
     /// <summary>Replaces the organisation's entries for one locale in its open draft (creating the draft from the published release if there is none). Other locales are kept. Nothing is published.</summary>
     Task<DraftDto> SaveAsync(Guid organisationId, string locale, IReadOnlyList<TermInput> inputs, CancellationToken ct = default);
     Task<TerminologyPreviewResult> PreviewAsync(Guid organisationId, string? locale = null, CancellationToken ct = default);
+    /// <summary>
+    /// Prepares a terminology draft from a solution pack for an organisation: the pack's wording, stamped with the pack and version it came from. Never publishes, never replaces a draft that is open and never touches terminology
+    /// the organisation has already published. Used by onboarding after a pack is chosen.
+    /// </summary>
+    Task<PackWordingResult> PrepareFromPackAsync(Guid organisationId, string packKey, CancellationToken ct = default);
+    /// <summary>A few headline labels from a pack's wording, to show before the pack is chosen. Needs no permission beyond seeing the pack catalogue (the caller supplies the pack).</summary>
+    Task<PackWordingExample?> ExampleOfPackAsync(string packKey, CancellationToken ct = default);
     Task<IReadOnlyList<TerminologyReleaseView>> HistoryAsync(Guid organisationId, CancellationToken ct = default);
     Task<PagedResult<TerminologyAuditItem>> AuditAsync(Guid organisationId, int page = 1, CancellationToken ct = default);
 }
 
 internal sealed class TerminologyAdministration(IConfigurationService configuration, ITerminologyResolver resolver, IOrganisationStructureService organisations, IAccessService access, ITenantContext tenant,
-    IAuditEventSource auditEvents) : ITerminologyAdministration
+    IAuditEventSource auditEvents, IPackLoader packs) : ITerminologyAdministration
 {
+    private static readonly string[] ExampleKeys = ["application.name", "contract", "supplier", "category", "contract.owner", "legal.review", "registration.approval", "primary.approver"];
+
+    public async Task<PackWordingExample?> ExampleOfPackAsync(string packKey, CancellationToken ct = default)
+    {
+        var entry = await packs.FindAsync(packKey, null, usableOnly: true, ct);
+        if (entry is null) return null;
+        var json = await packs.GetDocumentAsync(entry.PackKey, entry.Version, Kind, ct);
+        if (json is null) return null;
+        var doc = SafeParse(json);
+        if (doc is null) return null;
+        var set = TermSet.Build("en", null, doc.Terms, null, null);
+        return new PackWordingExample(entry.PackKey, entry.Version, ExampleKeys.Select(k => (k, set.Singular(k))).ToList(), doc.Terms.Count(t => t.Locale == (doc.Terms.GroupBy(x => x.Locale).OrderByDescending(g => g.Count()).First().Key)));
+    }
+
+    public async Task<PackWordingResult> PrepareFromPackAsync(Guid organisationId, string packKey, CancellationToken ct = default)
+    {
+        await access.RequireAsync("terminology.draft", Resource(organisationId), ct);
+        var entry = await packs.FindAsync(packKey, null, usableOnly: true, ct);
+        if (entry is null) return new PackWordingResult(PackWordingOutcome.PackNotAvailable, "That pack is not available here, so no wording was prepared.");
+        var json = await packs.GetDocumentAsync(entry.PackKey, entry.Version, Kind, ct);
+        var doc = json is null ? null : SafeParse(json);
+        if (doc is null) return new PackWordingResult(PackWordingOutcome.PackHasNoWording, "This pack carries no wording of its own, so the platform's neutral wording applies.", entry.PackKey, entry.Version);
+        if (await configuration.LatestReleaseAsync(Kind, organisationId, ct) is not null)
+            return new PackWordingResult(PackWordingOutcome.OrganisationKeepsItsOwn, "This organisation already publishes its own wording, which stays in force. The pack's wording applies only where it has none.", entry.PackKey, entry.Version, doc.Terms.Count);
+        if (await configuration.FindOpenDraftAsync(Kind, organisationId, ct) is not null)
+            return new PackWordingResult(PackWordingOutcome.DraftAlreadyOpen, "A terminology draft is already open and was kept.", entry.PackKey, entry.Version, doc.Terms.Count);
+        var seeded = doc.WithSource(entry.PackKey, entry.Version, TerminologyDocument.Overrides);
+        await configuration.GetOrCreateDraftAsync(Kind, organisationId, seeded.ToJson(), ct);
+        return new PackWordingResult(PackWordingOutcome.DraftCreated, "The pack's wording is prepared as a terminology draft. It applies as the default now; review it under Administration, Terminology and publish it only if you want it to become this organisation's own.", entry.PackKey, entry.Version, doc.Terms.Count);
+    }
+
     private const int AuditPageSize = 50;
     private const string Kind = TerminologyKind.KindName;
 
@@ -77,6 +119,10 @@ internal sealed class TerminologyAdministration(IConfigurationService configurat
     private async Task<bool> HoldsAsync(string permission, Guid organisationId, CancellationToken ct)
         => (await access.CheckSilentAsync(permission, Resource(organisationId), ct)).Allowed;
 
+    /// <summary>Reading terminology does not include seeing a draft: a person without the drafting permission simply sees no draft.</summary>
+    private async Task<DraftDto?> OpenDraftIfAllowedAsync(Guid organisationId, CancellationToken ct)
+        => await HoldsAsync("terminology.draft", organisationId, ct) ? await configuration.FindOpenDraftAsync(Kind, organisationId, ct) : null;
+
     private static TermEntry? Pick(TerminologyDocument? doc, string key, string locale)
     {
         if (doc is null) return null;
@@ -93,7 +139,7 @@ internal sealed class TerminologyAdministration(IConfigurationService configurat
         var effective = await resolver.GetAsync(organisationId, loc, ct);
         var pack = await resolver.PackLayerAsync(organisationId, ct);
         var release = await configuration.LatestReleaseAsync(Kind, organisationId, ct);
-        var draft = await configuration.FindOpenDraftAsync(Kind, organisationId, ct);
+        var draft = await OpenDraftIfAllowedAsync(organisationId, ct);
         TerminologyDocument? published = release is null ? null : TerminologyDocument.Parse(release.ContentJson);
         TerminologyDocument? draftDoc = null;
         if (draft is not null) try { draftDoc = TerminologyDocument.Parse(draft.ContentJson); } catch (DomainException) { /* an unreadable draft is shown as a draft with no readable rows */ }
@@ -177,7 +223,7 @@ internal sealed class TerminologyAdministration(IConfigurationService configurat
         var org = await OrganisationAsync(organisationId, ct);
         var loc = LocaleOrDefault(locale, org);
         var now = await resolver.GetAsync(organisationId, loc, ct);
-        var draft = await configuration.FindOpenDraftAsync(Kind, organisationId, ct);
+        var draft = await OpenDraftIfAllowedAsync(organisationId, ct);
         var doc = draft is null ? null : SafeParse(draft.ContentJson);
         var after = doc is null ? now : await resolver.PreviewAsync(organisationId, doc, loc, ct);
         var samples = Samples.Select(s => new TermSample(s.Area, s.Template, now.Expand(s.Template), after.Expand(s.Template))).ToList();

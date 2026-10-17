@@ -13,7 +13,7 @@ namespace Ecp.Host.Terminology;
 /// never query for a label. A page that is about one organisation's record (a contract, a supplier) calls <see cref="UseOrganisationAsync"/> so that record is described in its own organisation's words.
 /// Terminology is presentation only: nothing here decides what a person may see or do.
 /// </summary>
-public sealed class TermContext(ITerminologyResolver resolver, IAccessService access, IOrganisationStructureService organisations, ITenantDirectory tenants, ITenantContext tenant, IClock clock, ILogger<TermContext> logger)
+public sealed class TermContext(ITerminologyResolver resolver, ITenantContext tenant, ILogger<TermContext> logger)
 {
     private bool _loaded;
     public TermSet Current { get; private set; } = TermSet.Neutral();
@@ -26,7 +26,7 @@ public sealed class TermContext(ITerminologyResolver resolver, IAccessService ac
         _loaded = true;
         if (tenant.TenantId is null) { Current = TermSet.Neutral(CultureInfo.CurrentUICulture.Name); return; }
         Guid? home = null;
-        try { if (signedIn) home = await HomeOrganisationAsync(ct); }
+        try { if (signedIn) home = await resolver.HomeOrganisationAsync(ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogWarning(ex, "The home organisation for terminology could not be determined; the installation wording is used."); }
         await LoadAsync(home, ct);
     }
@@ -45,20 +45,9 @@ public sealed class TermContext(ITerminologyResolver resolver, IAccessService ac
         Current = await resolver.GetAsync(organisationId, CultureInfo.CurrentUICulture.Name, ct);   // never throws: falls back to the neutral wording
     }
 
-    private async Task<Guid?> HomeOrganisationAsync(CancellationToken ct)
-    {
-        var subject = await access.GetSubjectAsync(ct);
-        var now = clock.UtcNow;
-        var fromAssignment = subject?.Assignments.Where(a => a.IsActiveAt(now) && a.Scope.OrganisationIds.Count > 0).OrderBy(a => a.EffectiveFromUtc).SelectMany(a => a.Scope.OrganisationIds).FirstOrDefault();
-        if (fromAssignment is { } id && id != Guid.Empty) return id;
-        // A person with a tenant-wide role has no single organisation: the tenant's first organisation (the one it was set up with) is the home organisation. Pages about one record override it.
-        if (tenant.TenantId is { } t && (await tenants.FindAsync(t, ct))?.FirstOrganisationId is { } first) return first;
-        return (await organisations.ListOrganisationsAsync(ct)).OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase).Select(o => (Guid?)o.Id).FirstOrDefault();
-    }
-
     public string Singular(string key) => Current.Singular(key);
     public string Plural(string key) => Current.Plural(key);
-    public string Expand(string text) => Current.Expand(text);
+    public string Expand(string? text) => text is null ? "" : Current.Expand(text);
 
     /// <summary>
     /// The label for a role code (the code itself is a stable identifier and is shown separately where an administrator needs it). A value such as <c>Viewer (Site)</c>, a code followed by a qualifier, keeps its qualifier.

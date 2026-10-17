@@ -22,7 +22,7 @@ public interface IPeopleDirectory
     Task<PersonItem> GetManageableUserAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<AssignmentDto>> AssignmentsOfAsync(Guid userId, bool includeEnded, CancellationToken ct = default);
 
-    /// <summary>People who hold an active Category Owner role covering an organisation (requires <c>categories.assign</c>).</summary>
+    /// <summary>People who hold an active CategoryOwner role covering an organisation (requires <c>categories.assign</c>).</summary>
     Task<IReadOnlyList<PersonItem>> OwnerCandidatesAsync(Guid organisationId, CancellationToken ct = default);
 
     /// <summary>Names (no email) of the active people who hold any active role covering the organisation, for choosing a person in a form. Needs the caller to hold an active role; at most 500.</summary>
@@ -83,7 +83,7 @@ internal sealed class PeopleDirectory(IdentityDbContext db, IAccessService acces
     public async Task<IReadOnlyList<PersonItem>> OwnerCandidatesAsync(Guid organisationId, CancellationToken ct = default)
     {
         var grants = await access.GrantsAsync("categories.assign", ct);
-        if (!grants.Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(organisationId))) throw new ForbiddenException("You cannot assign category owners here.");
+        if (!grants.Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(organisationId))) throw new ForbiddenException("You cannot assign owners here.");
         var now = clock.UtcNow;
         var owners = (await db.RoleAssignments.AsNoTracking().Where(a => a.RoleCode == RoleCodes.CategoryOwner).ToListAsync(ct))
             .Where(a => a.IsActiveAt(now) && (a.ScopeLevel == ScopeLevel.Tenant || a.OrganisationIds.Contains(organisationId))).Select(a => a.UserId).Distinct().ToList();

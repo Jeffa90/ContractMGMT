@@ -285,8 +285,8 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
                     var row = rows[f.ContractStagingRowId!.Value];
                     if (row.TargetContractId is null)
                     {
-                        f.RecordMatch(FileState.Unmatched, QueueReason.TargetRejected, f.ManifestEntryId, f.ContractStagingRowId, f.MatchedBy, f.DocumentSourceId, "The contract this file belongs to was not loaded.");
-                        messages.Add(k.Message(batchId, MessagePhase.Commit, MessageSubject.File, f.Id, f.RelativePath, true, "MIG-F015", "The contract this file belongs to was not loaded, so the file stays in the queue."));
+                        f.RecordMatch(FileState.Unmatched, QueueReason.TargetRejected, f.ManifestEntryId, f.ContractStagingRowId, f.MatchedBy, f.DocumentSourceId, "The [[contract|lower]] this file belongs to was not loaded.");
+                        messages.Add(k.Message(batchId, MessagePhase.Commit, MessageSubject.File, f.Id, f.RelativePath, true, "MIG-F015", "The [[contract|lower]] this file belongs to was not loaded, so the file stays in the queue."));
                         continue;
                     }
                     if (f.QuarantineKey is null || !Ecp.Documents.Domain.StorageKey.IsValidFor(k.TenantId, f.QuarantineKey))

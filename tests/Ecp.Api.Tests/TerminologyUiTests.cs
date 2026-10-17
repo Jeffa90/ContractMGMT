@@ -330,5 +330,98 @@ public sealed class TerminologyUiTests
         Assert.DoesNotMatch("(?i)jbs|procurement", Regex.Replace(suppliers, "<title>.*?</title>", ""));
     }
 
+    // ---- exports, onboarding, stable identifiers ----
+
+    private static async Task<HttpResponseMessage> ExportAsync(HttpClient client, Guid org, string format)
+        => await DemoApp.PostFormAsync(client, "/Contracts", new Dictionary<string, string> { ["View"] = "system:all-contracts", ["Org"] = org.ToString(), ["ExportFormat"] = format, ["ExportLarge"] = "false" }, "/Contracts?handler=Export");
+
+    [Fact]
+    public async Task Export_headings_and_the_worksheet_name_use_the_exporting_organisations_wording()
+    {
+        using var app = DemoApp.Start();
+        var (tenant, jbsOrg) = await TenantAsync(app, "Demo Procurement Group");
+        var (_, blankOrg) = await TenantAsync(app, "Demo Facilities Organisation");
+        var blankEmail = await UserInAsync(app, tenant, blankOrg, RoleCodes.ProcurementAdministrator, null, "Confidential");
+        using var jbs = await app.SignInAsync(ProcAdmin, followRedirects: true);
+        using var blank = await app.SignInAsync(blankEmail, followRedirects: true);
+
+        var jbsCsv = await ExportAsync(jbs, jbsOrg, "csv");
+        Assert.Equal(HttpStatusCode.OK, jbsCsv.StatusCode);
+        var jbsHeader = (await jbsCsv.Content.ReadAsStringAsync()).Split('\n')[0];
+        Assert.Contains("Supplier", jbsHeader);
+
+        var blankCsv = await ExportAsync(blank, blankOrg, "csv");
+        Assert.Equal(HttpStatusCode.OK, blankCsv.StatusCode);
+        var blankHeader = (await blankCsv.Content.ReadAsStringAsync()).Split('\n')[0];
+        Assert.Contains("Counterparty", blankHeader);
+        Assert.DoesNotContain("Supplier", blankHeader);
+
+        // The workbook's sheet and details speak the same way; the sheet name obeys the spreadsheet rules.
+        async Task<string> Workbook(HttpClient c, Guid o)
+        {
+            var response = await ExportAsync(c, o, "xlsx");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(await response.Content.ReadAsByteArrayAsync()));
+            using var reader = new StreamReader(zip.GetEntry("xl/workbook.xml")!.Open());
+            return await reader.ReadToEndAsync();
+        }
+        Assert.Contains("name=\"Contracts\"", await Workbook(jbs, jbsOrg));
+        Assert.Contains("name=\"Contracts\"", await Workbook(blank, blankOrg));      // neutral wording is also 'Contracts'
+    }
+
+    [Fact]
+    public async Task Onboarding_pages_for_a_blank_organisation_carry_no_reference_wording_and_a_reference_organisation_keeps_it()
+    {
+        using var app = DemoApp.Start();
+        var (tenant, jbsOrg) = await TenantAsync(app, "Demo Procurement Group");
+        var (_, blankOrg) = await TenantAsync(app, "Demo Facilities Organisation");
+        var blankAdmin = await UserInAsync(app, tenant, blankOrg, RoleCodes.OrganisationAdministrator, null, "Confidential");
+        using var blank = await app.SignInAsync(blankAdmin, followRedirects: true);
+        using var jbs = await app.SignInAsync("orgadmin@a.example.test", followRedirects: true);
+
+        foreach (var url in new[] { $"/Onboarding?org={blankOrg}", $"/Onboarding/Step/categories?org={blankOrg}", $"/Onboarding/Step/viewers?org={blankOrg}", $"/Onboarding/Review?org={blankOrg}" })
+        {
+            var html = await BodyAsync(blank, url);
+            var visible = Regex.Replace(html, "<input[^>]*>|<a [^>]*>|<title>.*?</title>|<option[^>]*>[^<]*</option>|<textarea[^>]*>.*?</textarea>", "", RegexOptions.Singleline);
+            var hit = Regex.Match(visible, @"(?i:.{0,50}(jbs|procurement|group head|supplier|category owner|Europe/London|Brisbane).{0,50})|.{0,50}\b(USD|AUD)\b.{0,50}");
+            Assert.False(hit.Success, $"{url}: {hit.Value}");
+        }
+        // The pack step shows what the selected pack would say before anything is assigned.
+        var pack = await BodyAsync(blank, $"/Onboarding/Step/pack?org={blankOrg}");
+        Assert.Contains("Wording", pack);
+        var jbsViewers = await BodyAsync(jbs, $"/Onboarding/Step/viewers?org={jbsOrg}");
+        Assert.Contains("Category", jbsViewers);                                                       // the reference organisation keeps its pack's wording
+        var blankViewers = await BodyAsync(blank, $"/Onboarding/Step/viewers?org={blankOrg}");
+        Assert.DoesNotContain("Finance-Viewers", blankViewers);                                        // examples are neutral
+    }
+
+    [Fact]
+    public async Task Changing_a_label_changes_no_machine_identifier_url_form_field_role_code_or_permission()
+    {
+        Assert.Equal(["SystemAdministrator", "TenantAdministrator", "OrganisationAdministrator", "DivisionSiteAdministrator", "BusinessConfigurationAdministrator",
+            "ProcurementAdministrator", "CategoryOwner", "Legal", "Approver", "BackupApprover", "Auditor", "Viewer"], RoleCodes.All);
+
+        using var app = DemoApp.Start();
+        var (_, org) = await TenantAsync(app, "Demo Procurement Group");
+        using var biz = await app.SignInAsync(BizConfig, followRedirects: false);
+        using var viewer = await app.SignInAsync(Viewer, followRedirects: true);
+        var before = await BodyAsync(viewer, "/Contracts");
+        var form = EditForm(org, new Dictionary<string, (string, string)> { ["supplier"] = ("Partner", "Partners"), ["category"] = ("Portfolio", "Portfolios") });
+        await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Save&organisationId={org}&locale=en");
+        await DemoApp.PostFormAsync(biz, Edit(org), form, $"/Admin/Terminology/Edit?handler=Publish&organisationId={org}&locale=en");
+        var after = await BodyAsync(viewer, "/Contracts");
+
+        Assert.NotEqual(before, after);
+        // Field names, ids and addresses are the same; only the words differ.
+        static string Machine(string html) => string.Join("|", Regex.Matches(html, @"(?:name|id|href|value)=""([^""]*)""").Select(m => m.Groups[1].Value).Where(v => !v.Contains(' ')));
+        var names = Regex.Matches(before, @"name=""(F|Q|View|Org|Sort|Desc|ExportFormat)""").Count;
+        Assert.Equal(names, Regex.Matches(after, @"name=""(F|Q|View|Org|Sort|Desc|ExportFormat)""").Count);
+        Assert.Equal(Regex.Matches(before, @"href=""/Suppliers[^""]*""").Count, Regex.Matches(after, @"href=""/Suppliers[^""]*""").Count);
+        Assert.Contains("href=\"/Suppliers\"", after);
+        Assert.NotEmpty(Machine(after));
+        Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync("/Suppliers")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync("/Admin/Terminology")).StatusCode);
+    }
+
     private static IEnumerable<(string, string, string, string, int, bool)> Content(out Dictionary<string, string> documents) => PackTestKit.ThirdPackContent(out documents);
 }

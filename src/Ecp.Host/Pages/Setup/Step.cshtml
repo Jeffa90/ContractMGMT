@@ -4,25 +4,25 @@
 @using Ecp.Setup
 @{ ViewData["Title"] = Model.Stage?.Title ?? "Setup"; var st = Model.Stage!; }
 <p><a href="/Setup">&larr; @L["All steps"]</a></p>
-<h1>@st.Title</h1>
-<p class="lede">@st.Summary</p>
+<h1>@Terms.Expand(st.Title)</h1>
+<p class="lede">@Terms.Expand(st.Summary)</p>
 <p><span class="badge @(st.Status == StageStatus.Complete ? "ok" : "")">@st.Status</span></p>
 @if (Model.Result is { } r)
 {
     if (r.Succeeded)
     {
-        <div class="flash" role="status"><p>@r.Message</p>@foreach (var d in r.Details) { <p>@d</p> }</div>
+        <div class="flash" role="status"><p>@Terms.Expand(r.Message)</p>@foreach (var d in r.Details) { <p>@Terms.Expand(d)</p> }</div>
     }
     else
     {
-        <div class="error-summary" role="alert" tabindex="-1"><h2>@L["This step was not completed"]</h2><p>@r.Message</p>@foreach (var d in r.Details) { <p>@d</p> }</div>
+        <div class="error-summary" role="alert" tabindex="-1"><h2>@L["This step was not completed"]</h2><p>@Terms.Expand(r.Message)</p>@foreach (var d in r.Details) { <p>@Terms.Expand(d)</p> }</div>
     }
 }
 else if (st.LastMessage is not null && st.Status != StageStatus.NotStarted)
 {
     <p class="hint">@L["Last result"]: @st.LastMessage</p>
 }
-@foreach (var n in st.Notes) { <p class="hint">@n</p> }
+@foreach (var n in st.Notes) { <p class="hint">@Terms.Expand(n)</p> }
 @if (!st.Available)
 {
     <p class="error" role="alert">@st.UnavailableReason</p>
@@ -42,7 +42,7 @@ else
                 {
                     <tr><th scope="row"><code>@c.Id</code> @c.Description</th>
                         <td><span class="badge @(c.Status == "Pass" ? "ok" : c.Severity == "Blocking" ? "bad" : "warn")">@(c.Status == "Pass" ? "Pass" : c.Severity == "Blocking" ? "Blocking" : "Warning")</span></td>
-                        <td>@c.Message</td></tr>
+                        <td>@Terms.Expand(c.Message)</td></tr>
                 }
                 </tbody>
             </table>

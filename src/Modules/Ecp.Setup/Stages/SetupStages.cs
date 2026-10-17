@@ -35,8 +35,8 @@ internal sealed class ModeStage : SetupStageBase
         {
             new("deployment", "Deployment", FieldKind.Select, true, "Where this installation runs. Recorded in the setup report only.",
                 [new("Local", "Local development or evaluation"), new("IIS", "Windows Server with IIS"), new("Azure", "Azure App Service"), new("Container", "Container")], "Local"),
-            new("tenancyMode", "Tenancy", FieldKind.Select, true, "Single organisation is the usual choice. This can only be widened later by an installation administrator.",
-                [new("SingleOrganisation", "One organisation"), new("MultiOrganisation", "Several organisations in one tenant"), new("MultiTenant", "Several tenants")], "SingleOrganisation"),
+            new("tenancyMode", "Tenancy", FieldKind.Select, true, "Single [[organisation|lower]] is the usual choice. This can only be widened later by an installation administrator.",
+                [new("SingleOrganisation", "One [[organisation|lower]]"), new("MultiOrganisation", "Several [[organisation|plural|lower]] in one tenant"), new("MultiTenant", "Several tenants")], "SingleOrganisation"),
         };
         if (env.HostMode != EcpMode.Production)
             fields.Add(new("acknowledge", "I understand this installation is for demonstration or testing only and must not hold real confidential data", FieldKind.Checkbox, true));
@@ -107,14 +107,14 @@ internal sealed class DatabaseStage : SetupStageBase
 internal sealed class StorageStage : SetupStageBase
 {
     public override string Id => "storage";
-    public override string Title => "Document storage";
-    public override string Summary => "Prove that documents can be written, read back and removed.";
+    public override string Title => "[[document]] storage";
+    public override string Summary => "Prove that [[document|plural|lower]] can be written, read back and removed.";
     public override string ActionLabel => "Run storage check";
     public override IReadOnlyList<string> DependsOn => ["database"];
     public override bool Amendable => true;
 
     public override IReadOnlyList<string> Notes(SetupDocument doc, SetupEnvironment env) =>
-    [$"Documents are stored under the data directory, which must be on a persistent volume{(env.HostMode == EcpMode.Production ? " (a temporary location is refused)" : "")}."];
+    [$"[[document|plural]] are stored under the data directory, which must be on a persistent volume{(env.HostMode == EcpMode.Production ? " (a temporary location is refused)" : "")}."];
 
     public override async Task<StageResult> ExecuteAsync(StageContext c)
     {
@@ -141,11 +141,11 @@ internal sealed class TenantStage : SetupStageBase
 {
     public override string Id => "tenant";
     public override string Title => "Tenant";
-    public override string Summary => "Create the tenant that holds your organisation. Administrators are created before any organisation configuration.";
+    public override string Summary => "Create the tenant that holds your [[organisation|lower]]. Administrators are created before any [[organisation|lower]] configuration.";
     public override IReadOnlyList<string> DependsOn => ["database", "mode"];
 
     public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)
-        => [new("tenantName", "Tenant name", FieldKind.Text, true, "Usually your company or group name. It identifies the tenant; it is not shown to suppliers.", Value: doc.TenantName)];
+        => [new("tenantName", "Tenant name", FieldKind.Text, true, "Usually your company or group name. It identifies the tenant; it is not shown to [[supplier|plural|lower]].", Value: doc.TenantName)];
 
     public override async Task<StageResult> ExecuteAsync(StageContext c)
     {
@@ -175,7 +175,7 @@ internal sealed class TenantStage : SetupStageBase
 internal sealed class PackStage : SetupStageBase
 {
     public override string Id => "pack";
-    public override string Title => "Solution pack";
+    public override string Title => "[[solution.pack|sentence]]";
     public override string Summary => "Choose the starting configuration. A pack is data only; you can change everything it sets.";
     public override IReadOnlyList<string> DependsOn => ["tenant"];
     private readonly ISolutionPackCatalogue _catalogue;
@@ -186,8 +186,8 @@ internal sealed class PackStage : SetupStageBase
 
     // Nothing is chosen for the administrator: the starting pack is an explicit decision, and the choices come from the pack catalogue (external, verified packages), never from a name in code.
     public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)
-        => [new("packId", "Solution pack", FieldKind.Select, true,
-            "Choose the starting configuration for this organisation. A pack is data only and you can change everything it sets. More packs can be installed later under Administration, Solution packs.",
+        => [new("packId", "[[solution.pack|sentence]]", FieldKind.Select, true,
+            "Choose the starting configuration for this [[organisation|lower]]. A pack is data only and you can change everything it sets. More packs can be installed later under Administration, [[solution.pack|plural|sentence]].",
             [new FieldOption("", "Choose a starting pack"), .. _catalogue.ListEntries().Select(p => new FieldOption(p.PackKey, Label(p)))], doc.PackId ?? "")];
 
     public override IReadOnlyList<string> Notes(SetupDocument doc, SetupEnvironment env)
@@ -195,18 +195,35 @@ internal sealed class PackStage : SetupStageBase
         var entries = _catalogue.ListEntries();
         var notes = new List<string>();
         if (entries.Count == 0)
-            notes.Add("No solution pack is available. Packs ship as signed packages next to the application; in Production only packs signed by a trusted publisher are offered. Ask the person who installed the application to check Administration, Solution packs, or see docs/PACK_SIGNING.md.");
+            notes.Add("No [[solution.pack|lower]] is available. Packs ship as signed packages next to the application; in Production only packs signed by a trusted publisher are offered. Ask the person who installed the application to check Administration, [[solution.pack|plural|sentence]], or see docs/PACK_SIGNING.md.");
         else if (entries.Count == 1)
-            notes.Add("Only one pack is available. Additional packs can be installed later under Administration, Solution packs.");
+            notes.Add("Only one pack is available. Additional packs can be installed later under Administration, [[solution.pack|plural|sentence]].");
         foreach (var p in entries)
+        {
             notes.Add($"{p.Name()}: {p.DescriptionText()}" + (p.Synthetic ? " Contains synthetic example data only." : "") + (p.Capabilities.Count > 0 ? $" Capabilities: {string.Join(", ", p.Capabilities)}." : "")
                 + (p.Trust.IsTrusted ? "" : " This package is unsigned and is accepted only because this is a Demo or Test environment."));
+            notes.Add($"{p.Name()} wording: {ExampleWording(p.PackKey)}");
+        }
+        notes.Add("Wording (what the pack calls a [[contract|lower]], a [[supplier|lower]] and so on) is data in the pack. It applies as the default for the [[organisation|lower]] you create, and you can change any label later under Administration, Terminology. Nothing is published, and labels never change what anyone may do.");
         return notes;
+    }
+
+    /// <summary>A few headline labels from the pack's terminology, as plain text for the notes (the pack's own words, never wording written into this code).</summary>
+    private string ExampleWording(string packKey)
+    {
+        var json = _catalogue.TerminologyOf(packKey);
+        if (json is null) return "the platform's neutral wording (this pack carries none).";
+        try
+        {
+            var set = TermSet.Build("en", null, TerminologyDocument.Parse(json).Terms, null, null);
+            return string.Join("; ", new[] { "contract", "supplier", "category", "contract.owner", "legal.review", "registration.approval", "primary.approver" }.Select(k => $"{k} = {set.Singular(k)}")) + ".";
+        }
+        catch (DomainException) { return "the pack's wording could not be read; the platform's neutral wording applies."; }
     }
 
     public override Task<StageResult> ExecuteAsync(StageContext c)
     {
-        var id = c.Required("packId", "Solution pack");
+        var id = c.Required("packId", "[[solution.pack|sentence]]");
         var pack = _catalogue.Find(id) ?? throw new DomainException("unknown_pack", "That [[solution.pack|lower]] is not in the catalogue.");
         if (c.Doc.OrganisationId is not null && c.Doc.PackId != id) throw new DomainException("pack_locked", "The [[organisation|lower]] already exists; change its configuration through onboarding instead.");
         c.Doc.PackId = pack.PackId;
@@ -347,7 +364,7 @@ internal sealed class OrganisationStage : SetupStageBase
 {
     public override string Id => "organisation";
     public override string Title => "Organisation";
-    public override string Summary => "Create your organisation with its locale, time zone and currency.";
+    public override string Summary => "Create your [[organisation|lower]] with its locale, time zone and currency.";
     public override IReadOnlyList<string> DependsOn => ["pack", "admin"];
     private readonly ISolutionPackCatalogue _catalogue;
     private readonly LocalisationOptions _localisation;
@@ -358,22 +375,22 @@ internal sealed class OrganisationStage : SetupStageBase
         var d = doc.PackId is null ? null : _catalogue.Find(doc.PackId)?.Defaults;
         return
         [
-            new("organisationName", "Organisation name", FieldKind.Text, true, Value: doc.TenantName),
-            new("culture", "Locale", FieldKind.Select, true, "Controls date, number and currency formats. Australian English is the reference locale.",
+            new("organisationName", "[[organisation]] name", FieldKind.Text, true, Value: doc.TenantName),
+            new("culture", "Locale", FieldKind.Select, true, "Controls date, number and currency formats.",
                 [.. _localisation.SupportedCultures.Select(c => new FieldOption(c, c))], d?.Culture ?? _localisation.DefaultCulture),
-            new("timeZone", "Time zone", FieldKind.Text, true, "An IANA time zone such as Australia/Brisbane. Times are stored in UTC and shown in this zone.", Value: d?.TimeZoneId ?? _localisation.DefaultTimeZoneId),
-            new("currency", "Default currency", FieldKind.Text, true, "ISO 4217 code, for example AUD.", Value: d?.CurrencyCode ?? _localisation.DefaultCurrencyCode),
-            new("referencePrefix", "Contract reference prefix", FieldKind.Text, true, "Letters and digits, for example CON. References are allocated as PREFIX-0001.", Value: d?.ReferencePrefix ?? "CON"),
+            new("timeZone", "Time zone", FieldKind.Text, true, "An IANA time zone such as Europe/London. Times are stored in UTC and shown in this zone.", Value: d?.TimeZoneId ?? _localisation.DefaultTimeZoneId),
+            new("currency", "Default currency", FieldKind.Text, true, "ISO 4217 code, for example USD.", Value: d?.CurrencyCode ?? _localisation.DefaultCurrencyCode),
+            new("referencePrefix", "[[contract.reference|sentence]] prefix", FieldKind.Text, true, "Letters and digits, for example CON. References are allocated as PREFIX-0001.", Value: d?.ReferencePrefix ?? "CON"),
         ];
     }
 
     public override async Task<StageResult> ExecuteAsync(StageContext c)
     {
-        var name = c.Required("organisationName", "Organisation name");
+        var name = c.Required("organisationName", "[[organisation]] name");
         var culture = c.Required("culture", "Locale");
         var zone = c.Required("timeZone", "Time zone");
         var currency = c.Required("currency", "Default currency").ToUpperInvariant();
-        var prefix = c.Required("referencePrefix", "Contract reference prefix").ToUpperInvariant();
+        var prefix = c.Required("referencePrefix", "[[contract.reference|sentence]] prefix").ToUpperInvariant();
         if (!LocaleFormatter.TryGetCulture(culture, out _)) throw new DomainException("culture", "That locale is not recognised.");
         if (!TimeZones.TryFind(zone, out _)) throw new DomainException("time_zone", "That time zone is not recognised.");
         LocaleFormatter.ValidateCurrency(currency);
@@ -401,7 +418,7 @@ internal sealed class OrganisationStage : SetupStageBase
             {
                 var scale = await c.Get<IClassificationScaleProvider>().GetAsync(c.Ct);
                 await assignments.GrantTrustedAsync(new GrantRequest(adminId, RoleCodes.OrganisationAdministrator, null, ScopeSet.ForOrganisations([organisationId], scale.DefaultLevel),
-                    Reason: "Initial administrator of the first organisation, named during setup"), AssignmentSource.Setup, "setup:" + c.Actor.Label, null, c.Ct);
+                    Reason: "Initial administrator of the first [[organisation|lower]], named during setup"), AssignmentSource.Setup, "setup:" + c.Actor.Label, null, c.Ct);
             }
         }
         var configuration = c.Get<IConfigurationService>();
@@ -410,7 +427,7 @@ internal sealed class OrganisationStage : SetupStageBase
             await c.Get<IConfigurationBootstrap>().DraftValidatePublishAsync("SolutionPack", Guid.Empty, JsonSerializer.Serialize(new { packId }), "setup:" + c.Actor.Label, "Selected during setup", c.Ct);
         foreach (var (k, v) in new Dictionary<string, string> { ["organisationName"] = name, ["culture"] = culture, ["timeZone"] = zone, ["currency"] = currency, ["referencePrefix"] = prefix })
             c.Remember(k, v);
-        return StageResult.Ok($"Organisation '{name}' is ready.");
+        return StageResult.Ok($"[[organisation]] '{name}' is ready.");
     }
 }
 
@@ -489,7 +506,7 @@ internal sealed class ClassificationStage : SetupStageBase
 internal sealed class NotificationsStage : SetupStageBase
 {
     public override string Id => "notifications";
-    public override string Title => "Email notifications";
+    public override string Title => "Email [[notification|plural|lower]]";
     public override string Summary => "Choose how the platform sends email. SMTP credentials are referenced, never typed here.";
     public override IReadOnlyList<string> DependsOn => ["tenant"];
     public override bool Amendable => true;
@@ -527,11 +544,11 @@ internal sealed class NotificationsStage : SetupStageBase
             try { await factory.Create(settings).SendAsync(new EmailMessage(to, "Setup email test", "This message confirms that email is configured. No action is needed."), c.Ct); }
             catch (DomainException ex) { return StageResult.Fail("The test message could not be sent: " + ex.Message); }
         }
-        else details.Add("Email is disabled: no notifications will be delivered.");
+        else details.Add("Email is disabled: no [[notification|plural|lower]] will be delivered.");
         foreach (var (k, v) in new Dictionary<string, string?> { ["provider"] = kind.ToString(), ["from"] = settings.From, ["host"] = settings.Host, ["port"] = settings.Port.ToString(),
             ["useTls"] = settings.UseTls ? "true" : "false", ["userRef"] = settings.UserRef, ["passwordRef"] = settings.PasswordRef })
             c.Remember(k, v);
-        return StageResult.Ok(kind switch { EmailProviderKind.Disabled => "Email notifications are disabled.", EmailProviderKind.Mock => "The mock provider accepted the test message (nothing was delivered).", _ => "The test message was accepted by the mail server." }, [.. details]);
+        return StageResult.Ok(kind switch { EmailProviderKind.Disabled => "Email [[notification|plural|lower]] are disabled.", EmailProviderKind.Mock => "The mock provider accepted the test message (nothing was delivered).", _ => "The test message was accepted by the mail server." }, [.. details]);
     }
 }
 
@@ -539,7 +556,7 @@ internal sealed class DemoDataStage : SetupStageBase
 {
     public override string Id => "demo";
     public override string Title => "Demonstration data";
-    public override string Summary => "Optionally add the synthetic demonstration organisations, users and contracts. Never available in Production.";
+    public override string Summary => "Optionally add the synthetic demonstration [[organisation|plural|lower]], users and [[contract|plural|lower]]. Never available in Production.";
     public override string ActionLabel => "Add demonstration data";
     public override IReadOnlyList<string> DependsOn => ["organisation"];
     public override bool Optional => true;

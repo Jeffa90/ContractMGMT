@@ -45,10 +45,10 @@ public sealed record OnboardingDocument(
         if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}") return Empty;
         try
         {
-            var doc = JsonSerializer.Deserialize<OnboardingDocument>(json, Options) ?? throw new DomainException("invalid_json", "The onboarding document is empty.");
+            var doc = JsonSerializer.Deserialize<OnboardingDocument>(json, Options) ?? throw new DomainException("invalid_json", "The onboarding [[document|lower]] is empty.");
             return Normalise(doc);
         }
-        catch (JsonException ex) { throw new DomainException("invalid_json", "The onboarding document is not valid: " + ex.Message.Split('.')[0] + "."); }
+        catch (JsonException ex) { throw new DomainException("invalid_json", "The onboarding [[document|lower]] is not valid: " + ex.Message.Split('.')[0] + "."); }
     }
 
     public string ToJson() => JsonSerializer.Serialize(this, Options);
@@ -70,7 +70,7 @@ public static class OnboardingSteps
 {
     public static readonly IReadOnlyList<(string Id, string Title)> All =
     [
-        ("pack", "Solution pack and classification"), ("structure", "Organisation structure"), ("categories", "Categories (taxonomy)"), ("types", "Contract types"),
-        ("owners", "Category owners"), ("viewers", "Viewer scopes"), ("mappings", "Identity group mappings"), ("review", "Review, simulate and publish"),
+        ("pack", "[[solution.pack|sentence]] and classification"), ("structure", "[[organisation]] structure"), ("categories", "[[category|plural]] (taxonomy)"), ("types", "[[contract.type|plural|sentence]]"),
+        ("owners", "[[contract.owner|plural|sentence]]"), ("viewers", "Viewer scopes"), ("mappings", "Identity group mappings"), ("review", "Review, simulate and publish"),
     ];
 }

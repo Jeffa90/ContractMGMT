@@ -22,7 +22,7 @@ namespace Ecp.Notifications;
 internal sealed class ReminderScanner(
     NotificationsDbContext db, IUnitOfWork uow, ITenantContext tenant, IClock clock, IContractLifecyclePort contracts, IWorkflowDefinitions workflows, INotificationPolicyStore policies,
     NotificationRenderer renderer, RecipientResolver resolver, NotificationWriter writer, IOrganisationStructureService structure, IClassificationScaleProvider scales,
-    ActorContext actor) : IReminderScanner
+    ActorContext actor, Ecp.Configuration.ITerminologyResolver terminology) : IReminderScanner
 {
     private static readonly string[] LiveRoles = ["effective", "variation", "renewal", "suspended"];
 
@@ -99,7 +99,7 @@ internal sealed class ReminderScanner(
 
         var days = due.Date.DayNumber - today.DayNumber;
         var link = $"/Contracts/Details/{c.ContractId}";
-        var (subject, body) = renderer.Render(policy, template, new RenderContext(c.AgreementReference, c.Title, c.Classification, "The system", link, due.Date.ToString("yyyy-MM-dd"), days, window), scale);
+        var (subject, body) = renderer.Render(policy, template, new RenderContext(c.AgreementReference, c.Title, c.Classification, "The system", link, due.Date.ToString("yyyy-MM-dd"), days, window), scale, await terminology.GetAsync(c.OrganisationId, ct: ct));
         var correlation = actor.CorrelationId;
         var created = 0;
         var wasSuppressed = 0;

@@ -33,7 +33,7 @@ internal sealed class OrganisationOnboardingKind(OnboardingFactsLoader facts, On
 
     public async Task<ValidationReport> ValidateAsync(Guid organisationId, string contentJson, CancellationToken ct)
     {
-        if (organisationId == Guid.Empty) return new ValidationReport([new(ValidationSeverity.Error, "$", "organisation_required", "Onboarding belongs to one organisation.")]);
+        if (organisationId == Guid.Empty) return new ValidationReport([new(ValidationSeverity.Error, "$", "organisation_required", "Onboarding belongs to one [[organisation|lower]].")]);
         OnboardingDocument document;
         try { document = OnboardingDocument.Parse(contentJson); }
         catch (DomainException ex) { return new ValidationReport([new(ValidationSeverity.Error, "$", ex.Code, ex.Message)]); }
@@ -159,12 +159,12 @@ internal sealed class OnboardingService(IConfigurationService configuration, IAc
         static IEnumerable<string> K(IEnumerable<StructureEntry> v) => v.Select(x => OnboardingDocument.Key(x.Key));
         return
         [
-            Line("Legal entities", K(d.Structure.LegalEntities), f.LegalEntities, K(previous.Structure.LegalEntities)),
+            Line("[[legal.entity|plural|sentence]]", K(d.Structure.LegalEntities), f.LegalEntities, K(previous.Structure.LegalEntities)),
             Line("Divisions", K(d.Structure.Divisions), f.Divisions, K(previous.Structure.Divisions)),
-            Line("Business units", K(d.Structure.BusinessUnits), f.BusinessUnits, K(previous.Structure.BusinessUnits)),
+            Line("[[business.unit|plural|sentence]]", K(d.Structure.BusinessUnits), f.BusinessUnits, K(previous.Structure.BusinessUnits)),
             Line("Sites", K(d.Structure.Sites), f.Sites, K(previous.Structure.Sites)),
             Line("Categories", d.Categories.Select(c => OnboardingDocument.Key(c.Code)), f.Categories, previous.Categories.Select(c => OnboardingDocument.Key(c.Code))),
-            Line("Category owners", d.CategoryOwners.Select(Canonical.Owner), [], previous.CategoryOwners.Select(Canonical.Owner)),
+            Line("[[contract.owner|plural|sentence]]", d.CategoryOwners.Select(Canonical.Owner), [], previous.CategoryOwners.Select(Canonical.Owner)),
             Line("Viewer scopes", d.ViewerScopes.Select(Canonical.Viewer), [], previous.ViewerScopes.Select(Canonical.Viewer)),
             Line("Group mappings", d.GroupMappings.Select(Canonical.Mapping), [], previous.GroupMappings.Select(Canonical.Mapping)),
         ];

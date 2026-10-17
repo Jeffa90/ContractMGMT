@@ -9,7 +9,7 @@
     <p class="lede">@L["This installation is not set up yet. Setup is protected by a one-time token so that only the person who controls the server can configure it."]</p>
     @if (Model.Message is not null)
     {
-        <div class="error-summary" role="alert" tabindex="-1"><h2>@L["Setup could not be opened"]</h2><p>@Model.Message</p></div>
+        <div class="error-summary" role="alert" tabindex="-1"><h2>@L["Setup could not be opened"]</h2><p>@Terms.Expand(Model.Message)</p></div>
     }
     <section class="card" aria-labelledby="token-h">
         <h2 id="token-h">@L["Open setup"]</h2>
@@ -37,11 +37,11 @@ else
                 <span class="badge @(stage.Status == StageStatus.Complete ? "ok" : stage.Status == StageStatus.Skipped ? "warn" : "")">@stage.Status</span>
                 @if (stage.Available)
                 {
-                    <a href="/Setup/Step/@stage.Id">@stage.Title</a>
+                    <a href="/Setup/Step/@stage.Id">@Terms.Expand(stage.Title)</a>
                 }
                 else
                 {
-                    <span>@stage.Title</span> <span class="hint">@stage.UnavailableReason</span>
+                    <span>@Terms.Expand(stage.Title)</span> <span class="hint">@Terms.Expand(stage.UnavailableReason)</span>
                 }
             </li>
         }

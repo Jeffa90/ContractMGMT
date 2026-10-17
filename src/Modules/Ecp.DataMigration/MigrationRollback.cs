@@ -162,11 +162,11 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
             case "Contract":
             {
                 var c = await contracts.GetContractAsync(p.TargetEntityId, ct);
-                if (c is null) return ("Unlink", "The contract is already gone.");
+                if (c is null) return ("Unlink", "The [[contract|lower]] is already gone.");
                 if (p.Action == ProvenanceAction.Updated)
                 {
-                    if (compensate) return ("NotReversible", "Fields this batch updated on an existing contract are left in place after acceptance.");
-                    if (c.UpdatedUtc != p.AfterStampUtc) return ("NotReversible", "The contract has changed since the batch updated it, so the earlier values were not restored.");
+                    if (compensate) return ("NotReversible", "Fields this batch updated on an existing [[contract|lower]] are left in place after acceptance.");
+                    if (c.UpdatedUtc != p.AfterStampUtc) return ("NotReversible", "The [[contract|lower]] has changed since the batch updated it, so the earlier values were not restored.");
                     if (apply)
                     {
                         var before = JsonSerializer.Deserialize<Dictionary<string, string?>>(p.BeforeImageJson ?? "{}") ?? [];
@@ -174,37 +174,37 @@ internal sealed class MigrationRollbackService(MigrationKernel k, IContractMigra
                     }
                     return ("Restore", "The fields the batch changed were restored to their earlier values.");
                 }
-                if (c.MigrationBatchId != batch.Id) return ("NotReversible", "The contract does not belong to this batch.");
+                if (c.MigrationBatchId != batch.Id) return ("NotReversible", "The [[contract|lower]] does not belong to this batch.");
                 var untouched = c.UpdatedUtc == c.CreatedUtc;
                 var remainingDocuments = await documents.CountDocumentsOfContractAsync(c.Id, previewDocuments?.ToList(), ct);
                 if (!compensate && untouched && remainingDocuments == 0)
                 {
                     if (apply) await contracts.RemoveContractAsync(c.Id, batch.Id, why, ct);
-                    return ("Remove", "The contract was created by this batch and has not changed since.");
+                    return ("Remove", "The [[contract|lower]] was created by this batch and has not changed since.");
                 }
                 if (apply) await contracts.ArchiveContractAsync(c.Id, batch.Id, why, ct);
                 return ("Archive", compensate ? "Archived by compensating action; nothing was deleted."
-                    : !untouched ? "The contract has had activity since the batch loaded it, so it is archived instead of removed." : "Documents are still attached to the contract, so it is archived instead of removed.");
+                    : !untouched ? "The [[contract|lower]] has had activity since the batch loaded it, so it is archived instead of removed." : "Documents are still attached to the [[contract|lower]], so it is archived instead of removed.");
             }
             case "Supplier":
             {
-                if (p.Action == ProvenanceAction.Linked) return ("Unlink", "Nothing to undo: the batch only linked an existing supplier.");
+                if (p.Action == ProvenanceAction.Linked) return ("Unlink", "Nothing to undo: the batch only linked an existing [[supplier|lower]].");
                 if (compensate) return ("Keep", "Shared reference data is kept after acceptance.");
                 var uses = await contracts.CountContractsOfSupplierAsync(p.TargetEntityId, preview?.ToList(), ct);
-                if (uses > 0) return ("Keep", $"Kept: {uses} contract(s) still refer to this supplier (it was created by a rolled-back batch).");
+                if (uses > 0) return ("Keep", $"Kept: {uses} [[contract|lower]](s) still refer to this [[supplier|lower]] (it was created by a rolled-back batch).");
                 if (apply) await contracts.RemoveSupplierAsync(p.TargetEntityId, batch.Id, why, ct);
-                return ("Remove", "The supplier was created by this batch and nothing refers to it.");
+                return ("Remove", "The [[supplier|lower]] was created by this batch and nothing refers to it.");
             }
             case "Category":
             {
-                if (p.Action == ProvenanceAction.Linked) return ("Unlink", "Nothing to undo: the batch only linked an existing category.");
+                if (p.Action == ProvenanceAction.Linked) return ("Unlink", "Nothing to undo: the batch only linked an existing [[category|lower]].");
                 if (compensate) return ("Keep", "Shared reference data is kept after acceptance.");
                 var contractUses = await contracts.CountContractsOfCategoryAsync(p.TargetEntityId, preview?.ToList(), ct);
                 var children = await contracts.CountChildCategoriesAsync(p.TargetEntityId, previewCategories?.ToList(), ct);
-                if (contractUses == 0 && children > 0 && allowDefer) return ("Defer", "Waiting for the subcategories.");
-                if (contractUses + children > 0) return ("Keep", $"Kept: {contractUses + children} contract(s) or subcategories still refer to this category (it was created by a rolled-back batch).");
+                if (contractUses == 0 && children > 0 && allowDefer) return ("Defer", "Waiting for the [[subcategory|plural|lower]].");
+                if (contractUses + children > 0) return ("Keep", $"Kept: {contractUses + children} [[contract|lower]](s) or [[subcategory|plural|lower]] still refer to this [[category|lower]] (it was created by a rolled-back batch).");
                 if (apply) await contracts.RemoveCategoryAsync(p.TargetEntityId, batch.Id, why, ct);
-                return ("Remove", "The category was created by this batch and nothing refers to it.");
+                return ("Remove", "The [[category|lower]] was created by this batch and nothing refers to it.");
             }
             default:
                 return ("NotReversible", $"Unknown record type {p.TargetEntityType}.");

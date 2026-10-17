@@ -22,7 +22,7 @@ public interface IMigrationReports
     Task<PagedResult<ProvenanceDto>> ListProvenanceAsync(Guid batchId, int page = 1, int pageSize = 50, CancellationToken ct = default);
 }
 
-internal sealed class MigrationReportService(MigrationKernel k, MigrationReconciler reconciler) : IMigrationReports
+internal sealed class MigrationReportService(MigrationKernel k, MigrationReconciler reconciler, Ecp.Configuration.ITerminologyResolver terminology) : IMigrationReports
 {
     private const string Xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private const string Csv = "text/csv; charset=utf-8";
@@ -48,12 +48,13 @@ internal sealed class MigrationReportService(MigrationKernel k, MigrationReconci
         var rowById = rows.ToDictionary(r => r.Id);
         var files = await k.Db.StagedFiles.AsNoTracking().Where(f => f.BatchId == batchId).OrderBy(f => f.RelativePath).ToListAsync(ct);
 
+        var words = await terminology.GetAsync(project.OrganisationId, null, ct);   // the report speaks in the words of the project's organisation
         var messageRows = new List<IReadOnlyList<object?>> { new object?[] { "Severity", "Code", "Applies to", "Location", "Field", "Message", "SourceRecordId", "AgreementReference", "Phase" } };
         foreach (var m in messages)
         {
             string? sid = null, aref = null;
             if (m.Subject == MessageSubject.Row && m.SubjectId is { } id && rowById.TryGetValue(id, out var row)) { sid = row.SourceRecordId; aref = row.AgreementReference; }
-            messageRows.Add(new object?[] { m.Severity.ToString(), m.Code, m.Subject.ToString(), m.Location, m.FieldName, m.Message, sid, aref, m.Phase.ToString() });
+            messageRows.Add(new object?[] { m.Severity.ToString(), m.Code, m.Subject.ToString(), m.Location, m.FieldName, words.Expand(m.Message), sid, aref, m.Phase.ToString() });
         }
         if (format == ExportFormat.Csv) return new ExportFile($"{Slug(project.Name)}-batch-errors.csv", Csv, CsvWriter.Write(messageRows));
 
@@ -72,10 +73,10 @@ internal sealed class MigrationReportService(MigrationKernel k, MigrationReconci
         foreach (var r in rows.Where(r => r.Outcome == RowOutcome.Rejected).OrderBy(r => r.Sequence))
         {
             var raw = JsonSerializer.Deserialize<Dictionary<string, string>>(r.RawValuesJson) ?? [];
-            rejected.Add(new object?[] { r.RowNumber, r.Outcome.ToString(), r.PlanSummary }.Concat(headers.Select(h => (object?)raw.GetValueOrDefault(h))).ToArray());
+            rejected.Add(new object?[] { r.RowNumber, r.Outcome.ToString(), words.Expand(r.PlanSummary ?? "") }.Concat(headers.Select(h => (object?)raw.GetValueOrDefault(h))).ToArray());
         }
         var fileSheet = new List<IReadOnlyList<object?>> { new object?[] { "Path", "State", "Queue reason", "Matched by", "Scan", "SHA-256", "Size (bytes)", "Note", "Resolved by" } };
-        foreach (var f in files) fileSheet.Add(new object?[] { f.RelativePath, f.State.ToString(), f.QueueReason.ToString(), f.MatchedBy?.ToString(), f.Scan.ToString(), f.Sha256, f.SizeBytes, f.Note, f.ResolvedBy });
+        foreach (var f in files) fileSheet.Add(new object?[] { f.RelativePath, f.State.ToString(), f.QueueReason.ToString(), f.MatchedBy?.ToString(), f.Scan.ToString(), f.Sha256, f.SizeBytes, words.Expand(f.Note ?? ""), f.ResolvedBy });
 
         var bytes = XlsxWriter.Write([new("Summary", summary, HeaderRow: false), new("Messages", messageRows), new("Rejected rows", rejected), new("Files", fileSheet)]);
         return new ExportFile($"{Slug(project.Name)}-batch-errors.xlsx", Xlsx, bytes);
@@ -85,6 +86,7 @@ internal sealed class MigrationReportService(MigrationKernel k, MigrationReconci
     {
         var (batch, project) = await k.BatchAsync(batchId, MigrationPermissions.Stage, track: false, ct);
         var r = await reconciler.LatestAsync(batchId, ct);
+        var words = await terminology.GetAsync(project.OrganisationId, null, ct);
         var totals = new List<IReadOnlyList<object?>>
         {
             new object?[] { "Measure", "Value" },
@@ -108,7 +110,7 @@ internal sealed class MigrationReportService(MigrationKernel k, MigrationReconci
         void Add(string measure, IReadOnlyDictionary<string, long> source, IReadOnlyDictionary<string, long> target)
         { foreach (var key in source.Keys.Union(target.Keys).OrderBy(x => x, StringComparer.Ordinal)) dist.Add(new object?[] { measure, key, source.GetValueOrDefault(key), target.GetValueOrDefault(key) }); }
         Add("Status", r.Distributions.SourceStatus, r.Distributions.TargetStatus);
-        Add("Category", r.Distributions.SourceCategory, r.Distributions.TargetCategory);
+        Add(words.Expand("[[category]]"), r.Distributions.SourceCategory, r.Distributions.TargetCategory);
         foreach (var cur in r.Distributions.SourceValueByCurrency.Keys.Union(r.Distributions.TargetValueByCurrency.Keys).OrderBy(x => x, StringComparer.Ordinal))
             dist.Add(new object?[] { "Estimated value", cur, r.Distributions.SourceValueByCurrency.GetValueOrDefault(cur), r.Distributions.TargetValueByCurrency.GetValueOrDefault(cur) });
         return new ExportFile($"{Slug(project.Name)}-reconciliation.xlsx", Xlsx, XlsxWriter.Write([new("Totals", totals), new("Checks", checks), new("Distributions", dist)]));

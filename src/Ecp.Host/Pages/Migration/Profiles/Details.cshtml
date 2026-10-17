@@ -35,7 +35,7 @@
     @if (v.Issues.Count > 0)
     {
         <div class="card" role="status"><h3>@L["Checks"]</h3>
-            <ul>@foreach (var issue in v.Issues) { <li><span class="badge @(issue.IsError ? "bad" : "warn")">@(issue.IsError ? L["Fix"].Value : L["Note"].Value)</span> <strong>@issue.Field</strong> @issue.Message</li> }</ul></div>
+            <ul>@foreach (var issue in v.Issues) { <li><span class="badge @(issue.IsError ? "bad" : "warn")">@(issue.IsError ? L["Fix"].Value : L["Note"].Value)</span> <strong>@issue.Field</strong> @Terms.Expand(issue.Message)</li> }</ul></div>
     }
     else { <p><span class="badge ok">@L["All checks pass"]</span></p> }
 

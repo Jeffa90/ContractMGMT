@@ -23,7 +23,7 @@
             <div class="table-wrap"><table>
                 <caption class="visually-hidden">@L["Validation messages"]</caption>
                 <thead><tr><th scope="col">@L["Severity"]</th><th scope="col">@L["Where"]</th><th scope="col">@L["Message"]</th></tr></thead>
-                <tbody>@foreach (var m in s.Validation.Messages) { <tr><td><span class="badge @(m.Severity == ValidationSeverity.Error ? "bad" : "warn")">@m.Severity</span></td><td><code>@m.Path</code></td><td>@m.Message</td></tr> }</tbody>
+                <tbody>@foreach (var m in s.Validation.Messages) { <tr><td><span class="badge @(m.Severity == ValidationSeverity.Error ? "bad" : "warn")">@m.Severity</span></td><td><code>@m.Path</code></td><td>@Terms.Expand(m.Message)</td></tr> }</tbody>
             </table></div>
         }
     }
@@ -41,7 +41,7 @@
 
 <section class="card" aria-labelledby="sim-h">
     <h2 id="sim-h">@L["3. Who could see what (synthetic preview)"]</h2>
-    @foreach (var n in Model.Preview!.Notes) { <p class="hint">@n</p> }
+    @foreach (var n in Model.Preview!.Notes) { <p class="hint">@Terms.Expand(n)</p> }
     @if (Model.Preview.Rows.Count == 0) { <p>@L["No viewer scopes or group mappings are in the draft, so there is nothing to simulate."]</p> }
     else
     {

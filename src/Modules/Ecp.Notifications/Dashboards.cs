@@ -44,7 +44,7 @@ public interface IDashboardService
 
 internal sealed class DashboardService(
     ISecuredContractService contracts, ILegalReviewService legal, IRegisterAuthorisationService approvals, IVariationService variations, IRenewalService renewals, IWorkflowDefinitions workflows,
-    INotificationPolicyStore policies, IOrganisationStructureService structure, IClock clock, NotificationsDbContext db) : IDashboardService
+    INotificationPolicyStore policies, IOrganisationStructureService structure, IClock clock, NotificationsDbContext db, Ecp.Configuration.ITerminologyResolver terminology) : IDashboardService
 {
     private static readonly string[] LiveRoles = ["effective", "variation", "renewal", "suspended"];
     private static readonly string[] OwnerActionRoles = ["legalRework", "legalCleared", "drafting", "signature"];
@@ -77,7 +77,19 @@ internal sealed class DashboardService(
         return codes.ToList();
     }
 
+    /// <summary>A card in the words of the signed-in person's organisation: titles, descriptions and row texts are written with <c>[[term]]</c> tokens and expanded here.</summary>
     public async Task<DashboardCard> CardAsync(string key, int page = 1, int pageSize = 25, CancellationToken ct = default)
+    {
+        var card = await BuildAsync(key, page, pageSize, ct);
+        var terms = await terminology.GetAsync(await terminology.HomeOrganisationAsync(ct), ct: ct);
+        return card with
+        {
+            Title = terms.Expand(card.Title), Description = terms.Expand(card.Description),
+            Rows = card.Rows.Select(r => r with { Status = terms.Expand(r.Status), Detail = r.Detail is null ? null : terms.Expand(r.Detail) }).ToList()
+        };
+    }
+
+    private async Task<DashboardCard> BuildAsync(string key, int page, int pageSize, CancellationToken ct)
     {
         var p = Math.Max(1, page); var size = Math.Clamp(pageSize, 1, 200);
         switch (key)
@@ -85,7 +97,7 @@ internal sealed class DashboardService(
             case DashboardKeys.MyContracts:
                 {
                     var r = await contracts.ListAsync(new ContractFilter(OwnedByMe: true, Page: p, PageSize: size), ct);
-                    return new DashboardCard(key, "My Contracts", "Agreements in categories you currently own.", r.Total, r.Items.Select(c => Row(c, c.Status)).ToList(), "/Contracts?owned=true");
+                    return new DashboardCard(key, "My [[contract|plural]]", "[[agreement|plural]] in [[category|plural|lower]] you currently own.", r.Total, r.Items.Select(c => Row(c, c.Status)).ToList(), "/Contracts?owned=true");
                 }
             case DashboardKeys.AwaitingMyAction:
                 {
@@ -93,32 +105,32 @@ internal sealed class DashboardService(
                     foreach (var item in (await legal.QueueAsync(new LegalQueueFilter(OutstandingForMe: true, PageSize: 200), ct)).Items)
                         rows.Add(new DashboardRow(item.ContractId, item.AgreementReference, item.ContractTitle, item.StatusDisplay, item.Classification, item.Outstanding, null, item.SubjectKind == SubjectKinds.Variation ? $"/Variations/Details/{item.SubjectId}" : $"/Legal/Review/{item.ReviewId}"));
                     foreach (var a in (await approvals.PendingAsync(onlyActionable: true, pageSize: 200, ct: ct)).Items.Where(a => a.CanDecide))
-                        rows.Add(new DashboardRow(a.ContractId, a.AgreementReference, a.Title, "Awaiting Approval", a.Classification, $"Register authorisation waiting {a.AgeDays} day(s)" + (a.ActingAsBackup ? " (you are a backup)" : ""), null, $"/Approvals/Details/{a.RequestId}"));
+                        rows.Add(new DashboardRow(a.ContractId, a.AgreementReference, a.Title, "Awaiting [[approval]]", a.Classification, $"[[registration.approval|sentence]] waiting {a.AgeDays} day(s)" + (a.ActingAsBackup ? " (you are a backup)" : ""), null, $"/Approvals/Details/{a.RequestId}"));
                     var ownerStatuses = await StatusesWithRolesAsync(OwnerActionRoles, ct);
                     if (ownerStatuses.Count > 0)
                         foreach (var c in (await contracts.ListAsync(new ContractFilter(OwnedByMe: true, StatusIn: ownerStatuses, PageSize: 200), ct)).Items)
                             if (rows.All(r => r.ContractId != c.Id)) rows.Add(Row(c, "Needs your action"));
-                    return new DashboardCard(key, "Awaiting My Action", "Reviews, approvals and agreements waiting on you.", rows.Count, rows.Skip((p - 1) * size).Take(size).ToList(), "/Dashboards?card=" + key);
+                    return new DashboardCard(key, "Awaiting My Action", "Reviews, [[approval|plural|lower]] and [[agreement|plural|lower]] waiting on you.", rows.Count, rows.Skip((p - 1) * size).Take(size).ToList(), "/Dashboards?card=" + key);
                 }
             case DashboardKeys.AwaitingLegal:
                 {
                     var r = await legal.QueueAsync(new LegalQueueFilter(Status: LegalReviewStatus.AwaitingLegal, Page: p, PageSize: size), ct);
-                    return new DashboardCard(key, "Awaiting Legal", "Submitted and waiting for Legal to begin.", r.Total, r.Items.Select(i => new DashboardRow(i.ContractId, i.AgreementReference, i.ContractTitle, i.StatusDisplay, i.Classification, $"Waiting {i.AgeDays} day(s)", null, i.SubjectKind == SubjectKinds.Variation ? $"/Variations/Details/{i.SubjectId}" : $"/Legal/Review/{i.ReviewId}")).ToList(), "/Legal");
+                    return new DashboardCard(key, "Awaiting [[reviewer]]", "Submitted and waiting for [[reviewer]] to begin.", r.Total, r.Items.Select(i => new DashboardRow(i.ContractId, i.AgreementReference, i.ContractTitle, i.StatusDisplay, i.Classification, $"Waiting {i.AgeDays} day(s)", null, i.SubjectKind == SubjectKinds.Variation ? $"/Variations/Details/{i.SubjectId}" : $"/Legal/Review/{i.ReviewId}")).ToList(), "/Legal");
                 }
             case DashboardKeys.PendingApproval:
                 {
                     var r = await approvals.PendingAsync(onlyActionable: false, p, size, ct);
-                    return new DashboardCard(key, "Pending Approval", "Executed agreements waiting for register authorisation.", r.Total, r.Items.Select(a => new DashboardRow(a.ContractId, a.AgreementReference, a.Title, "Awaiting Approval", a.Classification, $"Submitted by {a.SubmittedByName}, {a.AgeDays} day(s) ago", null, $"/Approvals/Details/{a.RequestId}")).ToList(), "/Approvals");
+                    return new DashboardCard(key, "Pending [[approval]]", "Executed [[agreement|plural|lower]] waiting for [[registration.approval|lower]].", r.Total, r.Items.Select(a => new DashboardRow(a.ContractId, a.AgreementReference, a.Title, "Awaiting [[approval]]", a.Classification, $"Submitted by {a.SubmittedByName}, {a.AgeDays} day(s) ago", null, $"/Approvals/Details/{a.RequestId}")).ToList(), "/Approvals");
                 }
             case DashboardKeys.VariationsInProgress:
                 {
                     var r = await variations.InProgressAsync(p, size, ct);
-                    return new DashboardCard(key, "Variations in Progress", "Open Variations on Effective agreements.", r.Total, r.Items.Select(v => new DashboardRow(v.ContractId, v.AgreementReference, $"{v.Reference}: {v.Title}", v.StatusDisplay, "", $"Raised by {v.CreatedBy}", null, $"/Variations/Details/{v.Id}")).ToList(), "/Variations");
+                    return new DashboardCard(key, "[[variation|plural]] in Progress", "Open [[variation|plural]] on Effective [[agreement|plural|lower]].", r.Total, r.Items.Select(v => new DashboardRow(v.ContractId, v.AgreementReference, $"{v.Reference}: {v.Title}", v.StatusDisplay, "", $"Raised by {v.CreatedBy}", null, $"/Variations/Details/{v.Id}")).ToList(), "/Variations");
                 }
             case DashboardKeys.RenewalsInProgress:
                 {
                     var r = await renewals.InProgressAsync(p, size, ct);
-                    return new DashboardCard(key, "Renewals in Progress", "Agreements being renewed.", r.Total, r.Items.Select(x => new DashboardRow(x.PredecessorContractId, x.PredecessorReference, x.PredecessorTitle, "Renewal in Progress", "", x.SuccessorReference is null ? "Successor not visible to you" : $"Successor {x.SuccessorReference} ({x.SuccessorStatus})", null, Link(x.PredecessorContractId))).ToList(), "/Renewals");
+                    return new DashboardCard(key, "[[renewal|plural]] in Progress", "[[agreement|plural]] being renewed.", r.Total, r.Items.Select(x => new DashboardRow(x.PredecessorContractId, x.PredecessorReference, x.PredecessorTitle, "[[renewal]] in Progress", "", x.SuccessorReference is null ? "Successor not visible to you" : $"Successor {x.SuccessorReference} ({x.SuccessorStatus})", null, Link(x.PredecessorContractId))).ToList(), "/Renewals");
                 }
             case DashboardKeys.ExpiringSoon:
                 {
@@ -140,7 +152,7 @@ internal sealed class DashboardService(
                     var live = await StatusesWithRolesAsync(LiveRoles, ct);
                     var all = (await contracts.ListAsync(new ContractFilter(CriticalNotice: true, StatusIn: live, PageSize: 200), ct)).Items;
                     var rows = all.Select(c => Row(c, c.EndDate is null && c.ReviewDate is null ? "Critical Notice (no date set)" : "Critical Notice", c.ExtensionType == "Evergreen" ? c.ReviewDate : c.EndDate)).OrderBy(r => r.Date ?? DateOnly.MaxValue).ToList();
-                    return new DashboardCard(key, "Critical Notice", "Agreements flagged Critical Notice, soonest first.", rows.Count, rows.Skip((p - 1) * size).Take(size).ToList(), "/Contracts");
+                    return new DashboardCard(key, "Critical Notice", "[[agreement|plural]] flagged Critical Notice, soonest first.", rows.Count, rows.Skip((p - 1) * size).Take(size).ToList(), "/Contracts");
                 }
             case DashboardKeys.RemindedUnacknowledged:
                 {

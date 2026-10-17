@@ -23,7 +23,7 @@
 <partial name="_Errors" model="ViewData.ModelState" />
 @if (b.Status == BatchStatus.Failed)
 {
-    <div class="error-summary" role="alert"><h2>@L["The commit stopped"]</h2><p>@b.FailureReason</p><p>@L["Nothing was lost and nothing was duplicated: each stage is committed with its checkpoint. Fix the cause and commit again to carry on from the last checkpoint."]</p></div>
+    <div class="error-summary" role="alert"><h2>@L["The commit stopped"]</h2><p>@Terms.Expand(b.FailureReason)</p><p>@L["Nothing was lost and nothing was duplicated: each stage is committed with its checkpoint. Fix the cause and commit again to carry on from the last checkpoint."]</p></div>
 }
 
 <nav aria-label="@L["Steps"]"><ol class="steps">
@@ -136,7 +136,7 @@
         <h3>@L["Sample of original and transformed values"]</h3>
         @foreach (var row in v.Sample.Take(3))
         {
-            <details class="card"><summary>@L["Row"] @row.RowNumber: @row.Outcome @if (row.Summary.Length > 0) { <span>- @row.Summary</span> }</summary>
+            <details class="card"><summary>@L["Row"] @row.RowNumber: @row.Outcome @if (row.Summary.Length > 0) { <span>- @Terms.Expand(row.Summary)</span> }</summary>
             <div class="table-wrap"><table>
                 <caption class="visually-hidden">@L["Row"] @row.RowNumber</caption>
                 <thead><tr><th scope="col">@L["Field"]</th><th scope="col">@L["Original"]</th><th scope="col">@L["Becomes"]</th></tr></thead>
@@ -244,13 +244,13 @@ else { <p class="hint">@L["Available once the [[migration.batch|lower]] is recon
 {
     <div class="card">
         <h3>@L["What a rollback would do"]</h3>
-        @if (!pv.Allowed) { <p>@pv.BlockedReason</p> }
+        @if (!pv.Allowed) { <p>@Terms.Expand(pv.BlockedReason)</p> }
         else
         {
             <div class="table-wrap"><table>
                 <caption class="visually-hidden">@L["Rollback preview"]</caption>
                 <thead><tr><th scope="col">@L["Records"]</th><th scope="col">@L["Action"]</th><th scope="col">@L["Count"]</th><th scope="col">@L["Why"]</th></tr></thead>
-                <tbody>@foreach (var line in pv.Lines) { <tr><th scope="row">@line.Entity</th><td>@line.Action</td><td>@line.Count</td><td>@line.Detail</td></tr> }
+                <tbody>@foreach (var line in pv.Lines) { <tr><th scope="row">@line.Entity</th><td>@line.Action</td><td>@line.Count</td><td>@Terms.Expand(line.Detail)</td></tr> }
                 @if (pv.Lines.Count == 0) { <tr><td colspan="4">@L["Nothing to roll back."]</td></tr> }</tbody>
             </table></div>
             <p class="hint">@L["Only what this [[migration.batch|lower]] created or updated is touched. Records that were there before, and other [[migration.batch|plural|lower]], are never changed."]</p>

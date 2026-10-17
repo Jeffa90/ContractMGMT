@@ -37,7 +37,7 @@ public interface IContractRegister
 
 internal sealed partial class RegisterQueryEngine(
     ContractsDbContext db, IAccessService access, ContractAccessContext context, ICustomFieldCatalogue customCatalogue, IClock clock, IOrganisationStructureService structure,
-    IEnumerable<IContractSetProvider> setProviders, IEnumerable<IStatusGroupProvider> statusGroups, IPeopleDirectory people) : IContractRegister
+    IEnumerable<IContractSetProvider> setProviders, IEnumerable<IStatusGroupProvider> statusGroups, IPeopleDirectory people, Ecp.Configuration.ITerminologyResolver terminology) : IContractRegister
 {
     public const int MaxPageSize = 200, DefaultPageSize = 25, MaxFilters = 20, MaxSorts = 3, MaxValues = 50, MaxColumns = 30, MaxTokens = 5, MaxText = 200;
 
@@ -65,7 +65,8 @@ internal sealed partial class RegisterQueryEngine(
         var (grants, orgs) = await ReachAsync(ct);
         var notes = new List<string>();
         Guid? org = organisationId is { } o && orgs.Contains(o) ? o : organisationId is null && orgs.Count == 1 ? orgs[0] : null;
-        var fields = CoreFields.All.Select(f => new RegisterField(f.Key, f.Label, f.Type, false, f.Sortable, f.Filterable, f.Key is "agreementReference" or "contractTitle" or "supplier" or "supplierVendorNumber" or "supplierAbn" or "sapOutlineAgreementNumber", f.Group, Displayable: f.Key != "legalReviewStatus")).ToList();
+        var terms = await terminology.GetAsync(org ?? await terminology.HomeOrganisationAsync(ct), ct: ct);
+        var fields = CoreFields.All.Select(f => new RegisterField(f.Key, terms.Expand(f.Label), f.Type, false, f.Sortable, f.Filterable, f.Key is "agreementReference" or "contractTitle" or "supplier" or "supplierVendorNumber" or "supplierAbn" or "sapOutlineAgreementNumber", terms.Expand(f.Group), Displayable: f.Key != "legalReviewStatus")).ToList();
         var release = 0;
         if (org is { } id)
         {
@@ -85,7 +86,8 @@ internal sealed partial class RegisterQueryEngine(
     public async Task<RegisterCatalogue> DefinitionCatalogueAsync(Guid organisationId, CancellationToken ct = default)
     {
         if (!(await access.GrantsAsync("config.draft", ct)).Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(organisationId))) throw new ResourceNotFoundException();
-        var fields = CoreFields.All.Select(f => new RegisterField(f.Key, f.Label, f.Type, false, f.Sortable, f.Filterable, f.Key is "agreementReference" or "contractTitle" or "supplier" or "supplierVendorNumber" or "supplierAbn" or "sapOutlineAgreementNumber", f.Group, Displayable: f.Key != "legalReviewStatus")).ToList();
+        var terms = await terminology.GetAsync(organisationId, ct: ct);
+        var fields = CoreFields.All.Select(f => new RegisterField(f.Key, terms.Expand(f.Label), f.Type, false, f.Sortable, f.Filterable, f.Key is "agreementReference" or "contractTitle" or "supplier" or "supplierVendorNumber" or "supplierAbn" or "sapOutlineAgreementNumber", terms.Expand(f.Group), Displayable: f.Key != "legalReviewStatus")).ToList();
         var set = await customCatalogue.PublishedAsync(organisationId, ct);
         foreach (var d in set.Fields)
             fields.Add(new RegisterField(d.Key, d.Label, d.Type, true, d.Sortable && !d.IsCalculated, d.Filterable && !d.IsCalculated, d.Searchable, set.Sections.FirstOrDefault(s => s.Key == d.Section)?.Label ?? "Additional details", d.IsRetired, d.Section, Displayable: !d.IsCalculated, Reportable: d.Reportable));

@@ -39,7 +39,7 @@ public static class OnboardingValidator
         void Warn(string path, string code, string message) => m.Add(new(ValidationSeverity.Warning, path, code, message));
 
         if (d.SchemaVersion != OnboardingDocument.CurrentSchema) Error("$.schemaVersion", "schema_version", $"Schema version {d.SchemaVersion} is not supported; use {OnboardingDocument.CurrentSchema}.");
-        if (d.PackId is not null && !facts.PackIds.Contains(d.PackId)) Error("$.packId", "unknown_pack", $"Solution pack '{d.PackId}' is not in the catalogue.");
+        if (d.PackId is not null && !facts.PackIds.Contains(d.PackId)) Error("$.packId", "unknown_pack", $"[[solution.pack|sentence]] '{d.PackId}' is not in the catalogue.");
 
         // --- structure -------------------------------------------------------------------------------------------------------------------
         var legal = Keys("$.structure.legalEntities", d.Structure.LegalEntities);
@@ -51,7 +51,7 @@ public static class OnboardingValidator
         var allSites = sites.Union(facts.Sites).ToHashSet();
         for (var i = 0; i < d.Structure.BusinessUnits.Count; i++)
             if (d.Structure.BusinessUnits[i].ParentKey is { } parent && !allDivisions.Contains(OnboardingDocument.Key(parent)))
-                Error($"$.structure.businessUnits[{i}].parentKey", "division_not_found", $"Division '{parent}' is not defined here or in the organisation.");
+                Error($"$.structure.businessUnits[{i}].parentKey", "division_not_found", $"[[division]] '{parent}' is not defined here or in the [[organisation|lower]].");
         for (var i = 0; i < d.Structure.Sites.Count; i++)
             if (d.Structure.Sites[i].TimeZoneId is { } tz && !Ecp.SharedKernel.Localisation.TimeZones.TryFind(tz, out _))
                 Error($"$.structure.sites[{i}].timeZoneId", "invalid_time_zone", $"Time zone '{tz}' was not recognised.");
@@ -63,24 +63,24 @@ public static class OnboardingValidator
         {
             var c = d.Categories[i]; var path = $"$.categories[{i}]";
             var code = OnboardingDocument.Key(c.Code);
-            if (!KeyPattern.IsMatch(c.Code ?? "")) Error(path + ".code", "invalid_key", "A category code is 1 to 40 letters, digits, '.', '_' or '-'.");
-            else if (!codes.Add(code)) Error(path + ".code", "duplicate", $"Category code '{code}' appears more than once.");
+            if (!KeyPattern.IsMatch(c.Code ?? "")) Error(path + ".code", "invalid_key", "[[category|lower|a|cap]] code is 1 to 40 letters, digits, '.', '_' or '-'.");
+            else if (!codes.Add(code)) Error(path + ".code", "duplicate", $"[[category]] code '{code}' appears more than once.");
             else parentOf[code] = string.IsNullOrWhiteSpace(c.ParentCode) ? null : OnboardingDocument.Key(c.ParentCode);
-            if (string.IsNullOrWhiteSpace(c.Name) || c.Name.Length > 200) Error(path + ".name", "name", "A category name is 1 to 200 characters.");
+            if (string.IsNullOrWhiteSpace(c.Name) || c.Name.Length > 200) Error(path + ".name", "name", "[[category|lower|a|cap]] name is 1 to 200 characters.");
         }
         var allCategories = codes.Union(facts.Categories).ToHashSet();
         foreach (var (code, parent) in parentOf)
         {
             if (parent is null) continue;
-            if (!allCategories.Contains(parent)) { Error("$.categories", "parent_not_found", $"Category '{code}' names parent '{parent}', which is not defined here or in the organisation."); continue; }
-            if (parent == code) { Error("$.categories", "cycle", $"Category '{code}' cannot be its own parent."); continue; }
+            if (!allCategories.Contains(parent)) { Error("$.categories", "parent_not_found", $"[[category]] '{code}' names parent '{parent}', which is not defined here or in the [[organisation|lower]]."); continue; }
+            if (parent == code) { Error("$.categories", "cycle", $"[[category]] '{code}' cannot be its own parent."); continue; }
             var depth = 1; var cur = parent; var seen = new HashSet<string> { code };
             while (cur is not null && parentOf.TryGetValue(cur, out var next))
             {
-                if (!seen.Add(cur)) { Error("$.categories", "cycle", $"Category '{code}' is part of a parent cycle."); break; }
+                if (!seen.Add(cur)) { Error("$.categories", "cycle", $"[[category]] '{code}' is part of a parent cycle."); break; }
                 depth++; cur = next;
             }
-            if (depth > MaxCategoryDepth) Error("$.categories", "depth", $"Category '{code}' is nested more than {MaxCategoryDepth} levels deep.");
+            if (depth > MaxCategoryDepth) Error("$.categories", "depth", $"[[category]] '{code}' is nested more than {MaxCategoryDepth} levels deep.");
         }
 
         // --- contract types --------------------------------------------------------------------------------------------------------------
@@ -88,21 +88,21 @@ public static class OnboardingValidator
         for (var i = 0; i < d.ContractTypes.Count; i++)
         {
             var t = d.ContractTypes[i];
-            if (!KeyPattern.IsMatch(t.Code ?? "")) Error($"$.contractTypes[{i}].code", "invalid_key", "A contract type code is 1 to 40 letters, digits, '.', '_' or '-'.");
-            else if (!typeCodes.Add(OnboardingDocument.Key(t.Code))) Error($"$.contractTypes[{i}].code", "duplicate", $"Contract type '{t.Code}' appears more than once.");
-            if (string.IsNullOrWhiteSpace(t.Name) || t.Name.Length > 200) Error($"$.contractTypes[{i}].name", "name", "A contract type name is 1 to 200 characters.");
+            if (!KeyPattern.IsMatch(t.Code ?? "")) Error($"$.contractTypes[{i}].code", "invalid_key", "[[contract.type|lower|a|cap]] code is 1 to 40 letters, digits, '.', '_' or '-'.");
+            else if (!typeCodes.Add(OnboardingDocument.Key(t.Code))) Error($"$.contractTypes[{i}].code", "duplicate", $"[[contract.type|sentence]] '{t.Code}' appears more than once.");
+            if (string.IsNullOrWhiteSpace(t.Name) || t.Name.Length > 200) Error($"$.contractTypes[{i}].name", "name", "[[contract.type|lower|a|cap]] name is 1 to 200 characters.");
         }
 
-        // --- category owners -----------------------------------------------------------------------------------------------------------------
+        // --- category-owner assignments -----------------------------------------------------------------------------------------------------------------
         var ownerKeys = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < d.CategoryOwners.Count; i++)
         {
             var o = d.CategoryOwners[i]; var path = $"$.categoryOwners[{i}]";
-            if (!allCategories.Contains(OnboardingDocument.Key(o.CategoryCode))) Error(path + ".categoryCode", "category_not_found", $"Category '{o.CategoryCode}' is not defined here or in the organisation.");
+            if (!allCategories.Contains(OnboardingDocument.Key(o.CategoryCode))) Error(path + ".categoryCode", "category_not_found", $"[[category]] '{o.CategoryCode}' is not defined here or in the [[organisation|lower]].");
             RequireUser(path + ".email", o.Email);
-            if (!ownerKeys.Add(OnboardingDocument.Key(o.CategoryCode) + "|" + (o.Email ?? "").Trim().ToLowerInvariant())) Error(path, "duplicate", "This owner is listed twice for the category.");
+            if (!ownerKeys.Add(OnboardingDocument.Key(o.CategoryCode) + "|" + (o.Email ?? "").Trim().ToLowerInvariant())) Error(path, "duplicate", "This owner is listed twice for the [[category|lower]].");
         }
-        if (d.Categories.Count > 0 && d.CategoryOwners.Count == 0) Warn("$.categoryOwners", "no_owners", "No category owners are assigned. Categories without an owner can be read but nobody can edit their contracts as owner.");
+        if (d.Categories.Count > 0 && d.CategoryOwners.Count == 0) Warn("$.categoryOwners", "no_owners", "No [[contract.owner|plural|lower]] are assigned. [[category|plural]] without an owner can be read but nobody can edit their [[contract|plural|lower]] as owner.");
 
         // --- viewer scopes -------------------------------------------------------------------------------------------------------------------
         var viewerKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -137,7 +137,7 @@ public static class OnboardingValidator
                 if (g.ViewerKind is not null) Error(path + ".viewerKind", "viewer_kind_only_for_viewer", "A viewer kind applies only to the Viewer role.");
                 CheckKeys(path, g.CategoryCodes, g.BusinessUnitKeys, g.SiteKeys, allCategories, allBusinessUnits, allSites);
                 if (g.RoleCode == RoleCodes.DivisionSiteAdministrator && g.SiteKeys.Count == 0)
-                    Error(path + ".sites", "site_required", "A Division/Site Administrator mapping must name at least one site.");
+                    Error(path + ".sites", "site_required", "[[division|a|cap]]/Site Administrator mapping must name at least one [[site|lower]].");
             }
             CheckCeiling(path + ".ceiling", g.Ceiling);
             if (ErrorCount() == before) DomainCheck(path, g.RoleCode ?? "", g.ViewerKind, g.CategoryCodes, g.BusinessUnitKeys, g.SiteKeys, g.Ceiling);
@@ -183,9 +183,9 @@ public static class OnboardingValidator
 
         void CheckKeys(string path, IReadOnlyList<string> cats, IReadOnlyList<string> bus, IReadOnlyList<string> siteKeys, ISet<string> allCats, ISet<string> allBus, ISet<string> allSit)
         {
-            foreach (var c in cats) if (!allCats.Contains(OnboardingDocument.Key(c))) Error(path + ".categories", "category_not_found", $"Category '{c}' is not defined here or in the organisation.");
-            foreach (var b in bus) if (!allBus.Contains(OnboardingDocument.Key(b))) Error(path + ".businessUnits", "business_unit_not_found", $"Business unit '{b}' is not defined here or in the organisation.");
-            foreach (var s in siteKeys) if (!allSit.Contains(OnboardingDocument.Key(s))) Error(path + ".sites", "site_not_found", $"Site '{s}' is not defined here or in the organisation.");
+            foreach (var c in cats) if (!allCats.Contains(OnboardingDocument.Key(c))) Error(path + ".categories", "category_not_found", $"[[category]] '{c}' is not defined here or in the [[organisation|lower]].");
+            foreach (var b in bus) if (!allBus.Contains(OnboardingDocument.Key(b))) Error(path + ".businessUnits", "business_unit_not_found", $"[[business.unit|sentence]] '{b}' is not defined here or in the [[organisation|lower]].");
+            foreach (var s in siteKeys) if (!allSit.Contains(OnboardingDocument.Key(s))) Error(path + ".sites", "site_not_found", $"[[site]] '{s}' is not defined here or in the [[organisation|lower]].");
         }
 
         void CheckNarrowing(string path, ViewerKind kind, IReadOnlyList<string> cats, IReadOnlyList<string> bus, IReadOnlyList<string> siteKeys, ISet<string> allCats, ISet<string> allBus, ISet<string> allSit)
@@ -194,14 +194,14 @@ public static class OnboardingValidator
             switch (kind)
             {
                 case ViewerKind.AllContracts when cats.Count + bus.Count + siteKeys.Count > 0:
-                    Error(path, "viewer_not_narrowable", "An All Contracts viewer cannot be narrowed. Choose Category, BusinessUnit, Site or Restricted instead."); break;
-                case ViewerKind.Category when cats.Count == 0: Error(path + ".categories", "category_required", "A Category viewer must name at least one category."); break;
-                case ViewerKind.BusinessUnit when bus.Count == 0: Error(path + ".businessUnits", "business_unit_required", "A Business Unit viewer must name at least one business unit."); break;
-                case ViewerKind.Site when siteKeys.Count == 0: Error(path + ".sites", "site_required", "A Site viewer must name at least one site."); break;
+                    Error(path, "viewer_not_narrowable", "An All [[contract|plural]] viewer cannot be narrowed. Choose [[category]], BusinessUnit, [[site]] or Restricted instead."); break;
+                case ViewerKind.Category when cats.Count == 0: Error(path + ".categories", "category_required", "[[category|a|cap]] viewer must name at least one [[category|lower]]."); break;
+                case ViewerKind.BusinessUnit when bus.Count == 0: Error(path + ".businessUnits", "business_unit_required", "[[business.unit|a|cap]] viewer must name at least one [[business.unit|lower]]."); break;
+                case ViewerKind.Site when siteKeys.Count == 0: Error(path + ".sites", "site_required", "[[site|a|cap]] viewer must name at least one [[site|lower]]."); break;
                 case ViewerKind.Restricted:
                     var dimensions = (cats.Count > 0 ? 1 : 0) + (bus.Count > 0 ? 1 : 0) + (siteKeys.Count > 0 ? 1 : 0);
-                    if (dimensions == 0) Error(path, "restricted_needs_scope", "A Restricted viewer must be narrowed by at least one of category, business unit or site.");
-                    else if (dimensions == 1) Warn(path, "restricted_single", "A Restricted viewer narrowed on one dimension behaves like a Category, Business Unit or Site viewer. Add a second narrowing, or change the kind.");
+                    if (dimensions == 0) Error(path, "restricted_needs_scope", "A Restricted viewer must be narrowed by at least one of [[category|lower]], [[business.unit|lower]] or [[site|lower]].");
+                    else if (dimensions == 1) Warn(path, "restricted_single", "A Restricted viewer narrowed on one dimension behaves like [[category|a]], [[business.unit]] or [[site]] viewer. Add a second narrowing, or change the kind.");
                     break;
             }
         }
@@ -304,10 +304,10 @@ public static class OnboardingSimulator
 
         var notes = new List<string>
         {
-            "Each row asks the real access evaluator whether that person could open the contract in each sample. The samples are synthetic: nothing is read from your contracts.",
+            "Each row asks the real access evaluator whether that person could open the [[contract|lower]] in each sample. The samples are synthetic: nothing is read from your [[contract|plural|lower]].",
             "A record above a person's classification ceiling is never visible, even when it is in the person's scope.",
         };
-        if (d.CategoryOwners.Count > 0) notes.Add("Category owners can read every contract in their organisation within their ceiling and edit those in the categories they own; ownership comes from the owner list, the role from a mapping or user administration.");
+        if (d.CategoryOwners.Count > 0) notes.Add("[[contract.owner|plural|sentence]] can read every [[contract|lower]] in their [[organisation|lower]] within their ceiling and edit those in the [[category|plural|lower]] they own; ownership comes from the owner list, the role from a mapping or user administration.");
         return new OnboardingPreview(samples.Count, rows, notes);
     }
 }

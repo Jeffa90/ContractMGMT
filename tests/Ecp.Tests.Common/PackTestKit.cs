@@ -35,7 +35,8 @@ public static class PackTestKit
     /// <summary>Writes a pack source folder (recipe plus documents) into <paramref name="directory"/> and returns the folder.</summary>
     public static string WriteSource(string directory, string packKey = "sample-pack", string version = "1.0.0", bool synthetic = true, string requirement = "AllowUnsignedSynthetic",
         IReadOnlyDictionary<string, string>? extraDocuments = null, string minPlatform = "1.0.0", string? maxPlatform = null, bool ignoreUnknownOptional = false, string? packageId = null,
-        IEnumerable<(string Source, string Path, string Kind, string Scope, int Schema, bool Required)>? content = null, string? solutionPackJson = null)
+        IEnumerable<(string Source, string Path, string Kind, string Scope, int Schema, bool Required)>? content = null, string? solutionPackJson = null,
+        string displayName = "Sample pack", string description = "A neutral sample pack for tests.", string publisherName = "Test publisher")
     {
         Directory.CreateDirectory(directory);
         solutionPackJson ??= $$"""
@@ -51,8 +52,8 @@ public static class PackTestKit
         File.WriteAllText(Path.Combine(directory, PackBuilder.RecipeFile), $$"""
             {
               "packageId": "{{packageId ?? "test.pack." + packKey}}", "packKey": "{{packKey}}", "version": "{{version}}",
-              "displayName": { "en-AU": "Sample pack" }, "description": { "en-AU": "A neutral sample pack for tests." },
-              "publisher": { "id": "test.publisher", "name": "Test publisher" }, "createdUtc": "2026-10-20T00:00:00Z",
+              "displayName": { "en-AU": {{System.Text.Json.JsonSerializer.Serialize(displayName)}} }, "description": { "en-AU": {{System.Text.Json.JsonSerializer.Serialize(description)}} },
+              "publisher": { "id": "test.publisher", "name": {{System.Text.Json.JsonSerializer.Serialize(publisherName)}} }, "createdUtc": "2026-10-20T00:00:00Z",
               "compatibility": { "minPlatformVersion": "{{minPlatform}}", "maxPlatformVersion": {{(maxPlatform is null ? "null" : "\"" + maxPlatform + "\"")}}, "ignoreUnknownOptionalKinds": {{(ignoreUnknownOptional ? "true" : "false")}} },
               "signature": { "requirement": "{{requirement}}" }, "synthetic": {{(synthetic ? "true" : "false")}}, "capabilities": [], "dependencies": [],
               "content": [ {{contentJson}} ]
@@ -66,12 +67,13 @@ public static class PackTestKit
     /// <summary>Builds an unsigned package from a freshly written neutral source folder. The folder is removed afterwards.</summary>
     public static byte[] Build(string packKey = "sample-pack", string version = "1.0.0", bool synthetic = true, string requirement = "AllowUnsignedSynthetic",
         IReadOnlyDictionary<string, string>? extraDocuments = null, string minPlatform = "1.0.0", string? maxPlatform = null, bool ignoreUnknownOptional = false,
-        IEnumerable<(string Source, string Path, string Kind, string Scope, int Schema, bool Required)>? content = null, string? solutionPackJson = null)
+        IEnumerable<(string Source, string Path, string Kind, string Scope, int Schema, bool Required)>? content = null, string? solutionPackJson = null,
+        string displayName = "Sample pack", string description = "A neutral sample pack for tests.", string publisherName = "Test publisher")
     {
         var dir = TempDirectory();
         try
         {
-            WriteSource(dir, packKey, version, synthetic, requirement, extraDocuments, minPlatform, maxPlatform, ignoreUnknownOptional, null, content, solutionPackJson);
+            WriteSource(dir, packKey, version, synthetic, requirement, extraDocuments, minPlatform, maxPlatform, ignoreUnknownOptional, null, content, solutionPackJson, displayName, description, publisherName);
             var result = PackBuilder.Build(dir);
             if (!result.Succeeded) throw new InvalidOperationException("Test pack did not build: " + string.Join("; ", result.Issues.Select(i => i.Code + " " + i.Message)));
             return result.Package!;

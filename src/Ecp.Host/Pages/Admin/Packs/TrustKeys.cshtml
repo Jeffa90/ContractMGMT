@@ -36,7 +36,7 @@
     <p class="hint">@L["Paste the publisher's PUBLIC key (it begins with -----BEGIN PUBLIC KEY-----). Never paste a private key; it would be refused."]</p>
     <div class="field"><label for="KeyId">@L["Key identifier"]</label><input id="KeyId" name="KeyId" type="text" maxlength="64" required value="@Model.KeyId" /></div>
     <div class="field"><label for="Label">@L["Who it belongs to"]</label><input id="Label" name="Label" type="text" maxlength="120" required value="@Model.Label" /></div>
-    <div class="field"><label for="PublicKeyPem">@L["Public key"]</label><textarea id="PublicKeyPem" name="PublicKeyPem" rows="6" required spellcheck="false">@Model.PublicKeyPem</textarea></div>
+    <div class="field"><label for="PublicKeyPem">@L["Public key"]</label><textarea id="PublicKeyPem" name="PublicKeyPem" rows="6" required spellcheck="false">@(Model.PublicKeyPem.Contains("PRIVATE", StringComparison.OrdinalIgnoreCase) ? "" : Model.PublicKeyPem)</textarea></div>
     <div class="field"><label for="NotBeforeUtc">@L["Valid from (UTC, optional)"]</label><input id="NotBeforeUtc" name="NotBeforeUtc" type="datetime-local" /></div>
     <div class="field"><label for="NotAfterUtc">@L["Valid until (UTC, optional)"]</label><input id="NotAfterUtc" name="NotAfterUtc" type="datetime-local" /></div>
     <div class="actions"><button type="submit">@L["Register this key"]</button></div>

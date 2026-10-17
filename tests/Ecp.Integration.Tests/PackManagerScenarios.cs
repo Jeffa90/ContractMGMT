@@ -318,6 +318,60 @@ internal static class PackManagerScenarios
         Assert.DoesNotContain(audit.Items, a => (a.Details ?? "").Contains("BEGIN"));
     }
 
+    public static async Task The_package_cache_is_keyed_by_tenant_and_package_so_one_tenant_never_reads_anothers_bytes(TestApp app)
+    {
+        var a = await LifecycleWorld.CreateAsync(app);
+        var b = await LifecycleWorld.CreateAsync(app);
+        var key = Unique("cache");
+        string Doc(string name) => $$"""
+            { "packId": "{{key}}", "name": "{{name}}", "version": "1.0.0", "synthetic": true, "publisher": "Test publisher", "description": "d", "features": [], "ownershipModel": "ReadAllEditAssignedCategory", "approvalModel": "None",
+              "defaults": { "classification": { "levels": ["Public"], "defaultLevel": "Public", "privilegedLevels": [] }, "contractTypes": [], "categories": [] } }
+            """;
+        // The same pack key and version, different bytes, in two tenants: allowed, because a pack belongs to the tenant that installed it.
+        await InstallAsync(a, "tenantAdmin", PackTestKit.Build(key, "1.0.0", solutionPackJson: Doc("Tenant A edition")));
+        await InstallAsync(b, "tenantAdmin", PackTestKit.Build(key, "1.0.0", solutionPackJson: Doc("Tenant B edition")));
+        for (var i = 0; i < 3; i++)                                   // repeated reads exercise the cache
+        {
+            var docA = await a.W.AsAsync("tenantAdmin", s => s.Get<IPackLoader>().GetDocumentAsync(key, "1.0.0", "SolutionPack"));
+            var docB = await b.W.AsAsync("tenantAdmin", s => s.Get<IPackLoader>().GetDocumentAsync(key, "1.0.0", "SolutionPack"));
+            Assert.Contains("Tenant A edition", docA);
+            Assert.DoesNotContain("Tenant B edition", docA);
+            Assert.Contains("Tenant B edition", docB);
+            Assert.DoesNotContain("Tenant A edition", docB);
+        }
+        // Retiring in tenant A is seen at once there and not in tenant B.
+        await a.W.AsAsync("tenantAdmin", s => s.Get<IPackManager>().RetireAsync(key, "1.0.0", "test"));
+        Assert.Null(await a.W.AsAsync("tenantAdmin", s => s.Get<IPackLoader>().FindAsync(key, "1.0.0", usableOnly: true)));
+        Assert.NotNull(await b.W.AsAsync("tenantAdmin", s => s.Get<IPackLoader>().FindAsync(key, "1.0.0", usableOnly: true)));
+    }
+
+    public static async Task Diagnostics_report_unresolved_packs_and_fallback_definitions_without_changing_anything(TestApp app)
+    {
+        var w = await LifecycleWorld.CreateAsync(app);
+        // An organisation on the installation default (no pack of its own) gets the default pack's definitions when its first contract is created; it is then assigned a different pack.
+        var fell = await PackResolutionScenarios.AddOrganisationAsync(w, "Fallback Org", "FBK", null);
+        await w.W.AsAsync(fell.User, s => s.Get<ISecuredContractService>().CreateDraftAsync(new CreateContractRequest(fell.Org, "FBK-000001", "Fallback", fell.Supplier, fell.Category)));
+        await using (var s = w.W.AsScopeless()) await s.Get<IOrganisationStructureService>().SetSolutionPackAsync(fell.Org, TestPacks.Blank);
+        var ghost = await PackResolutionScenarios.AddOrganisationAsync(w, "Ghost Org", "GHO", "a-pack-nobody-installed");
+
+        var releasesBefore = await w.W.AsAsync("tenantAdmin", s => s.Get<IConfigurationService>().ReleasesAsync(WorkflowKinds.ContractLifecycle, fell.Org));
+        var findings = await w.W.AsAsync("tenantAdmin", s => s.Get<IPackDiagnostics>().OrganisationFindingsAsync());
+        Assert.Contains(findings, f => f.OrganisationId == ghost.Org && f.Code == "pack_unresolved");
+        Assert.Contains(findings, f => f.OrganisationId == fell.Org && f.Code == "starting_definitions_from_other_pack");
+        Assert.DoesNotContain(findings, f => f.OrganisationId == w.W.Org1);
+        Assert.All(findings, f => { Assert.DoesNotContain("   at ", f.Message); Assert.DoesNotContain(Path.GetTempPath(), f.Message); });
+
+        // Reporting changed nothing.
+        var releasesAfter = await w.W.AsAsync("tenantAdmin", s => s.Get<IConfigurationService>().ReleasesAsync(WorkflowKinds.ContractLifecycle, fell.Org));
+        Assert.Equal(releasesBefore.Count, releasesAfter.Count);
+
+        var sources = await w.W.AsAsync("tenantAdmin", s => s.Get<IPackDiagnostics>().SourcesAsync());
+        Assert.True(sources.DirectoryFound);
+        Assert.True(sources.UsableShippedPacks >= 2);
+        Assert.NotEmpty(sources.Directory);                                                      // only a folder name is shown, never a server path
+        Assert.DoesNotContain(Path.DirectorySeparatorChar, sources.Directory);
+    }
+
     public static async Task Concurrent_uploads_and_installs_of_one_pack_leave_exactly_one_installed_copy(TestApp app)
     {
         var w = await LifecycleWorld.CreateAsync(app);
@@ -389,6 +443,8 @@ public sealed class PackManagerScenarioTests_Sqlite
     [Fact] public Task Assignment() => ProviderRunner.SqliteAsync(PackManagerScenarios.Assigning_a_pack_creates_drafts_only_and_never_overwrites_published_configuration);
     [Fact] public Task Third_pack() => ProviderRunner.SqliteAsync(PackManagerScenarios.A_third_pack_the_repository_has_never_seen_runs_a_contract_with_no_source_change);
     [Fact] public async Task Production_trust() { await using var app = await TestApp.CreateSqliteAsync(Ecp.SharedKernel.EcpMode.Production); await PackManagerScenarios.Production_refuses_unsigned_and_untrusted_packs_until_the_publisher_key_is_trusted(app); }
+    [Fact] public Task Cache() => ProviderRunner.SqliteAsync(PackManagerScenarios.The_package_cache_is_keyed_by_tenant_and_package_so_one_tenant_never_reads_anothers_bytes);
+    [Fact] public Task Diagnostics() => ProviderRunner.SqliteAsync(PackManagerScenarios.Diagnostics_report_unresolved_packs_and_fallback_definitions_without_changing_anything);
     [Fact] public Task Concurrency() => ProviderRunner.SqliteAsync(PackManagerScenarios.Concurrent_uploads_and_installs_of_one_pack_leave_exactly_one_installed_copy);
     [Fact] public Task Hostile() => ProviderRunner.SqliteAsync(PackManagerScenarios.Hostile_packages_are_rejected_with_plain_messages_and_nothing_is_stored);
     [Fact] public Task Csv() => ProviderRunner.SqliteAsync(PackManagerScenarios.The_validation_report_csv_defuses_formulas_and_shows_no_server_paths);
@@ -403,6 +459,8 @@ public sealed class PackManagerScenarioTests_SqlServer
     [SqlServerFact] public Task Assignment() => ProviderRunner.SqlServerAsync(PackManagerScenarios.Assigning_a_pack_creates_drafts_only_and_never_overwrites_published_configuration);
     [SqlServerFact] public Task Third_pack() => ProviderRunner.SqlServerAsync(PackManagerScenarios.A_third_pack_the_repository_has_never_seen_runs_a_contract_with_no_source_change);
     [SqlServerFact] public async Task Production_trust() { await using var app = await TestApp.CreateSqlServerAsync(setupMode: Ecp.SharedKernel.EcpMode.Production); await PackManagerScenarios.Production_refuses_unsigned_and_untrusted_packs_until_the_publisher_key_is_trusted(app); }
+    [SqlServerFact] public Task Cache() => ProviderRunner.SqlServerAsync(PackManagerScenarios.The_package_cache_is_keyed_by_tenant_and_package_so_one_tenant_never_reads_anothers_bytes);
+    [SqlServerFact] public Task Diagnostics() => ProviderRunner.SqlServerAsync(PackManagerScenarios.Diagnostics_report_unresolved_packs_and_fallback_definitions_without_changing_anything);
     [SqlServerFact] public Task Concurrency() => ProviderRunner.SqlServerAsync(PackManagerScenarios.Concurrent_uploads_and_installs_of_one_pack_leave_exactly_one_installed_copy);
     [SqlServerFact] public Task Hostile() => ProviderRunner.SqlServerAsync(PackManagerScenarios.Hostile_packages_are_rejected_with_plain_messages_and_nothing_is_stored);
 }

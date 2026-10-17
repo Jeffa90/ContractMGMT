@@ -52,5 +52,7 @@
       <ShippedPackFile Include="$(OutDir)packs/*.ecpkg" />
     </ItemGroup>
     <Copy SourceFiles="@(ShippedPackFile)" DestinationFolder="$(PublishDir)packs" />
+    <!-- The build-time tool is not part of the runtime image; only the host's own files and the packs are. -->
+    <Delete Files="$(PublishDir)Ecp.PackTool.deps.json;$(PublishDir)Ecp.PackTool.runtimeconfig.json" />
   </Target>
 </Project>

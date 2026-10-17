@@ -11,16 +11,18 @@ trap cleanup EXIT; cleanup
 fail() { echo "FAILED: $*" >&2; exit 1; }
 wait_for() { for i in $(seq 1 60); do curl -fsS "$1" >/dev/null 2>&1 && return 0; sleep 1; done; return 1; }
 
-docker run -d --name ecp-smoke "${NET[@]}" -e ASPNETCORE_URLS="http://127.0.0.1:$PORT" -e Ecp__Mode=Demo \
+docker run -d --name ecp-smoke "${NET[@]}" -e ASPNETCORE_URLS="http://127.0.0.1:$PORT" -e Ecp__Mode=Demo -e Ecp__Packs__AllowUnsignedSyntheticPacks=true \
   -e Database__Provider=Sqlite -e Database__ConnectionString="Data Source=/var/ecp/ecp-demo.db" "$IMAGE" >/dev/null
 wait_for "http://127.0.0.1:$PORT/health/ready" || { docker logs --tail 40 ecp-smoke >&2; fail "seeded Demo did not become ready"; }
 READY=$(curl -fsS "http://127.0.0.1:$PORT/health/ready")
 echo "$READY" | grep -q '"id":"R-OPS-02","status":"Healthy"' || fail "ICU/time-zone data missing in the image: $READY"
 LOC=$(curl -sS -o /dev/null -w '%{redirect_url}' "http://127.0.0.1:$PORT/"); [[ "$LOC" == */SignIn* ]] || fail "seeded Demo did not ask for sign-in ($LOC)"
 [[ "$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/Setup")" == "404" ]] || fail "setup pages are open on a completed installation"
+echo "$READY" | grep -q '"id":"solution-packs","status":"Healthy"' || fail "the shipped solution packs are not available in the image: $READY"
+PACKS=$(docker exec ecp-smoke sh -c 'ls /app/packs/*.ecpkg 2>/dev/null | wc -l'); [[ "$PACKS" -ge 2 ]] || fail "the image does not carry the shipped .ecpkg packs under /app/packs ($PACKS found)"
 USER_ID=$(docker exec ecp-smoke id -u); [[ "$USER_ID" != "0" ]] || fail "runs as root"
 
-docker run -d --name ecp-smoke-fresh "${NET[@]}" -e ASPNETCORE_URLS="http://127.0.0.1:$FRESH" -e Ecp__Mode=Demo -e Ecp__DemoSeed=false \
+docker run -d --name ecp-smoke-fresh "${NET[@]}" -e ASPNETCORE_URLS="http://127.0.0.1:$FRESH" -e Ecp__Mode=Demo -e Ecp__DemoSeed=false -e Ecp__Packs__AllowUnsignedSyntheticPacks=true \
   -e Database__Provider=Sqlite -e Database__ConnectionString="Data Source=/var/ecp/ecp-fresh.db" "$IMAGE" >/dev/null
 wait_for "http://127.0.0.1:$FRESH/health/live" || { docker logs --tail 40 ecp-smoke-fresh >&2; fail "fresh installation did not start"; }
 LOC=$(curl -sS -o /dev/null -w '%{redirect_url}' "http://127.0.0.1:$FRESH/"); [[ "$LOC" == */Setup ]] || fail "fresh installation did not redirect to /Setup ($LOC)"
@@ -30,4 +32,4 @@ if docker logs ecp-smoke-fresh 2>&1 | grep -qF "$TOKEN"; then fail "the setup to
 
 if docker run --rm "${NET[@]}" -e Ecp__Mode=Production -e Database__Provider=Sqlite -e Database__ConnectionString="Data Source=x.db" "$IMAGE" >/dev/null 2>&1; then
   fail "Production accepted demo settings"; fi
-echo "VERIFIED: seeded Demo ready and setup closed, fresh installation gated to /Setup (API 503), setup token issued and not logged, ICU and time-zone data present (R-OPS-02), non-root uid $USER_ID, Production refuses demo/SQLite settings."
+echo "VERIFIED: seeded Demo ready and setup closed, fresh installation gated to /Setup (API 503), setup token issued and not logged, ICU and time-zone data present (R-OPS-02), shipped packs present as external .ecpkg files and ready, non-root uid $USER_ID, Production refuses demo/SQLite settings."

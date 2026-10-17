@@ -11,6 +11,10 @@ services:
       Ecp__Mode: Production
       Ecp__DemoTenantResolution: "false"
       Ecp__DemoSeed: "false"
+      # Production accepts only signed packs from a trusted publisher (docs/PACK_SIGNING.md). The shipped packs are built unsigned; sign them with your own key, mount them read-only
+      # over /app/packs, and trust your public key here (or register it in the Pack Manager). Until then readiness reports the packs as Degraded.
+      # Ecp__Packs__TrustFile: "/run/secrets/ecp-pack-keys.json"
+      # Ecp__Packs__ShippedDirectory: "/app/packs"
       Database__Provider: SqlServer
       Database__ConnectionStringRef: "file:/run/secrets/ecp-sql"
       Database__AutoMigrate: "false"   # run `dotnet Ecp.Host.dll migrate` as a deliberate release step

@@ -92,3 +92,33 @@ The least-privilege allocation for the four approval matrix permissions is confi
 | `approvals.simulate` | System Administrator, Tenant Administrator, Organisation Administrator, Business Configuration Administrator, Procurement Administrator, Auditor | Not Category Owners, Viewers or Approvers by default. Every run is audited because it reveals approver identities. |
 | `approvals.delegate` | Approver, Backup Approver | Own authority only, within the existing delegation limits (90 days, group members only, no loops, not transitive). |
 | `approvals.delegate.administer` | System Administrator, Tenant Administrator (tenant scope), Organisation Administrator (organisation scope) | Procurement Administrator holds it only by explicit assignment; no default role grants it. Every administrative delegation action requires a reason and writes an audit event. |
+
+## D7 External solution packs (S7, owner instruction 2026-10-17)
+
+Recorded in `decisions/ADR-0026-external-solution-packs.md`. The owner confirmed:
+
+- The Enterprise Platform path: the product is the Enterprise Contract Platform; JBS Procurement is one optional solution pack, never a compiled assumption, installation default or privileged special case.
+- The target in `docs/PACK_ARCHITECTURE.md` is approved. Signing uses ECDSA P-256 (`ES256`) in format version 1, the algorithm is stored in the package, and no external cryptographic dependency is added only for Ed25519.
+- Upgrade conflicts are handled per document in version 1; there is no per-definition or per-item merge.
+- `Organisation.SolutionPackKey` behaviour is preserved; the Blank and JBS organisations, existing published releases and pinned contracts stay valid.
+- A pack is data and configuration only. It never executes customer code, SQL, JavaScript, scripts or unsafe templates.
+- Business administrators can upload, validate, preview and install an approved pack without a rebuild or redeploy.
+- Production refuses unsigned, invalidly signed or untrusted packs. Demo and Test may permit explicitly marked unsigned synthetic packs only when a safe environment setting is enabled.
+- No signing private key is committed. Production key custody is an external operational responsibility.
+- The Pack Manager is initially form-based and accessible: no marketplace and no graphical designer.
+
+### D7a Pack permissions (proposal in the S7 brief, implemented as below)
+
+| Permission | Granted to |
+|---|---|
+| `packs.read` | Tenant Administrator, Organisation Administrator, Business Configuration Administrator, Auditor |
+| `packs.upload` | Tenant Administrator, Business Configuration Administrator |
+| `packs.validate` | Tenant Administrator, Organisation Administrator, Business Configuration Administrator |
+| `packs.install` | Tenant Administrator, Business Configuration Administrator |
+| `packs.assign` | Tenant Administrator, Organisation Administrator, Business Configuration Administrator (organisation scope) |
+| `packs.retire` | Tenant Administrator |
+| `packs.trust.manage` | Tenant Administrator |
+| `packs.audit.read` | Tenant Administrator, Auditor |
+
+Trust-key administration is deliberately not held by ordinary business configuration administrators. Install, retire, assign and trust changes also need a recent sign-in. (`requirements/02-reference/role-permission-matrix.csv` is the machine-readable source and the tests read it.)
+

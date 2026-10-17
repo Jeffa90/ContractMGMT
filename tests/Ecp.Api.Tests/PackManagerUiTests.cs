@@ -187,4 +187,38 @@ public sealed class PackManagerUiTests
         Assert.Contains("UI test publisher", list);
         Assert.DoesNotContain("PRIVATE KEY", list);
     }
+
+    private static async Task<(HttpStatusCode Status, string Status2, string Message)> PackReadinessAsync(DemoApp app)
+    {
+        using var client = app.NewClient();
+        var response = await client.GetAsync("/health/ready");
+        using var doc = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var check = doc.RootElement.GetProperty("checks").EnumerateArray().Single(c => c.GetProperty("id").GetString() == "solution-packs");
+        return (response.StatusCode, check.GetProperty("status").GetString()!, check.GetProperty("message").GetString()!);
+    }
+
+    [Fact]
+    public async Task Readiness_reports_the_shipped_packs_and_fails_when_the_pack_folder_is_missing()
+    {
+        using (var app = DemoApp.Start())
+        {
+            var (status, check, message) = await PackReadinessAsync(app);
+            Assert.Equal(HttpStatusCode.OK, status);
+            Assert.Equal("Healthy", check);
+            Assert.Contains("shipped solution pack", message);
+        }
+        using (var missing = DemoApp.Start(s => { s["Ecp:DemoSeed"] = "false"; s["Ecp:Packs:ShippedDirectory"] = Path.Combine(Path.GetTempPath(), "no-such-packs-" + Guid.NewGuid().ToString("N")); }))
+        {
+            var (status, check, message) = await PackReadinessAsync(missing);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, status);
+            Assert.Equal("Unhealthy", check);
+            Assert.DoesNotContain(Path.GetTempPath(), message);                      // no server path
+        }
+        using (var unsigned = DemoApp.Start(s => { s["Ecp:DemoSeed"] = "false"; s["Ecp:Packs:AllowUnsignedSyntheticPacks"] = "false"; }))
+        {
+            var (_, check, message) = await PackReadinessAsync(unsigned);              // unsigned shipped packs are not usable when the setting is off: degraded, with what to do
+            Assert.Equal("Degraded", check);
+            Assert.Contains("usable", message);
+        }
+    }
 }

@@ -14,6 +14,8 @@ services:
       Ecp__Mode: Demo
       Ecp__DemoTenantResolution: "true"
       Ecp__DemoSeed: "true"
+      # The shipped packs are unsigned (no signing key is held in this repository). Demo and Test may use unsigned SYNTHETIC packs only when this is on; Production ignores it.
+      Ecp__Packs__AllowUnsignedSyntheticPacks: "true"
       Database__Provider: Sqlite
       Database__ConnectionString: "Data Source=/var/ecp/ecp-demo.db"
       Database__AutoMigrate: "true"

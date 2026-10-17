@@ -36,6 +36,8 @@ jobs:
       - name: Honest result summary (Passed / Failed / Skipped / NOT VERIFIED)
         if: always()
         run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Solution packs (build, reproducibility, sign and verify with an ephemeral key, no embedded packs, no committed private key)
+        run: tools/check-packs.sh
       - name: Repository consistency checks (links, CSV/JSON, references, manifest, Mermaid structure)
         run: python3 -I tools/check-repo.py .
       - name: Tooling script tests

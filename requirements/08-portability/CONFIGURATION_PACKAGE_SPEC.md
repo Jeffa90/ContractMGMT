@@ -2,32 +2,38 @@
 
 Master: packs and packages are "versioned, dependency-aware, signed/checksummed, previewed and imported with dry run and conflict resolution"; packages include "manifests, compatibility versions, checksums, dependency graphs, identifier remapping, dry run, conflict resolution, rollback and audit" and exclude "secrets, live users and production assignments by default". `requirements/10-solution-packs/SOLUTION_PACK_SPEC.md` and `requirements/13-marketplace/CATALOGUE_SPEC.md` say the same briefly. This file defines the format and trust model (GAP-15). `[CONFIRMED]` requirements, `[CONFIRMED]` format.
 
-## 1. Archive layout (`.ecpkg`, a ZIP)
+## 1. Archive layout (`.ecpkg`, a ZIP; format version 1, implemented in S7)
 
 ```
-manifest.json            required; canonical JSON
-signature.json           optional detached signature of manifest.json
-definitions/<kind>/<code>.json     one file per configuration definition
-assets/                  logos, document templates (allowlisted types only)
-seed/                    optional synthetic demonstration data (separate package kind)
-docs/README.md, docs/CHANGELOG.md
+manifest.json            required; canonical JSON (sorted keys, UTF-8, no BOM, LF); lists the SHA-256 of every content document
+signature.json           detached signature of the canonical manifest (required in Production)
+content/<name>.json      one JSON document per configuration kind and scope (flat; at most one folder level)
 ```
 
-## 2. Manifest
+The archive is a closed structure. Only these three locations exist; anything else (extra folders, other file types, hidden files, absolute or climbing paths, backslashes, non-ASCII names, duplicate paths, symbolic links) is refused. Assets, documents and seed data are **future** (a later format version). `docs/PACK_AUTHORING.md` shows a complete example and `docs/PACK_SECURITY.md` lists the limits and error codes.
+
+Because the implemented configuration model is one document per kind per scope, each content entry names a kind and a scope; finer items (a single field, a single workflow state) are items inside a document and are not merged individually in version 1 (ADR-0026 D12).
+
+## 2. Manifest (format version 1, as implemented)
 
 | Field | Notes |
 |---|---|
-| `formatVersion` | Integer; importer refuses unknown major versions |
-| `packageId` | Reverse-domain identifier, for example `org.example.pack.jbs-procurement` |
-| `name`, `description`, `version` (semver), `kind` (`SolutionPack`, `ConfigurationExport`, `DemoData`) | |
-| `publisher` | `{ name, keyId }` |
-| `createdUtc` | UTC |
-| `compatibility` | `{ minPlatformVersion, maxPlatformVersion, minSchemaVersion }` |
-| `synthetic` | Boolean. `true` for anything shipped with live-looking sample data. Packs with `synthetic = false` and personal data are refused |
-| `contents` | List of `{ path, kind, code, sha256 }` covering every file except the manifest |
-| `dependencies` | List of `{ packageId, versionRange }` |
-| `requires` | Names of features and adapters needed (informational; they are never enabled by import) |
-| `excludes` | Statement of what was removed on export (secrets, users, assignments) |
+| `formatVersion` | Integer; the importer refuses unknown versions (`PACK-M003`) |
+| `packageId` | Dotted lower-case identifier, for example `platform.pack.blank`; the global identity of a package |
+| `packKey` | The short key an organisation stores in `SolutionPackKey` (lower case, hyphens); the tenant-local handle |
+| `displayName`, `description` | Localised text: an object of language tag to text (for example `en-AU`) |
+| `version` | Semantic version; a version never changes once published |
+| `publisher` | `{ id, name }` |
+| `createdUtc` | UTC. The builder takes it from the recipe so builds are reproducible |
+| `compatibility` | `{ minPlatformVersion, maxPlatformVersion, ignoreUnknownOptionalKinds }` |
+| `requiredKinds`, `optionalKinds` | Configuration kinds the pack needs and may use. An unknown required kind makes the pack incompatible; an unknown optional kind is a warning only when `ignoreUnknownOptionalKinds` is true |
+| `content` | List of `{ path, kind, scope (catalogue, tenant or organisation), schemaVersion, required, sha256 }` covering every document; a file not listed is refused |
+| `capabilities` | Names of features the pack declares (informational; never enabled by installing) |
+| `dependencies` | List of `{ packKey, minVersion, maxVersion }` |
+| `signature` | `{ requirement }`: `Required`, or `AllowUnsignedSynthetic` (a publisher statement only; it can never weaken the environment policy) |
+| `synthetic` | Boolean. Only synthetic packs may ever be accepted unsigned |
+
+Not yet implemented and therefore not part of format version 1: `requires`, `excludes`, identifier remapping and `kind` values other than `SolutionPack`.
 
 ## 3. Safety rules for any import
 
@@ -38,19 +44,19 @@ docs/README.md, docs/CHANGELOG.md
 5. Each definition is validated against the schema for its kind and the Configuration Studio closed vocabularies (`CONFIGURATION_STUDIO_SPEC.md` section 10). A package cannot contain role assignments to people, identity group ids from another tenant, secrets, URLs to non-allowlisted hosts, or permission grants that exceed the importer's own rights.
 6. Importing is itself a privileged, audited action (`packages.import` plus `config.publish` to apply) subject to step-up authentication.
 
-## 4. Signing and trust
+## 4. Signing and trust (implemented in S7; `docs/PACK_SIGNING.md`)
 
-- Signature: Ed25519 over the canonical manifest bytes; `signature.json` carries `keyId` and the signature.
-- Trust anchors: the platform's built-in key for packs it ships, and tenant-registered publisher public keys. Registration is a Tenant Administrator action with audit. Revocation list supported.
-- Policy by mode: Demo/Test may accept unsigned packages with a visible warning; **Production requires a valid signature from a trusted key for catalogue packs**, and allows an unsigned package only through an explicit, reasoned, audited Tenant Administrator override. Checksums are always required.
-- Pack-signing key management (generation, storage, rotation) is decided in ADR-0014. Keys are never committed.
+- Signature: **ECDSA P-256 with SHA-256 (`ES256`)**, IEEE P1363 (64-byte) signature, over `"ECP-PACK-MANIFEST-V1\n"` followed by the canonical manifest bytes. `signature.json` carries `formatVersion`, `algorithm`, `keyId`, `signedUtc` and the base64 `signature`. The algorithm is stored in the package so another can be added later. (This replaces the earlier Ed25519 line: .NET 10 has no Ed25519, and the owner approved ES256 and no extra cryptographic dependency; ADR-0026 D3.)
+- Trust anchors: public keys from host configuration (platform operator) and public keys registered by a Tenant Administrator (`packs.trust.manage`, audited, recent sign-in). A tenant key cannot shadow a platform key id. A revoked key is kept and refused. Keys may have validity dates.
+- Policy by mode: **Production requires a valid signature from a trusted, active, in-date key with a supported algorithm.** There is no override in version 1. Demo and Test additionally accept an unsigned package only if it is marked `synthetic`, its manifest allows it and `Ecp:Packs:AllowUnsignedSyntheticPacks` is on, and always with a visible warning. Hashes are always verified.
+- Private keys are never committed, logged, stored or displayed. Key generation, custody and rotation are operational responsibilities (`docs/PACK_SIGNING.md`; ADR-0014 and ADR-0026).
 
 ## 5. Import procedure
 
 1. Upload → quarantine → verify structure, checksums, signature, compatibility.
-2. Dependency analysis: required packages and versions present, conflicts between installed packs.
-3. Identifier remapping plan: definitions refer to each other by `code`; internal ids are generated on the target; references resolve to target ids; collisions are listed.
-4. Conflict detection per definition against the target: absent (create), identical (skip), different (conflict). Packages that carry reference numbering rules or seed records are also checked for **Agreement Reference conflicts**: a prefix or numbering range that overlaps another organisation's rule in the tenant, or a seed `agreementReference` already used in the tenant, is reported in the dry run and must be resolved **before anything is committed** (D3). `[CONFIRMED]`
+2. Dependency analysis: required packages and versions present, conflicts between installed packs. *(Implemented: missing dependencies, same key with a different package identity, same key and version with different bytes.)*
+3. Identifier remapping plan. *(Future: version 1 documents carry no cross-references that need remapping.)*
+4. Conflict detection per definition against the target: absent (create), identical (skip), different (conflict). *(Implemented per document in version 1: an open draft is kept and reported; no per-definition merge.)* Packages that carry reference numbering rules or seed records are also checked for **Agreement Reference conflicts**: a prefix or numbering range that overlaps another organisation's rule in the tenant, or a seed `agreementReference` already used in the tenant, is reported in the dry run and must be resolved **before anything is committed** (D3). `[CONFIRMED]` *(Future: version 1 packs carry no numbering rules or seed records, so this check has nothing to examine yet.)*
 5. **Dry run:** produces a report: counts created/updated/skipped/conflicting, validation results, simulation results on sample records, and a human-readable diff. No target change is made.
 6. Conflict resolution per definition: *Keep target*, *Replace with package*, *Keep both with new code*, or (for lookups) *Merge values*. Locally modified definitions are never silently overwritten.
 7. **Apply** creates a **draft** configuration for the target scope, never a published one. It then follows the normal lifecycle (validate, preview, simulate, publish).

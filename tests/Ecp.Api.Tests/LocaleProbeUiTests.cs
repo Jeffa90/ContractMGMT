@@ -82,7 +82,7 @@ public sealed class LocaleProbeUiTests
             Assert.True(response.StatusCode is HttpStatusCode.OK or HttpStatusCode.Forbidden or HttpStatusCode.NotFound, $"{url} -> {(int)response.StatusCode}");
             if (response.StatusCode != HttpStatusCode.OK) return;
             rendered++;
-            var html = Regex.Replace(await response.Content.ReadAsStringAsync(), "<script.*?</script>|<style.*?</style>", "", RegexOptions.Singleline);
+            var html = Regex.Replace(await response.Content.ReadAsStringAsync(), "<script.*?</script>|<style.*?</style>|<input[^>]*type=\"hidden\"[^>]*>|<meta[^>]*>", "", RegexOptions.Singleline);
             foreach (Match m in Leak.Matches(html)) leaks.Add($"{url}: '{m.Value}'");
         }
 

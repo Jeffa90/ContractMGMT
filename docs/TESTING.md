@@ -484,6 +484,8 @@ A first local run hung and then crashed the test host: the resolver resolved the
 
 Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors): unit 698, architecture 71, API 103, integration 234 on SQLite: **1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED** (the SQL Server wrappers; 3 are new). `tools/check-repo.py` and `tools/check-packs.sh` pass (Blank 1.5.0 and reference pack 2.5.0 rebuild reproducibly). CI result: `deploy/STATUS.md`.
 
+CI run 52 (commit f474afc) failed one API test, `A_pack_the_repository_has_never_seen_gives_an_organisation_its_own_words_with_no_source_change`: its case-insensitive scan for "jbs" matched three letters inside a random antiforgery token. A pre-existing test weakness, not a product defect; the scans now judge visible text only (hidden inputs removed), including the new tests. Not skipped, not quarantined.
+
 Found by the tests and fixed: the first smoke run showed a valid pack refused at upload four ways and every organisation-dependent draft reported as a problem at assignment (see `docs/S9_READINESS.md` section 13); the locale probe found the Audit page formatting with the installation default.
 
 ## 10. Security regression suite (`Category=Security`)

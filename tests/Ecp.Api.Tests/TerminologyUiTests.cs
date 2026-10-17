@@ -327,7 +327,8 @@ public sealed class TerminologyUiTests
         Assert.DoesNotMatch(">Contracts<|>Suppliers<|>Categories<", home);
         var suppliers = await BodyAsync(client, "/Suppliers");
         Assert.Contains("<h1>Counterparties</h1>", suppliers);
-        Assert.DoesNotMatch("(?i)jbs|procurement", Regex.Replace(suppliers, "<title>.*?</title>", ""));
+        // Form inputs carry random antiforgery tokens, which can contain any three letters; only the visible text is judged.
+        Assert.DoesNotMatch("(?i)jbs|procurement", Regex.Replace(suppliers, "<title>.*?</title>|<input[^>]*>", ""));
     }
 
     [Fact]
@@ -353,7 +354,7 @@ public sealed class TerminologyUiTests
         {
             var response = await blank.GetAsync(url);
             if (response.StatusCode == HttpStatusCode.Forbidden) continue;
-            var page = Regex.Replace(await response.Content.ReadAsStringAsync(), "<script.*?</script>", "", RegexOptions.Singleline);
+            var page = Regex.Replace(await response.Content.ReadAsStringAsync(), "<script.*?</script>|<input[^>]*type=\"hidden\"[^>]*>", "", RegexOptions.Singleline);
             Assert.DoesNotMatch(@"\bABN\b|\bSAP\b", page);
         }
         Assert.Contains("Tax Identifier", await BodyAsync(blank, "/Suppliers/Create"));
@@ -377,7 +378,7 @@ public sealed class TerminologyUiTests
         var supplierForm = await BodyAsync(client, "/Suppliers/Create");
         Assert.Contains("Company Registration", supplierForm);
         Assert.Contains("Account Code", supplierForm);
-        Assert.DoesNotMatch(@"\bABN\b|Tax Identifier|Vendor Number", supplierForm);
+        Assert.DoesNotMatch(@"\bABN\b|Tax Identifier|Vendor Number", Regex.Replace(supplierForm, "<input[^>]*type=\"hidden\"[^>]*>", ""));
         var register = await client.GetAsync("/Contracts");
         if (register.StatusCode == HttpStatusCode.OK)
         {

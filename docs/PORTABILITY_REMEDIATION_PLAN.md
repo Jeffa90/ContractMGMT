@@ -151,7 +151,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 | **S2, done** | R2 and R3 | S1 | Migrated contracts take the workflow's initial status; unowned-category reminder fall-back comes from the policy; JBS pack states the same recipient it has today |
 | S3 | R6 | none (can run in parallel with S2) | Signature request vocabulary neutral; EF migration renames the column and filtered index; no data loss. **Done 2026-10-17 (section 8.11, ADR-0027).** |
 | S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions. **Done 2026-10-17 (section 8.12, ADR-0028).** |
-| S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013 |
+| S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013. **Design written 2026-10-17, awaiting the owner's decision: `docs/ROLE_CATALOGUE_ADR.md` recommends stable identifiers with names from terminology (option A+) and retiring S8.** |
 | S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged |
 | S7 | R7 pack loader and store (CFG-04, PKM-01); remove embedded JBS resources; R4 stage C | S1, S5, S6 | A pack installs from the store with no rebuild; the three `.csproj` embeds are gone. **Done 2026-10-17 for S7a to S7c plus the Pack Manager, setup and onboarding integration (section 8.10); S7d to S7f are future.** The order dependency on S5 and S6 was waived by the owner's instruction. |
 | S8 | R8 step 2: implement the ADR | S5, S7 | Section 6.2 |

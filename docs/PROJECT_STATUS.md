@@ -205,8 +205,10 @@ Portability means a second business can run on the platform by configuration, pa
 | P-10 the signature boundary shaped like one vendor | Low | **Fixed (S3, ADR-0027)**: provider-neutral vocabulary and interfaces, status mapper, idempotent event inbox, renaming migration, guard over all of `src/` |
 | P-04 compiled capabilities, pack feature flags ignored | Medium | **Fixed (S6, ADR-0030)** for the five platform capabilities; evidence in `docs/PORTABILITY_AUDIT.md` section 0.6 |
 | P-05 JBS vocabulary in code and pages | Medium | **Fixed (S4, ADR-0028)** |
-| P-06, P-07, R-03, R-04 | Low | **Open** (S4, S10) |
-| R-01, R-02 | Medium | **Open** (S10) |
+| R-03 locale fall-backs | Low | **Fixed (S10, ADR-0033)**: installation defaults ship empty; organisation settings are the authority |
+| G2 tax-identifier formats; G12 ISO dates in messages | Medium, Low | **Fixed (S10)**: configurable identifier types, organisation formats in messages and exports |
+| P-06, P-07, R-04 | Low | **Open** (R-04's "Evergreen" part fixed by S10) |
+| R-01, R-02 | Medium | **Open** (R-01 partly addressed by S10: the tax identifier is a generic type; R-02 "Legal Privileged" constant remains a naming debt) |
 | R-05 compiled Legal-review and register steps | Medium | **On/off closed (S6)**; the capabilities remain compiled, with a switch |
 | R-06 | Info | **Open** |
 
@@ -219,9 +221,9 @@ Remaining high-severity portability violation: **none** from the original audit 
 | PRT-001 static scan | Partly verified: ARC-010 passes with every spelling in C#; no business or vendor name in `src` C#; the only `jbs-procurement` text in `src` is two project-file embedding lines (P-03) |
 | PRT-002 a second business | **Met (S9).** Harborline Construction (`construction-subcontracts` 1.0.0, synthetic) installs, assigns, publishes and runs a subcontract and a change order through every state and step with no source change; SQLite locally and SQL Server in CI (run 56). Not a claim of fitness for a real construction business |
 | PRT-003 no schema change per field | Verified |
-| PRT-004 terminology aliases | **Met for the proof's scope (S9).** Render sweep as four roles, exports, notification inbox and every pack document show only the pack's words where it sets a term, in US formats. Limits: platform validation-message wording is not swept as a class; notification dates are ISO (G12) |
+| PRT-004 terminology aliases | **Met for the proof's scope (S9).** Render sweep as four roles, exports, notification inbox and every pack document show only the pack's words where it sets a term, in US formats. Limits: platform validation-message wording is not swept as a class; notification dates now follow the organisation (G12 fixed by S10) |
 | PRT-006 and PRT-011 export and import round trips | **NOT VERIFIED** (not built) |
-| PRT-012 locale per organisation | Partly verified: the en-US, USD, America/Chicago probe (27 page addresses, one export) found and fixed one leak (the Audit page); installation-level fall-backs remain (S10) |
+| PRT-012 locale per organisation | **Met (S10).** Locale, currency and time zone are organisation settings (a published, versioned profile; packs propose, the organisation decides); display, reminder day, notifications, exports and approval timestamps follow them; parameterised tests across en-AU, en-NZ, en-US, de-DE and zones at UTC+10, UTC+13, UTC-8 and UTC-5/-6, with daylight saving in both halves of the year; no installation default ships. Limit: page text language is not localised |
 | PRT-013 renamed roles and states | **Met (S9)** under the amended criterion (ADR-0029): role, approver-group and state names shown to people come from terminology and definitions; identifiers are frozen by tests |
 
 ### 9.3 Slices
@@ -238,7 +240,7 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S8 implement the role decision | **Retired**: superseded by S4 and ADR-0029 |
 | S9 second pack end to end (PRT-002, PRT-004, PRT-013) | **Done** (ADR-0032, `docs/SECOND_BUSINESS_PROOF.md` section 16, `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`); local 1,145 Passed, 0 Failed, 0 Skipped; CI run 56 (commit 626877d) green: SQL Server 244 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke test passed (`deploy/STATUS.md`) |
 | S9 readiness prerequisites (G11, content-kind smoke test, G1a, G1b, locale probe; owner decisions D1 to D4) | **Done** (`docs/S9_READINESS.md` section 13); local 1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED; CI run 53 (commit c5d9ce2) green: SQL Server 233 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`). S9 itself has not started |
-| S10 cleanup of country, ERP and locale defaults | Not started (first incomplete remediation task). Includes G2 (non-Australian tax identifier formats; owner decision D4), R-01, R-02, R-04 |
+| S10 regional defaults, locale neutrality, country-aware organisation settings and configurable counterparty tax identifiers | **Done** (ADR-0033, `docs/REGIONAL_SETTINGS.md`, `docs/TAX_IDENTIFIERS.md`, `docs/PORTABILITY_AUDIT.md` section 0.9). Test and CI figures: `docs/TESTING.md` section 9.5 and `deploy/STATUS.md` |
 
 ## 10. Pilot readiness assessment
 

@@ -223,3 +223,15 @@ At every milestone exit: re-run the abuse cases as automated tests; add threats 
 | T-S9-02 | A business-specific shortcut creeps into generic source "to make the pack work" | `SecondBusinessGuardTests`: construction vocabulary scan of all shipped platform files, no project file names the pack, no compiled assembly contains it, and the S9 commits' diff is confined to the pack, tests and documents plus a short written list of generic fixes | Low |
 | T-S9-03 | A tenant-level document (classification scale, branding) of one business overrides another's in a shared tenant | Documented limit; the proof uses a single tenant for three businesses and records that these two kinds are tenant-wide | Medium (design limit) |
 | T-S9-04 | A synthetic example is mistaken for real advice or a real company | The pack states in its description and documentation that it is synthetic, fictional and not advice | Low |
+
+## Regional settings and identifiers (S10)
+
+| Threat | Control |
+|---|---|
+| A hidden identifier is inferred from a duplicate error, a count or a changed list | Classification gate before any duplicate check; the same "not found" answer; uniqueness scoped to the organisation (tested) |
+| A crafted identifier rule causes catastrophic backtracking or runs code | Closed rule and checksum catalogues, bounded values (80 characters), no customer expressions; regular expressions in the platform use non-backtracking matching |
+| Markup or template syntax in a label reaches a page or message | Labels are plain text, validated; Razor encodes; notification placeholders are a closed list and values are cleaned |
+| Another organisation's or tenant's regional settings are served from cache | Cache key includes tenant, organisation and version; tests warm two organisations, change one, and read both |
+| A wrong time zone or locale silently shifts dates | Date-only values are never shifted; instants are UTC and converted with the organisation's IANA zone; an unavailable zone blocks publication; readiness reports the host |
+| An export leaks a locale-dependent ambiguity | Business exports state their style; machine exports are ISO/UTC and stable |
+| A claim of verification is mistaken for a registry check | Statuses are structural; external statuses are reserved and unused; documents and UI say so |

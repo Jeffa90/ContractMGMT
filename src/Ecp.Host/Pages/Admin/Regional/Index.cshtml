@@ -58,7 +58,7 @@
                 @if (o.OfferedProfiles.Count > 0)
                 {
                     <div class="field"><label for="AddProfile">@L["Add a profile the installed packs offer"]</label>
-                        <select id="AddProfile" name="AddProfile"><option value="">@L["(none)"]</option>@foreach (var p in o.OfferedProfiles) { <option value="@p.Key">@p.Label (@p.Key@(p.Country is null ? "" : ", " + p.Country))</option> }</select></div>
+                        <select id="AddProfile" name="AddProfile"><option value="">@L["(none)"]</option>@foreach (var p in o.OfferedProfiles) { <option value="@p.Key">@p.LabelOr("Tax Identifier") (@p.Key@(p.Country is null ? "" : ", " + p.Country))</option> }</select></div>
                 }
                 @for (var i = 0; i < Model.Identifiers.Count; i++)
                 {

@@ -170,3 +170,27 @@ Source: `docs/S9_READINESS.md`, reviewed and approved by the owner. These bind t
 * D8.9, D8.10: pack key `construction-subcontracts`, en-US, USD, America/Chicago; shipped in `templates/packs` as a first-class pack.
 * D8.11: Professional Services was not started.
 * S9 owner rules (kept): no construction-specific platform code; one generic fix was needed and is recorded as "S9-discovered generic fix F1" (`docs/PORTABILITY_AUDIT.md` section 0.8, ADR-0032); Legal Review and Renewals are disabled in the pack, Register Authorisation, Variations (presented as Change Orders) and Signature Requests are enabled; the notification policy states its content levels explicitly.
+
+## D9 Regional defaults, locale neutrality and counterparty tax identifiers (S10, owner instruction 2026-10-17)
+
+Source: owner instruction for slice S10; architecture in `decisions/ADR-0033-regional-settings-and-counterparty-identifiers.md`; behaviour in `docs/REGIONAL_SETTINGS.md` and `docs/TAX_IDENTIFIERS.md`. D8.4 (G2 deferred to S10) is delivered by these decisions.
+
+| ID | Decision |
+|---|---|
+| D9.1 | **Organisation settings are the authority** for locale, currency and time zone. |
+| D9.2 | A pack may **propose** defaults; the organisation may **override** them. |
+| D9.3 | The generic platform must not default to en-AU, AUD, Australia/Brisbane, ABN or Australian address formats. |
+| D9.4 | Blank-pack defaults are **neutral**; where no safe universal default exists the organisation must choose explicitly. |
+| D9.5 | JBS may configure en-AU, AUD, Australia/Brisbane and ABN terminology and validation. |
+| D9.6 | Harborline may configure en-US, USD, America/Chicago and US tax-identifier terminology and validation. |
+| D9.7 | Tax identifiers are **configurable organisation and country identities**, not universally ABNs. |
+| D9.8 | Existing ABN and Vendor Number values remain **readable and searchable**. |
+| D9.9 | Existing database columns may remain where removal is disproportionately risky; generic UI, validation and services use neutral abstractions. |
+| D9.10 | Existing **audit records and migration provenance are not rewritten**. |
+| D9.11 | "Evergreen" is a stable contract-extension concept; its **label is terminology-driven**. |
+| D9.12 | Notification dates use the organisation's locale and time zone for user-facing output; timestamps remain UTC. |
+| D9.13 | API and machine exports may use ISO 8601 where documented. |
+| D9.14 | Business-facing CSV and XLSX exports use the requesting organisation's configured formats unless a machine-readable format is explicitly selected. |
+| D9.15 | The platform **does not claim legal validation** of tax identifiers; it validates configured structure and format only. |
+| D9.16 | **No live government registry lookups** in S10. |
+

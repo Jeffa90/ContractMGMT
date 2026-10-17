@@ -158,6 +158,8 @@ public static class PackTestKit
             ["variation.json"] = File.ReadAllText(Path.Combine(root, "workflows", "variation.json")),
             ["notifications.json"] = File.ReadAllText(Path.Combine(root, "notifications", "notification-policy.json")),
             ["terminology.json"] = ThirdPackTerminologyJson(),
+            // A pack that proposes one identifier type and gives it no label of its own: the type is called by the organisation's word for a tax identifier, which this pack renames.
+            ["regional.json"] = """{ "schemaVersion": 1, "mode": "defaults", "identifiers": [ { "key": "xx.company", "label": "", "required": false, "unique": false, "rule": "digits", "length": "9", "checksum": "none", "classification": "Internal", "order": 1 } ] }""",
         };
         return
         [
@@ -165,6 +167,7 @@ public static class PackTestKit
             ("variation.json", "content/variation-workflow.json", "WorkflowVariation", "organisation", 1, true),
             ("notifications.json", "content/notification-policy.json", "NotificationPolicy", "organisation", 1, true),
             TerminologyEntry(),
+            ("regional.json", "content/regional-profile.json", "RegionalProfile", "organisation", 1, false),
         ];
     }
 

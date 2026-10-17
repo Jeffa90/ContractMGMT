@@ -368,9 +368,9 @@ internal static class SecondBusinessScenarios
         var reminders = (await w.InboxAsync("packageManagerA")).Where(n => n.Kind == "Reminder" && n.ContractId == soon).ToList();
         var end = Assert.Single(reminders, n => n.ReminderKind == "endDate");
         Assert.StartsWith("Scheduled completion in", end.Title);
-        // Finding G12 (docs/PORTABILITY_AUDIT.md): notification dates are ISO 8601 for every organisation, an unambiguous platform convention that is neither day-first nor Australian. Formatting them in the organisation's
-        // culture is a generic improvement recorded for S10, not part of this proof.
-        Assert.Matches(@"\b\d{4}-\d{2}-\d{2}\b", end.Body);
+        // Finding G12 (docs/PORTABILITY_AUDIT.md) is fixed by S10: a notification writes its dates in the organisation's own locale (here en-US, month first), never as an ISO string and never day first.
+        Assert.Matches(@"\b\d{1,2}/\d{1,2}/\d{4}\b", end.Body);
+        Assert.DoesNotMatch(@"\b\d{4}-\d{2}-\d{2}\b", end.Body);
         Assert.DoesNotMatch(@"\b(1[3-9]|2\d|3[01])/\d{1,2}/\d{4}\b", end.Body);
         var countBefore = (await w.InboxAsync("packageManagerA")).Count;
         await w.ScanRemindersAsync();

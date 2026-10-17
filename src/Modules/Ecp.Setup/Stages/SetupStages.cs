@@ -410,7 +410,7 @@ internal sealed class OrganisationStage : SetupStageBase
             new("timeZone", "[[regional.time.zone]]", FieldKind.Text, true, "An IANA time zone identifier (Area/Location). Times are stored in UTC and shown in this zone.", Value: regional?.TimeZone ?? d?.TimeZoneId),
             new("currency", "Default currency", FieldKind.Text, true, "A three-letter ISO 4217 currency code. Every amount keeps its own currency; this is the default offered when an amount is entered.", Value: regional?.Currency ?? d?.CurrencyCode),
             new("identifierProfile", "[[supplier.tax.id]] type", FieldKind.Select, false, "Which kind of tax or registration identifier the organisation records for its counterparties. Only the structure of a value is checked; nothing is looked up in a registry.",
-                [new FieldOption("", "(none for now)"), .. profiles.Select(p => new FieldOption(p.Key, p.Label + (p.Country is null ? "" : " (" + p.Country + ")")))], regional?.Identifiers?.OrderBy(p => p.Order).FirstOrDefault()?.Key ?? ""),
+                [new FieldOption("", "(none for now)"), .. profiles.Select(p => new FieldOption(p.Key, p.LabelOr("Tax identifier") + (p.Country is null ? "" : " (" + p.Country + ")")))], regional?.Identifiers?.OrderBy(p => p.Order).FirstOrDefault()?.Key ?? ""),
             new("referencePrefix", "[[contract.reference|sentence]] prefix", FieldKind.Text, true, "Letters and digits, for example CON. References are allocated as PREFIX-0001.", Value: d?.ReferencePrefix ?? "CON"),
         ];
     }

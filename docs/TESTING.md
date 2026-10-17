@@ -507,6 +507,23 @@ Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locke
 
 Found by the tests and fixed: the render sweep found four contract-field labels typed into a Razor tuple literal (finding F1); the first API setup made the administrator tenant-wide, which (correctly) showed the Legal role in the picker because other organisations in reach offer it, so the administrator is now organisation-scoped; many scenario-writing errors against the real services (key prefixes in plan step names, access subject cached per scope, the closed notification vocabulary) were test-side only.
 
+
+### 9.5 S10: regional settings, locale neutrality and tax identifiers
+
+| Area | Tests |
+|---|---|
+| Catalogues, profile document, precedence | `tests/Ecp.UnitTests/RegionalSettingsTests.cs`: currencies, locales, zones and countries are checked against the host's data and no region is privileged; a valid profile round-trips; eleven invalid-profile cases give stable codes; a customer-supplied identifier rule or a markup label is refused; every order of precedence (profile, pack, stored settings, installation, nothing) and the Blank pack that proposes nothing |
+| Formats and daylight saving | dates in en-AU, en-US, de-DE, fr-FR, ja-JP; amounts in AUD, USD and CAD (symbol for the culture's own currency, ISO code otherwise); both offsets of zones with and without daylight saving; date-only values never shifted; PRT-012 theory over en-AU, en-NZ, en-US, de-DE and zones at UTC+10, +13, -8 and -7 |
+| Identifiers | eleven digits as one profile among others, masked, Luhn, alphanumeric, weighted-modulus; normalisation for duplicate keys; unusable profiles refused; no message claims registration or legal validity |
+| Notifications | the closed placeholder list, display and machine tokens for three locales and for no organisation, no guessed currency, unknown tokens fail validation |
+| Coexistence and lifecycle | `RegionalSettingsScenarios` (SQLite and SQL Server wrappers): three regions in one tenant, draft to publish to rollback with audit, blocked publication, cache isolation and invalidation, daylight saving through the stack, classified identifiers never shown or hinted, duplicate prevention, existing values readable and searchable, reminder date in the organisation's format, business and machine exports |
+| Migration | `MigrationIdentifierScenarios`: a value is checked against the configured type (MIG-E027), loaded with provenance and removed on rollback; no identifier type gives MIG-E028 |
+| Through the real host | `tests/Ecp.Api.Tests/RegionalUiTests.cs` (7): access, effective values with sources and preview, a Blank organisation choosing a German profile through the form and then adding a supplier with its own identifier and address labels, an invalid profile refused with the input kept, another organisation not reachable, export choice and no fixed UTC timestamps, readiness `regional`; `LocalisationApiTests` now prove that no installation locale ships |
+| Guard stage C | `VocabularyGuardTests`: 19 detection cases, 8 non-flag cases, the allowance rules (named file, written reason, can only shrink) |
+
+Changed existing tests (reasons recorded in the commit): the page-statement ceiling (42 to 44), reminders now assert the organisation's date format instead of ISO (finding G12 fixed), pack version numbers, the supplier form of an organisation with no identifier type, the localisation API tests, and the onboarding-review wording scan excludes the organisation's own regional section.
+
+Result (local workspace, Release, warnings as errors, locked restore): unit 819, architecture 108, API 114, integration 257 on SQLite (256 SQL Server wrappers NOT VERIFIED locally, run in CI): **1,298 Passed, 0 Failed, 0 Skipped**.
 ## 10. Security regression suite (`Category=Security`)
 
 | ID | Test |

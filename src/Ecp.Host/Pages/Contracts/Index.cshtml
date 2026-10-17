@@ -96,6 +96,13 @@
             if (col.Key == "agreementReference") { <th scope="row"><a href="/Contracts/Details/@row.Id">@row.AgreementReference</a></th> }
             else if (col.Key == "status") { <td>@Model.StatusLabels.GetValueOrDefault(row.Status, row.Status)</td> }
             else if (col.Type == "BOOLEAN") { <td>@(text == "true" ? L["Yes"] : text == "false" ? L["No"] : "")</td> }
+            else if (col.Type == "DATE" && DateOnly.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day)) { <td>@Fmt.Date(day)</td> }
+            else if (col.Type == "DATETIME" && DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var instant)) { <td>@Fmt.DateTime(DateTime.SpecifyKind(instant, DateTimeKind.Utc))</td> }
+            else if ((col.Type == "CURRENCY" || col.Type == "DECIMAL") && decimal.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number))
+            {
+                // An amount is shown in the organisation's number format and, when the row names its currency, with it; one without a currency is just a number.
+                <td>@(col.Type == "CURRENCY" && row.Cells.GetValueOrDefault("currencyCode") is { Length: 3 } code ? Fmt.Money(number, code) : Fmt.Number(number))</td>
+            }
             else { <td>@text</td> }
         }
         </tr>

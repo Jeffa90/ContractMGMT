@@ -70,7 +70,7 @@
       "locale": "en",
       "singular": "ABN",
       "plural": "ABN",
-      "description": "The supplier's Australian Business Number. The format check built in today is eleven digits."
+      "description": "The supplier's Australian Business Number. Its eleven-digit format check is the au.abn identifier type in the regional profile of this pack; it checks structure only and is not a registry lookup."
     },
     {
       "key": "erp.reference",
@@ -329,6 +329,27 @@
       "locale": "en-US",
       "singular": "Organization",
       "plural": "Organizations"
+    },
+    {
+      "key": "address.locality",
+      "locale": "en",
+      "singular": "Suburb or City",
+      "plural": "Suburb or City",
+      "description": "The suburb or city of an address."
+    },
+    {
+      "key": "address.region",
+      "locale": "en",
+      "singular": "State or Territory",
+      "plural": "State or Territory",
+      "description": "The state or territory of an address."
+    },
+    {
+      "key": "address.postal",
+      "locale": "en",
+      "singular": "Postcode",
+      "plural": "Postcode",
+      "description": "The postcode of an address."
     }
   ],
   "groups": [

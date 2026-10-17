@@ -114,7 +114,7 @@ internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IA
             if (!check.Valid) throw new DomainException(check.Code ?? "identifier_invalid", $"[[supplier.tax.id]]: {check.Message}");
         }
         foreach (var required in settings.Identifiers.Where(i => i.Required))
-            if (r.IdentifierSource == IdentifierSources.Manual && !wanted.Any(w => w.Type == required.Key)) throw new DomainException("identifier_required", $"{required.Label} is required.");
+            if (r.IdentifierSource == IdentifierSources.Manual && !wanted.Any(w => w.Type == required.Key)) throw new DomainException("identifier_required", $"{required.LabelOr("[[supplier.tax.id]]")} is required.");
         if (r.Address is { IsEmpty: false } address)
         {
             var problems = address.Check(settings.Address);

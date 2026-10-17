@@ -39,6 +39,13 @@ public static class RegionalSamples
 
     public static IReadOnlyList<RegionalSample> Build(RegionalSettings s)
     {
+        // A value the host cannot use (an unavailable zone, an unknown locale) must not break the page that is there to show the problem.
+        try { return BuildCore(s); }
+        catch (DomainException ex) { return [new("Preview", "Not available until the problems listed are corrected (" + ex.Message + ").")]; }
+    }
+
+    private static List<RegionalSample> BuildCore(RegionalSettings s)
+    {
         var samples = new List<RegionalSample>();
         var fmt = s.Formatter();
         var undecided = "(not decided: shown in the invariant form)";
@@ -55,7 +62,7 @@ public static class RegionalSamples
         }
         else samples.Add(new("Amount", "(no default currency decided: every amount must say its own currency)"));
         samples.Add(new("Address fields used", string.Join(", ", AddressProfile.FieldKeys.Where(k => s.Address.Spec(k).Used).Select(k => k + (s.Address.Spec(k).Required ? " (required)" : "")))));
-        samples.Add(new("Tax identifier types", s.Identifiers.Count == 0 ? "(none set up: no identifier is recorded or asked for)" : string.Join(", ", s.Identifiers.OrderBy(i => i.Order).Select(i => i.Label + (i.Country is null ? "" : " [" + i.Country + "]")))));
+        samples.Add(new("Tax identifier types", s.Identifiers.Count == 0 ? "(none set up: no identifier is recorded or asked for)" : string.Join(", ", s.Identifiers.OrderBy(i => i.Order).Select(i => i.LabelOr("Tax Identifier") + (i.Country is null ? "" : " [" + i.Country + "]")))));
         return samples;
     }
 

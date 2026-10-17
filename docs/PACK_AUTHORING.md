@@ -109,3 +109,20 @@ A test (`A_third_pack_the_repository_has_never_seen_runs_a_contract_with_no_sour
 * **Approver groups and roles keep their stable identifiers.** A pack names them for display through terminology (`groups`, `roles`) and may hide a role from pickers; it never renames a code.
 
 Build, sign and check it like any pack: `tools/check-packs.sh` builds all three shipped packs twice, compares them byte for byte, signs and verifies each with an ephemeral key and refuses tampered, wrong-key and unsigned packs.
+
+## 7. The regional profile document (S10; `docs/REGIONAL_SETTINGS.md`)
+
+A pack may carry one `RegionalProfile` document (kind `RegionalProfile`, scope `organisation`, optional; example `templates/packs/jbs-procurement/regional/regional-profile.json`). In a pack the mode is `defaults`: every value is a **proposal**. All members are optional; a pack that proposes nothing (Blank) leaves the choice to the organisation.
+
+```json
+{ "schemaVersion": 1, "mode": "defaults", "country": "CA", "locale": "fr-CA", "supportedLocales": ["fr-CA", "en-CA"],
+  "currency": "CAD", "supportedCurrencies": ["CAD", "USD"], "timeZone": "America/Toronto", "timeDisplay": "24h", "phoneRegion": "CA",
+  "identifiers": [ { "key": "ca.bn", "label": "Business Number", "country": "CA", "required": false, "unique": true,
+                     "rule": "digits", "length": "9", "checksum": "luhn", "classification": "Internal", "order": 1 } ],
+  "address": { "fields": [ { "key": "line1", "used": true, "required": true }, { "key": "region", "used": false, "required": false } ] } }
+```
+
+* Codes are validated against the platform catalogues (BCP 47, ISO 4217, ISO 3166, IANA zones available on the host). **No format string or regular expression is accepted**; identifier rules are `free`, `digits`, `alphanumeric`, `mask` with the checksums `none`, `luhn`, `mod89-weighted`. A label is plain text (no markup or template syntax); an empty label means "the organisation's word for a tax identifier".
+* The document is content-hashed and signed with the rest of the pack. Assigning the pack prepares a draft that inherits from this pack version; the organisation publishes it or overrides any value.
+* Pack authors must not put customer data or real identifiers in a pack; the shipped examples use synthetic structures only.
+* Terminology for address labels (`address.*`) belongs in the pack's terminology document (JBS and Harborline show how).

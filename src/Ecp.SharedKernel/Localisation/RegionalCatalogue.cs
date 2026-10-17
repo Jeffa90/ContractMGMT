@@ -117,6 +117,9 @@ public static class IdentifierVerification
 /// <summary>One kind of counterparty identifier an organisation records: its key, its label, the country it applies to, and the structural rule applied to values.</summary>
 public sealed record IdentifierTypeProfile(string Key, string Label, string? Country, bool Required, bool Unique, string Rule, string? Length, string? Mask, string Checksum, string Classification = "Internal", int Order = 0)
 {
+    /// <summary>What people read. A type with no label of its own is called by the organisation's word for a tax identifier (the terminology key <c>supplier.tax.id</c>), so a pack that only renames that word renames the field.</summary>
+    public string LabelOr(string fallback) => string.IsNullOrWhiteSpace(Label) ? fallback : Label;
+
     public bool IsPrimary(IReadOnlyList<IdentifierTypeProfile> all) => all.OrderBy(p => p.Order).ThenBy(p => p.Key, StringComparer.Ordinal).FirstOrDefault()?.Key == Key;
 }
 
@@ -149,8 +152,8 @@ public static class IdentifierRules
         if (p.Checksum == IdentifierChecksums.Mod89Weighted && Range(p) is not (11, 11))
             found.Add(("identifier_checksum_length", "The weighted modulus-89 checksum applies to eleven digits."));
         if (p.Country is not null && !RegionalCatalogue.IsCountry(p.Country)) found.Add(("identifier_country", $"'{p.Country}' is not a country or region code."));
-        if (string.IsNullOrWhiteSpace(p.Label) || p.Label.Length > 60 || p.Label.Any(char.IsControl) || p.Label.IndexOfAny(['<', '>', '{', '}', '$', '@', '[', ']', '&']) >= 0)
-            found.Add(("identifier_label", "A label is plain text of 1 to 60 characters."));
+        if (!string.IsNullOrEmpty(p.Label) && (p.Label.Length > 60 || p.Label.Any(char.IsControl) || p.Label.IndexOfAny(['<', '>', '{', '}', '$', '@', '[', ']', '&']) >= 0))
+            found.Add(("identifier_label", "A label is plain text of up to 60 characters. Leave it empty to use the organisation's word for a tax identifier."));
         return found;
     }
 

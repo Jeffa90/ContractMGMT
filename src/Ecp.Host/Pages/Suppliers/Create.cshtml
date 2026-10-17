@@ -23,7 +23,7 @@
     {
         var id = "Identifier_" + t.Key.Replace('.', '_');
         <div class="field">
-            <label for="@id">@t.Label@(t.Required ? "" : "")</label>
+            <label for="@id">@t.Label</label>
             <input id="@id" name="Identifier[@t.Key]" type="text" maxlength="80" value="@(Model.Identifier.TryGetValue(t.Key, out var v) ? v : "")" aria-describedby="@(id)-hint" required="@t.Required" />
             <p id="@(id)-hint" class="hint">@L["The format is checked ({0}). A registry lookup is not performed and a value that fits the format is not thereby verified.", t.Hint]</p>
         </div>

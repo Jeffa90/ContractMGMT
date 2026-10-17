@@ -1,4 +1,5 @@
 using Ecp.Configuration;
+using Ecp.Identity;
 using Ecp.SharedKernel;
 using Ecp.SharedKernel.Localisation;
 using Ecp.Tenancy;
@@ -12,7 +13,7 @@ namespace Ecp.Host.Pages.Admin.Regional;
 /// The page is a form over the regional-profile configuration kind: saving only changes the draft; validating, previewing, publishing and rolling back are the ordinary lifecycle, with its permissions, versions and audit.
 /// </summary>
 [Authorize(Policy = "perm:config.draft|config.history.read")]
-public sealed class IndexModel(IRegionalAdministration regional, IConfigurationService configuration, IOrganisationStructureService organisations) : EcpPageModel
+public sealed class IndexModel(IRegionalAdministration regional, IConfigurationService configuration, IOrganisationStructureService organisations, IAccessService access) : EcpPageModel
 {
     public sealed class IdentifierRow
     {
@@ -65,7 +66,9 @@ public sealed class IndexModel(IRegionalAdministration regional, IConfigurationS
 
     private async Task<Guid> ResolveAsync(CancellationToken ct)
     {
-        Organisations = await organisations.ListOrganisationsAsync(ct);
+        // Only the organisations in which the person may draft or read the history of configuration; naming any other is a plain not-found.
+        var grants = (await access.GrantsAsync("config.draft", ct)).Concat(await access.GrantsAsync("config.history.read", ct)).ToList();
+        Organisations = (await organisations.ListOrganisationsAsync(ct)).Where(o => grants.Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(o.Id))).ToList();
         if (OrganisationId is { } given && Organisations.All(o => o.Id != given)) throw new ResourceNotFoundException();
         OrganisationId ??= Organisations.FirstOrDefault()?.Id;
         if (OrganisationId is not { } org) throw new ResourceNotFoundException();

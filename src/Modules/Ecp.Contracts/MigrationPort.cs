@@ -88,7 +88,7 @@ public interface IMigrationIdentifierChecker
 internal sealed class MigrationIdentifierChecker(Ecp.SharedKernel.Localisation.IdentifierTypeProfile? profile) : IMigrationIdentifierChecker
 {
     public string? TypeKey => profile?.Key;
-    public string? Label => profile?.Label;
+    public string? Label => profile?.LabelOr("[[supplier.tax.id]]");
     public Ecp.SharedKernel.Localisation.IdentifierCheck Check(string value) => profile is null
         ? new(false, "", "identifier_type_unknown", "No tax identifier type is set up for this organisation.") : Ecp.SharedKernel.Localisation.IdentifierRules.Check(profile, value);
 }

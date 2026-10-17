@@ -165,3 +165,11 @@ The Harborline pack (`docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`) sets 52 terms: al
 * **Dates in notifications and pages are ISO** (G12), not locale-formatted; it is neutral but not yet en-US in appearance. Recorded in `docs/PORTABILITY_AUDIT.md`, not changed.
 * **The Pack step of onboarding lists every installed pack by name**, so it is the one page the leak scan does not apply to.
 * **The role picker hides a role only when every organisation in the administrator's reach hides it.** A tenant-wide administrator still sees Legal while any organisation offers it.
+
+## 17. Regional, address and identifier wording (S10; `docs/REGIONAL_SETTINGS.md`)
+
+* **New keys** (platform neutral wording in brackets): `supplier.identifier` (Identifier), `address` (Address), `address.line1` (Address Line 1), `address.line2` (Address Line 2), `address.locality` (City or Locality), `address.region` (State, Province or Region), `address.postal` (Postal Code), `address.country` (Country or Region), `regional.country` (Country or Region), `regional.locale` (Locale), `regional.time.zone` (Time Zone), `regional.date.format` (Date Format), `regional.time.display` (Time Display). `supplier.tax.id` stays "Tax Identifier".
+* **Per business**: Blank keeps the neutral wording; JBS Procurement says Suburb or City, State or Territory, Postcode and ABN (2.6.0); Harborline says City, State, ZIP Code and Tax Identifier (1.1.0). An organisation can override any of them like any other term.
+* **A tax identifier type with no label of its own** (`"label": ""` in a regional profile) is called by the organisation's word for `supplier.tax.id`, so a pack that only renames the term renames the field. A type with a label (such as "ABN" or "Federal Tax ID") shows that label.
+* **Evergreen** is the stable *code* of an extension type; the words people read are `field.evergreen` (neutral: Evergreen). Fixed "Evergreen" text is refused by guard stage C. Critical Notice and Notice Period were already keys (`field.critical.notice`, `field.notice.period`).
+* Exports and notifications use these words; a machine export keeps stable column keys.

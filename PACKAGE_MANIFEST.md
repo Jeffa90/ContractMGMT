@@ -40,6 +40,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0030-configurable-capabilities.md`
 - `decisions/ADR-0031-pack-validation-of-organisation-dependent-documents.md`
 - `decisions/ADR-0032-second-business-as-configuration-only.md`
+- `decisions/ADR-0033-regional-settings-and-counterparty-identifiers.md`
 - `docs/ARCHITECTURE.md`
 - `docs/CAPABILITIES.md`
 - `docs/DOCUMENT_INDEX.md`
@@ -57,9 +58,11 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `docs/REPOSITORY_REVIEW.md`
 - `docs/ROLE_CATALOGUE_ADR.md`
 - `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`
+- `docs/REGIONAL_SETTINGS.md`
 - `docs/S9_READINESS.md`
 - `docs/SECOND_BUSINESS_PROOF.md`
 - `docs/SECURITY.md`
+- `docs/TAX_IDENTIFIERS.md`
 - `docs/TERMINOLOGY.md`
 - `docs/TESTING.md`
 - `docs/THREAT_MODEL.md`

@@ -203,7 +203,7 @@
       "locale": "en",
       "singular": "Tax Identifier",
       "plural": "Tax Identifiers",
-      "description": "The supplier's national business or tax identifier. The format check built in today is eleven digits."
+      "description": "The subcontractor's tax identifier, in this pack's words. Its structure check is the us.ein identifier type in the regional profile of this pack; it checks structure only and is not a registry lookup."
     },
     {
       "key": "erp.reference",
@@ -364,6 +364,27 @@
       "locale": "en-US",
       "singular": "Company",
       "plural": "Companies"
+    },
+    {
+      "key": "address.locality",
+      "locale": "en",
+      "singular": "City",
+      "plural": "City",
+      "description": "The city of an address."
+    },
+    {
+      "key": "address.region",
+      "locale": "en",
+      "singular": "State",
+      "plural": "States",
+      "description": "The state of an address."
+    },
+    {
+      "key": "address.postal",
+      "locale": "en",
+      "singular": "ZIP Code",
+      "plural": "ZIP Codes",
+      "description": "The ZIP code of an address."
     }
   ],
   "groups": [

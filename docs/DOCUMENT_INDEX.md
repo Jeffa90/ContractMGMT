@@ -83,3 +83,5 @@ Not verified (cannot be, before code exists): that the proposed test IDs pass, t
 `docs/SECOND_BUSINESS_PROOF.md` (the second business: design, pack design, acceptance criteria, tests and risks for PRT-002, PRT-004 and PRT-013, and in section 16 the S9 results), `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md` (the shipped Harborline Construction pack: contents, lifecycle, change orders, approvals, words, installation and limits), `decisions/ADR-0032-second-business-as-configuration-only.md`.
 
 `docs/S9_READINESS.md` (readiness review of the S9 findings G1 to G10: classification, ranking, order, effort and risk).
+
+`docs/REGIONAL_SETTINGS.md` (S10: organisation locale, currency, time zone, address profile, resolver order, formats in pages, messages and exports), `docs/TAX_IDENTIFIERS.md` (S10: configurable counterparty identifier types, structural checks, access, compatibility for ABN data), `decisions/ADR-0033-regional-settings-and-counterparty-identifiers.md`.

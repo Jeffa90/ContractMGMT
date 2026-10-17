@@ -108,6 +108,7 @@ public sealed class IndexModel(IContractViews views, IContractRegister register,
         FoldFilterRows();
         if (string.IsNullOrWhiteSpace(View)) View = DefaultView;
         Organisations = await organisations.ListOrganisationsAsync(ct);
+        if (Org is { } chosen && Organisations.Any(o => o.Id == chosen)) await Format.UseAsync(chosen, ct);     // dates and amounts follow the organisation being looked at
         Views = await views.ListAsync(Org, ct);
         StatusLabels = await labels.AllAsync(ct);
         Catalogue = await register.CatalogueAsync(Org, ct);

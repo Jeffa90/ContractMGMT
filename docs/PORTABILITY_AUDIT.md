@@ -162,6 +162,72 @@ Harborline Construction (`construction-subcontracts` 1.0.0, a synthetic US gener
 
 **Closed by S9:** the "second business cannot run" objection of P-03/PRT-002; the field-label gap of PRT-004. **First incomplete remediation task:** S10 (regional defaults and tax-identifier formats).
 
+## 0.9 Status after slice S10 (regional defaults, locale neutrality and configurable tax identifiers; 2026-10-17)
+
+Slice S10 audited every regional assumption, then replaced the Australian and fixed-format assumptions in generic code with organisation settings (docs/REGIONAL_SETTINGS.md, docs/TAX_IDENTIFIERS.md, ADR-0033, owner decisions D9). The audit method is the one in section 12, with the regional terms below, run at the S9 baseline commit `ded66bf` (before S10) and again at the S10 head.
+
+### 0.9.1 Classification used for regional findings
+
+1. **Neutral platform violation** (generic code that assumes a country, locale, currency, zone, identifier format or label). 2. **Pack-specific configuration** (the JBS or Harborline pack proposing its own region). 3. **Compatibility reference** (a name kept so existing data stays readable). 4. **Migration profile** (a profile for a named source system). 5. **Historical migration or audit reference** (an existing migration or audit text that must not be rewritten). 6. **Machine-readable technical format** (ISO 8601 and invariant values read by programs). 7. **Synthetic fixture** (sample data, tests). 8. **Documentation example**. 9. **Legitimate installation-level setting** (used only where no organisation exists, with a documented reason).
+
+### 0.9.2 Occurrence counts at the S9 baseline (lines matching, tracked text files)
+
+| Term | `src/` | `tests/` | `templates/` | `sample-data/`, `migration-samples/`, `tools/`, `deploy/` | Docs, requirements, decisions |
+|---|---|---|---|---|---|
+| `en-AU` | 19 in 10 files | 47 in 21 | 5 in 3 | 2 | 24 |
+| `AUD` | 6 in 5 | 83 in 35 | 1 | 18 | 112 |
+| Australia/Brisbane | 5 in 5 | 24 in 11 | 1 | 0 | 0 |
+| `Brisbane` | 7 in 5 | 36 in 15 | 1 | 0 | 12 |
+| `Australia`, `Australian` | 10 in 6 | 90 in 25 | 7 | 4 | 52 |
+| `ABN` (whole word) | 2 in 2 | 9 in 6 | 2 | 0 | 35 |
+| `ACN` | 0 | 0 | 0 | 0 | 1 |
+| "eleven" (digit rule) | 4 in 3 | 3 in 2 | 2 | 0 | 25 |
+| day-first date patterns (dd/MM/yyyy) | 0 | 3 in 1 | 0 | 0 | 0 |
+| `Postcode`, `ZIP`, State/Province (words) | 11 in 4 (archive ZIP and a currency hint) | 3 | 0 | 5 | 40 |
+| "Evergreen" | 27 in 12 | 18 in 9 | 0 | 4 | 36 |
+| `yyyy-MM-dd HH:mm` printed in a business page | 58 in 26 | 1 | 0 | 0 | 0 |
+| `en-US` | 5 in 5 | 17 in 10 | 6 in 5 | 0 | 21 |
+| America/Chicago, `Chicago` | 0 | 17 in 7 | 1 | 0 | 15 |
+| `USD`, `GBP`, `EUR`, `CAD`, `NZD` | 3 in 3 | 46 in 12 | 9 in 3 | 4 | 23 |
+
+### 0.9.3 Findings in `src/` (class 1 unless stated) and their S10 disposition
+
+| ID | Finding | Class | Disposition |
+|---|---|---|---|
+| **G2** | `Supplier.NormaliseAbn`: "must be eleven digits" for every business | 1 | **Fixed.** Configurable identifier types with a closed structural rule catalogue; the eleven-digit rule is now the JBS pack's `au.abn` profile entry |
+| **G12** | ISO dates in notification messages, and `yyyy-MM-dd HH:mm UTC` in about 60 page cells | 1 | **Fixed.** Notification tokens and `PageFormat` render the organisation's locale and zone; explicit-UTC strings written by the approval and lifecycle engines stay (class 6) |
+| R-03 / `LocalisationOptions` defaults `en-AU`, Australia/Brisbane, `AUD`, `SupportedCultures` en-AU and en-US | `LocaleFormatter.cs`, `appsettings.json` | 1 | **Fixed.** Defaults are empty; the installation fall-back is applied only where no organisation exists (class 9) |
+| `new LocaleFormatter("en-AU", "Australia/Brisbane", "AUD")` fall-backs | `OrgLocale.cs`, `MigrationPageModel.cs` | 1 | **Fixed.** Replaced by the resolver and `PageFormat`; invariant formatter when nothing is decided |
+| `CultureInfo.GetCultureInfo("en-AU")` for custom-field parsing outside an organisation | `CustomFields.cs` | 1 | **Fixed.** Invariant fall-back |
+| Probe asserts Australian zone rules (`GlobalisationProbe`) | `GlobalisationProbe.cs` | 1 | **Fixed.** Neutral multi-region sample probe; allowed in the guard because it formats a sample date in several regions to prove culture data, setting no default |
+| `Supplier.Abn` column and "invalid_abn" code | `Contracts.cs`, `ContractsDbContext.cs` | 3 | **Kept by design (D9.9).** The property is `TaxIdentifier`; the column name `Abn` is retained, widened to 64, as the projection of the primary identifier type. Two file-specific guard allowances |
+| `Fixed "Evergreen"` in `system-views.json`, the configuration page, the contract page badge | UI text | 1 | **Fixed.** Terminology key `field.evergreen`; the stable code `Evergreen` is unchanged (`ExtensionTypes.OpenEnded = "Evergreen"`) |
+| `L["Estimated value"]` in Migration reconciliation (finding L1) | Razor | 1 | **Fixed.** Terminology key `field.estimated.value` |
+| "ABN" in comments (`ContractAccess.cs`, `RegisterEngine.cs`) | comments | 8 | Reworded |
+| Currency hint "for example USD" / "for example EUR", `pt-BR or en-GB` in setup help | text | 1 | **Fixed.** No example currency or locale is named |
+| `_Picker.cshtml` suggests `en-AU`, `en-US`, `en-GB` | Razor | 1 | **Fixed.** Suggestions come from the host's culture data |
+| `en-AU` in validation messages and comments (`TerminologyDocument`, `PackManifest`, `TermSet`) | messages | 8 | Reworded (`fr-CA`) |
+| `en-US` row in `TermCatalogue` (spelling variant of one label) | catalogue | 9 | Kept: a language variant keyed by locale, not a regional default. One guard allowance |
+| ISO 4217 code list in `RegionalCatalogue.cs` includes AUD, USD | validator catalogue | 9 | Kept: a closed list of accepted codes. Two guard allowances (the list; the checksum message) |
+| `NumberFormat.CurrencySymbol` in `LocaleFormatter` | formatter | 9 | Kept: the single formatter, only for the culture's own currency. One allowance |
+| Resource files hold Australian English spelling ("Organisation") | `SharedResource` | 9 | Language of text, not a regional default; unchanged. Page-text localisation stays Future |
+| `R-AUD-01` | `SetupChecks.cs`, `tools/check-repo.py` | 8 | "AUD" is the audit requirement prefix, not a currency. One allowance |
+| Approval-engine trace and "acts on behalf of … until … UTC" text | `MatrixEvaluator.cs`, `ApprovalParticipants.cs`, `RegisterAuthorisation.cs` | 6 | **Kept, documented.** Stored explanation text with explicit ISO/UTC; not rewritten (D9.10) |
+| Machine formats (`yyyy-MM-dd`, `…Z`) in codecs, API payloads, audit hash input, file names | many | 6 | Kept: documented invariant formats |
+| Migration sample profile maps an `ABN`-style column; Medius-style columns | `migration-samples/`, `sample-data/` | 4, 7 | Kept as sample/migration data |
+| Tests and fixtures using en-AU, AUD, Brisbane, en-US, America/Chicago | `tests/` | 7 | Kept; the test project is not scanned by the guard. Helpers that provision organisations state their synthetic settings |
+| Pack sources `templates/packs/*` (JBS en-AU/AUD/Brisbane/ABN; Harborline en-US/USD/Chicago) | packs | 2 | Kept: the packs *propose* these; the organisation decides |
+| Documentation | docs | 8 | Updated where it described the old behaviour |
+
+### 0.9.4 What is closed and what is not
+
+* **Closed:** G2, G12, L1, R-03, and the "Evergreen" part of R-04; PRT-012 is evidenced for creation, display, notification and export (section 0.9.5).
+* **Still open:** R-01 (a few ERP-named core columns outside the tax identifier), R-02 ("Legal Privileged" constant), page-text translation (Future), a registry-verification adapter (Future, Not Implemented), per-country address validation (not planned).
+
+### 0.9.5 Guard stage C
+
+`VocabularyGuardTests` now refuses any country's locale, currency, zone, identifier word (`ABN`, `ACN`, "eleven-digit"), currency symbol, address word (`Postcode`, `ZIP code`, `Suburb`, State/Province), fixed "Evergreen" wording, day-first or month-first date pattern, and a page timestamp printed with `ToString("yyyy-MM-dd HH:mm")` or `ToString("u")`, outside ten file-specific, reasoned allowances (the list can only shrink; a stale allowance fails the build). The previous installation-level allowances (appsettings, `LocaleFormatter` defaults, `OrgLocale`, `MigrationPageModel`, `CustomFields`, and four message and picker files) were removed because the code no longer needs them.
+
 ## 1. Scope, method and classification
 
 ### 1.1 What was scanned

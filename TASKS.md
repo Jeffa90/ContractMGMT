@@ -10,7 +10,21 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-17, end of S9: the second business proof)
+## Current state (2026-10-17, end of S10: regional defaults, locale neutrality and configurable tax identifiers)
+
+**S10 (this pass; `docs/REGIONAL_SETTINGS.md`, `docs/TAX_IDENTIFIERS.md`, `decisions/ADR-0033-regional-settings-and-counterparty-identifiers.md`, owner decisions D9, `docs/PORTABILITY_AUDIT.md` section 0.9, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.17).**
+
+* **Regional profile and resolver (Implemented).** `RegionalProfile` configuration kind (closed catalogues; draft, validate, preview, publish, version, rollback, audit); one resolver (profile, pinned pack, stored organisation settings, installation fall-back only without an organisation, invariant); cache by tenant, organisation and version; `/Admin/Regional`; setup and onboarding integration; readiness check `regional`. Installation defaults ship empty.
+* **Tax identifiers (Implemented).** Typed `SupplierIdentifier` rows with closed structural rules and checksums, classification gate, organisation-scoped uniqueness, provenance, migration target `supplier.taxIdentifier` (MIG-E027, MIG-E028); the `Abn` column is kept as the projection and every existing value is backfilled as `au.abn`. Structure only: no legal-validity claim; registry verification **Not Implemented**.
+* **Formatting (Implemented).** Pages (about sixty timestamp cells, dates, the register list), dashboards, reminders ("today" per organisation), notification placeholders, migration reports, business and machine exports.
+* **Terminology and packs (Implemented).** `address.*`, `regional.*`, `supplier.identifier`; Blank 1.6.0, JBS Procurement 2.6.0 (Suburb or City, State or Territory, Postcode, ABN), Construction Subcontracts 1.1.0 (City, State, ZIP Code).
+* **Guard stage C (Implemented).** Six new rules and one widened, ten file-specific allowances, stale allowances fail.
+* **Defects found and fixed by the work.** The identifier write path ignored the classification dimension; the page-statement ceiling moved 42 to 44.
+* **Verification.** Local: **1,298 Passed, 0 Failed, 0 Skipped, 256 NOT VERIFIED** (the SQL Server wrappers; unit 819, architecture 108, API 114, integration 257 on SQLite). `tools/check-repo.py`, `tools/check-packs.sh` and the locked restore pass. CI and container results: `deploy/STATUS.md`.
+* **Not done, by design:** registry verification, FX, address validation for any country, page-text translation, reporting integration, public API, SaaS control plane, Professional Services, a PR.
+* **First incomplete remediation task:** none in the S1 to S10 list (open: R-01, R-02). **First incomplete product task:** INT-03's live e-signature adapter (unchanged).
+
+## Previous state (2026-10-17, end of S9: the second business proof)
 
 **S9 (this pass; `docs/SECOND_BUSINESS_PROOF.md` section 16, `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`, `decisions/ADR-0032-second-business-as-configuration-only.md`, `docs/PORTABILITY_AUDIT.md` section 0.8, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.16).**
 

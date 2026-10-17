@@ -453,3 +453,16 @@ Implemented on the owner's instruction of 2026-10-17.
 * **S9-discovered generic fix F1.** One platform source file changed (`_ContractFields.cshtml`) because four labels bypassed terminology; the stage-B guard gained a rule for that pattern.
 * **Exit criteria.** "A second business installs and runs end to end with no source change": met (PRT-002). "No default term remains where the pack sets one": met for the swept page set, exports and notifications (PRT-004). "Role, state and approver-group names shown to people come from data": met (PRT-013).
 * **Not done, by design:** S10 (regional defaults, tax-identifier formats, ISO dates in notifications), sell-side Professional Services (the preferred third business), any construction product feature, PRT-005/006/009/011. **First incomplete remediation task:** S10.
+
+### 8.17 S10: regional defaults, locale neutrality, country-aware organisation settings and configurable counterparty tax identifiers (ADR-0033)
+
+Implemented on the owner's instruction of 2026-10-17 (decisions D9.1 to D9.16 in `requirements/01-authoritative/CONFIRMED_DECISIONS.md`). Detail: `docs/REGIONAL_SETTINGS.md`, `docs/TAX_IDENTIFIERS.md`, `docs/PORTABILITY_AUDIT.md` section 0.9.
+
+* **Regional profile (Implemented).** `RegionalProfile` configuration kind, closed catalogues, one resolver with the order profile, pinned pack version, stored organisation settings, installation fall-back (only without an organisation), invariant; cache by tenant, organisation and version; `/Admin/Regional` with preview and history; setup and onboarding integration; readiness check `regional`.
+* **Tax identifiers (Implemented).** Typed, normalised, classified identifiers with structural rules from a closed catalogue; JBS `au.abn`, Harborline `us.ein`, Blank none; ABN data backfilled by an additive migration and projected by the old column; migration target `supplier.taxIdentifier` (MIG-E027, MIG-E028); no legal-validity claim and no registry lookup (**Not Implemented**, reserved statuses).
+* **Formatting (Implemented).** `PageFormat` on about sixty page cells, the register list, dashboards, reminders ("today" per organisation), notification placeholders, migration reports, business and machine exports.
+* **Terminology (Implemented).** `address.*`, `regional.*` and `supplier.identifier` keys; pack wording for JBS and Harborline; "Evergreen" is a code, `field.evergreen` is the label.
+* **Packs.** Blank 1.6.0, JBS Procurement 2.6.0, Construction Subcontracts 1.1.0.
+* **Guard stage C (Implemented).** Any country's regional literals refused outside ten file-specific allowances; six new rules and one widened.
+* **Defects found by the work.** The identifier write path ignored the classification dimension when checking read access (fixed, tested); one page-statement ceiling moved from 42 to 44.
+* **Not done, by design:** a registry verification adapter, FX conversion, address validation for any country, page-text translation, reporting integration, public API formats, SaaS control plane, Professional Services. **First incomplete remediation task:** none in the original S1 to S10 list; open items are R-01, R-02 and the Future items above.

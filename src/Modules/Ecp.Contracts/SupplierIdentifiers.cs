@@ -45,7 +45,7 @@ internal sealed class SupplierIdentifierService(ContractsDbContext db, IAccessSe
     IRegionalSettingsResolver regional, ITerminologyResolver terminology) : ISupplierIdentifiers, ISupplierIdentifierWriter
 {
     private ResourceDescriptor Resource(Guid organisationId, Guid? supplierId = null, string? classification = null)
-        => new("Supplier", tenant.RequireTenantId(), organisationId, Id: supplierId?.ToString() ?? "new", Classification: classification, Dimensions: ScopeDimensions.OrganisationOnly);
+        => new("Supplier", tenant.RequireTenantId(), organisationId, Id: supplierId?.ToString() ?? "new", Classification: classification, Dimensions: classification is null ? ScopeDimensions.OrganisationOnly : ScopeDimensions.OrganisationOnly | ScopeDimensions.Classification);
 
     private static string Hint(IdentifierTypeProfile p) => p.Rule switch
     {
@@ -60,8 +60,9 @@ internal sealed class SupplierIdentifierService(ContractsDbContext db, IAccessSe
         await access.RequireAsync("suppliers.read", Resource(organisationId), ct);
         var settings = await regional.GetAsync(organisationId, ct);
         var primary = settings.PrimaryIdentifier?.Key;
+        var generic = (await terminology.GetAsync(organisationId, null, ct)).Expand("[[supplier.tax.id]]");
         return settings.Identifiers.OrderBy(i => i.Order).ThenBy(i => i.Key, StringComparer.Ordinal)
-            .Select(i => new IdentifierTypeInfo(i.Key, i.Label, i.Country, i.Required, i.Unique, i.Classification, Hint(i), i.Key == primary)).ToList();
+            .Select(i => new IdentifierTypeInfo(i.Key, i.LabelOr(generic), i.Country, i.Required, i.Unique, i.Classification, Hint(i), i.Key == primary)).ToList();
     }
 
     public async Task<IdentifierCheck> CheckAsync(Guid organisationId, string typeKey, string value, CancellationToken ct = default)
@@ -99,7 +100,7 @@ internal sealed class SupplierIdentifierService(ContractsDbContext db, IAccessSe
         foreach (var r in rows.Where(r => readable.Contains(r.Classification)).OrderBy(r => settings.Identifier(r.TypeKey)?.Order ?? int.MaxValue))
         {
             var profile = settings.Identifier(r.TypeKey);
-            var label = profile?.Label ?? words.Expand("[[supplier.tax.id]]");
+            var label = profile?.LabelOr(words.Expand("[[supplier.tax.id]]")) ?? words.Expand("[[supplier.tax.id]]");
             var shown = profile is { Rule: IdentifierRuleKinds.Mask } ? IdentifierRules.Display(profile, r.NormalisedValue) : r.Value;
             items.Add(new SupplierIdentifierItem(r.Id, r.SupplierId, r.TypeKey, label, shown, r.VerificationStatus, r.SourceKind, r.SourceSystem, r.Classification, r.TypeKey == primary));
         }
@@ -127,7 +128,7 @@ internal sealed class SupplierIdentifierService(ContractsDbContext db, IAccessSe
     private async Task<Guid> RecordAsync(Guid organisationId, Guid supplierId, RegionalSettings settings, IdentifierTypeProfile profile, string value, string sourceKind, string? sourceSystem, Guid? batch, CancellationToken ct)
     {
         var check = IdentifierRules.Check(profile, value);
-        if (!check.Valid) throw new DomainException(check.Code ?? "identifier_invalid", $"[[supplier.tax.id]] '{profile.Label}': {check.Message}");
+        if (!check.Valid) throw new DomainException(check.Code ?? "identifier_invalid", $"{profile.LabelOr("[[supplier.tax.id]]")}: {check.Message}");
         var tenantId = tenant.RequireTenantId();
         if (await db.SupplierIdentifiers.AnyAsync(i => i.SupplierId == supplierId && i.TypeKey == profile.Key && i.NormalisedValue == check.Normalised && i.EffectiveToUtc == null, ct))
             throw new DomainException("identifier_already_recorded", "That value is already recorded for this [[supplier|lower]].");

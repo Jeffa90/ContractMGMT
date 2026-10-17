@@ -273,3 +273,10 @@ Recorded in `TASKS.md` (MGR-ASM-*). In short:
 * The UI commits synchronously within the request (resumable); a background worker is **Future**.
 * Rollback preview for categories is indicative: a child is judged on its own when the rollback runs.
 * SQL Server proof depends on the disposable container; when unavailable those tests are **NOT VERIFIED**.
+
+## 14. Counterparty tax identifiers and regional formats (S10; `docs/TAX_IDENTIFIERS.md`)
+
+* Mapping target **`supplier.taxIdentifier`** loads the organisation's *primary* identifier type. It is checked with the same structural rule as a manual entry: **MIG-E027** when the value does not fit the configured structure, **MIG-E028** when the organisation has no identifier type. A row with no value loads without one. Existing profiles that mapped the old ABN column map to this target; the source column name is the profile's, not the platform's.
+* Loaded identifiers carry provenance (source kind Migration, batch, source system) and verification status Format Valid (structure only). Rolling a batch back removes the identifiers that batch created.
+* **Dates** in a source file still need an explicit `Format=` (the wizard never guesses day or month order). Amounts need an explicit currency or an authorised default; a pack's currency never rewrites an amount.
+* The migration preview, error report and reconciliation show dates, numbers and the reconciliation value distribution in the organisation's formats; downloadable reports add a "Generated (local time)" line beside "Generated (UTC)". Provenance columns remain explicit UTC.

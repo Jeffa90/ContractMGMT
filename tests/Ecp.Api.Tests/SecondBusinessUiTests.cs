@@ -215,7 +215,7 @@ public sealed class SecondBusinessUiTests
         // Pack Manager: the pack is in the catalogue as a synthetic, unsigned sample, with its documents listed.
         var packs = Visible(await BodyAsync(admin, "/Admin/Packs"));
         Assert.Contains("Construction Subcontracts (synthetic example)", packs);
-        var details = Visible(await BodyAsync(admin, $"/Admin/Packs/Details?key={Pack}&version=1.0.0"));
+        var details = Visible(await BodyAsync(admin, $"/Admin/Packs/Details?key={Pack}&version=1.1.0"));
         Assert.Contains("NOT SIGNED", details, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("synthetic", details, StringComparison.OrdinalIgnoreCase);
         // Onboarding opens for the organisation and speaks its words: pack step, structure, categories (trade packages), contract types, owners and the review.

@@ -27,3 +27,7 @@ A result over the limit is **refused, never cut short**, with a message saying h
 ## Not in this release
 
 Scheduled exports, emailed files, PDF output, background export jobs (an export runs in the request), and streaming of very large files.
+
+## Business and machine formats (S10; `docs/REGIONAL_SETTINGS.md`)
+
+An export has a **style**. **Business** (the default, and the only choice offered first) is for people: dates, date-times and numbers in the requesting organisation's locale and time zone (an instant is local date and time with its offset), and an amount never appears without its currency code (the code column is added automatically beside an amount column). The "Export details" sheet states the style. **Machine** has to be chosen on purpose and is for another system: ISO 8601 dates, UTC instants (`2026-10-16T04:30:00Z`), plain invariant numbers, ISO 4217 codes, independent of any locale; its content is stable. Column headers keep their stable keys when `KeysAsHeaders` is set. File names, the audit record and the reporting projection stay ISO/UTC. Formula-injection protection, the row limits and classification-safe content are unchanged. The older `ExportCsvAsync` contract list stays a machine-readable CSV with invariant values.

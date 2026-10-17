@@ -357,7 +357,8 @@ public sealed class TerminologyUiTests
             var page = Regex.Replace(await response.Content.ReadAsStringAsync(), "<script.*?</script>|<input[^>]*type=\"hidden\"[^>]*>", "", RegexOptions.Singleline);
             Assert.DoesNotMatch(@"\bABN\b|\bSAP\b", page);
         }
-        Assert.Contains("Tax Identifier", await BodyAsync(blank, "/Suppliers/Create"));
+        // It has chosen no identifier type, so the form asks for none (an organisation records only the identifiers it configured; nothing defaults to an ABN or to any other type).
+        Assert.DoesNotContain("Tax Identifier", await BodyAsync(blank, "/Suppliers/Create"));
 
         // A pack the repository has never seen renames the dates, the risk label, the identifiers and a group heading, and every page and the export follow with no source change.
         var key = "labels-" + Guid.NewGuid().ToString("N")[..6];
@@ -443,7 +444,7 @@ public sealed class TerminologyUiTests
         foreach (var url in new[] { $"/Onboarding?org={blankOrg}", $"/Onboarding/Step/categories?org={blankOrg}", $"/Onboarding/Step/viewers?org={blankOrg}", $"/Onboarding/Review?org={blankOrg}" })
         {
             var html = await BodyAsync(blank, url);
-            var visible = Regex.Replace(html, "<input[^>]*>|<a [^>]*>|<title>.*?</title>|<option[^>]*>[^<]*</option>|<textarea[^>]*>.*?</textarea>", "", RegexOptions.Singleline);
+            var visible = Regex.Replace(html, "<input[^>]*>|<a [^>]*>|<title>.*?</title>|<option[^>]*>[^<]*</option>|<textarea[^>]*>.*?</textarea>|<section class=\"card\" aria-labelledby=\"reg-h\">.*?</section>", "", RegexOptions.Singleline);   // the regional section prints the organisation's own settings
             var hit = Regex.Match(visible, @"(?i:.{0,50}(jbs|procurement|group head|supplier|category owner|Europe/London|Brisbane).{0,50})|.{0,50}\b(USD|AUD)\b.{0,50}");
             Assert.False(hit.Success, $"{url}: {hit.Value}");
         }

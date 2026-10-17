@@ -84,3 +84,7 @@ A pack may carry a `Capabilities` document (`docs/PACK_AUTHORING.md` section 3b)
 ## Three shipped packs (S9)
 
 The host build now ships three packs as external files: Blank (1.5.0), the reference pack (2.5.0) and **Harborline Construction** (`construction-subcontracts` 1.0.0, a synthetic example for a US general contractor). The Pack Manager lists all three; each is installed, assigned and published through the same controls, so a tenant can hold organisations on all three side by side. The shipped bytes cannot be uploaded again (the outcome is "Duplicate"); to exercise the upload route with a shipped pack a test raises the version. See `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md` section 7 for the installation steps.
+
+## Regional proposals (S10)
+
+A pack's details page lists its documents including the `RegionalProfile` document, if any. The catalogue shows pack versions Blank 1.6.0, JBS Procurement 2.6.0 and Construction Subcontracts 1.1.0 (each adds the regional document and, for JBS and Harborline, address wording). Assigning a pack to an organisation prepares a regional draft that inherits from the pack version; **nothing published changes** and a later pack upgrade changes no published setting. Dates in the Pack Manager (installed, assigned, key validity, audit) are shown in the organisation's locale and zone, not as fixed UTC text. The readiness check `regional` reports a shipped pack whose proposals do not validate on this host (for example a zone the host lacks).

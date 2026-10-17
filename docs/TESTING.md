@@ -468,7 +468,7 @@ Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locke
 | Portability guard | `tests/Ecp.Architecture.Tests/CapabilityGuardTests.cs` (7): keys only through `CapabilityKeys`; the engine gate present, before managed steps and free of state names; navigation consults the resolver; only the resolver reads the kind; each pack states every capability; documents are data |
 | Matrix and identifiers | `tests/Ecp.UnitTests/AccessEvaluatorTests.cs` (12 roles by 87 permissions), `tests/Ecp.UnitTests/FrozenIdentifierTests.cs` (87 codes) |
 
-Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locked restore) after S6: unit 695, architecture 71, API 101, integration 231 on SQLite: **1,098 Passed, 0 Failed, 0 Skipped, 230 NOT VERIFIED** (the SQL Server wrappers; 11 are new). The SQL Server runs are the CI evidence. The statement-count guard for a register page moved from 40 to 42 statements (the bounded capability reads); rows still do not add statements.
+Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locked restore) after S6: unit 695, architecture 71, API 101, integration 231 on SQLite: **1,098 Passed, 0 Failed, 0 Skipped, 230 NOT VERIFIED** (the SQL Server wrappers; 11 are new). CI run 48 (commit c88295c) ran the SQL Server wrappers: 230 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED. The statement-count guard for a register page moved from 40 to 42 statements (the bounded capability reads); rows still do not add statements.
 
 A first local run hung and then crashed the test host: the resolver resolved the configuration service in its constructor and made the dependency graph circular. It resolves its services on first use now; no test depends on the order.
 

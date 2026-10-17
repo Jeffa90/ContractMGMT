@@ -22,7 +22,7 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 * **Capability-aware navigation, pages, register, lists, dashboards, onboarding, setup (Implemented).** Admin pages under Administration, Capabilities.
 * **Readiness and compatibility (Implemented).** Errors for incoherent combinations, workflows using a capability that is off and turning one off with work in flight; readiness check `capabilities` for the shipped packs.
 * **Portability guard (Implemented).** `CapabilityGuardTests` (7).
-* **Verification.** Local: 1,098 Passed, 0 Failed, 0 Skipped, 230 NOT VERIFIED (the SQL Server wrappers). CI: recorded in `deploy/STATUS.md` once the run completes.
+* **Verification.** Local: 1,098 Passed, 0 Failed, 0 Skipped, 230 NOT VERIFIED (the SQL Server wrappers). CI run 48 (commit c88295c): all three jobs succeeded; SQL Server 230 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED; container build and smoke succeeded (`deploy/STATUS.md`).
 * **Found and fixed during testing:** a circular dependency (the resolver resolving the configuration service eagerly) crashed the test host; the resolver resolves lazily now. The register page statement-count guard moved from 40 to 42 for the bounded capability reads.
 * **Not done, by design:** other capabilities (category ownership, critical notice, external reporting; Future), hiding pages by direct address, reporting, DocuSign, operations, API work, AI, marketplace, role renaming. **First incomplete remediation task after S6:** S9 (second pack end to end), then S10 (regional defaults).
 

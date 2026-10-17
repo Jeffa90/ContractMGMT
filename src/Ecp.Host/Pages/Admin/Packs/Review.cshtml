@@ -1,0 +1,74 @@
+@page "/Admin/Packs/Review"
+@model Ecp.Host.Pages.Admin.Packs.ReviewModel
+@{ ViewData["Title"] = L["Check and install a solution pack"].Value; }
+@if (Model.Preview is { } pv)
+{
+    var r = pv.Report;
+    var s = r.Summary;
+    <h1>@L["Check and install a solution pack"]</h1>
+    <ol class="wizard-steps" aria-label="@L["Progress"]">
+        <li>1. @L["Choose the file"]</li><li aria-current="step"><span class="visually-hidden">@L["Current step: "]</span>2. @L["Check and review"]</li><li>3. @L["Install"]</li>
+    </ol>
+    <partial name="_Errors" model="ViewData.ModelState" />
+    <div class="alert @(r.CanInstall ? (r.Outcome == Ecp.Configuration.PackValidationOutcome.ValidWithWarnings ? "" : "ok") : "bad")" role="status">
+        <strong>@pv.Statement</strong>
+    </div>
+    @if (s is not null && s.SignatureStatus != "Trusted")
+    {
+        <div class="alert bad unsigned" role="alert">@L["This pack is NOT signed by a trusted publisher."] @L["It can be used only in a demonstration or test environment that allows unsigned synthetic packs. Production refuses it. Do not use an unsigned pack for real contracts."]</div>
+    }
+    @if (s is not null)
+    {
+        <section class="card" aria-labelledby="sum-h">
+            <h2 id="sum-h">@s.DisplayName <span class="hint">v@(s.Version)</span></h2>
+            <p>@s.Description</p>
+            <dl class="facts">
+                <dt>@L["Pack key"]</dt><dd>@s.PackKey</dd>
+                <dt>@L["Publisher"]</dt><dd>@s.PublisherName (@s.PublisherId)</dd>
+                <dt>@L["Signature"]</dt><dd>@s.SignatureStatus @if (s.SignatureKeyId is not null) { <span class="hint">(@L["key"] @s.SignatureKeyId, @s.SignatureAlgorithm)</span> }</dd>
+                <dt>@L["Capabilities"]</dt><dd>@(s.Capabilities.Count == 0 ? "-" : string.Join(", ", s.Capabilities))</dd>
+                <dt>@L["Needs platform version"]</dt><dd>@s.MinPlatformVersion @(s.MaxPlatformVersion is null ? L["or later"] : L["up to"] + " " + s.MaxPlatformVersion)</dd>
+                <dt>@L["Package checksum (SHA-256)"]</dt><dd><code>@s.PackageSha256</code></dd>
+            </dl>
+        </section>
+    }
+    <section class="card" aria-labelledby="iss-h">
+        <h2 id="iss-h">@L["Result of the checks"]</h2>
+        @if (r.Issues.Count == 0) { <p>@L["No problems were found."]</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Problems found"]</caption>
+                <thead><tr><th scope="col">@L["Level"]</th><th scope="col">@L["Code"]</th><th scope="col">@L["Where"]</th><th scope="col">@L["What was found"]</th><th scope="col">@L["How to fix it"]</th></tr></thead>
+                <tbody>@foreach (var i in r.Issues) { <tr><td><span class="badge @(i.IsError ? "bad" : "warn")">@(i.IsError ? L["Error"] : L["Warning"])</span></td><td>@i.Code</td><td>@(i.Entry ?? "-")</td><td>@i.Message</td><td>@(i.Remediation ?? "-")</td></tr> }</tbody>
+            </table></div>
+        }
+        <p><a href="/Admin/Packs/Review?token=@Model.Token&amp;handler=Report" download>@L["Download this report (CSV)"]</a></p>
+    </section>
+    @if (r.CanInstall)
+    {
+        <section class="card" aria-labelledby="prev-h">
+            <h2 id="prev-h">@L["What installing will do"]</h2>
+            <ul>
+                @foreach (var k in pv.Kinds) { <li>@k.Kind <span class="hint">(@k.Scope@(k.Required ? ", " + L["required"] : ""))</span></li> }
+            </ul>
+            @if (pv.CapabilityChanges.Count > 0) { <p>@L["New capabilities"]: @string.Join(", ", pv.CapabilityChanges)</p> }
+            @if (pv.MissingDependencies.Count > 0) { <p class="alert bad">@L["Needs other packs that are not installed"]: @string.Join(", ", pv.MissingDependencies)</p> }
+            <p>@L["Organisations currently using this pack key"]: @(pv.Organisations.Count == 0 ? "0" : string.Join(", ", pv.Organisations.Select(o => o.Name)))</p>
+            <h3>@L["Next steps"]</h3>
+            <ol>@foreach (var n in pv.NextSteps) { <li>@n</li> }</ol>
+        </section>
+        <form method="post" asp-page-handler="Install" class="card">
+            <input type="hidden" name="Token" value="@Model.Token" />
+            <div class="check field"><input id="Confirmed" name="Confirmed" type="checkbox" value="true" /><label for="Confirmed">@L["I have read the result and want to install this pack. I understand it changes no organisation until I assign it."]</label></div>
+            <div class="actions"><button type="submit" disabled="@(pv.MissingDependencies.Count > 0)">@L["Install this pack"]</button></div>
+        </form>
+    }
+    <form method="post" asp-page-handler="Cancel"><input type="hidden" name="Token" value="@Model.Token" /><div class="actions"><button type="submit" class="secondary">@(r.CanInstall ? L["Discard without installing"] : L["Discard this upload"])</button></div></form>
+}
+else
+{
+    <h1>@L["Check and install a solution pack"]</h1>
+    <p>@L["This upload is no longer available. It may have expired or been discarded. Upload the file again."]</p>
+    <a class="button" href="/Admin/Packs/Upload">@L["Upload a pack"]</a>
+}

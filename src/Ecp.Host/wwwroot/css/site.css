@@ -91,3 +91,12 @@ ol.steps li.current { font-weight: 700; }
 .filter-row select, .filter-row input[type=text] { min-width: 10rem; }
 .chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; }
 form.inline { display: inline; }
+
+/* Pack Manager */
+.alert { border-left: 6px solid var(--focus); background: var(--warn-bg); color: var(--warn-ink); padding: .75rem 1rem; margin: 0 0 1rem; }
+.alert.bad { border-left-color: var(--danger); background: #fff5f6; color: var(--danger); }
+.alert.ok { border-left-color: var(--ok); background: #effaf2; color: var(--ok); }
+.alert.unsigned { border: 3px solid var(--danger); font-weight: 600; }
+.wizard-steps { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; margin: 0 0 1rem; }
+.wizard-steps li { padding: .35rem .75rem; border: 1px solid var(--line); border-radius: 999px; }
+.wizard-steps li[aria-current="step"] { border: 2px solid var(--accent); background: #eef2ff; font-weight: 700; }

@@ -77,6 +77,7 @@ builder.Services.AddNotificationsModule(o =>
     o.DefaultPackId = installationDefaultPack;
 });
 builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.PackReadinessCheck>();
 builder.Services.AddHostedService<BackgroundJobService>();
 builder.Services.AddSingleton<DemoSeeder>();
 var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";

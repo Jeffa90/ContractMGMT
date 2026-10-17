@@ -1,0 +1,44 @@
+@page "/Admin/Packs/TrustKeys"
+@model Ecp.Host.Pages.Admin.Packs.TrustKeysModel
+@{ ViewData["Title"] = L["Trusted publishers"].Value; }
+<h1>@L["Trusted publishers"]</h1>
+<p class="lede">@L["A pack is signed with a private key that only its publisher holds. You trust a publisher by registering the matching public key here. Anyone holding this permission can decide which packs this organisation's tenant will accept, so grant it sparingly. Production accepts only packs signed by a key listed here or set by the installation operator."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Trusted publisher keys"]</caption>
+    <thead><tr><th scope="col">@L["Key"]</th><th scope="col">@L["Label"]</th><th scope="col">@L["Algorithm"]</th><th scope="col">@L["Fingerprint (SHA-256)"]</th><th scope="col">@L["Set by"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Valid from (UTC)"]</th><th scope="col">@L["Valid until (UTC)"]</th><th scope="col"><span class="visually-hidden">@L["Actions"]</span></th></tr></thead>
+    <tbody>
+    @foreach (var k in Model.Items)
+    {
+        <tr>
+            <td>@k.KeyId</td><td>@k.Label</td><td>@k.Algorithm</td><td><code>@k.Fingerprint</code></td><td>@k.Source</td>
+            <td><span class="badge @(k.Status == "Active" ? "ok" : "bad")">@k.Status</span></td>
+            <td>@(k.NotBeforeUtc?.ToString("u") ?? "-")</td><td>@(k.NotAfterUtc?.ToString("u") ?? "-")</td>
+            <td>
+                @if (k.Editable && k.Status == "Active")
+                {
+                    <form method="post" asp-page-handler="Revoke">
+                        <input type="hidden" name="keyId" value="@k.KeyId" />
+                        <label class="visually-hidden" for="reason-@k.KeyId">@L["Reason for revoking"] @k.KeyId</label>
+                        <input id="reason-@k.KeyId" name="Reason" type="text" maxlength="500" placeholder="@L["Reason"]" />
+                        <button type="submit" class="secondary">@L["Revoke"]</button>
+                    </form>
+                }
+                else if (k.RevokedUtc is { } at) { <span class="hint">@L["Revoked"] @at.ToString("u")@(k.RevokedReason is null ? "" : ": " + k.RevokedReason)</span> }
+            </td>
+        </tr>
+    }
+    @if (Model.Items.Count == 0) { <tr><td colspan="9">@L["No publisher keys are registered. Production will refuse every pack until one is."]</td></tr> }
+    </tbody>
+</table></div>
+<form method="post" asp-page-handler="Register" class="card" aria-labelledby="reg-h">
+    <h2 id="reg-h">@L["Trust a new publisher key"]</h2>
+    <p class="hint">@L["Paste the publisher's PUBLIC key (it begins with -----BEGIN PUBLIC KEY-----). Never paste a private key; it would be refused."]</p>
+    <div class="field"><label for="KeyId">@L["Key identifier"]</label><input id="KeyId" name="KeyId" type="text" maxlength="64" required value="@Model.KeyId" /></div>
+    <div class="field"><label for="Label">@L["Who it belongs to"]</label><input id="Label" name="Label" type="text" maxlength="120" required value="@Model.Label" /></div>
+    <div class="field"><label for="PublicKeyPem">@L["Public key"]</label><textarea id="PublicKeyPem" name="PublicKeyPem" rows="6" required spellcheck="false">@Model.PublicKeyPem</textarea></div>
+    <div class="field"><label for="NotBeforeUtc">@L["Valid from (UTC, optional)"]</label><input id="NotBeforeUtc" name="NotBeforeUtc" type="datetime-local" /></div>
+    <div class="field"><label for="NotAfterUtc">@L["Valid until (UTC, optional)"]</label><input id="NotAfterUtc" name="NotAfterUtc" type="datetime-local" /></div>
+    <div class="actions"><button type="submit">@L["Register this key"]</button></div>
+</form>
+<p><a href="/Admin/Packs">@L["Back to solution packs"]</a></p>

@@ -1,0 +1,59 @@
+@page "/Admin/Packs/Assign"
+@model Ecp.Host.Pages.Admin.Packs.AssignModel
+@{ ViewData["Title"] = L["Organisation packs"].Value; }
+<h1>@L["Organisation packs"]</h1>
+<p class="lede">@L["Each organisation works from one solution pack, or from the Blank configuration. Giving an organisation a pack prepares drafts of its lifecycle, Variation workflow and notification policy. It never replaces anything already published, and nothing takes effect until an administrator validates and publishes the drafts."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Organisations and their solution packs"]</caption>
+    <thead><tr><th scope="col">@L["Organisation"]</th><th scope="col">@L["Pack"]</th><th scope="col">@L["Version"]</th><th scope="col">@L["Where it came from"]</th><th scope="col">@L["Assigned (UTC)"]</th><th scope="col">@L["Status"]</th></tr></thead>
+    <tbody>
+    @foreach (var o in Model.Organisations)
+    {
+        <tr>
+            <td>@o.Name</td><td>@(o.PackKey ?? L["None (Blank)"].Value)</td><td>@(o.Version ?? "-")</td><td>@(o.Source ?? "-")</td><td>@(o.AssignedUtc?.ToString("u") ?? "-")</td>
+            <td>@if (o.PackKey is null) { <span class="badge">@L["Blank"]</span> } else if (o.PackUsable) { <span class="badge ok">@L["Pack available"]</span> } else { <span class="badge bad">@L["Pack not available here"]</span> }</td>
+        </tr>
+    }
+    </tbody>
+</table></div>
+<form method="get" class="card" aria-labelledby="pick-h">
+    <h2 id="pick-h">@L["Give an organisation a pack"]</h2>
+    <div class="field"><label for="OrganisationId">@L["Organisation"]</label>
+        <select id="OrganisationId" name="OrganisationId" required>
+            <option value="">@L["Choose an organisation"]</option>
+            @foreach (var o in Model.Organisations) { <option value="@o.OrganisationId" selected="@(o.OrganisationId == Model.OrganisationId)">@o.Name</option> }
+        </select></div>
+    <div class="field"><label for="Choice">@L["Pack and version"]</label>
+        <select id="Choice" name="Choice" required>
+            <option value="">@L["Choose a pack"]</option>
+            @foreach (var c in Model.Choices) { <option value="@(c.PackKey + "|" + c.Version)" selected="@(c.PackKey == Model.Key && c.Version == Model.Version)">@c.Name() v@(c.Version)@(c.Trust.IsTrusted ? "" : " (" + L["not signed"] + ")")</option> }
+        </select></div>
+    <div class="actions"><button type="submit">@L["Preview what would change"]</button></div>
+</form>
+@if (Model.Preview is { } pv)
+{
+    <section class="card" aria-labelledby="prev-h">
+        <h2 id="prev-h">@L["Preview"]: @pv.OrganisationName &larr; @pv.Entry.Name() v@(pv.Entry.Version)</h2>
+        @if (!pv.Entry.Trust.IsTrusted) { <div class="alert bad unsigned" role="alert">@L["This pack is NOT signed. It is accepted here only for demonstration or test."]</div> }
+        @foreach (var w in pv.Warnings) { <div class="alert" role="status">@w</div> }
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["What would happen to each kind of configuration"]</caption>
+            <thead><tr><th scope="col">@L["Kind"]</th><th scope="col">@L["Published already"]</th><th scope="col">@L["Draft waiting"]</th><th scope="col">@L["What would happen"]</th></tr></thead>
+            <tbody>@foreach (var i in pv.Items) { <tr><td>@i.Kind</td><td>@(i.HasPublishedRelease ? L["Yes"] : L["No"])</td><td>@(i.HasOpenDraft ? L["Yes"] : L["No"])</td><td>@i.Effect</td></tr> }</tbody>
+        </table></div>
+        <form method="post">
+            <input type="hidden" name="OrganisationId" value="@pv.OrganisationId" /><input type="hidden" name="Key" value="@pv.Entry.PackKey" /><input type="hidden" name="Version" value="@pv.Entry.Version" />
+            <div class="actions"><button type="submit">@L["Assign this pack and prepare drafts"]</button></div>
+        </form>
+    </section>
+}
+@if (Model.Result is { } res)
+{
+    <section class="card" aria-labelledby="res-h">
+        <h2 id="res-h">@L["Result"]</h2>
+        <ul>@foreach (var k in res.Kinds) { <li>@k.Kind: @k.Outcome @if (k.Detail is not null) { <span class="hint">@k.Detail</span> }</li> }</ul>
+        <h3>@L["Next steps"]</h3>
+        <ol>@foreach (var n in res.NextSteps) { <li>@n</li> }</ol>
+    </section>
+}

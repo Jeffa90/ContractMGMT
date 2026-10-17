@@ -1,0 +1,39 @@
+@page "/Admin/Packs/Checks"
+@model Ecp.Host.Pages.Admin.Packs.ChecksModel
+@{ ViewData["Title"] = L["Solution pack checks"].Value; }
+<h1>@L["Solution pack checks"]</h1>
+<p class="lede">@L["These checks only report. They change no organisation and no configuration."]</p>
+@if (Model.Sources is { } s)
+{
+    <section class="card" aria-labelledby="src-h">
+        <h2 id="src-h">@L["Packs shipped with this installation"]</h2>
+        <dl class="facts">
+            <dt>@L["Folder"]</dt><dd>@s.Directory @(s.DirectoryFound ? "" : L["(not found)"].Value)</dd>
+            <dt>@L["Pack files found"]</dt><dd>@s.ShippedFiles</dd>
+            <dt>@L["Usable in this environment"]</dt><dd>@s.UsableShippedPacks</dd>
+            <dt>@L["Unsigned demonstration packs"]</dt><dd>@(s.Production ? L["Refused (Production)"] : s.UnsignedAllowed ? L["Allowed (demonstration or test)"] : L["Refused"])</dd>
+        </dl>
+        @if (!s.DirectoryFound) { <div class="alert bad" role="alert">@L["The folder of shipped packs was not found. Organisations that need a shipped pack cannot start from it. Ask the person who runs the installation to check the deployment."]</div> }
+        @if (s.Production && s.UsableShippedPacks == 0) { <div class="alert bad" role="alert">@L["No shipped pack is trusted in Production. Packs must be signed by a publisher you trust. See Trusted publishers, or ask the person who runs the installation to sign them."]</div> }
+        @foreach (var p in s.TrustProblems) { <div class="alert" role="status">@p</div> }
+        @if (s.Rejected.Count > 0)
+        {
+            <h3>@L["Files that were not accepted"]</h3>
+            <ul>@foreach (var r in s.Rejected) { <li><code>@r.FileName</code>: @string.Join("; ", r.Issues.Select(i => i.Message))</li> }</ul>
+        }
+    </section>
+}
+<section class="card" aria-labelledby="org-h">
+    <h2 id="org-h">@L["Organisations whose pack cannot be used"]</h2>
+    @if (Model.Findings.Count == 0) { <p>@L["No problems were found."]</p> }
+    else
+    {
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Organisation findings"]</caption>
+            <thead><tr><th scope="col">@L["Organisation"]</th><th scope="col">@L["Pack"]</th><th scope="col">@L["Finding"]</th></tr></thead>
+            <tbody>@foreach (var f in Model.Findings) { <tr><td>@f.OrganisationName</td><td>@(f.PackKey ?? "-")</td><td><strong>@f.Code</strong>: @f.Message</td></tr> }</tbody>
+        </table></div>
+        <p class="hint">@L["Nothing is changed automatically. Install the missing pack, or open the organisation and choose a different pack or the Blank configuration."]</p>
+    }
+</section>
+<p><a href="/Admin/Packs">@L["Back to solution packs"]</a></p>

@@ -41,6 +41,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `docs/MIGRATION_RUNBOOK_TEMPLATE.md`
 - `docs/PRODUCTION_READINESS_CHECKLIST.md`
 - `docs/PROJECT_STATUS.md`
+- `docs/PACK_ARCHITECTURE.md`
 - `docs/REPOSITORY_REVIEW.md`
 - `docs/SECURITY.md`
 - `docs/TESTING.md`

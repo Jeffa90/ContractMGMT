@@ -18,7 +18,7 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 * **P-08 (R2).** A migrated, non-legacy contract starts in the initial state of its organisation's lifecycle (`IContractMigrationPort.InitialStatusAsync`); `Contracts:InitialStatusCode` is gone from `appsettings.json`; the dry run reports `MIG-E026` for an organisation with no lifecycle. (`MigrationInitialStatusScenarios`.)
 * **Not done by design:** role identifiers and the compiled role catalogue (P-02b, S5/S8; `OrganisationAdministrators` still resolves to the role the catalogue calls `ProcurementAdministrator`), the pack loader (P-03, S7), vocabulary (S4), signature vocabulary (S3).
 
-Tests (`docs/TESTING.md` sections 8.6 and 8.7): without `ECP_TEST_SQL` **738 Passed, 0 Failed, 0 Skipped, 193 NOT VERIFIED** (455 unit, 20 architecture, 72 API, 191 integration on SQLite). The SQL Server wrappers' CI result is in `deploy/STATUS.md`.
+Tests (`docs/TESTING.md` sections 8.6 and 8.7): without `ECP_TEST_SQL` **738 Passed, 0 Failed, 0 Skipped, 193 NOT VERIFIED** (455 unit, 20 architecture, 72 API, 191 integration on SQLite). On GitHub-hosted CI with SQL Server 2022 (run 35, commit 3245079) **193 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED**, and the build and container-image jobs succeeded (`deploy/STATUS.md`).
 
 **First incomplete product task: INT-03's live e-signature adapter. First incomplete portability remediation task: S3 (R6, neutral signature-request vocabulary with an EF migration). Remaining high-severity portability finding: P-03 (packs embedded in assemblies by project files, no loader).**
 

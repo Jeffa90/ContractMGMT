@@ -103,14 +103,14 @@ Deferred means decided not to build yet, recorded in `TASKS.md` and the ADRs; th
 
 ## 6. Verified capabilities
 
-Test totals at the end of this pass (details and history in `docs/TESTING.md`; the CI figure below is from run 32, commit `a0293ee`, the last CI run before S2; the S2 CI result is in `deploy/STATUS.md`):
+Test totals at the end of this pass (details and history in `docs/TESTING.md`; CI figures are from run 35, commit `3245079`, the S2 code; later commits are documentation only):
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
 | Workspace after S2, no SQL Server: unit 455, architecture 20, API 72, integration on SQLite 191 | 738 | 0 | 0 | 193 (the SQL Server wrappers) |
-| CI before S2 (run 32), SQL Server 2022 container (the 189 `SqlServer` tests; the performance baseline is a separate step) | 189 | 0 | 0 | 0 |
+| CI after S2 (run 35), SQL Server 2022 container (192 `SqlServer` tests plus the performance baseline, run as separate steps) | 193 | 0 | 0 | 0 |
 
-Verified on CI (runs 31 and 32; all three jobs succeeded in both): locked restore; Release build with warnings as errors and the NuGet audit as a gate; all non-SQL tests; the repository, tooling and supply-chain checks (SBOM, vulnerability and licence scan); the SQL Server suite (migrations, composite keys, Row-Level Security, audit chain, every slice's scenarios run on both providers); the Dockerfile SDK build stage, image verification and smoke test with host networking.
+Verified on CI (runs 31, 32 and 35; all three jobs succeeded in each): locked restore; Release build with warnings as errors and the NuGet audit as a gate; all non-SQL tests; the repository, tooling and supply-chain checks (SBOM, vulnerability and licence scan); the SQL Server suite (migrations, composite keys, Row-Level Security, audit chain, every slice's scenarios run on both providers); the Dockerfile SDK build stage, image verification and smoke test with host networking.
 
 Verified in the workspace only: `tools/docker-runtime-smoke.sh` and `tools/compose-smoke.sh` for earlier slices (the container daemon could not be started for the latest slices; nothing was worked around).
 

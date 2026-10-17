@@ -351,7 +351,7 @@ Without `ECP_TEST_SQL`: **730 Passed, 0 Failed, 0 Skipped, 189 NOT VERIFIED** (4
 
 ### 8.7 Totals at the end of the S2 pass
 
-Without `ECP_TEST_SQL`: **738 Passed, 0 Failed, 0 Skipped, 193 NOT VERIFIED** (455 unit, 20 architecture, 72 API, 191 integration on SQLite). The 193 SQL Server tests are the same scenarios on SQL Server; their CI result is in `deploy/STATUS.md`.
+Without `ECP_TEST_SQL`: **738 Passed, 0 Failed, 0 Skipped, 193 NOT VERIFIED** (455 unit, 20 architecture, 72 API, 191 integration on SQLite). CI with SQL Server 2022 (run 35, commit 3245079): **193 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** (192 SQL Server tests plus the performance baseline); the other two jobs also succeeded.
 
 ## 9. No-code, packages and portability suite
 

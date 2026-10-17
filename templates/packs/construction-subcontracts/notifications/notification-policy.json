@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "description": "Notification policy of the synthetic Harborline Construction pack. Events come from the platform's closed list; this pack uses none of the formal review or extension events. Content levels are stated explicitly for the pack's four-level scale (Public, Internal, Confidential, Restricted, with no privileged level). Data, not code. Synthetic.",
+  "reminders": {
+    "defaultLeadDays": 30,
+    "allowedLeadDays": [
+      14,
+      30,
+      60,
+      90
+    ],
+    "reviewDate": true,
+    "endDate": true,
+    "criticalNotice": {
+      "enabled": true,
+      "offsetsDays": [
+        14,
+        7,
+        3,
+        1
+      ],
+      "earlierLeadDays": 14
+    },
+    "evergreen": {
+      "suppressEndDate": true,
+      "keepReviewDate": true
+    },
+    "escalateUnacknowledgedAfterDays": 2,
+    "unownedFallback": [
+      "OrganisationAdministrators"
+    ]
+  },
+  "content": {
+    "withholdTitleFromLevel": "Confidential",
+    "withholdEverythingFromLevel": "Restricted"
+  },
+  "delivery": {
+    "maxAttempts": 5,
+    "backoffMinutes": [
+      1,
+      5,
+      30,
+      120,
+      720
+    ]
+  },
+  "events": [
+    {
+      "event": "approval.submitted",
+      "recipients": [
+        "ApproverGroup"
+      ],
+      "template": "approvalSubmitted",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "approval.approved",
+      "recipients": [
+        "Submitter",
+        "CategoryOwners"
+      ],
+      "template": "approvalApproved",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "approval.rejected",
+      "recipients": [
+        "Submitter",
+        "CategoryOwners"
+      ],
+      "template": "approvalRejected",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "contract.registered",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "contractRegistered",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "variation.raised",
+      "recipients": [
+        "CategoryOwners",
+        "ApproverGroup"
+      ],
+      "template": "variationRaised",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "variation.applied",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "variationApplied",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "variation.rejected",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "variationRejected",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "variation.cancelled",
+      "recipients": [
+        "CategoryOwners",
+        "Submitter"
+      ],
+      "template": "variationCancelled",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "unlock.opened",
+      "recipients": [
+        "CategoryOwners",
+        "OrganisationAdministrators"
+      ],
+      "template": "unlockOpened",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "unlock.closed",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "unlockClosed",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "ownership.assigned",
+      "recipients": [
+        "AffectedUser"
+      ],
+      "template": "ownershipAssigned",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "ownership.ended",
+      "recipients": [
+        "AffectedUser"
+      ],
+      "template": "ownershipEnded",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": false
+    },
+    {
+      "event": "reminder.reviewDate",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "reminderReview",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "reminder.endDate",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "reminderEnd",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "reminder.criticalNotice",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "reminderCritical",
+      "channels": [
+        "InApp",
+        "Email"
+      ],
+      "mandatory": true
+    },
+    {
+      "event": "reminder.acknowledged",
+      "recipients": [
+        "CategoryOwners"
+      ],
+      "template": "reminderAcknowledged",
+      "channels": [
+        "InApp"
+      ],
+      "mandatory": false
+    }
+  ],
+  "templates": {
+    "approvalSubmitted": {
+      "subject": "[[registration.approval|sentence]] needed: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) is waiting for [[registration.approval|lower]] at step {{step.name}}. Open it here: {{link}}"
+    },
+    "approvalApproved": {
+      "subject": "Approved: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) received [[registration.approval|lower]] and is now active and locked. {{link}}"
+    },
+    "approvalRejected": {
+      "subject": "[[registration.approval|sentence]] rejected: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) was rejected and returned to the commercial team. {{link}}"
+    },
+    "contractRegistered": {
+      "subject": "Activated: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) has been activated. {{link}}"
+    },
+    "variationRaised": {
+      "subject": "[[variation]] raised: {{contract.reference}}",
+      "body": "[[variation|a|cap]] was raised on {{contract.reference}} ({{contract.title}}). {{link}}"
+    },
+    "variationApplied": {
+      "subject": "[[variation]] applied: {{contract.reference}}",
+      "body": "[[variation|a|cap]] was approved and applied to {{contract.reference}} ({{contract.title}}). This includes an administrative [[variation|lower]] that records a completion fact such as practical completion. {{link}}"
+    },
+    "variationRejected": {
+      "subject": "[[variation]] rejected: {{contract.reference}}",
+      "body": "[[variation|a|cap]] on {{contract.reference}} ({{contract.title}}) was rejected. {{link}}"
+    },
+    "variationCancelled": {
+      "subject": "[[variation]] cancelled: {{contract.reference}}",
+      "body": "[[variation|a|cap]] on {{contract.reference}} ({{contract.title}}) was cancelled. The [[contract|lower]] is unchanged. {{link}}"
+    },
+    "unlockOpened": {
+      "subject": "Emergency unlock opened: {{contract.reference}}",
+      "body": "A locked [[contract|lower]], {{contract.reference}} ({{contract.title}}), was temporarily unlocked by {{actor.name}}. {{link}}"
+    },
+    "unlockClosed": {
+      "subject": "Emergency unlock closed: {{contract.reference}}",
+      "body": "The unlock on {{contract.reference}} ({{contract.title}}) has ended and the record is locked again. {{link}}"
+    },
+    "ownershipAssigned": {
+      "subject": "You now manage [[category|lower|a]]",
+      "body": "You are now the [[contract.owner|lower]] of [[category|lower|a]]. Its [[contract|plural|lower]] appear under My [[contract|plural]]. {{link}}"
+    },
+    "ownershipEnded": {
+      "subject": "[[category]] management ended",
+      "body": "You are no longer the [[contract.owner|lower]] of [[category|lower|a]]. {{link}}"
+    },
+    "reminderReview": {
+      "subject": "Compliance review due in {{days.remaining}} days: {{contract.reference}}",
+      "body": "The compliance review of {{contract.reference}} ({{contract.title}}) is due on {{due.date}} ({{days.remaining}} days): check insurance, licence and bond. Please acknowledge: {{link}}"
+    },
+    "reminderEnd": {
+      "subject": "Scheduled completion in {{days.remaining}} days: {{contract.reference}}",
+      "body": "{{contract.reference}} ({{contract.title}}) is scheduled for completion on {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}"
+    },
+    "reminderCritical": {
+      "subject": "Notice deadline in {{days.remaining}} days: {{contract.reference}}",
+      "body": "The notice deadline for {{contract.reference}} ({{contract.title}}) is {{due.date}} ({{days.remaining}} days). Please acknowledge: {{link}}"
+    },
+    "reminderAcknowledged": {
+      "subject": "Reminder acknowledged: {{contract.reference}}",
+      "body": "{{actor.name}} acknowledged the reminder for {{contract.reference}} ({{contract.title}}). {{link}}"
+    }
+  }
+}

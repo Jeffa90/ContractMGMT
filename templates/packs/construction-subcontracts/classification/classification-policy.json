@@ -1,0 +1,10 @@
+{
+  "levels": [
+    "Public",
+    "Internal",
+    "Confidential",
+    "Restricted"
+  ],
+  "defaultLevel": "Internal",
+  "privilegedLevels": []
+}

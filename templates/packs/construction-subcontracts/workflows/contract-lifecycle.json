@@ -1,0 +1,387 @@
+{
+  "schemaVersion": 1,
+  "workflow": "contract-lifecycle",
+  "subject": "Contract",
+  "description": "Lifecycle of the synthetic Harborline Construction subcontract pack: a subcontract is drafted, reviewed internally, released for signature, signed, given activation approval by value tier, and then runs until completion, termination or withdrawal. Change orders (Variations) amend an active subcontract; practical completion and similar facts are recorded by an administrative change order. Data, not code. Synthetic; not legal or industry advice.",
+  "settings": {
+    "documents": {
+      "executedCopyType": "ExecutedContract",
+      "finalTypes": [
+        "FinalAgreement"
+      ],
+      "legalMarkupType": "LegalMarkup",
+      "approvalEvidenceType": "ApprovalEvidence",
+      "uploadTypes": [
+        "FinalAgreement",
+        "Schedule",
+        "SupportingDocument",
+        "Correspondence",
+        "InsuranceCertificate",
+        "BondDocument"
+      ]
+    },
+    "approval": {
+      "approverGroupKey": "ProjectDirectors",
+      "requireExecutedCopy": true,
+      "matrix": "subcontract-activation"
+    },
+    "legal": {
+      "reworkReasonRequired": true
+    },
+    "unlock": {
+      "defaultMinutes": 60,
+      "maxMinutes": 240,
+      "requireSecondPerson": false
+    },
+    "variation": {
+      "workflow": "variation"
+    }
+  },
+  "states": [
+    {
+      "code": "Draft",
+      "display": "Draft",
+      "role": "initial",
+      "locked": false,
+      "freezeContent": false,
+      "documentPolicy": "Open",
+      "initial": true
+    },
+    {
+      "code": "InternalReview",
+      "display": "Internal review",
+      "locked": false,
+      "freezeContent": true,
+      "documentPolicy": "Open"
+    },
+    {
+      "code": "ReadyForSignature",
+      "display": "Ready for signature",
+      "role": "drafting",
+      "locked": false,
+      "freezeContent": false,
+      "documentPolicy": "Open"
+    },
+    {
+      "code": "SentForSignature",
+      "display": "Sent for signature",
+      "role": "signature",
+      "locked": false,
+      "freezeContent": true,
+      "documentPolicy": "Closed"
+    },
+    {
+      "code": "AwaitingActivation",
+      "display": "Awaiting activation approval",
+      "role": "approval",
+      "locked": false,
+      "freezeContent": true,
+      "documentPolicy": "Closed"
+    },
+    {
+      "code": "Active",
+      "display": "Active",
+      "role": "effective",
+      "locked": true,
+      "freezeContent": false,
+      "documentPolicy": "Closed",
+      "lockReason": "Active: changes need an authorised change order or an audited emergency unlock"
+    },
+    {
+      "code": "ChangeOrderOpen",
+      "display": "Change order open",
+      "role": "variation",
+      "locked": true,
+      "freezeContent": false,
+      "documentPolicy": "Closed",
+      "lockReason": "A change order is open on this subcontract"
+    },
+    {
+      "code": "StopWork",
+      "display": "Stop work",
+      "role": "suspended",
+      "locked": true,
+      "freezeContent": false,
+      "documentPolicy": "Closed",
+      "lockReason": "Work is stopped"
+    },
+    {
+      "code": "Completed",
+      "display": "Completed",
+      "role": "ended",
+      "locked": true,
+      "freezeContent": false,
+      "documentPolicy": "Closed",
+      "lockReason": "Completed",
+      "terminal": true
+    },
+    {
+      "code": "Terminated",
+      "display": "Terminated",
+      "role": "terminated",
+      "locked": true,
+      "freezeContent": false,
+      "documentPolicy": "Closed",
+      "lockReason": "Terminated",
+      "terminal": true
+    },
+    {
+      "code": "Withdrawn",
+      "display": "Withdrawn",
+      "role": "withdrawn",
+      "locked": true,
+      "freezeContent": false,
+      "documentPolicy": "Closed",
+      "lockReason": "Withdrawn before activation",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "code": "SubmitForInternalReview",
+      "display": "Submit for internal review",
+      "from": [
+        "Draft"
+      ],
+      "to": "InternalReview",
+      "permission": "contracts.edit_owned",
+      "role": "plain",
+      "guards": [
+        "RequiredFieldsPresent"
+      ],
+      "requiredFields": [
+        "category",
+        "contractType",
+        "estimatedValue",
+        "cf.project_number"
+      ]
+    },
+    {
+      "code": "ReturnToDraft",
+      "display": "Return to draft",
+      "from": [
+        "InternalReview"
+      ],
+      "to": "Draft",
+      "permission": "contracts.create",
+      "role": "plain",
+      "guards": [
+        "CommentRequired"
+      ],
+      "commentRequired": true
+    },
+    {
+      "code": "ReleaseForSignature",
+      "display": "Release for signature",
+      "from": [
+        "InternalReview"
+      ],
+      "to": "ReadyForSignature",
+      "permission": "contracts.create",
+      "role": "plain"
+    },
+    {
+      "code": "WithdrawDraft",
+      "display": "Withdraw",
+      "from": [
+        "Draft",
+        "InternalReview",
+        "ReadyForSignature"
+      ],
+      "to": "Withdrawn",
+      "permission": "contracts.edit_owned",
+      "role": "withdraw",
+      "guards": [
+        "ReasonRequired",
+        "NoExecutedCopy"
+      ],
+      "reasonRequired": true
+    },
+    {
+      "code": "SendForSignature",
+      "display": "Send for signature",
+      "from": [
+        "ReadyForSignature"
+      ],
+      "to": "SentForSignature",
+      "permission": "contracts.edit_owned",
+      "role": "sendSignature",
+      "guards": [
+        "FinalDocumentExists"
+      ]
+    },
+    {
+      "code": "ReturnToReady",
+      "display": "Return to ready (signature voided or declined)",
+      "from": [
+        "SentForSignature"
+      ],
+      "to": "ReadyForSignature",
+      "permission": "contracts.edit_owned",
+      "role": "returnToDrafting",
+      "guards": [
+        "SignatureVoidedOrDeclined"
+      ]
+    },
+    {
+      "code": "SubmitForActivation",
+      "display": "Submit for activation approval",
+      "from": [
+        "SentForSignature"
+      ],
+      "to": "AwaitingActivation",
+      "permission": "contracts.submit_approval",
+      "role": "submitRegister",
+      "guards": [
+        "ExecutedCopyExists"
+      ]
+    },
+    {
+      "code": "Approve",
+      "display": "Approve activation",
+      "from": [
+        "AwaitingActivation"
+      ],
+      "to": "Active",
+      "permission": "approvals.action",
+      "role": "approve",
+      "guards": [
+        "ExecutedCopyExists",
+        "AuthorisedApprover",
+        "SubmitterNotApprover"
+      ]
+    },
+    {
+      "code": "Reject",
+      "display": "Reject activation",
+      "from": [
+        "AwaitingActivation"
+      ],
+      "to": "ReadyForSignature",
+      "permission": "approvals.action",
+      "role": "reject",
+      "guards": [
+        "CommentRequired",
+        "AuthorisedApprover",
+        "SubmitterNotApprover"
+      ],
+      "commentRequired": true
+    },
+    {
+      "code": "OpenChangeOrder",
+      "display": "Create change order",
+      "from": [
+        "Active"
+      ],
+      "to": "ChangeOrderOpen",
+      "permission": "variations.create",
+      "role": "openVariation",
+      "guards": [
+        "ParentRemainsLocked",
+        "NoOtherOpenVariation"
+      ]
+    },
+    {
+      "code": "ApplyChangeOrder",
+      "display": "Apply change order",
+      "from": [
+        "ChangeOrderOpen"
+      ],
+      "to": "Active",
+      "permission": "approvals.action",
+      "role": "applyVariation",
+      "guards": [
+        "VariationOutcomeApplied"
+      ]
+    },
+    {
+      "code": "CancelChangeOrder",
+      "display": "Cancel change order",
+      "from": [
+        "ChangeOrderOpen"
+      ],
+      "to": "Active",
+      "permission": "variations.create",
+      "role": "cancelVariation",
+      "guards": [
+        "ReasonRequired",
+        "VariationOutcomeNotApplied"
+      ],
+      "reasonRequired": true
+    },
+    {
+      "code": "RejectChangeOrder",
+      "display": "Reject change order",
+      "from": [
+        "ChangeOrderOpen"
+      ],
+      "to": "Active",
+      "permission": "approvals.action",
+      "role": "rejectVariation",
+      "guards": [
+        "CommentRequired",
+        "VariationOutcomeNotApplied"
+      ],
+      "commentRequired": true
+    },
+    {
+      "code": "StopWork",
+      "display": "Stop work",
+      "from": [
+        "Active"
+      ],
+      "to": "StopWork",
+      "permission": "contracts.suspend",
+      "role": "plain",
+      "guards": [
+        "ReasonRequired",
+        "NoOtherOpenVariation"
+      ],
+      "reasonRequired": true
+    },
+    {
+      "code": "ResumeWork",
+      "display": "Resume work",
+      "from": [
+        "StopWork"
+      ],
+      "to": "Active",
+      "permission": "contracts.suspend",
+      "role": "plain",
+      "guards": [
+        "ReasonRequired"
+      ],
+      "reasonRequired": true
+    },
+    {
+      "code": "Complete",
+      "display": "Mark completed",
+      "from": [
+        "Active"
+      ],
+      "to": "Completed",
+      "permission": "contracts.close",
+      "role": "plain",
+      "guards": [
+        "Authorised",
+        "NoOtherOpenVariation"
+      ]
+    },
+    {
+      "code": "Terminate",
+      "display": "Terminate",
+      "from": [
+        "Active",
+        "StopWork"
+      ],
+      "to": "Terminated",
+      "permission": "contracts.close",
+      "role": "plain",
+      "guards": [
+        "ReasonRequired",
+        "NoOtherOpenVariation"
+      ],
+      "reasonRequired": true
+    }
+  ]
+}

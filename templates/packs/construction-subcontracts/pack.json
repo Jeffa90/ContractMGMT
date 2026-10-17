@@ -1,0 +1,85 @@
+{
+  "packId": "construction-subcontracts",
+  "name": "Construction Subcontracts (synthetic example)",
+  "version": "1.0.0",
+  "synthetic": true,
+  "publisher": "Platform (built-in sample)",
+  "description": "Synthetic example business for the second-business portability proof: a United States general contractor managing trade subcontracts, change orders and project sites. Different states, terms, fields, approval tiers, capabilities, notifications and locale from the other shipped packs. Not legal or industry advice, not a real contractor's process, and not fit for real contracts without review by qualified people.",
+  "features": [],
+  "ownershipModel": "ReadAllEditAssignedCategory",
+  "approvalModel": "ValueTierMatrix",
+  "defaults": {
+    "culture": "en-US",
+    "timeZoneId": "America/Chicago",
+    "currencyCode": "USD",
+    "referencePrefix": "HBL",
+    "classification": {
+      "levels": [
+        "Public",
+        "Internal",
+        "Confidential",
+        "Restricted"
+      ],
+      "defaultLevel": "Internal",
+      "privilegedLevels": []
+    },
+    "contractTypes": [
+      {
+        "code": "LUMP_SUM",
+        "name": "Lump sum"
+      },
+      {
+        "code": "UNIT_RATE",
+        "name": "Unit rate"
+      },
+      {
+        "code": "COST_PLUS",
+        "name": "Cost plus"
+      },
+      {
+        "code": "SUPPLY_ONLY",
+        "name": "Supply only"
+      },
+      {
+        "code": "CONSULTANCY",
+        "name": "Consultancy"
+      }
+    ],
+    "categories": [
+      {
+        "code": "EARTHWORKS",
+        "name": "Earthworks"
+      },
+      {
+        "code": "EARTHWORKS-EXC",
+        "name": "Excavation and backfill",
+        "parentCode": "EARTHWORKS"
+      },
+      {
+        "code": "CONCRETE",
+        "name": "Concrete"
+      },
+      {
+        "code": "CONCRETE-FORM",
+        "name": "Formwork",
+        "parentCode": "CONCRETE"
+      },
+      {
+        "code": "STEEL",
+        "name": "Structural steel"
+      },
+      {
+        "code": "MECHANICAL",
+        "name": "Mechanical"
+      },
+      {
+        "code": "ELECTRICAL",
+        "name": "Electrical"
+      },
+      {
+        "code": "FINISHES",
+        "name": "Finishes"
+      }
+    ]
+  }
+}

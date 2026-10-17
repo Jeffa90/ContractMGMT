@@ -1,0 +1,117 @@
+{
+  "packageId": "platform.pack.construction-subcontracts",
+  "packKey": "construction-subcontracts",
+  "version": "1.0.0",
+  "displayName": {
+    "en-US": "Construction Subcontracts (synthetic example)"
+  },
+  "description": {
+    "en-US": "Synthetic example business for the second-business portability proof: a general contractor's trade subcontracts and change orders. An optional solution pack, not platform behaviour; every value is editable. Not legal or industry advice."
+  },
+  "publisher": {
+    "id": "platform.builtin",
+    "name": "Platform (built-in sample)"
+  },
+  "createdUtc": "2026-10-20T00:00:00Z",
+  "compatibility": {
+    "minPlatformVersion": "1.0.0",
+    "maxPlatformVersion": null,
+    "ignoreUnknownOptionalKinds": false
+  },
+  "signature": {
+    "requirement": "AllowUnsignedSynthetic"
+  },
+  "synthetic": true,
+  "capabilities": [],
+  "dependencies": [],
+  "content": [
+    {
+      "source": "pack.json",
+      "path": "content/solution-pack.json",
+      "kind": "SolutionPack",
+      "scope": "catalogue",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "workflows/contract-lifecycle.json",
+      "path": "content/contract-lifecycle.json",
+      "kind": "WorkflowContractLifecycle",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "workflows/variation.json",
+      "path": "content/variation-workflow.json",
+      "kind": "WorkflowVariation",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "notifications/notification-policy.json",
+      "path": "content/notification-policy.json",
+      "kind": "NotificationPolicy",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": true
+    },
+    {
+      "source": "terminology/terminology.json",
+      "path": "content/terminology.json",
+      "kind": "Terminology",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "capabilities/capabilities.json",
+      "path": "content/capabilities.json",
+      "kind": "Capabilities",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "fields/custom-fields.json",
+      "path": "content/custom-fields.json",
+      "kind": "CustomField",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "matrices/approval-matrices.json",
+      "path": "content/approval-matrix.json",
+      "kind": "ApprovalMatrix",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "views/list-views.json",
+      "path": "content/list-views.json",
+      "kind": "ContractListView",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "classification/classification-policy.json",
+      "path": "content/classification-policy.json",
+      "kind": "ClassificationPolicy",
+      "scope": "tenant",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "branding/branding.json",
+      "path": "content/branding.json",
+      "kind": "Branding",
+      "scope": "tenant",
+      "schemaVersion": 1,
+      "required": false
+    }
+  ]
+}

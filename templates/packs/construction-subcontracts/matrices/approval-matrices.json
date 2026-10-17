@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "matrices": [
+    {
+      "code": "subcontract-activation",
+      "name": "Subcontract activation approval",
+      "description": "Activation approval by value tier. Amounts are in US dollars. The Canadian dollar rate is a synthetic illustration for testing a foreign-currency subcontract, not a live exchange rate.",
+      "currency": "USD",
+      "effectiveFrom": "2026-01-01",
+      "rates": [
+        {
+          "currency": "CAD",
+          "rate": 0.74,
+          "effectiveFrom": "2026-01-01"
+        }
+      ],
+      "rows": [
+        {
+          "code": "sub-small",
+          "description": "Below 250000",
+          "kind": "Base",
+          "priority": 100,
+          "flow": "Sequential",
+          "when": {
+            "valueMax": 250000.0
+          },
+          "steps": [
+            {
+              "key": "project-director",
+              "display": "Project Director",
+              "approverGroup": "ProjectDirectors",
+              "mode": "FirstResponse",
+              "backupGroup": "ProjectDirectorDeputies"
+            }
+          ]
+        },
+        {
+          "code": "sub-medium",
+          "description": "From 250000 to below 2000000: Project Director then Commercial Manager, in sequence",
+          "kind": "Base",
+          "priority": 100,
+          "flow": "Sequential",
+          "when": {
+            "valueMin": 250000.0,
+            "valueMax": 2000000.0
+          },
+          "steps": [
+            {
+              "key": "project-director",
+              "display": "Project Director",
+              "approverGroup": "ProjectDirectors",
+              "mode": "FirstResponse",
+              "backupGroup": "ProjectDirectorDeputies"
+            },
+            {
+              "key": "commercial-manager",
+              "display": "Commercial Manager",
+              "approverGroup": "CommercialManagers",
+              "mode": "FirstResponse",
+              "backupGroup": "CommercialManagerDeputies"
+            }
+          ]
+        },
+        {
+          "code": "sub-large",
+          "description": "2000000 and above: Project Director, Commercial Manager and Regional Director in parallel, all required",
+          "kind": "Base",
+          "priority": 100,
+          "flow": "Parallel",
+          "when": {
+            "valueMin": 2000000.0
+          },
+          "steps": [
+            {
+              "key": "project-director",
+              "display": "Project Director",
+              "approverGroup": "ProjectDirectors",
+              "mode": "AllRequired",
+              "backupGroup": "ProjectDirectorDeputies"
+            },
+            {
+              "key": "commercial-manager",
+              "display": "Commercial Manager",
+              "approverGroup": "CommercialManagers",
+              "mode": "AllRequired",
+              "backupGroup": "CommercialManagerDeputies"
+            },
+            {
+              "key": "regional-director",
+              "display": "Regional Director",
+              "approverGroup": "RegionalDirectors",
+              "mode": "AllRequired"
+            }
+          ]
+        },
+        {
+          "code": "sub-high-risk",
+          "description": "High or critical risk adds a Safety and Risk step after the base steps",
+          "kind": "Exception",
+          "effect": "AddSteps",
+          "priority": 200,
+          "when": {
+            "riskLevels": [
+              "High",
+              "Critical"
+            ]
+          },
+          "steps": [
+            {
+              "key": "safety-risk",
+              "display": "Safety and Risk Manager",
+              "approverGroup": "SafetyRisk",
+              "mode": "FirstResponse"
+            }
+          ]
+        },
+        {
+          "code": "sub-bonded",
+          "description": "Bonded work of 250,000 or more adds a Commercial Manager check of the bond",
+          "kind": "Exception",
+          "effect": "AddSteps",
+          "priority": 150,
+          "when": {
+            "valueMin": 250000,
+            "custom": [
+              {
+                "field": "bond_required",
+                "operator": "Equals",
+                "values": [
+                  "true"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "key": "bond-check",
+              "display": "Bond check",
+              "approverGroup": "CommercialManagers",
+              "mode": "FirstResponse",
+              "backupGroup": "CommercialManagerDeputies"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "change-order-approval",
+      "name": "Change order approval",
+      "description": "Change order approval by the resulting value of the subcontract once the change is applied (the matrix judges the resulting value, not the amount of the change). An administrative change order that only records a fact needs one Commercial Manager.",
+      "currency": "USD",
+      "effectiveFrom": "2026-01-01",
+      "rates": [
+        {
+          "currency": "CAD",
+          "rate": 0.74,
+          "effectiveFrom": "2026-01-01"
+        }
+      ],
+      "rows": [
+        {
+          "code": "co-small",
+          "description": "Below 1000000",
+          "kind": "Base",
+          "priority": 100,
+          "flow": "Sequential",
+          "when": {
+            "valueMax": 1000000.0
+          },
+          "steps": [
+            {
+              "key": "project-director",
+              "display": "Project Director",
+              "approverGroup": "ProjectDirectors",
+              "mode": "FirstResponse",
+              "backupGroup": "ProjectDirectorDeputies"
+            }
+          ]
+        },
+        {
+          "code": "co-medium",
+          "description": "From 1000000 to below 5000000: Project Director then Commercial Manager, in sequence",
+          "kind": "Base",
+          "priority": 100,
+          "flow": "Sequential",
+          "when": {
+            "valueMin": 1000000.0,
+            "valueMax": 5000000.0
+          },
+          "steps": [
+            {
+              "key": "project-director",
+              "display": "Project Director",
+              "approverGroup": "ProjectDirectors",
+              "mode": "FirstResponse",
+              "backupGroup": "ProjectDirectorDeputies"
+            },
+            {
+              "key": "commercial-manager",
+              "display": "Commercial Manager",
+              "approverGroup": "CommercialManagers",
+              "mode": "FirstResponse",
+              "backupGroup": "CommercialManagerDeputies"
+            }
+          ]
+        },
+        {
+          "code": "co-large",
+          "description": "5000000 and above: Project Director, Commercial Manager and Regional Director in parallel, all required",
+          "kind": "Base",
+          "priority": 100,
+          "flow": "Parallel",
+          "when": {
+            "valueMin": 5000000.0
+          },
+          "steps": [
+            {
+              "key": "project-director",
+              "display": "Project Director",
+              "approverGroup": "ProjectDirectors",
+              "mode": "AllRequired",
+              "backupGroup": "ProjectDirectorDeputies"
+            },
+            {
+              "key": "commercial-manager",
+              "display": "Commercial Manager",
+              "approverGroup": "CommercialManagers",
+              "mode": "AllRequired",
+              "backupGroup": "CommercialManagerDeputies"
+            },
+            {
+              "key": "regional-director",
+              "display": "Regional Director",
+              "approverGroup": "RegionalDirectors",
+              "mode": "AllRequired"
+            }
+          ]
+        },
+        {
+          "code": "co-high-risk",
+          "description": "High or critical risk adds a Safety and Risk step after the base steps",
+          "kind": "Exception",
+          "effect": "AddSteps",
+          "priority": 200,
+          "when": {
+            "riskLevels": [
+              "High",
+              "Critical"
+            ]
+          },
+          "steps": [
+            {
+              "key": "safety-risk",
+              "display": "Safety and Risk Manager",
+              "approverGroup": "SafetyRisk",
+              "mode": "FirstResponse"
+            }
+          ]
+        },
+        {
+          "code": "co-administrative",
+          "description": "An administrative change order records a fact and changes no value",
+          "kind": "Base",
+          "priority": 300,
+          "flow": "Sequential",
+          "when": {
+            "custom": [
+              {
+                "field": "change_order_type",
+                "operator": "Equals",
+                "values": [
+                  "ADMINISTRATIVE"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "key": "commercial-manager",
+              "display": "Commercial Manager",
+              "approverGroup": "CommercialManagers",
+              "mode": "FirstResponse",
+              "backupGroup": "CommercialManagerDeputies"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

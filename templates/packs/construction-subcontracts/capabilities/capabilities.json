@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "mode": "defaults",
+  "capabilities": [
+    {
+      "key": "legal.review",
+      "enabled": false,
+      "note": "Commercial staff negotiate standard terms; counsel is consulted outside the platform, so the lifecycle has no formal review rounds."
+    },
+    {
+      "key": "register.authorisation",
+      "enabled": true,
+      "note": "A Project Director (by value tier) gives activation approval to an executed subcontract."
+    },
+    {
+      "key": "variations",
+      "enabled": true,
+      "note": "Change orders are the central event after activation."
+    },
+    {
+      "key": "renewals",
+      "enabled": false,
+      "note": "A subcontract ends with its project; it is not renewed."
+    },
+    {
+      "key": "signature.requests",
+      "enabled": true,
+      "note": "Subcontracts and change orders are signed through the signature step."
+    }
+  ]
+}

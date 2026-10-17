@@ -1,0 +1,384 @@
+{
+  "schemaVersion": 1,
+  "views": [
+    {
+      "key": "awaiting-signature",
+      "name": "Awaiting Signature",
+      "description": "[[contract|plural]] sent for signature and not yet returned.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "updatedUtc"
+      ],
+      "sort": [
+        {
+          "field": "updatedUtc"
+        }
+      ],
+      "filters": [
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "SentForSignature"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "awaiting-activation",
+      "name": "Awaiting Activation Approval",
+      "description": "Executed [[contract|plural|lower]] waiting for [[registration.approval|lower]].",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "estimatedValue",
+        "updatedUtc"
+      ],
+      "sort": [
+        {
+          "field": "updatedUtc"
+        }
+      ],
+      "filters": [
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "AwaitingActivation"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "active-subcontracts",
+      "name": "Active [[contract|plural]]",
+      "description": "[[contract|plural]] that are active and running.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "estimatedValue",
+        "planned_completion_date"
+      ],
+      "sort": [
+        {
+          "field": "planned_completion_date"
+        }
+      ],
+      "filters": [
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "Active",
+            "ChangeOrderOpen"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "insurance-expiring",
+      "name": "Insurance Expiring",
+      "description": "Live [[contract|plural|lower]] whose insurance expires within 60 days.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "insurance_expiry"
+      ],
+      "sort": [
+        {
+          "field": "insurance_expiry"
+        }
+      ],
+      "filters": [
+        {
+          "field": "insurance_expiry",
+          "op": "Between",
+          "values": [
+            "@today",
+            "@today+60"
+          ]
+        },
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "@live"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "bonds-expiring",
+      "name": "Bonds Expiring",
+      "description": "Live [[contract|plural|lower]] with a bond that expires within 90 days.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "bond_expiry"
+      ],
+      "sort": [
+        {
+          "field": "bond_expiry"
+        }
+      ],
+      "filters": [
+        {
+          "field": "bond_required",
+          "op": "Is",
+          "values": [
+            "true"
+          ]
+        },
+        {
+          "field": "bond_expiry",
+          "op": "Between",
+          "values": [
+            "@today",
+            "@today+90"
+          ]
+        },
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "@live"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "completion-approaching",
+      "name": "Completion Approaching",
+      "description": "Live [[contract|plural|lower]] with a planned completion in the next 60 days.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "planned_completion_date",
+        "practical_completion_date"
+      ],
+      "sort": [
+        {
+          "field": "planned_completion_date"
+        }
+      ],
+      "filters": [
+        {
+          "field": "planned_completion_date",
+          "op": "Between",
+          "values": [
+            "@today",
+            "@today+60"
+          ]
+        },
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "@live"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "safety-critical",
+      "name": "Safety-Critical Work",
+      "description": "Live [[contract|plural|lower]] flagged as safety-critical work.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "riskLevel",
+        "safety_critical"
+      ],
+      "sort": [
+        {
+          "field": "riskLevel",
+          "descending": true
+        }
+      ],
+      "filters": [
+        {
+          "field": "safety_critical",
+          "op": "Is",
+          "values": [
+            "true"
+          ]
+        },
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "@live"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "stop-work",
+      "name": "Stop Work",
+      "description": "[[contract|plural]] where work is stopped.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "updatedUtc"
+      ],
+      "sort": [
+        {
+          "field": "updatedUtc",
+          "descending": true
+        }
+      ],
+      "filters": [
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "StopWork"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "completed-subcontracts",
+      "name": "Completed [[contract|plural]]",
+      "description": "[[contract|plural]] that reached completion.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "practical_completion_date",
+        "defects_liability_end_date"
+      ],
+      "sort": [
+        {
+          "field": "defects_liability_end_date"
+        }
+      ],
+      "filters": [
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "Completed"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "terminated-subcontracts",
+      "name": "Terminated [[contract|plural]]",
+      "description": "[[contract|plural]] that were terminated.",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "updatedUtc"
+      ],
+      "sort": [
+        {
+          "field": "updatedUtc",
+          "descending": true
+        }
+      ],
+      "filters": [
+        {
+          "field": "status",
+          "op": "In",
+          "values": [
+            "Terminated"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    },
+    {
+      "key": "change-orders-open",
+      "name": "[[variation|plural]] in Progress",
+      "description": "[[contract|plural]] with an open [[variation|lower]].",
+      "columns": [
+        "agreementReference",
+        "contractTitle",
+        "supplier",
+        "category",
+        "site",
+        "status",
+        "estimatedValue",
+        "change_order_type"
+      ],
+      "sort": [
+        {
+          "field": "updatedUtc",
+          "descending": true
+        }
+      ],
+      "filters": [
+        {
+          "field": "set",
+          "op": "Is",
+          "values": [
+            "variationsInProgress"
+          ]
+        }
+      ],
+      "pageSize": 25,
+      "statusChips": true
+    }
+  ]
+}

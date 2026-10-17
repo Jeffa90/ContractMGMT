@@ -1,0 +1,413 @@
+{
+  "schemaVersion": 1,
+  "mode": "complete",
+  "terms": [
+    {
+      "key": "application.name",
+      "locale": "en",
+      "singular": "Harborline Subcontract Hub",
+      "plural": "Harborline Subcontract Hub",
+      "description": "The name of the application shown in the header and in messages."
+    },
+    {
+      "key": "contract",
+      "locale": "en",
+      "singular": "Subcontract",
+      "plural": "Subcontracts",
+      "description": "The record this application manages."
+    },
+    {
+      "key": "contract.register",
+      "locale": "en",
+      "singular": "Subcontract Register",
+      "plural": "Subcontract Registers",
+      "description": "The searchable list of contracts a person may see."
+    },
+    {
+      "key": "contract.reference",
+      "locale": "en",
+      "singular": "Subcontract Number",
+      "plural": "Subcontract Numbers",
+      "description": "The reference number assigned to a contract."
+    },
+    {
+      "key": "contract.type",
+      "locale": "en",
+      "singular": "Subcontract Type",
+      "plural": "Subcontract Types",
+      "description": "The kind of contract, chosen from a list the organisation configures."
+    },
+    {
+      "key": "contract.portfolio",
+      "locale": "en",
+      "singular": "Trade Portfolio",
+      "plural": "Trade Portfolios",
+      "description": "A grouping of contracts that share an owner."
+    },
+    {
+      "key": "agreement",
+      "locale": "en",
+      "singular": "Subcontract",
+      "plural": "Subcontracts",
+      "description": "The legal instrument itself, where a page distinguishes it from the record that manages it."
+    },
+    {
+      "key": "registered.date",
+      "locale": "en",
+      "singular": "Activation Date",
+      "plural": "Activation Dates",
+      "description": "The date a contract was registered (stamped when registration is approved)."
+    },
+    {
+      "key": "executed.document",
+      "locale": "en",
+      "singular": "Executed Subcontract",
+      "plural": "Executed Subcontracts",
+      "description": "The signed copy of a contract."
+    },
+    {
+      "key": "document",
+      "locale": "en",
+      "singular": "Document",
+      "plural": "Documents",
+      "description": "A file attached to a contract."
+    },
+    {
+      "key": "contract.owner",
+      "locale": "en",
+      "singular": "Package Manager",
+      "plural": "Package Managers",
+      "description": "The person responsible for a contract or a portfolio of contracts."
+    },
+    {
+      "key": "contract.administrator",
+      "locale": "en",
+      "singular": "Commercial Administrator",
+      "plural": "Commercial Administrators",
+      "description": "The person who administers contracts across an organisation."
+    },
+    {
+      "key": "reviewer",
+      "locale": "en",
+      "singular": "Formal Reviewer",
+      "plural": "Formal Reviewers",
+      "description": "A person who reviews a contract before it is signed or registered."
+    },
+    {
+      "key": "review.team",
+      "locale": "en",
+      "singular": "Formal Review Panel",
+      "plural": "Formal Review Panels",
+      "description": "The group that carries out reviews, where a page names the group rather than a person."
+    },
+    {
+      "key": "primary.approver",
+      "locale": "en",
+      "singular": "Project Director",
+      "plural": "Project Directors",
+      "description": "The person who approves registration of an executed contract."
+    },
+    {
+      "key": "backup.approver",
+      "locale": "en",
+      "singular": "Deputy Project Director",
+      "plural": "Deputy Project Directors",
+      "description": "A person who may approve in place of the primary approver."
+    },
+    {
+      "key": "counterparty",
+      "locale": "en",
+      "singular": "Subcontractor",
+      "plural": "Subcontractors",
+      "description": "The other party to a contract."
+    },
+    {
+      "key": "supplier",
+      "locale": "en",
+      "singular": "Subcontractor",
+      "plural": "Subcontractors",
+      "description": "The organisation that supplies goods or services under a contract."
+    },
+    {
+      "key": "category",
+      "locale": "en",
+      "singular": "Trade Package",
+      "plural": "Trade Packages",
+      "description": "A grouping of contracts, usually with an owner."
+    },
+    {
+      "key": "subcategory",
+      "locale": "en",
+      "singular": "Work Section",
+      "plural": "Work Sections",
+      "description": "A grouping inside a category."
+    },
+    {
+      "key": "legal.review",
+      "locale": "en",
+      "singular": "Formal Review",
+      "plural": "Formal Reviews",
+      "description": "The review a contract goes through before signature."
+    },
+    {
+      "key": "approval",
+      "locale": "en",
+      "singular": "Approval",
+      "plural": "Approvals",
+      "description": "A decision that lets work continue."
+    },
+    {
+      "key": "registration.approval",
+      "locale": "en",
+      "singular": "Activation Approval",
+      "plural": "Activation Approvals",
+      "description": "The approval that registers an executed contract and makes it effective."
+    },
+    {
+      "key": "external.execution",
+      "locale": "en",
+      "singular": "External Signature",
+      "plural": "External Signatures",
+      "description": "Signature outside the platform."
+    },
+    {
+      "key": "variation",
+      "locale": "en",
+      "singular": "Change Order",
+      "plural": "Change Orders",
+      "description": "A controlled change to an effective contract."
+    },
+    {
+      "key": "renewal",
+      "locale": "en",
+      "singular": "Extension",
+      "plural": "Extensions",
+      "description": "A successor contract that replaces one that is ending."
+    },
+    {
+      "key": "notification",
+      "locale": "en",
+      "singular": "Notification",
+      "plural": "Notifications",
+      "description": "A message about work waiting or a date approaching."
+    },
+    {
+      "key": "supplier.number",
+      "locale": "en",
+      "singular": "Subcontractor Number",
+      "plural": "Subcontractor Numbers",
+      "description": "The supplier's identifier in the organisation's purchasing or finance system."
+    },
+    {
+      "key": "supplier.tax.id",
+      "locale": "en",
+      "singular": "Tax Identifier",
+      "plural": "Tax Identifiers",
+      "description": "The supplier's national business or tax identifier. The format check built in today is eleven digits."
+    },
+    {
+      "key": "erp.reference",
+      "locale": "en",
+      "singular": "Job Cost Reference",
+      "plural": "Job Cost References",
+      "description": "The reference of the contract in the organisation's purchasing or finance system."
+    },
+    {
+      "key": "field.owner",
+      "locale": "en",
+      "singular": "Package Manager",
+      "plural": "Package Managers",
+      "description": "The person who owns a contract."
+    },
+    {
+      "key": "field.classification",
+      "locale": "en",
+      "singular": "Data Classification",
+      "plural": "Data Classifications",
+      "description": "How sensitive the contract's information is."
+    },
+    {
+      "key": "field.risk.level",
+      "locale": "en",
+      "singular": "Risk Rating",
+      "plural": "Risk Ratings",
+      "description": "The assessed risk of a contract."
+    },
+    {
+      "key": "field.function",
+      "locale": "en",
+      "singular": "Work Type",
+      "plural": "Work Types",
+      "description": "The business function a contract serves."
+    },
+    {
+      "key": "field.estimated.value",
+      "locale": "en",
+      "singular": "Current Approved Value",
+      "plural": "Current Approved Values",
+      "description": "The estimated value of a contract."
+    },
+    {
+      "key": "field.extension.type",
+      "locale": "en",
+      "singular": "Time Extension Type",
+      "plural": "Time Extension Types",
+      "description": "How a contract can be extended."
+    },
+    {
+      "key": "field.evergreen",
+      "locale": "en",
+      "singular": "Open-Ended",
+      "plural": "Open-Ended",
+      "description": "A contract that renews without an end date."
+    },
+    {
+      "key": "field.start.date",
+      "locale": "en",
+      "singular": "Mobilization Date",
+      "plural": "Mobilization Dates",
+      "description": "The date a contract starts."
+    },
+    {
+      "key": "field.effective.date",
+      "locale": "en",
+      "singular": "Execution Date",
+      "plural": "Execution Dates",
+      "description": "The date a contract takes effect."
+    },
+    {
+      "key": "field.review.date",
+      "locale": "en",
+      "singular": "Compliance Review Date",
+      "plural": "Compliance Review Dates",
+      "description": "The date a contract is due for review."
+    },
+    {
+      "key": "field.end.date",
+      "locale": "en",
+      "singular": "Scheduled Completion Date",
+      "plural": "Scheduled Completion Dates",
+      "description": "The date a contract ends."
+    },
+    {
+      "key": "field.group.structure",
+      "locale": "en",
+      "singular": "Project Structure",
+      "plural": "Project Structure",
+      "description": "The heading that groups the structure fields of a contract."
+    },
+    {
+      "key": "field.group.dates",
+      "locale": "en",
+      "singular": "Key Dates",
+      "plural": "Key Dates",
+      "description": "The heading that groups the dates fields of a contract."
+    },
+    {
+      "key": "organisation",
+      "locale": "en",
+      "singular": "Company",
+      "plural": "Companies",
+      "description": "A legal or operating organisation inside the tenant."
+    },
+    {
+      "key": "legal.entity",
+      "locale": "en",
+      "singular": "Legal Entity",
+      "plural": "Legal Entities",
+      "description": "A company or other legal person."
+    },
+    {
+      "key": "business.unit",
+      "locale": "en",
+      "singular": "Division",
+      "plural": "Divisions",
+      "description": "A unit of the business."
+    },
+    {
+      "key": "division",
+      "locale": "en",
+      "singular": "Region",
+      "plural": "Regions",
+      "description": "A division of the organisation."
+    },
+    {
+      "key": "site",
+      "locale": "en",
+      "singular": "Project",
+      "plural": "Projects",
+      "description": "A place where the business operates."
+    },
+    {
+      "key": "solution.pack",
+      "locale": "en",
+      "singular": "Solution Pack",
+      "plural": "Solution Packs",
+      "description": "A ready-made starting configuration for a kind of business."
+    },
+    {
+      "key": "migration.project",
+      "locale": "en",
+      "singular": "Migration Project",
+      "plural": "Migration Projects",
+      "description": "A planned load of records from a previous system."
+    },
+    {
+      "key": "migration.batch",
+      "locale": "en",
+      "singular": "Migration Batch",
+      "plural": "Migration Batches",
+      "description": "One load inside a migration project."
+    },
+    {
+      "key": "organisation",
+      "locale": "en-US",
+      "singular": "Company",
+      "plural": "Companies"
+    }
+  ],
+  "groups": [
+    {
+      "key": "ProjectDirectors",
+      "locale": "en",
+      "name": "Project Directors",
+      "description": "Authorise subcontracts and change orders at the first tier."
+    },
+    {
+      "key": "ProjectDirectorDeputies",
+      "locale": "en",
+      "name": "Deputy Project Directors",
+      "description": "Act for a Project Director when one is unavailable."
+    },
+    {
+      "key": "CommercialManagers",
+      "locale": "en",
+      "name": "Commercial Managers",
+      "description": "Second tier for medium and large subcontracts and change orders."
+    },
+    {
+      "key": "CommercialManagerDeputies",
+      "locale": "en",
+      "name": "Deputy Commercial Managers",
+      "description": "Act for a Commercial Manager when one is unavailable."
+    },
+    {
+      "key": "RegionalDirectors",
+      "locale": "en",
+      "name": "Regional Directors",
+      "description": "Third tier for large subcontracts and change orders."
+    },
+    {
+      "key": "SafetyRisk",
+      "locale": "en",
+      "name": "Safety and Risk Managers",
+      "description": "Exception tier for high-risk work."
+    }
+  ],
+  "roles": [
+    {
+      "code": "Legal",
+      "offered": false
+    }
+  ]
+}

@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "workflow": "variation",
+  "subject": "Variation",
+  "description": "Change order workflow of the synthetic Harborline Construction pack. A change order (including an administrative change order that records practical completion) is prepared, signed, approved by the change order matrix and applied to the active subcontract. Its outcome returns the subcontract to Active. Data, not code. Synthetic.",
+  "settings": {
+    "documents": {
+      "executedCopyType": "ExecutedContract",
+      "finalTypes": [
+        "VariationDocument"
+      ],
+      "legalMarkupType": "LegalMarkup",
+      "approvalEvidenceType": "ApprovalEvidence"
+    },
+    "approval": {
+      "approverGroupKey": "ProjectDirectors",
+      "requireExecutedCopy": true,
+      "matrix": "change-order-approval"
+    },
+    "legal": {
+      "reworkReasonRequired": true
+    },
+    "variation": {
+      "legalReview": "None",
+      "changeableFields": [
+        "currencyCode",
+        "estimatedValue",
+        "noticePeriodValue",
+        "noticePeriodUnit",
+        "criticalNotice",
+        "reviewDate",
+        "endDate",
+        "businessUnitId",
+        "siteId",
+        "legalEntityId",
+        "riskLevel",
+        "cf.*"
+      ]
+    }
+  },
+  "states": [
+    {
+      "code": "Open",
+      "display": "Open",
+      "role": "initial",
+      "locked": false,
+      "freezeContent": false,
+      "documentPolicy": "Open",
+      "initial": true
+    },
+    {
+      "code": "Prepared",
+      "display": "Prepared",
+      "role": "drafting",
+      "locked": false,
+      "freezeContent": true,
+      "documentPolicy": "Open"
+    },
+    {
+      "code": "OutForSignature",
+      "display": "Out for signature",
+      "role": "signature",
+      "locked": false,
+      "freezeContent": true,
+      "documentPolicy": "Open"
+    },
+    {
+      "code": "Submitted",
+      "display": "Awaiting approval",
+      "role": "approval",
+      "locked": false,
+      "freezeContent": true,
+      "documentPolicy": "Open"
+    },
+    {
+      "code": "Applied",
+      "display": "Applied",
+      "role": "applied",
+      "locked": false,
+      "freezeContent": false,
+      "documentPolicy": "Open",
+      "terminal": true
+    },
+    {
+      "code": "Rejected",
+      "display": "Rejected",
+      "role": "rejected",
+      "locked": false,
+      "freezeContent": false,
+      "documentPolicy": "Open",
+      "terminal": true
+    },
+    {
+      "code": "Cancelled",
+      "display": "Cancelled",
+      "role": "cancelled",
+      "locked": false,
+      "freezeContent": false,
+      "documentPolicy": "Open",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "code": "Prepare",
+      "display": "Prepare for signature",
+      "from": [
+        "Open"
+      ],
+      "to": "Prepared",
+      "permission": "variations.create",
+      "role": "plain"
+    },
+    {
+      "code": "SendForSignature",
+      "display": "Send for signature",
+      "from": [
+        "Prepared"
+      ],
+      "to": "OutForSignature",
+      "permission": "variations.create",
+      "role": "sendSignature",
+      "guards": [
+        "FinalDocumentExists"
+      ]
+    },
+    {
+      "code": "ReturnToPrepared",
+      "display": "Return (signature voided or declined)",
+      "from": [
+        "OutForSignature"
+      ],
+      "to": "Prepared",
+      "permission": "variations.create",
+      "role": "returnToDrafting",
+      "guards": [
+        "SignatureVoidedOrDeclined"
+      ]
+    },
+    {
+      "code": "Submit",
+      "display": "Submit for approval",
+      "from": [
+        "OutForSignature"
+      ],
+      "to": "Submitted",
+      "permission": "variations.create",
+      "role": "submitRegister",
+      "guards": [
+        "ExecutedCopyExists"
+      ]
+    },
+    {
+      "code": "Approve",
+      "display": "Approve and apply",
+      "from": [
+        "Submitted"
+      ],
+      "to": "Applied",
+      "permission": "approvals.action",
+      "role": "approve",
+      "guards": [
+        "ExecutedCopyExists",
+        "AuthorisedApprover",
+        "SubmitterNotApprover"
+      ]
+    },
+    {
+      "code": "Reject",
+      "display": "Reject",
+      "from": [
+        "Submitted"
+      ],
+      "to": "Rejected",
+      "permission": "approvals.action",
+      "role": "reject",
+      "guards": [
+        "CommentRequired",
+        "AuthorisedApprover",
+        "SubmitterNotApprover"
+      ],
+      "commentRequired": true
+    },
+    {
+      "code": "CancelOpen",
+      "display": "Cancel",
+      "from": [
+        "Open",
+        "Prepared",
+        "OutForSignature"
+      ],
+      "to": "Cancelled",
+      "permission": "variations.create",
+      "role": "cancel",
+      "guards": [
+        "ReasonRequired"
+      ],
+      "reasonRequired": true
+    }
+  ]
+}

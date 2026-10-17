@@ -1,0 +1,443 @@
+{
+  "schemaVersion": 1,
+  "sections": [
+    {
+      "key": "project",
+      "label": "Project",
+      "order": 1
+    },
+    {
+      "key": "commercial",
+      "label": "Commercial",
+      "order": 2
+    },
+    {
+      "key": "compliance",
+      "label": "Compliance",
+      "order": 3
+    },
+    {
+      "key": "programme",
+      "label": "Programme",
+      "order": 4
+    },
+    {
+      "key": "change_order",
+      "label": "Change order",
+      "order": 5
+    }
+  ],
+  "lookups": [
+    {
+      "name": "riskLevel",
+      "label": "Risk rating",
+      "members": [
+        {
+          "code": "Low",
+          "label": "Low"
+        },
+        {
+          "code": "Medium",
+          "label": "Medium"
+        },
+        {
+          "code": "High",
+          "label": "High"
+        },
+        {
+          "code": "Critical",
+          "label": "Critical"
+        }
+      ]
+    },
+    {
+      "name": "contractType",
+      "label": "Subcontract type",
+      "members": [
+        {
+          "code": "LUMP_SUM",
+          "label": "Lump sum"
+        },
+        {
+          "code": "UNIT_RATE",
+          "label": "Unit rate"
+        },
+        {
+          "code": "COST_PLUS",
+          "label": "Cost plus"
+        },
+        {
+          "code": "SUPPLY_ONLY",
+          "label": "Supply only"
+        },
+        {
+          "code": "CONSULTANCY",
+          "label": "Consultancy"
+        }
+      ]
+    },
+    {
+      "name": "supplierType",
+      "label": "Subcontractor type",
+      "members": [
+        {
+          "code": "TRADE",
+          "label": "Trade subcontractor"
+        },
+        {
+          "code": "SUPPLIER",
+          "label": "Material supplier"
+        },
+        {
+          "code": "CONSULTANT",
+          "label": "Consultant"
+        },
+        {
+          "code": "PLANT_HIRE",
+          "label": "Plant hire"
+        }
+      ]
+    },
+    {
+      "name": "functionCode",
+      "label": "Work type",
+      "members": [
+        {
+          "code": "CIVIL",
+          "label": "Civil"
+        },
+        {
+          "code": "STRUCTURAL",
+          "label": "Structural"
+        },
+        {
+          "code": "MEP",
+          "label": "Mechanical and electrical"
+        },
+        {
+          "code": "FINISHES",
+          "label": "Finishes"
+        },
+        {
+          "code": "SITE_SERVICES",
+          "label": "Site services"
+        }
+      ]
+    },
+    {
+      "name": "tradePackage",
+      "label": "Trade package",
+      "members": [
+        {
+          "code": "EARTHWORKS",
+          "label": "Earthworks"
+        },
+        {
+          "code": "CONCRETE",
+          "label": "Concrete"
+        },
+        {
+          "code": "STEEL",
+          "label": "Structural steel"
+        },
+        {
+          "code": "MECHANICAL",
+          "label": "Mechanical"
+        },
+        {
+          "code": "ELECTRICAL",
+          "label": "Electrical"
+        },
+        {
+          "code": "FINISHES",
+          "label": "Finishes"
+        }
+      ]
+    }
+  ],
+  "fields": [
+    {
+      "key": "project_number",
+      "label": "Project number",
+      "type": "TEXT",
+      "section": "project",
+      "order": 1,
+      "required": false,
+      "searchable": true,
+      "filterable": true,
+      "sortable": true,
+      "reportable": true,
+      "validation": {
+        "maxLength": 20,
+        "pattern": "^[A-Z0-9-]+$",
+        "patternMessage": "Use capital letters, digits and hyphens."
+      }
+    },
+    {
+      "key": "scope_summary",
+      "label": "Scope summary",
+      "type": "LONG_TEXT",
+      "section": "project",
+      "order": 2,
+      "searchable": true,
+      "reportable": true
+    },
+    {
+      "key": "cost_code",
+      "label": "Cost code",
+      "type": "TEXT",
+      "section": "project",
+      "order": 3,
+      "filterable": true,
+      "reportable": true,
+      "validation": {
+        "maxLength": 20
+      }
+    },
+    {
+      "key": "project_manager",
+      "label": "Project manager",
+      "type": "PERSON",
+      "section": "project",
+      "order": 4,
+      "filterable": true
+    },
+    {
+      "key": "superintendent",
+      "label": "Superintendent",
+      "type": "PERSON",
+      "section": "project",
+      "order": 5,
+      "filterable": true
+    },
+    {
+      "key": "original_value",
+      "label": "Original subcontract value",
+      "type": "CURRENCY",
+      "section": "commercial",
+      "order": 1,
+      "reportable": true,
+      "sortable": true,
+      "filterable": true,
+      "validation": {
+        "currency": "USD",
+        "min": 0
+      }
+    },
+    {
+      "key": "retention_percentage",
+      "label": "Retention percentage",
+      "type": "PERCENTAGE",
+      "section": "commercial",
+      "order": 2,
+      "reportable": true,
+      "validation": {
+        "min": 0,
+        "max": 20,
+        "decimals": 2
+      }
+    },
+    {
+      "key": "retention_cap",
+      "label": "Retention cap",
+      "type": "CURRENCY",
+      "section": "commercial",
+      "order": 3,
+      "reportable": true,
+      "validation": {
+        "currency": "USD",
+        "min": 0
+      }
+    },
+    {
+      "key": "bond_required",
+      "label": "Bond required",
+      "type": "BOOLEAN",
+      "section": "commercial",
+      "order": 4,
+      "filterable": true,
+      "reportable": true,
+      "usableInApprovals": true
+    },
+    {
+      "key": "bond_expiry",
+      "label": "Bond expiry",
+      "type": "DATE",
+      "section": "commercial",
+      "order": 5,
+      "filterable": true,
+      "sortable": true,
+      "reportable": true
+    },
+    {
+      "key": "safety_critical",
+      "label": "Safety-critical work",
+      "type": "BOOLEAN",
+      "section": "compliance",
+      "order": 1,
+      "filterable": true,
+      "reportable": true,
+      "usableInApprovals": true
+    },
+    {
+      "key": "insurance_expiry",
+      "label": "Insurance expiry",
+      "type": "DATE",
+      "section": "compliance",
+      "order": 2,
+      "filterable": true,
+      "sortable": true,
+      "reportable": true
+    },
+    {
+      "key": "licence_reference",
+      "label": "Subcontractor licence reference",
+      "type": "TEXT",
+      "section": "compliance",
+      "order": 3,
+      "searchable": true,
+      "validation": {
+        "maxLength": 40
+      }
+    },
+    {
+      "key": "programme_start_date",
+      "label": "Programme start date",
+      "type": "DATE",
+      "section": "programme",
+      "order": 1,
+      "filterable": true,
+      "sortable": true
+    },
+    {
+      "key": "planned_completion_date",
+      "label": "Planned completion date",
+      "type": "DATE",
+      "section": "programme",
+      "order": 2,
+      "filterable": true,
+      "sortable": true,
+      "reportable": true
+    },
+    {
+      "key": "practical_completion_date",
+      "label": "Practical completion date",
+      "type": "DATE",
+      "section": "programme",
+      "order": 3,
+      "filterable": true,
+      "sortable": true,
+      "reportable": true,
+      "helpText": "Recorded by an administrative change order once practical completion is certified."
+    },
+    {
+      "key": "defects_liability_end_date",
+      "label": "Defects liability end date",
+      "type": "DATE",
+      "section": "programme",
+      "order": 4,
+      "filterable": true,
+      "sortable": true,
+      "reportable": true
+    },
+    {
+      "key": "change_order_type",
+      "label": "Change order type",
+      "type": "SINGLE_CHOICE",
+      "section": "change_order",
+      "order": 1,
+      "filterable": true,
+      "reportable": true,
+      "usableInApprovals": true,
+      "choices": [
+        {
+          "code": "SCOPE",
+          "label": "Scope"
+        },
+        {
+          "code": "TIME",
+          "label": "Time"
+        },
+        {
+          "code": "VALUE",
+          "label": "Value"
+        },
+        {
+          "code": "ADMINISTRATIVE",
+          "label": "Administrative"
+        }
+      ]
+    },
+    {
+      "key": "change_order_reason",
+      "label": "Change order reason",
+      "type": "LONG_TEXT",
+      "section": "change_order",
+      "order": 2,
+      "searchable": true
+    },
+    {
+      "key": "proposed_value_change",
+      "label": "Proposed value change",
+      "type": "CURRENCY",
+      "section": "change_order",
+      "order": 3,
+      "reportable": true,
+      "validation": {
+        "currency": "USD"
+      }
+    },
+    {
+      "key": "approved_value_change",
+      "label": "Approved value change",
+      "type": "CURRENCY",
+      "section": "change_order",
+      "order": 4,
+      "reportable": true,
+      "validation": {
+        "currency": "USD"
+      }
+    },
+    {
+      "key": "time_extension_days",
+      "label": "Time extension days",
+      "type": "INTEGER",
+      "section": "change_order",
+      "order": 5,
+      "reportable": true,
+      "validation": {
+        "min": 0,
+        "max": 3650
+      }
+    },
+    {
+      "key": "revised_completion_date",
+      "label": "Revised completion date",
+      "type": "DATE",
+      "section": "change_order",
+      "order": 6,
+      "filterable": true,
+      "sortable": true
+    },
+    {
+      "key": "affected_trade_package",
+      "label": "Affected trade package",
+      "type": "LOOKUP",
+      "section": "change_order",
+      "order": 7,
+      "filterable": true,
+      "lookup": "tradePackage"
+    },
+    {
+      "key": "supporting_instruction_ref",
+      "label": "Supporting instruction reference",
+      "type": "TEXT",
+      "section": "change_order",
+      "order": 8,
+      "searchable": true,
+      "validation": {
+        "maxLength": 40
+      }
+    }
+  ]
+}

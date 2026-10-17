@@ -391,3 +391,7 @@ flowchart LR
 | 0030 | Optional platform steps are configurable capabilities, never authority (S6) | Accepted (owner, 2026-10-17) |
 
 ADRs move to *Accepted* when the first milestone that depends on them completes with passing tests, or earlier by explicit owner decision.
+
+## 16. Second business as configuration only (S9)
+
+Slice S9 added **no architecture**. A second complete business, Harborline Construction (`templates/packs/construction-subcontracts`, `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`), runs on the pack, terminology, capability, custom-field, approval-matrix, workflow, notification-policy, view, classification and branding mechanisms exactly as they were. The one platform source change is a generic defect fix (contract-field labels in `_ContractFields.cshtml` now resolve through terminology). The boundary is enforced by tests rather than convention: `tests/Ecp.Architecture.Tests/SecondBusinessGuardTests.cs` scans every shipped platform file and every built `Ecp.*` assembly for the pack's vocabulary, refuses any project file that names the pack, and checks that the S9 commits touched only the pack, tests, documents and a short written list of generic fixes. Three packs (Blank, reference, Harborline) coexist in one installation; an organisation resolves its pack, terminology, capabilities, workflows, matrices, fields, views and notification policy by tenant and organisation, and tenant-wide documents (classification scale, branding) are the one place where businesses in a shared tenant must agree.

@@ -34,6 +34,10 @@ echo "== sign and verify with an ephemeral key (never written to the repository)
 PACK=$(ls "$WORK"/a/*.ecpkg | head -n 1)
 "${TOOL[@]}" sign --package "$PACK" --out "$WORK/signed.ecpkg" --key-id ci-ephemeral --key-file "$WORK/ci.key" >/dev/null
 "${TOOL[@]}" verify --package "$WORK/signed.ecpkg" --public-key "$WORK/ci.pub.pem" --key-id ci-ephemeral --production >/dev/null || fail "a correctly signed pack was refused"
+for f in "$WORK"/a/*.ecpkg; do   # every shipped pack signs and verifies the same way, whatever business it describes
+  "${TOOL[@]}" sign --package "$f" --out "$WORK/each-signed.ecpkg" --key-id ci-ephemeral --key-file "$WORK/ci.key" >/dev/null || fail "$(basename "$f") could not be signed"
+  "${TOOL[@]}" verify --package "$WORK/each-signed.ecpkg" --public-key "$WORK/ci.pub.pem" --key-id ci-ephemeral --production >/dev/null || fail "$(basename "$f") signed but was refused"
+done
 "${TOOL[@]}" verify --package "$PACK" --public-key "$WORK/ci.pub.pem" --key-id ci-ephemeral --production >/dev/null 2>&1 && fail "an unsigned pack was accepted as Production"
 "${TOOL[@]}" verify --package "$WORK/signed.ecpkg" --public-key "$WORK/other.pub.pem" --key-id ci-ephemeral --production >/dev/null 2>&1 && fail "a pack signed by a different key was accepted"
 python3 -I - "$WORK/signed.ecpkg" "$WORK/tampered.ecpkg" <<'PY'

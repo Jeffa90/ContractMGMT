@@ -155,3 +155,13 @@ It does **not** scan `templates/` (pack sources), `sample-data/`, `migration-sam
 3. Build, validate and sign with `ecp-pack` (see `docs/PACK_AUTHORING.md`). Install and assign through the Pack Manager. The organisation reads the pack's words immediately and can override any of them in a draft.
 
 No code changes and no recompilation are involved; the `A_pack_the_repository_has_never_seen…` API test and the third-pack scenarios prove it.
+
+## 16. A pack that renames everything (S9)
+
+The Harborline pack (`docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`) sets 52 terms: all 32 required keys and 20 optional ones, among them field-label keys such as "Subcontractor Number", "Job Cost Reference", "Risk Rating", "Mobilization Date" and "Scheduled Completion Date". Findings from the render sweep of four roles over the register, contract, lifecycle, approval, change-order, supplier, category, dashboard, notification, administration and onboarding pages (`tests/Ecp.Api.Tests/SecondBusinessUiTests.cs`):
+
+* **S9-discovered generic fix F1.** `src/Ecp.Host/Pages/Shared/_ContractFields.cshtml` built its labels in a tuple literal ("Contract type", "Agreement type", "Risk level", "Function"), which the page-literal guard could not see, so they never passed through the resolver. They are tokens now (`[[contract.type|sentence]]`, `[[agreement]] type`, `[[field.risk.level|sentence]]`, `[[field.function|sentence]]`). Stage B of the guard has a new rule (`fixed-field-label-literal`) that refuses those four bare quoted labels in Razor, with no new allowance. This benefits every pack.
+* **Acronym-capable terms are used unmodified.** The `sentence` modifier lower-cases the rest of the word, so a term that is an acronym or a proper noun is used as written.
+* **Dates in notifications and pages are ISO** (G12), not locale-formatted; it is neutral but not yet en-US in appearance. Recorded in `docs/PORTABILITY_AUDIT.md`, not changed.
+* **The Pack step of onboarding lists every installed pack by name**, so it is the one page the leak scan does not apply to.
+* **The role picker hides a role only when every organisation in the administrator's reach hides it.** A tenant-wide administrator still sees Legal while any organisation offers it.

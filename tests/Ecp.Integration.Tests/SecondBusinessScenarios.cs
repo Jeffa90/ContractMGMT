@@ -32,6 +32,9 @@ internal static class SecondBusinessScenarios
         var w = await HarborlineWorld.CreateTenantAsync(app);
         var up = await w.UploadAndInstallAsync();
         Assert.DoesNotContain(up.Report.Issues, i => i.IsError);
+        // A pack that is not on the file system (or in the pack store) is refused with the ordinary unknown-pack error: the pack is the only thing that makes the business exist.
+        var absent = await Assert.ThrowsAsync<DomainException>(() => w.AsAsync("admin", s => s.Get<IPackAssignments>().AssignAsync(w.Org, HarborlineWorld.PackKey, "9.9.9")));
+        Assert.Equal("pack_not_available", absent.Code);
         var assigned = await w.AssignAsync();
         // every kind the pack carries, other than the capability defaults and the terminology that already apply as a layer, became a draft
         foreach (var kind in HarborlineWorld.PublicationOrder) Assert.Contains(assigned.Kinds, k => k.Kind == kind);

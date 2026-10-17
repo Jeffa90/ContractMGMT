@@ -128,3 +128,7 @@ Configuration keys: `Ecp:Mode`, `Ecp:DemoSeed`, `Ecp:DemoTenantResolution`, `Ecp
 * **Roles.** Which roles a picker offers is still decided by terminology role visibility (ADR-0029 D8); capabilities do not hide or revoke a role.
 
 See `docs/CAPABILITIES.md`.
+
+## Onboarding a second business (S9)
+
+The onboarding wizard runs for a Harborline organisation from pack selection to publish with no platform change. The test drives the same service the pages call (`IConfigurationBootstrap` and the onboarding document) for an organisation with two sites in different time zones, trade packages as the category tree, contract types, category ownership and group mappings, then publishes the organisation-level drafts; the two tenant-level drafts (classification policy, branding) are created for a tenant administrator. The pages for the steps (`/Onboarding`, `pack`, `structure`, `categories`, `types`, `review`) render the pack's words for that organisation: the category step says Trade Packages and the type step Subcontract Types. The "Legal Review is off" note shows for the pack. Limits: the Pack step lists every installed pack by its own name, so it is not part of the neutral-wording scan; tenant-level policy and branding apply to a whole tenant, so two businesses in one tenant must agree on them.

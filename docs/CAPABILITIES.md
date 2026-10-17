@@ -148,3 +148,11 @@ SQL Server runs of the scenarios are skipped locally when no SQL Server is avail
 * **Assumption (reversible):** Variations require Register Authorisation because a Variation is approved the same way as a registration. A business that approves amendments some other way would need a catalogue change.
 * **Assumption (reversible):** the defaults for a pack that gives no capabilities document are "all on", so a pack written before S6 behaves exactly as before.
 * **Contradiction noted:** `docs/PORTABILITY_AUDIT.md` P-04 describes pack metadata `features` (`LegalReview`, `Variations`, `QlikExternalReporting`, `CriticalNotice`). Those metadata fields remain informational. Capabilities are a separate, validated, versioned document, because metadata cannot be versioned, previewed or audited per organisation. `QlikExternalReporting` and `CriticalNotice` are not capabilities (Future).
+
+## 10. Third pack: Harborline (S9)
+
+| Pack (version) | Legal Review | Register Authorisation | Variations | Renewals | Signature Requests |
+|---|---|---|---|---|---|
+| Harborline (1.0.0) | off | on | on | off | on |
+
+Harborline switches off two capabilities the reference pack uses and keeps three, and its lifecycle uses none of the two it turned off. The proof (`SecondBusinessScenarios.Capabilities`) shows: Legal Review and Renewals absent from navigation, lists and available steps; a legal or renewal start refused (the stable code is `invalid_transition` because the Harborline lifecycle defines no such step, or `capability_disabled` where it would; the test accepts either, and both refuse); the organisation's draft that switches off Variations, Signature Requests or Register Authorisation is not publishable while its workflows use them (`workflow_uses_disabled_capability` or `capability_requires`); switching Legal Review on is coherent and offers nothing new to the lifecycle. The reference organisation in the same tenant keeps all five on.

@@ -25,6 +25,7 @@ public class SecondBusinessGuardTests
     internal static readonly IReadOnlyDictionary<string, string> ApprovedPlatformChanges = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["src/Ecp.Host/Pages/Shared/_ContractFields.cshtml"] = "S9-discovered generic fix F1: the contract type, agreement type, risk and function labels were fixed English words; they now resolve through the terminology catalogue.",
+        ["tools/check-packs.sh"] = "Pack check only: every shipped pack (not just the first) is signed and verified with the ephemeral key; no pack is named.",
         [".github/workflows/ci.yml"] = "CI only: the checkout keeps full history so this guard can inspect the S9 diff against the baseline.",
     };
 
@@ -49,6 +50,28 @@ public class SecondBusinessGuardTests
             found.Add($"{path}:{line.i + 1}: {line.l.Trim()[..Math.Min(line.l.Trim().Length, 120)]}");
         }
         Assert.True(found.Count == 0, "The second business lives only in its pack. Move the wording to the pack's terminology:\n" + string.Join("\n", found));
+    }
+
+    [Fact]
+    public void No_compiled_platform_assembly_contains_the_second_business()
+    {
+        // SBP-AC-01: the pack reaches the running installation as an uploaded .ecpkg, so nothing compiled can know it. Look inside the built assemblies (UTF-8 and UTF-16 string heaps) rather than trusting the source scan.
+        var root = RepoRoot.Find();
+        var needles = new[] { "Harborline", "construction-subcontracts", "Subcontractor", "Change Order", "Trade Package" };
+        var patterns = needles.SelectMany(n => new[] { System.Text.Encoding.UTF8.GetBytes(n), System.Text.Encoding.Unicode.GetBytes(n) }).ToList();
+        var scanned = 0;
+        var found = new List<string>();
+        foreach (var dll in Directory.EnumerateFiles(Path.Combine(root, "src"), "Ecp.*.dll", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(root, dll).Replace('\\', '/');
+            if (!rel.Contains("/bin/") || rel.Contains("/ref/") || rel.Contains("/refint/")) continue;
+            var bytes = File.ReadAllBytes(dll);
+            scanned++;
+            foreach (var pattern in patterns)
+                if (bytes.AsSpan().IndexOf(pattern) >= 0) { found.Add($"{rel}: {System.Text.Encoding.UTF8.GetString(pattern)}"); break; }
+        }
+        Assert.True(scanned >= 10, "Expected to find the built platform assemblies under src/*/bin; found " + scanned);
+        Assert.True(found.Count == 0, "A compiled assembly contains the second business's vocabulary:\n" + string.Join("\n", found));
     }
 
     [Fact]

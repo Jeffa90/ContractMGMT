@@ -214,3 +214,12 @@ At every milestone exit: re-run the abuse cases as automated tests; add threats 
 | T-S6-02 | A capability switch is used to bypass an approval or a lock | A capability only removes optional steps and cannot grant or skip a permission, lock, classification or lifecycle rule; the gate runs after those checks at the single engine chokepoint | Low |
 | T-S6-03 | A pack or organisation document carries script or template syntax | Plain-data document; validator refuses markup, template and expression syntax in notes; unknown keys have no effect | Low |
 | T-S6-04 | A capability is turned off to strand in-flight work | Turning one off with work in flight, or while a published workflow uses it, is refused; work already under way can always be finished | Low |
+
+## Second business pack (S9)
+
+| ID | Threat | Mitigation | Residual |
+|---|---|---|---|
+| T-S9-01 | One business's wording, workflow, matrix, field, view or notification text is served to another business in the same tenant | Every resolver is keyed by tenant and organisation; the isolation scenario installs three packs in one tenant and a fourth organisation in a second tenant and compares what each sees | Low |
+| T-S9-02 | A business-specific shortcut creeps into generic source "to make the pack work" | `SecondBusinessGuardTests`: construction vocabulary scan of all shipped platform files, no project file names the pack, no compiled assembly contains it, and the S9 commits' diff is confined to the pack, tests and documents plus a short written list of generic fixes | Low |
+| T-S9-03 | A tenant-level document (classification scale, branding) of one business overrides another's in a shared tenant | Documented limit; the proof uses a single tenant for three businesses and records that these two kinds are tenant-wide | Medium (design limit) |
+| T-S9-04 | A synthetic example is mistaken for real advice or a real company | The pack states in its description and documentation that it is synthetic, fictional and not advice | Low |

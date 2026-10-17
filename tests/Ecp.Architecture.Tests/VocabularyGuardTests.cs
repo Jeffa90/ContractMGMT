@@ -27,7 +27,11 @@ public class VocabularyGuardTests
     private const string Words = @"Suppliers?|Procurement|Categor(?:y|ies)|Subcategor(?:y|ies)|Legal Review|Contract Register|Agreements?";
     private static readonly Rule PageLiterals = new("fixed-label-in-page-text", new Regex($@"L\[""[^""\]]*\b(?:{Words})\b|(?<![=\-])>[^<>@{{}}\n]*\b(?:{Words})\b[^<>@{{}}\n]*<"), Razor: true);
 
-    private static readonly Rule[] Rules = [Vendors, FixedLabels, RegionalDefaults, PageLiterals];
+    // S9-discovered generic fix F1: a quoted label inside a Razor tuple or array literal ("Contract type", "Risk level") never passes through L[...], so PageLiterals cannot see it. The names of the core fields that
+    // every business may call something else are refused as bare quoted labels; a token such as "[[field.risk.level|sentence]]" is not a bare label and passes.
+    private static readonly Rule QuotedFieldLabels = new("fixed-field-label-literal", new Regex(@"""(?:Contract type|Agreement type|Risk level|Function)"""), Razor: true);
+
+    private static readonly Rule[] Rules = [Vendors, FixedLabels, RegionalDefaults, PageLiterals, QuotedFieldLabels];
 
     /// <summary>The whole allow-list. Adding to it needs a reason that names the slice that removes the exception, or a statement that the place is data (a sample, an adapter note, a pack).</summary>
     internal static readonly IReadOnlyList<Allowance> Allowances =
@@ -146,6 +150,8 @@ public class VocabularyGuardTests
     [InlineData("fixed-label-in-page-text", "src/Pages/X.cshtml", "<h1>@L[\"Suppliers\"]</h1>")]
     [InlineData("fixed-label-in-page-text", "src/Pages/X.cshtml", "<label>Legal Review status</label>")]
     [InlineData("fixed-label-in-page-text", "src/Pages/X.cshtml", "<td>Category</td>")]
+    [InlineData("fixed-field-label-literal", "src/Pages/X.cshtml", "@foreach (var (key, label) in new[] { (\"riskLevel\", \"Risk level\") })")]
+    [InlineData("fixed-field-label-literal", "src/Pages/X.cshtml", "@foreach (var (key, label) in new[] { (\"contractType\", \"Contract type\") })")]
     public void The_guard_detects_fixed_labels_in_every_file_type(string rule, string path, string line)
     {
         var hits = Violations([(path, line)], [], out _);
@@ -157,6 +163,7 @@ public class VocabularyGuardTests
     [InlineData("src/Roles.cs", "RoleCodes.CategoryOwner, RoleCodes.GroupHeadApprover")]
     [InlineData("src/Pages/X.cshtml", "<h1>@L[\"[[supplier|plural]]\"]</h1>")]
     [InlineData("src/Pages/X.cshtml", "<td>@Terms.Singular(\"category\")</td>")]
+    [InlineData("src/Pages/X.cshtml", "(\"riskLevel\", \"[[field.risk.level|sentence]]\", i.RiskLevel)")]
     [InlineData("src/Pages/X.cshtml", "var q = items.Where(r => r.Category.IsActive);")]
     [InlineData("src/Setup/SetupChecks.cs", "public override string Id => \"R-AUD-01\";")]
     [InlineData("src/Pages/X.cs", "var currency = organisation.DefaultCurrencyCode;")]

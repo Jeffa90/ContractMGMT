@@ -94,3 +94,18 @@ A pack version never changes once it has been installed anywhere. To change a pa
 3. Build, validate, sign (for Production) and upload through the Pack Manager. No source change and no redeploy.
 
 A test (`A_third_pack_the_repository_has_never_seen_runs_a_contract_with_no_source_change`) does exactly this with a pack built at test time from a lifecycle whose initial state does not exist anywhere in the code or the shipped packs.
+
+## 6. A complete second business: the shipped Harborline pack (S9)
+
+`templates/packs/construction-subcontracts` is a **worked example of a full pack** and the proof that a second business needs no source change (`docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`). It carries eleven documents: catalogue entry, contract lifecycle, Variation workflow, notification policy, terminology, capabilities, custom fields and lookups, two approval matrices, shared list views, a classification policy and branding. It was written against the real validators and every document uploaded on the first complete attempt. What the exercise taught pack authors:
+
+* **Organisation-dependent documents upload with warnings, not errors** (G11, ADR-0031). A matrix condition on a custom field, a view over custom fields and a classification-gated document warn at upload ("depends on the organisation"); they are checked for real when published. Do not expect a green upload to mean a publishable draft.
+* **Publish in dependency order.** Lookups and fields first, then matrices (a workflow that names a matrix is refused until it is published), then workflows, terminology, capabilities, notification policy and views. Tenant-level kinds (classification policy, branding) create tenant drafts, not organisation drafts.
+* **Variation `changeableFields`** accept core fields and `cf.<key>`; they do not accept `functionCode` (`PACK-V001`).
+* **`requiredFields` on a step check the contract the step runs on**, not a change order that is still being prepared. Put a required change-order field on the step that submits it, or enforce it with a custom-field `required` flag.
+* **A role-less state is allowed**; a role appears at most once per workflow. A fact that needs no behaviour (such as practical completion) is better recorded by a Variation than by a state with no reminders.
+* **Notification events are a closed list** (`docs/LIFECYCLE_AND_NOTIFICATIONS.md`). A pack chooses which of the 28 events are on and rewrites their wording; it cannot invent an event, and custom date fields get no reminders.
+* **Never spell a label.** A pack sets a term for every label it wants changed; a label the pack does not set shows the neutral default, which the render sweep treats as a defect.
+* **Approver groups and roles keep their stable identifiers.** A pack names them for display through terminology (`groups`, `roles`) and may hide a role from pickers; it never renames a code.
+
+Build, sign and check it like any pack: `tools/check-packs.sh` builds all three shipped packs twice, compares them byte for byte, signs and verifies each with an ephemeral key and refuses tampered, wrong-key and unsigned packs.

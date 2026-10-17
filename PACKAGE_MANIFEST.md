@@ -55,6 +55,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `docs/PACK_ARCHITECTURE.md`
 - `docs/REPOSITORY_REVIEW.md`
 - `docs/ROLE_CATALOGUE_ADR.md`
+- `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md`
 - `docs/S9_READINESS.md`
 - `docs/SECOND_BUSINESS_PROOF.md`
 - `docs/SECURITY.md`
@@ -187,7 +188,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 ## Foundation, identity, configuration, setup and onboarding slice (2026-10-16; source listed by directory)
 
 - `src/Modules/Ecp.Identity/`, `src/Modules/Ecp.Configuration/`, `src/Modules/Ecp.Setup/` (each with `packages.lock.json`; the Setup project also holds the onboarding wizard)
-- `templates/packs/` (Blank and reference solution packs, embedded as data; the Blank pack carries the neutral lifecycle `templates/packs/blank/workflows/contract-lifecycle.json`, Variation workflow `templates/packs/blank/workflows/variation.json` and notification policy `templates/packs/blank/notifications/notification-policy.json` added by portability slice S1), `sample-data/demo-contracts.json`
+- `templates/packs/` (Blank, reference and Harborline Construction (`construction-subcontracts`, synthetic, S9) solution packs, built to external `.ecpkg` files; the Blank pack carries the neutral lifecycle `templates/packs/blank/workflows/contract-lifecycle.json`, Variation workflow `templates/packs/blank/workflows/variation.json` and notification policy `templates/packs/blank/notifications/notification-policy.json` added by portability slice S1), `sample-data/demo-contracts.json`
 - `.config/dotnet-tools.json` (pinned local tools: EF, CycloneDX, nuget-license)
 - `tools/check-licences.py`, `tools/licence-policy.json`, `tools/patch-migration-rls.py`, `tools/supply-chain.sh`, `tools/tests/`
 - `deploy/docker/verify-image.sh`

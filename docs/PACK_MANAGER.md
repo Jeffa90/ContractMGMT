@@ -80,3 +80,7 @@ Manual options, in order of preference: (1) install the missing pack, then reope
 ## Capability defaults (S6)
 
 A pack may carry a `Capabilities` document (`docs/PACK_AUTHORING.md` section 3b). The Pack Manager preview and the assignment preview show, per capability, whether it is on now and whether it would be on once the pack is assigned; the organisation's own published choice still wins. Assigning a pack creates no capability draft: the defaults apply from the assignment. **Assignment is refused** with `capability_conflict` when the pack's defaults would switch a capability off from under work in flight, or while the organisation's published workflows still use it, and the reasons are shown first in the preview. See `docs/CAPABILITIES.md` section 4.
+
+## Three shipped packs (S9)
+
+The host build now ships three packs as external files: Blank (1.5.0), the reference pack (2.5.0) and **Harborline Construction** (`construction-subcontracts` 1.0.0, a synthetic example for a US general contractor). The Pack Manager lists all three; each is installed, assigned and published through the same controls, so a tenant can hold organisations on all three side by side. The shipped bytes cannot be uploaded again (the outcome is "Duplicate"); to exercise the upload route with a shipped pack a test raises the version. See `docs/CONSTRUCTION_SUBCONTRACTS_PACK.md` section 7 for the installation steps.

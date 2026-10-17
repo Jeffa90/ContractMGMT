@@ -10,7 +10,7 @@ namespace Ecp.Notifications.Policy;
 /// <summary>The closed vocabularies a notification policy may use. A policy is data: it names these recipients, channels and placeholders, never code or expressions.</summary>
 public static class PolicyVocabulary
 {
-    public static readonly IReadOnlyList<string> Recipients = ["CategoryOwners", "Submitter", "LegalPool", "AssignedLegal", "ApproverGroup", "Counterpart", "AffectedUser", "Actor"];
+    public static readonly IReadOnlyList<string> Recipients = ["CategoryOwners", "Submitter", "LegalPool", "AssignedLegal", "ApproverGroup", "Counterpart", "AffectedUser", "Actor", "OrganisationAdministrators"];
     public static readonly IReadOnlyList<string> Channels = ["InApp", "Email"];
 
     /// <summary>The only variables a template may use. Every substituted value is encoded for plain text and bounded; there are no expressions, loops, conditions or includes.</summary>
@@ -30,7 +30,16 @@ public sealed record EventRule(string Event, IReadOnlyList<string> Recipients, s
 public sealed record MessageTemplate(string Subject, string Body);
 public sealed record CriticalNoticeRule(bool Enabled, IReadOnlyList<int> OffsetsDays, int EarlierLeadDays);
 public sealed record EvergreenRule(bool SuppressEndDate, bool KeepReviewDate);
-public sealed record ReminderRules(int DefaultLeadDays, IReadOnlyList<int> AllowedLeadDays, bool ReviewDate, bool EndDate, CriticalNoticeRule CriticalNotice, EvergreenRule Evergreen, int EscalateUnacknowledgedAfterDays);
+/// <summary>
+/// The reminder windows and who is told when nobody currently owns the contract's category (<paramref name="UnownedFallback"/>: recipient rules from the closed vocabulary; empty means the reminder is not sent
+/// and the scan tries again later). A policy published before the field existed has no entry for it; it reads as <see cref="ReminderRules.LegacyUnownedFallback"/>, which is what the platform did then.
+/// </summary>
+public sealed record ReminderRules(int DefaultLeadDays, IReadOnlyList<int> AllowedLeadDays, bool ReviewDate, bool EndDate, CriticalNoticeRule CriticalNotice, EvergreenRule Evergreen, int EscalateUnacknowledgedAfterDays,
+    IReadOnlyList<string> UnownedFallback)
+{
+    /// <summary>The fall-back of a policy that does not state one (every release published before this field existed). New packs state theirs, including "none".</summary>
+    public static readonly IReadOnlyList<string> LegacyUnownedFallback = ["OrganisationAdministrators"];
+}
 public sealed record ContentRules(string WithholdTitleFromLevel, string WithholdEverythingFromLevel);
 public sealed record DeliveryRules(int MaxAttempts, IReadOnlyList<int> BackoffMinutes);
 
@@ -77,6 +86,8 @@ public static partial class NotificationPolicyParser
         public RawCritical? CriticalNotice { get; set; }
         public RawEvergreen? Evergreen { get; set; }
         public int EscalateUnacknowledgedAfterDays { get; set; } = 3;
+        /// <summary>Null (absent) means the pre-field behaviour; an empty list means nobody.</summary>
+        public List<string>? UnownedFallback { get; set; }
     }
 
     private sealed class RawCritical { public bool Enabled { get; set; } = true; public List<int>? OffsetsDays { get; set; } public int EarlierLeadDays { get; set; } = 30; }
@@ -103,7 +114,8 @@ public static partial class NotificationPolicyParser
             SchemaVersion = raw.SchemaVersion,
             Reminders = new ReminderRules(r.DefaultLeadDays, r.AllowedLeadDays ?? [30, 60, 90, 120], r.ReviewDate, r.EndDate,
                 new CriticalNoticeRule(r.CriticalNotice?.Enabled ?? true, r.CriticalNotice?.OffsetsDays ?? [30, 14, 7, 1], r.CriticalNotice?.EarlierLeadDays ?? 30),
-                new EvergreenRule(r.Evergreen?.SuppressEndDate ?? true, r.Evergreen?.KeepReviewDate ?? true), r.EscalateUnacknowledgedAfterDays),
+                new EvergreenRule(r.Evergreen?.SuppressEndDate ?? true, r.Evergreen?.KeepReviewDate ?? true), r.EscalateUnacknowledgedAfterDays,
+                r.UnownedFallback ?? ReminderRules.LegacyUnownedFallback),
             Content = new ContentRules(raw.Content?.WithholdTitleFromLevel ?? "Restricted", raw.Content?.WithholdEverythingFromLevel ?? "Legal Privileged"),
             Delivery = new DeliveryRules(raw.Delivery?.MaxAttempts ?? 5, raw.Delivery?.BackoffMinutes ?? [1, 5, 30, 120, 720]),
             Events = (raw.Events ?? []).Select(e => new EventRule(e.Event ?? "", e.Recipients ?? [], e.Template ?? "", e.Channels ?? ["InApp"], e.Mandatory)).ToList(),
@@ -128,6 +140,9 @@ public static partial class NotificationPolicyParser
         if (r.CriticalNotice.OffsetsDays.Any(d => d is < 0 or > 3650) || r.CriticalNotice.OffsetsDays.Distinct().Count() != r.CriticalNotice.OffsetsDays.Count)
             Error("$.reminders.criticalNotice.offsetsDays", "critical_offsets", "Critical Notice offsets are days before the notice deadline, between 0 and 3650, once each.");
         if (r.CriticalNotice.EarlierLeadDays is < 0 or > 3650) Error("$.reminders.criticalNotice.earlierLeadDays", "critical_earlier", "The extra lead for Critical Notice contracts must be between 0 and 3650 days.");
+        foreach (var fallback in r.UnownedFallback)
+            if (!PolicyVocabulary.Recipients.Contains(fallback)) Error("$.reminders.unownedFallback", "recipient_unknown", $"Recipient rule '{fallback}' is not recognised.");
+        if (r.UnownedFallback.Distinct().Count() != r.UnownedFallback.Count) Error("$.reminders.unownedFallback", "recipient_duplicate", "Name each fall-back recipient rule once.");
         if (r.EscalateUnacknowledgedAfterDays is < 0 or > 365) Error("$.reminders.escalateUnacknowledgedAfterDays", "escalate", "Escalation data is held after 0 to 365 days.");
 
         if (!scale.IsKnown(p.Content.WithholdTitleFromLevel)) Error("$.content.withholdTitleFromLevel", "level", $"'{p.Content.WithholdTitleFromLevel}' is not a classification level.");

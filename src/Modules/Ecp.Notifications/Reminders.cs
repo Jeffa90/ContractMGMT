@@ -21,7 +21,7 @@ namespace Ecp.Notifications;
 /// </summary>
 internal sealed class ReminderScanner(
     NotificationsDbContext db, IUnitOfWork uow, ITenantContext tenant, IClock clock, IContractLifecyclePort contracts, IWorkflowDefinitions workflows, INotificationPolicyStore policies,
-    NotificationRenderer renderer, RecipientResolver resolver, NotificationWriter writer, IOrganisationStructureService structure, IClassificationScaleProvider scales, IAccessDirectory directory,
+    NotificationRenderer renderer, RecipientResolver resolver, NotificationWriter writer, IOrganisationStructureService structure, IClassificationScaleProvider scales,
     ActorContext actor) : IReminderScanner
 {
     private static readonly string[] LiveRoles = ["effective", "variation", "renewal", "suspended"];
@@ -91,8 +91,9 @@ internal sealed class ReminderScanner(
         var recipients = await resolver.ResolveAsync(rule.Recipients, ctx, filterByAccess: true, ct);
         if (recipients.Count == 0)
         {
-            // Nobody currently owns the category (or could open the record): fall back to the organisation's Procurement Administrators so a reminder is not lost; if there are none, try again next scan.
-            recipients = await resolver.FilterByReadAccessAsync(await directory.HoldersOfRoleAsync(RoleCodes.ProcurementAdministrator, c.OrganisationId, ct), c.ContractId, ct);
+            // Nobody currently owns the category (or could open the record): the policy says who is told instead (reminders.unownedFallback), so a reminder is not lost; a policy that names nobody, or a
+            // fall-back with nobody who can open the record, leaves the reminder for the next scan.
+            if (policy.Reminders.UnownedFallback.Count > 0) recipients = await resolver.ResolveAsync(policy.Reminders.UnownedFallback, ctx, filterByAccess: true, ct);
             if (recipients.Count == 0) return (0, 0, 0, 1);
         }
 

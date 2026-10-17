@@ -49,7 +49,7 @@ internal sealed class BatchRuntime(MigrationKernel k, IContractMigrationPort con
         var ctx = new PlanContext
         {
             TenantId = k.TenantId, OrganisationId = l.Batch.OrganisationId, SourceSystem = l.Project.SourceSystem, SourceExtractedUtc = l.Project.ExtractionUtc, Project = l.Project, Batch = l.Batch,
-            Definition = l.Definition, InitialStatusCode = contracts.InitialStatusCode, IsKnownClassification = scale.IsKnown, DefaultClassification = scale.DefaultLevel, NowUtc = k.Clock.UtcNow,
+            Definition = l.Definition, InitialStatusCode = await contracts.InitialStatusAsync(l.Batch.OrganisationId, ct), IsKnownClassification = scale.IsKnown, DefaultClassification = scale.DefaultLevel, NowUtc = k.Clock.UtcNow,
             CustomChecker = l.Definition.Fields.Any(f => MappingCatalogue.IsCustomTarget(f.TargetField)) ? await contracts.CustomFieldCheckerAsync(l.Batch.OrganisationId, ct) : null
         };
         var snapshot = await contracts.SnapshotReferenceDataAsync(l.Batch.OrganisationId, ct);
@@ -127,6 +127,8 @@ internal sealed class MigrationValidationService(MigrationKernel k, BatchRuntime
         if (l.Version is null) summary.Blockers.Add("Choose a mapping profile version for the batch.");
         else if (l.Version.Status != ProfileVersionStatus.Published) summary.Blockers.Add("The mapping profile version must be published before it can be used by a batch.");
         else foreach (var issue in MappingDefinitionValidator.Validate(l.Definition).Where(i => i.IsError)) summary.Blockers.Add($"Profile: {issue.Field}: {issue.Message}");
+        try { await contracts.InitialStatusAsync(batch.OrganisationId, ct); }
+        catch (DomainException ex) { summary.Blockers.Add($"MIG-E026: The organisation has no lifecycle definition to take its contracts' initial state from ({ex.Message})"); }
         if (batch.IsLegacyLoad && !project.LegacyLoadAllowedAt(k.Clock.UtcNow)) summary.Blockers.Add("MIG-E012: The legacy-load policy has expired or been closed.");
         if (l.Version is not null && l.Version.Status == ProfileVersionStatus.Published && l.Definition.Fields.Any(f => MappingCatalogue.IsCustomTarget(f.TargetField)))
         {

@@ -25,7 +25,10 @@
    "suppressEndDate": true,
    "keepReviewDate": true
   },
-  "escalateUnacknowledgedAfterDays": 3
+  "escalateUnacknowledgedAfterDays": 3,
+  "unownedFallback": [
+   "OrganisationAdministrators"
+  ]
  },
  "content": {
   "withholdTitleFromLevel": "Restricted",

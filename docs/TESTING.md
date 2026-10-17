@@ -335,9 +335,23 @@ PRT-002 as a whole (a second business with its own fields, rules and approvals) 
 
 No time limit is asserted (runner variance is up to 2.4 times). Result: `docs/PERFORMANCE_REVIEW.md` section 9.
 
-### 8.5 Totals at the end of the PER-002 / S1 pass
+### 8.5 Totals at the end of the PER-002 / S1 pass (superseded by 8.7)
 
 Without `ECP_TEST_SQL`: **730 Passed, 0 Failed, 0 Skipped, 189 NOT VERIFIED** (451 unit, 20 architecture, 72 API, 187 integration on SQLite). CI with SQL Server 2022 (run 32, commit a0293ee): **189 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED** for the SQL Server suite; the performance baseline is a separate step; the other two jobs also succeeded.
+
+### 8.6 Reminder fall-back and migrated initial status (portability slice S2, ADR-0025; P-02a and P-08)
+
+| Area | Where it is covered |
+|---|---|
+| The policy field `reminders.unownedFallback`: absent reads as the legacy fall-back, empty means nobody, unknown and repeated rules are refused, the JBS pack states `OrganisationAdministrators` and the Blank pack states none | unit `ReminderFallbackPolicyTests` (4) |
+| A Blank organisation never resolves JBS reminder recipients: with the category unowned, an administrator holding the old fall-back role is not told and the reminder is held (counted as skipped, no window used); with ownership restored the owner is reminded once and the administrator still is not; the test fails against the old fall-back | `ReminderFallbackScenarios` (`Blank_policy`), SQLite and SQL Server |
+| JBS behaviour unchanged: the reference policy states the fall-back and the administrator still receives the unowned reminder | `ReminderFallbackScenarios` (`Reference_policy`), SQLite and SQL Server |
+| A migrated contract starts in the initial state of its own organisation's lifecycle (JBS `Draft`, Blank `Open`); an organisation with no lifecycle is refused with `no_solution_pack` and nothing falls back to a configured status | `MigrationInitialStatusScenarios` (`Own_lifecycle`, `No_lifecycle`), SQLite and SQL Server |
+| Every migration message code is documented (now including `MIG-E026`) | unit `MigrationCatalogueTests` |
+
+### 8.7 Totals at the end of the S2 pass
+
+Without `ECP_TEST_SQL`: **738 Passed, 0 Failed, 0 Skipped, 193 NOT VERIFIED** (455 unit, 20 architecture, 72 API, 191 integration on SQLite). The 193 SQL Server tests are the same scenarios on SQL Server; their CI result is in `deploy/STATUS.md`.
 
 ## 9. No-code, packages and portability suite
 

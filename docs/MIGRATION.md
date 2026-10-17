@@ -152,6 +152,7 @@ Every code the code can produce appears here; `MigrationCatalogueTests` fails th
 | MIG-E022 | Value is not a defined (and still offered) choice or lookup member of the field |
 | MIG-E023 | Value breaks the additional field's type or validation (length, range, pattern, date range) |
 | MIG-E025 | The additional field cannot be loaded by a migration (calculated, person or file reference) |
+| MIG-E026 | The organisation has no lifecycle definition to take its contracts' initial state from (no solution pack of its own and no installation default); the dry run stops before any row is read |
 | MIG-W001 | Value normalised (trimmed, case, whitespace) |
 | MIG-W002 | Default applied, or row skipped because nothing would change |
 | MIG-W003 | End date blank with an open-ended extension type (expected) |

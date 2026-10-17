@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "Neutral notification policy of the Blank pack: the review, end-date and critical-notice reminders to the owners of a contract's category, and their acknowledgement. Data, not code: every event, recipient rule, template and reminder window here is editable configuration.",
+  "description": "Neutral notification policy of the Blank pack: the review, end-date and critical-notice reminders to the owners of a contract's category, and their acknowledgement. When nobody owns the category no one else is told (unownedFallback is empty) and the scan tries again later; a business that wants a fall-back names a recipient rule there. Data, not code: every event, recipient rule, template and reminder window here is editable configuration.",
   "reminders": {
     "defaultLeadDays": 90,
     "allowedLeadDays": [ 30, 60, 90, 120 ],
@@ -8,7 +8,8 @@
     "endDate": true,
     "criticalNotice": { "enabled": true, "offsetsDays": [ 30, 14, 7, 1 ], "earlierLeadDays": 30 },
     "evergreen": { "suppressEndDate": true, "keepReviewDate": true },
-    "escalateUnacknowledgedAfterDays": 3
+    "escalateUnacknowledgedAfterDays": 3,
+    "unownedFallback": []
   },
   "content": { "withholdTitleFromLevel": "Restricted", "withholdEverythingFromLevel": "Legal Privileged" },
   "delivery": { "maxAttempts": 5, "backoffMinutes": [ 1, 5, 30, 120, 720 ] },

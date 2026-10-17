@@ -1,6 +1,6 @@
 # Portability Remediation Plan
 
-Status: **S1 implemented (see section 8.6); every other slice is still a plan.** The plan itself changed no code, configuration, pack or data. It turns the findings of `docs/PORTABILITY_AUDIT.md` (P-01 to P-10, R-01 to R-06) into ordered, testable work. Finding IDs below are the audit's. Every fact about current behaviour was checked in the code and is cited by file and line; where something is a judgement it says so.
+Status: **S1 and S2 implemented (see sections 8.6 and 8.9); every other slice is still a plan.** The plan itself changed no code, configuration, pack or data. It turns the findings of `docs/PORTABILITY_AUDIT.md` (P-01 to P-10, R-01 to R-06) into ordered, testable work. Finding IDs below are the audit's. Every fact about current behaviour was checked in the code and is cited by file and line; where something is a judgement it says so.
 
 The target is the rule in `CLAUDE.md` and `requirements/01-authoritative/PORTABILITY_AND_NO_CODE.md`: JBS is a shipped reference configuration, not platform logic, and a second business must install and run with no source change (PRT-002, PRT-013).
 
@@ -148,7 +148,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 | Slice | Contents | Depends on | Exit evidence |
 |---|---|---|---|
 | **S1 (first), done** | R1, R4 stage A, a minimal PRT-002 test | none | section 8.6 |
-| S2 | R2 and R3 | S1 | Migrated contracts take the workflow's initial status; unowned-category reminder fall-back comes from the policy; JBS pack states the same recipient it has today |
+| **S2, done** | R2 and R3 | S1 | Migrated contracts take the workflow's initial status; unowned-category reminder fall-back comes from the policy; JBS pack states the same recipient it has today |
 | S3 | R6 | none (can run in parallel with S2) | Signature request vocabulary neutral; EF migration renames the column and filtered index; no data loss |
 | S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions |
 | S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013 |
@@ -314,7 +314,30 @@ Decisions taken inside the slice (the plan left them open): the seeded `org-a2` 
 | Repository, supply-chain and Docker checks | Repository, tooling and supply-chain checks passed locally and on CI; the container image build and smoke passed on CI; Docker smoke was not run in the workspace (no daemon) |
 | All existing and new portability tests on SQL Server | Passed: 189 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED (run 32, commit a0293ee) |
 
-Remaining high-severity findings after S1: **P-03** (packs embedded in assemblies by project files; no loader) and **P-02a** (the reminder fall-back for an unowned category names a JBS role). **First incomplete remediation task: S2.** PRT-002 as a whole remains NOT VERIFIED.
+Remaining high-severity findings after S1 (superseded by section 8.9): **P-03** (packs embedded in assemblies by project files; no loader) and **P-02a** (the reminder fall-back for an unowned category names a JBS role). **First incomplete remediation task: S2.** PRT-002 as a whole remains NOT VERIFIED.
+
+### 8.8 Slice S2: R2 and R3 (P-08 and P-02a)
+
+Implemented as defined (ADR-0025); no role identifier changed, no other remediation action touched.
+
+| Plan item | What was done |
+|---|---|
+| R3: reminder fall-back recipient as a policy rule | `reminders.unownedFallback` in the notification policy (a list from the closed recipient vocabulary, plus the new rule `OrganisationAdministrators`); `ReminderScanner` resolves the policy's list through the same `RecipientResolver` and access filter as before; the validator refuses an unknown or repeated rule; the JBS policy states `["OrganisationAdministrators"]`, the Blank policy `[]`; an absent field reads as the old behaviour so every published release is unchanged |
+| R2: initial status for migrated contracts from the organisation's workflow | `IContractMigrationPort.InitialStatusAsync(organisationId)` replaces `InitialStatusCode`; it uses `IContractCreationPolicy` (the lifecycle definition in force), is used by the dry run's context and by the commit, and `Contracts:InitialStatusCode` is removed from the shipped `appsettings.json`; `MIG-E026` blocks a dry run for an organisation with no lifecycle |
+
+Deviation to note: the plan said an absent field must read as today's behaviour for existing releases, which also applies to a Blank-pack release published between S1 and S2 (no deployment had one). A fresh Blank installation states `[]`; republishing corrects any older Blank release (recorded as a reversible assumption in ADR-0025).
+
+### 8.9 Verification of S2
+
+| Check | Result |
+|---|---|
+| A Blank organisation never resolves JBS reminder recipients | Passed: `ReminderFallbackScenarios` (SQLite locally; SQL Server in CI). An administrator holding the old fall-back role in the Blank organisation is never told; the category owner is, once, when ownership is restored; the test fails against the old fall-back |
+| JBS reminder behaviour unchanged | Passed: the reference policy states `OrganisationAdministrators`; with the category unowned the administrator receives the reminder as before; the existing reminder scenarios pass unchanged |
+| Policy compatibility | Passed: unit `ReminderFallbackPolicyTests` (absent reads as legacy, empty means nobody, unknown and repeated rules refused, both shipped packs state the field) |
+| Migrated contracts take the organisation's initial status | Passed: `MigrationInitialStatusScenarios` (JBS organisation `Draft`, Blank organisation `Open`, no lifecycle refused); the existing migration scenarios pass unchanged |
+| ARC-010 and the rest of the architecture tests | Passed (20) |
+| Remaining high-severity findings | **P-03** only (packs embedded by project files, no loader). P-02a is fixed; P-02b (compiled role catalogue, including the role that `OrganisationAdministrators` resolves to) remains Medium |
+| First incomplete remediation task | **S3** (R6: neutral signature-request vocabulary, with an EF migration), then S4 to S10 |
 
 ## 9. Open decisions for the owner
 

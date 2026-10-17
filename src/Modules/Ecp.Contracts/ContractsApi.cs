@@ -17,6 +17,7 @@ namespace Ecp.Contracts;
 /// </summary>
 public sealed class ContractsOptions
 {
+    /// <summary>Only for a host with no lifecycle module (the lifecycle definition decides otherwise). Unset by default: no business's state name is a platform default.</summary>
     public string InitialStatusCode { get; set; } = "";
     /// <summary>The most rows one export may contain. A bigger result is refused with a message to narrow it or to ask for a large export.</summary>
     public int ExportRowLimit { get; set; } = 10_000;
@@ -119,7 +120,7 @@ internal sealed class ContractService(
         var setup = policy is null ? null : await policy.ResolveAsync(r.OrganisationId, ct);
         var initial = setup?.InitialStatus ?? options.Value.InitialStatusCode;
         if (string.IsNullOrWhiteSpace(initial))
-            throw new InvalidOperationException("Contracts:InitialStatusCode is not configured (it comes from the workflow definition).");
+            throw new InvalidOperationException("The organisation has no initial contract state (it comes from its lifecycle definition; Contracts:InitialStatusCode serves only a host without a lifecycle module).");
 
         var contract = Contract.CreateDraft(new NewContract(
             tenantId, r.OrganisationId, r.AgreementReference, r.Title, r.SupplierId, r.CategoryId, initial, actor.ActorId ?? "system", clock.UtcNow,

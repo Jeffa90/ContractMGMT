@@ -23,9 +23,9 @@ namespace Ecp.Integration.Tests;
 /// </summary>
 internal static class PackResolutionScenarios
 {
-    private sealed record PackOrg(Guid Org, Guid Category, Guid Supplier, string User);
+    internal sealed record PackOrg(Guid Org, Guid Category, Guid Supplier, string User);
 
-    private static async Task<PackOrg> AddOrganisationAsync(LifecycleWorld w, string name, string prefix, string? pack)
+    internal static async Task<PackOrg> AddOrganisationAsync(LifecycleWorld w, string name, string prefix, string? pack)
     {
         await using var s = w.W.AsScopeless();
         var org = await s.Get<ITenantProvisioningService>().AddOrganisationAsync(new AddOrganisationRequest(name, "Australia/Sydney", "en-AU", "AUD", prefix, pack));

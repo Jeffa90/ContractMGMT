@@ -10,7 +10,19 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-16, end of PER-002 and portability remediation S1)
+## Current state (2026-10-17, end of portability remediation S2; PER-002 and S1 closed before it)
+
+**Portability remediation S2 (this pass; `decisions/ADR-0025-reminder-fallback-and-initial-status-from-the-organisation.md`, `docs/PORTABILITY_REMEDIATION_PLAN.md` sections 8.8 and 8.9).** No product feature was added; S3 onward and S7 were not started.
+
+* **P-02a (R3).** Who is told when nobody owns a contract's category is now the notification policy's `reminders.unownedFallback` (closed recipient vocabulary, one new rule `OrganisationAdministrators`). The JBS policy states today's recipient, the Blank policy states none, and a policy published before the field existed reads as the old behaviour, so published releases are unchanged. A Blank organisation never resolves JBS reminder recipients (`ReminderFallbackScenarios`, SQLite and SQL Server, fails against the old fall-back).
+* **P-08 (R2).** A migrated, non-legacy contract starts in the initial state of its organisation's lifecycle (`IContractMigrationPort.InitialStatusAsync`); `Contracts:InitialStatusCode` is gone from `appsettings.json`; the dry run reports `MIG-E026` for an organisation with no lifecycle. (`MigrationInitialStatusScenarios`.)
+* **Not done by design:** role identifiers and the compiled role catalogue (P-02b, S5/S8; `OrganisationAdministrators` still resolves to the role the catalogue calls `ProcurementAdministrator`), the pack loader (P-03, S7), vocabulary (S4), signature vocabulary (S3).
+
+Tests (`docs/TESTING.md` sections 8.6 and 8.7): without `ECP_TEST_SQL` **738 Passed, 0 Failed, 0 Skipped, 193 NOT VERIFIED** (455 unit, 20 architecture, 72 API, 191 integration on SQLite). The SQL Server wrappers' CI result is in `deploy/STATUS.md`.
+
+**First incomplete product task: INT-03's live e-signature adapter. First incomplete portability remediation task: S3 (R6, neutral signature-request vocabulary with an EF migration). Remaining high-severity portability finding: P-03 (packs embedded in assemblies by project files, no loader).**
+
+### Previous pass: PER-002 and portability remediation S1 (2026-10-16), kept for context
 
 **PER-002 closed and portability remediation S1 done (this pass; `docs/PERFORMANCE_REVIEW.md`, `docs/PERFORMANCE.md`, `docs/PORTABILITY_AUDIT.md`, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.6, `decisions/ADR-0024-solution-pack-resolved-by-organisation.md`, `docs/PROJECT_STATUS.md`).** No product feature was added.
 

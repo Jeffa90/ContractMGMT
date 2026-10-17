@@ -16,15 +16,17 @@ Everything else is Low or Medium (labels, examples, comments, locale defaults). 
 
 **Not verifiable today:** PRT-002 (a second, non-JBS business walked through a lifecycle). Only the `blank` pack exists besides JBS, and `blank` has no workflow of its own (P-01), so the check cannot pass yet. It is reported **NOT VERIFIED**, not passed.
 
-## 0.1 Status after remediation slice S1
+## 0.1 Status after remediation slices S1 and S2
 
-Slice S1 of `docs/PORTABILITY_REMEDIATION_PLAN.md` was implemented after this audit (ADR-0024). The registers below describe the repository **as audited** and are not regenerated; this table records what changed.
+Slices S1 and S2 of `docs/PORTABILITY_REMEDIATION_PLAN.md` were implemented after this audit (ADR-0024, ADR-0025). The registers below describe the repository **as audited** and are not regenerated; this table records what changed.
 
 | Finding | Status |
 |---|---|
 | **P-01** JBS pack selected by a code default | **Fixed.** The pack comes from the organisation's own `SolutionPackKey`; an organisation with none uses the installation default `Ecp:DefaultPackId`, which ships unset; with neither the request is refused (`no_solution_pack`). The two `DefaultPackId = "jbs-procurement"` lines and their uses are gone from `src/` |
 | **P-09** ARC-010 too narrow | **Partly fixed (stage A).** Case-insensitive, inside identifiers, all `src` C# files, names `JBS`, `Medius`, `Qlik`, `DocuSign`. Razor, project and JSON files, `Procurement`, `Group Head` and role names remain for stages B and C |
-| P-02a, P-02b, P-03, P-04, P-05, P-06, P-07, P-08, P-10, R-01 to R-06 | **Open, unchanged** (other slices) |
+| **P-02a** reminder fall-back routes to a JBS-named role | **Fixed in S2 (ADR-0025).** Who is told when nobody owns the category is the policy's `reminders.unownedFallback` (closed recipient vocabulary, one new rule `OrganisationAdministrators`). The JBS policy states it (today's recipient); the Blank policy states none; a policy published before the field existed reads as it behaved. `Reminders.cs` no longer names a role. The role identifier that `OrganisationAdministrators` resolves to is still compiled in `RecipientResolver`: that is P-02b (Medium), slices S5 and S8 |
+| **P-08** initial status of migrated contracts is a host setting naming a JBS state | **Fixed in S2 (ADR-0025).** The initial status comes from the organisation's lifecycle definition through the same source the contract pages use; `Contracts:InitialStatusCode` is gone from `appsettings.json`; the dry run reports `MIG-E026` for an organisation with no lifecycle |
+| P-02b, P-03, P-04, P-05, P-06, P-07, P-10, R-01 to R-06 | **Open, unchanged** (other slices) |
 | **PRT-002** | Still **NOT VERIFIED** as a whole. Its first step passes: a Blank-pack organisation creates a contract, activates it and opens a Variation, and none of the 17 JBS states appears (`tests/Ecp.Integration.Tests/PackResolutionScenarios.cs`, SQLite and SQL Server) |
 | Verification | Locally: 730 Passed, 0 Failed, 0 Skipped, 189 NOT VERIFIED (the SQL Server wrappers). CI (run 31 commit f3cddb4 and run 32 commit a0293ee, SQL Server 2022): 189 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED; Release build with warnings as errors, repository, supply-chain and container-image jobs succeeded. A fresh scan after S1: no occurrence of `jbs`, `medius`, `qlik` or `docusign` in any spelling in `src` C# files; no `jbs-procurement` in any `src` `.cs` or `.cshtml` file; the only `src` files that name `jbs-procurement` are the embedding lines of two project files (P-03, open). No EF migration changed since this audit |
 | New | The Blank pack now ships a neutral lifecycle, Variation workflow and notification policy as data (`templates/packs/blank/`), still embedded by project files (P-03 is open) |

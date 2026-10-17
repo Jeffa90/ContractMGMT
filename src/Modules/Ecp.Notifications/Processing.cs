@@ -78,6 +78,8 @@ internal sealed class RecipientResolver(IContractLifecyclePort contracts, IAcces
                 case "Actor": if (c.ActorUserId is { } a) people.Add(a); break;
                 case "AffectedUser": if (c.AffectedUserId is { } u) people.Add(u); break;
                 case "AssignedLegal": if (c.AssignedLegalUserId is { } l) people.Add(l); break;
+                // The holders of the organisation-level administrator role. Which role that is comes from the role catalogue (portability finding P-02b), not from any policy.
+                case "OrganisationAdministrators": people.AddRange(await directory.HoldersOfRoleAsync(RoleCodes.ProcurementAdministrator, c.OrganisationId, ct)); break;
                 case "LegalPool": people.AddRange(await directory.HoldersOfRoleAsync(RoleCodes.Legal, c.OrganisationId, ct)); break;
                 case "ApproverGroup":
                     {

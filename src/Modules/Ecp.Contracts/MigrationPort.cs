@@ -41,8 +41,8 @@ public sealed record BatchContractSummary(
 /// </summary>
 public interface IContractMigrationPort
 {
-    /// <summary>The workflow state a new editable record starts in (from configuration).</summary>
-    string InitialStatusCode { get; }
+    /// <summary>The workflow state a new editable record of the organisation starts in: the initial state of the organisation's own lifecycle definition. Refused (<c>no_solution_pack</c>) when the organisation has none.</summary>
+    Task<string> InitialStatusAsync(Guid organisationId, CancellationToken ct = default);
     Task<ReferenceSnapshot> SnapshotReferenceDataAsync(Guid organisationId, CancellationToken ct = default);
     /// <summary>Contracts that match any of the given source record ids (within the organisation and source system) or agreement references (tenant-wide, normalised).</summary>
     Task<IReadOnlyList<ExistingContractRef>> FindContractsAsync(Guid organisationId, string sourceSystem, IReadOnlyCollection<string> sourceRecordIds,
@@ -76,9 +76,17 @@ public interface IContractMigrationPort
 
 internal sealed class ContractMigrationPort(
     ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IActorContext actor, IClock clock, ITenantContext tenant, ReferenceAllocator allocator,
-    ITenantDirectory tenants, IOptions<ContractsOptions> options, IContractCustomFieldWriter customFields, ICustomFieldCatalogue fieldCatalogue) : IContractMigrationPort
+    ITenantDirectory tenants, IOptions<ContractsOptions> options, IEnumerable<IContractCreationPolicy> policies, IContractCustomFieldWriter customFields, ICustomFieldCatalogue fieldCatalogue) : IContractMigrationPort
 {
-    public string InitialStatusCode => options.Value.InitialStatusCode;
+    // The same source the contract pages use: the lifecycle definition in force for the organisation. Only a host with no lifecycle module falls back to the configured code.
+    public async Task<string> InitialStatusAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        var policy = policies.FirstOrDefault();
+        var initial = policy is null ? options.Value.InitialStatusCode : (await policy.ResolveAsync(organisationId, ct)).InitialStatus;
+        if (string.IsNullOrWhiteSpace(initial))
+            throw new InvalidOperationException("The organisation has no initial contract state (it comes from its lifecycle definition).");
+        return initial;
+    }
 
     public async Task<ReferenceSnapshot> SnapshotReferenceDataAsync(Guid organisationId, CancellationToken ct = default)
     {
@@ -157,7 +165,7 @@ internal sealed class ContractMigrationPort(
         if (!await db.Suppliers.AnyAsync(s => s.Id == m.SupplierId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("supplier_not_found", "The supplier was not found.");
         if (!await db.Categories.AnyAsync(s => s.Id == m.CategoryId && s.OrganisationId == m.OrganisationId, ct)) throw new DomainException("category_not_found", "The category was not found.");
         var by = actor.ActorId ?? "system";
-        var n = new NewContract(tenantId, m.OrganisationId, m.AgreementReference, m.Title, m.SupplierId, m.CategoryId, options.Value.InitialStatusCode, by, clock.UtcNow, m.Description,
+        var n = new NewContract(tenantId, m.OrganisationId, m.AgreementReference, m.Title, m.SupplierId, m.CategoryId, await InitialStatusAsync(m.OrganisationId, ct), by, clock.UtcNow, m.Description,
             m.Classification, m.CurrencyCode, m.EstimatedValue, m.ExtensionType, m.LegalReviewRequired, m.StartDate, m.EffectiveDate, m.ReviewDate, m.EndDate,
             ContractType: m.ContractType, AgreementType: m.AgreementType, RiskLevel: m.RiskLevel, FunctionCode: m.FunctionCode, SapOutlineAgreementNumber: m.SapOutlineAgreementNumber,
             NoticePeriodValue: m.NoticePeriodValue, NoticePeriodUnit: m.NoticePeriodUnit, CriticalNotice: m.CriticalNotice);

@@ -8,7 +8,7 @@
 @functions {
     static string Id(string name) => "Input_" + name;
 }
-@foreach (var (key, label, current) in new[] { ("contractType", "Contract type", i.ContractType), ("agreementType", "Agreement type", i.AgreementType), ("riskLevel", "Risk level", i.RiskLevel), ("functionCode", "Function", i.FunctionCode) })
+@foreach (var (key, label, current) in new[] { ("contractType", "[[contract.type|sentence]]", i.ContractType), ("agreementType", "[[agreement]] type", i.AgreementType), ("riskLevel", "[[field.risk.level|sentence]]", i.RiskLevel), ("functionCode", "[[field.function|sentence]]", i.FunctionCode) })
 {
     var prop = char.ToUpperInvariant(key[0]) + key[1..];
     var list = o.ListFor(key);

@@ -155,7 +155,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 | S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged. **Done 2026-10-17 (section 8.14, ADR-0030): a business can operate with Legal Review, Register Authorisation, Variations, Renewals and Signature Requests all off.** |
 | S7 | R7 pack loader and store (CFG-04, PKM-01); remove embedded JBS resources; R4 stage C | S1, S5, S6 | A pack installs from the store with no rebuild; the three `.csproj` embeds are gone. **Done 2026-10-17 for S7a to S7c plus the Pack Manager, setup and onboarding integration (section 8.10); S7d to S7f are future.** The order dependency on S5 and S6 was waived by the owner's instruction. |
 | S8 | R8 step 2: implement the ADR | S5, S7 | **Retired 2026-10-17, superseded by S4 (ADR-0028) and ADR-0029.** The accepted decision needs no rename; its follow-ups were delivered in section 8.13. |
-| S9 | R11: second pack (PKM-04) with PRT-002, PRT-004, PRT-013 end-to-end | S1 to S8 | PRT-002 passes |
+| S9 | R11: second pack (PKM-04) with PRT-002, PRT-004, PRT-013 end-to-end | S1 to S8 | PRT-002 passes. **Designed 2026-10-17, not built: `docs/SECOND_BUSINESS_PROOF.md` (construction subcontracts; 19 acceptance criteria)** |
 | S10 | R10 cleanup (neutral fall-backs; validation as rule; field relocation only if justified) | any | Section 6.3 |
 
 Why this order and not another:

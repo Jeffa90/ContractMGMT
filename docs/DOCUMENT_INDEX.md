@@ -75,3 +75,7 @@ Not verified (cannot be, before code exists): that the proposed test IDs pass, t
 ## Added in portability slice S6 (2026-10-17)
 
 `docs/CAPABILITIES.md` (the capability catalogue, matrix, architecture, compatibility rules and verification; ADR-0030), `decisions/ADR-0030-configurable-capabilities.md`.
+
+## Added in portability slice S9 design (2026-10-17)
+
+`docs/SECOND_BUSINESS_PROOF.md` (design only: the second business, pack design, acceptance criteria, tests and risks for PRT-002, PRT-004 and PRT-013).

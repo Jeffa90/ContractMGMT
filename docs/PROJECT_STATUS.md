@@ -232,7 +232,7 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S6 feature flags that gate capabilities | **Done** (ADR-0030): catalogue, `Capabilities` kind, pack defaults, organisation overrides, resolver, engine gate, capability-aware navigation, onboarding and setup, compatibility and readiness checks, guard; local 1,098 Passed, 0 Failed, 0 Skipped, 230 NOT VERIFIED; CI run 48 (commit c88295c) green: SQL Server 230 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`) |
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |
 | S8 implement the role decision | **Retired**: superseded by S4 and ADR-0029 |
-| S9 second pack end to end (PRT-002, PRT-004, PRT-013) | Not started |
+| S9 second pack end to end (PRT-002, PRT-004, PRT-013) | **Designed, not built**: `docs/SECOND_BUSINESS_PROOF.md` recommends a synthetic construction-subcontracts business, 19 acceptance criteria, platform findings G1 to G10 and owner questions Q1 to Q6 |
 | S10 cleanup of country, ERP and locale defaults | Not started |
 
 ## 10. Pilot readiness assessment

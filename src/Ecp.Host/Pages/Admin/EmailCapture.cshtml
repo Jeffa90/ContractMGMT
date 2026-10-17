@@ -10,7 +10,7 @@
     <tbody>
     @foreach (var m in Model.Result.Items)
     {
-        <tr><td>@m.CapturedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><td>@m.To</td><th scope="row">@m.Subject</th><td><pre class="mail">@m.Body</pre></td></tr>
+        <tr><td>@Fmt.DateTime(m.CapturedUtc)</td><td>@m.To</td><th scope="row">@m.Subject</th><td><pre class="mail">@m.Body</pre></td></tr>
     }
     @if (Model.Result.Items.Count == 0) { <tr><td colspan="4">@L["No email has been captured."]</td></tr> }
     </tbody>

@@ -73,13 +73,13 @@ public static class TermCatalogue
         new("field.created", "Fields", "Created", "Created", "When a record was created."),
         new("field.updated", "Fields", "Updated", "Updated", "When a record was last changed."),
         new("supplier.identifier", "Fields", "Identifier", "Identifiers", "One of the supplier's tax or registration identifiers, where an organisation records more than one."),
-        // Address and regional settings: labels an organisation's address form, regional settings pages and exports use. A country's own words (State, Province, ZIP Code, Postcode) are set by a pack or the organisation.
+        // Address and regional settings: labels an organisation's address form, regional settings pages and exports use. A country's own words for the parts of an address are set by a pack or the organisation.
         new("address", "Fields", "Address", "Addresses", "A supplier's postal address."),
         new("address.line1", "Fields", "Address Line 1", "Address Line 1", "The first line of an address."),
         new("address.line2", "Fields", "Address Line 2", "Address Line 2", "The second line of an address."),
         new("address.locality", "Fields", "City or Locality", "City or Locality", "The town, city or suburb of an address."),
         new("address.region", "Fields", "State, Province or Region", "State, Province or Region", "The state, province or region of an address."),
-        new("address.postal", "Fields", "Postal Code", "Postal Code", "The postal code, ZIP code or postcode of an address."),
+        new("address.postal", "Fields", "Postal Code", "Postal Code", "The postal or delivery code of an address, by whatever name the country uses for it."),
         new("address.country", "Fields", "Country or Region", "Country or Region", "The country or region of an address."),
         new("regional.country", "Administration", "Country or Region", "Country or Region", "The country or region an organisation works in."),
         new("regional.locale", "Administration", "Locale", "Locales", "The locale that decides date, number and currency formats (not the language of page text)."),

@@ -1,4 +1,5 @@
 using Ecp.Contracts;
+using Ecp.Contracts.Domain;
 using Ecp.Identity;
 using Ecp.Identity.Domain;
 using Ecp.Lifecycle;
@@ -21,8 +22,8 @@ namespace Ecp.Notifications;
 /// </summary>
 internal sealed class ReminderScanner(
     NotificationsDbContext db, IUnitOfWork uow, ITenantContext tenant, IClock clock, IContractLifecyclePort contracts, IWorkflowDefinitions workflows, INotificationPolicyStore policies,
-    NotificationRenderer renderer, RecipientResolver resolver, NotificationWriter writer, IOrganisationStructureService structure, IClassificationScaleProvider scales,
-    ActorContext actor, Ecp.Configuration.ITerminologyResolver terminology) : IReminderScanner
+    NotificationRenderer renderer, RecipientResolver resolver, NotificationWriter writer, IClassificationScaleProvider scales,
+    ActorContext actor, Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.IRegionalSettingsResolver regional) : IReminderScanner
 {
     private static readonly string[] LiveRoles = ["effective", "variation", "renewal", "suspended"];
 
@@ -35,9 +36,8 @@ internal sealed class ReminderScanner(
         var byOrg = candidates.GroupBy(c => c.OrganisationId);
         foreach (var group in byOrg)
         {
-            var org = await structure.GetOrganisationAsync(group.Key, ct);
-            var zone = TimeZones.Find(org?.TimeZoneId);
-            var today = TimeZones.LocalDate(clock.UtcNow, zone);
+            // "Today" is the organisation's own calendar day, from its published regional profile (docs/REGIONAL_SETTINGS.md); an organisation that has not decided a zone is scanned on the UTC day.
+            var today = TimeZones.LocalDate(clock.UtcNow, (await regional.FormatterAsync(group.Key, ct)).TimeZone);
             var policy = await policies.CurrentAsync(group.Key, ct);
             var def = (await workflows.CurrentAsync(WorkflowKinds.ContractLifecycle, group.Key, ct)).Definition;
             var liveStatuses = def.States.Where(s => s.Role is not null && LiveRoles.Contains(s.Role)).Select(s => s.Code).ToHashSet(StringComparer.Ordinal);
@@ -56,21 +56,21 @@ internal sealed class ReminderScanner(
         return new ReminderScanResult(scanned, sent, created, suppressed, skipped);
     }
 
-    /// <summary>The dates a contract is reminded about and the windows for each, from its own lead time and the policy. Evergreen contracts are never reminded about an End Date.</summary>
+    /// <summary>The dates a contract is reminded about and the windows for each, from its own lead time and the policy. Open-ended (extension type "Evergreen") contracts are never reminded about an end date.</summary>
     private static IEnumerable<Due> DueDates(ReminderCandidate c, NotificationPolicy policy)
     {
         var r = policy.Reminders;
-        var evergreen = string.Equals(c.ExtensionType, "Evergreen", StringComparison.OrdinalIgnoreCase);
+        var evergreen = string.Equals(c.ExtensionType, ExtensionTypes.OpenEnded, StringComparison.OrdinalIgnoreCase);
         var lead = c.ReminderLeadDays ?? r.DefaultLeadDays;
         // A Critical Notice contract is reminded earlier: its lead time is lengthened by the policy's extra days.
         var effectiveLead = lead + (c.CriticalNotice && r.CriticalNotice.Enabled ? r.CriticalNotice.EarlierLeadDays : 0);
         var windows = r.AllowedLeadDays.Where(d => d <= effectiveLead).Append(effectiveLead).Distinct().OrderByDescending(d => d).ToList();
 
-        if (r.ReviewDate && c.ReviewDate is { } review && (!evergreen || r.Evergreen.KeepReviewDate)) yield return new Due("reviewDate", review, windows);
-        if (r.EndDate && c.EndDate is { } end && !(evergreen && r.Evergreen.SuppressEndDate)) yield return new Due("endDate", end, windows);
+        if (r.ReviewDate && c.ReviewDate is { } review && (!evergreen || r.OpenEnded.KeepReviewDate)) yield return new Due("reviewDate", review, windows);
+        if (r.EndDate && c.EndDate is { } end && !(evergreen && r.OpenEnded.SuppressEndDate)) yield return new Due("endDate", end, windows);
         if (c.CriticalNotice && r.CriticalNotice.Enabled && c.NoticePeriodDays is { } notice)
         {
-            // The notice deadline is the End Date less the notice period (for an Evergreen contract, the Review Date less it).
+            // The notice deadline is the End Date less the notice period (for an open-ended contract, the review date less it).
             var basis = evergreen ? c.ReviewDate : c.EndDate;
             if (basis is { } b) yield return new Due("criticalNotice", b.AddDays(-notice), r.CriticalNotice.OffsetsDays.OrderByDescending(d => d).ToList());
         }
@@ -99,7 +99,7 @@ internal sealed class ReminderScanner(
 
         var days = due.Date.DayNumber - today.DayNumber;
         var link = $"/Contracts/Details/{c.ContractId}";
-        var (subject, body) = renderer.Render(policy, template, new RenderContext(c.AgreementReference, c.Title, c.Classification, "The system", link, due.Date.ToString("yyyy-MM-dd"), days, window), scale, await terminology.GetAsync(c.OrganisationId, ct: ct));
+        var (subject, body) = renderer.Render(policy, template, new RenderContext(c.AgreementReference, c.Title, c.Classification, "The system", link, due.Date, days, window, NowUtc: clock.UtcNow, Formatter: await regional.FormatterAsync(c.OrganisationId, ct)), scale, await terminology.GetAsync(c.OrganisationId, ct: ct));
         var correlation = actor.CorrelationId;
         var created = 0;
         var wasSuppressed = 0;

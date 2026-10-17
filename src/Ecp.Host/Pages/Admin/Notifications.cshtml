@@ -34,7 +34,7 @@
     @foreach (var d in Model.Deliveries.Items)
     {
         <tr>
-            <td>@d.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@d.RecipientName</td><td>@d.Channel (@d.Provider)</td><td>@d.Title</td>
+            <td>@Fmt.DateTime(d.CreatedUtc)</td><td>@d.RecipientName</td><td>@d.Channel (@d.Provider)</td><td>@d.Title</td>
             <td><span class="badge @(d.Status == "DeadLetter" ? "warn" : d.Status == "Sent" ? "ok" : "")">@d.Status</span></td>
             <td><a href="/Admin/Notifications?delivery=@d.DeliveryId&status=@Model.Status">@d.Attempts</a></td>
             <td>@d.LastError</td>
@@ -50,7 +50,7 @@
     <h3>@L["Attempts"]</h3>
     <div class="table-wrap"><table>
         <thead><tr><th scope="col">#</th><th scope="col">@L["Provider"]</th><th scope="col">@L["Started (UTC)"]</th><th scope="col">@L["Duration (ms)"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Correlation id"]</th></tr></thead>
-        <tbody>@foreach (var a in Model.Attempts) { <tr><td>@a.Number</td><td>@a.Provider</td><td>@a.StartedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><td>@a.DurationMs</td><td>@(a.Succeeded ? "Succeeded" : a.Error)</td><td><code>@a.CorrelationId</code></td></tr> }</tbody>
+        <tbody>@foreach (var a in Model.Attempts) { <tr><td>@a.Number</td><td>@a.Provider</td><td>@Fmt.DateTime(a.StartedUtc)</td><td>@a.DurationMs</td><td>@(a.Succeeded ? "Succeeded" : a.Error)</td><td><code>@a.CorrelationId</code></td></tr> }</tbody>
     </table></div>
 }
 
@@ -63,7 +63,7 @@
     <tbody>
     @foreach (var j in Model.Jobs)
     {
-        <tr><th scope="row">@j.JobName</th><td>@j.StartedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><td>@(j.FinishedUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</td><td><span class="badge @(j.Status == "Failed" ? "warn" : j.Status == "Succeeded" ? "ok" : "")">@j.Status</span></td><td>@j.Processed</td><td>@j.Failures</td><td>@j.Detail</td></tr>
+        <tr><th scope="row">@j.JobName</th><td>@Fmt.DateTime(j.StartedUtc)</td><td>@(Fmt.DateTime(j.FinishedUtc) ?? "-")</td><td><span class="badge @(j.Status == "Failed" ? "warn" : j.Status == "Succeeded" ? "ok" : "")">@j.Status</span></td><td>@j.Processed</td><td>@j.Failures</td><td>@j.Detail</td></tr>
     }
     @if (Model.Jobs.Count == 0) { <tr><td colspan="7">@L["No job has run yet."]</td></tr> }
     </tbody>

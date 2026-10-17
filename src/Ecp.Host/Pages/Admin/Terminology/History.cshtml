@@ -15,7 +15,7 @@
     <tbody>
     @foreach (var v in Model.Releases)
     {
-        <tr><th scope="row">@v.Release.Number@if (v.Release.RollbackOfNumber is { } rb) { <span class="hint"> (@L["restores release {0}", rb])</span> }</th><td>@v.Release.PublishedUtc.ToString("u")</td><td>@v.Release.PublishedBy</td><td>@v.Release.Note</td>
+        <tr><th scope="row">@v.Release.Number@if (v.Release.RollbackOfNumber is { } rb) { <span class="hint"> (@L["restores release {0}", rb])</span> }</th><td>@Fmt.DateTime(v.Release.PublishedUtc)</td><td>@v.Release.PublishedBy</td><td>@v.Release.Note</td>
             <td>@v.Added / @v.Changed / @v.Removed</td><td><code>@v.Release.ContentHash[..Math.Min(12, v.Release.ContentHash.Length)]</code></td></tr>
     }
     @if (Model.Releases.Count == 0) { <tr><td colspan="6">@L["Nothing has been published yet."]</td></tr> }

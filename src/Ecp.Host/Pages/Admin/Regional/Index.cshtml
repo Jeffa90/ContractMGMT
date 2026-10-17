@@ -1,0 +1,139 @@
+@page "/Admin/Regional"
+@model Ecp.Host.Pages.Admin.Regional.IndexModel
+@using Ecp.SharedKernel.Localisation
+@{ ViewData["Title"] = L["Regional settings"].Value; var o = Model.Overview; }
+<h1>@L["Regional settings"]</h1>
+<p class="lede">@L["The [[regional.locale|lower]], currency and [[regional.time.zone|lower]] that dates, times, numbers and amounts are shown in. A solution pack proposes values; the organisation decides, and its published choice always wins. Times are stored in UTC and shown in the [[regional.time.zone|lower]]. A [[regional.locale|lower]] is a language and region for formats; it is not the language of the page text. Only the format of a tax identifier is checked: nothing is looked up in a registry."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="card inline-form" aria-label="@L["Choose the organisation"]">
+        <div class="field"><label for="org-pick">@L["[[organisation]]"]</label><select id="org-pick" name="OrganisationId">@foreach (var og in Model.Organisations) { <option value="@og.Id" selected="@(og.Id == Model.OrganisationId)">@og.Name</option> }</select></div>
+        <div class="actions"><button type="submit" class="secondary">@L["Show"]</button></div>
+    </form>
+}
+@if (o is not null)
+{
+    var s = o.Effective;
+    <section class="card" aria-labelledby="eff-h">
+        <h2 id="eff-h">@L["In force for"] @o.OrganisationName</h2>
+        @if (!s.IsComplete)
+        {
+            <p role="alert" class="badge warn">@L["Not complete: the locale, default currency or time zone is not decided. Dates and amounts are shown in an invariant form, and Production readiness reports this organisation until all three are set."]</p>
+        }
+        <dl class="facts">
+            <dt>@L["[[regional.country]]"]</dt><dd>@(s.CountryCode is null ? "-" : RegionalCatalogue.CountryName(s.CountryCode) + " (" + s.CountryCode + ")") <span class="hint">@L["from"] @L[s.SourceOf("country")]</span></dd>
+            <dt>@L["[[regional.locale]]"]</dt><dd>@(s.PrimaryLocale ?? "-") <span class="hint">@L["from"] @L[s.SourceOf("locale")]</span></dd>
+            <dt>@L["Default currency"]</dt><dd>@(s.DefaultCurrency ?? "-") <span class="hint">@L["from"] @L[s.SourceOf("currency")]</span></dd>
+            <dt>@L["[[regional.time.zone]]"]</dt><dd>@(s.TimeZoneId ?? "-") <span class="hint">@L["from"] @L[s.SourceOf("timeZone")]</span></dd>
+            <dt>@L["[[regional.time.display]]"]</dt><dd>@s.TimeDisplay</dd>
+            <dt>@L["Published release"]</dt><dd>@(o.Latest is null ? L["none yet"].Value : "#" + o.Latest.Number + " · " + Fmt.DateTime(o.Latest.PublishedUtc) + " · " + o.Latest.PublishedBy)</dd>
+            <dt>@L["Pack proposing defaults"]</dt><dd>@(o.Pack is null ? L["none"].Value : o.Pack.PackKey + " " + o.Pack.PackVersion)</dd>
+        </dl>
+    </section>
+
+    <section class="card" aria-labelledby="draft-h">
+        <h2 id="draft-h">@L["Edit the draft"]</h2>
+        <p class="hint">@(o.Draft is null ? L["There is no open draft yet; saving starts one."] : L["A draft is open."]) @L["Leave a field empty to inherit the pack's proposal. Saving never publishes."]</p>
+        <form method="post" aria-label="@L["Regional settings draft"]">
+            <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+            <div class="field"><label for="Country">@L["[[regional.country]]"]</label>
+                <select id="Country" name="Country"><option value="">@L["(inherit)"]</option>@foreach (var c in RegionalCatalogue.Countries) { <option value="@c.Key" selected="@(c.Key == Model.Country)">@c.Value (@c.Key)</option> }</select></div>
+            <div class="field"><label for="Locale">@L["[[regional.locale]]"]</label><input id="Locale" name="Locale" type="text" maxlength="35" value="@Model.Locale" list="locale-list" aria-describedby="Locale-hint" />
+                <span id="Locale-hint" class="hint">@L["A language and region tag. It decides the date order, the number and currency formats; it is not the page language."]</span></div>
+            <div class="field"><label for="SupportedLocales">@L["Supported locales (comma separated, optional)"]</label><input id="SupportedLocales" name="SupportedLocales" type="text" maxlength="400" value="@Model.SupportedLocales" /></div>
+            <div class="field"><label for="Currency">@L["Default currency"]</label>
+                <select id="Currency" name="Currency"><option value="">@L["(inherit)"]</option>@foreach (var c in RegionalCatalogue.Currencies.Order(StringComparer.Ordinal)) { <option value="@c" selected="@(c == Model.Currency)">@c</option> }</select>
+                <span class="hint">@L["Every amount keeps its own currency; this is the one offered when an amount is entered. Changing it never converts or rewrites an amount."]</span></div>
+            <div class="field"><label for="SupportedCurrencies">@L["Supported currencies (comma separated, optional)"]</label><input id="SupportedCurrencies" name="SupportedCurrencies" type="text" maxlength="400" value="@Model.SupportedCurrencies" /></div>
+            <div class="field"><label for="TimeZone">@L["[[regional.time.zone]]"]</label><input id="TimeZone" name="TimeZone" type="text" maxlength="80" value="@Model.TimeZone" list="zone-list" />
+                <span class="hint">@L["An IANA time zone. Daylight saving follows the zone's own rules."]</span></div>
+            <div class="field"><label for="TimeDisplay">@L["[[regional.time.display]]"]</label>
+                <select id="TimeDisplay" name="TimeDisplay"><option value="" selected="@string.IsNullOrEmpty(Model.TimeDisplay)">@L["(inherit)"]</option><option value="locale" selected="@(Model.TimeDisplay == "locale")">@L["The locale's own habit"]</option><option value="24h" selected="@(Model.TimeDisplay == "24h")">@L["24-hour clock"]</option><option value="12h" selected="@(Model.TimeDisplay == "12h")">@L["12-hour clock"]</option></select></div>
+            <div class="field"><label for="PhoneRegion">@L["Phone region (optional)"]</label><input id="PhoneRegion" name="PhoneRegion" type="text" maxlength="2" value="@Model.PhoneRegion" /></div>
+
+            <fieldset class="card"><legend>@L["[[supplier.tax.id]] types"]</legend>
+                <div class="check field"><input id="OwnIdentifiers" name="OwnIdentifiers" type="checkbox" value="true" checked="@Model.OwnIdentifiers" /><label for="OwnIdentifiers">@L["Use my own list instead of the pack's"]</label></div>
+                <p class="hint">@L["Only the structure of a value is checked, from a closed list of rules. Nothing is looked up in a government or tax registry, and a value that passes is not thereby registered or legally valid."]</p>
+                @if (o.OfferedProfiles.Count > 0)
+                {
+                    <div class="field"><label for="AddProfile">@L["Add a profile the installed packs offer"]</label>
+                        <select id="AddProfile" name="AddProfile"><option value="">@L["(none)"]</option>@foreach (var p in o.OfferedProfiles) { <option value="@p.Key">@p.Label (@p.Key@(p.Country is null ? "" : ", " + p.Country))</option> }</select></div>
+                }
+                @for (var i = 0; i < Model.Identifiers.Count; i++)
+                {
+                    var r = Model.Identifiers[i];
+                    <fieldset class="term"><legend>@(string.IsNullOrWhiteSpace(r.Key) ? L["A new type"].Value : r.Key)</legend>
+                        <div class="field"><label for="id-@i-key">@L["Type key"]</label><input id="id-@i-key" name="Identifiers[@i].Key" type="text" maxlength="40" value="@r.Key" /></div>
+                        <div class="field"><label for="id-@i-label">@L["Label shown"]</label><input id="id-@i-label" name="Identifiers[@i].Label" type="text" maxlength="60" value="@r.Label" /></div>
+                        <div class="field"><label for="id-@i-country">@L["Country (optional)"]</label><input id="id-@i-country" name="Identifiers[@i].Country" type="text" maxlength="2" value="@r.Country" /></div>
+                        <div class="field"><label for="id-@i-rule">@L["Rule"]</label><select id="id-@i-rule" name="Identifiers[@i].Rule">@foreach (var k in IdentifierRuleKinds.All) { <option value="@k" selected="@(k == r.Rule)">@k</option> }</select></div>
+                        <div class="field"><label for="id-@i-length">@L["Length (digits and alphanumeric rules)"]</label><input id="id-@i-length" name="Identifiers[@i].Length" type="text" maxlength="8" value="@r.Length" /></div>
+                        <div class="field"><label for="id-@i-mask">@L["Mask (mask rule: # digit, A letter, * either)"]</label><input id="id-@i-mask" name="Identifiers[@i].Mask" type="text" maxlength="40" value="@r.Mask" /></div>
+                        <div class="field"><label for="id-@i-checksum">@L["Checksum"]</label><select id="id-@i-checksum" name="Identifiers[@i].Checksum">@foreach (var k in IdentifierChecksums.All) { <option value="@k" selected="@(k == r.Checksum)">@k</option> }</select></div>
+                        <div class="check field"><input id="id-@i-required" name="Identifiers[@i].Required" type="checkbox" value="true" checked="@r.Required" /><label for="id-@i-required">@L["Required"]</label></div>
+                        <div class="check field"><input id="id-@i-unique" name="Identifiers[@i].Unique" type="checkbox" value="true" checked="@r.Unique" /><label for="id-@i-unique">@L["No two [[supplier|plural|lower]] in the [[organisation|lower]] share a value"]</label></div>
+                        <div class="field"><label for="id-@i-class">@L["Classification"]</label><input id="id-@i-class" name="Identifiers[@i].Classification" type="text" maxlength="30" value="@r.Classification" /></div>
+                    </fieldset>
+                }
+            </fieldset>
+
+            <fieldset class="card"><legend>@L["[[address]] fields"]</legend>
+                <div class="check field"><input id="OwnAddress" name="OwnAddress" type="checkbox" value="true" checked="@Model.OwnAddress" /><label for="OwnAddress">@L["Use my own choice instead of the pack's"]</label></div>
+                <p class="hint">@L["Labels come from the terminology. An address is free text of bounded length: no postal format is checked for any country."]</p>
+                @for (var i = 0; i < Model.AddressRows.Count; i++)
+                {
+                    var a = Model.AddressRows[i];
+                    <div class="field"><input type="hidden" name="AddressRows[@i].Key" value="@a.Key" />
+                        <span class="check"><input id="addr-@i-used" name="AddressRows[@i].Used" type="checkbox" value="true" checked="@a.Used" /><label for="addr-@i-used">@L["[[address." + a.Key + "]]"]</label></span>
+                        <span class="check"><input id="addr-@i-req" name="AddressRows[@i].Required" type="checkbox" value="true" checked="@a.Required" /><label for="addr-@i-req">@L["Required"]</label></span></div>
+                }
+            </fieldset>
+
+            <div class="field"><label for="Note">@L["Note for the history (optional)"]</label><input id="Note" name="Note" type="text" maxlength="200" /></div>
+            <div class="actions">
+                <button type="submit" asp-page-handler="Save">@L["Save draft"]</button>
+                <button type="submit" asp-page-handler="Validate" class="secondary">@L["Save and validate"]</button>
+                <button type="submit" asp-page-handler="Publish">@L["Validate and publish"]</button>
+                @if (o.Draft is not null) { <button type="submit" asp-page-handler="Discard" class="secondary">@L["Discard the draft"]</button> }
+            </div>
+        </form>
+        <datalist id="locale-list">@foreach (var l in RegionalCatalogue.SuggestedLocales) { <option value="@l"></option> }</datalist>
+        <datalist id="zone-list">@foreach (var z in RegionalCatalogue.TimeZoneIds) { <option value="@z"></option> }</datalist>
+    </section>
+
+    @if (Model.Preview is { } pv)
+    {
+        <section class="card" aria-labelledby="prev-h">
+            <h2 id="prev-h">@L["Preview of the form as it stands"]</h2>
+            <p class="hint">@L["Nothing is saved or published by looking at this. Sample values are written in the settings the form would give."]</p>
+            <dl class="facts">@foreach (var smp in pv.Samples) { <dt>@L[smp.Label]</dt><dd>@smp.Value</dd> }</dl>
+            @if (pv.Messages.Count > 0) { <ul class="plain">@foreach (var m in pv.Messages) { <li><span class="badge @(m.Severity == Ecp.Configuration.ValidationSeverity.Error ? "bad" : "warn")">@m.Severity</span> @m.Message</li> }</ul> }
+        </section>
+    }
+
+    @if (Model.Problems.Count > 0)
+    {
+        <section class="card" aria-labelledby="prob-h"><h2 id="prob-h">@L["The last validation of the draft"]</h2>
+            <ul class="plain">@foreach (var m in Model.Problems) { <li><span class="badge @(m.Severity == Ecp.Configuration.ValidationSeverity.Error ? "bad" : "warn")">@m.Severity</span> @m.Message</li> }</ul></section>
+    }
+
+    <section class="card" aria-labelledby="hist-h">
+        <h2 id="hist-h">@L["History and rollback"]</h2>
+        @if (!Model.CanHistory) { <p class="hint">@L["You cannot read the version history."]</p> }
+        else if (Model.Releases.Count == 0) { <p class="hint">@L["Nothing has been published yet."]</p> }
+        else
+        {
+            <table><caption class="sr-only">@L["Releases"]</caption>
+                <thead><tr><th scope="col">@L["Release"]</th><th scope="col">@L["Published"]</th><th scope="col">@L["By"]</th><th scope="col">@L["Note"]</th></tr></thead>
+                <tbody>@foreach (var r in Model.Releases.OrderByDescending(x => x.Number)) { <tr><th scope="row">@r.Number @if (r.RollbackOfNumber is { } rb) { <span class="hint">(@L["republishes"] @rb)</span> }</th><td>@Fmt.DateTime(r.PublishedUtc)</td><td>@r.PublishedBy</td><td>@r.Note</td></tr> }</tbody></table>
+            <form method="post" asp-page-handler="Rollback" class="inline-form" aria-label="@L["Roll back"]">
+                <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+                <div class="field"><label for="ToRelease">@L["Publish the content of release"]</label><input id="ToRelease" name="ToRelease" type="number" min="1" required /></div>
+                <div class="field"><label for="RbNote">@L["Reason"]</label><input id="RbNote" name="Note" type="text" maxlength="200" required /></div>
+                <div class="actions"><button type="submit" class="secondary">@L["Roll back"]</button></div>
+            </form>
+        }
+        <p><a href="/Admin/Audit?entityType=ConfigurationRelease">@L["Audit history of configuration changes"]</a></p>
+    </section>
+}

@@ -385,16 +385,32 @@ internal sealed class OrganisationStage : SetupStageBase
     private readonly LocalisationOptions _localisation;
     public OrganisationStage(ISolutionPackCatalogue catalogue, LocalisationOptions localisation) { _catalogue = catalogue; _localisation = localisation; }
 
+    private RegionalProfileDocument? PackRegional(string? packId)
+    {
+        if (packId is null || _catalogue.RegionalOf(packId) is not { } json) return null;
+        try { return RegionalProfileDocument.Parse(json); } catch (DomainException) { return null; }
+    }
+
+    /// <summary>The identifier profiles the installed packs carry, by key, for the organisation to choose from. Nothing is chosen for it.</summary>
+    private IReadOnlyList<IdentifierTypeProfile> AvailableIdentifierProfiles()
+        => _catalogue.ListEntries().Select(e => PackRegional(e.PackKey)).Where(r => r?.Identifiers is not null).SelectMany(r => r!.Identifiers!).GroupBy(p => p.Key, StringComparer.Ordinal).Select(g => g.First()).OrderBy(p => p.Key, StringComparer.Ordinal).ToList();
+
     public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)
     {
+        // The pack proposes; the organisation decides. A pack that proposes nothing (the Blank pack) leaves the fields empty, because no country, locale, currency or time zone is a safe default for everybody.
         var d = doc.PackId is null ? null : _catalogue.Find(doc.PackId)?.Defaults;
+        var regional = PackRegional(doc.PackId);
+        var profiles = AvailableIdentifierProfiles();
         return
         [
             new("organisationName", "[[organisation]] name", FieldKind.Text, true, Value: doc.TenantName),
-            new("culture", "Locale", FieldKind.Select, true, "Controls date, number and currency formats.",
-                [.. _localisation.SupportedCultures.Select(c => new FieldOption(c, c))], d?.Culture ?? _localisation.DefaultCulture),
-            new("timeZone", "Time zone", FieldKind.Text, true, "An IANA time zone such as Europe/London. Times are stored in UTC and shown in this zone.", Value: d?.TimeZoneId ?? _localisation.DefaultTimeZoneId),
-            new("currency", "Default currency", FieldKind.Text, true, "ISO 4217 code, for example USD.", Value: d?.CurrencyCode ?? _localisation.DefaultCurrencyCode),
+            new("country", "[[regional.country]]", FieldKind.Select, false, "The country or region the organisation works in. It is a label for people and for the identifier and address profiles; it decides no format by itself.",
+                [new FieldOption("", "(not set)"), .. RegionalCatalogue.Countries.Select(c => new FieldOption(c.Key, c.Value + " (" + c.Key + ")"))], regional?.Country ?? ""),
+            new("culture", "[[regional.locale]]", FieldKind.Text, true, "A BCP 47 language-and-region tag. It controls date, number and currency formats; it is not the language of the page text.", Value: regional?.Locale ?? d?.Culture),
+            new("timeZone", "[[regional.time.zone]]", FieldKind.Text, true, "An IANA time zone identifier (Area/Location). Times are stored in UTC and shown in this zone.", Value: regional?.TimeZone ?? d?.TimeZoneId),
+            new("currency", "Default currency", FieldKind.Text, true, "A three-letter ISO 4217 currency code. Every amount keeps its own currency; this is the default offered when an amount is entered.", Value: regional?.Currency ?? d?.CurrencyCode),
+            new("identifierProfile", "[[supplier.tax.id]] type", FieldKind.Select, false, "Which kind of tax or registration identifier the organisation records for its counterparties. Only the structure of a value is checked; nothing is looked up in a registry.",
+                [new FieldOption("", "(none for now)"), .. profiles.Select(p => new FieldOption(p.Key, p.Label + (p.Country is null ? "" : " (" + p.Country + ")")))], regional?.Identifiers?.OrderBy(p => p.Order).FirstOrDefault()?.Key ?? ""),
             new("referencePrefix", "[[contract.reference|sentence]] prefix", FieldKind.Text, true, "Letters and digits, for example CON. References are allocated as PREFIX-0001.", Value: d?.ReferencePrefix ?? "CON"),
         ];
     }
@@ -402,13 +418,16 @@ internal sealed class OrganisationStage : SetupStageBase
     public override async Task<StageResult> ExecuteAsync(StageContext c)
     {
         var name = c.Required("organisationName", "[[organisation]] name");
-        var culture = c.Required("culture", "Locale");
-        var zone = c.Required("timeZone", "Time zone");
+        var culture = c.Required("culture", "[[regional.locale]]");
+        var zone = c.Required("timeZone", "[[regional.time.zone]]");
         var currency = c.Required("currency", "Default currency").ToUpperInvariant();
         var prefix = c.Required("referencePrefix", "[[contract.reference|sentence]] prefix").ToUpperInvariant();
-        if (!LocaleFormatter.TryGetCulture(culture, out _)) throw new DomainException("culture", "That locale is not recognised.");
+        var country = c.Value("country");
+        var identifierKey = c.Value("identifierProfile");
+        if (!RegionalCatalogue.IsLocale(culture)) throw new DomainException("culture", "That locale is not recognised.");
         if (!TimeZones.TryFind(zone, out _)) throw new DomainException("time_zone", "That time zone is not recognised.");
-        LocaleFormatter.ValidateCurrency(currency);
+        if (!RegionalCatalogue.IsCurrency(currency)) throw new DomainException("currency", "That currency is not an ISO 4217 code the platform offers.");
+        if (!string.IsNullOrWhiteSpace(country) && !RegionalCatalogue.IsCountry(country)) throw new DomainException("country", "That country or region is not recognised.");
         var packId = c.Doc.PackId ?? throw new DomainException("pack", "Choose [[solution.pack|lower|a]] first.");
 
         using var tenantScope = c.UseTenant();
@@ -421,6 +440,15 @@ internal sealed class OrganisationStage : SetupStageBase
             c.Doc.OrganisationId = orgId;
             await c.AuditAsync("setup.organisation.created", "Organisation", orgId.Value.ToString());
         }
+        // The organisation's regional profile is published at once, as a versioned release that records what was chosen and which pack version proposed it; the pack changes nothing afterwards.
+        var packRegional = PackRegional(packId);
+        var chosen = string.IsNullOrWhiteSpace(identifierKey) ? null : AvailableIdentifierProfiles().FirstOrDefault(p => p.Key == identifierKey);
+        var version = _catalogue.Find(packId)?.Version;
+        var profile = new RegionalProfileDocument(RegionalProfileDocument.Overrides, version is null ? null : new RegionalSource(packId, version), string.IsNullOrWhiteSpace(country) ? null : country, culture, [culture], currency, [currency], zone, null,
+            string.IsNullOrWhiteSpace(country) ? null : country, chosen is null ? [] : [chosen with { Order = 1 }], packRegional?.Address);
+        var configuration = c.Get<IConfigurationService>();
+        if (await configuration.LatestReleaseAsync(RegionalKinds.Name, orgId.Value, c.Ct) is null)
+            await c.Get<IConfigurationBootstrap>().DraftValidatePublishAsync(RegionalKinds.Name, orgId.Value, profile.ToJson(), "setup:" + c.Actor.Label, "Chosen during setup", c.Ct);
         // A Tenant Administrator's configuration rights cover tenant-level definitions only, so the person named as initial administrator also becomes the Organisation
         // Administrator of this first organisation (a Tenant Administrator could grant themselves that role anyway). This is what lets them run organisation onboarding.
         if (Guid.TryParse(c.Doc.Get("admin", "userId"), out var adminId))
@@ -436,11 +464,10 @@ internal sealed class OrganisationStage : SetupStageBase
                     Reason: "Initial administrator of the first [[organisation|lower]], named during setup"), AssignmentSource.Setup, "setup:" + c.Actor.Label, null, c.Ct);
             }
         }
-        var configuration = c.Get<IConfigurationService>();
         var latest = await configuration.LatestReleaseAsync("SolutionPack", Guid.Empty, c.Ct);
         if (latest is null || !latest.ContentJson.Contains($"\"{packId}\"", StringComparison.Ordinal))
             await c.Get<IConfigurationBootstrap>().DraftValidatePublishAsync("SolutionPack", Guid.Empty, JsonSerializer.Serialize(new { packId }), "setup:" + c.Actor.Label, "Selected during setup", c.Ct);
-        foreach (var (k, v) in new Dictionary<string, string> { ["organisationName"] = name, ["culture"] = culture, ["timeZone"] = zone, ["currency"] = currency, ["referencePrefix"] = prefix })
+        foreach (var (k, v) in new Dictionary<string, string> { ["organisationName"] = name, ["culture"] = culture, ["timeZone"] = zone, ["currency"] = currency, ["referencePrefix"] = prefix, ["country"] = country ?? "", ["identifierProfile"] = identifierKey ?? "" })
             c.Remember(k, v);
         return StageResult.Ok($"[[organisation]] '{name}' is ready.");
     }

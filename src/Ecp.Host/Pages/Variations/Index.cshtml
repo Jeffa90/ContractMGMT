@@ -12,7 +12,7 @@
     @foreach (var v in Model.Result.Items)
     {
         <tr><th scope="row"><a href="/Variations/Details/@v.Id">@v.Reference</a> <span class="hint">@v.Title</span></th><td><a href="/Contracts/Details/@v.ContractId">@v.AgreementReference</a></td><td>@v.SupplierName</td><td>@v.StatusDisplay</td>
-            <td>@v.ProposedDate?.ToString("yyyy-MM-dd")</td><td>@v.CreatedBy</td><td>@v.UpdatedUtc.ToString("yyyy-MM-dd HH:mm")</td></tr>
+            <td>@Fmt.Date(v.ProposedDate, "")</td><td>@v.CreatedBy</td><td>@Fmt.DateTime(v.UpdatedUtc)</td></tr>
     }
     @if (Model.Result.Items.Count == 0) { <tr><td colspan="7">@L["No [[variation]] is open."]</td></tr> }
     </tbody>

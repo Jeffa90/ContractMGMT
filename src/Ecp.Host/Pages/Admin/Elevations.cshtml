@@ -11,7 +11,7 @@
     @foreach (var e in Model.Items)
     {
         <tr>
-            <td>@e.InitiatorLabel</td><td>@e.Kind</td><td>@e.Reason</td><td>@e.RequestedUtc.ToString("u")</td><td>@(e.ExpiresUtc?.ToString("u") ?? "-")</td>
+            <td>@e.InitiatorLabel</td><td>@e.Kind</td><td>@e.Reason</td><td>@Fmt.DateTime(e.RequestedUtc)</td><td>@Fmt.DateTime(e.ExpiresUtc)</td>
             <td><span class="badge @(e.State == Ecp.Identity.Domain.ElevationState.Active ? "bad" : "ok")">@e.State</span></td>
             <td><a href="/Admin/Elevations?id=@e.Id">@L["What was done"]</a></td>
         </tr>
@@ -28,10 +28,10 @@
             <dt>@L["Reason"]</dt><dd>@sel.Reason</dd>
             <dt>@L["Classification ceiling"]</dt><dd>@sel.ClassificationCeiling</dd>
             <dt>@L["Permissions"]</dt><dd>@string.Join(", ", sel.Permissions)</dd>
-            <dt>@L["Started"]</dt><dd>@(sel.StartUtc?.ToString("u") ?? "-")</dd>
-            <dt>@L["Expires"]</dt><dd>@(sel.ExpiresUtc?.ToString("u") ?? "-")</dd>
+            <dt>@L["Started"]</dt><dd>@Fmt.DateTime(sel.StartUtc)</dd>
+            <dt>@L["Expires"]</dt><dd>@Fmt.DateTime(sel.ExpiresUtc)</dd>
             <dt>@L["Confirmed by"]</dt><dd>@(sel.ConfirmedByLabel ?? "-")</dd>
-            <dt>@L["Ended"]</dt><dd>@(sel.EndedUtc?.ToString("u") ?? "-") @(sel.EndedByLabel is null ? "" : "(" + sel.EndedByLabel + ")")</dd>
+            <dt>@L["Ended"]</dt><dd>@Fmt.DateTime(sel.EndedUtc) @(sel.EndedByLabel is null ? "" : "(" + sel.EndedByLabel + ")")</dd>
         </dl>
         @if (sel.State == Ecp.Identity.Domain.ElevationState.Active)
         {
@@ -40,7 +40,7 @@
                 <div class="actions"><button type="submit">@L["End this access now"]</button></div></form>
         }
         <h3>@L["Actions performed"]</h3>
-        <ul>@foreach (var a in Model.Actions) { <li>@a.OccurredUtc.ToString("u") &middot; @a.Action &middot; @a.EntityType (@a.Outcome)</li> }
+        <ul>@foreach (var a in Model.Actions) { <li>@Fmt.DateTime(a.OccurredUtc) &middot; @a.Action &middot; @a.EntityType (@a.Outcome)</li> }
             @if (Model.Actions.Count == 0) { <li>@L["Nothing was done under this access."]</li> }</ul>
     </section>
 }

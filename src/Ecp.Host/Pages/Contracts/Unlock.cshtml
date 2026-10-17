@@ -10,7 +10,7 @@
 @if (Model.Current is { } cur)
 {
     <div class="access-banner" role="alert">
-        <strong>@L["Temporarily unlocked"]</strong> @L["until"] @cur.ExpiresUtc.ToString("yyyy-MM-dd HH:mm") UTC &mdash; @cur.Reason (@cur.OpenedByName)
+        <strong>@L["Temporarily unlocked"]</strong> @L["until"] @Fmt.DateTime(cur.ExpiresUtc) &mdash; @cur.Reason (@cur.OpenedByName)
     </div>
     <section class="card" aria-labelledby="chg-h">
         <h2 id="chg-h">@L["Make changes"]</h2>
@@ -49,7 +49,7 @@ else { <p class="flash" role="status">@L["This [[agreement|lower]] is not locked
     <tbody>
     @foreach (var h in Model.History)
     {
-        <tr><td>@h.OpenedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@h.OpenedByName</td><td>@h.Reason</td><td>@string.Join(", ", h.Fields)</td><td>@h.ExpiresUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@(h.ClosedUtc?.ToString("yyyy-MM-dd HH:mm") ?? (h.IsOpen ? "open" : "-")) @h.CloseKind</td><td>@h.ChangeCount</td></tr>
+        <tr><td>@Fmt.DateTime(h.OpenedUtc)</td><td>@h.OpenedByName</td><td>@h.Reason</td><td>@string.Join(", ", h.Fields)</td><td>@Fmt.DateTime(h.ExpiresUtc)</td><td>@(Fmt.DateTime(h.ClosedUtc) ?? (h.IsOpen ? "open" : "-")) @h.CloseKind</td><td>@h.ChangeCount</td></tr>
     }
     @if (Model.History.Count == 0) { <tr><td colspan="7">@L["No unlock has been opened."]</td></tr> }
     </tbody>

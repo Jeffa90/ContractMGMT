@@ -5,9 +5,12 @@ using Xunit;
 namespace Ecp.Architecture.Tests;
 
 /// <summary>
-/// Portability guard, stage B (S4). Stage A (<c>SourceRuleTests</c>) reads C# only. Stage B reads every text file that ships with the platform: Razor, resources, JSON, project and props files, appsettings,
+/// Portability guard, stage B (S4) and stage C (S10). Stage A (<c>SourceRuleTests</c>) reads C# only. Stage B reads every text file that ships with the platform: Razor, resources, JSON, project and props files, appsettings,
 /// deployment files, workflows, scripts, CSS and JavaScript. It refuses business-specific vocabulary and fixed regional defaults wherever they are not on the narrow, written allow-list below.
 /// A label such as "Supplier" must reach a person through the terminology resolver (docs/TERMINOLOGY.md), never as a fixed string.
+/// Stage C (S10, docs/REGIONAL_SETTINGS.md) adds the regional rules: no country, locale, currency, time zone, tax-identifier format, address label, day-first date format or fixed "Evergreen" wording may be assumed by generic code.
+/// A locale, currency, time zone, identifier type and address profile reach a person through the organisation's regional profile (a pack proposes, the organisation decides), never as a fixed string. Every allowance is for one named
+/// file with a written reason, and an allowance that stops matching fails the build.
 /// Machine identifiers are not labels and are not flagged: <c>ProcurementAdministrator</c>, <c>CategoryOwner</c>, <c>GroupHeadApprover</c> and their permission and state codes keep their spelling (ADR-0028).
 /// </summary>
 [Trait("Category", "Architecture")]
@@ -21,7 +24,20 @@ public class VocabularyGuardTests
     private static readonly Rule Vendors = new("vendor-names", new Regex(@"JBS|Medius|Qlik|DocuSign", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
     private static readonly Rule FixedLabels = new("fixed-business-labels",
         new Regex(@"Group\s+Procurement|(Group\s+)?Head\s+of\s+Procurement|Procurement\s+Administrator|Procurement\s+Contract\s+Register|Category\s+Owner", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
-    private static readonly Rule RegionalDefaults = new("regional-defaults", new Regex(@"en-AU|Australia/|Brisbane|(?<![-\w])AUD(?![-\w])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+    // Stage C widens the stage B rule from one country to any: a fixed locale, zone or currency of any country is the same defect as the Australian one.
+    private static readonly Rule RegionalDefaults = new("regional-defaults", new Regex(@"en-AU|en-US|en-GB|Australia/|America/|Brisbane|Chicago|(?<![-\w])(?:AUD|USD|GBP|EUR|CAD|NZD)(?![-\w])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+    // A tax identifier is an organisation's configured type (docs/TAX_IDENTIFIERS.md); a country's own name for one, or a rule such as "eleven digits", is the pack's.
+    private static readonly Rule TaxIdentifierTerms = new("tax-identifier-terms", new Regex(@"\bABN\b|\bACN\b|eleven[- ]digit|\b11[- ]digit", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase));
+    // A symbol is ambiguous ($ is many currencies); amounts are written with the organisation's formatter and an ISO code.
+    private static readonly Rule CurrencySymbols = new("currency-symbol-literal", new Regex(@"[€£¥₹]|\bA\$|\bAU\$|\bUS\$|NumberFormat\.CurrencySymbol", RegexOptions.CultureInvariant));
+    // Address words differ by country (ZIP code, postcode, state, province, suburb); the labels are terminology keys address.*.
+    private static readonly Rule AddressLabels = new("fixed-address-label", new Regex(@"(?<![\w.])(?:Postcode|ZIP code|Zip code|Post code|State/Province|Suburb)(?![\w])|""(?:Province|County|Postcode|ZIP)""", RegexOptions.CultureInvariant));
+    // "Evergreen" is the stable code of an extension type (written exactly as "Evergreen" or ExtensionTypes.OpenEnded); the words people read are the terminology key field.evergreen.
+    private static readonly Rule EvergreenLabel = new("fixed-evergreen-label", new Regex(@"(?<![\w.])(?:(?<!"")|(?!Evergreen""))Evergreen(?!\w)", RegexOptions.CultureInvariant));
+    // Day-first and other country-specific date patterns; a date is written with the organisation's formatter, or as ISO 8601 where a machine reads it.
+    private static readonly Rule DateFormats = new("fixed-date-format", new Regex(@"dd/MM/yyyy|d/M/yyyy|\bd MMM yyyy|dd MMM yyyy|d MMMM yyyy|dd-MM-yyyy|MM/dd/yyyy", RegexOptions.CultureInvariant));
+    // A page prints a stored instant through the page formatter (Fmt.DateTime), in the organisation's zone, never as a fixed ISO string followed by "UTC".
+    private static readonly Rule PageTimestamps = new("iso-timestamp-in-page", new Regex(@"ToString\(""yyyy-MM-dd HH:mm(?::ss)?""\)|ToString\(""u""\)"), Razor: true);
 
     // Capitalised business words typed into a page. Case-sensitive on purpose: tokens such as [[supplier|lower]] are lower case, and a capitalised fixed word is exactly the defect.
     private const string Words = @"Suppliers?|Procurement|Categor(?:y|ies)|Subcategor(?:y|ies)|Legal Review|Contract Register|Agreements?";
@@ -31,21 +47,19 @@ public class VocabularyGuardTests
     // every business may call something else are refused as bare quoted labels; a token such as "[[field.risk.level|sentence]]" is not a bare label and passes.
     private static readonly Rule QuotedFieldLabels = new("fixed-field-label-literal", new Regex(@"""(?:Contract type|Agreement type|Risk level|Function)"""), Razor: true);
 
-    private static readonly Rule[] Rules = [Vendors, FixedLabels, RegionalDefaults, PageLiterals, QuotedFieldLabels];
+    private static readonly Rule[] Rules = [Vendors, FixedLabels, RegionalDefaults, TaxIdentifierTerms, CurrencySymbols, AddressLabels, EvergreenLabel, DateFormats, PageTimestamps, PageLiterals, QuotedFieldLabels];
 
     /// <summary>The whole allow-list. Adding to it needs a reason that names the slice that removes the exception, or a statement that the place is data (a sample, an adapter note, a pack).</summary>
     internal static readonly IReadOnlyList<Allowance> Allowances =
     [
-        new("regional-defaults", "src/Ecp.Host/appsettings.json", "S10: the installation default locale, time zone and currency; every organisation overrides them."),
-        new("regional-defaults", "src/Ecp.SharedKernel/Localisation/LocaleFormatter.cs", "S10: LocalisationOptions defaults, used only until an organisation or installation setting says otherwise."),
-        new("regional-defaults", "src/Ecp.SharedKernel/Localisation/GlobalisationProbe.cs", "S10: the readiness probe that proves the image carries ICU and the Australian zone rules the default needs."),
-        new("regional-defaults", "src/Ecp.Host/Pages/OrgLocale.cs", "S10: fallback formatter when a page has no organisation."),
-        new("regional-defaults", "src/Ecp.Host/Pages/Migration/MigrationPageModel.cs", "S10: fallback formatter before a batch's organisation is known."),
-        new("regional-defaults", "src/Modules/Ecp.Contracts/CustomFields.cs", "S10: fallback culture when a field value is parsed outside any organisation."),
-        new("regional-defaults", "src/Ecp.SharedKernel/Terminology/TermSet.cs", "Documentation example of a regional locale code."),
-        new("regional-defaults", "src/Modules/Ecp.Configuration/Terminology/TerminologyDocument.cs", "Validation message and documentation example of a regional locale code."),
-        new("regional-defaults", "src/Ecp.Host/Pages/Admin/Terminology/_Picker.cshtml", "Locale suggestions offered to an administrator (a datalist), not a default."),
-        new("regional-defaults", "src/Ecp.Packs/PackManifest.cs", "Validation message and documentation example of a culture code."),
+        // Legitimate places for regional vocabulary (stage C). Each names one file and says why that file, and no other, may spell it.
+        new("regional-defaults", "src/Ecp.SharedKernel/Localisation/RegionalCatalogue.cs", "Regional validator catalogue: the closed ISO 4217 list of currency codes the platform accepts. A list of every code is not a default for any organisation."),
+        new("tax-identifier-terms", "src/Ecp.SharedKernel/Localisation/RegionalCatalogue.cs", "Regional validator catalogue: the weighted modulus-89 checksum validator names its eleven-digit input in its own error message. It is offered, never applied unless a profile selects it."),
+        new("regional-defaults", "src/Ecp.SharedKernel/Localisation/GlobalisationProbe.cs", "Readiness probe R-OPS-02 formats a fixed date in sample cultures from several regions to prove that the host carries culture data; it sets no default."),
+        new("currency-symbol-literal", "src/Ecp.SharedKernel/Localisation/LocaleFormatter.cs", "The one formatter that writes a currency symbol, and only for the culture's own currency; any other currency is written with its ISO code."),
+        new("regional-defaults", "src/Ecp.SharedKernel/Terminology/TermCatalogue.cs", "The terminology catalogue's English (United States) spelling variant of one label (a language variant keyed by locale, not a regional default)."),
+        new("tax-identifier-terms", "src/Modules/Ecp.Contracts/Domain/Contracts.cs", "Compatibility reference: the documented name of the original database column that still holds the primary tax identifier (docs/TAX_IDENTIFIERS.md, existing data stays readable)."),
+        new("tax-identifier-terms", "src/Modules/Ecp.Contracts/Persistence/ContractsDbContext.cs", "Compatibility reference: the mapping keeps the original column name so existing data and queries stay valid; renaming a populated column is disproportionately risky."),
         new("regional-defaults", "tools/check-repo.py", "AUD is the audit requirement-id prefix, not a currency."),
         new("fixed-business-labels", "src/Ecp.Host/DemoSeeder.cs", "Sample-data loader: maps the role names written in the shipped sample CSV to stable role codes. Never used by a customer installation."),
         new("vendor-names", "tools/migration-demo.py", "Demonstration script for the shipped Medius migration profile (a migration compatibility profile, not platform logic)."),
@@ -120,7 +134,7 @@ public class VocabularyGuardTests
     [Fact]
     public void The_allow_list_is_narrow_files_only_never_a_folder_or_a_wildcard()
     {
-        Assert.True(Allowances.Count <= 16, "The allow-list grew; each entry weakens the guard.");
+        Assert.True(Allowances.Count <= 12, "The allow-list grew; each entry weakens the guard.");
         Assert.All(Allowances, a =>
         {
             Assert.DoesNotContain('*', a.PathSuffix);
@@ -152,6 +166,26 @@ public class VocabularyGuardTests
     [InlineData("fixed-label-in-page-text", "src/Pages/X.cshtml", "<td>Category</td>")]
     [InlineData("fixed-field-label-literal", "src/Pages/X.cshtml", "@foreach (var (key, label) in new[] { (\"riskLevel\", \"Risk level\") })")]
     [InlineData("fixed-field-label-literal", "src/Pages/X.cshtml", "@foreach (var (key, label) in new[] { (\"contractType\", \"Contract type\") })")]
+    // Stage C (S10): any country's locale, currency, zone, identifier word, address word, date order or fixed wording is the same defect as the Australian one.
+    [InlineData("regional-defaults", "src/Pages/X.cs", "var culture = new CultureInfo(\"en-US\");")]
+    [InlineData("regional-defaults", "src/Pages/X.cs", "var c = \"GBP\";")]
+    [InlineData("regional-defaults", "src/appsettings.json", "\"DefaultTimeZoneId\": \"America/Chicago\"")]
+    [InlineData("regional-defaults", "src/Pages/X.cs", "TimeZoneInfo.FindSystemTimeZoneById(\"Europe/London\"); // EUR")]
+    [InlineData("tax-identifier-terms", "src/Pages/X.cs", "if (digits.Length != 11) return \"An ABN has eleven digits\";")]
+    [InlineData("tax-identifier-terms", "src/Pages/X.cshtml", "<label>ACN</label>")]
+    [InlineData("tax-identifier-terms", "src/Pages/X.cs", "// the eleven-digit rule")]
+    [InlineData("currency-symbol-literal", "src/Pages/X.cs", "var s = amount.ToString(\"N2\") + \" €\";")]
+    [InlineData("currency-symbol-literal", "src/Pages/X.cs", "label = \"A$ \" + total;")]
+    [InlineData("fixed-address-label", "src/Pages/X.cshtml", "<label>Postcode</label>")]
+    [InlineData("fixed-address-label", "src/Pages/X.cs", "var l = \"ZIP code\";")]
+    [InlineData("fixed-address-label", "src/Pages/X.cs", "var l = \"Province\";")]
+    [InlineData("fixed-evergreen-label", "src/Pages/X.cshtml", "<span class=\"badge\">Evergreen</span>")]
+    [InlineData("fixed-evergreen-label", "src/Pages/X.cs", "var text = \"Evergreen and Critical Notice rules.\";")]
+    [InlineData("fixed-evergreen-label", "src/Data/views.json", "\"description\": \"Evergreen agreements have no end date.\"")]
+    [InlineData("fixed-date-format", "src/Pages/X.cs", "when.ToString(\"dd/MM/yyyy\")")]
+    [InlineData("fixed-date-format", "src/Pages/X.cs", "when.ToString(\"MM/dd/yyyy\")")]
+    [InlineData("iso-timestamp-in-page", "src/Pages/X.cshtml", "<td>@r.CreatedUtc.ToString(\"yyyy-MM-dd HH:mm\") UTC</td>")]
+    [InlineData("iso-timestamp-in-page", "src/Pages/X.cshtml", "<td>@r.CreatedUtc.ToString(\"u\")</td>")]
     public void The_guard_detects_fixed_labels_in_every_file_type(string rule, string path, string line)
     {
         var hits = Violations([(path, line)], [], out _);
@@ -167,8 +201,32 @@ public class VocabularyGuardTests
     [InlineData("src/Pages/X.cshtml", "var q = items.Where(r => r.Category.IsActive);")]
     [InlineData("src/Setup/SetupChecks.cs", "public override string Id => \"R-AUD-01\";")]
     [InlineData("src/Pages/X.cs", "var currency = organisation.DefaultCurrencyCode;")]
+    [InlineData("src/Pages/X.cs", "public const string OpenEnded = \"Evergreen\";")]                         // the stable extension-type code, written exactly
+    [InlineData("src/Pages/X.cs", "c.ExtensionType == ExtensionTypes.OpenEnded")]
+    [InlineData("src/Pages/X.cshtml", "@L[\"[[field.evergreen]]\"]")]                                         // the words people read come from terminology
+    [InlineData("src/Pages/X.cshtml", "<td>@Fmt.DateTime(r.CreatedUtc)</td>")]                                   // the page formatter, in the organisation's zone
+    [InlineData("src/Pages/X.cshtml", "<input type=\"date\" value=\"@d.ToString(\"yyyy-MM-dd\")\" />")]          // a machine value of a date input, not a label
+    [InlineData("src/Pages/X.cs", "var iso = DateOnly.ParseExact(v, \"yyyy-MM-dd\", CultureInfo.InvariantCulture);")]
+    [InlineData("src/Pages/X.cs", "var l = \"[[address.postal]]\";")]
+    [InlineData("src/Pages/X.cshtml", "<th scope=\"col\">@L[\"State\"]</th>")]                                 // a workflow state is not an address word
+
     public void Identifiers_tokens_and_neutral_words_are_not_flagged(string path, string line)
         => Assert.Empty(Violations([(path, line)], [], out _));
+
+    [Fact]
+    public void Stage_C_rules_are_in_force_and_every_allowance_has_a_real_reason()
+    {
+        var ids = Rules.Select(r => r.Id).ToList();
+        foreach (var id in new[] { "regional-defaults", "tax-identifier-terms", "currency-symbol-literal", "fixed-address-label", "fixed-evergreen-label", "fixed-date-format", "iso-timestamp-in-page" }) Assert.Contains(id, ids);
+        Assert.All(Allowances, a =>
+        {
+            Assert.Contains(a.Rule, ids);
+            Assert.True(a.Reason.Length >= 40, $"The reason for {a.PathSuffix} is too short to be a reason.");
+        });
+        // Every allowance names a different file and rule pair, and none is for a page or a pack.
+        Assert.Equal(Allowances.Count, Allowances.Select(a => (a.Rule, a.PathSuffix)).Distinct().Count());
+        Assert.DoesNotContain(Allowances, a => a.PathSuffix.EndsWith(".cshtml", StringComparison.Ordinal) || a.PathSuffix.StartsWith("templates/", StringComparison.Ordinal));
+    }
 
     [Fact]
     public void An_exception_covers_only_its_own_file_and_its_own_rule()

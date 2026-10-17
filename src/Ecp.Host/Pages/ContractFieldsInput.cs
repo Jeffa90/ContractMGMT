@@ -86,6 +86,6 @@ public static class ContractFieldOptionsLoader
     public static async Task<ContractFieldOptions> LoadAsync(Guid organisationId, IOrganisationStructureService organisations, ICoreFieldLists lists, CancellationToken ct)
     {
         var structure = await organisations.GetAsync(organisationId, ct);
-        return new ContractFieldOptions(structure.BusinessUnits, structure.Sites, structure.LegalEntities, await lists.ForOrganisationAsync(organisationId, ct), [Ecp.Contracts.Domain.ExtensionTypes.Evergreen, "Fixed term", "Rolling", "Option to extend"]);
+        return new ContractFieldOptions(structure.BusinessUnits, structure.Sites, structure.LegalEntities, await lists.ForOrganisationAsync(organisationId, ct), [Ecp.Contracts.Domain.ExtensionTypes.OpenEnded, "Fixed term", "Rolling", "Option to extend"]);
     }
 }

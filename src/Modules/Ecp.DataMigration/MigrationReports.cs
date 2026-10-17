@@ -22,7 +22,7 @@ public interface IMigrationReports
     Task<PagedResult<ProvenanceDto>> ListProvenanceAsync(Guid batchId, int page = 1, int pageSize = 50, CancellationToken ct = default);
 }
 
-internal sealed class MigrationReportService(MigrationKernel k, MigrationReconciler reconciler, Ecp.Configuration.ITerminologyResolver terminology) : IMigrationReports
+internal sealed class MigrationReportService(MigrationKernel k, MigrationReconciler reconciler, Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.IRegionalSettingsResolver regional) : IMigrationReports
 {
     private const string Xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private const string Csv = "text/csv; charset=utf-8";
@@ -61,7 +61,7 @@ internal sealed class MigrationReportService(MigrationKernel k, MigrationReconci
         var summary = new List<IReadOnlyList<object?>>
         {
             new object?[] { "Migration error report" }, new object?[] { "Project", project.Name }, new object?[] { "Source system", project.SourceSystem }, new object?[] { "Batch", batch.Id.ToString() },
-            new object?[] { "Kind", batch.Kind.ToString() }, new object?[] { "Status", batch.Status.ToString() }, new object?[] { "Generated (UTC)", k.Clock.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") },
+            new object?[] { "Kind", batch.Kind.ToString() }, new object?[] { "Status", batch.Status.ToString() }, new object?[] { "Generated (UTC)", k.Clock.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }, new object?[] { "Generated (local time)", (await regional.FormatterAsync(project.OrganisationId, ct)).DateTime(k.Clock.UtcNow) },
             new object?[] { "Source rows", rows.Count }, new object?[] { "Rejected rows", rows.Count(r => r.Outcome == RowOutcome.Rejected) },
             new object?[] { "Errors", messages.Count(m => m.Severity == MessageSeverity.Error) }, new object?[] { "Warnings", messages.Count(m => m.Severity == MessageSeverity.Warning) }, new object?[] { },
             new object?[] { "Code", "Severity", "Count" }
@@ -91,7 +91,8 @@ internal sealed class MigrationReportService(MigrationKernel k, MigrationReconci
         {
             new object?[] { "Measure", "Value" },
             new object?[] { "Project", project.Name }, new object?[] { "Batch", batch.Id.ToString() }, new object?[] { "Status", batch.Status.ToString() }, new object?[] { "Report sequence", r.Sequence },
-            new object?[] { "Generated (UTC)", r.GeneratedUtc == DateTime.MinValue ? "(live)" : r.GeneratedUtc.ToString("yyyy-MM-dd HH:mm:ss") }, new object?[] { "Balanced", r.Balanced ? "Yes" : "No" },
+            new object?[] { "Generated (UTC)", r.GeneratedUtc == DateTime.MinValue ? "(live)" : r.GeneratedUtc.ToString("yyyy-MM-dd HH:mm:ss") },
+            new object?[] { "Generated (local time)", r.GeneratedUtc == DateTime.MinValue ? "(live)" : (await regional.FormatterAsync(project.OrganisationId, ct)).DateTime(DateTime.SpecifyKind(r.GeneratedUtc, DateTimeKind.Utc)) }, new object?[] { "Balanced", r.Balanced ? "Yes" : "No" },
             new object?[] { "Exceptions approved", r.ExceptionsApproved ? "Yes" : "No" }, new object?[] { "Source rows", r.Totals.SourceRows }, new object?[] { "Accepted", r.Totals.Accepted },
             new object?[] { "Rejected", r.Totals.Rejected }, new object?[] { "Skipped", r.Totals.Skipped }, new object?[] { "Created", r.Totals.Created }, new object?[] { "Updated", r.Totals.Updated },
             new object?[] { "Manifest rows", r.Files.ManifestRows }, new object?[] { "Manifest matched", r.Files.ManifestMatched }, new object?[] { "Manifest orphan", r.Files.ManifestOrphans }, new object?[] { "Manifest invalid", r.Files.ManifestInvalid },
@@ -112,7 +113,7 @@ internal sealed class MigrationReportService(MigrationKernel k, MigrationReconci
         Add("Status", r.Distributions.SourceStatus, r.Distributions.TargetStatus);
         Add(words.Expand("[[category]]"), r.Distributions.SourceCategory, r.Distributions.TargetCategory);
         foreach (var cur in r.Distributions.SourceValueByCurrency.Keys.Union(r.Distributions.TargetValueByCurrency.Keys).OrderBy(x => x, StringComparer.Ordinal))
-            dist.Add(new object?[] { "Estimated value", cur, r.Distributions.SourceValueByCurrency.GetValueOrDefault(cur), r.Distributions.TargetValueByCurrency.GetValueOrDefault(cur) });
+            dist.Add(new object?[] { words.Expand("[[field.estimated.value]]"), cur, r.Distributions.SourceValueByCurrency.GetValueOrDefault(cur), r.Distributions.TargetValueByCurrency.GetValueOrDefault(cur) });
         return new ExportFile($"{Slug(project.Name)}-reconciliation.xlsx", Xlsx, XlsxWriter.Write([new("Totals", totals), new("Checks", checks), new("Distributions", dist)]));
     }
 

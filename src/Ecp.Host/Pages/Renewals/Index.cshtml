@@ -13,7 +13,7 @@
     {
         <tr><th scope="row"><a href="/Contracts/Lifecycle/@r.PredecessorContractId">@r.PredecessorReference</a> <span class="hint">@r.PredecessorTitle</span></th><td>@r.SupplierName</td>
             <td>@if (r.SuccessorReference is { } sr) { <a href="/Contracts/Details/@r.SuccessorContractId">@sr</a> <span class="hint">(@r.SuccessorStatus)</span> } else { <span class="hint">@L["not visible to you"]</span> }</td>
-            <td>@r.StartedUtc.ToString("yyyy-MM-dd")</td><td>@r.StartedBy</td><td>@r.CopiedFields.Count @L["field(s)"], @r.CopiedDocuments.Count @L["[[document|lower]](s)"]</td></tr>
+            <td>@Fmt.Date(r.StartedUtc)</td><td>@r.StartedBy</td><td>@r.CopiedFields.Count @L["field(s)"], @r.CopiedDocuments.Count @L["[[document|lower]](s)"]</td></tr>
     }
     @if (Model.Result.Items.Count == 0) { <tr><td colspan="6">@L["No [[renewal|lower]] is in progress."]</td></tr> }
     </tbody>

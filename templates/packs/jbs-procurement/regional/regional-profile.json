@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "mode": "defaults",
+  "country": "AU",
+  "locale": "en-AU",
+  "supportedLocales": [
+    "en-AU"
+  ],
+  "currency": "AUD",
+  "supportedCurrencies": [
+    "AUD",
+    "USD",
+    "NZD"
+  ],
+  "timeZone": "Australia/Brisbane",
+  "timeDisplay": "locale",
+  "phoneRegion": "AU",
+  "identifiers": [
+    {
+      "key": "au.abn",
+      "label": "ABN",
+      "country": "AU",
+      "required": false,
+      "unique": false,
+      "rule": "digits",
+      "length": "11",
+      "checksum": "none",
+      "classification": "Internal",
+      "order": 1
+    }
+  ],
+  "address": {
+    "fields": [
+      {
+        "key": "line1",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "line2",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "locality",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "region",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "postal",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "country",
+        "used": true,
+        "required": false
+      }
+    ]
+  }
+}

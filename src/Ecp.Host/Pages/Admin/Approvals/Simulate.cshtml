@@ -57,7 +57,7 @@
     var r = result.Resolution;
     <section class="card" aria-labelledby="res-h">
         <h2 id="res-h">@L["Result"]</h2>
-        <p role="status"><span class="badge @(r.Resolved ? "ok" : "warn")">@(r.Resolved ? L["Resolved"] : L["Blocked"])</span> @L["Matrix"] <code>@r.MatrixCode</code>, @r.SourceLabel, @L["tested for"] @r.EffectiveDate.ToString("yyyy-MM-dd")
+        <p role="status"><span class="badge @(r.Resolved ? "ok" : "warn")">@(r.Resolved ? L["Resolved"] : L["Blocked"])</span> @L["Matrix"] <code>@r.MatrixCode</code>, @r.SourceLabel, @L["tested for"] @Fmt.Date(r.EffectiveDate)
             @if (result.IsFuture) { <span class="badge">@L["future date"]</span> } @if (result.IsPast) { <span class="badge">@L["past date"]</span> }</p>
         @foreach (var n in result.Notes) { <p class="flash warn" role="status">@n</p> }
         @if (!r.Resolved) { <p class="error-summary" role="alert"><strong>@L["Nobody would be asked: the submission is blocked."]</strong> @r.BlockMessage</p> }

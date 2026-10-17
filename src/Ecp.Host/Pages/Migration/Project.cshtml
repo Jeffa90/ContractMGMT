@@ -8,11 +8,11 @@
 <dl class="facts card">
     <dt>@L["Source system"]</dt><dd>@p.SourceSystem @p.SourceSystemVersion</dd>
     <dt>@L["Data owner"]</dt><dd>@p.DataOwner</dd>
-    <dt>@L["Extracted"]</dt><dd>@p.ExtractionUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+    <dt>@L["Extracted"]</dt><dd>@Fmt.DateTime(p.ExtractionUtc)</dd>
     <dt>@L["Status"]</dt><dd>@p.Status</dd>
     <dt>@L["Reference policy"]</dt><dd>@(p.ReferencePolicy == ReferencePolicy.KeepSource ? L["Keep the source [[contract.reference|lower]] where it is free"].Value : L["Generate a new reference from the numbering rule"].Value)</dd>
-    <dt>@L["Legacy-load policy"]</dt><dd>@if (p.LegacyLoadEnabled) { <span class="badge ok">@L["Active until"] @p.LegacyPolicyExpiresUtc?.ToString("yyyy-MM-dd") UTC</span> <span>@L["Allowed states"]: @string.Join(", ", p.LegacyAllowedStatuses)</span> } else { <span class="badge">@L["None"]</span> }</dd>
-    <dt>@L["Cutover freeze"]</dt><dd>@if (p.FreezeStartUtc is { } fs) { <span>@fs.ToString("yyyy-MM-dd HH:mm") @L["to"] @p.FreezeEndUtc?.ToString("yyyy-MM-dd HH:mm") UTC</span> <span class="badge @(p.TargetFreezeEnabled ? "warn" : "")">@(p.TargetFreezeEnabled ? L["Target freeze ON"].Value : L["Target freeze off"].Value)</span> } else { <span>@L["Not recorded"]</span> }</dd>
+    <dt>@L["Legacy-load policy"]</dt><dd>@if (p.LegacyLoadEnabled) { <span class="badge ok">@L["Active until"] @Fmt.Date(p.LegacyPolicyExpiresUtc)</span> <span>@L["Allowed states"]: @string.Join(", ", p.LegacyAllowedStatuses)</span> } else { <span class="badge">@L["None"]</span> }</dd>
+    <dt>@L["Cutover freeze"]</dt><dd>@if (p.FreezeStartUtc is { } fs) { <span>@Fmt.DateTime(fs) @L["to"] @Fmt.DateTime(p.FreezeEndUtc)</span> <span class="badge @(p.TargetFreezeEnabled ? "warn" : "")">@(p.TargetFreezeEnabled ? L["Target freeze ON"].Value : L["Target freeze off"].Value)</span> } else { <span>@L["Not recorded"]</span> }</dd>
 </dl>
 
 <h2>@L["[[migration.batch|plural]]"]</h2>
@@ -26,7 +26,7 @@
         <tr>
             <th scope="row"><a href="/Migration/Batches/@b.Id">@(b.Name ?? b.Id.ToString()[..8])</a> @if (b.IsLegacyLoad) { <span class="badge warn">@L["Legacy load"]</span> }</th>
             <td>@IndexModel_Label(b.Kind)</td><td><span class="badge @MigrationPageModelBadge(b.Status)">@MigrationPageModelLabel(b.Status)</span></td>
-            <td>@b.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC by @b.CreatedBy</td><td>@b.SourceRows</td><td>@b.Created / @b.Updated</td>
+            <td>@Fmt.DateTime(b.CreatedUtc) by @b.CreatedBy</td><td>@b.SourceRows</td><td>@b.Created / @b.Updated</td>
         </tr>
     }
     @if (p.Batches.Count == 0) { <tr><td colspan="6">@L["No [[migration.batch|plural|lower]] yet."]</td></tr> }

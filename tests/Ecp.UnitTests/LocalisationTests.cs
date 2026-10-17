@@ -200,20 +200,24 @@ public sealed class LocaleFormatterTests
 public sealed class LocalisationOptionsAndProbeTests
 {
     [Fact]
-    public void The_reference_defaults_are_en_AU_and_Brisbane_and_are_valid()
+    public void The_platform_assumes_no_country_locale_currency_or_zone_and_the_empty_configuration_is_valid()
     {
         var options = new LocalisationOptions();
         options.Validate();
-        Assert.Equal("en-AU", options.DefaultCulture);
-        Assert.Equal("Australia/Brisbane", options.DefaultTimeZoneId);
-        Assert.Equal("AUD", options.DefaultCurrencyCode);
+        Assert.Equal("", options.DefaultCulture);
+        Assert.Equal("", options.DefaultTimeZoneId);
+        Assert.Equal("", options.DefaultCurrencyCode);
+        Assert.False(options.HasInstallationDefaults);
+        // The page language is a separate matter from the regional settings.
+        Assert.Equal("en", options.FallbackLanguage);
     }
 
     [Fact]
-    public void Additional_locales_are_configuration()
+    public void An_installation_may_name_fall_backs_for_output_no_organisation_owns()
     {
         var options = new LocalisationOptions { DefaultCulture = "en-NZ", DefaultTimeZoneId = "Pacific/Auckland", DefaultCurrencyCode = "NZD", SupportedCultures = ["en-NZ", "en-AU", "mi-NZ"] };
         options.Validate();
+        Assert.True(options.HasInstallationDefaults);
     }
 
     [Fact]
@@ -222,7 +226,7 @@ public sealed class LocalisationOptionsAndProbeTests
         Assert.Throws<DomainException>(() => new LocalisationOptions { DefaultCulture = "zz-ZZ", SupportedCultures = ["zz-ZZ"] }.Validate());
         Assert.Throws<DomainException>(() => new LocalisationOptions { DefaultTimeZoneId = "Nowhere/Land" }.Validate());
         Assert.Throws<DomainException>(() => new LocalisationOptions { DefaultCurrencyCode = "XX" }.Validate());
-        Assert.Throws<DomainException>(() => new LocalisationOptions { SupportedCultures = ["en-US"] }.Validate()); // must include the default
+        Assert.Throws<DomainException>(() => new LocalisationOptions { DefaultCulture = "en-GB", SupportedCultures = ["en-US"] }.Validate()); // must include the default
     }
 
     [Fact]
@@ -231,7 +235,16 @@ public sealed class LocalisationOptionsAndProbeTests
         var results = GlobalisationProbe.Run("en-AU", "Australia/Brisbane");
         Assert.All(results, r => Assert.True(r.Ok, $"{r.Id}: {r.Message}"));
         Assert.Contains(results, r => r.Id == "icu.mode");
-        Assert.Contains(results, r => r.Id == "tz.australia");
+        Assert.Contains(results, r => r.Id == "culture.samples");
+        Assert.Contains(results, r => r.Id == "tz.samples");
+    }
+
+    [Fact]
+    public void The_probe_needs_no_configured_locale_or_zone()
+    {
+        var results = GlobalisationProbe.Run();
+        Assert.All(results, r => Assert.True(r.Ok, $"{r.Id}: {r.Message}"));
+        Assert.DoesNotContain(results, r => r.Id is "culture.resolve" or "tz.resolve");
     }
 
     [Fact]

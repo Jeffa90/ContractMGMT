@@ -1,6 +1,8 @@
+using Ecp.Host.Pages;
 using Ecp.Approvals.Definitions;
 
 namespace Ecp.Host.Pages.Admin.Approvals;
+
 
 /// <summary>Plain-language descriptions of matrix rows for the administration pages.</summary>
 public static class MatrixText
@@ -22,7 +24,7 @@ public static class MatrixText
         return parts.Count == 0 ? ["anything"] : parts;
     }
 
-    public static string Window(DateOnly? from, DateOnly? to) => from is null && to is null ? "always" : $"{from?.ToString("yyyy-MM-dd") ?? "…"} to {to?.ToString("yyyy-MM-dd") ?? "…"}";
+    public static string Window(PageFormat fmt, DateOnly? from, DateOnly? to) => from is null && to is null ? "always" : $"{fmt.Date(from, "…")} to {fmt.Date(to, "…")}";
 
     public static string Effect(MatrixRow r) => r.Kind == RowKinds.Base ? "Base" : r.Effect == RowKinds.ReplaceSteps ? "Exception: replaces the steps" : "Exception: adds steps";
 }

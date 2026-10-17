@@ -18,7 +18,7 @@
         <tr>
             <th scope="row"><a href="/Migration/Profiles/@pr.Id?versionId=@ver.Id" aria-current="@(ver.Id == v?.Version.Id ? "true" : null)">@ver.VersionNumber</a></th>
             <td><span class="badge @(ver.Status == ProfileVersionStatus.Published ? "ok" : "warn")">@ver.Status</span></td><td>@ver.FieldMappings</td><td>@ver.LookupEntries</td>
-            <td>@ver.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td><td>@(ver.PublishedUtc is { } pu ? pu.ToString("yyyy-MM-dd HH:mm") + " UTC by " + ver.PublishedBy : "-")</td>
+            <td>@Fmt.DateTime(ver.CreatedUtc)</td><td>@(ver.PublishedUtc is { } pu ? Fmt.DateTime(pu) + " by " + ver.PublishedBy : "-")</td>
         </tr>
     }
     </tbody>

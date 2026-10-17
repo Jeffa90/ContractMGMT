@@ -90,8 +90,8 @@
             @if (ex.ProviderRequestId is { } req) { <dt>@L["Provider request ID"]</dt><dd><code>@req</code></dd> }
             @if (ex.ProviderStatus is { Length: > 0 } native) { <dt>@L["Provider status"]</dt><dd>@native</dd> }
             @if (ex.FailureMessage is { Length: > 0 } failure) { <dt>@L["Problem"]</dt><dd>@failure</dd> }
-            <dt>@L["Requested"]</dt><dd>@ex.RequestedBy, @ex.RequestedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-            @if (ex.CompletedUtc is { } done) { <dt>@L["[[executed.document|sentence]] attached"]</dt><dd>@done.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+            <dt>@L["Requested"]</dt><dd>@ex.RequestedBy, @Fmt.DateTime(ex.RequestedUtc)</dd>
+            @if (ex.CompletedUtc is { } done) { <dt>@L["[[executed.document|sentence]] attached"]</dt><dd>@Fmt.DateTime(done)</dd> }
         </dl>
         <p class="hint">@L["A completed signature never approves, registers or locks the [[agreement|lower]]. It only lets the [[executed.document|lower]] be submitted for [[registration.approval|lower]]."]</p>
         @if (ex.Status != SignatureRequestStatus.Completed && v.Steps.Any(s => s.Role is "submitRegister" or "returnToDrafting"))

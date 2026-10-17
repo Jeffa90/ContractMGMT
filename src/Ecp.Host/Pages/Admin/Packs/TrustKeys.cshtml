@@ -13,7 +13,7 @@
         <tr>
             <td>@k.KeyId</td><td>@k.Label</td><td>@k.Algorithm</td><td><code>@k.Fingerprint</code></td><td>@k.Source</td>
             <td><span class="badge @(k.Status == "Active" ? "ok" : "bad")">@k.Status</span></td>
-            <td>@(k.NotBeforeUtc?.ToString("u") ?? "-")</td><td>@(k.NotAfterUtc?.ToString("u") ?? "-")</td>
+            <td>@Fmt.DateTime(k.NotBeforeUtc)</td><td>@Fmt.DateTime(k.NotAfterUtc)</td>
             <td>
                 @if (k.Editable && k.Status == "Active")
                 {
@@ -24,7 +24,7 @@
                         <button type="submit" class="secondary">@L["Revoke"]</button>
                     </form>
                 }
-                else if (k.RevokedUtc is { } at) { <span class="hint">@L["Revoked"] @at.ToString("u")@(k.RevokedReason is null ? "" : ": " + k.RevokedReason)</span> }
+                else if (k.RevokedUtc is { } at) { <span class="hint">@L["Revoked"] @Fmt.DateTime(at)@(k.RevokedReason is null ? "" : ": " + k.RevokedReason)</span> }
             </td>
         </tr>
     }

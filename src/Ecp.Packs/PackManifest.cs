@@ -275,7 +275,7 @@ public static partial class PackManifestParser
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var p in v.EnumerateObject())
         {
-            if (!CulturePattern().IsMatch(p.Name)) { bad($"{name}.{p.Name}", "is not a culture such as en or en-AU."); continue; }
+            if (!CulturePattern().IsMatch(p.Name)) { bad($"{name}.{p.Name}", "is not a culture such as en or fr-CA."); continue; }
             var text = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString()! : "";
             if (text.Length == 0 || text.Length > maxLength || text.Any(c => char.IsControl(c) && c is not '\n')) { bad($"{name}.{p.Name}", $"must be 1 to {maxLength} characters of plain text."); continue; }
             values[p.Name] = text;

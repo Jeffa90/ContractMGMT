@@ -14,7 +14,15 @@ public static class PolicyVocabulary
     public static readonly IReadOnlyList<string> Channels = ["InApp", "Email"];
 
     /// <summary>The only variables a template may use. Every substituted value is encoded for plain text and bounded; there are no expressions, loops, conditions or includes.</summary>
-    public static readonly IReadOnlyList<string> Placeholders = ["contract.reference", "contract.title", "actor.name", "link", "due.date", "days.remaining", "window.days", "step.name"];
+    /// <remarks>
+    /// Date, time and amount placeholders are constrained tokens (docs/REGIONAL_SETTINGS.md): <c>due.date</c>, <c>now.date</c> and <c>now.datetime</c> are shown in the organisation's own locale and time zone; <c>contract.value</c> is an
+    /// amount with its ISO currency code; <c>due.date.iso</c>, <c>now.utc</c> and <c>contract.currency</c> are invariant machine values (ISO 8601, UTC, ISO 4217) for a message another system reads.
+    /// </remarks>
+    public static readonly IReadOnlyList<string> Placeholders =
+    [
+        "contract.reference", "contract.title", "actor.name", "link", "due.date", "days.remaining", "window.days", "step.name",
+        "due.date.iso", "now.date", "now.datetime", "now.utc", "contract.value", "contract.currency"
+    ];
 
     /// <summary>Every event a policy may configure. Workflow events come from the lifecycle's outbox; ownership events from the audit trail; reminders from the scan.</summary>
     public static readonly IReadOnlyList<string> Events =
@@ -34,7 +42,7 @@ public sealed record EvergreenRule(bool SuppressEndDate, bool KeepReviewDate);
 /// The reminder windows and who is told when nobody currently owns the contract's category (<paramref name="UnownedFallback"/>: recipient rules from the closed vocabulary; empty means the reminder is not sent
 /// and the scan tries again later). A policy published before the field existed has no entry for it; it reads as <see cref="ReminderRules.LegacyUnownedFallback"/>, which is what the platform did then.
 /// </summary>
-public sealed record ReminderRules(int DefaultLeadDays, IReadOnlyList<int> AllowedLeadDays, bool ReviewDate, bool EndDate, CriticalNoticeRule CriticalNotice, EvergreenRule Evergreen, int EscalateUnacknowledgedAfterDays,
+public sealed record ReminderRules(int DefaultLeadDays, IReadOnlyList<int> AllowedLeadDays, bool ReviewDate, bool EndDate, CriticalNoticeRule CriticalNotice, EvergreenRule OpenEnded, int EscalateUnacknowledgedAfterDays,
     IReadOnlyList<string> UnownedFallback)
 {
     /// <summary>The fall-back of a policy that does not state one (every release published before this field existed). New packs state theirs, including "none".</summary>
@@ -84,7 +92,7 @@ public static partial class NotificationPolicyParser
         public bool ReviewDate { get; set; } = true;
         public bool EndDate { get; set; } = true;
         public RawCritical? CriticalNotice { get; set; }
-        public RawEvergreen? Evergreen { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("evergreen")] public RawEvergreen? OpenEnded { get; set; }
         public int EscalateUnacknowledgedAfterDays { get; set; } = 3;
         /// <summary>Null (absent) means the pre-field behaviour; an empty list means nobody.</summary>
         public List<string>? UnownedFallback { get; set; }
@@ -114,7 +122,7 @@ public static partial class NotificationPolicyParser
             SchemaVersion = raw.SchemaVersion,
             Reminders = new ReminderRules(r.DefaultLeadDays, r.AllowedLeadDays ?? [30, 60, 90, 120], r.ReviewDate, r.EndDate,
                 new CriticalNoticeRule(r.CriticalNotice?.Enabled ?? true, r.CriticalNotice?.OffsetsDays ?? [30, 14, 7, 1], r.CriticalNotice?.EarlierLeadDays ?? 30),
-                new EvergreenRule(r.Evergreen?.SuppressEndDate ?? true, r.Evergreen?.KeepReviewDate ?? true), r.EscalateUnacknowledgedAfterDays,
+                new EvergreenRule(r.OpenEnded?.SuppressEndDate ?? true, r.OpenEnded?.KeepReviewDate ?? true), r.EscalateUnacknowledgedAfterDays,
                 r.UnownedFallback ?? ReminderRules.LegacyUnownedFallback),
             Content = new ContentRules(raw.Content?.WithholdTitleFromLevel ?? "Restricted", raw.Content?.WithholdEverythingFromLevel ?? "Legal Privileged"),
             Delivery = new DeliveryRules(raw.Delivery?.MaxAttempts ?? 5, raw.Delivery?.BackoffMinutes ?? [1, 5, 30, 120, 720]),

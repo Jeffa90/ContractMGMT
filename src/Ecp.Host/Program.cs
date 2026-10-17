@@ -83,6 +83,7 @@ builder.Services.AddNotificationsModule(o =>
 builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.PackReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.CapabilityReadinessCheck>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.RegionalReadinessCheck>();
 builder.Services.AddHostedService<BackgroundJobService>();
 builder.Services.AddSingleton<DemoSeeder>();
 var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
@@ -233,7 +234,7 @@ app.UseMiddleware<SetupGateMiddleware>();
 app.UseRequestLocalization(o =>
 {
     o.SetDefaultCulture(localisation.DefaultCulture).AddSupportedCultures([.. localisation.SupportedCultures]).AddSupportedUICultures([.. localisation.SupportedCultures]);
-    // Culture comes from the organisation default or an explicit cookie, not from browser Accept-Language (an en-US browser must not
+    // Culture comes from the organisation default or an explicit cookie, not from browser Accept-Language (a browser set up for one country must not
     // silently switch an organisation to another date order).
     o.RequestCultureProviders = [new Microsoft.AspNetCore.Localization.CookieRequestCultureProvider()];
     o.ApplyCurrentCultureToResponseHeaders = true;

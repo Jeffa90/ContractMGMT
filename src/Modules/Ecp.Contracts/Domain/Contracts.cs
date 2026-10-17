@@ -19,10 +19,10 @@ public static class Classifications
 
 public enum RegisteredDateProvenance { Platform, Migration }
 
-/// <summary>The extension type that means a contract has no End Date to expire (it renews until ended). The reminder rules and the register's Evergreen filter read the same value.</summary>
+/// <summary>The extension type that means a contract has no End Date to expire (it renews until ended). The reminder rules and the register's open-ended filter read the same value.</summary>
 public static class ExtensionTypes
 {
-    public const string Evergreen = "Evergreen";
+    public const string OpenEnded = "Evergreen";
 }
 
 /// <summary>Who may add documents to a contract in its current state (set by the workflow state; see the state definitions in the solution pack).</summary>

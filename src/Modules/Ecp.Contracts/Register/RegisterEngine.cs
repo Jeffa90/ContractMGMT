@@ -231,7 +231,7 @@ internal sealed partial class RegisterQueryEngine(
                    join g in db.Categories.AsNoTracking() on new { c.TenantId, Id = c.CategoryId } equals new { g.TenantId, g.Id }
                    select new Row { C = c, S = s, G = g };
 
-        // Free text: every word must match somewhere readable (reference, title, supplier, vendor number, ABN, SAP number, or a searchable configured field the caller may see).
+        // Free text: every word must match somewhere readable (reference, title, supplier, vendor number, tax identifier, ERP number, or a searchable configured field the caller may see).
         // Kept as "row match OR id in (configured match)". Rewriting it as "id in (row matches UNION ALL configured matches)" cut logical reads of the count but was slower in elapsed time on the same
         // SQL Server runner (text search 417 ms against 450 ms; core text search 87 ms against 168 ms), because SQL Server split the union back into two probes and the page lost its early stop. It was tried and
         // reverted (docs/PERFORMANCE_REVIEW.md, section 6.1); do not repeat it without a same-runner measurement.

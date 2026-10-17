@@ -135,7 +135,7 @@ public sealed class TermSet
         return decided.Where(kv => !kv.Value && !RolesNeverHidden.Contains(kv.Key)).Select(kv => kv.Key).ToHashSet(StringComparer.Ordinal);
     }
 
-    /// <summary>'en-AU' resolves as en-AU, then en. A locale with no region resolves as itself only.</summary>
+    /// <summary>'fr-CA' resolves as fr-CA, then fr. A locale with no region resolves as itself only.</summary>
     public static IReadOnlyList<string> LocaleChain(string locale)
     {
         var chain = new List<string>();

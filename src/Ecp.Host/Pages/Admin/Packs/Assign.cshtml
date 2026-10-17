@@ -11,7 +11,7 @@
     @foreach (var o in Model.Organisations)
     {
         <tr>
-            <td>@o.Name</td><td>@(o.PackKey ?? L["None (Blank)"].Value)</td><td>@(o.Version ?? "-")</td><td>@(o.Source ?? "-")</td><td>@(o.AssignedUtc?.ToString("u") ?? "-")</td>
+            <td>@o.Name</td><td>@(o.PackKey ?? L["None (Blank)"].Value)</td><td>@(o.Version ?? "-")</td><td>@(o.Source ?? "-")</td><td>@Fmt.DateTime(o.AssignedUtc)</td>
             <td>@if (o.PackKey is null) { <span class="badge">@L["Blank"]</span> } else if (o.PackUsable) { <span class="badge ok">@L["Pack available"]</span> } else { <span class="badge bad">@L["Pack not available here"]</span> }</td>
         </tr>
     }

@@ -123,7 +123,7 @@ public static class NotificationsModule
 }
 
 public sealed record ReminderStatusInfo(
-    int LeadDays, bool LeadIsDefault, IReadOnlyList<int> AllowedLeadDays, int? NoticePeriodDays, bool CriticalNotice, bool Evergreen, DateTime? LastReminderSentUtc, string? LastReminderKind, int? LastWindowDays,
+    int LeadDays, bool LeadIsDefault, IReadOnlyList<int> AllowedLeadDays, int? NoticePeriodDays, bool CriticalNotice, bool OpenEnded, DateTime? LastReminderSentUtc, string? LastReminderKind, int? LastWindowDays,
     DateOnly? LastDueDate, bool Unacknowledged, string? AcknowledgedBy, DateTime? AcknowledgedUtc, DateTime? EscalationDueUtc, bool CanConfigure, bool CanAcknowledge, IReadOnlyList<string> Schedule);
 
 /// <summary>A contract's reminder state and lead time, for its page. Reading needs the right to read the contract; changing the lead time needs <c>reminders.configure</c> and a lead time the policy allows.</summary>

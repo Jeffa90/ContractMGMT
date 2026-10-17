@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "mode": "defaults",
+  "identifiers": [],
+  "address": {
+    "fields": [
+      {
+        "key": "line1",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "line2",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "locality",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "region",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "postal",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "country",
+        "used": true,
+        "required": false
+      }
+    ]
+  }
+}

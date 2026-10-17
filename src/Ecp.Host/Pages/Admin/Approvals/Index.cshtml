@@ -33,7 +33,7 @@ else
         <tbody>
         @foreach (var m in Model.Summaries)
         {
-            <tr><th scope="row"><a href="#m-@m.Code">@m.Code</a></th><td>@m.Name</td><td>@m.Currency</td><td>@m.Rows</td><td>@m.Exceptions</td><td>@MatrixText.Window(m.EffectiveFrom, m.EffectiveTo)</td><td>@(m.InForceToday ? L["In force"] : L["Not in force"])</td></tr>
+            <tr><th scope="row"><a href="#m-@m.Code">@m.Code</a></th><td>@m.Name</td><td>@m.Currency</td><td>@m.Rows</td><td>@m.Exceptions</td><td>@MatrixText.Window(Fmt, m.EffectiveFrom, m.EffectiveTo)</td><td>@(m.InForceToday ? L["In force"] : L["Not in force"])</td></tr>
         }
         </tbody>
     </table></div>
@@ -44,7 +44,7 @@ else
             <h2 id="h-@matrix.Code">@matrix.Name <span class="badge">@matrix.Code</span></h2>
             @if (matrix.Description.Length > 0) { <p>@matrix.Description</p> }
             <p class="hint">@L["Values are compared in"] <strong>@matrix.Currency</strong>. @L["Value ranges include the lower bound and exclude the upper bound."]
-                @if (matrix.Rates.Count > 0) { <span>@L["Rates"]: @string.Join("; ", matrix.Rates.Select(r => $"{r.Currency} × {r.Rate} ({MatrixText.Window(r.EffectiveFrom, r.EffectiveTo)})"))</span> }
+                @if (matrix.Rates.Count > 0) { <span>@L["Rates"]: @string.Join("; ", matrix.Rates.Select(r => $"{r.Currency} × {r.Rate} ({MatrixText.Window(Fmt, r.EffectiveFrom, r.EffectiveTo)})"))</span> }
                 else { <span>@L["No rate table: a submission in another currency is blocked, never converted silently."]</span> }</p>
             <div class="table-wrap"><table>
                 <caption class="visually-hidden">@L["Rows of"] @matrix.Code</caption>
@@ -56,7 +56,7 @@ else
                         <th scope="row">@row.Code @if (row.Description.Length > 0) { <div class="hint">@row.Description</div> }</th>
                         <td>@MatrixText.Effect(row)</td><td>@row.Priority</td>
                         <td><ul class="plain">@foreach (var c in MatrixText.Conditions(row.When)) { <li>@Terms.Expand(c)</li> }</ul></td>
-                        <td>@MatrixText.Window(row.EffectiveFrom, row.EffectiveTo)</td>
+                        <td>@MatrixText.Window(Fmt, row.EffectiveFrom, row.EffectiveTo)</td>
                         <td><ol class="plain">@foreach (var s in row.Steps) { <li><strong>@s.Display</strong>: @Terms.GroupLabel(s.ApproverGroup)@(s.BackupGroup is { } bg ? $" (backup group {Terms.GroupLabel(bg)})" : "") &middot; @(s.Mode == StepModes.AllRequired ? L["every named approver must respond"] : L["first response wins"]) @if (s.TimeoutDays is { } t) { <span>&middot; @t @L["days"]</span> }</li> }</ol>
                             <span class="hint">@(row.Flow == RowFlows.Parallel ? L["Steps are open together."] : L["Steps follow one another."])</span></td>
                     </tr>

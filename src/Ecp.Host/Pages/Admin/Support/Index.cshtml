@@ -36,7 +36,7 @@
                 <td>@(Model.TenantNames.TryGetValue(e.TenantId, out var n) ? n : e.TenantId.ToString()[..8])</td>
                 <td>@e.Kind</td><td>@e.InitiatorLabel</td><td>@e.Reason</td>
                 <td><span class="badge @(e.State == ElevationState.Active ? "ok" : "warn")">@e.State</span></td>
-                <td>@(e.ExpiresUtc?.ToString("u") ?? "-")</td>
+                <td>@Fmt.DateTime(e.ExpiresUtc)</td>
                 <td>
                     @if (e.State == ElevationState.PendingConfirmation)
                     {

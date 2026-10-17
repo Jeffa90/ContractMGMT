@@ -45,7 +45,7 @@
                 else { <span class="badge bad">@L["Cannot be used here"]</span> }
             </td>
             <td>@i.OrganisationsUsing</td>
-            <td>@(e.InstalledUtc?.ToString("u") ?? "-")</td>
+            <td>@Fmt.DateTime(e.InstalledUtc)</td>
             <td><a href="/Admin/Packs/Details?key=@Uri.EscapeDataString(e.PackKey)&amp;version=@Uri.EscapeDataString(e.Version)">@L["Details"]<span class="visually-hidden"> @e.PackKey @e.Version</span></a></td>
         </tr>
     }

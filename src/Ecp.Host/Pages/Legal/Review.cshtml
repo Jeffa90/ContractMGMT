@@ -12,8 +12,8 @@
     <dl class="facts">
         <dt>@L["Next step"]</dt><dd>@r.Outstanding</dd>
         <dt>@L["Assigned to"]</dt><dd>@(r.AssignedToName ?? "-")</dd>
-        <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @r.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-        @if (r.ClearedBy is not null) { <dt>@L["Cleared by"]</dt><dd>@r.ClearedBy, @r.ClearedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+        <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @Fmt.DateTime(r.SubmittedUtc)</dd>
+        @if (r.ClearedBy is not null) { <dt>@L["Cleared by"]</dt><dd>@r.ClearedBy, @Fmt.DateTime(r.ClearedUtc)</dd> }
     </dl>
     <p class="hint">@L["Clearance records [[reviewer]]'s view only. It does not register the [[agreement|lower]], lock it or make it Effective."]</p>
 </section>
@@ -90,10 +90,10 @@
     <section class="card" aria-labelledby="round-@round.Number">
         <h3 id="round-@round.Number">@L["Round"] @round.Number <span class="badge @(round.Outcome == LegalRoundOutcome.Cleared ? "ok" : round.Outcome == LegalRoundOutcome.ReturnedForRework ? "warn" : "")">@round.Outcome</span></h3>
         <dl class="facts">
-            <dt>@L["Submitted"]</dt><dd>@round.SubmittedByName, @round.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC @if (round.SubmissionNote is { Length: > 0 }) { <span class="hint">&mdash; @round.SubmissionNote</span> }</dd>
-            @if (round.ReviewerName is not null) { <dt>@L["Reviewer"]</dt><dd>@round.ReviewerName, @L["started"] @round.StartedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+            <dt>@L["Submitted"]</dt><dd>@round.SubmittedByName, @Fmt.DateTime(round.SubmittedUtc) @if (round.SubmissionNote is { Length: > 0 }) { <span class="hint">&mdash; @round.SubmissionNote</span> }</dd>
+            @if (round.ReviewerName is not null) { <dt>@L["Reviewer"]</dt><dd>@round.ReviewerName, @L["started"] @Fmt.DateTime(round.StartedUtc)</dd> }
             @if (round.ReworkReason is { Length: > 0 }) { <dt>@(round.Outcome == LegalRoundOutcome.ReturnedForRework ? L["Reason for rework"] : L["Reason"])</dt><dd>@round.ReworkReason</dd> }
-            @if (round.ClosedUtc is { } closed) { <dt>@L["Closed"]</dt><dd>@round.ClosedBy, @closed.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+            @if (round.ClosedUtc is { } closed) { <dt>@L["Closed"]</dt><dd>@round.ClosedBy, @Fmt.DateTime(closed)</dd> }
         </dl>
         @if (round.Documents.Count > 0)
         {
@@ -104,7 +104,7 @@
         {
             <h4>@L["[[document|plural]] added in this round"]</h4>
             <ul class="plain">
-                @foreach (var at in round.Attachments) { <li><a href="/Documents/Download/@at.DocumentId">@at.FileName</a> <span class="badge">@at.Kind</span> <span class="hint">@L["version"] @at.VersionNumber &middot; @at.AddedBy &middot; @at.AddedUtc.ToString("yyyy-MM-dd HH:mm") UTC</span></li> }
+                @foreach (var at in round.Attachments) { <li><a href="/Documents/Download/@at.DocumentId">@at.FileName</a> <span class="badge">@at.Kind</span> <span class="hint">@L["version"] @at.VersionNumber &middot; @at.AddedBy &middot; @Fmt.DateTime(at.AddedUtc)</span></li> }
                 @if (round.HiddenAttachments > 0) { <li class="hint">@round.HiddenAttachments @L["[[document|lower]](s) are classified above your access and are not shown."]</li> }
             </ul>
         }
@@ -115,11 +115,11 @@
             @foreach (var c in top)
             {
                 <div class="comment @c.Side.ToLowerInvariant()">
-                    <p><strong>@c.AuthorName</strong> <span class="badge">@c.Side</span> <span class="hint">@c.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</span></p>
+                    <p><strong>@c.AuthorName</strong> <span class="badge">@c.Side</span> <span class="hint">@Fmt.DateTime(c.CreatedUtc)</span></p>
                     <p>@c.Body</p>
                     @foreach (var reply in round.Comments.Where(x => x.ParentCommentId == c.Id))
                     {
-                        <div class="comment reply @reply.Side.ToLowerInvariant()"><p><strong>@reply.AuthorName</strong> <span class="badge">@reply.Side</span> <span class="hint">@reply.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</span></p><p>@reply.Body</p></div>
+                        <div class="comment reply @reply.Side.ToLowerInvariant()"><p><strong>@reply.AuthorName</strong> <span class="badge">@reply.Side</span> <span class="hint">@Fmt.DateTime(reply.CreatedUtc)</span></p><p>@reply.Body</p></div>
                     }
                     @if ((a.CanComment || a.CanReply) && round.Number == r.CurrentRound)
                     {
@@ -139,7 +139,7 @@
 <ol class="timeline">
 @foreach (var t in r.Timeline)
 {
-    <li><span class="hint">@t.OccurredUtc.ToString("yyyy-MM-dd HH:mm") UTC</span> <strong>@t.Kind</strong> @if (t.Round is { } n) { <span class="badge">@L["Round"] @n</span> } &middot; @t.Actor @if (t.Detail is { Length: > 0 }) { <span class="hint">&mdash; @t.Detail</span> }</li>
+    <li><span class="hint">@Fmt.DateTime(t.OccurredUtc)</span> <strong>@t.Kind</strong> @if (t.Round is { } n) { <span class="badge">@L["Round"] @n</span> } &middot; @t.Actor @if (t.Detail is { Length: > 0 }) { <span class="hint">&mdash; @t.Detail</span> }</li>
 }
 </ol>
 <p><a href="/Legal">&larr; @L["[[legal.review|sentence]] queue"]</a></p>

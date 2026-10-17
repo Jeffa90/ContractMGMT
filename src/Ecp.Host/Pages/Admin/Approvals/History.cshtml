@@ -25,7 +25,7 @@ else
         <tbody>
         @foreach (var r in Model.Releases)
         {
-            <tr><th scope="row">@r.Number @if (r.RollbackOfNumber is { } rb) { <span class="hint">(@L["republishes"] @rb)</span> }</th><td>@r.PublishedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@r.PublishedBy</td><td>@r.Note</td><td><code>@r.ContentHash[..Math.Min(12, r.ContentHash.Length)]</code></td></tr>
+            <tr><th scope="row">@r.Number @if (r.RollbackOfNumber is { } rb) { <span class="hint">(@L["republishes"] @rb)</span> }</th><td>@Fmt.DateTime(r.PublishedUtc)</td><td>@r.PublishedBy</td><td>@r.Note</td><td><code>@r.ContentHash[..Math.Min(12, r.ContentHash.Length)]</code></td></tr>
         }
         @if (Model.Releases.Count == 0) { <tr><td colspan="5">@L["Nothing has been published."]</td></tr> }
         </tbody>
@@ -43,7 +43,7 @@ else
         <tbody>
         @foreach (var e in Model.Events.Items)
         {
-            <tr><td>@e.OccurredUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><th scope="row">@e.Action</th><td>@e.ActorId</td><td>@e.EntityType <code>@e.EntityId</code></td><td>@e.Outcome</td><td>@e.Reason</td></tr>
+            <tr><td>@Fmt.DateTime(e.OccurredUtc)</td><th scope="row">@e.Action</th><td>@e.ActorId</td><td>@e.EntityType <code>@e.EntityId</code></td><td>@e.Outcome</td><td>@e.Reason</td></tr>
         }
         @if (Model.Events.Items.Count == 0) { <tr><td colspan="6">@L["No events."]</td></tr> }
         </tbody>

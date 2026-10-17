@@ -12,7 +12,7 @@ public sealed class LocalisationOptions
     public string DefaultCulture { get; set; } = "";
     public string DefaultTimeZoneId { get; set; } = "";
     public string DefaultCurrencyCode { get; set; } = "";
-    public List<string> SupportedCultures { get; set; } = ["en", "en-US"];
+    public List<string> SupportedCultures { get; set; } = ["en"];
 
     /// <summary>The culture the page text falls back to when a person has chosen none. A language, not a regional setting.</summary>
     public string FallbackLanguage => "en";
@@ -111,7 +111,7 @@ public sealed class LocaleFormatter
 
     /// <summary>
     /// Money in the given currency, or the organisation's default currency when none is named. There is no fall-back currency: with neither, the amount cannot be shown, because "100" without a currency is not an amount.
-    /// The culture's own currency uses its symbol; any other currency is shown with its ISO code (USD 1,234.50) so a symbol such as "$" is never ambiguous in a contract register.
+    /// The culture's own currency uses its symbol; any other currency is shown with its ISO code (a code followed by the amount) so a symbol such as "$" is never ambiguous in a contract register.
     /// </summary>
     public string Money(decimal amount, string? currencyCode = null)
     {
@@ -120,14 +120,14 @@ public sealed class LocaleFormatter
         var number = amount.ToString("N" + digits.ToString(CultureInfo.InvariantCulture), _culture);
         return CultureCurrency(_culture) == code
             ? (amount < 0 ? "-" : "") + _culture.NumberFormat.CurrencySymbol + Math.Abs(amount).ToString("N" + digits.ToString(CultureInfo.InvariantCulture), _culture)
-            : string.Concat(code, " ", number);
+            : string.Concat(code, "\u00A0", number);
     }
 
-    /// <summary>The amount in the locale's number format followed by the ISO code, never a symbol (1,234.50 USD): for exports and reports a person reads but a spreadsheet user may sort.</summary>
+    /// <summary>The amount in the locale's number format followed by the ISO code, never a symbol: for exports and reports a person reads but a spreadsheet user may sort.</summary>
     public string MoneyWithCode(decimal amount, string currencyCode)
     {
         var code = ValidateCurrency(currencyCode);
-        return amount.ToString("N" + MinorUnitsFor(code).ToString(CultureInfo.InvariantCulture), _culture) + " " + code;
+        return amount.ToString("N" + MinorUnitsFor(code).ToString(CultureInfo.InvariantCulture), _culture) + "\u00A0" + code;
     }
 
     private static string? CultureCurrency(CultureInfo culture)

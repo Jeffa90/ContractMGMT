@@ -24,12 +24,12 @@ else
         <dl class="facts">
             <dt>@L["Reason"]</dt><dd>@v.Reason</dd>
             @if (v.Description is { Length: > 0 }) { <dt>@L["[[field.description]]"]</dt><dd>@v.Description</dd> }
-            <dt>@L["Proposed effective date"]</dt><dd>@(s.ProposedDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
+            <dt>@L["Proposed effective date"]</dt><dd>@Fmt.Date(s.ProposedDate)</dd>
             <dt>@L["Financial impact"]</dt><dd>@(s.ImpactAmount is { } a ? $"{a:N2} {s.ImpactCurrency}" : "-") @v.ImpactNote</dd>
             <dt>@L["[[legal.review|sentence]]"]</dt><dd>@(v.LegalReviewRequired ? L["Required"] : L["Not required"])</dd>
-            <dt>@L["Raised by"]</dt><dd>@s.CreatedBy, @s.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+            <dt>@L["Raised by"]</dt><dd>@s.CreatedBy, @Fmt.DateTime(s.CreatedUtc)</dd>
             <dt>@L["[[agreement]] was"]</dt><dd>@v.ParentStatusBefore</dd>
-            @if (s.CompletedUtc is { } done) { <dt>@L["Completed"]</dt><dd>@done.ToString("yyyy-MM-dd HH:mm") UTC @if (v.OutcomeReason is { Length: > 0 }) { <span class="hint">&mdash; @v.OutcomeReason</span> }</dd> }
+            @if (s.CompletedUtc is { } done) { <dt>@L["Completed"]</dt><dd>@Fmt.DateTime(done) @if (v.OutcomeReason is { Length: > 0 }) { <span class="hint">&mdash; @v.OutcomeReason</span> }</dd> }
         </dl>
         @if (v.CanEdit) { <p><a class="button secondary" href="/Variations/Details/@s.Id?edit=true">@L["Edit the [[variation]]"]</a></p> }
     </section>

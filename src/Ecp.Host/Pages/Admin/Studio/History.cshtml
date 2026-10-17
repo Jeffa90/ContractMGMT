@@ -20,7 +20,7 @@ else
         {
             <tr>
                 <th scope="row">@r.Number @if (r.Number == Model.Current) { <span class="badge ok">@L["In force"]</span> } @if (r.RollbackOfNumber is { } rb) { <span class="badge">@L["Restores"] @rb</span> }</th>
-                <td>@r.PublishedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td><td>@r.PublishedBy</td><td>@r.Note</td><td>@summary</td>
+                <td>@Fmt.DateTime(r.PublishedUtc)</td><td>@r.PublishedBy</td><td>@r.Note</td><td>@summary</td>
             </tr>
         }
         @if (Model.Releases.Count == 0) { <tr><td colspan="5">@L["Nothing has been published yet."]</td></tr> }

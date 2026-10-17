@@ -1,4 +1,5 @@
 using Ecp.Contracts;
+using Ecp.Contracts.Domain;
 using Ecp.Identity;
 using Ecp.Lifecycle;
 using Ecp.Lifecycle.Definitions;
@@ -44,7 +45,7 @@ public interface IDashboardService
 
 internal sealed class DashboardService(
     ISecuredContractService contracts, ILegalReviewService legal, IRegisterAuthorisationService approvals, IVariationService variations, IRenewalService renewals, IWorkflowDefinitions workflows,
-    INotificationPolicyStore policies, IOrganisationStructureService structure, IClock clock, NotificationsDbContext db, Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.ICapabilityResolver capabilities) : IDashboardService
+    INotificationPolicyStore policies, IOrganisationStructureService structure, IClock clock, NotificationsDbContext db, Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.ICapabilityResolver capabilities, Ecp.Configuration.IRegionalSettingsResolver regional) : IDashboardService
 {
     private static readonly string[] LiveRoles = ["effective", "variation", "renewal", "suspended"];
     private static readonly string[] OwnerActionRoles = ["legalRework", "legalCleared", "drafting", "signature"];
@@ -65,9 +66,16 @@ internal sealed class DashboardService(
     private async Task<(DateOnly Today, int Lead, Guid OrgId)> ClockAsync(CancellationToken ct)
     {
         var org = (await structure.ListOrganisationsAsync(ct)).FirstOrDefault();
-        var zone = TimeZones.Find(org?.TimeZoneId);
+        var zone = org is null ? TimeZoneInfo.Utc : (await regional.FormatterAsync(org.Id, ct)).TimeZone;
         var lead = org is null ? 90 : (await policies.CurrentAsync(org.Id, ct)).Reminders.DefaultLeadDays;
         return (TimeZones.LocalDate(clock.UtcNow, zone), lead, org?.Id ?? Guid.Empty);
+    }
+
+    /// <summary>How dates on a card are written: the formats of the first organisation in the person's reach, the one whose calendar day and lead time the card already uses.</summary>
+    private async Task<LocaleFormatter> FormatterAsync(CancellationToken ct)
+    {
+        var org = (await structure.ListOrganisationsAsync(ct)).FirstOrDefault();
+        return org is null ? LocaleFormatter.Invariant : await regional.FormatterAsync(org.Id, ct);
     }
 
     private async Task<IReadOnlyList<string>> StatusesWithRolesAsync(string[] roles, CancellationToken ct)
@@ -139,22 +147,24 @@ internal sealed class DashboardService(
                 {
                     var (today, lead, _) = await ClockAsync(ct);
                     var live = await StatusesWithRolesAsync(LiveRoles, ct);
-                    // Evergreen agreements have no [[field.end.date]] to expire, so they are not listed here (their review dates are).
-                    var r = await contracts.ListAsync(new ContractFilter(EndsOnOrAfter: today, EndsOnOrBefore: today.AddDays(lead), StatusIn: live, ExcludeExtensionTypes: ["Evergreen"], Page: p, PageSize: size), ct);
-                    return new DashboardCard(key, "Expiring Soon", $"Ending within {lead} days.", r.Total, r.Items.Select(c => Row(c, $"Ends {c.EndDate:yyyy-MM-dd}", c.EndDate)).ToList(), "/Contracts");
+                    // Open-ended agreements have no [[field.end.date]] to expire, so they are not listed here (their review dates are).
+                    var r = await contracts.ListAsync(new ContractFilter(EndsOnOrAfter: today, EndsOnOrBefore: today.AddDays(lead), StatusIn: live, ExcludeExtensionTypes: [ExtensionTypes.OpenEnded], Page: p, PageSize: size), ct);
+                    var fmt = await FormatterAsync(ct);
+                    return new DashboardCard(key, "Expiring Soon", $"Ending within {lead} days.", r.Total, r.Items.Select(c => Row(c, c.EndDate is { } ends ? $"Ends {fmt.Date(ends)}" : "", c.EndDate)).ToList(), "/Contracts");
                 }
             case DashboardKeys.ReviewsDue:
                 {
                     var (today, lead, _) = await ClockAsync(ct);
                     var live = await StatusesWithRolesAsync(LiveRoles, ct);
                     var r = await contracts.ListAsync(new ContractFilter(ReviewOnOrBefore: today.AddDays(lead), StatusIn: live, Page: p, PageSize: size), ct);
-                    return new DashboardCard(key, "Reviews Due", $"[[field.review.date]] within {lead} days, or already passed.", r.Total, r.Items.Where(c => c.ReviewDate != null).Select(c => Row(c, c.ReviewDate < today ? $"Review overdue since {c.ReviewDate:yyyy-MM-dd}" : $"Review {c.ReviewDate:yyyy-MM-dd}", c.ReviewDate)).ToList(), "/Contracts");
+                    var fmt = await FormatterAsync(ct);
+                    return new DashboardCard(key, "Reviews Due", $"[[field.review.date]] within {lead} days, or already passed.", r.Total, r.Items.Where(c => c.ReviewDate != null).Select(c => Row(c, c.ReviewDate < today ? $"Review overdue since {fmt.Date(c.ReviewDate!.Value)}" : $"Review {fmt.Date(c.ReviewDate!.Value)}", c.ReviewDate)).ToList(), "/Contracts");
                 }
             case DashboardKeys.CriticalNotice:
                 {
                     var live = await StatusesWithRolesAsync(LiveRoles, ct);
                     var all = (await contracts.ListAsync(new ContractFilter(CriticalNotice: true, StatusIn: live, PageSize: 200), ct)).Items;
-                    var rows = all.Select(c => Row(c, c.EndDate is null && c.ReviewDate is null ? "[[field.critical.notice]] (no date set)" : "[[field.critical.notice]]", c.ExtensionType == "Evergreen" ? c.ReviewDate : c.EndDate)).OrderBy(r => r.Date ?? DateOnly.MaxValue).ToList();
+                    var rows = all.Select(c => Row(c, c.EndDate is null && c.ReviewDate is null ? "[[field.critical.notice]] (no date set)" : "[[field.critical.notice]]", c.ExtensionType == ExtensionTypes.OpenEnded ? c.ReviewDate : c.EndDate)).OrderBy(r => r.Date ?? DateOnly.MaxValue).ToList();
                     return new DashboardCard(key, "[[field.critical.notice]]", "[[agreement|plural]] flagged [[field.critical.notice]], soonest first.", rows.Count, rows.Skip((p - 1) * size).Take(size).ToList(), "/Contracts");
                 }
             case DashboardKeys.RemindedUnacknowledged:
@@ -163,7 +173,8 @@ internal sealed class DashboardService(
                     var seen = new Dictionary<Guid, ContractListItem>();
                     foreach (var chunk in tracked.Select(t => t.ContractId).Chunk(200))
                         foreach (var item in (await contracts.ListAsync(new ContractFilter(Ids: chunk, PageSize: 200), ct)).Items) seen[item.Id] = item;
-                    var rows = tracked.Where(t => seen.ContainsKey(t.ContractId)).Select(t => Row(seen[t.ContractId], $"Reminded {t.LastReminderSentUtc:yyyy-MM-dd} ({t.LastReminderKind}), not acknowledged", t.LastDueDate)).ToList();
+                    var fmt = await FormatterAsync(ct);
+                    var rows = tracked.Where(t => seen.ContainsKey(t.ContractId)).Select(t => Row(seen[t.ContractId], $"Reminded {fmt.Date(t.LastReminderSentUtc)} ({t.LastReminderKind}), not acknowledged", t.LastDueDate)).ToList();
                     return new DashboardCard(key, "Reminded but Unacknowledged", "Reminders sent that no owner has acknowledged.", rows.Count, rows.Skip((p - 1) * size).Take(size).ToList(), "/Notifications");
                 }
             default:

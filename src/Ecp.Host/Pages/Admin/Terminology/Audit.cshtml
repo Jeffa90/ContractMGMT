@@ -12,7 +12,7 @@
     <caption class="visually-hidden">@L["Terminology audit events"]</caption>
     <thead><tr><th scope="col">@L["When (UTC)"]</th><th scope="col">@L["Action code"]</th><th scope="col">@L["Who"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Subject"]</th><th scope="col">@L["Reason"]</th></tr></thead>
     <tbody>
-    @foreach (var a in Model.Items.Items) { <tr><td>@a.OccurredUtc.ToString("u")</td><td><code class="id">@a.Action</code></td><td>@(a.Actor ?? "-")</td><td>@a.Outcome</td><td>@a.Subject</td><td>@(a.Reason ?? "-")</td></tr> }
+    @foreach (var a in Model.Items.Items) { <tr><td>@Fmt.DateTime(a.OccurredUtc)</td><td><code class="id">@a.Action</code></td><td>@(a.Actor ?? "-")</td><td>@a.Outcome</td><td>@a.Subject</td><td>@(a.Reason ?? "-")</td></tr> }
     @if (Model.Items.Items.Count == 0) { <tr><td colspan="6">@L["Nothing has been recorded yet."]</td></tr> }
     </tbody>
 </table></div>

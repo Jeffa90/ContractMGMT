@@ -32,7 +32,7 @@ else if (r.Decision is { } d)
         <dl class="facts">
             <dt>@L["Decision"]</dt><dd>@d.Status</dd>
             <dt>@L["Decided by"]</dt><dd>@d.DecidedByName (@d.DecidedAsRole) @if (d.OnBehalfOfName is { } o) { <span>@L["on behalf of"] @o</span> }</dd>
-            <dt>@L["Decided"]</dt><dd>@d.DecidedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+            <dt>@L["Decided"]</dt><dd>@Fmt.DateTime(d.DecidedUtc)</dd>
             @if (d.Comment is { Length: > 0 }) { <dt>@L["Comment"]</dt><dd>@d.Comment</dd> }
         </dl>
     </section>
@@ -42,7 +42,7 @@ else if (r.Decision is { } d)
 {
     <section class="card" aria-labelledby="plan-h">
         <h2 id="plan-h">@L["[[approval]] steps"]</h2>
-        <p>@L["This request is approved through the [[approval|lower]] matrix"] <code>@plan.MatrixCode</code> (@plan.MatrixName, @L["release"] @plan.Release, @L["resolved for"] @plan.EffectiveDate.ToString("yyyy-MM-dd")). <span class="badge @(plan.Status == "Approved" ? "ok" : plan.Status == "Rejected" ? "" : "warn")">@plan.Status</span>
+        <p>@L["This request is approved through the [[approval|lower]] matrix"] <code>@plan.MatrixCode</code> (@plan.MatrixName, @L["release"] @plan.Release, @L["resolved for"] @Fmt.Date(plan.EffectiveDate)). <span class="badge @(plan.Status == "Approved" ? "ok" : plan.Status == "Rejected" ? "" : "warn")">@plan.Status</span>
             <span class="hint">@L["The steps and people were fixed when it was submitted; later changes to the matrix do not alter it."]</span></p>
         @if (plan.YourPart is { } part) { <p class="flash" role="status">@L["Your part"]: <strong>@part</strong></p> }
         else if (r.Status == Ecp.Lifecycle.Domain.ApprovalStatus.Pending && plan.YourPartNote is { } note) { <p class="hint">@note</p> }
@@ -55,7 +55,7 @@ else if (r.Decision is { } d)
                 <tr><td>@st.Stage</td><th scope="row">@st.Display</th><td><span class="badge @(st.Status == "Satisfied" ? "ok" : st.Status == "Open" ? "warn" : "")">@st.Status</span></td><td>@Terms.Group(st.ApproverGroup)@(st.BackupGroup is { } bg ? $" + {Terms.Group(bg)}" : "")</td>
                     <td>@(st.Mode == "AllRequired" ? L["Every named approver"] : L["First response wins"])</td>
                     <td><ul class="plain">@foreach (var a in st.Approvers) { <li>@a.Name <span class="badge">@a.Role</span>@if (a.OnBehalfOfName is { } ob) { <span class="hint"> @L["for"] @ob</span> }</li> }</ul></td>
-                    <td><ul class="plain">@foreach (var rs in st.Responses) { <li>@(rs.Approved ? L["Approved"] : L["Rejected"]) @L["by"] @rs.Name@(rs.OnBehalfOfName is { } rob ? $" ({L["for"]} {rob})" : "") @rs.RespondedUtc.ToString("yyyy-MM-dd HH:mm") UTC@(rs.Comment is { Length: > 0 } c ? ": " + c : "")</li> }</ul></td>
+                    <td><ul class="plain">@foreach (var rs in st.Responses) { <li>@(rs.Approved ? L["Approved"] : L["Rejected"]) @L["by"] @rs.Name@(rs.OnBehalfOfName is { } rob ? $" ({L["for"]} {rob})" : "") @Fmt.DateTime(rs.RespondedUtc)@(rs.Comment is { Length: > 0 } c ? ": " + c : "")</li> }</ul></td>
                     <td>@(st.Outstanding.Count == 0 ? "-" : string.Join(", ", st.Outstanding))</td></tr>
             }
             </tbody>
@@ -90,7 +90,7 @@ else if (r.Decision is { } d)
         <dt>@L["[[field.review.date|sentence]]"]</dt><dd>@(s.ReviewDate ?? "-")</dd>
         <dt>@L["[[legal.review|sentence]]"]</dt><dd>@(s.LegalStatus ?? (s.LegalReviewRequired ? "Required" : "Not required")) @if (s.LegalRounds > 0) { <span>(@s.LegalRounds @L["round(s)"]@(s.LegalClearedBy is { } cb ? ", " + L["cleared by"].Value + " " + cb : ""))</span> }</dd>
         <dt>@L["Execution"]</dt><dd>@(s.ExecutionProvider ?? "-") @(s.ProviderRequestId is { } req ? $"· request {req}" : "") @(s.ExecutionStatus is { } es ? $"· {es}" : "")</dd>
-        <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @r.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+        <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @Fmt.DateTime(r.SubmittedUtc)</dd>
         <dt>@L["Workflow"]</dt><dd><code>@s.WorkflowRef</code></dd>
         <dt>@L["Snapshot checksum"]</dt><dd><code>@r.SnapshotSha256</code></dd>
     </dl>
@@ -127,7 +127,7 @@ else if (r.Decision is { } d)
         <tbody>
         @foreach (var h in r.History)
         {
-            <tr><td>@h.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td><td>@h.SubmittedByName</td><td>@h.Status</td><td>@(h.DecidedByName ?? "-") @(h.OnBehalfOfName is { } ob ? $"(for {ob})" : "")</td><td>@h.Comment</td></tr>
+            <tr><td>@Fmt.DateTime(h.SubmittedUtc)</td><td>@h.SubmittedByName</td><td>@h.Status</td><td>@(h.DecidedByName ?? "-") @(h.OnBehalfOfName is { } ob ? $"(for {ob})" : "")</td><td>@h.Comment</td></tr>
         }
         </tbody>
     </table></div>

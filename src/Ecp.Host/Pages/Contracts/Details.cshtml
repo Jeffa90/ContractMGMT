@@ -13,13 +13,13 @@
 {
     @if (prot.ActiveUnlockId is not null && Model.OpenUnlock is { } ou)
     {
-        <div class="access-banner" role="alert"><strong>@L["Temporarily unlocked"]</strong> @L["until"] @ou.ExpiresUtc.ToString("yyyy-MM-dd HH:mm") UTC &mdash; @ou.Reason (@ou.OpenedByName).
+        <div class="access-banner" role="alert"><strong>@L["Temporarily unlocked"]</strong> @L["until"] @Fmt.DateTime(ou.ExpiresUtc) &mdash; @ou.Reason (@ou.OpenedByName).
             @if (Model.CanUnlock) { <a href="/Contracts/Unlock/@Model.Contract.Id">@L["Manage the unlock"]</a> }</div>
     }
     else if (prot.IsLocked)
     {
         <div class="flash warn" role="status"><strong>@L["Locked."]</strong> @prot.LockReason
-            @if (prot.LockedBy is { } lb) { <span class="hint">(@L["by"] @lb, @prot.LockedUtc?.ToString("yyyy-MM-dd HH:mm") UTC)</span> }
+            @if (prot.LockedBy is { } lb) { <span class="hint">(@L["by"] @lb, @Fmt.DateTime(prot.LockedUtc))</span> }
             @L["Metadata changes need an authorised [[variation]]."]
             @if (Model.CanUnlock) { <a href="/Contracts/Unlock/@Model.Contract.Id">@L["Emergency unlock"]</a> }</div>
     }
@@ -51,8 +51,8 @@
         <dt>@L["[[supplier]] [[supplier.number]]"]</dt><dd>@(cl.SupplierVendorNumber ?? "-")</dd>
     }
     <dt>@L["[[field.extension.type|sentence]]"]</dt><dd>@(Model.Contract.ExtensionType ?? "-")</dd>
-    <dt>@L["[[field.effective.date|sentence]]"]</dt><dd>@(Model.Contract.EffectiveDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
-    <dt>@L["[[field.review.date|sentence]]"]</dt><dd>@(Model.Contract.ReviewDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
+    <dt>@L["[[field.effective.date|sentence]]"]</dt><dd>@Fmt.Date(Model.Contract.EffectiveDate)</dd>
+    <dt>@L["[[field.review.date|sentence]]"]</dt><dd>@Fmt.Date(Model.Contract.ReviewDate)</dd>
     @if (Terms.Uses(CapabilityKeys.LegalReview) || Model.Review is not null) { <dt>@L["[[legal.review|sentence]] required"]</dt><dd>@(Model.Contract.LegalReviewRequired ? L["Yes"] : L["No"])</dd> }
 </dl>
 @if (Model.Fields is { } extra && extra.Fields.Count > 0)
@@ -73,7 +73,7 @@
     <ul class="plain">
     @foreach (var ch in Model.Changes)
     {
-        <li><strong>@ch.What</strong> <span class="hint">@ch.OccurredUtc.ToString("yyyy-MM-dd HH:mm") UTC · @ch.Who@(ch.Reason is { Length: > 0 } rs ? " · " + rs : "")</span>
+        <li><strong>@ch.What</strong> <span class="hint">@Fmt.DateTime(ch.OccurredUtc) · @ch.Who@(ch.Reason is { Length: > 0 } rs ? " · " + rs : "")</span>
             @if (ch.Fields.Count > 0)
             {
                 <ul>@foreach (var f in ch.Fields) { <li>@(Model.Fields?.Fields.FirstOrDefault(x => "cf." + x.Definition.Key == f.Field)?.Definition.Label ?? f.Field): @(f.Before ?? "-") &rarr; @(f.After ?? "-")</li> }</ul>
@@ -95,7 +95,7 @@
         <tr>
             <th scope="row">@if (d.CanDownload) { <a href="/Documents/Download/@d.DocumentId">@d.Title</a> } else { @d.Title }
                 @if (d.IsExecutedCopy) { <span class="badge">@L["[[executed.document|sentence]]"]</span> } @if (d.Status != "Active") { <span class="badge warn">@d.Status</span> }
-                <span class="hint">@d.FileName@(d.VersionLabel is null ? "" : " · version " + d.VersionLabel)@(d.DocumentDate is { } dd ? " · " + dd.ToString("yyyy-MM-dd") : "")</span></th>
+                <span class="hint">@d.FileName@(d.VersionLabel is null ? "" : " · version " + d.VersionLabel)@(d.DocumentDate is { } dd ? " · " + Fmt.Date(dd) : "")</span></th>
             <td>@d.DocumentType</td><td>@d.Versions</td><td>@(d.SizeBytes / 1024 + 1) KB</td>
             <td>@d.ScanStatus @if (!d.CanDownload) { <span class="hint">(@L["download not available"])</span> }</td>
             <td>@if (d.MigrationBatchId is { } mb) { if (Model.CanSeeMigration) { <a href="/Migration/Batches/@mb/Provenance">@L["Migrated"] @d.SourceSystem</a> } else { <span>@L["Migrated"] @d.SourceSystem</span> } } else { <span>-</span> }</td>
@@ -123,7 +123,7 @@
 <ul class="plain">
 @foreach (var v in Model.VariationList)
 {
-    <li><a href="/Variations/Details/@v.Id">@v.Reference</a>: @v.Title <span class="badge">@v.StatusDisplay</span> @if (v.Outcome is { } o) { <span class="badge">@o</span> } <span class="hint">@v.CreatedUtc.ToString("yyyy-MM-dd")</span></li>
+    <li><a href="/Variations/Details/@v.Id">@v.Reference</a>: @v.Title <span class="badge">@v.StatusDisplay</span> @if (v.Outcome is { } o) { <span class="badge">@o</span> } <span class="hint">@Fmt.Date(v.CreatedUtc)</span></li>
 }
 @if (Model.VariationList.Count == 0) { <li class="hint">@L["No [[variation]] has been raised."]</li> }
 </ul>
@@ -134,11 +134,11 @@
 <section class="card">
     <dl class="facts">
         <dt>@L["Lead time"]</dt><dd>@Model.Reminder.LeadDays @L["days"] @if (Model.Reminder.LeadIsDefault) { <span class="hint">(@L["the [[organisation|lower]]'s default"])</span> }</dd>
-        <dt>@L["[[field.notice.period|sentence]]"]</dt><dd>@(Model.Reminder.NoticePeriodDays is { } np ? np + " " + L["days"].Value : "-") @if (Model.Reminder.CriticalNotice) { <span class="badge warn">@L["[[field.critical.notice]]"]</span> } @if (Model.Reminder.Evergreen) { <span class="badge">@L["Evergreen"]</span> }</dd>
-        <dt>@L["Last reminder"]</dt><dd>@(Model.Reminder.LastReminderSentUtc is { } lr ? lr.ToString("yyyy-MM-dd HH:mm") + " UTC (" + Model.Reminder.LastReminderKind + ", " + Model.Reminder.LastWindowDays + " " + L["day window"].Value + ")" : L["None sent yet"].Value)</dd>
+        <dt>@L["[[field.notice.period|sentence]]"]</dt><dd>@(Model.Reminder.NoticePeriodDays is { } np ? np + " " + L["days"].Value : "-") @if (Model.Reminder.CriticalNotice) { <span class="badge warn">@L["[[field.critical.notice]]"]</span> } @if (Model.Reminder.OpenEnded) { <span class="badge">@L["[[field.evergreen]]"]</span> }</dd>
+        <dt>@L["Last reminder"]</dt><dd>@(Model.Reminder.LastReminderSentUtc is { } lr ? Fmt.DateTime(lr) + " (" + Model.Reminder.LastReminderKind + ", " + Model.Reminder.LastWindowDays + " " + L["day window"].Value + ")" : L["None sent yet"].Value)</dd>
         @if (Model.Reminder.LastReminderSentUtc is not null)
         {
-            <dt>@L["Acknowledgement"]</dt><dd>@if (Model.Reminder.Unacknowledged) { <span class="badge warn">@L["Not acknowledged"]</span> } else { <span class="badge ok">@L["Acknowledged by"] @Model.Reminder.AcknowledgedBy, @Model.Reminder.AcknowledgedUtc?.ToString("yyyy-MM-dd HH:mm") UTC</span> }</dd>
+            <dt>@L["Acknowledgement"]</dt><dd>@if (Model.Reminder.Unacknowledged) { <span class="badge warn">@L["Not acknowledged"]</span> } else { <span class="badge ok">@L["Acknowledged by"] @Model.Reminder.AcknowledgedBy, @Fmt.DateTime(Model.Reminder.AcknowledgedUtc)</span> }</dd>
         }
     </dl>
     @if (Model.Reminder.Schedule.Count > 0) { <h3>@L["Reminder dates"]</h3><ul class="plain">@foreach (var line in Model.Reminder.Schedule) { <li>@line</li> }</ul> }

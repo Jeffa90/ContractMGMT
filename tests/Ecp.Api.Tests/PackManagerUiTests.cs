@@ -77,7 +77,7 @@ public sealed class PackManagerUiTests
         Assert.Contains("NOT SIGNED", html);
         Assert.Contains("Shipped", html);
         Assert.Contains("/Admin/Packs/Details?key=blank", html);
-        var details = await org.GetStringAsync("/Admin/Packs/Details?key=blank&version=1.5.0");
+        var details = await org.GetStringAsync("/Admin/Packs/Details?key=blank&version=1.6.0");
         Assert.Contains("This pack is NOT signed.", details);
         Assert.Contains("Package checksum (SHA-256)", details);
         Assert.Equal(HttpStatusCode.NotFound, (await org.GetAsync("/Admin/Packs/Details?key=nope&version=1.0.0")).StatusCode);

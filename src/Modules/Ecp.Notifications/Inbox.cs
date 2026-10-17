@@ -15,7 +15,7 @@ namespace Ecp.Notifications;
 
 internal sealed class NotificationInbox(
     NotificationsDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, CurrentUser currentUser, IAccessService access, ISecuredContractService contracts, IContractLifecyclePort port,
-    IAccessDirectory directory, INotificationPolicyStore policies, NotificationRenderer renderer, RecipientResolver resolver, NotificationWriter writer, IClassificationScaleProvider scales, ActorContext actor, Ecp.Configuration.ITerminologyResolver terminology) : INotificationInbox
+    IAccessDirectory directory, INotificationPolicyStore policies, NotificationRenderer renderer, RecipientResolver resolver, NotificationWriter writer, IClassificationScaleProvider scales, ActorContext actor, Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.IRegionalSettingsResolver regional) : INotificationInbox
 {
     private Guid Me => currentUser.UserId ?? throw new ForbiddenException("A signed-in person is required.");
 
@@ -132,7 +132,7 @@ internal sealed class NotificationInbox(
         if (facts is null) return;
         var recipients = await resolver.ResolveAsync(rule.Recipients, new RecipientContext(source.OrganisationId, cid, source.Classification, me, null, null, null, null, null), true, ct);
         var link = $"/Contracts/Details/{cid}";
-        var (subject, body) = renderer.Render(policy, template, new RenderContext(facts.AgreementReference, facts.Title, source.Classification, name, link), await scales.GetAsync(ct), await terminology.GetAsync(source.OrganisationId, ct: ct));
+        var (subject, body) = renderer.Render(policy, template, new RenderContext(facts.AgreementReference, facts.Title, source.Classification, name, link, NowUtc: clock.UtcNow, Formatter: await regional.FormatterAsync(source.OrganisationId, ct)), await scales.GetAsync(ct), await terminology.GetAsync(source.OrganisationId, ct: ct));
         foreach (var person in recipients)
             await writer.AddAsync(new NotificationDraft(source.OrganisationId, person, "reminder.acknowledged", "Event", null, cid, SubjectKinds.Contract, cid, source.Classification, subject, body, link, rule, false,
                 $"ack:{cid:N}:{source.ReminderKind}:{source.WindowDays}:{person:N}", actor.CorrelationId), ct);

@@ -12,7 +12,7 @@
             <dt>@L["Locale"]</dt><dd>@o.Locale</dd>
             <dt>@L["[[solution.pack]]"]</dt><dd>@if (o.PackKey is null) { @L["None: the platform's neutral wording applies"] } else { <span>@o.PackKey v@(o.PackVersion) @(o.PackHasTerminology ? "" : L["(carries no terminology)"].Value)</span> }</dd>
             <dt>@L["Published terminology"]</dt><dd>@(o.ReleaseNumber is { } n ? L["Release {0}", n].Value : L["None yet: the pack's and the platform's wording apply"].Value)</dd>
-            <dt>@L["Draft"]</dt><dd>@if (o.Draft is { } d) { <span>@L["Open"]: @(d.IsPublishable ? L["validated"] : L["not yet validated"]), @L["last edited"] @d.UpdatedUtc.ToString("u")</span> } else { @L["No draft"] }</dd>
+            <dt>@L["Draft"]</dt><dd>@if (o.Draft is { } d) { <span>@L["Open"]: @(d.IsPublishable ? L["validated"] : L["not yet validated"]), @L["last edited"] @Fmt.DateTime(d.UpdatedUtc)</span> } else { @L["No draft"] }</dd>
         </dl>
         <p class="actions">
             @if (o.CanDraft) { <a class="button" href="/Admin/Terminology/Edit?organisationId=@o.OrganisationId&amp;locale=@Uri.EscapeDataString(o.Locale)">@(o.Draft is null ? L["Start a draft"] : L["Edit the draft"])</a> }

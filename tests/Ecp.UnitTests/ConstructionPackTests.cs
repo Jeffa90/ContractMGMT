@@ -39,7 +39,7 @@ public sealed class ConstructionPackTests
         Assert.True(a.Succeeded, string.Join("; ", a.Issues.Select(i => i.Code + " " + i.Message)));
         Assert.True(a.Package!.AsSpan().SequenceEqual(b.Package!));
         var m = a.Opened!.Manifest!;
-        Assert.Equal((Key, "1.0.0", true), (m.PackKey, m.Version, m.Synthetic));
+        Assert.Equal((Key, "1.1.0", true), (m.PackKey, m.Version, m.Synthetic));
         Assert.Equal(PackKinds.Packable.Order(StringComparer.Ordinal).ToArray(), m.Content.Select(c => c.Kind).Where(k => k != "SolutionPack").Order(StringComparer.Ordinal).ToArray());
         Assert.Contains(m.Content, c => c.Kind == "ClassificationPolicy" && c.Scope == PackScopes.Tenant);
         Assert.Contains(m.Content, c => c.Kind == "Branding" && c.Scope == PackScopes.Tenant);

@@ -19,7 +19,7 @@ public sealed class IndexModel(IConfigurationService configuration, IOrganisatio
     [
         (WorkflowKinds.ContractLifecycle, "Contract workflow", "States, transitions, guards, permissions, locking and the renewal, unlock and approval settings."),
         (WorkflowKinds.Variation, "Variation workflow", "The stages a Variation passes through and the fields it may change."),
-        (NotificationPolicyKinds.Policy, "Notification policy", "Who is told about what, the templates, reminder lead times and windows, Evergreen and Critical Notice rules."),
+        (NotificationPolicyKinds.Policy, "Notification policy", "Who is told about what, the templates, reminder lead times and windows, [[field.evergreen]] and [[field.critical.notice]] rules."),
         (ApprovalsModule.MatrixKind, "Approval matrices", "Who must approve a submission: rows by value, currency, category, classification and more; sequential, parallel, first-response and all-required steps; exceptions; effective dates. A workflow opts in by naming a matrix. Try a change in the simulator before publishing.")
     ];
 

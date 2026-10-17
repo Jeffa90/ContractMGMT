@@ -14,7 +14,7 @@ else
         @foreach (var v in Model.Releases)
         {
             <tr>
-                <th scope="row">@v.Release.Number</th><td>@v.Release.PublishedUtc.ToString("yyyy-MM-dd HH:mm") UTC</td><td>@v.Release.PublishedBy</td><td>@v.Release.Note</td>
+                <th scope="row">@v.Release.Number</th><td>@Fmt.DateTime(v.Release.PublishedUtc)</td><td>@v.Release.PublishedBy</td><td>@v.Release.Note</td>
                 <td>@(v.Changes.Count == 0 ? "-" : string.Join("; ", v.Changes))</td>
                 <td>@if (Model.CanRollback && v.Release.Number != Model.Releases.Max(x => x.Release.Number))
                     {

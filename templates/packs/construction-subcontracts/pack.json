@@ -1,7 +1,7 @@
 {
   "packId": "construction-subcontracts",
   "name": "Construction Subcontracts (synthetic example)",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "synthetic": true,
   "publisher": "Platform (built-in sample)",
   "description": "Synthetic example business for the second-business portability proof: a United States general contractor managing trade subcontracts, change orders and project sites. Different states, terms, fields, approval tiers, capabilities, notifications and locale from the other shipped packs. Not legal or industry advice, not a real contractor's process, and not fit for real contracts without review by qualified people.",

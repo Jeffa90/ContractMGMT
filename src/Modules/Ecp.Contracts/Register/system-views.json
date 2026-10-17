@@ -11,7 +11,7 @@
       "columns": ["agreementReference", "contractTitle", "supplier", "category", "status", "updatedUtc"], "sort": [ { "field": "updatedUtc" } ], "filters": [ { "field": "set", "op": "Is", "values": ["awaitingLegal"] } ], "pageSize": 25, "statusChips": true },
     { "key": "pending-approval", "name": "Pending [[approval]]", "description": "Executed [[agreement|plural|lower]] waiting for [[registration.approval|lower]].",
       "columns": ["agreementReference", "contractTitle", "supplier", "category", "status", "updatedUtc"], "sort": [ { "field": "updatedUtc" } ], "filters": [ { "field": "set", "op": "Is", "values": ["pendingApproval"] } ], "pageSize": 25, "statusChips": true },
-    { "key": "expiring-soon", "name": "Expiring Soon", "description": "[[agreement|plural]] ending within the next 90 days. Evergreen [[agreement|plural|lower]] have no End Date to expire.",
+    { "key": "expiring-soon", "name": "Expiring Soon", "description": "[[agreement|plural]] ending within the next 90 days. [[field.evergreen]] [[agreement|plural|lower]] have no [[field.end.date]] to expire.",
       "columns": ["agreementReference", "contractTitle", "supplier", "status", "endDate", "noticePeriodValue"], "sort": [ { "field": "endDate" } ],
       "filters": [ { "field": "endDate", "op": "Between", "values": ["@today", "@today+90"] }, { "field": "status", "op": "In", "values": ["@live"] }, { "field": "evergreen", "op": "Is", "values": ["false"] } ], "pageSize": 25, "statusChips": true },
     { "key": "reviews-due", "name": "Reviews Due", "description": "Review Date within the next 90 days, or already passed.",

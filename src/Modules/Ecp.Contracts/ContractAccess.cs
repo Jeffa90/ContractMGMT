@@ -33,7 +33,7 @@ public sealed record ContractDetails(
     ContractProtection? Protection = null, ContractReminderInfo? Reminders = null, ContractRenewalInfo? Renewal = null, bool LegalReviewRequired = false, string? ExtensionType = null,
     ContractClassifiers? Classifiers = null);
 
-/// <summary>The classifying facts of a contract beyond the basics, as they are stored. The supplier's own ABN, vendor number and type are shown with the contract but belong to the supplier.</summary>
+/// <summary>The classifying facts of a contract beyond the basics, as they are stored. The supplier's own tax identifier, vendor number and type are shown with the contract but belong to the supplier.</summary>
 public sealed record ContractClassifiers(
     Guid? LegalEntityId, string? ContractType, string? AgreementType, string? RiskLevel, string? FunctionCode, string? SapOutlineAgreementNumber, int? NoticePeriodValue, string? NoticePeriodUnit,
     string? SupplierType, string? SupplierTaxIdentifier, string? SupplierVendorNumber);

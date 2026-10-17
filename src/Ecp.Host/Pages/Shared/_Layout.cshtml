@@ -41,6 +41,7 @@
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
         if (await Can("capabilities.read", "capabilities.draft")) items.Add(("/Admin/Capabilities", L["Capabilities"].Value, "/Admin/Capabilities"));
         if (await Can("terminology.read", "terminology.draft")) items.Add(("/Admin/Terminology", L["Terminology"].Value, "/Admin/Terminology"));
+        if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Regional", L["Regional settings"].Value, "/Admin/Regional"));
         if (await Can("packs.read")) items.Add(("/Admin/Packs", L["[[solution.pack|plural|sentence]]"].Value, "/Admin/Packs"));
         if (await Can("setup.run")) items.Add(("/Admin/Setup", L["Installation setup"].Value, "/Admin/Setup"));
     }
@@ -65,7 +66,7 @@
     {
         <div class="access-banner" role="alert">
             <strong>@L["Support access is active"]</strong>
-            (@elevated.Kind, @L["until"] @elevated.ExpiresUtc.ToString("u")): @elevated.Reason
+            (@elevated.Kind, @L["until"] @Fmt.DateTime(elevated.ExpiresUtc)): @elevated.Reason
             <form method="post" asp-page="/Account/EndAccess"><button type="submit" class="secondary">@L["End this access"]</button></form>
         </div>
     }

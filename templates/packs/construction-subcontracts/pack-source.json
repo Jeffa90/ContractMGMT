@@ -1,7 +1,7 @@
 {
   "packageId": "platform.pack.construction-subcontracts",
   "packKey": "construction-subcontracts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": {
     "en-US": "Construction Subcontracts (synthetic example)"
   },
@@ -110,6 +110,14 @@
       "path": "content/branding.json",
       "kind": "Branding",
       "scope": "tenant",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "regional/regional-profile.json",
+      "path": "content/regional-profile.json",
+      "kind": "RegionalProfile",
+      "scope": "organisation",
       "schemaVersion": 1,
       "required": false
     }

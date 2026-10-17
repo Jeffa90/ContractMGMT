@@ -1,4 +1,5 @@
 using Ecp.Contracts;
+using Ecp.Contracts.Domain;
 using Ecp.Identity;
 using Ecp.Notifications.Persistence;
 using Ecp.Notifications.Policy;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Ecp.Notifications;
 
-internal sealed class ReminderSettings(NotificationsDbContext db, IContractLifecyclePort port, ISecuredContractService contracts, IAccessService access, INotificationPolicyStore policies, CurrentUser currentUser, ActorContext actor)
+internal sealed class ReminderSettings(NotificationsDbContext db, IContractLifecyclePort port, ISecuredContractService contracts, IAccessService access, INotificationPolicyStore policies, CurrentUser currentUser, ActorContext actor, Ecp.Configuration.IRegionalSettingsResolver regional)
     : IReminderSettings
 {
     public async Task<ReminderStatusInfo> StatusAsync(Guid contractId, CancellationToken ct = default)
@@ -19,19 +20,20 @@ internal sealed class ReminderSettings(NotificationsDbContext db, IContractLifec
         var tracking = await db.Tracking.AsNoTracking().FirstOrDefaultAsync(t => t.ContractId == contractId, ct);
         var owners = await port.CurrentOwnersAsync(contractId, ct);
         var lead = facts.ReminderLeadDays ?? policy.Reminders.DefaultLeadDays;
-        var evergreen = string.Equals(facts.ExtensionType, "Evergreen", StringComparison.OrdinalIgnoreCase);
+        var evergreen = string.Equals(facts.ExtensionType, ExtensionTypes.OpenEnded, StringComparison.OrdinalIgnoreCase);
+        var fmt = await regional.FormatterAsync(facts.OrganisationId, ct);
         var schedule = new List<string>();
         var effectiveLead = lead + (facts.CriticalNotice && policy.Reminders.CriticalNotice.Enabled ? policy.Reminders.CriticalNotice.EarlierLeadDays : 0);
         var windows = policy.Reminders.AllowedLeadDays.Where(d => d <= effectiveLead).Append(effectiveLead).Distinct().OrderByDescending(d => d).ToList();
-        if (policy.Reminders.ReviewDate && facts.ReviewDate is { } review && (!evergreen || policy.Reminders.Evergreen.KeepReviewDate))
-            schedule.Add("[[field.review.date]] " + review.ToString("yyyy-MM-dd") + ": " + string.Join(", ", windows.Select(w => review.AddDays(-w).ToString("yyyy-MM-dd"))));
-        if (policy.Reminders.EndDate && facts.EndDate is { } end && !(evergreen && policy.Reminders.Evergreen.SuppressEndDate))
-            schedule.Add("[[field.end.date]] " + end.ToString("yyyy-MM-dd") + ": " + string.Join(", ", windows.Select(w => end.AddDays(-w).ToString("yyyy-MM-dd"))));
-        if (evergreen && policy.Reminders.Evergreen.SuppressEndDate) schedule.Add("[[field.evergreen]]: no [[field.end.date]] reminders.");
+        if (policy.Reminders.ReviewDate && facts.ReviewDate is { } review && (!evergreen || policy.Reminders.OpenEnded.KeepReviewDate))
+            schedule.Add("[[field.review.date]] " + fmt.Date(review) + ": " + string.Join(", ", windows.Select(w => fmt.Date(review.AddDays(-w)))));
+        if (policy.Reminders.EndDate && facts.EndDate is { } end && !(evergreen && policy.Reminders.OpenEnded.SuppressEndDate))
+            schedule.Add("[[field.end.date]] " + fmt.Date(end) + ": " + string.Join(", ", windows.Select(w => fmt.Date(end.AddDays(-w)))));
+        if (evergreen && policy.Reminders.OpenEnded.SuppressEndDate) schedule.Add("[[field.evergreen]]: no [[field.end.date]] reminders.");
         if (facts.CriticalNotice && policy.Reminders.CriticalNotice.Enabled && facts.NoticePeriodDays is { } notice && (evergreen ? facts.ReviewDate : facts.EndDate) is { } basis)
         {
             var deadline = basis.AddDays(-notice);
-            schedule.Add("[[field.critical.notice]] deadline " + deadline.ToString("yyyy-MM-dd") + ": " + string.Join(", ", policy.Reminders.CriticalNotice.OffsetsDays.OrderByDescending(d => d).Select(d => deadline.AddDays(-d).ToString("yyyy-MM-dd"))));
+            schedule.Add("[[field.critical.notice]] deadline " + fmt.Date(deadline) + ": " + string.Join(", ", policy.Reminders.CriticalNotice.OffsetsDays.OrderByDescending(d => d).Select(d => fmt.Date(deadline.AddDays(-d)))));
         }
         var me = currentUser.UserId;
         return new ReminderStatusInfo(lead, facts.ReminderLeadDays is null, policy.Reminders.AllowedLeadDays, facts.NoticePeriodDays, facts.CriticalNotice, evergreen, tracking?.LastReminderSentUtc, tracking?.LastReminderKind,

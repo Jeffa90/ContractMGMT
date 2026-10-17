@@ -98,8 +98,8 @@ internal static class SearchPlanShapeScenarios
         var few = await CountFor(2);
         var many = await CountFor(50);
         Assert.True(many <= few, $"A page of 50 rows took {many} SELECT statements and a page of 2 took {few}: the statements grow with the rows (N+1).");
-        // S6: the capability resolver adds a bounded number of reads per request (release, organisation and pack assignment, once per organisation in reach; the pack document is cached), so the ceiling moved from 40 to 42.
-        Assert.True(many <= 42, $"A page took {many} SELECT statements (34 before S6; the identity, configuration, tenancy and capability lookups are about half of them):\n{seen[50]}");
+        // S6: the capability resolver adds a bounded number of reads per request (release, organisation and pack assignment, once per organisation in reach; the pack document is cached), so the ceiling moved from 40 to 42. S10: the register resolves the organisation's regional profile once per request to decide whether the tax identifier may be read (one release read, memoised for the rest of the request), so the ceiling moved to 44.
+        Assert.True(many <= 44, $"A page took {many} SELECT statements (34 before S6; the identity, configuration, tenancy and capability lookups are about half of them):\n{seen[50]}");
     }
 }
 

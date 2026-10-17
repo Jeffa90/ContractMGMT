@@ -105,7 +105,7 @@ public sealed record TerminologyDocument(string Mode, IReadOnlyList<TermEntry> T
             var t = Terms[i];
             var p = $"$.terms['{Trim(t.Key)}','{Trim(t.Locale)}']";   // named by key and locale, so a person reads which term, not a position
             if (!KeyPattern.IsMatch(t.Key)) { Err(p + ".key", "term_key", "A term key is lower-case words separated by dots, for example 'contract.type'."); continue; }
-            if (!LocalePattern.IsMatch(t.Locale)) Err(p + ".locale", "term_locale", $"'{Trim(t.Locale)}' is not a locale such as 'en' or 'en-AU'.");
+            if (!LocalePattern.IsMatch(t.Locale)) Err(p + ".locale", "term_locale", $"'{Trim(t.Locale)}' is not a locale such as 'en' or 'fr-CA'.");
             if (!seen.Add((t.Key, t.Locale))) Err(p, "term_duplicate", $"The key '{t.Key}' appears more than once for the locale '{t.Locale}'.");
             Label(p + ".singular", "singular", t.Singular, MaxLabel, true);
             Label(p + ".plural", "plural", t.Plural, MaxLabel, true);
@@ -148,7 +148,7 @@ public sealed record TerminologyDocument(string Mode, IReadOnlyList<TermEntry> T
         {
             var p = $"$.groups['{Trim(g.Key)}','{Trim(g.Locale)}']";
             if (!GroupKeyPattern.IsMatch(g.Key)) { Err(p + ".key", "group_key", $"An approver group key is letters, digits, dots, hyphens or underscores, at most {MaxGroupKey} characters, as written in the workflow and on role assignments."); continue; }
-            if (!LocalePattern.IsMatch(g.Locale)) Err(p + ".locale", "group_locale", $"'{Trim(g.Locale)}' is not a locale such as 'en' or 'en-AU'.");
+            if (!LocalePattern.IsMatch(g.Locale)) Err(p + ".locale", "group_locale", $"'{Trim(g.Locale)}' is not a locale such as 'en' or 'fr-CA'.");
             if (!seenGroups.Add((g.Key, g.Locale))) Err(p, "group_duplicate", $"The approver group '{g.Key}' is named more than once for the locale '{g.Locale}'.");
             PlainText(p + ".name", "group_name", "name", g.Name, MaxLabel, true);
             PlainText(p + ".description", "group_description", "description", g.Description, MaxDescription, false);
@@ -172,7 +172,7 @@ public sealed record TerminologyDocument(string Mode, IReadOnlyList<TermEntry> T
         }
     }
 
-    /// <summary>A locale that has no region ('en') is the base for its regional variants ('en-AU'), which only need what differs.</summary>
+    /// <summary>A locale that has no region ('en') is the base for its regional variants ('fr-CA'), which only need what differs.</summary>
     private static bool IsBaseLocale(string locale) => !locale.Contains('-');
 
     private static bool HasControl(string v, bool singleLine) => v.Any(c => char.IsControl(c) && (singleLine || c is not ('\n' or '\r')));

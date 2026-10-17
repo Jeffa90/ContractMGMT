@@ -11,8 +11,8 @@ public sealed class HealthModel(ReadinessService readiness, EcpHostOptions host,
 {
     public ReadinessReport Report { get; private set; } = new(ReadinessStatus.Healthy, []);
     public string Mode => host.Mode.ToString();
-    public string Culture => localisation.DefaultCulture;
-    public string TimeZone => localisation.DefaultTimeZoneId;
+    public string Culture => string.IsNullOrWhiteSpace(localisation.DefaultCulture) ? "(none set: each organisation decides)" : localisation.DefaultCulture;
+    public string TimeZone => string.IsNullOrWhiteSpace(localisation.DefaultTimeZoneId) ? "(none set)" : localisation.DefaultTimeZoneId;
     public string Version => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 
     public async Task<IActionResult> OnGetAsync(CancellationToken ct) { Report = await readiness.RunAsync(ct); return Page(); }

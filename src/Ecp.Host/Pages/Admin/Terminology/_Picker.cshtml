@@ -5,7 +5,7 @@
             @foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }
         </select></div>
     <div class="field"><label for="Locale">@L["Locale"]</label><input id="Locale" name="Locale" type="text" value="@Model.Locale" maxlength="20" list="locales" aria-describedby="locale-hint" />
-        <datalist id="locales"><option value="en"></option><option value="en-AU"></option><option value="en-US"></option><option value="en-GB"></option></datalist>
-        <span id="locale-hint" class="hint">@L["A language code such as en, or a language and region such as en-AU."]</span></div>
+        <datalist id="locales"><option value="en"></option>@foreach (var l in Ecp.SharedKernel.Localisation.RegionalCatalogue.SuggestedLocales.Where(x => x.StartsWith("en-", StringComparison.Ordinal))) { <option value="@l"></option> }</datalist>
+        <span id="locale-hint" class="hint">@L["A language code such as en, or a language and region such as fr-CA."]</span></div>
     <div class="actions"><button type="submit" class="secondary">@L["Show"]</button></div>
 </form>

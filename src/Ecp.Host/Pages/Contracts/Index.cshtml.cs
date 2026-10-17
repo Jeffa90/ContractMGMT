@@ -35,6 +35,7 @@ public sealed class IndexModel(IContractViews views, IContractRegister register,
     [BindProperty(SupportsGet = true)] public bool Owned { get; set; }
     [BindProperty] public string? SaveName { get; set; }
     [BindProperty] public string? ExportFormat { get; set; }
+    [BindProperty] public string? ExportStyle { get; set; }
     [BindProperty] public string? ExportReason { get; set; }
     [BindProperty] public bool ExportLarge { get; set; }
 
@@ -87,7 +88,8 @@ public sealed class IndexModel(IContractViews views, IContractRegister register,
         var prepared = await views.PrepareAsync(View, Org, 1, Q, ParseFilters(), SortOverride(), ct);
         var summary = string.Join("; ", new[] { string.IsNullOrWhiteSpace(Q) ? null : $"text '{Q.Trim()}'" }.Concat((ParseFilters() ?? []).Select(f => $"{f.Field} {f.Op} {string.Join(",", f.Values)}")).Where(x => x is not null));
         var format = string.Equals(ExportFormat, "xlsx", StringComparison.OrdinalIgnoreCase) ? Ecp.Contracts.Register.ExportFormat.Xlsx : Ecp.Contracts.Register.ExportFormat.Csv;
-        var result = await exports.ExportAsync(new ExportRequest(prepared.Query, format, null, false, ExportLarge, ExportReason, summary.Length == 0 ? null : summary, prepared.View.Definition.Name), ct);
+        var result = await exports.ExportAsync(new ExportRequest(prepared.Query, format, null, false, ExportLarge, ExportReason, summary.Length == 0 ? null : summary, prepared.View.Definition.Name,
+            string.Equals(ExportStyle, "machine", StringComparison.OrdinalIgnoreCase) ? Ecp.Contracts.Register.ExportStyle.Machine : Ecp.Contracts.Register.ExportStyle.Business), ct);
         Response.Headers.CacheControl = "no-store";
         return File(result.Content, result.ContentType, result.FileName);
     }, () => ReloadAsync());

@@ -24,7 +24,7 @@ namespace Ecp.Integration.Tests;
 internal sealed class HarborlineWorld
 {
     public const string PackKey = "construction-subcontracts";
-    public const string ShippedVersion = "1.0.0";
+    public const string ShippedVersion = "1.1.0";
     public const string Prefix = "HBL";
 
     public TestApp App { get; }
@@ -151,7 +151,7 @@ internal sealed class HarborlineWorld
     }
 
     /// <summary>Uploads the built package through the Pack Manager as the tenant administrator, installs it and returns the validation report.</summary>
-    public async Task<PackUploadResult> UploadAndInstallAsync(string version = "1.0.1", byte[]? bytes = null)
+    public async Task<PackUploadResult> UploadAndInstallAsync(string version = "1.1.1", byte[]? bytes = null)
     {
         PackVersion = version;
         bytes ??= UploadableCopy(version);

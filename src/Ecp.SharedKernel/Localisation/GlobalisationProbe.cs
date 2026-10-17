@@ -24,9 +24,9 @@ public static class GlobalisationProbe
         var decimalComma = LocaleFormatter.TryGetCulture("de-DE", out var de) && 1234.5m.ToString("N2", de) == "1.234,50";
         results.Add(new("culture.samples", dayFirst && monthFirst && decimalComma, dayFirst && monthFirst && decimalComma ? "Day-first, month-first and decimal-comma cultures format as expected." : "Culture data are missing or wrong for the sample cultures."));
 
-        // Daylight-saving rules must be present: Chicago is -6 in January and -5 in July, London is 0 and +1, Kolkata is +5:30 all year.
+        // Daylight-saving rules must be present: New York is -5 in January and -4 in July, London is 0 and +1, Kolkata is +5:30 all year.
         static TimeSpan At(string zone, int month) => TimeZones.TryFind(zone, out var z) ? z.GetUtcOffset(new DateTime(2026, month, 15, 0, 0, 0, DateTimeKind.Utc)) : TimeSpan.MinValue;
-        var zonesOk = At("America/Chicago", 1) == TimeSpan.FromHours(-6) && At("America/Chicago", 7) == TimeSpan.FromHours(-5)
+        var zonesOk = At("America/New_York", 1) == TimeSpan.FromHours(-5) && At("America/New_York", 7) == TimeSpan.FromHours(-4)
             && At("Europe/London", 1) == TimeSpan.Zero && At("Europe/London", 7) == TimeSpan.FromHours(1)
             && At("Asia/Kolkata", 1) == new TimeSpan(5, 30, 0) && At("Asia/Kolkata", 7) == new TimeSpan(5, 30, 0);
         results.Add(new("tz.samples", zonesOk, zonesOk ? "Time-zone rules are present (daylight saving and fixed offsets)." : "Time-zone rules are missing or wrong for the sample zones."));

@@ -8,19 +8,19 @@
 <nav class="tabs" aria-label="@L["[[document|plural]]"]">
     @foreach (var k in Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds) { <a href="/Admin/Configuration?kind=@k.Kind&organisationId=@Model.OrganisationId" aria-current="@(k.Kind == Model.Kind ? "page" : null)">@k.Title</a> }
 </nav>
-<p class="hint">@Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds.First(k => k.Kind == Model.Kind).Help</p>
+<p class="hint">@L[Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds.First(k => k.Kind == Model.Kind).Help]</p>
 <form method="get" class="card"><input type="hidden" name="kind" value="@Model.Kind" />
     <div class="field"><label for="org">@L["[[organisation]]"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
     <button type="submit" class="secondary">@L["Show"]</button></form>
 
-@if (Model.Latest is { } latest) { <p>@L["In force"]: <strong>@L["release"] @latest.Number</strong> @L["published by"] @latest.PublishedBy, @latest.PublishedUtc.ToString("yyyy-MM-dd HH:mm") UTC. <span class="hint">@latest.Note</span></p> }
+@if (Model.Latest is { } latest) { <p>@L["In force"]: <strong>@L["release"] @latest.Number</strong> @L["published by"] @latest.PublishedBy, @Fmt.DateTime(latest.PublishedUtc). <span class="hint">@latest.Note</span></p> }
 else { <p class="hint">@L["Nothing has been published yet. The reference definition from the [[solution.pack|lower]] is installed the first time it is needed."]</p> }
 
 @if (Model.Draft is { } draft)
 {
     <section class="card" aria-labelledby="draft-h">
         <h2 id="draft-h">@L["Draft"] <span class="badge">@draft.Status</span></h2>
-        <p class="hint">@L["Last edited by"] @draft.LastEditedBy, @draft.UpdatedUtc.ToString("yyyy-MM-dd HH:mm") UTC</p>
+        <p class="hint">@L["Last edited by"] @draft.LastEditedBy, @Fmt.DateTime(draft.UpdatedUtc)</p>
         @if (draft.Validation is { } v)
         {
             <div class="@(v.IsValid ? "flash" : "error-summary")" role="status">
@@ -55,7 +55,7 @@ else
         <tbody>
         @foreach (var r in Model.Releases)
         {
-            <tr><th scope="row">@r.Number @if (r.RollbackOfNumber is { } rb) { <span class="hint">(@L["republishes"] @rb)</span> }</th><td>@r.PublishedUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@r.PublishedBy</td><td>@r.Note</td><td><code>@r.ContentHash[..Math.Min(12, r.ContentHash.Length)]</code></td>
+            <tr><th scope="row">@r.Number @if (r.RollbackOfNumber is { } rb) { <span class="hint">(@L["republishes"] @rb)</span> }</th><td>@Fmt.DateTime(r.PublishedUtc)</td><td>@r.PublishedBy</td><td>@r.Note</td><td><code>@r.ContentHash[..Math.Min(12, r.ContentHash.Length)]</code></td>
                 <td>@if (r.Number != Model.Latest?.Number)
                     {
                         <form method="post" asp-page-handler="Rollback"><input type="hidden" name="Kind" value="@Model.Kind" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="ToRelease" value="@r.Number" />

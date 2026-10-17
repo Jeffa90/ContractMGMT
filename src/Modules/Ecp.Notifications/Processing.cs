@@ -12,13 +12,15 @@ using Ecp.Notifications.Persistence;
 using Ecp.Notifications.Policy;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
+using Ecp.SharedKernel.Localisation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Ecp.Notifications;
 
 /// <summary>What a message may say. The contract's reference and title are shown only below the policy's classification thresholds; above them the message says only that a restricted record needs attention.</summary>
-internal sealed record RenderContext(string Reference, string Title, string Classification, string ActorName, string Link, string? DueDate = null, int? DaysRemaining = null, int? WindowDays = null, string? StepName = null);
+internal sealed record RenderContext(string Reference, string Title, string Classification, string ActorName, string Link, DateOnly? DueOn = null, int? DaysRemaining = null, int? WindowDays = null, string? StepName = null,
+    DateTime? NowUtc = null, decimal? Amount = null, string? CurrencyCode = null, LocaleFormatter? Formatter = null);
 
 internal sealed class NotificationRenderer
 {
@@ -36,13 +38,21 @@ internal sealed class NotificationRenderer
         if (everything)
             return (terms.Expand("Action needed on a restricted record"), terms.Expand($"A restricted record needs your attention. Sign in to open it: ") + Clean(c.Link, 300));
 
+        // The organisation's own formats (docs/REGIONAL_SETTINGS.md); with none decided the invariant formatter prints ISO dates and UTC, which is machine-safe and assumes no country.
+        var fmt = c.Formatter ?? LocaleFormatter.Invariant;
         string Sub(string text) => NotificationPolicyParser.PlaceholderPattern().Replace(text, m => m.Groups[1].Value switch
         {
             "contract.reference" => Clean(c.Reference, 100),
             "contract.title" => titleWithheld ? WithheldTitle : Clean(c.Title, 200),
             "actor.name" => Clean(c.ActorName, 100),
             "link" => Clean(c.Link, 300),
-            "due.date" => c.DueDate ?? "",
+            "due.date" => c.DueOn is { } due ? fmt.Date(due) : "",
+            "due.date.iso" => c.DueOn?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+            "now.date" => c.NowUtc is { } nowD ? fmt.Date(nowD) : "",
+            "now.datetime" => c.NowUtc is { } nowT ? fmt.DateTime(nowT) : "",
+            "now.utc" => c.NowUtc is { } nowU ? DateTime.SpecifyKind(nowU, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture) : "",
+            "contract.value" => c.Amount is { } amount && !string.IsNullOrWhiteSpace(c.CurrencyCode) ? fmt.MoneyWithCode(amount, c.CurrencyCode) : "",
+            "contract.currency" => Clean(c.CurrencyCode, 3),
             "days.remaining" => c.DaysRemaining?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "",
             "window.days" => c.WindowDays?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "",
             "step.name" => Clean(c.StepName ?? "", 100),
@@ -151,7 +161,7 @@ internal sealed class NotificationWriter(NotificationsDbContext db, ITenantConte
 internal sealed class NotificationDispatcher(
     NotificationsDbContext db, IUnitOfWork uow, ITenantContext tenant, ILifecycleOutbox outbox, INotificationPolicyStore policies, NotificationRenderer renderer, RecipientResolver resolver,
     NotificationWriter writer, IContractLifecyclePort contracts, IAccessDirectory directory, IClassificationScaleProvider scales, IAuditEventSource auditSource, IOptions<NotificationsOptions> options,
-    Ecp.Configuration.ITerminologyResolver terminology) : INotificationDispatcher
+    Ecp.Configuration.ITerminologyResolver terminology, Ecp.Configuration.IRegionalSettingsResolver regional, IClock clock) : INotificationDispatcher
 {
     private static readonly string[] OwnershipActions = ["category.ownership_assigned", "category.ownership_ended"];
     private const string AuditSource = "audit-ownership";
@@ -209,7 +219,7 @@ internal sealed class NotificationDispatcher(
             : type.StartsWith("legal.", StringComparison.Ordinal) && Guid_("reviewId") is { } rv ? $"/Legal/Review/{rv}"
             : e.SubjectKind == SubjectKinds.Variation ? $"/Variations/Details/{e.SubjectId}"
             : $"/Contracts/Details/{e.ContractId}";
-        var (subject, body) = renderer.Render(policy, template, new RenderContext(facts.AgreementReference, facts.Title, e.Classification, actorName, link), scale, await terminology.GetAsync(e.OrganisationId, ct: ct));
+        var (subject, body) = renderer.Render(policy, template, new RenderContext(facts.AgreementReference, facts.Title, e.Classification, actorName, link, NowUtc: clock.UtcNow, Amount: facts.EstimatedValue, CurrencyCode: facts.CurrencyCode, Formatter: await regional.FormatterAsync(e.OrganisationId, ct)), scale, await terminology.GetAsync(e.OrganisationId, ct: ct));
 
         var made = 0;
         foreach (var person in recipients)
@@ -259,7 +269,7 @@ internal sealed class NotificationDispatcher(
         if (rule is null || !policy.Templates.TryGetValue(rule.Template, out var template)) return 0;
         var scale = await scales.GetAsync(ct);
         var link = "/Dashboards";
-        var (subject, body) = renderer.Render(policy, template, new RenderContext("", "", "Internal", "", link), scale, await terminology.GetAsync(org, ct: ct));
+        var (subject, body) = renderer.Render(policy, template, new RenderContext("", "", "Internal", "", link, NowUtc: clock.UtcNow, Formatter: await regional.FormatterAsync(org, ct)), scale, await terminology.GetAsync(org, ct: ct));
         var draft = new NotificationDraft(org, userId, type, "Event", null, null, null, null, "Internal", subject, body, link, rule, false, $"own:{sequence}:{userId:N}", correlationId);
         var made = await writer.AddAsync(draft, ct) is not null ? 1 : 0;
         await db.SaveChangesAsync(ct);

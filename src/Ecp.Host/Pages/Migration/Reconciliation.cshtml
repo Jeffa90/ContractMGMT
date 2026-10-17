@@ -52,7 +52,7 @@
     <tbody>
     @foreach (var k in r.Distributions.SourceStatus.Keys.Union(r.Distributions.TargetStatus.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["Status"]</th><td>@k</td><td>@r.Distributions.SourceStatus.GetValueOrDefault(k)</td><td>@r.Distributions.TargetStatus.GetValueOrDefault(k)</td></tr> }
     @foreach (var k in r.Distributions.SourceCategory.Keys.Union(r.Distributions.TargetCategory.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["[[category]]"]</th><td>@k</td><td>@r.Distributions.SourceCategory.GetValueOrDefault(k)</td><td>@r.Distributions.TargetCategory.GetValueOrDefault(k)</td></tr> }
-    @foreach (var k in r.Distributions.SourceValueByCurrency.Keys.Union(r.Distributions.TargetValueByCurrency.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["Estimated value"]</th><td>@k</td><td>@r.Distributions.SourceValueByCurrency.GetValueOrDefault(k).ToString("N2")</td><td>@r.Distributions.TargetValueByCurrency.GetValueOrDefault(k).ToString("N2")</td></tr> }
+    @foreach (var k in r.Distributions.SourceValueByCurrency.Keys.Union(r.Distributions.TargetValueByCurrency.Keys).OrderBy(x => x)) { <tr><th scope="row">@L["[[field.estimated.value]]"]</th><td>@k</td><td>@r.Distributions.SourceValueByCurrency.GetValueOrDefault(k) is var amt ? Fmt.Number(amt) : ""</td><td>@r.Distributions.TargetValueByCurrency.GetValueOrDefault(k) is var amt ? Fmt.Number(amt) : ""</td></tr> }
     </tbody>
 </table></div>
 

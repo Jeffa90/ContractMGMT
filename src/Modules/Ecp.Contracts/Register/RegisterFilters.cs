@@ -76,7 +76,7 @@ internal sealed partial class RegisterQueryEngine
             case "legalReviewRequired": { var b = f.Values[0] == "true"; return (cq.Where(c => c.LegalReviewRequired == b), sq); }
             case "recordLocked": { var b = f.Values[0] == "true"; return (cq.Where(c => c.RecordLocked == b), sq); }
             case "evergreen":
-                return f.Values[0] == "true" ? (cq.Where(c => c.ExtensionType == ExtensionTypes.Evergreen), sq) : (cq.Where(c => c.ExtensionType == null || c.ExtensionType != ExtensionTypes.Evergreen), sq);
+                return f.Values[0] == "true" ? (cq.Where(c => c.ExtensionType == ExtensionTypes.OpenEnded), sq) : (cq.Where(c => c.ExtensionType == null || c.ExtensionType != ExtensionTypes.OpenEnded), sq);
             case "legalReviewStatus":
                 {
                     var provider = setProviders.FirstOrDefault(s => s.Key == "legalReviewStatus") ?? throw new RegisterQueryException([new RegisterIssue("filters", "set", "Legal review status is not available.")]);
@@ -460,7 +460,7 @@ internal sealed partial class RegisterQueryEngine
                     "businessUnit" => c.BusinessUnitId is { } bu && n.Bu.TryGetValue(bu, out var bname) ? bname : null,
                     "site" => c.SiteId is { } si && n.Site.TryGetValue(si, out var sname) ? sname : null,
                     "currencyCode" => c.CurrencyCode, "estimatedValue" => c.EstimatedValue is { } v ? Ecp.Metadata.ValueCodec.Plain(v) : null, "extensionType" => c.ExtensionType,
-                    "evergreen" => c.ExtensionType == ExtensionTypes.Evergreen ? "true" : "false",
+                    "evergreen" => c.ExtensionType == ExtensionTypes.OpenEnded ? "true" : "false",
                     "noticePeriodValue" => c.NoticePeriodValue is { } npv ? $"{npv} {c.NoticePeriodUnit}" : null, "noticePeriodUnit" => c.NoticePeriodUnit,
                     "criticalNotice" => c.CriticalNotice ? "true" : "false", "legalReviewRequired" => c.LegalReviewRequired ? "true" : "false", "recordLocked" => c.RecordLocked ? "true" : "false",
                     "sapOutlineAgreementNumber" => c.SapOutlineAgreementNumber, "startDate" => Iso(c.StartDate), "effectiveDate" => Iso(c.EffectiveDate), "reviewDate" => Iso(c.ReviewDate), "endDate" => Iso(c.EndDate),

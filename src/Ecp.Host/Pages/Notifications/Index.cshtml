@@ -19,12 +19,12 @@
     @foreach (var n in Model.Result.Items)
     {
         <tr>
-            <td>@n.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</td>
+            <td>@Fmt.DateTime(n.CreatedUtc)</td>
             <th scope="row">@(n.ReadUtc is null ? "● " : "")@n.Title
                 <span class="hint">@n.Body</span>
                 @if (n.LinkPath is { Length: > 0 } link) { <a href="@link">@L["Open"]</a> }</th>
             <td>@if (n.Mandatory) { <span class="badge">@L["Mandatory"]</span> }
-                @if (n.RequiresAcknowledgement) { if (n.AcknowledgedUtc is { } at) { <span class="badge ok">@L["Acknowledged by"] @n.AcknowledgedBy, @at.ToString("yyyy-MM-dd HH:mm")</span> } else { <span class="badge warn">@L["Needs acknowledging"]</span> } }</td>
+                @if (n.RequiresAcknowledgement) { if (n.AcknowledgedUtc is { } at) { <span class="badge ok">@L["Acknowledged by"] @n.AcknowledgedBy, @Fmt.DateTime(at)</span> } else { <span class="badge warn">@L["Needs acknowledging"]</span> } }</td>
             <td>
                 @if (n.RequiresAcknowledgement && n.AcknowledgedUtc is null)
                 {

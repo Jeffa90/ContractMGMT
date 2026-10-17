@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "mode": "defaults",
+  "country": "US",
+  "locale": "en-US",
+  "supportedLocales": [
+    "en-US"
+  ],
+  "currency": "USD",
+  "supportedCurrencies": [
+    "USD",
+    "CAD"
+  ],
+  "timeZone": "America/Chicago",
+  "timeDisplay": "locale",
+  "phoneRegion": "US",
+  "identifiers": [
+    {
+      "key": "us.ein",
+      "label": "Federal Tax ID",
+      "country": "US",
+      "required": false,
+      "unique": true,
+      "rule": "mask",
+      "mask": "##-#######",
+      "checksum": "none",
+      "classification": "Internal",
+      "order": 1
+    }
+  ],
+  "address": {
+    "fields": [
+      {
+        "key": "line1",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "line2",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "locality",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "region",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "postal",
+        "used": true,
+        "required": false
+      },
+      {
+        "key": "country",
+        "used": true,
+        "required": false
+      }
+    ]
+  }
+}

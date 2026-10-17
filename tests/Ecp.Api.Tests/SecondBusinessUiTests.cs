@@ -53,7 +53,7 @@ public sealed class SecondBusinessUiTests
             var org = await sp.GetRequiredService<ITenantProvisioningService>().AddOrganisationAsync(new AddOrganisationRequest("Harborline Construction", "America/Chicago", "en-US", "USD", "HBL", Pack));
             var admin = await UserAsync(sp, "hbl.admin", RoleCodes.OrganisationAdministrator, org, ceiling: "Restricted");
             sp.GetRequiredService<CurrentUser>().Set(admin);
-            var assigned = await sp.GetRequiredService<IPackAssignments>().AssignAsync(org, Pack, "1.0.0");
+            var assigned = await sp.GetRequiredService<IPackAssignments>().AssignAsync(org, Pack, "1.1.0");
             // The scale and branding drafts are tenant-level: in a tenant shared with other businesses they are left unpublished here.
             Assert.All(assigned.Kinds.Where(k => k.Kind != CapabilityKinds.Name), k => Assert.False(k.NeedsAttention, k.Kind + ": " + k.Outcome));
             Assert.Equal(2, assigned.Kinds.Count(k => k.Scope == "tenant"));

@@ -171,6 +171,11 @@ internal sealed class ShippedSolutionPackCatalogue(ShippedPackSource shipped, Pl
         var entry = ListEntries().FirstOrDefault(e => e.PackKey == packKey);
         return entry is null ? null : shipped.Packs.FirstOrDefault(p => p.Package.Sha256 == entry.PackageSha256).Package?.Document(CapabilityKinds.Name);
     }
+    public string? RegionalOf(string packKey)
+    {
+        var entry = ListEntries().FirstOrDefault(e => e.PackKey == packKey);
+        return entry is null ? null : shipped.Packs.FirstOrDefault(p => p.Package.Sha256 == entry.PackageSha256).Package?.Document(RegionalKinds.Name);
+    }
     public IReadOnlyList<SolutionPackInfo> List() => ListEntries().Select(e => e.Info!).ToList();
     public SolutionPackInfo? Find(string packId) => ListEntries().Where(e => e.PackKey == packId).OrderByDescending(e => SemVer.TryParse(e.Version, out var v) ? v : new SemVer(0, 0, 0, null)).Select(e => e.Info).FirstOrDefault();
     public IReadOnlyList<PackCatalogueEntry> Rejected() => [];

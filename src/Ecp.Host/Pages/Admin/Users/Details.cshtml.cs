@@ -113,5 +113,5 @@ public sealed class DetailsModel(IPeopleDirectory people, IUserAdministration ad
         return string.Join("; ", parts);
     }
 
-    public string Period(AssignmentDto a) => a.EffectiveFromUtc.ToString("yyyy-MM-dd") + (a.EffectiveToUtc is { } to ? " to " + to.ToString("yyyy-MM-dd") : " onwards");
+    public string Period(AssignmentDto a) => Format.Date(a.EffectiveFromUtc) + (a.EffectiveToUtc is { } to ? " to " + Format.Date(to) : " onwards");
 }

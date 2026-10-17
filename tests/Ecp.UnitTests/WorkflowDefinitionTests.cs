@@ -216,8 +216,8 @@ public sealed class NotificationPolicyTests
         Assert.NotNull(p.RuleFor("reminder.reviewDate"));
         Assert.NotNull(p.RuleFor("reminder.endDate"));
         Assert.NotNull(p.RuleFor("reminder.criticalNotice"));
-        Assert.True(p.Reminders.Evergreen.SuppressEndDate);
-        Assert.True(p.Reminders.Evergreen.KeepReviewDate);
+        Assert.True(p.Reminders.OpenEnded.SuppressEndDate);
+        Assert.True(p.Reminders.OpenEnded.KeepReviewDate);
         Assert.True(p.Reminders.CriticalNotice.Enabled);
         Assert.Equal("Restricted", p.Content.WithholdTitleFromLevel);
         Assert.Equal("Legal Privileged", p.Content.WithholdEverythingFromLevel);

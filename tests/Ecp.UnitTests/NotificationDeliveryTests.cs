@@ -17,7 +17,7 @@ public sealed class NotificationRendererTests
     private static NotificationPolicy Parse() { var (p, m) = NotificationPolicyParser.Parse(PackFiles.Read("notifications/notification-policy.json")); Assert.Empty(m); return p!; }
     private static readonly MessageTemplate Template = new("{{contract.reference}}: {{contract.title}}", "{{actor.name}} acted on {{contract.title}}. Open {{link}} (due {{due.date}}, {{days.remaining}} days, window {{window.days}}, step {{step.name}})");
 
-    private static RenderContext Context(string classification, string title = "Secret supplier terms", string actor = "Pat") => new("AGR-1", title, classification, actor, "/Contracts/Details/1", "2027-01-31", 12, 30, "Review");
+    private static RenderContext Context(string classification, string title = "Secret supplier terms", string actor = "Pat") => new("AGR-1", title, classification, actor, "/Contracts/Details/1", new DateOnly(2027, 1, 31), 12, 30, "Review");
 
     [Theory]
     [InlineData("Public")]

@@ -46,7 +46,7 @@
     {
         <li>@r.Status &middot; @L["predecessor"] <a href="/Contracts/Details/@r.PredecessorContractId">@r.PredecessorReference</a> &rarr; @L["successor"]
             @if (r.SuccessorReference is { } sr) { <a href="/Contracts/Details/@r.SuccessorContractId">@sr</a> <span class="hint">(@r.SuccessorStatus)</span> } else { <span class="hint">@L["not visible to you"]</span> }
-            <span class="hint">@L["started"] @r.StartedUtc.ToString("yyyy-MM-dd") @L["by"] @r.StartedBy</span></li>
+            <span class="hint">@L["started"] @Fmt.Date(r.StartedUtc) @L["by"] @r.StartedBy</span></li>
     }
     </ul>
 }
@@ -64,7 +64,7 @@
     <tbody>
     @foreach (var h in Model.History.OrderByDescending(x => x.OccurredUtc))
     {
-        <tr><td>@h.OccurredUtc.ToString("yyyy-MM-dd HH:mm:ss")</td><th scope="row">@h.TransitionDisplay @if (h.SubjectKind == "Variation") { <span class="badge">@L["[[variation]]"]</span> }</th><td>@h.FromDisplay</td><td>@h.ToDisplay</td><td>@h.Actor</td><td>@h.Comment</td></tr>
+        <tr><td>@Fmt.DateTime(h.OccurredUtc)</td><th scope="row">@h.TransitionDisplay @if (h.SubjectKind == "Variation") { <span class="badge">@L["[[variation]]"]</span> }</th><td>@h.FromDisplay</td><td>@h.ToDisplay</td><td>@h.Actor</td><td>@h.Comment</td></tr>
     }
     @if (Model.History.Count == 0) { <tr><td colspan="6">@L["No steps taken yet."]</td></tr> }
     </tbody>

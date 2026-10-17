@@ -16,7 +16,7 @@
     {
         <tr>
             <th scope="row"><a href="/Migration/Projects/@p.Id">@p.Name</a></th>
-            <td>@p.SourceSystem @p.SourceSystemVersion</td><td>@p.DataOwner</td><td>@p.ExtractionUtc.ToString("yyyy-MM-dd") UTC</td><td>@p.BatchCount</td><td>@p.Status</td>
+            <td>@p.SourceSystem @p.SourceSystemVersion</td><td>@p.DataOwner</td><td>@Fmt.Date(p.ExtractionUtc)</td><td>@p.BatchCount</td><td>@p.Status</td>
         </tr>
     }
     @if (Model.Projects.Count == 0) { <tr><td colspan="6">@L["There are no [[migration.project|plural|lower]] yet."]</td></tr> }

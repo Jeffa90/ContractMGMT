@@ -1,7 +1,7 @@
 {
   "packageId": "platform.pack.blank",
   "packKey": "blank",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "displayName": {
     "en-AU": "Blank (no business defaults)"
   },
@@ -69,6 +69,14 @@
       "source": "capabilities/capabilities.json",
       "path": "content/capabilities.json",
       "kind": "Capabilities",
+      "scope": "organisation",
+      "schemaVersion": 1,
+      "required": false
+    },
+    {
+      "source": "regional/regional-profile.json",
+      "path": "content/regional-profile.json",
+      "kind": "RegionalProfile",
       "scope": "organisation",
       "schemaVersion": 1,
       "required": false

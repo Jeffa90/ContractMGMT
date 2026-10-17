@@ -58,6 +58,12 @@ public static class RegionalCatalogue
     /// <summary>The IANA zone identifiers this host knows, for pickers.</summary>
     public static IReadOnlyList<string> TimeZoneIds => Zones.Value;
 
+    /// <summary>Locale tags the host knows, for an input suggestion list. A suggestion is not a default; any tag the catalogue accepts may be typed.</summary>
+    public static IReadOnlyList<string> SuggestedLocales => Locales.Value;
+
+    private static readonly Lazy<IReadOnlyList<string>> Locales = new(() =>
+        CultureInfo.GetCultures(CultureTypes.SpecificCultures).Select(c => c.Name).Where(n => n.Length > 0).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList());
+
     /// <summary>A phone region is a country or region code.</summary>
     public static bool IsPhoneRegion(string? code) => IsCountry(code);
 
@@ -91,7 +97,7 @@ public static class IdentifierChecksums
     public const string None = "none";
     /// <summary>The Luhn check over all digits.</summary>
     public const string Luhn = "luhn";
-    /// <summary>The weighted modulus-89 check of an eleven-digit Australian business number. Offered as a validator; a profile switches it on only if it wants it.</summary>
+    /// <summary>The weighted modulus-89 check used by one national business-number scheme. Offered as a validator; a profile switches it on only if it wants it.</summary>
     public const string Mod89Weighted = "mod89-weighted";
 
     public static readonly IReadOnlyList<string> All = [None, Luhn, Mod89Weighted];

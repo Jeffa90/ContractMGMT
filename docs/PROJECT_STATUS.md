@@ -87,7 +87,7 @@ Each is a slice that runs end to end from the page through the services to the d
 
 ### 4.3 First incomplete task
 
-The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. CFG-03 was ticked once the PER-002 plan check was done (section 3). The first incomplete **portability remediation** task is **S3** (`docs/PORTABILITY_REMEDIATION_PLAN.md` section 5: the signature-request vocabulary, with an EF migration). P-01 is fixed by S1, P-02a and P-08 by S2; P-03 is closed by S7 (packs are external; a second business is a file, not a release). P-02b (compiled role catalogue; Medium) remains open.
+The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. CFG-03 was ticked once the PER-002 plan check was done (section 3). The first incomplete **portability remediation** task is **S4** (`docs/PORTABILITY_REMEDIATION_PLAN.md` section 5: the vocabulary and terminology read side, guard stage B). P-01 is fixed by S1, P-02a and P-08 by S2; P-03 is closed by S7 (packs are external; a second business is a file, not a release). P-02b (compiled role catalogue; Medium) remains open.
 
 ## 5. Deferred tasks
 
@@ -109,6 +109,7 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| Workspace after S3, no SQL Server: unit 563, architecture 36, API 80, integration on SQLite 207 | 886 | 0 | 0 | 209 (the SQL Server wrappers, including the S3 migration test) |
 | Workspace after S7, no SQL Server: unit 545, architecture 27, API 80, integration on SQLite 202 | 854 | 0 | 0 | 203 (the SQL Server wrappers, including 10 new Pack Manager scenarios) |
 | CI after S7 (run 39), SQL Server 2022 container (203 `SqlServer` tests including the performance baseline) | 203 | 0 | 0 | 0 |
 | Workspace after S2, no SQL Server: unit 455, architecture 20, API 72, integration on SQLite 191 | 738 | 0 | 0 | 193 (the SQL Server wrappers) |
@@ -164,7 +165,7 @@ Known shortcuts and gaps in what is built, each with where it is tracked. None i
 | The 12-role catalogue (including `ProcurementAdministrator`) is compiled; the new reminder rule `OrganisationAdministrators` still resolves to it | Roles cannot be renamed or replaced per business | P-02b; slices S5, S8 |
 | Legal review and register authorisation (with Registered Date stamping) are compiled capabilities that are always on; pack `features` switches are read and ignored | A business without them cannot switch them off | R-05, P-04; slice S6 |
 | Labels, dashboard titles and help text are resource strings that name JBS roles and states; no terminology service | Terminology aliases (PRT-004) cannot work | P-05 to P-07, R-06; CFG-02, slice S4 |
-| The signature boundary is shaped like one vendor (envelope request, vendor-style column names) | An EF migration and vocabulary change are needed before a second provider | P-10; slice S3 |
+| The signature boundary was shaped like one vendor | **Fixed in S3 (ADR-0027)**: provider-neutral vocabulary, interfaces, status mapper, event inbox and a renaming migration. A live adapter and the callback endpoint remain Future | P-10; slice S3 |
 | Country and ERP specifics in core fields and validation (ABN, SAP outline agreement number), the compiled classification name `Legal Privileged`, `en-AU` and Brisbane defaults | Another country or ERP needs source changes | R-01 to R-04; slice S10 |
 | The architecture guard ARC-010 scans C# only (stage A); Razor, JSON and project files are not scanned | A business name could return in a page or data file unseen | P-09; slices S4, S7 |
 | Configured-field text search: a selective second word costs about 0.8 s, every statement scans the contract table once, the missing-index suggestion is unapplied, small tenancy reads repeat, offset paging only | Fine at 10,000 contracts, unknown at 100,000 | `docs/PERFORMANCE_REVIEW.md` section 10; PRF-01 |
@@ -193,8 +194,9 @@ Portability means a second business can run on the platform by configuration, pa
 | P-09 the architecture guard was too narrow | Medium | **Stage A done (S1)**; stages B and C open |
 | P-03 packs embedded by project files, no loader | **High** | **Fixed (S7, ADR-0026)**: external signed-or-allowed packs, one loader, Pack Manager; evidence in `docs/PORTABILITY_AUDIT.md` section 0.2 |
 | P-02b compiled role catalogue | Medium | **Open** (S5, S8) |
+| P-10 the signature boundary shaped like one vendor | Low | **Fixed (S3, ADR-0027)**: provider-neutral vocabulary and interfaces, status mapper, idempotent event inbox, renaming migration, guard over all of `src/` |
 | P-04, P-05 compiled capabilities and JBS vocabulary in code and pages | Medium | **Open** (S4, S6) |
-| P-06, P-07, P-10, R-03, R-04 | Low | **Open** (S3, S4, S10) |
+| P-06, P-07, R-03, R-04 | Low | **Open** (S4, S10) |
 | R-01, R-02, R-05 | Medium | **Open** (S6, S10) |
 | R-06 | Info | **Open** |
 
@@ -218,8 +220,8 @@ Remaining high-severity portability violation: **none** from the original audit 
 |---|---|
 | S1 pack per organisation, neutral Blank pack, guard stage A, first PRT-002 proof | **Done**, CI-verified |
 | S2 reminder fall-back and migrated initial status | **Done**, CI-verified (run 35) |
-| S3 neutral signature vocabulary with an EF migration | **First incomplete** |
-| S4 vocabulary and terminology read side, guard stage B | Not started |
+| S3 neutral signature vocabulary with an EF migration | **Done** (ADR-0027); SQL Server migration test and CI result in `deploy/STATUS.md` |
+| S4 vocabulary and terminology read side, guard stage B | **First incomplete** |
 | S5 role catalogue decision (ADR) | Not started |
 | S6 feature flags that gate capabilities | Not started |
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |

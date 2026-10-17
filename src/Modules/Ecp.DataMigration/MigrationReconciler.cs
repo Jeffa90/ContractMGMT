@@ -15,7 +15,7 @@ internal sealed class MigrationReconciler(MigrationKernel k, IContractMigrationP
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    private sealed record Envelope(ReconciliationDistributions Distributions, List<string> Imbalances, List<string> Outstanding);
+    private sealed record ReconciliationPayload(ReconciliationDistributions Distributions, List<string> Imbalances, List<string> Outstanding);
 
     public async Task<ReconciliationDto> PreviewAsync(Guid batchId, CancellationToken ct)
     {
@@ -30,8 +30,8 @@ internal sealed class MigrationReconciler(MigrationKernel k, IContractMigrationP
         if (report is null) return await ComputeAsync(batch, 0, DateTime.MinValue, "", false, null, null, false, ct);
         var totals = JsonSerializer.Deserialize<ReconciliationTotals>(report.TotalsJson, Json)!;
         var files = JsonSerializer.Deserialize<FileReconciliation>(report.FileTotalsJson, Json)!;
-        var env = JsonSerializer.Deserialize<Envelope>(report.DistributionsJson, Json)!;
-        return new ReconciliationDto(report.Id, report.Sequence, report.GeneratedUtc, report.GeneratedBy, totals, files, env.Distributions, report.Balanced, report.ExceptionsApproved, env.Imbalances, env.Outstanding,
+        var stored = JsonSerializer.Deserialize<ReconciliationPayload>(report.DistributionsJson, Json)!;
+        return new ReconciliationDto(report.Id, report.Sequence, report.GeneratedUtc, report.GeneratedBy, totals, files, stored.Distributions, report.Balanced, report.ExceptionsApproved, stored.Imbalances, stored.Outstanding,
             report.ApprovedBy, report.ApprovalNote, true);
     }
 
@@ -47,9 +47,9 @@ internal sealed class MigrationReconciler(MigrationKernel k, IContractMigrationP
         var sequence = (await k.Db.Reconciliations.Where(r => r.BatchId == batchId).MaxAsync(r => (int?)r.Sequence, ct) ?? 0) + 1;
         var dto = await ComputeAsync(batch, sequence, k.Clock.UtcNow, by, false, note, null, true, ct);
         var approved = approveExceptions && !dto.Balanced;
-        var envelope = new Envelope(dto.Distributions, dto.Imbalances.ToList(), dto.OutstandingItems.ToList());
+        var payload = new ReconciliationPayload(dto.Distributions, dto.Imbalances.ToList(), dto.OutstandingItems.ToList());
         var report = ReconciliationReport.Create(k.TenantId, batchId, sequence, by, k.Clock.UtcNow, JsonSerializer.Serialize(dto.Totals, Json), JsonSerializer.Serialize(dto.Files, Json),
-            JsonSerializer.Serialize(envelope, Json), dto.Balanced, approved, approved ? JsonSerializer.Serialize(dto.Imbalances.Concat(dto.OutstandingItems), Json) : null, approved ? by : null, note);
+            JsonSerializer.Serialize(payload, Json), dto.Balanced, approved, approved ? JsonSerializer.Serialize(dto.Imbalances.Concat(dto.OutstandingItems), Json) : null, approved ? by : null, note);
         if (dto.Balanced || approved) batch.Reconcile(dto.Totals, approved, dto.Balanced);
         await k.Uow.ExecuteAsync(async c =>
         {

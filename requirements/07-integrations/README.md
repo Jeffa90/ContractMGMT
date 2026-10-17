@@ -6,7 +6,8 @@ Added by repository review (GAP-16). Master requires provider interfaces for doc
 |---|---|
 | `ADAPTER_CATALOGUE.md` | Every provider interface: purpose, default implementation, production implementations, failure behaviour |
 | `IDENTITY_SPEC.md` | Demo identity, generic OIDC, Microsoft Entra ID, group-to-role mapping, step-up authentication |
-| `ESIGNATURE_DOCUSIGN_SPEC.md` | E-signature provider contract and the DocuSign adapter, including Delegation of Authority evidence |
+| `ESIGNATURE_PROVIDER_SPEC.md` | E-signature provider contract (provider-neutral): signature request, provider status mapping, callbacks, inbox, executed document |
+| `DOCUSIGN_ADAPTER_NOTES.md` | Notes for the future DocuSign adapter, in DocuSign's own vocabulary (provider-specific; Future) |
 | `REPORTING_QLIK_SPEC.md` | External full analytics (Qlik for the JBS pack) without bypassing security |
 | `API_AND_WEBHOOKS_SPEC.md` | REST API, OpenAPI, outbound and inbound webhooks |
 | `NOTIFICATIONS_SPEC.md` | Email and in-app notifications, templates, reminders and escalations |

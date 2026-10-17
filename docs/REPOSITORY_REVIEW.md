@@ -207,7 +207,7 @@ All relative links and backticked repository paths in the new and updated docume
 | Decision | Applied to | Resolves |
 |---|---|---|
 | D1 Roles, permissions, scopes | `CONFIRMED_DECISIONS.md`, `roles-and-permissions.csv` (12 roles), `permission-catalogue.csv` and `role-permission-matrix.csv` (59 permissions), `ACCESS_CONTROL_SPEC.md` (scope intersection, Viewer kinds), `identity.csv`, `reference-lookups.csv`, sample users | Q-02, Q-03 (in part), Q-05 (in part), GAP-10, CON-05 (with A4), CON-14 |
-| D2 DocuSign and approvals | `ESIGNATURE_DOCUSIGN_SPEC.md`, `CONFIGURATION_STUDIO_SPEC.md` section 6, `WORKFLOW_SPEC.md`, sample matrix renamed `synthetic-generic-value-approval-matrix.json` (roles replaced by synthetic tiers) | Q-01, Q-09 (in part), CON-02, ASM-08 |
+| D2 DocuSign and approvals | `ESIGNATURE_PROVIDER_SPEC.md`, `CONFIGURATION_STUDIO_SPEC.md` section 6, `WORKFLOW_SPEC.md`, sample matrix renamed `synthetic-generic-value-approval-matrix.json` (roles replaced by synthetic tiers) | Q-01, Q-09 (in part), CON-02, ASM-08 |
 | D3 Agreement Reference | `contracts-extended.csv`, `org-structure.csv`, `MIGRATION_SUPPLEMENT.md`, `CONFIGURATION_PACKAGE_SPEC.md`, `TENANCY_AND_ORGANISATION_SPEC.md`, glossary, INV-01, tests REF-001 and PKG-012 | Q-07, CON-07 (uniqueness part) |
 | D4 Development and SQL Server testing | `docs/TESTING.md` section 3, readiness R-DB-01, CI workflow, ADR-0005 | Q-14 (in part), RISK-01 policy |
 | D5 Skills | `.claude/skills/` (10 skills, one canonical copy), all references updated | Q-16, GAP-03, CON-18 |

@@ -210,6 +210,40 @@ public class SourceRuleTests
     public void The_business_name_guard_recognises_every_spelling(string line)
         => Assert.Matches(new Regex("(JBS|Medius|Qlik|DocuSign)", RegexOptions.IgnoreCase), line);
 
+    private static readonly Regex SignatureVendorWords = new(@"envelope|signing[ _-]?ceremony|recipient[ _-]?tabs?|signature[ _-]?tabs?|docusign", RegexOptions.IgnoreCase);
+
+    [Fact] // S3 / R6 (ADR-0027): the signature boundary is provider-neutral
+    public void The_signature_boundary_uses_no_signature_vendor_vocabulary_in_any_source_file()
+    {
+        // C#, Razor, project, JSON and resource files under src/. The one allowed hit is the read-only compatibility name that lets a register-authorisation snapshot frozen before the rename still be read.
+        var src = Path.Combine(RepoRoot.Find(), "src");
+        var hits = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories))
+        {
+            var f = file.Replace('\\', '/');
+            if (f.Contains("/obj/") || f.Contains("/bin/") || f.Contains("/Persistence/Migrations/") || f.EndsWith("packages.lock.json", StringComparison.Ordinal)) continue;
+            if (Path.GetExtension(f) is not (".cs" or ".cshtml" or ".csproj" or ".json" or ".resx" or ".css" or ".js")) continue;
+            if (f.EndsWith("/Modules/Ecp.Lifecycle/RegisterAuthorisation.cs", StringComparison.Ordinal)) continue;     // the compatibility name, checked below
+            if (SignatureVendorWords.IsMatch(File.ReadAllText(file))) hits.Add(f);
+        }
+        Assert.True(hits.Count == 0, "Signature-vendor vocabulary belongs in a provider adapter, not the platform: " + string.Join(", ", hits));
+
+        var compat = File.ReadAllLines(Path.Combine(src, "Modules", "Ecp.Lifecycle", "RegisterAuthorisation.cs")).Where(l => SignatureVendorWords.IsMatch(l)).ToList();
+        Assert.Single(compat);
+        Assert.Contains("JsonPropertyName(\"envelopeId\")", compat[0]);
+    }
+
+    [Theory]
+    [InlineData("string EnvelopeId")]
+    [InlineData("CreateEnvelopeAsync(")]
+    [InlineData("<dt>Envelope</dt>")]
+    [InlineData("recipient tabs")]
+    [InlineData("RecipientTabs")]
+    [InlineData("the signing ceremony")]
+    [InlineData("SignatureTabs")]
+    [InlineData("DocuSign Connect")]
+    public void The_signature_vendor_guard_recognises_every_spelling(string line) => Assert.Matches(SignatureVendorWords, line);
+
     [Fact]
     public void Secrets_are_not_hard_coded_in_source()
         => AssertNone(new Regex(@"(?i)(password|pwd|secret|apikey|token)\s*=\s*[""'][^""']{4,}[""']"), "Possible hard-coded secret");

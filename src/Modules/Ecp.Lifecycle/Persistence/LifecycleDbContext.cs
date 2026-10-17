@@ -12,7 +12,8 @@ public sealed class LifecycleDbContext(DbContextOptions<LifecycleDbContext> opti
     public DbSet<LegalComment> LegalComments => Set<LegalComment>();
     public DbSet<LegalAttachment> LegalAttachments => Set<LegalAttachment>();
     public DbSet<LegalEvent> LegalEvents => Set<LegalEvent>();
-    public DbSet<ExecutionRecord> Executions => Set<ExecutionRecord>();
+    public DbSet<SignatureRequest> SignatureRequests => Set<SignatureRequest>();
+    public DbSet<SignatureProviderEvent> ProviderEvents => Set<SignatureProviderEvent>();
     public DbSet<ApprovalRequest> Approvals => Set<ApprovalRequest>();
     public DbSet<ApprovalStepResponse> StepResponses => Set<ApprovalStepResponse>();
     public DbSet<RecordUnlock> Unlocks => Set<RecordUnlock>();
@@ -116,19 +117,41 @@ public sealed class LifecycleDbContext(DbContextOptions<LifecycleDbContext> opti
             e.HasOne<LegalReview>().WithMany().HasForeignKey(x => new { x.TenantId, x.ReviewId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         });
 
-        mb.Entity<ExecutionRecord>(e =>
+        mb.Entity<SignatureRequest>(e =>
         {
-            e.ToTable("ExecutionRecord");
+            e.ToTable("SignatureRequest");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.SubjectKind).HasMaxLength(20).IsRequired();
             e.Property(x => x.Provider).HasMaxLength(40).IsRequired();
-            e.Property(x => x.EnvelopeId).HasMaxLength(200);
+            e.Property(x => x.ProviderRequestId).HasMaxLength(200);
+            e.Property(x => x.ProviderStatus).HasMaxLength(100);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.StartedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RequestedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.CorrelationId).HasMaxLength(64);
+            e.Property(x => x.IdempotencyKey).HasMaxLength(100);
+            e.Property(x => x.FailureCode).HasMaxLength(60);
+            e.Property(x => x.FailureMessage).HasMaxLength(500);
             e.Property(x => x.Detail).HasMaxLength(1000);
             e.HasIndex(x => new { x.TenantId, x.SubjectKind, x.SubjectId, x.IsCurrent });
-            e.HasIndex(x => new { x.TenantId, x.Provider, x.EnvelopeId }).HasFilter("[EnvelopeId] IS NOT NULL");
+            e.HasIndex(x => new { x.TenantId, x.Provider, x.ProviderRequestId }).HasFilter("[ProviderRequestId] IS NOT NULL");
+            e.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
+        });
+
+        mb.Entity<SignatureProviderEvent>(e =>
+        {
+            e.ToTable("SignatureProviderEvent");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Provider).HasMaxLength(40).IsRequired();
+            e.Property(x => x.ProviderEventId).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ProviderRequestId).HasMaxLength(200);
+            e.Property(x => x.ProviderStatus).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Outcome).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.OutcomeDetail).HasMaxLength(500);
+            e.Property(x => x.CorrelationId).HasMaxLength(64);
+            e.HasIndex(x => new { x.TenantId, x.Provider, x.ProviderEventId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Outcome, x.ReceivedUtc });
         });
 
         mb.Entity<ApprovalRequest>(e =>

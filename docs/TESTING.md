@@ -286,7 +286,7 @@ Scenarios live in `tests/Ecp.Integration.Tests/Lifecycle*.cs`, `NotificationScen
 | Elevation (IDN-03) | `ElevationScenarios` (6 scenarios) and `ElevationUiTests` | |
 | Cross-tenant | `Another_tenants_records_do_not_exist_for_any_lifecycle_call`; `Notification_administrators_see_only_their_own_organisations_deliveries` | |
 | Dashboards | `Dashboards_never_show_or_count_a_record_the_reader_could_not_open`; `A_reminder_is_acknowledged_by_a_current_owner_and_the_dashboard_follows`; API `The_new_pages_need_sign_in_and_the_permissions_they_name` | |
-| Signature boundary | `The_signature_boundary_stores_envelope_status_and_a_completed_envelope_only_supplies_the_executed_copy`; unit `SignatureProviderTests` | |
+| Signature boundary | `The_signature_boundary_stores_the_request_and_status_and_a_completed_request_only_supplies_the_executed_copy`; unit `SignatureProviderTests` | |
 
 Not tested by design or not possible here: SMTP and Graph against live services; a real e-signature service; browser-level accessibility of the new pages (ACC-01 remains open); daylight-saving boundaries for reminders; performance of the dashboards with large registers (PER-001 baseline is not measured).
 
@@ -379,6 +379,29 @@ Not covered: a browser accessibility audit of the new pages (ACC-01), SQL Server
 ### 8.9 Totals at the end of the S7 pass
 
 Without `ECP_TEST_SQL`: **854 Passed, 0 Failed, 0 Skipped, 203 NOT VERIFIED** (545 unit, 27 architecture, 80 API, 202 integration on SQLite). The 203 are the SQL Server wrappers, reported NOT VERIFIED rather than passed. CI run 39 (commit `3c78a29`, SQL Server 2022): **203 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED**; build, repository, supply-chain, solution-pack and container-image checks succeeded (`deploy/STATUS.md`).
+
+### 8.10 Provider-neutral signature boundary (slice S3, ADR-0027; ADP-003 to ADP-005 in part, P-10)
+
+| Area | Where it is covered |
+|---|---|
+| Provider words are mapped by the provider's mapper; the platform status and the provider's native status are kept apart | integration `SignatureRequestScenarios` `Mapped_once_and_never_moves_the_contract`; unit `SignatureProviderTests` (status mapper theory, unknown words) |
+| A provider event id is processed once; a repeat is acknowledged and changes nothing; late and post-final events are ignored; an unknown word is Unmapped and visible; an unknown request is recorded without effect; administrators (`audit.read_admin`) see what needs attention and ordinary users do not | `Mapped_once_and_never_moves_the_contract` |
+| A provider cannot move or make a contract Effective; Completed only supplies the executed copy, stored through the document service; register authorisation stays a separate person's act | `Mapped_once_and_never_moves_the_contract`, `New_adapter_end_to_end`, existing `Signature_boundary` |
+| An executed document the platform refuses is kept visible (failure code and sanitised message, event Failed) and the redelivered event is applied | `Refused_document_is_kept_and_retried` |
+| A new adapter with its own words, headers, secret and payload runs end to end (verifier, inbox, polling fallback, return to drafting, register authorisation) with no change to the lifecycle | `New_adapter_end_to_end` |
+| Expired and failed requests can be taken back to drafting; cancel ends a request as Voided without moving the contract; a repeated client request id returns the first request | `Expired_failed_cancelled_and_repeated` |
+| Events never cross tenants; the same event id is a different event in each tenant | `Tenants_are_isolated` |
+| Callback verification: valid, forged key, tampered body, stale and future timestamps, missing headers, bad hex, missing secret, unreadable payload | unit `SignatureProviderTests` |
+| Mock provider and its verifier refused in Production; the unconnected provider fails closed; honest labels | unit `SignatureProviderTests` |
+| Frozen snapshots written under the old key still read and are not rewritten; new ones do not write it | unit `SignatureVocabularyTests` |
+| No vendor word anywhere under `src/` (one named compatibility line allowed); the guard recognises every spelling | architecture `The_signature_boundary_uses_no_signature_vendor_vocabulary_in_any_source_file`, `The_signature_vendor_guard_recognises_every_spelling` |
+| The migration keeps every row and value, renames in place, re-creates the policy, leaves the old names nowhere and is safe to run twice | SQL Server `SignatureVocabularyMigrationTests` (**NOT VERIFIED in a workspace without SQL Server**; runs in CI). The lightweight provider builds its schema from the model and does not run migrations |
+
+Not covered: a live provider (none exists), the callback HTTP endpoint (not built), a provider configuration page (not built).
+
+### 8.11 Totals at the end of the S3 pass
+
+Without `ECP_TEST_SQL`: **886 Passed, 0 Failed, 0 Skipped, 209 NOT VERIFIED** (563 unit, 36 architecture, 80 API, 207 integration on SQLite). The 209 are the SQL Server wrappers (203 existing, 5 new signature scenarios and the migration test `SignatureVocabularyMigrationTests`), reported NOT VERIFIED rather than passed. The CI result is recorded in `deploy/STATUS.md` once the run has finished.
 
 ## 9. No-code, packages and portability suite
 

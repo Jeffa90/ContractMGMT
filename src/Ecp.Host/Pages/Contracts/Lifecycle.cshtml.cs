@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ecp.Host.Pages.Contracts;
 
 [Authorize(Policy = "perm:contracts.read")]
-public sealed class LifecycleModel(ILifecycleService lifecycle, IVariationService variations, ILegalReviewService legal, IExecutionService execution, IRegisterAuthorisationService approvals,
+public sealed class LifecycleModel(ILifecycleService lifecycle, IVariationService variations, ILegalReviewService legal, ISignatureRequestService execution, IRegisterAuthorisationService approvals,
     ISecuredContractService contracts, IRenewalService renewals, EcpHostOptions host) : StepsPageModel(lifecycle, variations, legal, execution, approvals)
 {
     protected override string SubjectKind => Ecp.Lifecycle.Domain.SubjectKinds.Contract;

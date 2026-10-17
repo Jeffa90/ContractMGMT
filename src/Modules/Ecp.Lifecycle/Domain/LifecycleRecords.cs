@@ -259,15 +259,32 @@ public sealed class LegalEvent : ITenantOwned
     };
 }
 
-public enum ExecutionStatus { NotStarted, Sent, Delivered, Completed, Declined, Voided }
+/// <summary>
+/// Where a signature request stands, in the platform's own words. Sent is "sent for signature". Completed, Declined, Voided, Expired and Failed are final. A provider's own status words are never used here: they are
+/// kept apart (<see cref="SignatureRequest.ProviderStatus"/>) and reach this value only through an explicit status mapper.
+/// </summary>
+public enum SignatureRequestStatus { Sent, Delivered, Completed, Declined, Voided, Expired, Failed }
+
+public static class SignatureRequestStatuses
+{
+    /// <summary>Completed, Declined, Voided, Expired and Failed end a request: nothing later can change it to something else.</summary>
+    public static bool IsFinal(this SignatureRequestStatus s) => s is SignatureRequestStatus.Completed or SignatureRequestStatus.Declined or SignatureRequestStatus.Voided or SignatureRequestStatus.Expired or SignatureRequestStatus.Failed;
+
+    /// <summary>The request ended without an executed document, so the document can be taken back to drafting.</summary>
+    public static bool EndedWithoutExecution(this SignatureRequestStatus s) => s is SignatureRequestStatus.Declined or SignatureRequestStatus.Voided or SignatureRequestStatus.Expired or SignatureRequestStatus.Failed;
+
+    /// <summary>Order of progress used to ignore an event that arrives late: Sent, then Delivered, then any final status.</summary>
+    public static int Rank(this SignatureRequestStatus s) => s == SignatureRequestStatus.Sent ? 0 : s == SignatureRequestStatus.Delivered ? 1 : 2;
+}
 
 /// <summary>
-/// Where execution stands. Signing and the Delegation of Authority belong to the external signature service: the platform records the envelope id and status and receives the executed copy.
-/// Execution never approves, registers or locks anything; it only lets the executed-copy guard be satisfied.
+/// A request to an external signature service to collect signatures on a contract's final document (External Execution). Signing and the Delegation of Authority belong to the provider; the platform records which
+/// provider, the provider's own request identifier (empty until the provider accepts the request), the platform status and, separately, the provider's native status, and receives the executed document.
+/// A request never approves, registers or locks anything and never makes a contract Effective: it only lets the executed-copy guard be satisfied, after which register authorisation is a separate step.
 /// </summary>
-public sealed class ExecutionRecord : ITenantOwned
+public sealed class SignatureRequest : ITenantOwned
 {
-    private ExecutionRecord() { }
+    private SignatureRequest() { }
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid OrganisationId { get; private set; }
@@ -275,34 +292,100 @@ public sealed class ExecutionRecord : ITenantOwned
     public Guid SubjectId { get; private set; }
     public Guid ContractId { get; private set; }
     public string Provider { get; private set; } = "";
-    public string? EnvelopeId { get; private set; }
-    public ExecutionStatus Status { get; private set; }
+    public string? ProviderRequestId { get; private set; }
+    public SignatureRequestStatus Status { get; private set; }
+    /// <summary>The provider's own word for where the request stands. Informational; it never controls the platform status or the contract.</summary>
+    public string? ProviderStatus { get; private set; }
     public bool IsCurrent { get; private set; }
     public Guid? ExecutedDocumentId { get; private set; }
-    public DateTime? ExecutedUtc { get; private set; }
-    public string StartedBy { get; private set; } = "";
-    public DateTime StartedUtc { get; private set; }
+    public DateTime? CompletedUtc { get; private set; }
+    public string RequestedBy { get; private set; } = "";
+    public DateTime RequestedUtc { get; private set; }
+    public DateTime? LastProviderEventUtc { get; private set; }
     public DateTime StatusUpdatedUtc { get; private set; }
+    public string? CorrelationId { get; private set; }
+    public string? IdempotencyKey { get; private set; }
+    public string? FailureCode { get; private set; }
+    public string? FailureMessage { get; private set; }
     public string? Detail { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
 
-    public static ExecutionRecord Start(Guid tenantId, Guid organisationId, string subjectKind, Guid subjectId, Guid contractId, string provider, string? envelopeId, ExecutionStatus status, string by, DateTime nowUtc) => new()
+    public static SignatureRequest Start(Guid tenantId, Guid organisationId, string subjectKind, Guid subjectId, Guid contractId, string provider, string? providerRequestId, SignatureRequestStatus status, string? providerStatus,
+        string by, string? correlationId, string? idempotencyKey, DateTime nowUtc) => new()
     {
         Id = Ids.New(), TenantId = tenantId, OrganisationId = organisationId, SubjectKind = subjectKind, SubjectId = subjectId, ContractId = contractId, Provider = Guard.NotBlank(provider, "Provider", 40),
-        EnvelopeId = Guard.OptionalBounded(envelopeId, "Envelope id", 200), Status = status, IsCurrent = true, StartedBy = Guard.NotBlank(by, "Started by", 200), StartedUtc = Guard.Utc(nowUtc, nameof(nowUtc)), StatusUpdatedUtc = nowUtc
+        ProviderRequestId = Guard.OptionalBounded(providerRequestId, "Provider request id", 200), Status = status, ProviderStatus = Guard.OptionalBounded(providerStatus, "Provider status", 100), IsCurrent = true,
+        RequestedBy = Guard.NotBlank(by, "Requested by", 200), RequestedUtc = Guard.Utc(nowUtc, nameof(nowUtc)), StatusUpdatedUtc = nowUtc,
+        CorrelationId = Guard.OptionalBounded(correlationId, "Correlation id", 64), IdempotencyKey = Guard.OptionalBounded(idempotencyKey, "Idempotency key", 100)
     };
 
     public void Supersede() => IsCurrent = false;
 
-    public void SetStatus(ExecutionStatus status, string? detail, DateTime nowUtc)
+    /// <summary>Records an event from the provider: the provider's own status word is kept as it was sent, and the platform status moves only to the mapped value.</summary>
+    public void ApplyProviderEvent(SignatureRequestStatus status, string providerStatus, DateTime occurredUtc, string? detail, DateTime nowUtc)
     {
-        if (Status == ExecutionStatus.Completed && status != ExecutionStatus.Completed) throw new DomainException("execution_completed", "Execution has completed and cannot go back.");
-        Status = status; Detail = Guard.OptionalBounded(detail, "Detail", 1000); StatusUpdatedUtc = nowUtc;
+        if (Status == SignatureRequestStatus.Completed && status != SignatureRequestStatus.Completed) throw new DomainException("execution_completed", "Execution has completed and cannot go back.");
+        Status = status; ProviderStatus = Guard.OptionalBounded(providerStatus, "Provider status", 100); LastProviderEventUtc = occurredUtc; Detail = Guard.OptionalBounded(detail, "Detail", 1000); StatusUpdatedUtc = nowUtc;
+        if (status != SignatureRequestStatus.Failed) { FailureCode = null; FailureMessage = null; }
     }
 
-    public void Complete(Guid executedDocumentId, DateTime nowUtc)
+    /// <summary>Notes the provider's native status without changing the platform status (an unmapped word, kept visible for an administrator).</summary>
+    public void NoteProviderStatus(string providerStatus, DateTime occurredUtc, DateTime nowUtc)
     {
-        ExecutedDocumentId = Guard.NotEmpty(executedDocumentId, nameof(executedDocumentId)); ExecutedUtc = nowUtc; Status = ExecutionStatus.Completed; StatusUpdatedUtc = nowUtc;
+        ProviderStatus = Guard.OptionalBounded(providerStatus, "Provider status", 100); LastProviderEventUtc = occurredUtc; StatusUpdatedUtc = nowUtc;
+    }
+
+    /// <summary>Records why the platform could not use what the provider reported (for example the executed document was refused), without ending the request.</summary>
+    public void RecordFailure(string code, string message, DateTime nowUtc)
+    {
+        FailureCode = Guard.NotBlank(code, "Failure code", 60); FailureMessage = Guard.NotBlank(message, "Failure message", 500); StatusUpdatedUtc = nowUtc;
+    }
+
+    public void Complete(Guid executedDocumentId, DateTime nowUtc, string? providerStatus = null, DateTime? eventUtc = null)
+    {
+        ExecutedDocumentId = Guard.NotEmpty(executedDocumentId, nameof(executedDocumentId)); CompletedUtc = nowUtc; Status = SignatureRequestStatus.Completed; StatusUpdatedUtc = nowUtc;
+        FailureCode = null; FailureMessage = null;
+        if (providerStatus is not null) ProviderStatus = Guard.OptionalBounded(providerStatus, "Provider status", 100);
+        if (eventUtc is not null) LastProviderEventUtc = eventUtc;
+    }
+}
+
+public enum ProviderEventOutcome { Pending, Applied, Ignored, Unmapped, UnknownRequest, Failed }
+
+/// <summary>
+/// One verified event received from a signature provider, kept as the inbox record: who sent it, which request it was about, the provider's own status word and what the platform did with it. The same provider event id
+/// is processed once. The provider's raw payload is not stored; it stays inside the adapter.
+/// </summary>
+public sealed class SignatureProviderEvent : ITenantOwned
+{
+    private SignatureProviderEvent() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid? OrganisationId { get; private set; }
+    public Guid? SignatureRequestId { get; private set; }
+    public string Provider { get; private set; } = "";
+    public string ProviderEventId { get; private set; } = "";
+    public string? ProviderRequestId { get; private set; }
+    public string ProviderStatus { get; private set; } = "";
+    public DateTime OccurredUtc { get; private set; }
+    public DateTime ReceivedUtc { get; private set; }
+    public ProviderEventOutcome Outcome { get; private set; }
+    public string? OutcomeDetail { get; private set; }
+    public int Attempts { get; private set; }
+    public DateTime? ProcessedUtc { get; private set; }
+    public string? CorrelationId { get; private set; }
+    public byte[] RowVersion { get; private set; } = [];
+
+    public static SignatureProviderEvent Receive(Guid tenantId, string provider, string providerEventId, string? providerRequestId, string providerStatus, DateTime occurredUtc, string? correlationId, DateTime nowUtc) => new()
+    {
+        Id = Ids.New(), TenantId = tenantId, Provider = Guard.NotBlank(provider, "Provider", 40), ProviderEventId = Guard.NotBlank(providerEventId, "Provider event id", 200),
+        ProviderRequestId = Guard.OptionalBounded(providerRequestId, "Provider request id", 200), ProviderStatus = Guard.OptionalBounded(providerStatus, "Provider status", 100) ?? "", OccurredUtc = Guard.Utc(occurredUtc, nameof(occurredUtc)),
+        ReceivedUtc = Guard.Utc(nowUtc, nameof(nowUtc)), Outcome = ProviderEventOutcome.Pending, CorrelationId = Guard.OptionalBounded(correlationId, "Correlation id", 64)
+    };
+
+    public void Resolve(ProviderEventOutcome outcome, string? detail, Guid? requestId, Guid? organisationId, DateTime nowUtc)
+    {
+        Outcome = outcome; OutcomeDetail = Guard.OptionalBounded(detail, "Detail", 500); SignatureRequestId = requestId; OrganisationId = organisationId; ProcessedUtc = nowUtc; Attempts++;
     }
 }
 

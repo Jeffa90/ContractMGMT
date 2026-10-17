@@ -149,7 +149,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 |---|---|---|---|
 | **S1 (first), done** | R1, R4 stage A, a minimal PRT-002 test | none | section 8.6 |
 | **S2, done** | R2 and R3 | S1 | Migrated contracts take the workflow's initial status; unowned-category reminder fall-back comes from the policy; JBS pack states the same recipient it has today |
-| S3 | R6 | none (can run in parallel with S2) | Signature request vocabulary neutral; EF migration renames the column and filtered index; no data loss |
+| S3 | R6 | none (can run in parallel with S2) | Signature request vocabulary neutral; EF migration renames the column and filtered index; no data loss. **Done 2026-10-17 (section 8.11, ADR-0027).** |
 | S4 | R5 and the terminology read side (the part of CFG-02 PRT-004 needs); R4 stage B (Razor, JSON, project files) | S1 | Render test with a renamed vocabulary shows no JBS term; guard passes on all source extensions |
 | S5 | R8 step 1: the ADR deciding the role catalogue (no code) | S1 | ADR accepted by the owner; decision D1 reconciled with PRT-013 |
 | S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged |
@@ -353,6 +353,21 @@ Delivered, as one slice, on the owner's instruction (the Enterprise Platform pat
 **Deferred (not started, by design):** S7d upgrade workflow across versions and per-item merge, S7e pack and tenant export, S7f marketplace and catalogue, billing, graphical designer, AI-generated packs; the other packable kinds in shipped packs; the Razor and JSON stages (B, C) of the ARC-010 guard (P-09) which belong to later slices.
 
 **First incomplete remediation task after S7:** S3 (R6, neutral signature-request vocabulary with an EF migration), then S4, S5, S6, S8 to S10. **Remaining high-severity portability findings:** none from the original audit's High list; P-02b (compiled role catalogue) remains Medium.
+
+### 8.11 Slice S3: provider-neutral signature boundary (ADR-0027)
+
+Delivered on the owner's instruction (R6, finding P-10):
+
+* **Vocabulary.** Signature Request, Signature Provider, Provider Request ID, Signature Request Status (Sent for signature, Delivered, Completed, Declined, Voided, Expired, Failed), Executed Document, Provider Event, Provider Callback, External Execution. Envelope, Envelope ID, DocuSign Envelope, DocuSign Status, Recipient Tabs and DocuSign Connect are not platform concepts; they live only in `requirements/07-integrations/DOCUSIGN_ADAPTER_NOTES.md`.
+* **Model.** `ExecutionRecord` becomes `SignatureRequest` (provider key, optional Provider Request ID, platform status, provider-native status kept apart, requested by/when, last provider event, completed, executed-document reference, correlation id, idempotency key, failure code and message). New `SignatureProviderEvent` is the idempotent inbox record.
+* **Interfaces.** `ISignatureProvider`, `ISignatureRequestService`, `ISignatureStatusMapper`, `ISignatureCallbackVerifier` (with the `HmacCallbackVerifier` base), `ISignatureEventInbox`, `IExecutedDocumentRetriever`, `ISignatureProviderFactory`. `IESignatureProvider` and its envelope types are gone. A test adapter with its own words, headers, secret and payload runs end to end with no change to the lifecycle.
+* **Behaviour.** Provider words are mapped explicitly; unknown words and unknown requests fail safely and stay visible; each provider event id is processed once; a provider cannot move or make Effective a contract; completed execution stores the executed document through the normal document rules; every change is audited; mock provider, verifier and simulated events are refused in Production; manual upload still works.
+* **Migration `SignatureRequestVocabulary`.** Renames the table, four columns, indexes and primary key in place, re-creates the filtered index and the row-level-security policy, adds six empty columns and the inbox table. No value is rewritten. Contract state, approvals, executed-document references and audit records are untouched. Frozen register-authorisation snapshots written under the old key still read.
+* **Guard.** An architecture test scans all of `src/` for the vendor words (only the one compatibility name is allowed; applied migrations are history).
+
+**Exit criteria.** "No vendor word in the platform": met (architecture test). "No data loss": proved by a SQL Server migration test that runs in CI; **NOT VERIFIED in this workspace**. **Rollback**: restore the pre-upgrade backup; a development `Down` exists.
+
+**Not done:** live adapter, callback endpoint, provider configuration page, reporting, operations, role catalogue, feature flags, another pack slice. **First incomplete remediation task after S3:** S4 (vocabulary and terminology read side, guard stage B), then S5, S6, S8 to S10.
 
 ## 9. Open decisions for the owner
 

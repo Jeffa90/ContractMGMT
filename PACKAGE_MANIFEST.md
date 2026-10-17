@@ -34,6 +34,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0013-ui-and-api.md`
 - `decisions/ADR-0014-supply-chain-and-pack-signing.md`
 - `decisions/ADR-0026-external-solution-packs.md`
+- `decisions/ADR-0027-provider-neutral-signature-boundary.md`
 - `docs/ARCHITECTURE.md`
 - `docs/DOCUMENT_INDEX.md`
 - `docs/DOMAIN_MODEL.md`
@@ -101,7 +102,8 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `requirements/06-design/README.md`
 - `requirements/07-integrations/ADAPTER_CATALOGUE.md`
 - `requirements/07-integrations/API_AND_WEBHOOKS_SPEC.md`
-- `requirements/07-integrations/ESIGNATURE_DOCUSIGN_SPEC.md`
+- `requirements/07-integrations/DOCUSIGN_ADAPTER_NOTES.md`
+- `requirements/07-integrations/ESIGNATURE_PROVIDER_SPEC.md`
 - `requirements/07-integrations/IDENTITY_SPEC.md`
 - `requirements/07-integrations/NOTIFICATIONS_SPEC.md`
 - `requirements/07-integrations/README.md`
@@ -154,6 +156,11 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Ecp.Packs/PlatformVersion.cs`
 - `src/Ecp.Packs/SemVer.cs`
 - `src/Ecp.Packs/packages.lock.json`
+- `src/Modules/Ecp.Lifecycle/Persistence/Migrations/20261017040140_SignatureRequestVocabulary.Designer.cs`
+- `src/Modules/Ecp.Lifecycle/Persistence/Migrations/20261017040140_SignatureRequestVocabulary.cs`
+- `src/Modules/Ecp.Lifecycle/Signatures/SignatureContracts.cs`
+- `src/Modules/Ecp.Lifecycle/Signatures/SignatureProviders.cs`
+- `src/Modules/Ecp.Lifecycle/Signatures/SignatureRequestService.cs`
 - `templates/demo/.gitkeep`
 - `tests/.gitkeep`
 
@@ -186,7 +193,6 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Modules/Ecp.Lifecycle/Engine/GuardEvaluator.cs`
 - `src/Modules/Ecp.Lifecycle/Engine/LifecycleEngine.cs`
 - `src/Modules/Ecp.Lifecycle/Engine/Support.cs`
-- `src/Modules/Ecp.Lifecycle/Execution.cs`
 - `src/Modules/Ecp.Lifecycle/LegalReviews.cs`
 - `src/Modules/Ecp.Lifecycle/LifecycleApi.cs`
 - `src/Modules/Ecp.Lifecycle/Persistence/LifecycleDbContext.cs`

@@ -38,12 +38,12 @@ internal static class LifecycleScenarios
         Assert.Equal("InitialCreation", await w.StatusAsync(id));
 
         await w.AddDocumentAsync(id, "FinalAgreement", "Final agreement");
-        await w.As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "manual"));
+        await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "manual"));
         Assert.Equal("OutForSignature", await w.StatusAsync(id));
         // Register submission needs the executed copy.
         var noCopy = await Assert.ThrowsAsync<TransitionBlockedException>(() => w.As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, id, null)));
         Assert.Contains("executed copy", noCopy.Message, StringComparison.OrdinalIgnoreCase);
-        await w.As("ownerPackaging", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, id, "executed.pdf", "application/pdf", LifecycleWorld.Bytes("executed"))));
+        await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, id, "executed.pdf", "application/pdf", LifecycleWorld.Bytes("executed"))));
         var request = await w.As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, id, "Executed"));
         Assert.Equal("AwaitingApproval", await w.StatusAsync(id));
 

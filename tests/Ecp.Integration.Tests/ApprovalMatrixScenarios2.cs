@@ -117,7 +117,7 @@ internal static class ApprovalMatrixScenarios2
         // Nobody can respond to a decided request, and the same contract can be submitted again under a fresh plan.
         var late = await Assert.ThrowsAsync<DomainException>(() => Approve(w, "tierB", request));
         Assert.Equal("already_decided", late.Code);
-        var again = await w.As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "manual"));
+        var again = await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "manual"));
         Assert.NotNull(again);
     }
 

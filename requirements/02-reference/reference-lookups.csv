@@ -26,7 +26,7 @@ DocumentType,ExecutedContract,Executed Contract,Confirmed,attachment-manifest.cs
 DocumentType,Schedule,Schedule,Confirmed,attachment-manifest.csv
 DocumentType,VariationDocument,Variation,Confirmed,WORKFLOW_SPEC.md
 DocumentType,LegalAdvice,Legal advice,Confirmed,WORKFLOW_SPEC.md
-DocumentType,ApprovalEvidence,Approval evidence,Confirmed,ESIGNATURE_DOCUSIGN_SPEC.md
+DocumentType,ApprovalEvidence,Approval evidence,Confirmed,ESIGNATURE_PROVIDER_SPEC.md
 DocumentType,SupportingDocument,Supporting document,Confirmed,
 DocumentType,Correspondence,Correspondence,Confirmed,
 DocumentType,FinalAgreement,Final agreement (for signature),Confirmed,DR-2026-10-16 lifecycle slice

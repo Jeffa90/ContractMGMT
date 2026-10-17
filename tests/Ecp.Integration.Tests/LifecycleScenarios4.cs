@@ -9,42 +9,42 @@ namespace Ecp.Integration.Tests;
 
 internal static class LifecycleScenarios4
 {
-    public static async Task The_signature_boundary_stores_envelope_status_and_a_completed_envelope_only_supplies_the_executed_copy(TestApp app)
+    public static async Task The_signature_boundary_stores_the_request_and_status_and_a_completed_request_only_supplies_the_executed_copy(TestApp app)
     {
         var w = await LifecycleWorld.CreateAsync(app);
         var id = await w.ToStateAsync("InitialCreation");
         await w.AddDocumentAsync(id, "FinalAgreement", "Final agreement");
 
         // The external adapter is a scaffold: it fails closed and the contract does not move.
-        var external = await Assert.ThrowsAsync<DomainException>(() => w.As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "external")));
+        var external = await Assert.ThrowsAsync<DomainException>(() => w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "external")));
         Assert.Equal("provider_not_configured", external.Code);
-        await Assert.ThrowsAsync<DomainException>(() => w.As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "carrier-pigeon")));
+        await Assert.ThrowsAsync<DomainException>(() => w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "carrier-pigeon")));
         Assert.Equal("InitialCreation", await w.StatusAsync(id));
-        Assert.Null(await w.As("ownerPackaging", s => s.Get<IExecutionService>().CurrentAsync(SubjectKinds.Contract, id)));
+        Assert.Null(await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().CurrentAsync(SubjectKinds.Contract, id)));
 
-        // Sent through the mock service: an envelope id and status are stored, and the contract is out for signature.
-        var sent = await w.As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "mock"));
-        Assert.StartsWith("MOCK-", sent.EnvelopeId);
-        Assert.Equal(ExecutionStatus.Sent, sent.Status);
+        // Sent through the mock service: a provider request id and status are stored, and the contract is out for signature.
+        var sent = await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "mock"));
+        Assert.StartsWith("MOCK-", sent.ProviderRequestId);
+        Assert.Equal(SignatureRequestStatus.Sent, sent.Status);
         Assert.True(sent.IsSimulated);
         Assert.Equal("OutForSignature", await w.StatusAsync(id));
 
         // Not yet signed: register authorisation is refused (clearance, signature and authorisation are separate).
         await Assert.ThrowsAnyAsync<DomainException>(() => w.As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, id, "too early")));
-        Assert.Equal(ExecutionStatus.Delivered, (await w.As("ownerPackaging", s => s.Get<IExecutionService>().SimulateEventAsync(SubjectKinds.Contract, id, ExecutionStatus.Delivered))).Status);
+        Assert.Equal(SignatureRequestStatus.Delivered, (await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().SimulateEventAsync(SubjectKinds.Contract, id, SignatureRequestStatus.Delivered))).Status);
 
-        // Declined: the owner takes it back to drafting and sends it again; the earlier envelope is superseded.
-        await w.As("ownerPackaging", s => s.Get<IExecutionService>().SimulateEventAsync(SubjectKinds.Contract, id, ExecutionStatus.Declined));
+        // Declined: the owner takes it back to drafting and sends it again; the earlier request is superseded.
+        await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().SimulateEventAsync(SubjectKinds.Contract, id, SignatureRequestStatus.Declined));
         await Assert.ThrowsAnyAsync<DomainException>(() => w.As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, id, "declined")));
         await w.As("ownerPackaging", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "ReturnToDrafting")));
         Assert.Equal("InitialCreation", await w.StatusAsync(id));
-        var again = await w.As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "mock"));
-        Assert.NotEqual(sent.EnvelopeId, again.EnvelopeId);
-        Assert.Equal(again.Id, (await w.As("ownerPackaging", s => s.Get<IExecutionService>().CurrentAsync(SubjectKinds.Contract, id)))!.Id);
+        var again = await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "mock"));
+        Assert.NotEqual(sent.ProviderRequestId, again.ProviderRequestId);
+        Assert.Equal(again.Id, (await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().CurrentAsync(SubjectKinds.Contract, id)))!.Id);
 
         // Completed: only the executed-copy check is satisfied. The contract is not registered and not locked until an approver responds.
-        var done = await w.As("ownerPackaging", s => s.Get<IExecutionService>().SimulateEventAsync(SubjectKinds.Contract, id, ExecutionStatus.Completed));
-        Assert.Equal(ExecutionStatus.Completed, done.Status);
+        var done = await w.As("ownerPackaging", s => s.Get<ISignatureRequestService>().SimulateEventAsync(SubjectKinds.Contract, id, SignatureRequestStatus.Completed));
+        Assert.Equal(SignatureRequestStatus.Completed, done.Status);
         Assert.NotNull(done.ExecutedDocumentId);
         var facts = await w.FactsAsync(id);
         Assert.Equal("OutForSignature", facts.Status);
@@ -59,7 +59,7 @@ internal static class LifecycleScenarios4
         var other = await w.ToStateAsync("InitialCreation");
         await w.AddDocumentAsync(other, "FinalAgreement", "Final agreement 2");
         foreach (var user in new[] { "legalA", "viewerAll", "groupHead" })
-            Assert.True((await Assert.ThrowsAnyAsync<Exception>(() => w.As(user, s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, other, "mock")))) is ForbiddenException or ResourceNotFoundException);
+            Assert.True((await Assert.ThrowsAnyAsync<Exception>(() => w.As(user, s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, other, "mock")))) is ForbiddenException or ResourceNotFoundException);
         Assert.Equal("InitialCreation", await w.StatusAsync(other));
     }
 }

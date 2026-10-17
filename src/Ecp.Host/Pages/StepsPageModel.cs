@@ -6,19 +6,19 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ecp.Host.Pages;
 
 /// <summary>Everything the shared steps panel shows for a contract or a Variation.</summary>
-public sealed record StepsView(string SubjectKind, Guid SubjectId, string StatusDisplay, IReadOnlyList<AvailableTransition> Steps, ExecutionInfo? Execution, IReadOnlyList<ProviderInfo> Providers,
+public sealed record StepsView(string SubjectKind, Guid SubjectId, string StatusDisplay, IReadOnlyList<AvailableTransition> Steps, SignatureRequestInfo? Execution, IReadOnlyList<ProviderInfo> Providers,
     ApprovalDetail? Approval, LegalReviewDetail? Legal, bool IsMockEnvironment);
 
 /// <summary>
 /// The steps a contract and a Variation share: take a plain step, submit to Legal, send for signature, attach the executed copy, submit for register authorisation. Each handler passes the request to the
 /// service that owns the step; the page decides nothing, so a crafted post gets the same answer as a button would.
 /// </summary>
-public abstract class StepsPageModel(ILifecycleService lifecycle, IVariationService variations, ILegalReviewService legal, IExecutionService execution, IRegisterAuthorisationService approvals) : EcpPageModel
+public abstract class StepsPageModel(ILifecycleService lifecycle, IVariationService variations, ILegalReviewService legal, ISignatureRequestService execution, IRegisterAuthorisationService approvals) : EcpPageModel
 {
     protected ILifecycleService Lifecycle { get; } = lifecycle;
     protected IVariationService Variations { get; } = variations;
     protected ILegalReviewService Legal { get; } = legal;
-    protected IExecutionService Execution { get; } = execution;
+    protected ISignatureRequestService Execution { get; } = execution;
     protected IRegisterAuthorisationService Approvals { get; } = approvals;
 
     protected abstract string SubjectKind { get; }
@@ -46,7 +46,7 @@ public abstract class StepsPageModel(ILifecycleService lifecycle, IVariationServ
 
     public Task<IActionResult> OnPostLegalSubmitAsync(Guid id, CancellationToken ct) => Step(id, ct, async () => await Legal.SubmitAsync(new SubmitLegalRequest(SubjectKind, id, Comment, ClientRequestId), ct), "Submitted to Legal.");
 
-    public Task<IActionResult> OnPostSendSignatureAsync(Guid id, string provider, CancellationToken ct) => Step(id, ct, async () => await Execution.SendForSignatureAsync(SubjectKind, id, provider, ClientRequestId, ct),
+    public Task<IActionResult> OnPostSendSignatureAsync(Guid id, string provider, CancellationToken ct) => Step(id, ct, async () => await Execution.RequestSignatureAsync(SubjectKind, id, provider, ClientRequestId, ct),
         "Sent for signature. The agreement is now out for signature; Legal clearance and signing are separate from register authorisation.");
 
     public Task<IActionResult> OnPostExecutedCopyAsync(Guid id, IFormFile? file, CancellationToken ct) => Step(id, ct, async () =>
@@ -56,7 +56,7 @@ public abstract class StepsPageModel(ILifecycleService lifecycle, IVariationServ
         await Execution.RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKind, id, Path.GetFileName(file.FileName), file.ContentType, stream), ct);
     }, "The executed copy is attached. It is scanned like any upload and counts only once it has passed.");
 
-    public Task<IActionResult> OnPostSimulateAsync(Guid id, ExecutionStatus status, CancellationToken ct) => Step(id, ct, async () => await Execution.SimulateEventAsync(SubjectKind, id, status, ct), "The mock signature service reported: " + status + ".");
+    public Task<IActionResult> OnPostSimulateAsync(Guid id, SignatureRequestStatus status, CancellationToken ct) => Step(id, ct, async () => await Execution.SimulateEventAsync(SubjectKind, id, status, ct), "The mock signature service reported: " + status + ".");
 
     public Task<IActionResult> OnPostSubmitApprovalAsync(Guid id, CancellationToken ct) => Step(id, ct, async () => await Approvals.SubmitAsync(SubjectKind, id, Comment, ClientRequestId, ct), "Submitted for register authorisation.");
 }

@@ -297,7 +297,7 @@ internal static class LifecycleScenarios3
             await Assert.ThrowsAsync<ResourceNotFoundException>(() => b.As(user, s => s.Get<IVariationService>().CancelAsync(variation, "x")));
             await Assert.ThrowsAsync<ResourceNotFoundException>(() => b.As(user, s => s.Get<IRenewalService>().StartAsync(id, null)));
             await Assert.ThrowsAsync<ResourceNotFoundException>(() => b.As(user, s => s.Get<IRecordUnlockService>().CurrentAsync(id)));
-            await Assert.ThrowsAsync<ResourceNotFoundException>(() => b.As(user, s => s.Get<IExecutionService>().CurrentAsync(SubjectKinds.Contract, id)));
+            await Assert.ThrowsAsync<ResourceNotFoundException>(() => b.As(user, s => s.Get<ISignatureRequestService>().CurrentAsync(SubjectKinds.Contract, id)));
         }
         Assert.Equal("VariationInProgress", await a.StatusAsync(id));
         // The other tenant's queues and dashboards show nothing of this tenant's work.

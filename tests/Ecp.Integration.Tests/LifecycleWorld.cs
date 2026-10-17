@@ -93,8 +93,8 @@ internal sealed class LifecycleWorld
         }
         else await As("ownerPackaging", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(contractId, "ProceedWithoutLegal")));
         await AddDocumentAsync(contractId, "FinalAgreement", "Final agreement");
-        await As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, contractId, "manual"));
-        await As("ownerPackaging", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, contractId, "executed.pdf", "application/pdf", Bytes("executed"))));
+        await As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, contractId, "manual"));
+        await As("ownerPackaging", s => s.Get<ISignatureRequestService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, contractId, "executed.pdf", "application/pdf", Bytes("executed"))));
         return await As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, contractId, "Executed copy attached"));
     }
 
@@ -144,9 +144,9 @@ internal sealed class LifecycleWorld
             return id;
         }
         await AddDocumentAsync(id, "FinalAgreement", "Final agreement");
-        await As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "manual"));
+        await As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "manual"));
         if (state == "OutForSignature") return id;
-        await As("ownerPackaging", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, id, "executed.pdf", "application/pdf", Bytes("executed"))));
+        await As("ownerPackaging", s => s.Get<ISignatureRequestService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, id, "executed.pdf", "application/pdf", Bytes("executed"))));
         var request = await As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, id, "go"));
         if (state == "AwaitingApproval") return id;
         await As("groupHead", s => s.Get<IRegisterAuthorisationService>().ApproveAsync(request, "ok"));
@@ -176,8 +176,8 @@ internal sealed class LifecycleWorld
         var variation = await As("ownerPackaging", s => s.Get<IVariationService>().CreateAsync(contractId, input ?? SimpleVariation()));
         await As("ownerPackaging", s => s.Get<IVariationService>().TransitionAsync(variation, "ProceedWithoutLegal", null));
         await As("ownerPackaging", s => s.Get<IVariationService>().AddDocumentAsync(new AddVariationDocumentRequest(variation, "Final", "Deed of variation", "deed.pdf", "application/pdf", Bytes("deed"))));
-        await As("ownerPackaging", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Variation, variation, "manual"));
-        await As("ownerPackaging", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Variation, variation, "signed.pdf", "application/pdf", Bytes("signed"))));
+        await As("ownerPackaging", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Variation, variation, "manual"));
+        await As("ownerPackaging", s => s.Get<ISignatureRequestService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Variation, variation, "signed.pdf", "application/pdf", Bytes("signed"))));
         var request = await As("ownerPackaging", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Variation, variation, "go"));
         return (variation, request);
     }

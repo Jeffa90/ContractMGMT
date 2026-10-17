@@ -89,7 +89,7 @@ else if (r.Decision is { } d)
         <dt>@L["Start / End"]</dt><dd>@(s.StartDate ?? "-") / @(s.EndDate ?? "-")</dd>
         <dt>@L["Review date"]</dt><dd>@(s.ReviewDate ?? "-")</dd>
         <dt>@L["Legal review"]</dt><dd>@(s.LegalStatus ?? (s.LegalReviewRequired ? "Required" : "Not required")) @if (s.LegalRounds > 0) { <span>(@s.LegalRounds @L["round(s)"]@(s.LegalClearedBy is { } cb ? ", " + L["cleared by"].Value + " " + cb : ""))</span> }</dd>
-        <dt>@L["Execution"]</dt><dd>@(s.ExecutionProvider ?? "-") @(s.EnvelopeId is { } env ? $"· envelope {env}" : "") @(s.ExecutionStatus is { } es ? $"· {es}" : "")</dd>
+        <dt>@L["Execution"]</dt><dd>@(s.ExecutionProvider ?? "-") @(s.ProviderRequestId is { } req ? $"· request {req}" : "") @(s.ExecutionStatus is { } es ? $"· {es}" : "")</dd>
         <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @r.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
         <dt>@L["Workflow"]</dt><dd><code>@s.WorkflowRef</code></dd>
         <dt>@L["Snapshot checksum"]</dt><dd><code>@r.SnapshotSha256</code></dd>

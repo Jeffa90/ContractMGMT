@@ -89,8 +89,9 @@ internal sealed class GuardEvaluator(LifecycleDbContext db, IDocumentQuery docum
                 return g.Command.Inputs?.VariationOutcome is VariationOutcome.Rejected or VariationOutcome.Cancelled ? null : "The Variation has not been rejected or cancelled.";
             case "SignatureVoidedOrDeclined":
                 {
-                    var exec = await db.Executions.AsNoTracking().FirstOrDefaultAsync(x => x.SubjectKind == s.Kind && x.SubjectId == s.Id && x.IsCurrent, ct);
-                    return exec is { Status: ExecutionStatus.Declined or ExecutionStatus.Voided } ? null : "Signing has not been declined or voided, so the document cannot be taken back.";
+                    var exec = await db.SignatureRequests.AsNoTracking().FirstOrDefaultAsync(x => x.SubjectKind == s.Kind && x.SubjectId == s.Id && x.IsCurrent, ct);
+                    // Declined, voided, expired or failed: the request ended without an executed copy, so the document can be taken back to drafting.
+                    return exec is not null && exec.Status.EndedWithoutExecution() ? null : "Signing has not been declined, voided or ended, so the document cannot be taken back.";
                 }
             case "RequiredFieldsPresent":
             case "RequiredDocumentsPresent":

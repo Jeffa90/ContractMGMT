@@ -20,6 +20,8 @@ public sealed class LifecycleOptions
     public EcpMode Mode { get; set; } = EcpMode.Production;
     /// <summary>How recently the person must have signed in to force-unlock a record.</summary>
     public TimeSpan ReauthenticationWindow { get; set; } = TimeSpan.FromMinutes(10);
+    /// <summary>Demo and Test only: the shared key that signs the mock signature provider's callbacks. Unset by default, so mock callbacks are refused until a test or demonstration sets it. Not used in Production.</summary>
+    public string? MockSignatureCallbackKey { get; set; }
 }
 
 /// <summary>A workflow definition as it was published, with the reference a contract is pinned to.</summary>

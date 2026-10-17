@@ -79,7 +79,9 @@ public static class LifecycleModule
         services.AddScoped<LegalReviewService>();
         services.AddScoped<ILegalReviewService>(sp => sp.GetRequiredService<LegalReviewService>());
         services.AddScoped<VisibleContracts>();
-        services.AddScoped<IExecutionService, ExecutionService>();
+        services.AddScoped<SignatureRequestService>();
+        services.AddScoped<ISignatureRequestService>(sp => sp.GetRequiredService<SignatureRequestService>());
+        services.AddScoped<ISignatureEventInbox>(sp => sp.GetRequiredService<SignatureRequestService>());
         services.AddScoped<WorkflowStatusGroups>();
         services.AddScoped<Ecp.Contracts.Register.IStatusGroupProvider, LiveStatusGroup>();
         services.AddScoped<Ecp.Metadata.IWorkflowStateSource, WorkflowStates>();
@@ -103,7 +105,14 @@ public static class LifecycleModule
         services.AddScoped<IVariationService>(sp => sp.GetRequiredService<VariationService>());
         services.AddScoped<IVariationOutcomes>(sp => sp.GetRequiredService<VariationService>());
         services.AddScoped<IRenewalService, RenewalService>();
-        services.TryAddSingleton<IESignatureProviderFactory, ESignatureProviderFactory>();
+        // Signature providers. A future live adapter registers its own provider, status mapper, callback verifier and executed-document retriever here (or in its own module); the lifecycle does not change.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISignatureProvider, ManualSignatureProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISignatureProvider, MockSignatureProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISignatureProvider, UnconnectedSignatureProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IExecutedDocumentRetriever, MockSignatureProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISignatureStatusMapper, MockStatusMapper>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISignatureCallbackVerifier, MockCallbackVerifier>());
+        services.TryAddSingleton<ISignatureProviderFactory, SignatureProviderFactory>();
         return services;
     }
 }

@@ -18,6 +18,7 @@ description: Find business-specific hard-coding (JBS, Medius, DocuSign, Qlik, ro
 5. Run the checklist.
 
 ## Checklist
+- No signature-provider vocabulary (envelope, recipient tabs, signing ceremony, a vendor name) in `src/` outside a provider adapter (ADR-0027); the architecture test `The_signature_boundary_uses_no_signature_vendor_vocabulary_in_any_source_file` enforces it.
 - No state, role, permission, approver-group or terminology literals in domain code; they come from definitions and the catalogue (PRT-013).
 - Terminology aliases apply to labels, notifications, exports and help (PRT-004).
 - Creating fields, forms, rules and workflows changes no schema (PRT-003).

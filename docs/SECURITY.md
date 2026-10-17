@@ -156,7 +156,7 @@ Source files are untrusted. CSV, XLSX and ZIP are read by in-repository code wit
 
 ## 10. Integrations and webhooks
 
-Signature verification (HMAC, timestamp, replay protection via inbox), per-tenant secrets by reference, SSRF-guarded egress, idempotent handlers, no trust in identity fields from callbacks, dead-letter visibility, minimal payloads (`API_AND_WEBHOOKS_SPEC.md`, `ESIGNATURE_DOCUSIGN_SPEC.md`). Reporting access via curated views with per-tenant principals and RLS (`REPORTING_QLIK_SPEC.md`).
+Signature verification (HMAC, timestamp, replay protection via inbox; implemented provider-neutrally in S3 as `HmacCallbackVerifier` and `ISignatureEventInbox`, ADR-0027; no live provider or callback endpoint yet), per-tenant secrets by reference, SSRF-guarded egress, idempotent handlers, no trust in identity fields from callbacks, dead-letter visibility, minimal payloads (`API_AND_WEBHOOKS_SPEC.md`, `ESIGNATURE_PROVIDER_SPEC.md`). Reporting access via curated views with per-tenant principals and RLS (`REPORTING_QLIK_SPEC.md`).
 
 ## 11. Web and API hardening
 

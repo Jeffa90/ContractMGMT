@@ -95,8 +95,8 @@ internal static class LifecycleScenarios2
         var id = await w.NewDraftAsync(legal: false, owner: "dual");
         await w.As("dual", s => s.Get<ILifecycleService>().TransitionAsync(new TransitionRequest(id, "ProceedWithoutLegal")));
         await w.AddDocumentAsync(id, "FinalAgreement", "Final", "dual");
-        await w.As("dual", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "manual"));
-        await w.As("dual", s => s.Get<IExecutionService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, id, "e.pdf", "application/pdf", LifecycleWorld.Bytes("e"))));
+        await w.As("dual", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "manual"));
+        await w.As("dual", s => s.Get<ISignatureRequestService>().RecordExecutedCopyAsync(new RecordExecutedCopyRequest(SubjectKinds.Contract, id, "e.pdf", "application/pdf", LifecycleWorld.Bytes("e"))));
         var request = await w.As("dual", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, id, "go"));
         await Assert.ThrowsAsync<ForbiddenException>(() => w.As("dual", s => s.Get<IRegisterAuthorisationService>().ApproveAsync(request, "me")));
         // Others cannot: another group's approver, Legal, an administrator.
@@ -120,7 +120,7 @@ internal static class LifecycleScenarios2
         Assert.True(detail.SnapshotIntact);
 
         // After the fix it is submitted again; the primary approves. Registered Date is stamped once, in UTC, and is not the start or effective date.
-        await w.As("dual", s => s.Get<IExecutionService>().SendForSignatureAsync(SubjectKinds.Contract, id, "manual"));
+        await w.As("dual", s => s.Get<ISignatureRequestService>().RequestSignatureAsync(SubjectKinds.Contract, id, "manual"));
         var second = await w.As("dual", s => s.Get<IRegisterAuthorisationService>().SubmitAsync(SubjectKinds.Contract, id, "fixed"));
         Assert.NotEqual(request, second);
         w.App.Clock.Advance(TimeSpan.FromHours(3));

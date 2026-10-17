@@ -26,9 +26,19 @@ public sealed record EligibleApprover(Guid UserId, string DisplayName, string Ro
 public sealed record RegisterSnapshot(
     DateTime CapturedUtc, string SubjectKind, string AgreementReference, string Title, string? VariationReference, string Status, string Classification, string SupplierName, string CategoryName,
     string? CurrencyCode, decimal? EstimatedValue, string? StartDate, string? EffectiveDate, string? ReviewDate, string? EndDate, string? ExtensionType, int? NoticePeriodDays, bool CriticalNotice,
-    bool LegalReviewRequired, string? LegalStatus, int LegalRounds, string? LegalClearedBy, DateTime? LegalClearedUtc, string? ExecutionProvider, string? EnvelopeId, string? ExecutionStatus,
+    bool LegalReviewRequired, string? LegalStatus, int LegalRounds, string? LegalClearedBy, DateTime? LegalClearedUtc, string? ExecutionProvider, string? ProviderRequestId, string? ExecutionStatus,
     Guid? ExecutedDocumentId, string? ExecutedFileName, string? ExecutedSha256, string WorkflowRef, string ApproverGroupKey, string SubmittedBy, IReadOnlyList<EligibleApprover> EligibleApprovers,
-    IReadOnlyDictionary<string, string?>? ProposedChanges, IReadOnlyDictionary<string, string?>? CurrentValues);
+    IReadOnlyDictionary<string, string?>? ProposedChanges, IReadOnlyDictionary<string, string?>? CurrentValues)
+{
+    /// <summary>
+    /// Snapshots frozen before the provider-neutral vocabulary carry the provider's request identifier under its old key. They are never rewritten (they are evidence); this property lets them be read, and
+    /// <see cref="WithLegacyNames"/> folds it into <see cref="ProviderRequestId"/>. New snapshots do not write it.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("envelopeId"), System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyRequestId { get; init; }
+
+    public RegisterSnapshot WithLegacyNames() => ProviderRequestId is null && LegacyRequestId is not null ? this with { ProviderRequestId = LegacyRequestId, LegacyRequestId = null } : this;
+}
 
 public sealed record ApprovalDecisionInfo(Guid RequestId, string SubjectKind, ApprovalStatus Status, string SubmittedByName, DateTime SubmittedUtc, string? DecidedByName, string? DecidedAsRole,
     string? OnBehalfOfName, string? Comment, DateTime? DecidedUtc);
@@ -149,7 +159,7 @@ internal sealed partial class RegisterAuthorisationService(
         var s = scope.Subject;
         var details = await contracts.GetAsync(s.ContractId, c);
         var review = await db.LegalReviews.AsNoTracking().FirstOrDefaultAsync(r => r.SubjectKind == s.Kind && r.SubjectId == s.Id, c);
-        var exec = await db.Executions.AsNoTracking().FirstOrDefaultAsync(e => e.SubjectKind == s.Kind && e.SubjectId == s.Id && e.IsCurrent, c);
+        var exec = await db.SignatureRequests.AsNoTracking().FirstOrDefaultAsync(e => e.SubjectKind == s.Kind && e.SubjectId == s.Id && e.IsCurrent, c);
         var executed = await ExecutedDocumentAsync(s, exec?.ExecutedDocumentId, c);
         Dictionary<string, string?>? proposed = null, current = null;
         if (s.IsVariation)
@@ -166,7 +176,7 @@ internal sealed partial class RegisterAuthorisationService(
         return new RegisterSnapshot(scope.NowUtc, s.Kind, details.AgreementReference, s.IsVariation ? s.Variation!.Title : details.Title, s.IsVariation ? s.Variation!.Reference : null, s.Status, s.Classification,
             details.SupplierName, details.CategoryName, details.CurrencyCode, details.EstimatedValue, details.StartDate?.ToString("yyyy-MM-dd"), details.EffectiveDate?.ToString("yyyy-MM-dd"),
             details.ReviewDate?.ToString("yyyy-MM-dd"), details.EndDate?.ToString("yyyy-MM-dd"), details.ExtensionType, s.Contract.NoticePeriodDays, s.Contract.CriticalNotice, s.LegalRequired,
-            review?.Status.ToString(), review?.CurrentRound ?? 0, review?.ClearedBy, review?.ClearedUtc, exec?.Provider, exec?.EnvelopeId, exec?.Status.ToString(), executed?.DocumentId, executed?.FileName, executed?.Sha256,
+            review?.Status.ToString(), review?.CurrentRound ?? 0, review?.ClearedBy, review?.ClearedUtc, exec?.Provider, exec?.ProviderRequestId, exec?.Status.ToString(), executed?.DocumentId, executed?.FileName, executed?.Sha256,
             resolved.WorkflowRef, group, scope.Actor, eligible, proposed, current);
     }
 
@@ -231,7 +241,7 @@ internal sealed partial class RegisterAuthorisationService(
         var descriptor = Approving(await engine.DescribeAsync(subject, null, ct), request);
         // A person who can act on the group sees the request; so does anyone who can read the record. Anyone else gets a 404.
         if (!alreadyAuthorised) await engine.RequireReadAsync(descriptor, ct);
-        var snapshot = JsonSerializer.Deserialize<RegisterSnapshot>(request.SnapshotJson, Json)!;
+        var snapshot = JsonSerializer.Deserialize<RegisterSnapshot>(request.SnapshotJson, Json)!.WithLegacyNames();
         var intact = string.Equals(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.SnapshotJson))).ToLowerInvariant(), request.SnapshotSha256, StringComparison.Ordinal);
         var eligible = JsonSerializer.Deserialize<List<EligibleApprover>>(request.EligibleApproversJson, Json) ?? [];
         var current = await EligibleApproversAsync(request.ApproverGroupKey, ct);

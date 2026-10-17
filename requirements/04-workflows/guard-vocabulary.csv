@@ -15,7 +15,7 @@ ReasonRequired,A non-empty reason is supplied,Request payload,Withdraw; Cancel v
 ControlledFieldChanged,A field marked controlled for Legal was changed after clearance,Change tracking since Legal Cleared,Return to Legal,OPEN (Q-18)
 VariationOutcomeApplied,The Variation reached outcome Applied,Variation record,Apply variation,Approved baseline (DR-2026-10-15)
 VariationOutcomeNotApplied,The Variation reached outcome Rejected or Cancelled,Variation record,Cancel variation,Approved baseline (DR-2026-10-15)
-SignatureVoidedOrDeclined,The e-signature provider reported a declined or voided envelope (verified via inbox),Inbox message with verified signature,Return to drafting,OPEN (Q-18)
+SignatureVoidedOrDeclined,The signature request ended without an executed copy: declined; voided; expired or failed (reported by the provider and verified via the event inbox),Inbox message with verified signature,Return to drafting,OPEN (Q-18)
 RequiredFieldsPresent,All fields marked required for the target state in the published configuration are present,Published form and field definitions,Any transition configured to require fields,Master (Workflow designer: required fields)
 RequiredDocumentsPresent,All document types required for the target state are present,Published workflow definition,Any transition configured to require documents,Master (Workflow designer: required documents)
 ClassificationClearance,Actor's clearance covers the record's classification,Access evaluator,All read and write actions,Master (classification rules)

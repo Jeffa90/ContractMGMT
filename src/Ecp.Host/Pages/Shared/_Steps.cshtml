@@ -86,20 +86,22 @@
         <h2 id="exec-h">@L["Signing"]</h2>
         <dl class="facts">
             <dt>@L["Provider"]</dt><dd>@ex.ProviderLabel @if (ex.IsSimulated) { <span class="badge warn">@L["Simulated"]</span> }</dd>
-            <dt>@L["Status"]</dt><dd>@ex.Status @if (ex.Detail is { Length: > 0 }) { <span class="hint">&mdash; @ex.Detail</span> }</dd>
-            @if (ex.EnvelopeId is { } env) { <dt>@L["Envelope"]</dt><dd><code>@env</code></dd> }
-            <dt>@L["Started"]</dt><dd>@ex.StartedBy, @ex.StartedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-            @if (ex.ExecutedUtc is { } done) { <dt>@L["Executed copy attached"]</dt><dd>@done.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
+            <dt>@L["Status"]</dt><dd>@(ex.Status == SignatureRequestStatus.Sent ? L["Sent for signature"].Value : ex.Status.ToString()) @if (ex.Detail is { Length: > 0 }) { <span class="hint">&mdash; @ex.Detail</span> }</dd>
+            @if (ex.ProviderRequestId is { } req) { <dt>@L["Provider request ID"]</dt><dd><code>@req</code></dd> }
+            @if (ex.ProviderStatus is { Length: > 0 } native) { <dt>@L["Provider status"]</dt><dd>@native</dd> }
+            @if (ex.FailureMessage is { Length: > 0 } failure) { <dt>@L["Problem"]</dt><dd>@failure</dd> }
+            <dt>@L["Requested"]</dt><dd>@ex.RequestedBy, @ex.RequestedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+            @if (ex.CompletedUtc is { } done) { <dt>@L["Executed copy attached"]</dt><dd>@done.ToString("yyyy-MM-dd HH:mm") UTC</dd> }
         </dl>
         <p class="hint">@L["A completed signature never approves, registers or locks the agreement. It only lets the executed copy be submitted for register authorisation."]</p>
-        @if (ex.Status != ExecutionStatus.Completed && v.Steps.Any(s => s.Role is "submitRegister" or "returnToDrafting"))
+        @if (ex.Status != SignatureRequestStatus.Completed && v.Steps.Any(s => s.Role is "submitRegister" or "returnToDrafting"))
         {
             <form method="post" asp-page-handler="ExecutedCopy" enctype="multipart/form-data">
                 <div class="field"><label for="ec">@L["Upload the executed copy"]</label><input id="ec" name="file" type="file" required /></div>
                 <button type="submit" class="secondary">@L["Attach the executed copy"]</button>
             </form>
         }
-        @if (ex.Provider == "mock" && v.IsMockEnvironment && ex.Status != ExecutionStatus.Completed)
+        @if (ex.Provider == "mock" && v.IsMockEnvironment && ex.Status != SignatureRequestStatus.Completed)
         {
             <form method="post" asp-page-handler="Simulate" class="actions">
                 <p class="hint">@L["Mock signature service (demonstration only): report what the service would send."]</p>
@@ -107,6 +109,8 @@
                 <button type="submit" name="status" value="Completed" class="secondary">@L["Completed"]</button>
                 <button type="submit" name="status" value="Declined" class="secondary">@L["Declined"]</button>
                 <button type="submit" name="status" value="Voided" class="secondary">@L["Voided"]</button>
+                <button type="submit" name="status" value="Expired" class="secondary">@L["Expired"]</button>
+                <button type="submit" name="status" value="Failed" class="secondary">@L["Failed"]</button>
             </form>
         }
     </section>

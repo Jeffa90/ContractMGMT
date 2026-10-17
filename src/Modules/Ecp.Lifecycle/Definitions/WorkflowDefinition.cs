@@ -26,7 +26,7 @@ public static class WorkflowVocabulary
         "openVariation", "applyVariation", "rejectVariation", "cancelVariation", "startRenewal", "completeRenewal", "cancelRenewal", "withdraw", "flag", "archive", "cancel"
     ];
 
-    /// <summary>Transitions the generic call refuses because their step has its own data and rules (a Legal round, an approval request, a Variation, a renewal, an envelope).</summary>
+    /// <summary>Transitions the generic call refuses because their step has its own data and rules (a Legal round, an approval request, a Variation, a renewal, a signature request).</summary>
     public static readonly IReadOnlySet<string> ManagedRoles = new HashSet<string>(StringComparer.Ordinal)
     {
         "submitLegal", "recallLegal", "beginLegal", "returnLegal", "clearLegal", "resubmitLegal", "returnToLegal", "sendSignature", "submitRegister", "approve", "reject",

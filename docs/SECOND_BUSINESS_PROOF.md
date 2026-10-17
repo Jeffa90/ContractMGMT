@@ -313,6 +313,10 @@ The review of the code, not of the documents, found these. They are findings, no
 | G9 | Approval matrix judges the resulting value of a change order, not the amount of change | `docs/APPROVAL_MATRIX.md` facts | Document in the pack guide; tier design in 6.7 uses resulting value |
 | G10 | The reference-prefix numbering capability (prefix, pattern) is stated in the portability checklist; the code shows a prefix | `Organisation.ReferencePrefix` | Confirm in S9-0; the pack uses whatever exists |
 
+### 7.1 Readiness review
+
+`docs/S9_READINESS.md` re-checked G1 to G10 against the code and classifies them. In short: **G11 (new), G8 and the country- and ERP-specific part of G1 must be fixed before S9**; G6 and the rest of G1 should be; G2, G3, G4, G5, G7 and G9 can wait; **G10 is closed**. Its corrections to this design (a defects-liability state is replaced by an administrative change order; the notification policy states its content levels explicitly; matrix conditions and views over custom fields only upload once G11 is fixed) take precedence over the text above until they are applied here.
+
 ## 8. Acceptance criteria
 
 S9 passes only when **every** criterion below passes on SQLite locally and on SQL Server in CI. Anything that cannot run is reported NOT VERIFIED and keeps the criterion open. Numbering SBP-AC-nn.

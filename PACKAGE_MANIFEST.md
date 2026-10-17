@@ -54,6 +54,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `docs/PACK_ARCHITECTURE.md`
 - `docs/REPOSITORY_REVIEW.md`
 - `docs/ROLE_CATALOGUE_ADR.md`
+- `docs/S9_READINESS.md`
 - `docs/SECOND_BUSINESS_PROOF.md`
 - `docs/SECURITY.md`
 - `docs/TERMINOLOGY.md`

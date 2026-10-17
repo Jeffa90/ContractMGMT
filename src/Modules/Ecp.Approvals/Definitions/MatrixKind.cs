@@ -23,7 +23,9 @@ internal sealed class ApprovalMatrixKind(
     {
         var (set, messages) = MatrixParser.Parse(contentJson);
         if (set is null) return new ValidationReport(messages);
-        var data = reference is null ? MatrixReferenceData.Empty : await reference.LoadAsync(organisationId, ct);
+        // A pack is checked with no organisation (Guid.Empty): there are no categories, sites or workflows to look up, so the checks that need them are left to the draft for a real organisation.
+        var forPack = organisationId == Guid.Empty;
+        var data = reference is null || forPack ? MatrixReferenceData.Empty : await reference.LoadAsync(organisationId, ct);
         messages.AddRange(MatrixParser.Validate(set, await scales.GetAsync(ct), data));
 
         // A group that nobody holds today is a warning, not an error: people join and leave, and a future-dated rule may name a group whose approvers start later.
@@ -54,11 +56,11 @@ internal sealed class ApprovalMatrixKind(
                     Need(w.RiskLevels.Count > 0, ApprovalFactCatalogue.RiskLevels, "the risk level");
                     Need(w.SupplierTypes.Count > 0, ApprovalFactCatalogue.SupplierTypes, "the supplier type");
                     foreach (var c in w.Custom)
-                        if (!live.CustomKeys.Contains(c.Field)) messages.Add(new ValidationMessage(ValidationSeverity.Error, path, "fact_unavailable", $"The custom field '{c.Field}' is not available to approvals. Publish it as a field that is marked usable in approvals, or remove the condition."));
+                        if (!live.CustomKeys.Contains(c.Field)) messages.Add(new ValidationMessage(ValidationSeverity.Error, path, forPack && ContextDependentCodes.IsCustomKeyShape(c.Field) ? ContextDependentCodes.CustomFactUnavailable : "fact_unavailable", $"The custom field '{c.Field}' is not available to approvals. Publish it as a field that is marked usable in approvals, or remove the condition."));
                 }
         }
 
-        if (references is not null)
+        if (references is not null && !forPack)
             foreach (var code in await references.ReferencedMatrixCodesAsync(organisationId, ct))
                 if (set.Find(code) is null)
                     messages.Add(new ValidationMessage(ValidationSeverity.Error, "$.matrices", "matrix_in_use", $"A workflow still refers to the matrix '{code}'. Change the workflow first, or keep this matrix."));

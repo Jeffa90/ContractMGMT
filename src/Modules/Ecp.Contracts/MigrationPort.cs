@@ -132,7 +132,7 @@ internal sealed class ContractMigrationPort(
         {
             db.Suppliers.Add(supplier);
             try { await db.SaveChangesAsync(c); }
-            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("vendor_number_in_use", "That vendor number is already in use."); }
+            catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("vendor_number_in_use", "That [[supplier.number]] is already in use."); }
             audit.Record(new AuditEntry("migration.supplier.created", nameof(Supplier), supplier.Id.ToString(), OrganisationId: organisationId, MigrationBatchId: batchId,
                 NewValuesJson: AuditJson.Of(new { supplier.Name, supplier.VendorNumber, sourceSystem, sourceRecordId })));
         }, ct);

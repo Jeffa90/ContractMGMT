@@ -24,14 +24,14 @@ internal sealed class ReminderSettings(NotificationsDbContext db, IContractLifec
         var effectiveLead = lead + (facts.CriticalNotice && policy.Reminders.CriticalNotice.Enabled ? policy.Reminders.CriticalNotice.EarlierLeadDays : 0);
         var windows = policy.Reminders.AllowedLeadDays.Where(d => d <= effectiveLead).Append(effectiveLead).Distinct().OrderByDescending(d => d).ToList();
         if (policy.Reminders.ReviewDate && facts.ReviewDate is { } review && (!evergreen || policy.Reminders.Evergreen.KeepReviewDate))
-            schedule.Add("Review Date " + review.ToString("yyyy-MM-dd") + ": " + string.Join(", ", windows.Select(w => review.AddDays(-w).ToString("yyyy-MM-dd"))));
+            schedule.Add("[[field.review.date]] " + review.ToString("yyyy-MM-dd") + ": " + string.Join(", ", windows.Select(w => review.AddDays(-w).ToString("yyyy-MM-dd"))));
         if (policy.Reminders.EndDate && facts.EndDate is { } end && !(evergreen && policy.Reminders.Evergreen.SuppressEndDate))
-            schedule.Add("End Date " + end.ToString("yyyy-MM-dd") + ": " + string.Join(", ", windows.Select(w => end.AddDays(-w).ToString("yyyy-MM-dd"))));
-        if (evergreen && policy.Reminders.Evergreen.SuppressEndDate) schedule.Add("Evergreen: no End Date reminders.");
+            schedule.Add("[[field.end.date]] " + end.ToString("yyyy-MM-dd") + ": " + string.Join(", ", windows.Select(w => end.AddDays(-w).ToString("yyyy-MM-dd"))));
+        if (evergreen && policy.Reminders.Evergreen.SuppressEndDate) schedule.Add("[[field.evergreen]]: no [[field.end.date]] reminders.");
         if (facts.CriticalNotice && policy.Reminders.CriticalNotice.Enabled && facts.NoticePeriodDays is { } notice && (evergreen ? facts.ReviewDate : facts.EndDate) is { } basis)
         {
             var deadline = basis.AddDays(-notice);
-            schedule.Add("Critical Notice deadline " + deadline.ToString("yyyy-MM-dd") + ": " + string.Join(", ", policy.Reminders.CriticalNotice.OffsetsDays.OrderByDescending(d => d).Select(d => deadline.AddDays(-d).ToString("yyyy-MM-dd"))));
+            schedule.Add("[[field.critical.notice]] deadline " + deadline.ToString("yyyy-MM-dd") + ": " + string.Join(", ", policy.Reminders.CriticalNotice.OffsetsDays.OrderByDescending(d => d).Select(d => deadline.AddDays(-d).ToString("yyyy-MM-dd"))));
         }
         var me = currentUser.UserId;
         return new ReminderStatusInfo(lead, facts.ReminderLeadDays is null, policy.Reminders.AllowedLeadDays, facts.NoticePeriodDays, facts.CriticalNotice, evergreen, tracking?.LastReminderSentUtc, tracking?.LastReminderKind,

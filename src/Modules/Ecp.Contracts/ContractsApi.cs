@@ -98,7 +98,7 @@ internal sealed class SupplierService(ContractsDbContext db, IUnitOfWork uow, IA
             db.Suppliers.Add(supplier);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex))
-            { throw new DomainException("vendor_number_in_use", "That vendor number is already in use."); }
+            { throw new DomainException("vendor_number_in_use", "That [[supplier.number]] is already in use."); }
             audit.Record(new AuditEntry("supplier.created", nameof(Supplier), supplier.Id.ToString(), OrganisationId: supplier.OrganisationId,
                 NewValuesJson: AuditJson.Of(new { supplier.Name })));
             return supplier.Id;

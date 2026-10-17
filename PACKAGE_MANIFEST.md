@@ -38,6 +38,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0028-configurable-terminology.md`
 - `decisions/ADR-0029-stable-role-and-permission-identifiers.md`
 - `decisions/ADR-0030-configurable-capabilities.md`
+- `decisions/ADR-0031-pack-validation-of-organisation-dependent-documents.md`
 - `docs/ARCHITECTURE.md`
 - `docs/CAPABILITIES.md`
 - `docs/DOCUMENT_INDEX.md`

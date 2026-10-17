@@ -96,8 +96,8 @@ The pack format has the content kind `Capabilities` (stored in the package under
 
 | Pack (version) | Legal Review | Register Authorisation | Variations | Renewals | Signature Requests |
 |---|---|---|---|---|---|
-| Blank (1.4.0) | off | on | on | off | off |
-| Reference (2.4.0) | on | on | on | on | on |
+| Blank (1.5.0) | off | on | on | off | off |
+| Reference (2.5.0) | on | on | on | on | on |
 | No pack document, or an organisation with no pack and no installation default | on | on | on | on | on |
 
 The Blank defaults match the Blank lifecycle, which has amendments but no Legal, signature or renewal step. They are not a statement about any business; they describe what that starting lifecycle uses.

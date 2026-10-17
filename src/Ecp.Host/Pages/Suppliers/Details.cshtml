@@ -3,9 +3,9 @@
 @{ ViewData["Title"] = Model.Supplier.Name; }
 <h1>@Model.Supplier.Name</h1>
 <dl class="facts card">
-    <dt>@L["Vendor number"]</dt><dd>@(Model.Supplier.VendorNumber ?? "-")</dd>
-    <dt>@L["ABN"]</dt><dd>@(Model.Supplier.Abn ?? "-")</dd>
-    <dt>@L["Status"]</dt><dd>@Model.Supplier.Status</dd>
+    <dt>@L["[[supplier.number]]"]</dt><dd>@(Model.Supplier.VendorNumber ?? "-")</dd>
+    <dt>@L["[[supplier.tax.id]]"]</dt><dd>@(Model.Supplier.Abn ?? "-")</dd>
+    <dt>@L["[[field.status]]"]</dt><dd>@Model.Supplier.Status</dd>
 </dl>
 <h2>@L["[[contract|plural]] you can see for this [[supplier|lower]]"]</h2>
 <div class="table-wrap">

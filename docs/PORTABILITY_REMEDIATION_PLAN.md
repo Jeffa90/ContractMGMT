@@ -155,7 +155,7 @@ Each slice is shippable on its own, leaves the JBS pack behaving exactly as toda
 | S6 | R9 feature flags that gate (CFG-02) | S4 | A pack without Legal review installs and runs; JBS unchanged. **Done 2026-10-17 (section 8.14, ADR-0030): a business can operate with Legal Review, Register Authorisation, Variations, Renewals and Signature Requests all off.** |
 | S7 | R7 pack loader and store (CFG-04, PKM-01); remove embedded JBS resources; R4 stage C | S1, S5, S6 | A pack installs from the store with no rebuild; the three `.csproj` embeds are gone. **Done 2026-10-17 for S7a to S7c plus the Pack Manager, setup and onboarding integration (section 8.10); S7d to S7f are future.** The order dependency on S5 and S6 was waived by the owner's instruction. |
 | S8 | R8 step 2: implement the ADR | S5, S7 | **Retired 2026-10-17, superseded by S4 (ADR-0028) and ADR-0029.** The accepted decision needs no rename; its follow-ups were delivered in section 8.13. |
-| S9 | R11: second pack (PKM-04) with PRT-002, PRT-004, PRT-013 end-to-end | S1 to S8 | PRT-002 passes. **Designed 2026-10-17, not built: `docs/SECOND_BUSINESS_PROOF.md` (construction subcontracts; 19 acceptance criteria). Readiness review: `docs/S9_READINESS.md` (three must-fix items before S9 starts)** |
+| S9 | R11: second pack (PKM-04) with PRT-002, PRT-004, PRT-013 end-to-end | S1 to S8 | PRT-002 passes. **Designed 2026-10-17, not built: `docs/SECOND_BUSINESS_PROOF.md` (construction subcontracts; 19 acceptance criteria). Readiness review: `docs/S9_READINESS.md`; its prerequisites (G11, smoke test, G1a, G1b, locale probe) are implemented (section 8.15), so S9 has no known blocker** |
 | S10 | R10 cleanup (neutral fall-backs; validation as rule; field relocation only if justified) | any | Section 6.3 |
 
 Why this order and not another:
@@ -413,6 +413,19 @@ Delivered on the owner's S6 instruction. Design and matrix in `docs/CAPABILITIES
 **Found while testing, fixed:** the first version resolved the configuration service from the resolver's constructor and made the kind graph circular (the test host crashed); the resolver now resolves its services on first use.
 
 **Not done, by design:** capabilities beyond the five (category ownership, critical notice, external reporting; Future), hiding pages by direct address (work in flight must stay reachable), reporting, DocuSign, operations, API work, AI, marketplace, role renaming. **First incomplete remediation task after S6:** S9 (second pack end to end), then S10 (regional defaults).
+
+### 8.15 S9 readiness prerequisites (owner decisions D1 to D4; `docs/S9_READINESS.md` section 13)
+
+Implemented on the owner's instruction of 2026-10-17, in the order given. S9 has not started.
+
+* **G11 generic pack-validation fix (Implemented).** `ContextDependentCodes` (a closed list), `ClassificationScaleOverride`, the matrix and view kinds' pack-time handling, `PackKinds.Prerequisites` and the "waits" outcome of a pack assignment.
+* **Content-kind smoke test (Implemented).** `tests/Ecp.Integration.Tests/PackKindSmokeScenarios.cs`: every packable kind end to end; dependency order enforced; narrowness kept.
+* **G1a and G1b (Implemented).** 31 terminology keys (73 in the catalogue); `CoreFields.All`, pages, reminders, dashboards, Variation labels and messages read them; Blank 1.5.0 and reference pack 2.5.0.
+* **Locale probe (Implemented).** `tests/Ecp.Api.Tests/LocaleProbeUiTests.cs`; one leak fixed (Audit page).
+* **Small owner items (Implemented).** "Approval Authority"; the onboarding warning prints a label.
+* **Decisions recorded:** `CONFIRMED_DECISIONS.md` D8 (D1 Administrative Change Order instead of a role-less state; D2; D3; D4 G2 deferred to S10; S8 retired; permanent identifiers; Harborline Construction, `construction-subcontracts`, en-US, USD, America/Chicago; first-class pack; sell-side Professional Services next).
+
+**Not done, by design:** S9 itself (the Construction Subcontracts pack, its tests and the PRT-002, PRT-004 and PRT-013 sweeps), G2 (S10), R-01, R-02, R-04. **First incomplete remediation task:** S9, then S10.
 
 ## 9. Open decisions for the owner
 

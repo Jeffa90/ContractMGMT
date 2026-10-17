@@ -330,6 +330,66 @@ public sealed class TerminologyUiTests
         Assert.DoesNotMatch("(?i)jbs|procurement", Regex.Replace(suppliers, "<title>.*?</title>", ""));
     }
 
+    [Fact]
+    public async Task Contract_and_supplier_field_labels_follow_the_organisations_words_and_name_no_country_or_ERP_product_unless_the_pack_does()
+    {
+        using var app = DemoApp.Start();
+        var (tenant, jbsOrg) = await TenantAsync(app, "Demo Procurement Group");
+        var (_, blankOrg) = await TenantAsync(app, "Demo Facilities Organisation");
+
+        // The reference business keeps today's words.
+        using var jbs = await app.SignInAsync(ProcAdmin, followRedirects: true);
+        var jbsSupplier = await BodyAsync(jbs, "/Suppliers/Create");
+        Assert.Contains(">ABN<", jbsSupplier);
+        Assert.Contains("Vendor Number", jbsSupplier);
+        var jbsContract = await BodyAsync(jbs, $"/Contracts/Create?organisationId={jbsOrg}");
+        Assert.Contains("SAP Outline Agreement Number", jbsContract);
+        Assert.Contains("Start date", jbsContract);
+
+        // A neutral organisation sees no Australian identifier and no ERP product anywhere on these pages.
+        var blankAdmin = await UserInAsync(app, tenant, blankOrg, RoleCodes.ProcurementAdministrator, null, "Confidential");
+        using var blank = await app.SignInAsync(blankAdmin, followRedirects: true);
+        foreach (var url in new[] { "/Suppliers/Create", "/Suppliers", $"/Contracts/Create?organisationId={blankOrg}", "/Contracts" })
+        {
+            var response = await blank.GetAsync(url);
+            if (response.StatusCode == HttpStatusCode.Forbidden) continue;
+            var page = Regex.Replace(await response.Content.ReadAsStringAsync(), "<script.*?</script>", "", RegexOptions.Singleline);
+            Assert.DoesNotMatch(@"\bABN\b|\bSAP\b", page);
+        }
+        Assert.Contains("Tax Identifier", await BodyAsync(blank, "/Suppliers/Create"));
+
+        // A pack the repository has never seen renames the dates, the risk label, the identifiers and a group heading, and every page and the export follow with no source change.
+        var key = "labels-" + Guid.NewGuid().ToString("N")[..6];
+        var package = PackTestKit.Build(key, "1.0.0", content: Content(out var docs), extraDocuments: docs);
+        var (_, tenantAdminId) = await app.FindUserAsync(TenantAdmin);
+        var orgId = await app.WithTenantAsync(tenant, async sp =>
+        {
+            sp.GetRequiredService<CurrentUser>().Set(tenantAdminId);
+            var up = await sp.GetRequiredService<IPackManager>().UploadAsync(new MemoryStream(package), "p.ecpkg");
+            Assert.True(up.Report.CanInstall, string.Join("; ", up.Report.Issues.Select(i => i.Message)));
+            await sp.GetRequiredService<IPackManager>().InstallAsync(up.Token);
+            var created = await sp.GetRequiredService<ITenantProvisioningService>().AddOrganisationAsync(new AddOrganisationRequest("Label Business", "America/Chicago", "en-US", "USD", "LBL", key));
+            await sp.GetRequiredService<IPackAssignments>().AssignAsync(created, key, "1.0.0");
+            return created;
+        });
+        var admin = await UserInAsync(app, tenant, orgId, RoleCodes.ProcurementAdministrator, null, "Confidential");
+        using var client = await app.SignInAsync(admin, followRedirects: true);
+        var supplierForm = await BodyAsync(client, "/Suppliers/Create");
+        Assert.Contains("Company Registration", supplierForm);
+        Assert.Contains("Account Code", supplierForm);
+        Assert.DoesNotMatch(@"\bABN\b|Tax Identifier|Vendor Number", supplierForm);
+        var register = await client.GetAsync("/Contracts");
+        if (register.StatusCode == HttpStatusCode.OK)
+        {
+            var body = await register.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("End Date", body);
+        }
+        var csv = await (await ExportAsync(client, orgId, "csv")).Content.ReadAsStringAsync();
+        var header = csv.Split('\n')[0];
+        Assert.Contains("Scheduled Completion Date", header);
+        Assert.DoesNotMatch(@"\bEnd Date\b|\bStart Date\b|\bABN\b|\bSAP\b", header);
+    }
+
     // ---- exports, onboarding, stable identifiers ----
 
     private static async Task<HttpResponseMessage> ExportAsync(HttpClient client, Guid org, string format)

@@ -46,33 +46,33 @@
         @foreach (var s in o.Sites.Where(x => x.IsActive || x.Id == i.SiteId)) { <option value="@s.Id" selected="@(s.Id == i.SiteId)">@s.Name</option> }
     </select>
 </div>
-<div class="field"><label for="Input_SapOutlineAgreementNumber">@L["SAP outline [[agreement|lower]] number"]</label><input id="Input_SapOutlineAgreementNumber" name="Input.SapOutlineAgreementNumber" type="text" maxlength="100" value="@i.SapOutlineAgreementNumber" /></div>
-<div class="field"><label for="Input_CurrencyCode">@L["Currency"]</label><input id="Input_CurrencyCode" name="Input.CurrencyCode" type="text" maxlength="3" value="@i.CurrencyCode" aria-describedby="cur-hint" /><p id="cur-hint" class="hint">@L["Three-letter ISO 4217 code, for example EUR."]</p></div>
-<div class="field"><label for="Input_EstimatedValue">@L["Estimated [[agreement|lower]] value"]</label><input id="Input_EstimatedValue" name="Input.EstimatedValue" type="text" inputmode="decimal" value="@i.EstimatedValue" aria-describedby="val-hint" /><p id="val-hint" class="hint">@L["Digits with an optional decimal point, for example 125000.50."]</p></div>
+<div class="field"><label for="Input_SapOutlineAgreementNumber">@L["[[erp.reference]]"]</label><input id="Input_SapOutlineAgreementNumber" name="Input.SapOutlineAgreementNumber" type="text" maxlength="100" value="@i.SapOutlineAgreementNumber" /></div>
+<div class="field"><label for="Input_CurrencyCode">@L["[[field.currency|sentence]]"]</label><input id="Input_CurrencyCode" name="Input.CurrencyCode" type="text" maxlength="3" value="@i.CurrencyCode" aria-describedby="cur-hint" /><p id="cur-hint" class="hint">@L["Three-letter ISO 4217 code, for example EUR."]</p></div>
+<div class="field"><label for="Input_EstimatedValue">@L["[[field.estimated.value|sentence]]"]</label><input id="Input_EstimatedValue" name="Input.EstimatedValue" type="text" inputmode="decimal" value="@i.EstimatedValue" aria-describedby="val-hint" /><p id="val-hint" class="hint">@L["Digits with an optional decimal point, for example 125000.50."]</p></div>
 <div class="field">
-    <label for="Input_ExtensionType">@L["Extension type"]</label>
+    <label for="Input_ExtensionType">@L["[[field.extension.type|sentence]]"]</label>
     <select id="Input_ExtensionType" name="Input.ExtensionType">
         <option value="">@L["Not set"]</option>
         @foreach (var x in o.ExtensionTypes) { <option value="@x" selected="@string.Equals(x, i.ExtensionType, StringComparison.OrdinalIgnoreCase)">@x</option> }
         @if (!string.IsNullOrEmpty(i.ExtensionType) && o.ExtensionTypes.All(x => !string.Equals(x, i.ExtensionType, StringComparison.OrdinalIgnoreCase))) { <option value="@i.ExtensionType" selected>@i.ExtensionType</option> }
     </select>
-    <p class="hint">@L["Evergreen [[agreement|plural|lower]] have no End Date to expire."]</p>
+    <p class="hint">@L["[[field.evergreen]] [[agreement|plural|lower]] have no [[field.end.date]] to expire."]</p>
 </div>
-<div class="field"><label for="Input_StartDate">@L["Start date"]</label><input id="Input_StartDate" name="Input.StartDate" type="date" value="@i.StartDate" /></div>
-<div class="field"><label for="Input_EffectiveDate">@L["Effective date"]</label><input id="Input_EffectiveDate" name="Input.EffectiveDate" type="date" value="@i.EffectiveDate" /></div>
-<div class="field"><label for="Input_ReviewDate">@L["Review date"]</label><input id="Input_ReviewDate" name="Input.ReviewDate" type="date" value="@i.ReviewDate" /></div>
-<div class="field"><label for="Input_EndDate">@L["End date"]</label><input id="Input_EndDate" name="Input.EndDate" type="date" value="@i.EndDate" /></div>
+<div class="field"><label for="Input_StartDate">@L["[[field.start.date|sentence]]"]</label><input id="Input_StartDate" name="Input.StartDate" type="date" value="@i.StartDate" /></div>
+<div class="field"><label for="Input_EffectiveDate">@L["[[field.effective.date|sentence]]"]</label><input id="Input_EffectiveDate" name="Input.EffectiveDate" type="date" value="@i.EffectiveDate" /></div>
+<div class="field"><label for="Input_ReviewDate">@L["[[field.review.date|sentence]]"]</label><input id="Input_ReviewDate" name="Input.ReviewDate" type="date" value="@i.ReviewDate" /></div>
+<div class="field"><label for="Input_EndDate">@L["[[field.end.date|sentence]]"]</label><input id="Input_EndDate" name="Input.EndDate" type="date" value="@i.EndDate" /></div>
 <fieldset class="field">
-    <legend>@L["Notice period"]</legend>
-    <label for="Input_NoticePeriodValue" class="visually-hidden">@L["Notice period length"]</label>
+    <legend>@L["[[field.notice.period|sentence]]"]</legend>
+    <label for="Input_NoticePeriodValue" class="visually-hidden">@L["[[field.notice.period|sentence]] length"]</label>
     <input id="Input_NoticePeriodValue" name="Input.NoticePeriodValue" type="text" inputmode="numeric" maxlength="5" value="@i.NoticePeriodValue" />
-    <label for="Input_NoticePeriodUnit" class="visually-hidden">@L["Notice period unit"]</label>
+    <label for="Input_NoticePeriodUnit" class="visually-hidden">@L["[[field.notice.period|sentence]] unit"]</label>
     <select id="Input_NoticePeriodUnit" name="Input.NoticePeriodUnit">
         <option value="">@L["Not set"]</option>
         @foreach (var u in Ecp.Contracts.Domain.NoticePeriods.Units) { <option value="@u" selected="@string.Equals(u, i.NoticePeriodUnit, StringComparison.OrdinalIgnoreCase)">@L[u]</option> }
     </select>
     <p class="hint">@L["Give both the length and the unit, or neither."]</p>
 </fieldset>
-<div class="field"><label><input type="checkbox" name="Input.CriticalNotice" value="true" checked="@i.CriticalNotice" /> @L["Critical Notice"]</label><input type="hidden" name="Input.CriticalNotice" value="false" /></div>
+<div class="field"><label><input type="checkbox" name="Input.CriticalNotice" value="true" checked="@i.CriticalNotice" /> @L["[[field.critical.notice]]"]</label><input type="hidden" name="Input.CriticalNotice" value="false" /></div>
 @if (Terms.Uses(CapabilityKeys.LegalReview)) { <div class="field"><label><input type="checkbox" name="Input.LegalReviewRequired" value="true" checked="@i.LegalReviewRequired" /> @L["[[legal.review|sentence]] required"]</label><input type="hidden" name="Input.LegalReviewRequired" value="false" /></div> }
 else { <input type="hidden" name="Input.LegalReviewRequired" value="@(i.LegalReviewRequired ? "true" : "false")" /> }

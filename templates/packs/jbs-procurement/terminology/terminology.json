@@ -59,6 +59,34 @@
       "description": "The date a contract was registered (stamped when registration is approved)."
     },
     {
+      "key": "supplier.number",
+      "locale": "en",
+      "singular": "Vendor Number",
+      "plural": "Vendor Number",
+      "description": "The supplier's identifier in the organisation's purchasing or finance system."
+    },
+    {
+      "key": "supplier.tax.id",
+      "locale": "en",
+      "singular": "ABN",
+      "plural": "ABN",
+      "description": "The supplier's Australian Business Number. The format check built in today is eleven digits."
+    },
+    {
+      "key": "erp.reference",
+      "locale": "en",
+      "singular": "SAP Outline Agreement Number",
+      "plural": "SAP Outline Agreement Number",
+      "description": "The reference of the contract in SAP."
+    },
+    {
+      "key": "field.estimated.value",
+      "locale": "en",
+      "singular": "Estimated Agreement Value",
+      "plural": "Estimated Agreement Value",
+      "description": "The estimated value of an agreement."
+    },
+    {
       "key": "executed.document",
       "locale": "en",
       "singular": "Executed Copy",

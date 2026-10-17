@@ -472,6 +472,20 @@ Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors, locke
 
 A first local run hung and then crashed the test host: the resolver resolved the configuration service in its constructor and made the dependency graph circular. It resolves its services on first use now; no test depends on the order.
 
+### 9.3 S9 readiness prerequisites (G11, G8, G1a, G1b, G6; owner decisions D1 to D4)
+
+| Area | Tests |
+|---|---|
+| Every packable kind from one pack | `tests/Ecp.Integration.Tests/PackKindSmokeScenarios.cs` (3 scenarios on SQLite, 3 SQL Server wrappers): `All_kinds` builds a throw-away pack with a document per packable kind (a matrix condition on a custom field, a view over a custom field, a four-level classification with no privileged level, branding, capabilities), uploads, installs, assigns, publishes in dependency order and creates a contract; the assignment reports "waits" (not a problem) for drafts that depend on unpublished ones; `Order`: judged for the real organisation, a dependent draft is refused until its prerequisite is published (`fact_unavailable`, `column_unavailable`, `filter_unavailable`, `matrix_missing`); `Narrow`: a typo'd core column, a bad type and a bad date are still refused at upload |
+| Label keys | `tests/Ecp.UnitTests/TerminologyTests.cs` (+2): every core field label and group is made only of catalogue tokens and four structural words; the 31 keys are optional; the neutral wording names no country, tax authority or ERP product |
+| Labels through the real host | `tests/Ecp.Api.Tests/TerminologyUiTests.cs` (+1): the reference organisation keeps ABN and SAP wording; a neutral organisation's supplier, contract and register pages contain neither; a pack the repository has never seen renames the identifiers, dates and a group heading and the supplier form and export header follow |
+| Neutral approver label, onboarding warning | `TerminologyTests`, `TerminologyScenarios` ("Approval Authority"); `OnboardingValidatorTests.The_privileged_mapping_warning_names_the_role_by_its_label_not_its_stable_code` (+1) |
+| Locale probe | `tests/Ecp.Api.Tests/LocaleProbeUiTests.cs` (1): an en-US, USD, America/Chicago organisation with two sites in two zones, a critical-notice contract and an export; 27 page addresses scanned for AUD, Brisbane, Sydney, Melbourne, `A$` and day-first dates; at least 15 must render; US number grouping on the contract page |
+
+Result (2026-10-17, workspace, no SQL Server, Release, warnings as errors): unit 698, architecture 71, API 103, integration 234 on SQLite: **1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED** (the SQL Server wrappers; 3 are new). `tools/check-repo.py` and `tools/check-packs.sh` pass (Blank 1.5.0 and reference pack 2.5.0 rebuild reproducibly). CI result: `deploy/STATUS.md`.
+
+Found by the tests and fixed: the first smoke run showed a valid pack refused at upload four ways and every organisation-dependent draft reported as a problem at assignment (see `docs/S9_READINESS.md` section 13); the locale probe found the Audit page formatting with the installation default.
+
 ## 10. Security regression suite (`Category=Security`)
 
 | ID | Test |

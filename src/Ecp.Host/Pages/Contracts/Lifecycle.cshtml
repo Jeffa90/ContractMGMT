@@ -3,7 +3,7 @@
 @{ ViewData["Title"] = L["Lifecycle"].Value + " " + Model.Contract.AgreementReference; var c = Model.Contract; }
 <h1>@L["Lifecycle"]: @c.Title</h1>
 <p><a class="badge" href="/Contracts/Details/@c.Id">@c.AgreementReference</a> <span class="badge">@Model.State.StatusDisplay</span> <span class="badge">@c.Classification</span>
-@if (Model.State.Locked) { <span class="badge warn">@L["Locked"]</span> }
+@if (Model.State.Locked) { <span class="badge warn">@L["[[field.locked|sentence]]"]</span> }
 @if (Model.State.ContentFrozen) { <span class="badge warn">@L["Content frozen at this stage"]</span> }</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 

@@ -3,7 +3,7 @@
 @{ ViewData["Title"] = L["Emergency unlock"].Value; var c = Model.Contract; }
 <h1>@L["Emergency unlock"]: @c.Title</h1>
 <p><a class="badge" href="/Contracts/Details/@c.Id">@c.AgreementReference</a> <span class="badge">@c.Status</span>
-   @if (c.RecordLocked) { <span class="badge warn">@L["Locked"]</span> }</p>
+   @if (c.RecordLocked) { <span class="badge warn">@L["[[field.locked|sentence]]"]</span> }</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 <p class="lede">@L["An Effective [[agreement|lower]] changes through [[variation|a]]. An emergency unlock is the audited exception: it needs the permission, a recent sign-in, a written reason and a time limit, opens only the fields you name, and records every change. It never changes the status, the [[registered.date]] or the original [[approval|lower]]."]</p>
 

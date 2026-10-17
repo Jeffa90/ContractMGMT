@@ -33,26 +33,26 @@
     <dt>@L["[[organisation]]"]</dt><dd>@Model.OrganisationName</dd>
     <dt>@L["[[business.unit|sentence]]"]</dt><dd>@(Model.BusinessUnitName ?? "-")</dd>
     <dt>@L["[[site]]"]</dt><dd>@(Model.SiteName ?? "-")</dd>
-    <dt>@L["Estimated value"]</dt><dd>@(Model.Value ?? "-")</dd>
-    <dt>@L["Start date"]</dt><dd>@(Model.Start ?? "-")</dd>
-    <dt>@L["End date"]</dt><dd>@(Model.End ?? "-")</dd>
+    <dt>@L["[[field.estimated.value|sentence]]"]</dt><dd>@(Model.Value ?? "-")</dd>
+    <dt>@L["[[field.start.date|sentence]]"]</dt><dd>@(Model.Start ?? "-")</dd>
+    <dt>@L["[[field.end.date|sentence]]"]</dt><dd>@(Model.End ?? "-")</dd>
     <dt>@L["Registered"]</dt><dd>@(Model.Registered ?? L["Not yet registered"].Value)</dd>
-    <dt>@L["Created"]</dt><dd>@Model.Created @L["by"] @Model.Contract.CreatedBy</dd>
+    <dt>@L["[[field.created]]"]</dt><dd>@Model.Created @L["by"] @Model.Contract.CreatedBy</dd>
     @if (Model.Contract.Classifiers is { } cl)
     {
         <dt>@L["[[legal.entity|sentence]]"]</dt><dd>@(Model.LegalEntityName ?? "-")</dd>
         <dt>@L["[[contract.type|sentence]]"]</dt><dd>@(cl.ContractType ?? "-")</dd>
         <dt>@L["[[agreement]] type"]</dt><dd>@(cl.AgreementType ?? "-")</dd>
-        <dt>@L["Risk level"]</dt><dd>@(cl.RiskLevel ?? "-")</dd>
-        <dt>@L["Function"]</dt><dd>@(cl.FunctionCode ?? "-")</dd>
-        <dt>@L["SAP outline [[agreement|lower]] number"]</dt><dd>@(cl.SapOutlineAgreementNumber ?? "-")</dd>
+        <dt>@L["[[field.risk.level|sentence]]"]</dt><dd>@(cl.RiskLevel ?? "-")</dd>
+        <dt>@L["[[field.function|sentence]]"]</dt><dd>@(cl.FunctionCode ?? "-")</dd>
+        <dt>@L["[[erp.reference]]"]</dt><dd>@(cl.SapOutlineAgreementNumber ?? "-")</dd>
         <dt>@L["[[supplier]] type"]</dt><dd>@(cl.SupplierType ?? "-")</dd>
-        <dt>@L["[[supplier]] ABN"]</dt><dd>@(cl.SupplierAbn ?? "-")</dd>
-        <dt>@L["[[supplier]] vendor number"]</dt><dd>@(cl.SupplierVendorNumber ?? "-")</dd>
+        <dt>@L["[[supplier]] [[supplier.tax.id]]"]</dt><dd>@(cl.SupplierAbn ?? "-")</dd>
+        <dt>@L["[[supplier]] [[supplier.number]]"]</dt><dd>@(cl.SupplierVendorNumber ?? "-")</dd>
     }
-    <dt>@L["Extension type"]</dt><dd>@(Model.Contract.ExtensionType ?? "-")</dd>
-    <dt>@L["Effective date"]</dt><dd>@(Model.Contract.EffectiveDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
-    <dt>@L["Review date"]</dt><dd>@(Model.Contract.ReviewDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
+    <dt>@L["[[field.extension.type|sentence]]"]</dt><dd>@(Model.Contract.ExtensionType ?? "-")</dd>
+    <dt>@L["[[field.effective.date|sentence]]"]</dt><dd>@(Model.Contract.EffectiveDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
+    <dt>@L["[[field.review.date|sentence]]"]</dt><dd>@(Model.Contract.ReviewDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
     @if (Terms.Uses(CapabilityKeys.LegalReview) || Model.Review is not null) { <dt>@L["[[legal.review|sentence]] required"]</dt><dd>@(Model.Contract.LegalReviewRequired ? L["Yes"] : L["No"])</dd> }
 </dl>
 @if (Model.Fields is { } extra && extra.Fields.Count > 0)
@@ -64,7 +64,7 @@
 {
     <div class="flash warn" role="status"><strong>@L["Archived."]</strong> @Model.Contract.ArchiveReason</div>
 }
-@if (Model.Contract.Description is { Length: > 0 }) { <h2>@L["Description"]</h2><p>@Model.Contract.Description</p> }
+@if (Model.Contract.Description is { Length: > 0 }) { <h2>@L["[[field.description]]"]</h2><p>@Model.Contract.Description</p> }
 
 @if (Model.Changes.Count > 0)
 {
@@ -134,7 +134,7 @@
 <section class="card">
     <dl class="facts">
         <dt>@L["Lead time"]</dt><dd>@Model.Reminder.LeadDays @L["days"] @if (Model.Reminder.LeadIsDefault) { <span class="hint">(@L["the [[organisation|lower]]'s default"])</span> }</dd>
-        <dt>@L["Notice period"]</dt><dd>@(Model.Reminder.NoticePeriodDays is { } np ? np + " " + L["days"].Value : "-") @if (Model.Reminder.CriticalNotice) { <span class="badge warn">@L["Critical Notice"]</span> } @if (Model.Reminder.Evergreen) { <span class="badge">@L["Evergreen"]</span> }</dd>
+        <dt>@L["[[field.notice.period|sentence]]"]</dt><dd>@(Model.Reminder.NoticePeriodDays is { } np ? np + " " + L["days"].Value : "-") @if (Model.Reminder.CriticalNotice) { <span class="badge warn">@L["[[field.critical.notice]]"]</span> } @if (Model.Reminder.Evergreen) { <span class="badge">@L["Evergreen"]</span> }</dd>
         <dt>@L["Last reminder"]</dt><dd>@(Model.Reminder.LastReminderSentUtc is { } lr ? lr.ToString("yyyy-MM-dd HH:mm") + " UTC (" + Model.Reminder.LastReminderKind + ", " + Model.Reminder.LastWindowDays + " " + L["day window"].Value + ")" : L["None sent yet"].Value)</dd>
         @if (Model.Reminder.LastReminderSentUtc is not null)
         {

@@ -10,4 +10,16 @@ public static class PackKinds
     [
         "WorkflowContractLifecycle", "WorkflowVariation", "NotificationPolicy", "ApprovalMatrix", "ClassificationPolicy", "CustomField", "ContractListView", "Branding", "Terminology", "Capabilities"
     ];
+
+    /// <summary>
+    /// What a kind's document is judged against, by kind: an organisation can only publish a document of the key once these have been published. A closed table in the platform's vocabulary (not a rule engine):
+    /// it lets a pack assignment tell "this draft waits for the drafts it depends on" from "this draft has a problem".
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Prerequisites = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+    {
+        ["ApprovalMatrix"] = ["CustomField"],
+        ["ContractListView"] = ["CustomField"],
+        ["WorkflowContractLifecycle"] = ["ApprovalMatrix", "CustomField"],
+        ["WorkflowVariation"] = ["ApprovalMatrix", "CustomField"],
+    };
 }

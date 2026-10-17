@@ -110,6 +110,7 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| Workspace after the S9 readiness prerequisites, no SQL Server: unit 698, architecture 71, API 103, integration on SQLite 234 | 1,106 | 0 | 0 | 233 (the SQL Server wrappers, including 3 new smoke-test wrappers) |
 | Workspace after S6, no SQL Server: unit 695, architecture 71, API 101, integration on SQLite 231 | 1,098 | 0 | 0 | 230 (the SQL Server wrappers, including 11 new capability wrappers) |
 | Workspace after S5, no SQL Server: unit 655, architecture 64, API 95, integration on SQLite 220 | 1,034 | 0 | 0 | 219 (the SQL Server wrappers, including 1 new group-and-role wrapper) |
 | Workspace after S4, no SQL Server: unit 629, architecture 64, API 93, integration on SQLite 219 | 1,005 | 0 | 0 | 218 (the SQL Server wrappers, including 9 new terminology wrappers) |
@@ -215,9 +216,9 @@ Remaining high-severity portability violation: **none** from the original audit 
 | PRT-001 static scan | Partly verified: ARC-010 passes with every spelling in C#; no business or vendor name in `src` C#; the only `jbs-procurement` text in `src` is two project-file embedding lines (P-03) |
 | PRT-002 a second business | **NOT VERIFIED** as a whole. Its first step passes on SQLite and SQL Server: a Blank organisation gets its own states, Variation workflow, notification policy and reminder behaviour and opens a Variation, and no JBS state or reminder recipient appears |
 | PRT-003 no schema change per field | Verified |
-| PRT-004 terminology aliases | **NOT VERIFIED** (not built) |
+| PRT-004 terminology aliases | **Implemented, tick pending S9.** Terminology (S4) covers business nouns; the S9 readiness work (G1a, G1b) made every contract-field and supplier label a key (73 keys). Enforced by a unit test and a render and export test. Ticked only when the S9 sweep passes |
 | PRT-006 and PRT-011 export and import round trips | **NOT VERIFIED** (not built) |
-| PRT-012 locale per organisation | Partly verified |
+| PRT-012 locale per organisation | Partly verified: the en-US, USD, America/Chicago probe (27 page addresses, one export) found and fixed one leak (the Audit page); installation-level fall-backs remain (S10) |
 | PRT-013 renamed roles and states | **NOT VERIFIED** (roles compiled) |
 
 ### 9.3 Slices
@@ -232,8 +233,9 @@ Remaining high-severity portability violation: **none** from the original audit 
 | S6 feature flags that gate capabilities | **Done** (ADR-0030): catalogue, `Capabilities` kind, pack defaults, organisation overrides, resolver, engine gate, capability-aware navigation, onboarding and setup, compatibility and readiness checks, guard; local 1,098 Passed, 0 Failed, 0 Skipped, 230 NOT VERIFIED; CI run 48 (commit c88295c) green: SQL Server 230 Passed, 0 Failed, 0 Skipped, 0 NOT VERIFIED, container build and smoke succeeded (`deploy/STATUS.md`) |
 | S7 pack loader and store; remove embedded packs; Pack Manager | **Done** (S7a to S7c; S7d to S7f Future); CI-verified (run 39; `deploy/STATUS.md`) |
 | S8 implement the role decision | **Retired**: superseded by S4 and ADR-0029 |
-| S9 second pack end to end (PRT-002, PRT-004, PRT-013) | **Designed, not built**: `docs/SECOND_BUSINESS_PROOF.md` recommends a synthetic construction-subcontracts business, 19 acceptance criteria, platform findings G1 to G10 and owner questions Q1 to Q6; readiness review in `docs/S9_READINESS.md` finds three items to fix first (pack-time validation of organisation-dependent documents, an untested set of pack kinds, Australian and ERP core labels) |
-| S10 cleanup of country, ERP and locale defaults | Not started |
+| S9 second pack end to end (PRT-002, PRT-004, PRT-013) | **Designed, ready to start, not built**: `docs/SECOND_BUSINESS_PROOF.md` (Harborline Construction, `construction-subcontracts`, en-US, USD, America/Chicago; 19 acceptance criteria; amended by owner decisions D8); the readiness prerequisites are implemented, no known blocker |
+| S9 readiness prerequisites (G11, content-kind smoke test, G1a, G1b, locale probe; owner decisions D1 to D4) | **Done** (`docs/S9_READINESS.md` section 13); local 1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED; CI result in `deploy/STATUS.md`. S9 itself has not started |
+| S10 cleanup of country, ERP and locale defaults | Not started. Includes G2 (non-Australian tax identifier formats; owner decision D4), R-01, R-02, R-04 |
 
 ## 10. Pilot readiness assessment
 

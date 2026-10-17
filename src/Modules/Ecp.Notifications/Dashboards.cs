@@ -139,7 +139,7 @@ internal sealed class DashboardService(
                 {
                     var (today, lead, _) = await ClockAsync(ct);
                     var live = await StatusesWithRolesAsync(LiveRoles, ct);
-                    // Evergreen agreements have no End Date to expire, so they are not listed here (their Review Dates are).
+                    // Evergreen agreements have no [[field.end.date]] to expire, so they are not listed here (their review dates are).
                     var r = await contracts.ListAsync(new ContractFilter(EndsOnOrAfter: today, EndsOnOrBefore: today.AddDays(lead), StatusIn: live, ExcludeExtensionTypes: ["Evergreen"], Page: p, PageSize: size), ct);
                     return new DashboardCard(key, "Expiring Soon", $"Ending within {lead} days.", r.Total, r.Items.Select(c => Row(c, $"Ends {c.EndDate:yyyy-MM-dd}", c.EndDate)).ToList(), "/Contracts");
                 }
@@ -148,14 +148,14 @@ internal sealed class DashboardService(
                     var (today, lead, _) = await ClockAsync(ct);
                     var live = await StatusesWithRolesAsync(LiveRoles, ct);
                     var r = await contracts.ListAsync(new ContractFilter(ReviewOnOrBefore: today.AddDays(lead), StatusIn: live, Page: p, PageSize: size), ct);
-                    return new DashboardCard(key, "Reviews Due", $"Review Date within {lead} days, or already passed.", r.Total, r.Items.Where(c => c.ReviewDate != null).Select(c => Row(c, c.ReviewDate < today ? $"Review overdue since {c.ReviewDate:yyyy-MM-dd}" : $"Review {c.ReviewDate:yyyy-MM-dd}", c.ReviewDate)).ToList(), "/Contracts");
+                    return new DashboardCard(key, "Reviews Due", $"[[field.review.date]] within {lead} days, or already passed.", r.Total, r.Items.Where(c => c.ReviewDate != null).Select(c => Row(c, c.ReviewDate < today ? $"Review overdue since {c.ReviewDate:yyyy-MM-dd}" : $"Review {c.ReviewDate:yyyy-MM-dd}", c.ReviewDate)).ToList(), "/Contracts");
                 }
             case DashboardKeys.CriticalNotice:
                 {
                     var live = await StatusesWithRolesAsync(LiveRoles, ct);
                     var all = (await contracts.ListAsync(new ContractFilter(CriticalNotice: true, StatusIn: live, PageSize: 200), ct)).Items;
-                    var rows = all.Select(c => Row(c, c.EndDate is null && c.ReviewDate is null ? "Critical Notice (no date set)" : "Critical Notice", c.ExtensionType == "Evergreen" ? c.ReviewDate : c.EndDate)).OrderBy(r => r.Date ?? DateOnly.MaxValue).ToList();
-                    return new DashboardCard(key, "Critical Notice", "[[agreement|plural]] flagged Critical Notice, soonest first.", rows.Count, rows.Skip((p - 1) * size).Take(size).ToList(), "/Contracts");
+                    var rows = all.Select(c => Row(c, c.EndDate is null && c.ReviewDate is null ? "[[field.critical.notice]] (no date set)" : "[[field.critical.notice]]", c.ExtensionType == "Evergreen" ? c.ReviewDate : c.EndDate)).OrderBy(r => r.Date ?? DateOnly.MaxValue).ToList();
+                    return new DashboardCard(key, "[[field.critical.notice]]", "[[agreement|plural]] flagged [[field.critical.notice]], soonest first.", rows.Count, rows.Skip((p - 1) * size).Take(size).ToList(), "/Contracts");
                 }
             case DashboardKeys.RemindedUnacknowledged:
                 {

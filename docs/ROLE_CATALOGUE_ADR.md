@@ -200,8 +200,8 @@ Estimates are for the code and tests; SQL Server verification is CI-only in this
 1. **Freeze the identifiers.** A unit or architecture test asserting `RoleCodes.All` equals the twelve codes and that the permission catalogue only grows. (Hours.)
 2. **Approver-group display names.** A group key such as `GroupHeadProcurement` is shown raw on the approvals page and on user administration. Let a pack (or terminology) supply a display name per group key, optional and additive. The key stays the identifier. (About 1 day.)
 3. **Hide unused roles** when a capability is off (S6), so a business without Legal does not see the Legal role in a dropdown. (Part of S6.)
-4. **Neutral `Approver` label.** The neutral label for `Approver` is *Registration Approver*, but the role also approves dispositions where the matrix assigns it. Consider *Approver* as the neutral label and let packs narrow it. (A one-line change to the catalogue and pack data; a terminology wording decision for the owner.)
-5. **Label, not code, in one message.** The onboarding warning about a privileged group mapping prints the raw role code; it could print the label with the code beside it. (An hour.)
+4. **Neutral `Approver` label. Done (owner decision D8).** The neutral label is now *Approval Authority*. Previously: the neutral label for `Approver` is *Registration Approver*, but the role also approves dispositions where the matrix assigns it. Consider *Approver* as the neutral label and let packs narrow it. (A one-line change to the catalogue and pack data; a terminology wording decision for the owner.)
+5. **Label, not code, in one message. Done (S9 readiness).** The warning now prints the role's label. Previously: The onboarding warning about a privileged group mapping prints the raw role code; it could print the label with the code beside it. (An hour.)
 6. **Document the closed vocabularies as stable too.** The notification recipient rules (`CategoryOwners`, `LegalPool`, `AssignedLegal`, `OrganisationAdministrators`) and permission codes follow the same policy: stable identifiers, labels from terminology.
 
 ## 11. Owner decisions required

@@ -156,7 +156,7 @@ public sealed partial class Supplier : ITenantOwned
         {
             Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
             Name = cleanName, NormalisedName = NormaliseName(cleanName), Abn = NormaliseAbn(abn),
-            VendorNumber = Guard.OptionalBounded(vendorNumber, "Vendor number", 50), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+            VendorNumber = Guard.OptionalBounded(vendorNumber, "[[supplier.number]]", 50), CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
         }.WithType(supplierType);
     }
 
@@ -184,7 +184,7 @@ public sealed partial class Supplier : ITenantOwned
         if (string.IsNullOrWhiteSpace(abn)) return null;
         var digits = new string(abn.Where(char.IsDigit).ToArray());
         if (digits.Length != 11 || abn.Any(c => !char.IsDigit(c) && c != ' '))
-            throw new DomainException("invalid_abn", "ABN must be eleven digits.");
+            throw new DomainException("invalid_abn", "[[supplier.tax.id]] must be eleven digits.");
         return digits;
     }
 
@@ -502,7 +502,7 @@ public sealed class Contract : ITenantOwned
             case "agreementType": w.AgreementType = Code(raw, "Agreement type", 100); break;
             case "riskLevel": w.RiskLevel = Code(raw, "Risk level", 50); break;
             case "functionCode": w.Function = Code(raw, "Function", 100); break;
-            case "sapOutlineAgreementNumber": w.Sap = Code(raw, "SAP outline agreement number", 100); break;
+            case "sapOutlineAgreementNumber": w.Sap = Code(raw, "[[erp.reference]]", 100); break;
             case "noticePeriodValue": w.NoticeValue = string.IsNullOrWhiteSpace(raw) ? null : int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : throw new DomainException("invalid_notice", "The notice period is not a whole number."); break;
             case "noticePeriodUnit": w.NoticeUnit = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim(); break;
             case "noticePeriodDays": // the older single-number form: days
@@ -653,7 +653,7 @@ public sealed class Contract : ITenantOwned
             LegalReviewRequired = n.LegalReviewRequired, StartDate = n.StartDate, EffectiveDate = n.EffectiveDate, ReviewDate = n.ReviewDate,
             EndDate = n.EndDate, BusinessUnitId = n.BusinessUnitId, SiteId = n.SiteId, LegalEntityId = n.LegalEntityId, ContractType = Code(n.ContractType, "Contract type", 100),
             AgreementType = Code(n.AgreementType, "Agreement type", 100), RiskLevel = Code(n.RiskLevel, "Risk level", 50), FunctionCode = Code(n.FunctionCode, "Function", 100),
-            SapOutlineAgreementNumber = Code(n.SapOutlineAgreementNumber, "SAP outline agreement number", 100), CriticalNotice = n.CriticalNotice,
+            SapOutlineAgreementNumber = Code(n.SapOutlineAgreementNumber, "[[erp.reference]]", 100), CriticalNotice = n.CriticalNotice,
             NoticePeriodValue = notice.Value, NoticePeriodUnit = notice.Unit, NoticePeriodDays = NoticePeriods.ToDays(notice.Value, notice.Unit, n.EndDate),
             CreatedUtc = Guard.Utc(n.NowUtc, nameof(n.NowUtc)), CreatedBy = actor, UpdatedUtc = n.NowUtc, UpdatedBy = actor
         };

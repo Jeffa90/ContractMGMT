@@ -11,7 +11,7 @@
         </select>
     </div>
     <div class="field"><label for="Name">@L["Name"]</label><input id="Name" name="Name" type="text" required aria-required="true" maxlength="300" value="@Model.Name" /></div>
-    <div class="field"><label for="VendorNumber">@L["Vendor number"]</label><input id="VendorNumber" name="VendorNumber" type="text" maxlength="50" value="@Model.VendorNumber" /></div>
-    <div class="field"><label for="Abn">@L["ABN"]</label><input id="Abn" name="Abn" type="text" inputmode="numeric" maxlength="14" value="@Model.Abn" aria-describedby="abn-hint" /><p id="abn-hint" class="hint">@L["Eleven digits. The format is checked; a registry lookup is not performed."]</p></div>
+    <div class="field"><label for="VendorNumber">@L["[[supplier.number]]"]</label><input id="VendorNumber" name="VendorNumber" type="text" maxlength="50" value="@Model.VendorNumber" /></div>
+    <div class="field"><label for="Abn">@L["[[supplier.tax.id]]"]</label><input id="Abn" name="Abn" type="text" inputmode="numeric" maxlength="14" value="@Model.Abn" aria-describedby="abn-hint" /><p id="abn-hint" class="hint">@L["[[supplier.tax.id]] is eleven digits. The format is checked; a registry lookup is not performed."]</p></div>
     <div class="actions"><button type="submit">@L["Add [[supplier|lower]]"]</button> <a class="button secondary" href="/Suppliers">@L["Cancel"]</a></div>
 </form>

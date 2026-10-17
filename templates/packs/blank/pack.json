@@ -1,7 +1,7 @@
 {
   "packId": "blank",
   "name": "Blank (no business defaults)",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "synthetic": true,
   "publisher": "Platform (built-in)",
   "description": "Starts with no categories, contract types or reference prefix, and a neutral starting lifecycle, Variation workflow and notification policy that name no business. Everything is configured by the organisation.",

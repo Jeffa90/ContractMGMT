@@ -66,8 +66,8 @@ internal sealed class VariationService(
 {
     private static readonly Dictionary<string, string> Labels = new()
     {
-        ["currencyCode"] = "Currency", ["estimatedValue"] = "Estimated value", ["extensionType"] = "Extension type", ["noticePeriodDays"] = "Notice period (days)", ["criticalNotice"] = "Critical Notice",
-        ["reviewDate"] = "Review date", ["endDate"] = "End date", ["businessUnitId"] = "Business unit", ["siteId"] = "Site"
+        ["currencyCode"] = "[[field.currency]]", ["estimatedValue"] = "[[field.estimated.value]]", ["extensionType"] = "[[field.extension.type]]", ["noticePeriodDays"] = "[[field.notice.period]] (days)", ["criticalNotice"] = "[[field.critical.notice]]",
+        ["reviewDate"] = "[[field.review.date]]", ["endDate"] = "[[field.end.date]]", ["businessUnitId"] = "[[business.unit]]", ["siteId"] = "[[site]]"
     };
 
     private static string LabelOf(string field) => Labels.TryGetValue(field, out var l) ? l : field;

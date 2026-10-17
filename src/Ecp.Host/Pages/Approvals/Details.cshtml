@@ -87,7 +87,7 @@ else if (r.Decision is { } d)
         <dt>@L["[[supplier]]"]</dt><dd>@s.SupplierName</dd><dt>@L["[[category]]"]</dt><dd>@s.CategoryName</dd>
         <dt>@L["Value"]</dt><dd>@(s.EstimatedValue is { } val ? $"{val:N2} {s.CurrencyCode}" : "-")</dd>
         <dt>@L["Start / End"]</dt><dd>@(s.StartDate ?? "-") / @(s.EndDate ?? "-")</dd>
-        <dt>@L["Review date"]</dt><dd>@(s.ReviewDate ?? "-")</dd>
+        <dt>@L["[[field.review.date|sentence]]"]</dt><dd>@(s.ReviewDate ?? "-")</dd>
         <dt>@L["[[legal.review|sentence]]"]</dt><dd>@(s.LegalStatus ?? (s.LegalReviewRequired ? "Required" : "Not required")) @if (s.LegalRounds > 0) { <span>(@s.LegalRounds @L["round(s)"]@(s.LegalClearedBy is { } cb ? ", " + L["cleared by"].Value + " " + cb : ""))</span> }</dd>
         <dt>@L["Execution"]</dt><dd>@(s.ExecutionProvider ?? "-") @(s.ProviderRequestId is { } req ? $"· request {req}" : "") @(s.ExecutionStatus is { } es ? $"· {es}" : "")</dd>
         <dt>@L["Submitted by"]</dt><dd>@r.SubmittedByName, @r.SubmittedUtc.ToString("yyyy-MM-dd HH:mm") UTC</dd>

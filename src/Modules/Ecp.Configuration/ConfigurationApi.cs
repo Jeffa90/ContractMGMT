@@ -48,6 +48,35 @@ public interface IConfigurationKind
     string HistoryPermission => "config.history.read";
 }
 
+/// <summary>
+/// Validation codes for findings that depend on something the organisation has or has not published yet: a matrix a workflow names, a custom field a matrix condition or a list view uses. A pack is checked when it is
+/// uploaded with no organisation at all, so these cannot be judged then and are reported as warnings; when the same document is validated as a draft for a real organisation they are errors again (docs/S9_READINESS.md, G11).
+/// A kind that can be asked to validate with no organisation (<see cref="Guid.Empty"/>) must neither throw nor look anything up for it; it reports these codes for what it cannot yet judge.
+/// </summary>
+public static class ContextDependentCodes
+{
+    public const string MatrixMissing = "matrix_missing";
+    public const string CustomFactUnavailable = "custom_fact_unavailable";
+    public const string CustomFieldUnavailable = "custom_field_unavailable";
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { MatrixMissing, CustomFactUnavailable, CustomFieldUnavailable };
+
+    private static readonly System.Text.RegularExpressions.Regex CustomKeyShape = new("^[a-z][a-z0-9_]{1,62}$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.NonBacktracking);
+    /// <summary>
+    /// True for a name written the way a configured field's key is (lower-case letters, digits and underscores, as the field validator requires). The platform's own field keys are camel case, so a name of this shape that is
+    /// not one of them can only be a configured field, which may not be published yet. Anything else is a mistake and stays an error.
+    /// </summary>
+    public static bool IsCustomKeyShape(string key) => CustomKeyShape.IsMatch(key);
+}
+
+/// <summary>
+/// The classification scale to judge a pack against while it is being validated. A pack that carries its own classification policy is checked against that scale, because a level it names in a notification rule,
+/// a field or a matrix row belongs to its own scale and not to whatever the tenant has published so far. Outside pack validation this holds nothing and the tenant's published scale applies.
+/// </summary>
+public sealed class ClassificationScaleOverride
+{
+    public ClassificationScale? Scale { get; set; }
+}
+
 public interface IConfigurationService
 {
     Task<DraftDto> GetOrCreateDraftAsync(string kind, Guid organisationId, string? initialJson = null, CancellationToken ct = default);
@@ -342,12 +371,13 @@ public sealed record ClassificationPolicyDocument(IReadOnlyList<string> Levels, 
 }
 
 /// <summary>Reads the tenant's published classification policy; falls back to the placeholder scale until one is published.</summary>
-internal sealed class ConfiguredClassificationScaleProvider(ConfigurationDbContext db) : IClassificationScaleProvider
+internal sealed class ConfiguredClassificationScaleProvider(ConfigurationDbContext db, ClassificationScaleOverride scaleOverride) : IClassificationScaleProvider
 {
     private ClassificationScale? _cached;
 
     public async Task<ClassificationScale> GetAsync(CancellationToken ct = default)
     {
+        if (scaleOverride.Scale is { } pinned) return pinned;                      // only while a pack is being validated
         if (_cached is not null) return _cached;
         var json = await db.Releases.AsNoTracking().Where(r => r.OrganisationId == Guid.Empty && r.Kind == ClassificationPolicyKind.KindName)
             .OrderByDescending(r => r.Number).Select(r => r.ContentJson).FirstOrDefaultAsync(ct);
@@ -388,6 +418,7 @@ public static class ConfigurationModule
         services.AddScoped<ICapabilityAdministration, CapabilityAdministration>();
         services.AddScoped<ITerminologyAdministration, TerminologyAdministration>();
         // Replace the default scale with the configured one (registered after the Identity module).
+        services.AddScoped<ClassificationScaleOverride>();
         services.AddScoped<IClassificationScaleProvider, ConfiguredClassificationScaleProvider>();
         return services;
     }

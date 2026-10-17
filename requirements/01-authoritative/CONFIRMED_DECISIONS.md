@@ -143,3 +143,21 @@ Owner decision of 2026-10-17 (Option A+; `decisions/ADR-0029-stable-role-and-per
 ### D7d Optional steps are configurable capabilities (S6)
 
 Owner instruction of 2026-10-17 (slice S6; `decisions/ADR-0030-configurable-capabilities.md`, `docs/CAPABILITIES.md`): Legal Review, Register Authorisation, Variations, Renewals and Signature Requests are platform capabilities that a business can switch off with no code change. The order is the organisation's published choice, then its solution pack's defaults, then the platform default (all on). A capability is operating-model configuration, never authority: it grants, widens and removes no permission. Switching one off stops new starts only; work already under way can be finished. Incoherent combinations (a capability on without one it needs, a published workflow using one that is off, turning one off from under work in flight) are refused. Allocation of the five new permissions: `capabilities.read` and `capabilities.audit.read` to the Tenant Administrator, Organisation Administrator, Business Configuration Administrator and Auditor; `capabilities.draft` to the first three; `capabilities.publish` and `capabilities.rollback` to the Tenant and Organisation Administrators only. The Business Configuration Administrator can prepare a capability change but not publish it. The permission codes are permanent identifiers (D7c).
+
+## D8 Decisions before the second business proof (S9 readiness, owner instruction 2026-10-17)
+
+Source: `docs/S9_READINESS.md`, reviewed and approved by the owner. These bind the S9 build; they do not start it.
+
+| ID | Decision |
+|---|---|
+| D8.1 (D1) | An **Administrative Change Order** records practical completion and similar completion facts on a locked contract. No role-less Defects Liability state is introduced as part of S9. |
+| D8.2 (D2) | The pack-validation limitation for organisation-dependent documents (G11) is fixed **generically before S9**. The proof does not design around it. A valid pack must not be rejected at upload because an organisation-dependent artefact cannot be judged without an organisation. |
+| D8.3 (D3) | **G1b is pre-S9 scope.** PRT-004 is to be satisfied in full, not in part: core field labels are terminology-driven. |
+| D8.4 (D4) | **G2 is deferred to S10.** Non-Australian tax identifier formats are out of scope until S10. A pack may rename the identifier (G1a) but the eleven-digit format check remains. |
+| D8.5 | Slice **S8 stays retired**. |
+| D8.6 | Role codes, permission codes and approver-group identifiers are **permanent** (D7c). |
+| D8.7 | **"Approval Authority"** is the neutral display label of the `Approver` role (the code `Approver` is unchanged). |
+| D8.8 | The onboarding warning that printed a raw role code prints the role's label. |
+| D8.9 | S9 uses: business **Harborline Construction**, pack key **construction-subcontracts**, locale **en-US**, currency **USD**, time zone **America/Chicago**. |
+| D8.10 | The Construction Subcontracts pack ships as a **first-class pack** in `templates/packs`, alongside Blank and JBS Procurement. |
+| D8.11 | **Sell-side Professional Services** remains the preferred candidate for the next proof business after S9. |

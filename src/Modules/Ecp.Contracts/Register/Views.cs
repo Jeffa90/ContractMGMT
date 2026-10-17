@@ -78,10 +78,12 @@ public static partial class ViewParser
     }, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
 
     /// <summary>Checks one view against the fields the checking person may use. A view that names a field or a classification they cannot reach is refused, so nobody publishes a view that exposes more than they can see.</summary>
-    public static List<ValidationMessage> ValidateView(ViewDefinition v, RegisterCatalogue catalogue, IReadOnlyCollection<string> readableClassifications, IReadOnlySet<string> knownSets, string path, bool requireKey = true)
+    public static List<ValidationMessage> ValidateView(ViewDefinition v, RegisterCatalogue catalogue, IReadOnlyCollection<string> readableClassifications, IReadOnlySet<string> knownSets, string path, bool requireKey = true, bool forPack = false)
     {
         var m = new List<ValidationMessage>();
         ValidationMessage E(string p, string code, string text) => new(ValidationSeverity.Error, p, code, text);
+        // A pack is checked with no organisation, so a configured field the view names cannot exist yet. A name written like a configured field's key is reported as waiting for it (a warning at upload, an error when the draft is validated for an organisation); anything else is a mistake.
+        string Unavailable(string name, string code) => forPack && !CoreFields.IsCore(name) && ContextDependentCodes.IsCustomKeyShape(name) ? ContextDependentCodes.CustomFieldUnavailable : code;
         if (requireKey && !KeyPattern().IsMatch(v.Key)) m.Add(E(path + ".key", "view_key", "A view key is lower-case letters, digits and hyphens, starting with a letter."));
         if (string.IsNullOrWhiteSpace(v.Name) || v.Name.Length > 100) m.Add(E(path + ".name", "view_name", "A view needs a name of up to 100 characters."));
         if (v.Description.Length > 300) m.Add(E(path + ".description", "view_description", "A description is limited to 300 characters."));
@@ -90,7 +92,7 @@ public static partial class ViewParser
         foreach (var c in v.Columns)
         {
             var f = catalogue.Find(c);
-            if (f is null) m.Add(E(path + ".columns", "column_unavailable", $"The column '{c}' is not a field you can use."));
+            if (f is null) m.Add(E(path + ".columns", Unavailable(c, "column_unavailable"), $"The column '{c}' is not a field you can use."));
             else if (!f.Displayable) m.Add(E(path + ".columns", "column_not_displayable", $"{f.Label} cannot be shown as a column."));
             else if (f.Retired) m.Add(new(ValidationSeverity.Warning, path + ".columns", "column_retired", $"{f.Label} is retired. Its stored values still show, but it takes no new ones."));
         }
@@ -100,13 +102,13 @@ public static partial class ViewParser
         if (v.GroupBy is not null && !ViewFormats.Groupings.Contains(v.GroupBy)) m.Add(E(path + ".groupBy", "group_by", $"Grouping is by one of: {string.Join(", ", ViewFormats.Groupings)}."));
         if (v.Sort.Count > RegisterQueryEngine.MaxSorts) m.Add(E(path + ".sort", "too_many", $"At most {RegisterQueryEngine.MaxSorts} sort fields can be used."));
         foreach (var s in v.Sort)
-            if (catalogue.Find(s.Field) is not { Sortable: true }) m.Add(E(path + ".sort", "sort_unavailable", $"'{s.Field}' cannot be used to sort."));
+            if (catalogue.Find(s.Field) is not { Sortable: true }) m.Add(E(path + ".sort", Unavailable(s.Field, "sort_unavailable"), $"'{s.Field}' cannot be used to sort."));
         if (v.Filters.Count > RegisterQueryEngine.MaxFilters) m.Add(E(path + ".filters", "too_many", $"At most {RegisterQueryEngine.MaxFilters} filters can be used."));
         foreach (var f in v.Filters)
         {
             if (f.Field == "set") { if (f.Op != FilterOps.Is || f.Values.Count is < 1 or > 2 || !knownSets.Contains(f.Values[0])) m.Add(E(path + ".filters", "set_unavailable", "That list is not available.")); continue; }
             var field = catalogue.Find(f.Field);
-            if (field is null || !field.Filterable) { m.Add(E(path + ".filters", "filter_unavailable", $"'{f.Field}' is not a field you can filter on.")); continue; }
+            if (field is null || !field.Filterable) { m.Add(E(path + ".filters", Unavailable(f.Field, "filter_unavailable"), $"'{f.Field}' is not a field you can filter on.")); continue; }
             if (!field.Operators.Contains(f.Op, StringComparer.Ordinal)) m.Add(E(path + ".filters", "filter_operator", $"{field.Label} cannot be filtered with '{f.Op}'."));
             if (field.Key == "classification" && f.Values.Any(x => !readableClassifications.Contains(x, StringComparer.OrdinalIgnoreCase)))
                 m.Add(E(path + ".filters", "classification_unavailable", "A filter names a classification level you cannot read, so a view with it cannot be saved or published by you."));
@@ -183,7 +185,7 @@ internal sealed class ContractListViewKind(IServiceProvider services, IAuditWrit
             var v = set.Views[i];
             if (!keys.Add(v.Key)) messages.Add(new(ValidationSeverity.Error, $"$.views[{i}].key", "duplicate_view", $"The view key '{v.Key}' is used twice."));
             if (system.Find(v.Key) is not null) messages.Add(new(ValidationSeverity.Error, $"$.views[{i}].key", "system_view", $"'{v.Key}' is the key of a view the platform ships. Choose another."));
-            messages.AddRange(ViewParser.ValidateView(v, catalogue, readable, sets, $"$.views[{i}]"));
+            messages.AddRange(ViewParser.ValidateView(v, catalogue, readable, sets, $"$.views[{i}]", forPack: organisationId == Guid.Empty));
         }
         return new ValidationReport(messages);
     }

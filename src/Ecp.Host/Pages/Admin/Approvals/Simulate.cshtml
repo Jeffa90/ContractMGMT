@@ -40,7 +40,7 @@
         <div class="field"><label for="LegalEntityId">@L["[[legal.entity|sentence]]"]</label><select id="LegalEntityId" name="LegalEntityId"><option value="">@L["(not known)"]</option>@foreach (var c in Model.Choices.LegalEntities) { <option value="@c.Id" selected="@(c.Id == Model.LegalEntityId)">@c.Code &ndash; @c.Name</option> }</select></div>
         <div class="field"><label for="Classification">@L["Classification"]</label><select id="Classification" name="Classification">@foreach (var c in Model.Choices.Classifications) { <option selected="@(c == Model.Classification)">@c</option> }</select></div>
         <div class="field"><label for="ContractType">@L["[[contract.type|sentence]]"]</label><input id="ContractType" name="ContractType" maxlength="100" value="@Model.ContractType" /></div>
-        <div class="field"><label for="RiskLevel">@L["Risk level"]</label><input id="RiskLevel" name="RiskLevel" maxlength="100" value="@Model.RiskLevel" /></div>
+        <div class="field"><label for="RiskLevel">@L["[[field.risk.level|sentence]]"]</label><input id="RiskLevel" name="RiskLevel" maxlength="100" value="@Model.RiskLevel" /></div>
         <div class="field"><label for="SupplierType">@L["[[supplier]] type"]</label><input id="SupplierType" name="SupplierType" maxlength="100" value="@Model.SupplierType" /></div>
         <div class="field"><label for="CustomFields">@L["Custom fields (one per line, code=value)"]</label><textarea id="CustomFields" name="CustomFields" rows="3" maxlength="2000">@Model.CustomFields</textarea></div>
         @if (Model.People.Count > 0)

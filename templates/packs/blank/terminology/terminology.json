@@ -103,8 +103,8 @@
     {
       "key": "primary.approver",
       "locale": "en",
-      "singular": "Registration Approver",
-      "plural": "Registration Approvers",
+      "singular": "Approval Authority",
+      "plural": "Approval Authorities",
       "description": "The person who approves registration of an executed contract."
     },
     {
@@ -307,7 +307,7 @@
     {
       "key": "Approvers",
       "locale": "en",
-      "name": "Registration Approvers",
+      "name": "Approval Authorities",
       "description": "The people who approve registration of an executed contract."
     }
   ]

@@ -63,7 +63,7 @@
 
 @if (Model.StatusChips.Count > 0)
 {
-    <nav aria-label="@L["Status"]" class="chips">
+    <nav aria-label="@L["[[field.status]]"]" class="chips">
         @foreach (var s in Model.StatusChips) { <a class="badge" href="@Model.LinkTo(1, null, null, s)">@Model.StatusLabels.GetValueOrDefault(s, s)</a> }
     </nav>
 }

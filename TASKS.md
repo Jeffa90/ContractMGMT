@@ -10,7 +10,20 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-17, end of portability slice S6: configurable capabilities)
+## Current state (2026-10-17, end of the S9 readiness prerequisites)
+
+**S9 readiness prerequisites (this pass; owner decisions D1 to D4, `requirements/01-authoritative/CONFIRMED_DECISIONS.md` D8, `docs/S9_READINESS.md` section 13, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.15, `docs/PORTABILITY_AUDIT.md` section 0.7).** S9 itself has **not** started.
+
+* **G11 generic pack-validation fix (Implemented).** Organisation-dependent documents (approval matrix conditions, views over custom fields, a pack's own classification levels) upload as warnings and are judged for the real organisation at publish; an assignment reports "waits" for drafts that depend on unpublished ones (`PackKinds.Prerequisites`). Narrow errors still refuse.
+* **Content-kind smoke test (Implemented).** Every packable kind from one pack, installed, assigned and published in dependency order (`PackKindSmokeScenarios`; SQL Server wrappers run in CI).
+* **G1a and G1b (Implemented).** 31 field-label terminology keys (73 in the catalogue, 32 required): Tax Identifier, Vendor Number and ERP Reference as neutral wording; every contract-field label and group heading; the reference pack 2.5.0 keeps today's words; Blank 1.5.0. PRT-004 is ticked at the S9 sweep.
+* **Locale probe (Implemented).** An en-US, USD, America/Chicago organisation; one leak (the Audit page) fixed.
+* **Owner items (Implemented).** "Approval Authority" as the neutral Approver label; the onboarding warning prints the role's label.
+* **Verification.** Local: **1,106 Passed, 0 Failed, 0 Skipped, 233 NOT VERIFIED** (the SQL Server wrappers). CI: see `deploy/STATUS.md`.
+* **Not done, by design:** S9 (the Construction Subcontracts pack and the PRT-002, PRT-004, PRT-013 sweeps), G2 non-Australian tax identifier formats (S10, D4), R-01, R-02, R-04.
+* **First incomplete remediation task:** S9, then S10.
+
+## Previous state (2026-10-17, end of portability slice S6: configurable capabilities)
 
 **Slice S6 (this pass; `decisions/ADR-0030-configurable-capabilities.md`, `docs/CAPABILITIES.md`, `docs/PORTABILITY_AUDIT.md` section 0.6, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.14).** The five optional platform steps (Legal Review, Register Authorisation, Variations, Renewals, Signature Requests) are configurable capabilities. P-04 is closed and the on/off part of R-05. A business can operate with all five off with no code change.
 
@@ -295,7 +308,7 @@ Gate: PKG-001 to PKG-011; IMP-001 to IMP-006; PRT-001 to PRT-015.
 | [ ] | PKM-01 | Package format: export, import with quarantine, verification, dependency analysis, remapping, dry run, conflicts, apply-as-draft, rollback | STU-01, CFG-04 | PKG-001 to PKG-004, PKG-006 to PKG-008, PKG-010, PKG-011 | I **Status:** Partial (S7): import with quarantine, verification, dependency check, dry-run report, conflict handling per document (identical is idempotent, different bytes refused), apply as draft, audit and rollback by the normal lifecycle are implemented (`docs/PACK_MANAGER.md`); export, identifier remapping and per-item conflict resolution are Future (S7e). |
 | [ ] | PKM-02 | Signing, trust anchors, revocation, Production signature policy, catalogue | PKM-01 | PKG-005 | I **Status:** Partial (S7): ES256 signing and verification, trust anchors (host configuration and tenant keys), revocation, expiry, Production signature policy and the `ecp-pack` tool are implemented (`docs/PACK_SIGNING.md`); the catalogue is Future (S7f); Production key custody is an external operational responsibility. |
 | [ ] | PKM-03 | Pack upgrade with three-way comparison | PKM-01 | PKG-009 | I |
-| [ ] | PKM-04 | Second non-JBS pack (for example Construction demo) proving portability | PKM-01, STU-08 | PRT-002 | I **Status:** Partial evidence only: a pack the repository has never seen (built at test time) installs and runs a contract end to end with no source change (`Third_pack`); a real second business pack with its own fields, rules and approvals is slice S9 and remains NOT VERIFIED. |
+| [ ] | PKM-04 | Second non-JBS pack (for example Construction demo) proving portability | PKM-01, STU-08 | PRT-002 | I **Status:** Partial evidence only: a pack the repository has never seen (built at test time) installs and runs a contract end to end with no source change (`Third_pack`); a real second business pack with its own fields, rules and approvals is slice S9 and remains NOT VERIFIED. **Readiness (2026-10-17):** the prerequisites (generic pack validation, content-kind smoke test, field-label keys, locale probe) are implemented; the pack is designed in `docs/SECOND_BUSINESS_PROOF.md` (Harborline Construction, `construction-subcontracts`, ships in `templates/packs`). |
 | [ ] | EXP-01 | Records, documents (manifest re-ingestable), audit evidence and full-tenant export with expiring authorised links | MGR-11, PKM-01 | IMP-001 to IMP-006; PRT-011 | I |
 | [ ] | DOCS-JBS | JBS solution-pack guide | PKM-04 | Docs link-checked | n/a |
 

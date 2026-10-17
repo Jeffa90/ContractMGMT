@@ -40,7 +40,7 @@ public sealed class TerminologyTests
         Assert.Equal("Contract Administrator", neutral.Singular("contract.administrator"));
         Assert.Equal("Contract Owner", neutral.Singular("contract.owner"));
         Assert.Equal("Reviewer", neutral.Singular("reviewer"));
-        Assert.Equal("Registration Approver", neutral.Singular("primary.approver"));
+        Assert.Equal("Approval Authority", neutral.Singular("primary.approver"));
         Assert.Equal("Backup Approver", neutral.Singular("backup.approver"));
         Assert.Equal("Contract Type", neutral.Singular("contract.type"));
         Assert.Equal("Contract Portfolio", neutral.Singular("contract.portfolio"));
@@ -445,10 +445,40 @@ public sealed class GroupNamesAndRoleVisibilityTests
         var jbs = TerminologyDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot.Find(), "templates", "packs", "jbs-procurement", "terminology", "terminology.json")));
         var blank = TerminologyDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot.Find(), "templates", "packs", "blank", "terminology", "terminology.json")));
         Assert.Equal("Group Head of Procurement", TermSet.Build("en", null, null, null, null, null, jbs.Extras).Group("GroupHeadProcurement"));
-        Assert.Equal("Registration Approvers", TermSet.Build("en", null, null, null, null, null, blank.Extras).Group("Approvers"));
+        Assert.Equal("Approval Authorities", TermSet.Build("en", null, null, null, null, null, blank.Extras).Group("Approvers"));
         Assert.Empty(TermSet.Build("en", null, null, null, null, null, jbs.Extras).HiddenRoles);
         Assert.Empty(TermSet.Build("en", null, null, null, null, null, blank.Extras).HiddenRoles);
         // The group key stays out of the other pack: no leak of one business's group into the neutral pack.
         Assert.False(TermSet.Build("en", null, null, null, null, null, blank.Extras).HasGroupName("GroupHeadProcurement"));
+    }
+
+    // ---- contract field labels (G1a, G1b): every label the core fields show is a terminology key ----
+
+    [Fact]
+    public void Every_core_field_label_and_group_is_made_of_catalogue_tokens_and_a_few_structural_words()
+    {
+        var structural = new[] { "Title", "Type", "Status", "Required", "Unit" };
+        foreach (var f in Ecp.Metadata.CoreFields.All)
+            foreach (var text in new[] { f.Label, f.Group })
+            {
+                var tokens = System.Text.RegularExpressions.Regex.Matches(text, @"\[\[([a-z.]+)(?:\|[a-z|]+)?\]\]").Select(m => m.Groups[1].Value).ToList();
+                foreach (var t in tokens) Assert.True(TermCatalogue.IsKnown(t), $"{f.Key}: '{t}' is not a catalogue key.");
+                var rest = System.Text.RegularExpressions.Regex.Replace(text, @"\[\[[^\]]*\]\]", " ");
+                foreach (var word in rest.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                    Assert.True(structural.Contains(word), $"{f.Key}: the literal word '{word}' in '{text}' is not a terminology key.");
+            }
+    }
+
+    [Fact]
+    public void The_field_label_keys_are_optional_and_the_country_and_ERP_wording_is_neutral()
+    {
+        var neutral = TermSet.Build("en", null, null, null, null, null);
+        Assert.Equal("Tax Identifier", neutral.Singular("supplier.tax.id"));
+        Assert.Equal("Vendor Number", neutral.Singular("supplier.number"));
+        Assert.Equal("ERP Reference", neutral.Singular("erp.reference"));
+        Assert.Equal(32, TermCatalogue.RequiredKeys.Count);
+        foreach (var k in new[] { "supplier.tax.id", "supplier.number", "erp.reference", "field.end.date", "field.group.dates" }) Assert.DoesNotContain(k, TermCatalogue.RequiredKeys);
+        // Nothing neutral names a country, a tax authority or an ERP product.
+        foreach (var d in TermCatalogue.All) Assert.DoesNotMatch(@"\b(ABN|SAP|GST|VAT|EIN)\b", d.Singular + " " + d.Plural);
     }
 }

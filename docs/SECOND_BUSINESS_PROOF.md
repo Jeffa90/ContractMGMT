@@ -2,6 +2,13 @@
 
 Status: **Design only. Nothing in this document is implemented.** Written 2026-10-17 after slices S1 to S7. It is the plan for portability slice S9 of `docs/PORTABILITY_REMEDIATION_PLAN.md` (task PKM-04; acceptance criteria PRT-002, PRT-004, PRT-013, PRT-015). It builds, changes and approves nothing, and it does not declare production approval.
 
+**Amendments from the owner decisions of 2026-10-17 (`CONFIRMED_DECISIONS.md` D8), which take precedence over the text below where they differ:**
+
+* **D1: no Defects Liability state.** Practical completion and similar completion facts are recorded by an **Administrative Change Order** (a Variation that changes the recorded fact), not by a role-less state and not by a "certify practical completion" step. The lifecycle therefore has **ten** states, not eleven; the `Defects Liability Period` state, the "certify practical completion" step and the finding about missing reminders in that state are **withdrawn**. Where sections 5 and 6.4 and the risk table still mention them, read them as withdrawn.
+* **D2, D3: G11 and G1b are done before S9.** The pack is no longer designed around pack-time validation (G11); its organisation-dependent documents upload as they are. PRT-004 is to be satisfied in full. Both are implemented (`docs/S9_READINESS.md` section 13).
+* **D4: G2 is deferred to S10.** The proof leaves the tax identifier empty or uses an eleven-digit value and records the limit.
+* **D8.9 and D8.10:** Harborline Construction, `construction-subcontracts`, en-US, USD, America/Chicago; the pack ships in `templates/packs` as a first-class pack. **D8.7:** the neutral label of the `Approver` role is "Approval Authority", so the pack names its tiers explicitly. **D8.11:** sell-side Professional Services is the preferred next business.
+
 Everything described as a pack, a test or a page below is **Future** until a later pass builds it and records the result in `deploy/STATUS.md`. Paths that do not exist yet are written without code formatting on purpose.
 
 ## 1. What S9 has to prove
@@ -117,7 +124,7 @@ JBS is the reference: seventeen lifecycle states, Legal Review with rounds, a si
 | Live | Effective | Work in Progress |
 | Change | Variation in Progress | Change Order Open |
 | Pause | Suspended | Stop-Work |
-| Phases | none | Defects Liability Period (section 6.4) |
+| Phases | none | none (practical completion is recorded by an Administrative Change Order; D1) |
 | End | Ended, flagged, archived | Final Completion; Terminated; Withdrawn |
 | Renewal | Renewal in Progress | **None.** Subcontracts do not renew |
 | State count | 17 | About 10 |
@@ -221,7 +228,6 @@ Design intent, to be validated by the existing lifecycle validator in S9-1. Role
 | Work in Progress | effective | yes | Live; reminders on End Date and Review Date |
 | Change Order Open | variation | yes | Variations on |
 | Stop-Work | suspended | yes | Live role, so reminders continue |
-| Defects Liability Period | (no role) | yes | See 6.4 |
 | Final Completion | ended | yes | Terminal |
 | Terminated | terminated | yes | Terminal |
 | Withdrawn | withdrawn | yes | Terminal; before award |
@@ -425,7 +431,7 @@ Documents to update when S9 is built: docs/PORTABILITY_AUDIT.md (PRT-002, 004, 0
 | Q1 | How should a progress fact (practical completion date) be recorded on a locked contract? | Use an administrative change order in S9 (no platform change). Consider a generic "editable while locked" field flag later, with its own ADR |
 | Q2 | Is a state with no role (Defects Liability Period) acceptable, or should the platform give a live role or a "live" flag to a state? | Acceptable for S9. Record the missing reminders as a finding; decide the generic fix after the proof |
 | Q3 | Should G1 (all core field labels become terminology keys) be done before S9 starts? | **Yes.** It is small, generic, and PRT-004 cannot pass without it |
-| Q4 | Locale for the second business: en-US, USD, America/Chicago? | Yes. It is the most different from the reference locale and tests R-03 cheaply |
+| Q4 | Locale for the second business: en-US, USD, America/Chicago? | **Decided (D8.9): yes.** It is the most different from the reference locale and tests R-03 cheaply |
 | Q5 | Should the construction pack ship in templates/packs and the demonstration seed, or stay a test pack? | Ship it in templates/packs as a synthetic sample (like the reference pack); add a demonstration organisation as an optional extra |
 | Q6 | Is the next business after S9 sell-side professional services? | Yes. It inverts buy and sell and is the best remaining stress on the "supplier" model |
 

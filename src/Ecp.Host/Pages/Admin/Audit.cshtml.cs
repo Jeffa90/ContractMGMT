@@ -1,4 +1,5 @@
 using System.Text;
+using Ecp.Configuration;
 using Ecp.Identity;
 using Ecp.SharedKernel;
 using Ecp.SharedKernel.Localisation;
@@ -9,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ecp.Host.Pages.Admin;
 
 [Authorize(Policy = "perm:audit.read|audit.read_admin")]
-public sealed class AuditModel(IAuditBrowser audit, IAccessService access, LocalisationOptions localisation) : EcpPageModel
+public sealed class AuditModel(IAuditBrowser audit, IAccessService access, LocalisationOptions localisation, ITerminologyResolver terminology, IOrganisationStructureService organisations) : EcpPageModel
 {
     [BindProperty(SupportsGet = true)] public string? Action { get; set; }
     [BindProperty(SupportsGet = true)] public string? EntityType { get; set; }
@@ -22,7 +23,8 @@ public sealed class AuditModel(IAuditBrowser audit, IAccessService access, Local
 
     public async Task<IActionResult> OnGetAsync(CancellationToken ct) => await RunAsync(async () =>
     {
-        _fmt = new LocaleFormatter(localisation.DefaultCulture, localisation.DefaultTimeZoneId, localisation.DefaultCurrencyCode);
+        // The audit trail spans the tenant, so it is shown in the reader's own organisation's culture and zone when there is one; the installation default only when there is none.
+        _fmt = await terminology.HomeOrganisationAsync(ct) is { } home ? await OrgLocale.ForAsync(organisations, home, ct) : new LocaleFormatter(localisation.DefaultCulture, localisation.DefaultTimeZoneId, localisation.DefaultCurrencyCode);
         CanExport = await access.HoldsAnywhereAsync("audit.export", ct);
         Result = await audit.QueryAsync(Filter(), ct);
         return Page();

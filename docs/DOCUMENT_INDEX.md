@@ -76,6 +76,8 @@ Not verified (cannot be, before code exists): that the proposed test IDs pass, t
 
 `docs/CAPABILITIES.md` (the capability catalogue, matrix, architecture, compatibility rules and verification; ADR-0030), `decisions/ADR-0030-configurable-capabilities.md`.
 
+`decisions/ADR-0031-pack-validation-of-organisation-dependent-documents.md` (G11: how a pack with organisation-dependent documents is validated at upload and at assignment), `docs/S9_READINESS.md` (the readiness assessment and, in section 13, the outcome of the prerequisites).
+
 ## Added in portability slice S9 design (2026-10-17)
 
 `docs/SECOND_BUSINESS_PROOF.md` (design only: the second business, pack design, acceptance criteria, tests and risks for PRT-002, PRT-004 and PRT-013).

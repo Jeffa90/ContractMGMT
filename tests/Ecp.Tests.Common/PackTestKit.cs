@@ -99,6 +99,13 @@ public static class PackTestKit
     public static readonly IReadOnlyDictionary<string, (string Singular, string Plural)> ThirdPackWords = new Dictionary<string, (string, string)>
     {
         ["application.name"] = ("Agreement Hub", "Agreement Hub"),
+        ["supplier.number"] = ("Account Code", "Account Codes"),
+        ["supplier.tax.id"] = ("Company Registration", "Company Registrations"),
+        ["erp.reference"] = ("Ledger Code", "Ledger Codes"),
+        ["field.start.date"] = ("Commencement Date", "Commencement Dates"),
+        ["field.end.date"] = ("Scheduled Completion Date", "Scheduled Completion Dates"),
+        ["field.risk.level"] = ("Exposure Rating", "Exposure Ratings"),
+        ["field.group.dates"] = ("Key Dates", "Key Dates"),
         ["contract"] = ("Agreement", "Agreements"),
         ["agreement"] = ("Agreement", "Agreements"),
         ["contract.register"] = ("Agreement Ledger", "Agreement Ledgers"),

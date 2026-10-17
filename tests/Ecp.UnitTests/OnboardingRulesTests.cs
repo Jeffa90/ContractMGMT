@@ -210,6 +210,15 @@ public class OnboardingValidatorTests
     }
 
     [Fact]
+    public void The_privileged_mapping_warning_names_the_role_by_its_label_not_its_stable_code()
+    {
+        var report = Run(OnboardingDocument.Empty with { GroupMappings = [new("corp-sso", "grp", RoleCodes.ProcurementAdministrator, null, [], [], [], "Internal")] });
+        var warning = report.Messages.Single(m => m.Code == "privileged_mapping").Message;
+        Assert.Contains("[[contract.administrator|lower|a]]", warning);
+        Assert.DoesNotContain(RoleCodes.ProcurementAdministrator, warning);
+    }
+
+    [Fact]
     public void Schema_version_and_pack_are_checked()
     {
         Assert.True(Has(Run(OnboardingDocument.Empty with { SchemaVersion = 7 }), "schema_version"));

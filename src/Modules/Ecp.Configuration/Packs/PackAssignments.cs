@@ -116,6 +116,7 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
         if (capabilityFindings.Where(f => f.Severity == ValidationSeverity.Error).ToList() is { Count: > 0 } blockers)
             throw new DomainException("capability_conflict", "This pack's capability defaults do not fit this organisation as it is now, so it was not assigned. " + string.Join(" ", blockers.Select(b => b.Message)));
         var outcomes = new List<PackKindOutcome>();
+        var deferred = new List<(int Index, string Kind, List<ValidationMessage> Errors)>();
         foreach (var c in InstallableContent(package))
         {
             var scopeOrg = c.Scope == PackScopes.Tenant ? Guid.Empty : organisationId;
@@ -139,14 +140,27 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
                 }
                 var draft = await configuration.GetOrCreateDraftAsync(c.Kind, scopeOrg, json, ct);
                 var validated = await configuration.ValidateAsync(draft.Id, ct);
-                var errors = validated.Validation?.Messages.Count(m => m.Severity == ValidationSeverity.Error) ?? 0;
-                outcomes.Add(new PackKindOutcome(c.Kind, c.Scope, errors == 0 ? "Draft created and validated" : "Draft created; validation found problems", errors > 0,
-                    errors == 0 ? "It can be published after review." : $"{errors} problem(s) must be fixed before it can be published."));
+                var errorMessages = validated.Validation?.Messages.Where(m => m.Severity == ValidationSeverity.Error).ToList() ?? [];
+                // A finding that only says "something this depends on is not published yet" is not a problem with the draft: publish the other draft first (docs/SECOND_BUSINESS_PROOF.md, publication order).
+                var waiting = errorMessages.Where(m => ContextDependentCodes.All.Contains(m.Code)).ToList();
+                // Other findings may name something a prerequisite kind has not published yet; that is decided once every draft exists, below.
+                var rest = errorMessages.Except(waiting).ToList();
+                if (rest.Count > 0) deferred.Add((outcomes.Count, c.Kind, rest));
+                outcomes.Add(Outcome(c.Kind, c.Scope, 0, waiting));
             }
             catch (ForbiddenException)
             {
                 outcomes.Add(new PackKindOutcome(c.Kind, c.Scope, "Not created: you do not have permission to draft this kind", true, c.Scope == PackScopes.Tenant ? "This is tenant-wide configuration; a tenant administrator can create it." : "Ask an administrator who can draft configuration."));
             }
+        }
+
+        foreach (var (index, kind, errors) in deferred)
+        {
+            var scopeOrg = outcomes[index].Scope == PackScopes.Tenant ? Guid.Empty : organisationId;
+            var pending = new List<string>();
+            foreach (var pre in PackKinds.Prerequisites.GetValueOrDefault(kind) ?? [])
+                if (await configuration.FindOpenDraftAsync(pre, organisationId, ct) is not null) pending.Add(pre);
+            outcomes[index] = pending.Count > 0 ? Outcome(kind, outcomes[index].Scope, 0, errors, pending) : Outcome(kind, outcomes[index].Scope, errors.Count, []);
         }
 
         await organisations.SetSolutionPackAsync(organisationId, packKey, ct);
@@ -164,6 +178,12 @@ internal sealed class PackAssignments(IPackLoader loader, IConfigurationService 
             "Open Configuration, review each draft, validate it, and publish it when you are satisfied. Second-person publication applies where it is required."
         ]);
     }
+
+    private static PackKindOutcome Outcome(string kind, string scope, int errors, IReadOnlyList<ValidationMessage> waiting, IReadOnlyList<string>? after = null) => new(kind, scope,
+        errors > 0 ? "Draft created; validation found problems" : waiting.Count > 0 ? "Draft created; waits for something it depends on to be published first" : "Draft created and validated", errors > 0,
+        errors > 0 ? $"{errors} problem(s) must be fixed before it can be published."
+        : waiting.Count > 0 ? "Publish the drafts it depends on first (" + (after is { Count: > 0 } ? string.Join(", ", after) : "for example the custom fields, then the approval matrix, then the workflows") + "): " + string.Join(" ", waiting.Select(m => m.Message).Distinct().Take(3))
+        : "It can be published after review.");
 
     public async Task<IReadOnlyList<OrganisationPackStatus>> OrganisationsAsync(CancellationToken ct = default)
     {

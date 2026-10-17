@@ -11,7 +11,7 @@
     </div>
     <partial name="_ContractFields" model="new ContractFieldsView(Model.Input, Model.Options)" />
     <div class="field">
-        <label for="Description">@L["Description"]</label>
+        <label for="Description">@L["[[field.description]]"]</label>
         <textarea id="Description" asp-for="Description" maxlength="4000"></textarea>
     </div>
     @if (Model.Fields is { } fields && fields.AnyEditable)

@@ -23,7 +23,7 @@ else
         <h2 id="sum-h">@L["The [[variation]]"]</h2>
         <dl class="facts">
             <dt>@L["Reason"]</dt><dd>@v.Reason</dd>
-            @if (v.Description is { Length: > 0 }) { <dt>@L["Description"]</dt><dd>@v.Description</dd> }
+            @if (v.Description is { Length: > 0 }) { <dt>@L["[[field.description]]"]</dt><dd>@v.Description</dd> }
             <dt>@L["Proposed effective date"]</dt><dd>@(s.ProposedDate?.ToString("yyyy-MM-dd") ?? "-")</dd>
             <dt>@L["Financial impact"]</dt><dd>@(s.ImpactAmount is { } a ? $"{a:N2} {s.ImpactCurrency}" : "-") @v.ImpactNote</dd>
             <dt>@L["[[legal.review|sentence]]"]</dt><dd>@(v.LegalReviewRequired ? L["Required"] : L["Not required"])</dd>
@@ -42,7 +42,7 @@ else
             <tbody>
             @foreach (var c in v.Comparison)
             {
-                <tr class="@(c.Changed ? "changed" : "")"><th scope="row">@c.Label</th><td>@(c.Before ?? "-")</td><td>@(c.After ?? "-")</td>@if (s.IsOpen) { <td>@(c.Current ?? "-")</td> }</tr>
+                <tr class="@(c.Changed ? "changed" : "")"><th scope="row">@Terms.Expand(c.Label)</th><td>@(c.Before ?? "-")</td><td>@(c.After ?? "-")</td>@if (s.IsOpen) { <td>@(c.Current ?? "-")</td> }</tr>
             }
             </tbody>
         </table></div>

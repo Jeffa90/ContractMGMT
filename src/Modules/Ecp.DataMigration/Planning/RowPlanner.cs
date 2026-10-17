@@ -391,7 +391,7 @@ internal static class RowPlanner
         if (string.IsNullOrEmpty(name)) { plan.Messages.Add(new(true, "MIG-E001", "supplier.name", "The [[supplier|lower]] name is required.")); return; }
         if (name.Length > 300) { plan.Messages.Add(new(true, "MIG-E009", "supplier.name", $"The [[supplier|lower]] name is {name.Length} characters; the most allowed is 300. It is not shortened.")); return; }
         var vendor = mapped.Values.GetValueOrDefault("supplier.vendorNumber")?.Trim();
-        if (vendor is { Length: > 50 }) { plan.Messages.Add(new(true, "MIG-E009", "supplier.vendorNumber", "The vendor number is longer than 50 characters. It is not shortened.")); return; }
+        if (vendor is { Length: > 50 }) { plan.Messages.Add(new(true, "MIG-E009", "supplier.vendorNumber", "The [[supplier.number]] is longer than 50 characters. It is not shortened.")); return; }
         var normalised = Supplier.NormaliseName(name);
 
         WorkingSupplier? chosen = null;
@@ -402,9 +402,9 @@ internal static class RowPlanner
             {
                 chosen = byVendor[0];
                 if (chosen.Normalised != normalised)
-                    plan.Messages.Add(new(false, "MIG-W006", "supplier.name", $"The [[supplier|lower]] name differs from the existing [[supplier|lower]] '{chosen.Name}' that has vendor number {vendor}. The existing [[supplier|lower]] is used."));
+                    plan.Messages.Add(new(false, "MIG-W006", "supplier.name", $"The [[supplier|lower]] name differs from the existing [[supplier|lower]] '{chosen.Name}' that has [[supplier.number]] {vendor}. The existing [[supplier|lower]] is used."));
             }
-            else if (byVendor.Count > 1) { plan.Messages.Add(new(true, "MIG-E010", "supplier.vendorNumber", $"More than one [[supplier|lower]] has vendor number {vendor}. A person must resolve this.")); return; }
+            else if (byVendor.Count > 1) { plan.Messages.Add(new(true, "MIG-E010", "supplier.vendorNumber", $"More than one [[supplier|lower]] has [[supplier.number]] {vendor}. A person must resolve this.")); return; }
         }
         if (chosen is null)
         {
@@ -414,10 +414,10 @@ internal static class RowPlanner
             {
                 var s = byName[0];
                 if (!string.IsNullOrEmpty(vendor) && !string.IsNullOrEmpty(s.VendorNumber) && !string.Equals(s.VendorNumber, vendor, StringComparison.OrdinalIgnoreCase))
-                { plan.Messages.Add(new(true, "MIG-E010", "supplier.vendorNumber", $"[[supplier|lower|a|cap]] named '{name}' exists with a different vendor number. A person must resolve this.")); return; }
+                { plan.Messages.Add(new(true, "MIG-E010", "supplier.vendorNumber", $"[[supplier|lower|a|cap]] named '{name}' exists with a different [[supplier.number]]. A person must resolve this.")); return; }
                 chosen = s;
                 if (!string.IsNullOrEmpty(vendor) && string.IsNullOrEmpty(s.VendorNumber))
-                    plan.Messages.Add(new(false, "MIG-W006", "supplier.name", $"The existing [[supplier|lower]] '{s.Name}' has no vendor number; it was matched on its exact name."));
+                    plan.Messages.Add(new(false, "MIG-W006", "supplier.name", $"The existing [[supplier|lower]] '{s.Name}' has no [[supplier.number]]; it was matched on its exact name."));
             }
         }
         if (chosen is null)

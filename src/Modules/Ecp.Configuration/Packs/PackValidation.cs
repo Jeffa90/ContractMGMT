@@ -32,7 +32,7 @@ internal sealed class PackValidationService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     /// <summary>Validator messages that depend on the organisation the document is applied to. Without an organisation they are warnings, and become errors when the draft is validated for one.</summary>
-    private static readonly HashSet<string> ContextDependent = new(StringComparer.Ordinal) { "matrix_missing" };
+    private static readonly IReadOnlySet<string> ContextDependent = ContextDependentCodes.All;
 
     private readonly PackKindRegistry _kinds;
     private readonly PackTrustEvaluator _trust;
@@ -41,9 +41,11 @@ internal sealed class PackValidationService
     private readonly ITenantContext _tenant;
     private readonly IOptions<PackOptions> _options;
     private readonly IPackLoader _loader;
+    private readonly ClassificationScaleOverride _scale;
 
-    public PackValidationService(PackKindRegistry kinds, PackTrustEvaluator trust, ShippedPackSource shipped, ConfigurationDbContext db, ITenantContext tenant, IOptions<PackOptions> options, IPackLoader loader)
-    { _kinds = kinds; _trust = trust; _shipped = shipped; _db = db; _tenant = tenant; _options = options; _loader = loader; }
+    public PackValidationService(PackKindRegistry kinds, PackTrustEvaluator trust, ShippedPackSource shipped, ConfigurationDbContext db, ITenantContext tenant, IOptions<PackOptions> options, IPackLoader loader,
+        ClassificationScaleOverride scale)
+    { _kinds = kinds; _trust = trust; _shipped = shipped; _db = db; _tenant = tenant; _options = options; _loader = loader; _scale = scale; }
 
     public async Task<PackValidationReport> ValidateAsync(byte[] bytes, CancellationToken ct = default)
     {
@@ -72,11 +74,19 @@ internal sealed class PackValidationService
 
         // Each document through the module that owns its kind.
         if (!issues.Any(i => i.IsError && i.Code is PackCodes.KindUnknownRequired or PackCodes.SchemaUnsupported))
-            foreach (var entry in manifest.Content)
+        {
+            // A pack that carries its own classification policy is judged against that scale, not the tenant's current one (see ClassificationScaleOverride).
+            _scale.Scale = ScaleOf(opened);
+            try
             {
-                if (entry.Kind == PackReader.SolutionPackKind || !_kinds.Known.Contains(entry.Kind)) continue;
-                issues.AddRange(await ValidateDocumentAsync(entry, opened.Document(entry.Kind)!, ct));
+                foreach (var entry in manifest.Content)
+                {
+                    if (entry.Kind == PackReader.SolutionPackKind || !_kinds.Known.Contains(entry.Kind)) continue;
+                    issues.AddRange(await ValidateDocumentAsync(entry, opened.Document(entry.Kind)!, ct));
+                }
             }
+            finally { _scale.Scale = null; }
+        }
 
         // Dependencies.
         foreach (var d in manifest.Dependencies)
@@ -148,6 +158,17 @@ internal sealed class PackValidationService
             yield return new PackIssue(PackCodes.ContentInvalid, PackSeverity.Error, "The pack's default classification level is not one of its levels.", "content/solution-pack.json", "Correct the classification defaults.");
     }
 
+    private static ClassificationScale? ScaleOf(OpenedPackage opened)
+    {
+        try
+        {
+            if (opened.Manifest!.Content.All(c => c.Kind != ClassificationPolicyKind.KindName) || opened.Document(ClassificationPolicyKind.KindName) is not { } json) return null;
+            var policy = ClassificationPolicyDocument.Parse(json);
+            return new ClassificationScale(policy.Levels, policy.DefaultLevel, policy.PrivilegedLevels);
+        }
+        catch (Exception ex) when (ex is DomainException or JsonException) { return null; }                 // the policy's own validation reports it
+    }
+
     private async Task<IEnumerable<PackIssue>> ValidateDocumentAsync(PackContentEntry entry, string json, CancellationToken ct)
     {
         var found = new List<PackIssue>();
@@ -163,7 +184,7 @@ internal sealed class PackValidationService
                     $"{entry.Kind}: {m.Path}: {m.Message}", entry.Path, error ? "Correct the document in the pack source (the same rule applies in the Configuration Studio)." : null));
             }
         }
-        catch (Exception ex) when (ex is DomainException or JsonException or InvalidOperationException or ForbiddenException)
+        catch (Exception ex) when (ex is DomainException or JsonException or InvalidOperationException or ForbiddenException or ResourceNotFoundException)
         {
             found.Add(new PackIssue(PackCodes.ContentInvalid, PackSeverity.Error, $"{entry.Kind} could not be checked: {(ex is DomainException ? ex.Message : "the document is not in a form this platform can read.")}", entry.Path, "Correct the document in the pack source."));
         }

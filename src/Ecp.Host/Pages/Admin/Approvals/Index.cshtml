@@ -29,7 +29,7 @@ else
     @if (Model.UsedBy.Count > 0) { <p class="hint">@L["Workflows currently name"]: @string.Join(", ", Model.UsedBy). @L["A matrix a workflow names cannot be removed."]</p> }
     <div class="table-wrap"><table>
         <caption class="visually-hidden">@L["Matrices in force"]</caption>
-        <thead><tr><th scope="col">@L["Code"]</th><th scope="col">@L["Name"]</th><th scope="col">@L["Currency"]</th><th scope="col">@L["Base rows"]</th><th scope="col">@L["Exceptions"]</th><th scope="col">@L["Effective"]</th><th scope="col">@L["Today"]</th></tr></thead>
+        <thead><tr><th scope="col">@L["Code"]</th><th scope="col">@L["Name"]</th><th scope="col">@L["[[field.currency|sentence]]"]</th><th scope="col">@L["Base rows"]</th><th scope="col">@L["Exceptions"]</th><th scope="col">@L["Effective"]</th><th scope="col">@L["Today"]</th></tr></thead>
         <tbody>
         @foreach (var m in Model.Summaries)
         {

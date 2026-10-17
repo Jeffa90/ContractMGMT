@@ -80,7 +80,7 @@ internal static class TerminologyScenarios
         Assert.Equal("Contract Administrator", forBlank.Singular("contract.administrator"));
         Assert.Equal("Contract Owner", forBlank.Singular("contract.owner"));
         Assert.Equal("Review", forBlank.Singular("legal.review"));
-        Assert.Equal("Registration Approver", forBlank.Singular("primary.approver"));
+        Assert.Equal("Approval Authority", forBlank.Singular("primary.approver"));
         Assert.Equal("Counterparty", forBlank.Singular("supplier"));
         foreach (var (k, term) in forBlank.Terms)
             Assert.DoesNotMatch("(?i)jbs|procurement|group head|supplier", term.Singular + " " + term.Plural);
@@ -128,7 +128,7 @@ internal static class TerminologyScenarios
         var forBlank = await TermsAsync(w, "tenantAdmin", blank.Org);
         var forThird = await TermsAsync(w, "tenantAdmin", third.Org);
         Assert.Equal("Group Head of Procurement", forJbs.Group("GroupHeadProcurement"));
-        Assert.Equal("Registration Approvers", forBlank.Group("Approvers"));
+        Assert.Equal("Approval Authorities", forBlank.Group("Approvers"));
         Assert.Equal("Activation Approvers", forThird.Group("Approvers"));
         Assert.Equal("GroupHeadProcurement", forBlank.Group("GroupHeadProcurement"));          // no leak from the other pack: an unnamed group is its own key
         Assert.Equal("Approvers", forJbs.Group("Approvers"));

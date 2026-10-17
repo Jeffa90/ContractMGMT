@@ -119,6 +119,21 @@ New classes used in this section: **Stable machine identifier** (a role, permiss
 
 **Closed:** P-04; R-05 (on/off). **Still open:** regional defaults (S10), R-01 to R-04, PRT-002 as a whole (S9).
 
+## 0.7 Status after the S9 readiness prerequisites (2026-10-17; owner decisions D8)
+
+Five prerequisites were implemented before the second business proof; S9 itself has not started. Detail: `docs/S9_READINESS.md` section 13.
+
+| Item | Outcome |
+|---|---|
+| **G11** a valid pack refused at upload because an organisation-dependent document cannot be judged without an organisation | **Fixed generically.** Context-dependent findings are warnings at upload and "waits" at assignment (a closed prerequisite table); a pack's own classification levels are judged against its own scale; narrow errors still refuse |
+| **G8** untested pack kinds | **Verified** by a content-kind smoke test: every packable kind from one pack, uploaded, installed, assigned and published in dependency order, then used (SQLite local; SQL Server wrappers in CI) |
+| **G1a** ABN, vendor number and SAP wording reached every business | **Fixed.** Three terminology keys; neutral wording Tax Identifier, Vendor Number, ERP Reference; the reference pack (2.5.0) keeps ABN, Vendor Number, SAP Outline Agreement Number |
+| **G1b** the other core labels were literal (PRT-004 only partial) | **Fixed (D3).** 28 more keys (19 field labels, 9 group headings); the core field list, contract, supplier and Variation pages, reminders, dashboards and messages read them. Catalogue now 73 keys, 32 required |
+| **G6** locale fall-backs (R-03) | **Probed** with an en-US, USD, America/Chicago organisation: one real leak (the tenant-wide Audit page used the installation default) fixed; `lang` is an installation setting. **R-03 is closed for pages a US organisation reaches.** Remaining installation-level fall-backs stay in the guard list (S10) |
+| Neutral `Approver` label; raw role code in the onboarding warning | **Done.** "Approval Authority"; the warning prints the label |
+
+**PRT-004:** the platform now offers a label key for every contract-field and supplier label, enforced by a unit test and a render and export test. The criterion is ticked at the S9 sweep, not before. **Still open:** G2 non-Australian tax identifier *formats* (S10, owner decision D4), R-01, R-02, R-04, PRT-002 as a whole (S9), PRT-006/PRT-011 round trips.
+
 ## 1. Scope, method and classification
 
 ### 1.1 What was scanned

@@ -146,7 +146,7 @@ public static class OnboardingValidator
             if (g.RoleCode == RoleCodes.Legal && facts.Capabilities is { } caps && !caps.IsEnabled(CapabilityKeys.LegalReview))
                 Warn(path + ".role", "role_unused_capability", "[[legal.review|sentence]] is switched off for this [[organisation|lower]], so this role has nothing to do until it is switched on (Administration, Capabilities).");
             if (g.RoleCode is RoleCodes.ProcurementAdministrator or RoleCodes.DivisionSiteAdministrator)
-                Warn(path + ".role", "privileged_mapping", $"Everyone in group '{g.GroupKey}' becomes a {g.RoleCode}. Confirm the group's membership is controlled.");
+                Warn(path + ".role", "privileged_mapping", $"Everyone in group '{g.GroupKey}' becomes [[{TermCatalogue.KeyForRole(g.RoleCode)}|lower|a]]. Confirm the group's membership is controlled.");
         }
         if (d.GroupMappings.Count == 0 && d.ViewerScopes.Count == 0) Warn("$", "no_access", "Nobody is given access by this release: add viewer scopes or group mappings, or assign roles in user administration.");
 

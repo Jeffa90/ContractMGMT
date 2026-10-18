@@ -29,6 +29,8 @@ public static class OnboardingRoles
 public static class OnboardingValidator
 {
     private static readonly System.Text.RegularExpressions.Regex KeyPattern = new(@"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,39}$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.NonBacktracking);
+    // Structure keys are held by the tenancy module, which accepts letters, digits, '-' and '_' only; checking the same shape here stops a key that validates and then fails to publish (G-21).
+    private static readonly System.Text.RegularExpressions.Regex StructureKeyPattern = new(@"^[A-Za-z0-9][A-Za-z0-9_\-]{0,39}$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.NonBacktracking);
     private const int MaxCategoryDepth = 6;
 
     public static ValidationReport Validate(OnboardingDocument d, OnboardingFacts facts)
@@ -158,7 +160,7 @@ public static class OnboardingValidator
             for (var i = 0; i < entries.Count; i++)
             {
                 var e = entries[i];
-                if (!KeyPattern.IsMatch(e.Key ?? "")) Error($"{path}[{i}].key", "invalid_key", "A key is 1 to 40 letters, digits, '.', '_' or '-'.");
+                if (!StructureKeyPattern.IsMatch(e.Key ?? "")) Error($"{path}[{i}].key", "invalid_key", "A key is 1 to 40 letters, digits, '_' or '-', and starts with a letter or digit.");
                 else if (!set.Add(OnboardingDocument.Key(e.Key))) Error($"{path}[{i}].key", "duplicate", $"Key '{e.Key}' appears more than once.");
                 if (string.IsNullOrWhiteSpace(e.Name) || e.Name.Length > 200) Error($"{path}[{i}].name", "name", "A name is 1 to 200 characters.");
             }

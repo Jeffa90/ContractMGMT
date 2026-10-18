@@ -1,0 +1,36 @@
+@page "/Admin/Organisations"
+@model Ecp.Host.Pages.Admin.Organisations.IndexModel
+@{ ViewData["Title"] = L["Organisations"].Value; }
+<h1>@L["Organisations"]</h1>
+<p class="lede">@L["Create another organisation in this tenant and follow its set-up. Creating an organisation records it, its structure and its first administrator; it publishes nothing."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+@if (Model.Tenancy.IsSingleOrganisation)
+{
+    <section class="card" aria-labelledby="widen-h">
+        <h2 id="widen-h">@L["This installation supports one organisation"]</h2>
+        <p>@L["It was set up for a single organisation. To add another, widen it to several organisations first. This cannot be undone: an installation never goes back to a single organisation."]</p>
+        <form method="post" asp-page-handler="Widen">
+            <div class="field"><label for="Reason">@L["Why is this needed?"]</label><input id="Reason" name="Reason" type="text" required maxlength="500" /></div>
+            <div class="actions"><button type="submit">@L["Widen to several organisations"]</button></div>
+        </form>
+    </section>
+}
+else
+{
+    <p><a class="button" href="/Admin/Organisations/New">@L["Create an organisation"]</a></p>
+}
+
+<div class="table-wrap"><table>
+    <caption class="visually-hidden">@L["Organisations and their set-up progress"]</caption>
+    <thead><tr><th scope="col">@L["Organisation"]</th><th scope="col">@L["Key"]</th><th scope="col">@L["Pack"]</th><th scope="col">@L["Locale"]</th><th scope="col">@L["Time zone"]</th><th scope="col">@L["Currency"]</th><th scope="col">@L["Set-up"]</th></tr></thead>
+    <tbody>
+    @foreach (var o in Model.Organisations)
+    {
+        <tr>
+            <th scope="row">@o.Name</th><td>@o.Key</td><td>@(o.PackKey ?? "-")</td><td>@o.Culture</td><td>@o.TimeZone</td><td>@o.Currency</td>
+            <td><a href="/Admin/Organisations/Setup?id=@o.Id">@o.Done @L["of"] @o.Total @L["steps done"]</a></td>
+        </tr>
+    }
+    </tbody>
+</table></div>

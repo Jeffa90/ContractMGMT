@@ -15,7 +15,8 @@ public sealed record ProvisionTenantRequest(
 
 public sealed record ProvisionedTenant(Guid TenantId, Guid OrganisationId);
 
-public sealed record AddOrganisationRequest(string Name, string TimeZoneId, string CultureCode, string DefaultCurrencyCode, string ReferencePrefix, string? SolutionPackKey = null);
+public sealed record AddOrganisationRequest(string Name, string TimeZoneId, string CultureCode, string DefaultCurrencyCode, string ReferencePrefix, string? SolutionPackKey = null,
+    string ReferenceSeparator = "-", int ReferenceDigits = 6);
 
 public interface ITenantProvisioningService
 {
@@ -27,6 +28,11 @@ public interface ITenantProvisioningService
 
     /// <summary>Adds an organisation to the current tenant (requires an established tenant scope). The reference prefix must be unique in the tenant.</summary>
     Task<Guid> AddOrganisationAsync(AddOrganisationRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Widens the current tenant from a single organisation to several. A trusted operation for the organisation administration service, which has authorised it; it only ever widens, and it is audited with its reason.
+    /// </summary>
+    Task WidenTenancyAsync(TenancyMode to, string reason, CancellationToken ct = default);
 }
 
 public interface ITenantDirectory
@@ -41,7 +47,7 @@ public interface ITenantDirectory
     Task<bool> OrganisationExistsAsync(Guid organisationId, CancellationToken ct = default);
 }
 
-public sealed record TenantInfo(Guid Id, string Name, TenantStatus Status, Guid? FirstOrganisationId);
+public sealed record TenantInfo(Guid Id, string Name, TenantStatus Status, Guid? FirstOrganisationId, TenancyMode TenancyMode = TenancyMode.MultiOrganisation);
 
 internal sealed class TenantProvisioningService(
     TenantContext tenant, IUnitOfWork uow, TenancyDbContext db, IAuditWriter audit, IClock clock) : ITenantProvisioningService
@@ -96,7 +102,7 @@ internal sealed class TenantProvisioningService(
     public async Task<Guid> AddOrganisationAsync(AddOrganisationRequest r, CancellationToken ct = default)
     {
         var tenantId = tenant.RequireTenantId();
-        var rule = ReferenceNumberingRule.Create(r.ReferencePrefix);
+        var rule = ReferenceNumberingRule.Create(r.ReferencePrefix, r.ReferenceSeparator, r.ReferenceDigits);
         var org = Organisation.Create(tenantId, r.Name, r.TimeZoneId, r.CultureCode, r.DefaultCurrencyCode, rule, r.SolutionPackKey, clock.UtcNow);
         return await uow.ExecuteAsync(async c =>
         {
@@ -106,6 +112,29 @@ internal sealed class TenantProvisioningService(
             { throw new DomainException("organisation_conflict", "[[organisation|lower|a|cap]] with that name or reference prefix already exists in this tenant."); }
             audit.Record(new AuditEntry("organisation.created", nameof(Organisation), org.Id.ToString(), OrganisationId: org.Id));
             return org.Id;
+        }, ct);
+    }
+    public async Task WidenTenancyAsync(TenancyMode to, string reason, CancellationToken ct = default)
+    {
+        var tenantId = tenant.RequireTenantId();
+        var why = Guard.NotBlank(reason, "Reason", 500);
+        TenancyMode from;
+        using (tenant.UseInstallationScope())
+        {
+            from = await uow.ExecuteAsync(async c =>
+            {
+                var row = await db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, c) ?? throw new ResourceNotFoundException();
+                var previous = row.TenancyMode;
+                row.WidenTo(to);
+                await db.SaveChangesAsync(c);
+                return previous;
+            }, ct);
+        }
+        // The audit event belongs to the tenant, so it is written in the tenant's own scope once the installation-level change is made.
+        await uow.ExecuteAsync(_ =>
+        {
+            audit.Record(new AuditEntry("tenant.tenancy_widened", nameof(Tenant), tenantId.ToString(), Reason: why, NewValuesJson: $"{{\"from\":\"{from}\",\"to\":\"{to}\"}}"));
+            return Task.CompletedTask;
         }, ct);
     }
 }
@@ -132,7 +161,7 @@ internal sealed class TenantDirectory(TenantContext tenant, TenancyDbContext db)
             using (tenant.Use(t.Id))
             {
                 var orgId = await db.Organisations.AsNoTracking().OrderBy(o => o.CreatedUtc).Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct);
-                result.Add(new TenantInfo(t.Id, t.Name, t.Status, orgId));
+                result.Add(new TenantInfo(t.Id, t.Name, t.Status, orgId, t.TenancyMode));
             }
         }
         return result;
@@ -148,7 +177,7 @@ internal sealed class TenantDirectory(TenantContext tenant, TenancyDbContext db)
             using (tenant.Use(t.Id))
             {
                 var orgId = await db.Organisations.AsNoTracking().OrderBy(o => o.CreatedUtc).Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct);
-                return new TenantInfo(t.Id, t.Name, t.Status, orgId);
+                return new TenantInfo(t.Id, t.Name, t.Status, orgId, t.TenancyMode);
             }
         }
     }

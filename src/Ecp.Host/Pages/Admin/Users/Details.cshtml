@@ -64,7 +64,9 @@ else
         <select id="categories" name="categories" multiple size="4">@foreach (var c in Model.Categories) { <option value="@c.Id">@c.Name</option> }</select></div>
     <div class="field"><label for="ceiling">@L["Classification ceiling"]</label>
         <select id="ceiling" name="ceiling">@foreach (var l in Model.Levels) { <option value="@l" selected="@(l == Model.DefaultLevel)">@l</option> }</select></div>
-    <div class="field"><label for="approverGroup">@L["Approver group (Approver and Backup Approver only)"]</label><input id="approverGroup" name="approverGroup" type="text" maxlength="100" /></div>
+    <div class="field"><label for="approverGroup">@L["Approver group (Approver and Backup Approver only)"]</label>
+        <select id="approverGroup" name="approverGroup" aria-describedby="ag-hint"><option value="">@L["None"]</option>@foreach (var ag in Model.ApproverGroupChoices) { <option value="@ag.Key">@Terms.GroupLabel(ag.Key)@(ag.Registered ? "" : " (not registered)")</option> }</select>
+        <p class="hint" id="ag-hint">@L["Groups are registered, and their members managed, under Approver groups."] <a href="/Admin/ApproverGroups">@L["Open approver groups"]</a></p></div>
     <div class="field"><label for="reason">@L["Reason"]</label><input id="reason" name="reason" type="text" required aria-required="true" maxlength="1000" /></div>
     <button type="submit">@L["Grant role"]</button>
 </form>

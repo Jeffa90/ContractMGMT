@@ -1,0 +1,37 @@
+# ADR-0037: Implementation readiness: second-person publication, configuration review, form editors, organisation and approver-group administration, pack publisher separation and the malware-scanning gate
+
+Status: Implemented by the Implementation Readiness Gap Closure slice (2026-10-18). Proposed until the owner reviews it; production approval remains external governance.
+Builds on ADR-0003 (tenant isolation), ADR-0011 (audit chain), ADR-0026 (external packs), ADR-0029 (approver-group display names), ADR-0030 (capabilities), ADR-0034 and ADR-0035 (operations and upgrades). Owner decisions: `requirements/01-authoritative/CONFIRMED_DECISIONS.md`, section D13. The gap register is `docs/IMPLEMENTATION_READINESS.md`.
+
+## Context
+
+`docs/IMPLEMENTATION_PLAYBOOK.md` listed thirty gaps between the platform as built and an implementation a trained Business Administrator can carry out through the application alone. Each was re-checked against the code before anything was built; the register records which were confirmed. The most serious was G-01: in Production the form pages save a draft and publish it in one action, which makes the person who presses Publish the last editor, so the second-person rule refused every publication from a form page. The review model was also incomplete (no submission, no reviewer's decision, no record of who did what), rollback bypassed the second-person rule, and the three most business-specific documents (workflow, approval matrix, notification policy) could only be edited as JSON.
+
+## Decision
+
+1. **Publication is a two-person act that is bound to content.** A person validates a draft and submits it. The submission records the submitter, the time and the SHA-256 of the exact content. Any change to the content (by anyone) withdraws the submission. Where a second person is required (always in Production; elsewhere when `ConfigurationOptions.RequireSecondPersonPublish` is set) publication needs a submission whose hash equals the draft's current hash, and the publisher must be neither the draft's creator, its last editor nor its submitter. Saving content identical to what is held changes nothing, so a page that re-posts a form can no longer make a reviewer the editor. Reviewing, rejecting, returning, withdrawing and publishing never change `LastEditedBy`.
+2. **The release keeps the evidence.** A release records creator, last editor, submitter, submission time, submitted hash, publisher, publication time and the governance mode in force (`SecondPerson`, `SinglePerson` or `System`). Drafts and releases keep these in additive columns; a new table `configuration.ConfigurationReviewEvent` keeps every submission, withdrawal, rejection, return, invalidation and publication with its comment.
+3. **Refusals are audited.** A publication refused for governance reasons writes `config.publish.refused` (outcome Denied) in its own transaction so that it survives. Submission, withdrawal, rejection, return, publication and rollback request each have their own audit action.
+4. **Concurrent decisions: the first valid final decision wins.** Decisions use the row version of the draft and the unique release number; the loser is told that someone else decided.
+5. **Rollback follows the same rule.** A rollback needs the rollback permission, a reason and (in the host) a recent sign-in. It builds a draft from the chosen release's content, re-validates it against today's rules and, where a second person is required, submits it for review; the second person's publication creates a new release that points to the source release. Earlier releases are never changed. `RollbackAsync` remains as the direct form for installations without the requirement and refuses (creating nothing) where one applies. The audit records the requester, the reason, the source version, the publisher and the resulting version.
+6. **A review inbox for business people** (`Administration, Configuration reviews`) lists submissions with a plain-language summary of what would change against what is in force, the validation result, who did what, and the decisions open to the reader: approve and publish, return for changes, reject, withdraw. No JSON is shown; the technical detail (hashes) is separate and needs the history permission. The queue lists only what the reader may publish or put forward themselves, inside their tenant and organisations.
+7. **Form editors replace JSON editing** for the workflow, the approval matrix and the notification policy. They read and write the same documents through the same parsers and validators (closed vocabularies only; no code, SQL, script or expression), add preview or simulation and an impact summary, and publish through the same draft, review, publish and rollback model. The generic document page remains as an advanced diagnostic and export view; in Production it does not edit.
+8. **Organisations.** An authorised administrator (`organisations.manage`) creates further organisations through a wizard; widening a single-organisation tenant is an explicit, audited operation. Nothing is published by the wizard: pack content arrives as drafts.
+9. **Approver groups** get a registry (key, description, scope, active, delegation eligibility) and member management (primary and backup, effective dates) over the existing role assignments, with protections for the last member of a group in use. Display names stay in terminology.
+10. **Pack signing stays outside the application.** The application never holds a private signing key. The Business Administrator, the Pack Publisher (who builds and signs with the pack tool), the System Administrator and the key custodian are distinct roles, described in `docs/PACK_IMPLEMENTATION_GUIDE.md`.
+11. **The malware-scanning gate fails closed in Production.** An uploaded or migrated file is Pending until a scanner says Clean. A file that is not Clean is never downloadable, whatever the reason, and a Production installation with no scanner holds files in quarantine. The mock scanner exists only in Demonstration and Test. No real scanner is claimed.
+12. **No-code is a claim the rehearsal must earn.** `docs/IMPLEMENTATION_READINESS.md` says no-code only for what the automated rehearsal proves.
+
+## Alternatives considered
+
+* **Weakening the rule** (let the publisher re-save, or drop the check on form pages). Rejected: it removes the control instead of fixing the defect.
+* **A second-person approval stored apart from the draft.** Rejected: binding the approval to the draft's content hash gives the same evidence with one record and makes "approved this, published that" impossible by construction.
+* **Replacing the document model with a designer.** Rejected for this slice: forms over the existing, validated documents; no graphical designer.
+* **A signing service inside the application.** Rejected: it would put private keys in the web application's trust boundary.
+
+## Consequences
+
+* Production configuration changes from the form pages work, with a visible second person. Existing flows that published without submitting in Production now need the submit step; the test that covered second-person terminology publication was extended accordingly.
+* Additive migration `AddConfigurationReview` (and the others listed in `docs/IMPLEMENTATION_READINESS.md`). Existing drafts and releases read as before; new columns default to empty.
+* The single-person policy stays available in Demonstration and Test and is recorded on each release.
+* The gap register states what remains deferred, by design or not verified.

@@ -26,6 +26,16 @@ public sealed class Tenant
         TenancyMode = tenancyMode, ConfigurationMode = mode, CreatedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
     };
 
+    /// <summary>
+    /// Widens the tenant so that it may hold more than one organisation. Only ever outward (a single-organisation tenant becomes multi-organisation; a multi-organisation tenant may become multi-tenant): narrowing would strand organisations,
+    /// so it is not offered.
+    /// </summary>
+    public void WidenTo(TenancyMode to)
+    {
+        if (to <= TenancyMode) throw new DomainException("not_wider", "That does not widen the tenant; a tenant can only be widened, never narrowed.");
+        TenancyMode = to;
+    }
+
     public void Suspend() => Status = TenantStatus.Suspended;
     public void Reactivate() => Status = TenantStatus.Active;
 }

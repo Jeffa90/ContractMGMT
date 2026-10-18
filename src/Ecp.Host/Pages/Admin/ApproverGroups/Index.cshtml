@@ -1,0 +1,47 @@
+@page "/Admin/ApproverGroups"
+@model Ecp.Host.Pages.Admin.ApproverGroups.IndexModel
+@{ ViewData["Title"] = L["Approver groups"].Value; }
+<h1>@L["Approver groups"]</h1>
+<p class="lede">@L["An approver group is who decides an approval. Approval matrices and workflows name a group by its key; the people in it are the approvers and backup approvers you add here. The key is permanent. The name people read comes from Terminology."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+@if (Model.Groups.Count == 0)
+{
+    <p class="hint">@L["No approver group exists yet. Register the first one below."]</p>
+}
+else
+{
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Approver groups, their members and what relies on them"]</caption>
+        <thead><tr><th scope="col">@L["Group"]</th><th scope="col">@L["Description"]</th><th scope="col">@L["For"]</th><th scope="col">@L["Approvers"]</th><th scope="col">@L["Backups"]</th><th scope="col">@L["Relied on"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Open"]</th></tr></thead>
+        <tbody>
+        @foreach (var g in Model.Groups)
+        {
+            <tr>
+                <th scope="row">@Terms.GroupLabel(g.Key)</th>
+                <td>@g.Description</td>
+                <td>@Model.OrganisationName(g.OrganisationId)</td>
+                <td>@g.Approvers</td><td>@g.Backups</td><td>@g.InUse</td>
+                <td>@if (!g.Registered) { <span class="badge warning">@L["Not registered"]</span> } else if (!g.IsActive) { <span class="badge">@L["Retired"]</span> } else if (g.Approvers + g.Backups == 0) { <span class="badge warning">@L["No members"]</span> } else { <span class="badge">@L["In use"]</span> }</td>
+                <td><a href="/Admin/ApproverGroups/Details?key=@Uri.EscapeDataString(g.Key)">@(g.Registered ? L["Manage"] : L["Register and manage"])</a></td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+}
+
+<section class="card" aria-labelledby="new-h">
+    <h2 id="new-h">@L["Register an approver group"]</h2>
+    <form method="post" asp-page-handler="Create">
+        <div class="field"><label for="Key">@L["Group key"]</label><input id="Key" name="Key" type="text" required maxlength="100" aria-describedby="key-hint" value="@Model.Key" />
+            <p class="hint" id="key-hint">@L["Letters, digits, full stops, hyphens and underscores, starting with a letter or digit. Approval matrices use exactly this. It cannot be changed later."]</p></div>
+        <div class="field"><label for="Description">@L["What this group is for"]</label><input id="Description" name="Description" type="text" maxlength="300" value="@Model.Description" /></div>
+        <div class="field"><label for="OrganisationId">@L["Belongs to"]</label>
+            <select id="OrganisationId" name="OrganisationId">
+                @if (Model.CoversEverywhere) { <option value="">@L["All organisations"]</option> }
+                @foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(Model.OrganisationId == o.Id)">@o.Name</option> }
+            </select></div>
+        <div class="check field"><input name="AllowDelegation" type="hidden" value="false" /><input id="AllowDelegation" name="AllowDelegation" type="checkbox" value="true" checked="@Model.AllowDelegation" /><label for="AllowDelegation">@L["Members may delegate their approvals to someone else for a period"]</label></div>
+        <div class="actions"><button type="submit">@L["Register the group"]</button></div>
+    </form>
+</section>

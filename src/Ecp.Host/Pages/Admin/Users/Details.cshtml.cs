@@ -11,7 +11,7 @@ namespace Ecp.Host.Pages.Admin.Users;
 
 [Authorize(Policy = "perm:users.manage")]
 public sealed class DetailsModel(IPeopleDirectory people, IUserAdministration admin, IRoleAssignmentService roles, IAccessService access,
-    IOrganisationStructureService structure, ISecuredCategoryService categories, Ecp.Configuration.ITerminologyResolver terminology) : EcpPageModel
+    IOrganisationStructureService structure, ISecuredCategoryService categories, Ecp.Configuration.ITerminologyResolver terminology, IApproverGroupService approverGroups) : EcpPageModel
 {
     public PersonItem Person { get; private set; } = null!;
     public IReadOnlyList<AssignmentDto> Assignments { get; private set; } = [];
@@ -25,6 +25,7 @@ public sealed class DetailsModel(IPeopleDirectory people, IUserAdministration ad
     public IReadOnlyList<CategoryItem> Categories { get; private set; } = [];
     public IReadOnlyList<string> Levels { get; private set; } = [];
     public string DefaultLevel { get; private set; } = "";
+    public IReadOnlyList<ApproverGroupSummary> ApproverGroupChoices { get; private set; } = [];
     private Dictionary<Guid, string> _names = [];
 
     public Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct) => RunAsync(async () => { await LoadAsync(id, ct); return Page(); });
@@ -75,6 +76,7 @@ public sealed class DetailsModel(IPeopleDirectory people, IUserAdministration ad
         GrantableRoles = subject is null ? [] : subject.Assignments.Where(a => a.IsActiveAt(now) && AccessEvaluator.Default.Matrix.Of(a.RoleCode, "roles.delegate") != Grant.None)
             .SelectMany(a => DelegationPolicy.GrantableBy(a.RoleCode)).Distinct().Order().ToList();
         Organisations = await structure.ListOrganisationsAsync(ct);
+        ApproverGroupChoices = (await approverGroups.ListAsync(ct)).Where(g => g.IsActive).ToList();
         // A role is offered when at least one organisation the grantor can delegate in offers it; a role every such organisation hides drops out of the picker.
         var delegating = subject is null ? [] : subject.Assignments.Where(a => a.IsActiveAt(now) && AccessEvaluator.Default.Matrix.Of(a.RoleCode, "roles.delegate") != Grant.None).ToList();
         var inReach = delegating.Any(a => a.Scope.Level != ScopeLevel.Organisation) ? Organisations : Organisations.Where(o => delegating.Any(a => a.Scope.OrganisationIds.Contains(o.Id))).ToList();

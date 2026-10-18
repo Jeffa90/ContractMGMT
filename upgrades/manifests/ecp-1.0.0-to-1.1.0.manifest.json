@@ -8,7 +8,7 @@
     "1.0.0"
   ],
   "sourceLedgerSha256": "dc6242cab14aa459f345e553cdd3a7d90e249fba69552e6ef552750c3c5aa64f",
-  "targetLedgerSha256": "b5a75b475c328e4111dddb77a00100207a7e9f60923def46aa79b26885724e51",
+  "targetLedgerSha256": "7d89460805ec3b55112975f27a5d3f9f6a5af1db1ab654724c76e476e07ebcef",
   "moduleOrder": [
     "Audit",
     "Tenancy",
@@ -125,7 +125,7 @@
       "module": "Identity",
       "tier": 3,
       "schema": "identity",
-      "schemaVersion": "20261016050707_ElevationAndPrivilegedAccess",
+      "schemaVersion": "20261018094912_AddApproverGroups",
       "migrations": [
         {
           "id": "20261016010618_Initial",
@@ -172,6 +172,21 @@
             "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
           ],
           "operations": 5
+        },
+        {
+          "id": "20261018094912_AddApproverGroups",
+          "checksum": "09b2ed00f43f2105176330f4f674f76ab05110189c1be61ed7f7628b8d100a3e",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index identity.ApproverGroup.IX_ApproverGroup_TenantId_Key",
+            "create table identity.ApproverGroup",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_ApproverGroup] ADD FILTER PREDICATE\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
+          ],
+          "operations": 4
         }
       ]
     },
@@ -883,6 +898,23 @@
   ],
   "newMigrations": [
     {
+      "module": "Identity",
+      "id": "20261018094912_AddApproverGroups",
+      "checksum": "09b2ed00f43f2105176330f4f674f76ab05110189c1be61ed7f7628b8d100a3e",
+      "categories": [
+        "IndexOrConstraint",
+        "RowLevelSecurity"
+      ],
+      "objects": [
+        "create index identity.ApproverGroup.IX_ApproverGroup_TenantId_Key",
+        "create table identity.ApproverGroup",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_ApproverGroup] ADD FILTER PREDICATE\u2026",
+        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
+      ],
+      "reviewRequired": false,
+      "reviewed": true
+    },
+    {
       "module": "Configuration",
       "id": "20261018094305_AddConfigurationReview",
       "checksum": "5ca523a214eb783854acb15d271ec08c36f7ea496e5436d3e363c182281565f0",
@@ -1003,5 +1035,5 @@
     ],
     "dataLossStatement": "Rolling back discards everything created after the pre-upgrade backup, including anything done after the upgrade finished. It cannot be recovered from the backup."
   },
-  "manifestSha256": "d0eaa7e0485c8330053f940d7e87bc70c1906eea6ecb42015fd2f2490dbbb38b"
+  "manifestSha256": "368ee7ac234593c340bb9ba59b98a28d371c90a693cabe3d54d1b6f6309f329b"
 }

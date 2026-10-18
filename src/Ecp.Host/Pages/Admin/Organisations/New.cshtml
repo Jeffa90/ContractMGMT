@@ -1,0 +1,95 @@
+@page "/Admin/Organisations/New"
+@model Ecp.Host.Pages.Admin.Organisations.NewModel
+@{ ViewData["Title"] = L["Create an organisation"].Value; }
+<h1>@L["Create an organisation"]</h1>
+<p class="lede">@L["Fill in the form and choose Check. Check lists every problem beside its field and shows what would be created; it changes nothing. Create makes the organisation, its structure and its first administrator, and assigns the pack as drafts. Nothing is published."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+@if (Model.Created is { } done)
+{
+    <section class="card" aria-labelledby="done-h" role="status">
+        <h2 id="done-h">@L["The organisation was created"]</h2>
+        <ul>@foreach (var d in done.Done) { <li>@d</li> }</ul>
+        <h3>@L["What to do next"]</h3>
+        <ul>@foreach (var n in done.NextSteps) { <li>@n</li> }</ul>
+        <p><a class="button" href="/Admin/Organisations/Setup?id=@done.OrganisationId">@L["Open the set-up checklist"]</a></p>
+    </section>
+}
+else if (Model.IsSingle)
+{
+    <p class="notice" role="alert">@L["This installation is set up for a single organisation. Widen it to several organisations first."] <a href="/Admin/Organisations">@L["Go to Organisations"]</a></p>
+}
+else
+{
+    @if (Model.Plan is { } plan)
+    {
+        <section class="card" aria-labelledby="plan-h" role="status">
+            <h2 id="plan-h">@(plan.CanCreate ? L["Ready to create"] : L["Fix these first"])</h2>
+            @if (plan.Problems.Count > 0)
+            {
+                <ul>@foreach (var p in plan.Problems) { <li><strong>@(p.IsError ? L["Problem"] : L["Note"]):</strong> @p.Message</li> }</ul>
+            }
+            @if (plan.CanCreate)
+            {
+                <p>@L["If you choose Create, this will happen:"]</p>
+                <ol>@foreach (var a in plan.Actions) { <li>@a</li> }</ol>
+            }
+        </section>
+    }
+
+    <form method="post">
+        <fieldset>
+            <legend>@L["The organisation"]</legend>
+            <div class="field"><label for="Name">@L["Display name"]</label><input id="Name" name="Name" type="text" required maxlength="200" value="@Model.Name" aria-describedby="Name-hint Name-err" />
+                <p class="hint" id="Name-hint">@L["The name people see. Example: Harborline Construction. Must be unique in this tenant."]</p><p class="error" id="Name-err">@Model.ErrorFor("Name")</p></div>
+            <div class="field"><label for="LegalName">@L["Registered legal name"]</label><input id="LegalName" name="LegalName" type="text" required maxlength="200" value="@Model.LegalName" aria-describedby="LegalName-hint LegalName-err" />
+                <p class="hint" id="LegalName-hint">@L["The company's full legal name. It is recorded as the first legal entity (key MAIN). Example: Harborline Construction Pty Ltd."]</p><p class="error" id="LegalName-err">@Model.ErrorFor("LegalName")</p></div>
+            <div class="field"><label for="Key">@L["Organisation key"]</label><input id="Key" name="Key" type="text" required maxlength="16" value="@Model.Key" aria-describedby="Key-hint Key-err" />
+                <p class="hint" id="Key-hint">@L["2 to 16 letters or digits, starting with a letter. It begins every reference number and cannot be changed later. Example: HBL gives HBL-000001."]</p><p class="error" id="Key-err">@Model.ErrorFor("Key")</p></div>
+            <div class="field"><label for="ReferenceSeparator">@L["Separator in reference numbers"]</label>
+                <select id="ReferenceSeparator" name="ReferenceSeparator" aria-describedby="ReferenceSeparator-err">
+                    @foreach (var s in new[] { ("-", "Hyphen (HBL-000001)"), ("/", "Slash (HBL/000001)"), (".", "Full stop (HBL.000001)"), ("", "None (HBL000001)") }) { <option value="@s.Item1" selected="@(Model.ReferenceSeparator == s.Item1)">@s.Item2</option> }
+                </select><p class="error" id="ReferenceSeparator-err">@Model.ErrorFor("ReferenceSeparator")</p></div>
+            <div class="field"><label for="ReferenceDigits">@L["Digits in the number"]</label><input id="ReferenceDigits" name="ReferenceDigits" type="number" min="3" max="12" value="@Model.ReferenceDigits" aria-describedby="ReferenceDigits-hint ReferenceDigits-err" />
+                <p class="hint" id="ReferenceDigits-hint">@L["3 to 12. Six digits allows a million references."]</p><p class="error" id="ReferenceDigits-err">@Model.ErrorFor("ReferenceDigits")</p></div>
+        </fieldset>
+        <fieldset>
+            <legend>@L["Where and how it works"]</legend>
+            <div class="field"><label for="Country">@L["Country or region"]</label>
+                <select id="Country" name="Country" aria-describedby="Country-err"><option value="">@L["(not set)"]</option>
+                    @foreach (var c in Model.Countries) { <option value="@c.Key" selected="@(Model.Country == c.Key)">@c.Value (@c.Key)</option> }
+                </select><p class="error" id="Country-err">@Model.ErrorFor("Country")</p></div>
+            <div class="field"><label for="Culture">@L["Locale"]</label><input id="Culture" name="Culture" type="text" required maxlength="35" value="@Model.Culture" aria-describedby="Culture-hint Culture-err" />
+                <p class="hint" id="Culture-hint">@L["Language and region, for dates and numbers. Examples: en-AU, en-US, en-GB."]</p><p class="error" id="Culture-err">@Model.ErrorFor("Culture")</p></div>
+            <div class="field"><label for="TimeZone">@L["Time zone"]</label><input id="TimeZone" name="TimeZone" type="text" required maxlength="100" value="@Model.TimeZone" aria-describedby="TimeZone-hint TimeZone-err" />
+                <p class="hint" id="TimeZone-hint">@L["An IANA name. Examples: Australia/Sydney, America/Chicago. Times are stored in UTC and shown in this zone."]</p><p class="error" id="TimeZone-err">@Model.ErrorFor("TimeZone")</p></div>
+            <div class="field"><label for="Currency">@L["Default currency"]</label><input id="Currency" name="Currency" type="text" required maxlength="3" value="@Model.Currency" aria-describedby="Currency-hint Currency-err" />
+                <p class="hint" id="Currency-hint">@L["Three letters. Examples: AUD, USD. Each amount keeps its own currency."]</p><p class="error" id="Currency-err">@Model.ErrorFor("Currency")</p></div>
+        </fieldset>
+        <fieldset>
+            <legend>@L["People and pack"]</legend>
+            <div class="field"><label for="InitialAdministratorId">@L["Initial administrator"]</label>
+                <select id="InitialAdministratorId" name="InitialAdministratorId" aria-describedby="Admin-hint Admin-err"><option value="">@L["(none yet)"]</option>
+                    @foreach (var p in Model.People) { <option value="@p.Id" selected="@(Model.InitialAdministratorId == p.Id)">@p.DisplayName</option> }
+                </select>
+                <p class="hint" id="Admin-hint">@L["This person becomes Organisation Administrator of this organisation only. Invite them under Users first if they are not listed. Without one, nobody can configure the organisation."]</p><p class="error" id="Admin-err">@Model.ErrorFor("InitialAdministratorId")</p></div>
+            <div class="field"><label for="PackKey">@L["Pack"]</label>
+                <select id="PackKey" name="PackKey" aria-describedby="Pack-hint Pack-err"><option value="">@L["(choose later)"]</option>
+                    @foreach (var p in Model.Packs) { <option value="@p.Key" selected="@(Model.PackKey == p.Key)">@p.Label</option> }
+                </select>
+                <p class="hint" id="Pack-hint">@L["The pack supplies starting workflow, wording and settings as drafts. Nothing is published."]</p><p class="error" id="Pack-err">@Model.ErrorFor("PackKey")</p></div>
+        </fieldset>
+        <fieldset>
+            <legend>@L["Structure (optional)"]</legend>
+            <div class="field"><label for="StructureCsv">@L["Divisions, business units, sites and further legal entities"]</label>
+                <textarea id="StructureCsv" name="StructureCsv" rows="8" aria-describedby="Structure-hint Structure-err">@Model.StructureCsv</textarea>
+                <p class="hint" id="Structure-hint">@L["One line each, copied from a spreadsheet. Columns: type, key, name, parent key, time zone, registration number. The type is LegalEntity, Division, BusinessUnit or Site. A business unit's parent key names its division."]</p>
+                <p class="error" id="Structure-err">@Model.ErrorFor("StructureCsv")</p></div>
+            <details><summary>@L["Example"]</summary><pre>type,key,name,parentKey,timeZone,registrationNumber
+Division,CIVIL,Civil Division,,,
+BusinessUnit,ROADS,Roads and Bridges,CIVIL,,
+Site,SYD,Sydney Office,,Australia/Sydney,</pre></details>
+        </fieldset>
+        <div class="actions"><button type="submit" asp-page-handler="Check">@L["Check"]</button> <button type="submit" asp-page-handler="Create" disabled="@(Model.Plan is null || !Model.Plan.CanCreate)">@L["Create the organisation"]</button></div>
+    </form>
+}

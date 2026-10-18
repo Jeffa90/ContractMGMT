@@ -32,6 +32,8 @@
         if (await Can("suppliers.read")) items.Add(("/Suppliers", L["[[supplier|plural]]"].Value, "/Suppliers"));
         if (await Can("categories.manage", "contracts.read")) items.Add(("/Admin/Categories", L["[[category|plural]]"].Value, "/Admin/Categories"));
         if (await Can("users.manage")) items.Add(("/Admin/Users", L["Users and roles"].Value, "/Admin/Users"));
+        if (await Can("organisations.manage")) items.Add(("/Admin/Organisations", L["Organisations"].Value, "/Admin/Organisations"));
+        if (await Can("users.manage")) items.Add(("/Admin/ApproverGroups", L["Approver groups"].Value, "/Admin/ApproverGroups"));
         if (await Can("audit.read", "audit.read_admin")) items.Add(("/Admin/Audit", L["Audit events"].Value, "/Admin/Audit"));
         if (await Can("onboarding.run")) items.Add(("/Onboarding", L["[[organisation]] onboarding"].Value, "/Onboarding"));
         if (await Can("migration.stage")) items.Add(("/Migration", L["Data migration"].Value, "/Migration"));

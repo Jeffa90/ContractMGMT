@@ -719,6 +719,7 @@ public static class IdentityModule
         services.AddScoped<IAuditBrowser, AuditBrowser>();
         services.AddScoped<IPeopleDirectory, PeopleDirectory>();
         services.AddScoped<IUserAdministration, UserAdministration>();
+        services.AddScoped<IApproverGroupService, ApproverGroupService>();
         services.AddScoped<IClassificationScaleProvider, DefaultClassificationScaleProvider>();
         return services;
     }

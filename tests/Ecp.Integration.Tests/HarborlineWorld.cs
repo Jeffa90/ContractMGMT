@@ -104,13 +104,13 @@ internal sealed class HarborlineWorld
     public Task AsAsync(string userKey, Func<TenantScope, Task> work) => AsAsync<bool>(userKey, async s => { await work(s); return true; });
 
     /// <summary>Creates a tenant whose first organisation is Harborline (US locale, dollars, Chicago) pointing at the pack, and its people. Nothing is installed or published yet.</summary>
-    public static async Task<HarborlineWorld> CreateTenantAsync(TestApp app, string? tenantName = null)
+    public static async Task<HarborlineWorld> CreateTenantAsync(TestApp app, string? tenantName = null, TenancyMode tenancy = TenancyMode.MultiOrganisation)
     {
         var w = new HarborlineWorld(app);
         await using var bootstrap = app.Services.CreateAsyncScope();
         var name = tenantName ?? "Harborline" + Guid.NewGuid().ToString("N")[..6];
         var provisioned = await bootstrap.ServiceProvider.GetRequiredService<ITenantProvisioningService>().ProvisionAsync(new ProvisionTenantRequest(
-            name, TenancyMode.MultiOrganisation, EcpMode.Test, "Harborline Construction", "America/Chicago", "en-US", "USD", Prefix, PackKey));
+            name, tenancy, EcpMode.Test, "Harborline Construction", "America/Chicago", "en-US", "USD", Prefix, PackKey));
         w.TenantId = provisioned.TenantId; w.Org = provisioned.OrganisationId;
         await w.AddPeopleAsync();
         return w;

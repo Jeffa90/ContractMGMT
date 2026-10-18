@@ -103,6 +103,7 @@ public static class LifecycleModule
         services.AddScoped<IApprovalMatrixReferences>(sp => sp.GetRequiredService<LifecycleMatrixReferences>());
         services.AddScoped<IRegisterAuthorisationService, RegisterAuthorisationService>();
         services.AddScoped<IPendingApprovalSource, PendingApprovalSource>();
+        services.AddScoped<Ecp.Identity.IApproverGroupUsageSource, LifecycleApproverGroupUsage>();
         services.AddScoped<IRecordUnlockService, RecordUnlockService>();
         services.AddScoped<VariationService>();
         services.AddScoped<IVariationService>(sp => sp.GetRequiredService<VariationService>());

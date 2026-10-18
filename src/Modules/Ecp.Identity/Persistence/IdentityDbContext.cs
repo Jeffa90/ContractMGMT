@@ -16,6 +16,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<GroupRoleMapping> GroupMappings => Set<GroupRoleMapping>();
     public DbSet<IdentityProviderRegistration> Providers => Set<IdentityProviderRegistration>();
     public DbSet<Elevation> Elevations => Set<Elevation>();
+    public DbSet<ApproverGroup> ApproverGroups => Set<ApproverGroup>();
     protected override string SchemaName => IdentityModule.Schema;
 
     private static readonly JsonSerializerOptions Json = new();
@@ -32,6 +33,20 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     protected override void ConfigureModule(ModelBuilder mb)
     {
+        mb.Entity<ApproverGroup>(e =>
+        {
+            e.ToTable("ApproverGroup");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Key).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(300).IsRequired();
+            e.Property(x => x.CreatedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RetiredReason).HasMaxLength(500);
+            e.Property(x => x.RowVersion);
+            // A key names one group in a tenant (matching is exact, as matrices and workflows name it).
+            e.HasIndex(x => new { x.TenantId, x.Key }).IsUnique();
+        });
+
         mb.Entity<UserProfile>(e =>
         {
             e.ToTable("UserProfile");

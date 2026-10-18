@@ -235,6 +235,7 @@ public static class ContractsModule
         services.AddScoped<ISupplierIdentifierWriter>(sp => sp.GetRequiredService<SupplierIdentifierService>());
         services.AddScoped<TaxIdentifierGate>();
         services.AddScoped<IContractService, ContractService>();
+        services.AddScoped<Ecp.Tenancy.IOrganisationUsageSource, ContractsOrganisationUsage>();
         services.AddScoped<Ecp.Documents.IDocumentParentValidator, ContractDocumentParentValidator>();
         services.AddScoped<ContractAccessContext>();
         services.AddScoped<ReferenceAllocator>();

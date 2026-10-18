@@ -1,0 +1,132 @@
+@page "/Admin/ApproverGroups/Details"
+@model Ecp.Host.Pages.Admin.ApproverGroups.DetailsModel
+@{ ViewData["Title"] = L["Approver group"].Value; var g = Model.Group; }
+<h1>@L["Approver group"]: @Terms.GroupLabel(Model.Key)</h1>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (g is not null)
+{
+    var s = g.Summary;
+    <section class="card" aria-labelledby="set-h">
+        <h2 id="set-h">@L["Settings"]</h2>
+        @if (!s.Registered)
+        {
+            <p class="error-summary" role="status">@L["This key is held by people but has not been registered. Register it to manage it here."]</p>
+            <form method="post" action="/Admin/ApproverGroups?handler=Create">
+                <input type="hidden" name="Key" value="@s.Key" /><input type="hidden" name="AllowDelegation" value="true" />
+                <div class="field"><label for="reg-desc">@L["What this group is for"]</label><input id="reg-desc" name="Description" type="text" maxlength="300" /></div>
+                <div class="actions"><button type="submit">@L["Register the group"]</button></div>
+            </form>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="Save">
+                <input type="hidden" name="Key" value="@s.Key" />
+                <p>@L["Key"]: <code>@s.Key</code> · @L["For"]: @Model.OrganisationName(s.OrganisationId) · @(s.IsActive ? L["Active"] : L["Retired"])</p>
+                <div class="field"><label for="Description">@L["What this group is for"]</label><input id="Description" name="Description" type="text" maxlength="300" value="@Model.Description" /></div>
+                <div class="check field"><input name="AllowDelegation" type="hidden" value="false" /><input id="AllowDelegation" name="AllowDelegation" type="checkbox" value="true" checked="@Model.AllowDelegation" /><label for="AllowDelegation">@L["Members may delegate their approvals to someone else for a period"]</label></div>
+                <div class="actions"><button type="submit" class="secondary">@L["Save the settings"]</button></div>
+            </form>
+        }
+    </section>
+
+    <section class="card" aria-labelledby="rel-h">
+        <h2 id="rel-h">@L["What relies on this group"]</h2>
+        @if (g.Usage.Count == 0) { <p class="hint">@L["Nothing relies on this group at the moment."]</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Places this approver group is relied on"]</caption>
+                <thead><tr><th scope="col">@L["Where"]</th><th scope="col">@L["Count"]</th></tr></thead>
+                <tbody>@foreach (var u in g.Usage) { <tr><th scope="row">@u.Where</th><td>@u.Count</td></tr> }</tbody>
+            </table></div>
+        }
+    </section>
+
+    <section class="card" aria-labelledby="mem-h">
+        <h2 id="mem-h">@L["Members"]</h2>
+        @if (g.Members.Count == 0) { <p class="hint">@L["Nobody is in this group yet."]</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Members of the approver group, with their dates"]</caption>
+                <thead><tr><th scope="col">@L["Person"]</th><th scope="col">@L["As"]</th><th scope="col">@L["For"]</th><th scope="col">@L["From"]</th><th scope="col">@L["Until"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["End"]</th></tr></thead>
+                <tbody>
+                @foreach (var m in g.Members)
+                {
+                    <tr>
+                        <th scope="row">@m.DisplayName</th><td>@(m.IsBackup ? L["Backup"] : L["Approver"])</td><td>@Model.OrganisationName(m.OrganisationId)</td>
+                        <td>@Fmt.DateTime(m.EffectiveFromUtc)</td><td>@(m.EffectiveToUtc is { } t ? Fmt.DateTime(t) : "-")</td><td>@(m.IsActive ? L["Active"] : L["Not active"])</td>
+                        <td>@if (m.IsActive || m.EffectiveFromUtc > DateTime.UtcNow)
+                            {
+                                <form method="post" asp-page-handler="PreviewEnd"><input type="hidden" name="Key" value="@s.Key" /><input type="hidden" name="AssignmentId" value="@m.AssignmentId" />
+                                    <button type="submit" class="secondary" aria-label="@L["Preview ending {0}", m.DisplayName]">@L["Preview ending"]</button></form>
+                            }</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        }
+    </section>
+
+    @if (Model.Effect is { } effect)
+    {
+        <section class="card" aria-labelledby="eff-h">
+            <h2 id="eff-h">@(Model.PreviewKind == "add" ? L["If you add this person"] : L["If you end this membership"])</h2>
+            <p>@L["Who can approve now"]: <strong>@(effect.ApproversBefore.Count == 0 ? L["nobody"].Value : string.Join(", ", effect.ApproversBefore))</strong></p>
+            <p>@L["Who could approve afterwards"]: <strong>@(effect.ApproversAfter.Count == 0 ? L["nobody"].Value : string.Join(", ", effect.ApproversAfter))</strong></p>
+            @if (effect.RelyingOnTheGroup.Count > 0) { <p class="hint">@L["Relied on by"]: @string.Join("; ", effect.RelyingOnTheGroup.Select(u => u.Where + " (" + u.Count + ")"))</p> }
+            @if (effect.Refusal is { Length: > 0 } refusal) { <p class="error-summary" role="alert">@refusal</p> }
+            else if (Model.PreviewKind == "add")
+            {
+                <form method="post" asp-page-handler="Add">
+                    <input type="hidden" name="Key" value="@s.Key" /><input type="hidden" name="UserId" value="@Model.UserId" /><input type="hidden" name="Role" value="@Model.Role" />
+                    <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="Ceiling" value="@Model.Ceiling" /><input type="hidden" name="From" value="@Model.From?.ToString("yyyy-MM-ddTHH:mm")" /><input type="hidden" name="To" value="@Model.To?.ToString("yyyy-MM-ddTHH:mm")" />
+                    <div class="field"><label for="add-reason">@L["Reason (kept in the audit trail)"]</label><input id="add-reason" name="Reason" type="text" required maxlength="500" value="@Model.Reason" /></div>
+                    <div class="actions"><button type="submit">@L["Add them to the group"]</button></div>
+                </form>
+            }
+            else
+            {
+                <form method="post" asp-page-handler="End">
+                    <input type="hidden" name="Key" value="@s.Key" /><input type="hidden" name="AssignmentId" value="@Model.AssignmentId" />
+                    <div class="field"><label for="end-reason">@L["Reason (kept in the audit trail)"]</label><input id="end-reason" name="Reason" type="text" required maxlength="500" /></div>
+                    <div class="actions"><button type="submit" class="danger">@L["End the membership"]</button></div>
+                </form>
+            }
+        </section>
+    }
+
+    @if (s.Registered && s.IsActive)
+    {
+        <section class="card" aria-labelledby="add-h">
+            <h2 id="add-h">@L["Add a person"]</h2>
+            <form method="post" asp-page-handler="PreviewAdd">
+                <input type="hidden" name="Key" value="@s.Key" />
+                <div class="field"><label for="UserId">@L["Person"]</label>
+                    <select id="UserId" name="UserId" required><option value="">@L["Choose a person"]</option>@foreach (var p in Model.People) { <option value="@p.Id" selected="@(Model.UserId == p.Id)">@p.DisplayName</option> }</select></div>
+                <div class="field"><label for="Role">@L["As"]</label>
+                    <select id="Role" name="Role"><option value="primary" selected="@(Model.Role == "primary")">@L["Approver"]</option><option value="backup" selected="@(Model.Role == "backup")">@L["Backup approver"]</option></select></div>
+                <div class="field"><label for="OrganisationId">@L["For"]</label>
+                    <select id="OrganisationId" name="OrganisationId" required>@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(Model.OrganisationId == o.Id)">@o.Name</option> }</select></div>
+                <div class="field"><label for="Ceiling">@L["Highest classification they may see"]</label>
+                    <select id="Ceiling" name="Ceiling">@foreach (var l in Model.Levels) { <option value="@l" selected="@(Model.Ceiling == l)">@l</option> }</select></div>
+                <div class="field"><label for="From">@L["From (optional, UTC)"]</label><input id="From" name="From" type="datetime-local" value="@Model.From?.ToString("yyyy-MM-ddTHH:mm")" /></div>
+                <div class="field"><label for="To">@L["Until (optional, UTC)"]</label><input id="To" name="To" type="datetime-local" value="@Model.To?.ToString("yyyy-MM-ddTHH:mm")" /></div>
+                <div class="actions"><button type="submit" class="secondary">@L["Preview the effect"]</button></div>
+            </form>
+        </section>
+
+        <section class="card" aria-labelledby="ret-h">
+            <h2 id="ret-h">@L["Retire this group"]</h2>
+            <p class="hint">@L["A group can be retired only when nothing relies on it and nobody is in it. Retiring keeps its history; it is not deleted."]</p>
+            <form method="post" asp-page-handler="Retire"><input type="hidden" name="Key" value="@s.Key" />
+                <div class="field"><label for="ret-reason">@L["Reason"]</label><input id="ret-reason" name="Reason" type="text" required maxlength="500" /></div>
+                <div class="actions"><button type="submit" class="danger">@L["Retire the group"]</button></div></form>
+        </section>
+    }
+    else if (s.Registered)
+    {
+        <form method="post" asp-page-handler="Reactivate"><input type="hidden" name="Key" value="@s.Key" /><div class="actions"><button type="submit">@L["Make the group active again"]</button></div></form>
+    }
+}
+<p><a href="/Admin/ApproverGroups">@L["Back to approver groups"]</a></p>

@@ -1,0 +1,47 @@
+@page "/Admin/Organisations/Setup"
+@model Ecp.Host.Pages.Admin.Organisations.SetupModel
+@using Ecp.Setup.Organisations
+@{ ViewData["Title"] = L["Set-up checklist"].Value; }
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Checklist is { } c)
+{
+    <h1>@L["Set-up checklist"]: @c.Organisation.Name</h1>
+    <p class="lede">@c.Done @L["of"] @c.Items.Count @L["steps done. The state of each step is read from what is published and what is drafted, so it cannot drift from the facts."]</p>
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Set-up steps, their state and who does them"]</caption>
+        <thead><tr><th scope="col">@L["Step"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Detail"]</th><th scope="col">@L["Who"]</th><th scope="col">@L["Go to"]</th></tr></thead>
+        <tbody>
+        @foreach (var i in c.Items)
+        {
+            <tr>
+                <th scope="row">@i.Title</th>
+                <td>@switch (i.State)
+                    {
+                        case ChecklistState.Done: <span class="badge">@L["Done"]</span> break;
+                        case ChecklistState.InProgress: <span class="badge warning">@L["In progress"]</span> break;
+                        case ChecklistState.NotStarted: <span class="badge warning">@L["Not started"]</span> break;
+                        default: <span class="badge">@L["Not visible"]</span> break;
+                    }</td>
+                <td>@i.Detail</td><td>@i.Owner</td>
+                <td>@if (i.Link is not null) { <a href="@i.Link">@L["Open"]</a> }</td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+
+    @if (c.CanReset)
+    {
+        <section class="card" aria-labelledby="reset-h">
+            <h2 id="reset-h">@L["Start this set-up again"]</h2>
+            <p>@L["Because nothing has been recorded against this organisation yet, you can discard its open drafts and end its structure so the set-up can begin again. The organisation itself stays listed (organisations are never deleted, so their audit history stays whole), and published releases and role assignments are untouched."]</p>
+            <form method="post" asp-page-handler="Reset">
+                <div class="field"><label for="Reason">@L["Reason"]</label><input id="Reason" name="Reason" type="text" required maxlength="500" /></div>
+                <div class="actions"><button type="submit" class="danger">@L["Discard drafts and end structure"]</button></div>
+            </form>
+        </section>
+    }
+    else if (c.Usage.Count > 0)
+    {
+        <p class="hint">@L["Set-up cannot be reset because the organisation already holds"] @string.Join(", ", c.Usage.Select(u => u.Count + " " + u.What)).</p>
+    }
+}

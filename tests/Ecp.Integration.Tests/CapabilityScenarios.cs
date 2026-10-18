@@ -48,6 +48,7 @@ internal static class CapabilityScenarios
     private sealed class FlakyReleases(IConfigurationReleases inner, Switch sw) : IConfigurationReleases
     {
         public Task<ReleaseDto?> FindAsync(Guid releaseId, CancellationToken ct = default) => inner.FindAsync(releaseId, ct);
+        public Task<IReadOnlyList<OpenDraftInfo>> OpenDraftsAsync(Guid organisationId, CancellationToken ct = default) => inner.OpenDraftsAsync(organisationId, ct);
         public Task<ReleaseDto?> LatestAsync(string kind, Guid organisationId, CancellationToken ct = default)
             => sw.FailCapabilityReads && kind == Kind ? throw new InvalidOperationException("The configuration store is unavailable.") : inner.LatestAsync(kind, organisationId, ct);
     }

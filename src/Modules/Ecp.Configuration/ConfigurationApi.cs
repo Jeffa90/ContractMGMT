@@ -128,6 +128,8 @@ public interface IConfigurationService
 public interface IConfigurationBootstrap
 {
     Task<ReleaseDto> DraftValidatePublishAsync(string kind, Guid organisationId, string contentJson, string publishedBy, string note, CancellationToken ct = default);
+    /// <summary>Discards every open draft of one organisation (never a published release), for the reset of an organisation whose setup was not completed. The caller has authorised it; each discard is audited.</summary>
+    Task<int> DiscardOpenDraftsAsync(Guid organisationId, string discardedBy, string reason, CancellationToken ct = default);
 }
 
 /// <summary>Trusted reads of published releases for modules that run on configuration (the lifecycle engine pins contracts to a release). No per-user authorisation; not reachable from request input.</summary>
@@ -135,7 +137,11 @@ public interface IConfigurationReleases
 {
     Task<ReleaseDto?> FindAsync(Guid releaseId, CancellationToken ct = default);
     Task<ReleaseDto?> LatestAsync(string kind, Guid organisationId, CancellationToken ct = default);
+    /// <summary>The kinds with an open draft for the organisation, and whether each has been submitted for a second person. A trusted read for progress displays; it shows no content.</summary>
+    Task<IReadOnlyList<OpenDraftInfo>> OpenDraftsAsync(Guid organisationId, CancellationToken ct = default);
 }
+
+public sealed record OpenDraftInfo(string Kind, DateTime UpdatedUtc, bool Submitted);
 
 public sealed class ConfigurationOptions
 {
@@ -350,6 +356,14 @@ internal sealed partial class ConfigurationService(
         return r is null ? null : ToDto(r);
     }
 
+    public async Task<IReadOnlyList<OpenDraftInfo>> OpenDraftsAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        var drafts = await db.Drafts.AsNoTracking().Where(d => d.OrganisationId == organisationId && (d.Status == DraftStatus.Draft || d.Status == DraftStatus.Validated)).Select(d => new { d.Id, d.Kind, d.UpdatedUtc }).ToListAsync(ct);
+        var ids = drafts.Select(d => d.Id).ToList();
+        var submitted = (await db.Reviews.AsNoTracking().Where(r => ids.Contains(r.Id) && r.State == ReviewState.Submitted).Select(r => r.Id).ToListAsync(ct)).ToHashSet();
+        return drafts.OrderBy(d => d.Kind, StringComparer.Ordinal).Select(d => new OpenDraftInfo(d.Kind, d.UpdatedUtc, submitted.Contains(d.Id))).ToList();
+    }
+
     /// <summary>The trusted read used by modules that run on configuration: served from the published-release cache, and from the database whenever the cache has nothing or fails.</summary>
     public async Task<ReleaseDto?> LatestAsync(string kind, Guid organisationId, CancellationToken ct = default)
     {
@@ -379,6 +393,23 @@ internal sealed partial class ConfigurationService(
         var ids = releases.Select(r => r.Id).ToList();
         var evidence = (await db.Evidence.AsNoTracking().Where(e => ids.Contains(e.Id)).ToListAsync(ct)).ToDictionary(e => e.Id);
         return releases.Select(r => ToDto(r, evidence.GetValueOrDefault(r.Id))).ToList();
+    }
+
+    public async Task<int> DiscardOpenDraftsAsync(Guid organisationId, string discardedBy, string reason, CancellationToken ct = default)
+    {
+        if (organisationId == Guid.Empty) throw new DomainException("organisation_required", "Only an organisation's drafts can be discarded this way.");
+        var drafts = await db.Drafts.Where(d => d.OrganisationId == organisationId && (d.Status == DraftStatus.Draft || d.Status == DraftStatus.Validated)).ToListAsync(ct);
+        if (drafts.Count == 0) return 0;
+        await uow.ExecuteAsync(async c =>
+        {
+            foreach (var draft in drafts)
+            {
+                draft.Discard(clock.UtcNow);
+                audit.Record(new AuditEntry("config.draft.discarded", draft.Kind, draft.Id.ToString(), OrganisationId: organisationId, Reason: reason, NewValuesJson: JsonSerializer.Serialize(new { by = discardedBy, trusted = true })));
+            }
+            await db.SaveChangesAsync(c);
+        }, ct);
+        return drafts.Count;
     }
 
     public async Task DiscardDraftAsync(Guid draftId, CancellationToken ct = default)

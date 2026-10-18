@@ -1,0 +1,55 @@
+@page "/Admin/Documents/Scanning"
+@model Ecp.Host.Pages.Admin.Documents.ScanningModel
+@using Ecp.Documents.Domain
+@{ ViewData["Title"] = L["Document scanning"].Value; }
+<h1>@L["Document scanning"]</h1>
+<p class="lede">@L["An uploaded file can be downloaded, copied or counted as evidence only after a connected scanner has called it clean. Until then it is held. A file found to be infected is kept in quarantine and is never released."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Overview is { } o)
+{
+    <section class="card" aria-labelledby="scanner-h">
+        <h2 id="scanner-h">@L["Scanner"]</h2>
+        <p>
+            @if (!o.ScannerConnected) { <span class="badge warning">@L["No scanner connected"]</span> <span>@L["Every uploaded file is held. Production needs a scanner provider connected by the system administrator."]</span> }
+            else if (o.DemonstrationOnly) { <span class="badge warning">@L["Demonstration scanner"]</span> <span>@L["It checks only for a standard test string. It is for trials and is not protection."]</span> }
+            else { <span class="badge">@L["Connected"]</span> <span>@o.Provider</span> }
+        </p>
+        @if (o.AllowSkippedScan) { <p class="error" role="alert">@L["Files whose scan was skipped are allowed to be used. That should be off in Production."]</p> }
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Files by scan result"]</caption>
+            <thead><tr><th scope="col">@L["Clean (released)"]</th><th scope="col">@L["Waiting"]</th><th scope="col">@L["Skipped"]</th><th scope="col">@L["Failed"]</th><th scope="col">@L["Infected (quarantined)"]</th><th scope="col">@L["Oldest held (UTC)"]</th></tr></thead>
+            <tbody><tr><td>@o.Clean</td><td>@o.Pending</td><td>@o.Skipped</td><td>@o.Error</td><td>@o.Infected</td><td>@(o.OldestHeldUtc is { } at ? Fmt.DateTime(at) : "-")</td></tr></tbody>
+        </table></div>
+        <p class="hint">@L["A failed scan is tried again automatically up to"] @o.MaxAttempts @L["times, then left here for an administrator. A failure is never treated as clean."]</p>
+    </section>
+
+    <h2>@L["Files that are held"]</h2>
+    @if (Model.Held.Count == 0) { <p>@L["Nothing is held. Every uploaded file has been scanned and released."]</p> }
+    else
+    {
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Held files"]</caption>
+            <thead><tr><th scope="col">@L["Document"]</th><th scope="col">@L["File"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Uploaded (UTC)"]</th><th scope="col">@L["Attempts"]</th><th scope="col">@L["Last note"]</th><th scope="col"><span class="visually-hidden">@L["Actions"]</span></th></tr></thead>
+            <tbody>
+            @foreach (var i in Model.Held)
+            {
+                <tr>
+                    <th scope="row">@i.Title</th><td>@i.FileName</td>
+                    <td>@switch (i.Status)
+                        {
+                            case ScanStatus.Infected: <span class="badge bad">@L["Quarantined (infected)"]</span> break;
+                            case ScanStatus.Error: <span class="badge warning">@(i.GivenUp ? L["Failed: needs an administrator"] : L["Failed: will be retried"])</span> break;
+                            case ScanStatus.Skipped: <span class="badge warning">@L["Skipped"]</span> break;
+                            default: <span class="badge warning">@L["Waiting"]</span> break;
+                        }</td>
+                    <td>@Fmt.DateTime(i.UploadedUtc)</td><td>@i.Attempts</td><td>@i.LastDetail</td>
+                    <td>@if (i.Status != ScanStatus.Infected && o.ScannerConnected)
+                        {
+                            <form method="post" asp-page-handler="Rescan"><input type="hidden" name="versionId" value="@i.VersionId" /><button type="submit" class="secondary" aria-label="@L["Scan again"] @i.FileName">@L["Scan again"]</button></form>
+                        }</td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    }
+}

@@ -46,6 +46,7 @@
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Studio", L["Configuration Studio"].Value, "/Admin/Studio"));
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
         if (await Can("operations.read")) items.Add(("/Admin/Operations", L["Operations"].Value, "/Admin/Operations"));
+        if (await Can("notifications.administer")) items.Add(("/Admin/Documents/Scanning", L["Document scanning"].Value, "/Admin/Documents/Scanning"));
         if (await Can("capabilities.read", "capabilities.draft")) items.Add(("/Admin/Capabilities", L["Capabilities"].Value, "/Admin/Capabilities"));
         if (await Can("terminology.read", "terminology.draft")) items.Add(("/Admin/Terminology", L["Terminology"].Value, "/Admin/Terminology"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Regional", L["Regional settings"].Value, "/Admin/Regional"));

@@ -17,12 +17,17 @@ public enum ScanVerdict { Clean, Infected, Skipped, Error }
 public interface IMalwareScanner
 {
     string Name { get; }
+    /// <summary>False when no scanner is connected: nothing is scanned, and documents stay held until one is.</summary>
+    bool IsConnected => true;
+    /// <summary>True for the scanner that stands in for a provider in Demonstration and tests. It proves the hook, not protection.</summary>
+    bool IsDemonstrationOnly => false;
     Task<ScanVerdict> ScanAsync(Stream content, CancellationToken ct = default);
 }
 
 internal sealed class DisabledMalwareScanner : IMalwareScanner
 {
     public string Name => "none";
+    public bool IsConnected => false;
     public Task<ScanVerdict> ScanAsync(Stream content, CancellationToken ct = default) => Task.FromResult(ScanVerdict.Skipped);
 }
 

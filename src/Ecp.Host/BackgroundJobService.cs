@@ -60,6 +60,7 @@ public sealed class BackgroundJobService(IServiceScopeFactory scopes, IOptions<N
                 var actor = scope.ServiceProvider.GetRequiredService<ActorContext>();
                 actor.Type = ActorType.System; actor.ActorId = "system"; actor.Source = "Job";
                 await scope.ServiceProvider.GetRequiredService<INotificationJobs>().RunAllAsync(ct);
+                await scope.ServiceProvider.GetRequiredService<Ecp.Documents.IDocumentScanJob>().RunAsync(ct);
                 ran++;
             }
             catch (Exception ex) when (ex is not OperationCanceledException) { failed++; log.LogError(ex, "Background jobs failed for tenant {Tenant}.", tenant.Id); }

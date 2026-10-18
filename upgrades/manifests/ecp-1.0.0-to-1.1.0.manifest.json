@@ -8,7 +8,7 @@
     "1.0.0"
   ],
   "sourceLedgerSha256": "dc6242cab14aa459f345e553cdd3a7d90e249fba69552e6ef552750c3c5aa64f",
-  "targetLedgerSha256": "7d89460805ec3b55112975f27a5d3f9f6a5af1db1ab654724c76e476e07ebcef",
+  "targetLedgerSha256": "46397e57e8fb3ab6fd3e12270b477840158bb0c57c072c8807a135cfa4484e69",
   "moduleOrder": [
     "Audit",
     "Tenancy",
@@ -482,7 +482,7 @@
       "module": "Documents",
       "tier": 6,
       "schema": "documents",
-      "schemaVersion": "20261016034900_MigrationSupport",
+      "schemaVersion": "20261018103354_AddScanAttempts",
       "migrations": [
         {
           "id": "20261016000551_Initial",
@@ -517,6 +517,22 @@
             "add column documents.DocumentVersion.MigrationBatchId",
             "create index documents.Document.IX_Document_TenantId_MigrationBatchId",
             "create index documents.DocumentVersion.IX_DocumentVersion_TenantId_MigrationBatchId"
+          ],
+          "operations": 5
+        },
+        {
+          "id": "20261018103354_AddScanAttempts",
+          "checksum": "ba85ed48a5be891e154cc766d38ccbea0e59b69045772d50a6bc9d93d3817a3f",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index documents.DocumentScanAttempt.IX_DocumentScanAttempt_TenantId_Outcome_AttemptedUtc",
+            "create index documents.DocumentScanAttempt.IX_DocumentScanAttempt_TenantId_VersionId_AttemptedUtc",
+            "create table documents.DocumentScanAttempt",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_documents_DocumentScanAttempt] ADD FILTER PR\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[documents] TO [ecp_runtime];"
           ],
           "operations": 5
         }
@@ -937,6 +953,24 @@
       "reviewed": true
     },
     {
+      "module": "Documents",
+      "id": "20261018103354_AddScanAttempts",
+      "checksum": "ba85ed48a5be891e154cc766d38ccbea0e59b69045772d50a6bc9d93d3817a3f",
+      "categories": [
+        "IndexOrConstraint",
+        "RowLevelSecurity"
+      ],
+      "objects": [
+        "create index documents.DocumentScanAttempt.IX_DocumentScanAttempt_TenantId_Outcome_AttemptedUtc",
+        "create index documents.DocumentScanAttempt.IX_DocumentScanAttempt_TenantId_VersionId_AttemptedUtc",
+        "create table documents.DocumentScanAttempt",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_documents_DocumentScanAttempt] ADD FILTER PR\u2026",
+        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[documents] TO [ecp_runtime];"
+      ],
+      "reviewRequired": false,
+      "reviewed": true
+    },
+    {
       "module": "Operations",
       "id": "20261018003226_AddMigrationRecords",
       "checksum": "20276a7b97c1094f06867474fac4bfdb86c9890c33554575da6203a1f913f651",
@@ -1035,5 +1069,5 @@
     ],
     "dataLossStatement": "Rolling back discards everything created after the pre-upgrade backup, including anything done after the upgrade finished. It cannot be recovered from the backup."
   },
-  "manifestSha256": "368ee7ac234593c340bb9ba59b98a28d371c90a693cabe3d54d1b6f6309f329b"
+  "manifestSha256": "dfad53dc40c90c48816fce13611ce92ac460683e905fea667b1acb08b25d838f"
 }

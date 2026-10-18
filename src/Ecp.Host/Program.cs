@@ -57,6 +57,7 @@ builder.Services.AddSingleton<Ecp.Recovery.IRestoreTargetFactory>(new RestoreTar
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.PackReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.CapabilityReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.RegionalReadinessCheck>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.DocumentScanReadinessCheck>();
 builder.Services.AddHostedService<BackgroundJobService>();
 builder.Services.AddSingleton<DemoSeeder>();
 builder.Services.AddSingleton<ISetupProtector, DataProtectionSetupProtector>();

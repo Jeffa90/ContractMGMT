@@ -9,6 +9,7 @@ public sealed class DocumentsDbContext(DbContextOptions<DocumentsDbContext> opti
 {
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<DocumentVersion> Versions => Set<DocumentVersion>();
+    public DbSet<DocumentScanAttempt> ScanAttempts => Set<DocumentScanAttempt>();
     protected override string SchemaName => DocumentsModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
@@ -50,6 +51,18 @@ public sealed class DocumentsDbContext(DbContextOptions<DocumentsDbContext> opti
             e.HasIndex(x => new { x.TenantId, x.MigrationBatchId });
             e.HasOne<Document>().WithMany().HasForeignKey(x => new { x.TenantId, x.DocumentId })
                 .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+        mb.Entity<DocumentScanAttempt>(e =>
+        {
+            e.ToTable("DocumentScanAttempt");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Outcome).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Provider).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Trigger).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Detail).HasMaxLength(300);
+            e.HasIndex(x => new { x.TenantId, x.VersionId, x.AttemptedUtc });
+            e.HasIndex(x => new { x.TenantId, x.Outcome, x.AttemptedUtc });
         });
     }
 }

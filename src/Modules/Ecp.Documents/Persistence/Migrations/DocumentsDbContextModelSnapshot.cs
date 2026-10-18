@@ -103,6 +103,54 @@ namespace Ecp.Documents.Persistence.Migrations
                     b.ToTable("Document", "documents");
                 });
 
+            modelBuilder.Entity("Ecp.Documents.Domain.DocumentScanAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AttemptedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Outcome", "AttemptedUtc");
+
+                    b.HasIndex("TenantId", "VersionId", "AttemptedUtc");
+
+                    b.ToTable("DocumentScanAttempt", "documents");
+                });
+
             modelBuilder.Entity("Ecp.Documents.Domain.DocumentVersion", b =>
                 {
                     b.Property<Guid>("Id")

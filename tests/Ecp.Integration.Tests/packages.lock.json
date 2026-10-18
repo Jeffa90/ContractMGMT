@@ -370,66 +370,67 @@
       "ecp.approvals": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.audit": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "ecp.configuration": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Packs": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Packs": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.contracts": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Documents": "[1.0.0, )",
-          "Ecp.Formats": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Metadata": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Documents": "[1.1.0, )",
+          "Ecp.Formats": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Metadata": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.datamigration": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Contracts": "[1.0.0, )",
-          "Ecp.Documents": "[1.0.0, )",
-          "Ecp.Formats": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Contracts": "[1.1.0, )",
+          "Ecp.Documents": "[1.1.0, )",
+          "Ecp.Formats": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.documents": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "ecp.formats": {
@@ -438,57 +439,57 @@
       "ecp.identity": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.lifecycle": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Approvals": "[1.0.0, )",
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Contracts": "[1.0.0, )",
-          "Ecp.Documents": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Metadata": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Approvals": "[1.1.0, )",
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Contracts": "[1.1.0, )",
+          "Ecp.Documents": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Metadata": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.metadata": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "ecp.notifications": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Contracts": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Lifecycle": "[1.0.0, )",
-          "Ecp.Operations": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Contracts": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Lifecycle": "[1.1.0, )",
+          "Ecp.Operations": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.operations": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
           "Microsoft.Extensions.Configuration.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )"
         }
@@ -499,7 +500,7 @@
       "ecp.persistence": {
         "type": "Project",
         "dependencies": {
-          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.12, )",
@@ -512,16 +513,16 @@
       "ecp.recovery": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Documents": "[1.0.0, )",
-          "Ecp.Formats": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Operations": "[1.0.0, )",
-          "Ecp.Packs": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )",
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Documents": "[1.1.0, )",
+          "Ecp.Formats": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Operations": "[1.1.0, )",
+          "Ecp.Packs": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Options": "[10.0.12, )"
         }
@@ -529,15 +530,15 @@
       "ecp.setup": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Contracts": "[1.0.0, )",
-          "Ecp.Documents": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Operations": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Contracts": "[1.1.0, )",
+          "Ecp.Documents": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Operations": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.sharedkernel": {
@@ -546,31 +547,31 @@
       "ecp.tenancy": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "ecp.tests.common": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Approvals": "[1.0.0, )",
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Contracts": "[1.0.0, )",
-          "Ecp.DataMigration": "[1.0.0, )",
-          "Ecp.Documents": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Lifecycle": "[1.0.0, )",
-          "Ecp.Metadata": "[1.0.0, )",
-          "Ecp.Notifications": "[1.0.0, )",
-          "Ecp.Operations": "[1.0.0, )",
-          "Ecp.Packs": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.Recovery": "[1.0.0, )",
-          "Ecp.Setup": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )",
+          "Ecp.Approvals": "[1.1.0, )",
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Contracts": "[1.1.0, )",
+          "Ecp.DataMigration": "[1.1.0, )",
+          "Ecp.Documents": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Lifecycle": "[1.1.0, )",
+          "Ecp.Metadata": "[1.1.0, )",
+          "Ecp.Notifications": "[1.1.0, )",
+          "Ecp.Operations": "[1.1.0, )",
+          "Ecp.Packs": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.Recovery": "[1.1.0, )",
+          "Ecp.Setup": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.12, )",
           "Microsoft.NET.Test.Sdk": "[18.11.0, )",

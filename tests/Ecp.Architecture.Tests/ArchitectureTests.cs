@@ -294,6 +294,20 @@ public class PackRuleTests
         Assert.True(hits.Count == 0, "Reading a package belongs to the pack loader only: " + string.Join(", ", hits));
     }
 
+    [Fact] // G-07
+    public void No_private_signing_key_is_created_held_or_asked_for_by_the_web_application_or_any_module()
+    {
+        // Signing is the publisher's task, done with the ecp-pack tool on the publisher's own machine with a key held outside this product. The application only ever verifies, with public keys.
+        var allowed = new[] { "/src/Ecp.Packs/", "/src/Ecp.PackTool/", "/src/Modules/Ecp.Recovery/Redaction.cs" };
+        var pattern = new Regex(@"EcdsaP256Signer|IPackSigner|PackSigner\b|(?<!PublicKey)FromPem\s*\(|ImportPkcs8PrivateKey|ImportECPrivateKey|ExportECPrivateKey|ExportPkcs8PrivateKey|BEGIN (EC |RSA )?PRIVATE KEY|CreateSigner|\.SignData\s*\(|\.SignHash\s*\(", RegexOptions.CultureInvariant);
+        var hits = Files("src", "*.cs").Concat(Files("src", "*.cshtml")).Where(f => !allowed.Any(a => f.Replace('\\', '/').Contains(a, StringComparison.Ordinal)))
+            .Where(f => pattern.IsMatch(File.ReadAllText(f))).ToList();
+        Assert.True(hits.Count == 0, "Only the pack tool signs: " + string.Join(", ", hits));
+        // No page offers a field for a private key.
+        var fields = Files("src/Ecp.Host", "*.cshtml").Where(f => Regex.IsMatch(File.ReadAllText(f), @"name=""(PrivateKey|PrivateKeyPem|SigningKey)""", RegexOptions.IgnoreCase)).ToList();
+        Assert.True(fields.Count == 0, "A page asks for a private key: " + string.Join(", ", fields));
+    }
+
     [Fact]
     public void The_pack_loader_names_no_pack_and_makes_no_decision_by_pack_key()
     {

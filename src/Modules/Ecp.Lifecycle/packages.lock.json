@@ -451,52 +451,53 @@
       "ecp.approvals": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.audit": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "ecp.configuration": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Packs": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Packs": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.contracts": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Documents": "[1.0.0, )",
-          "Ecp.Formats": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Metadata": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Documents": "[1.1.0, )",
+          "Ecp.Formats": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Metadata": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.documents": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "ecp.formats": {
@@ -505,20 +506,20 @@
       "ecp.identity": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )",
-          "Ecp.Tenancy": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
         }
       },
       "ecp.metadata": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Configuration": "[1.0.0, )",
-          "Ecp.Identity": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "ecp.packs": {
@@ -527,7 +528,7 @@
       "ecp.persistence": {
         "type": "Project",
         "dependencies": {
-          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.12, )",
@@ -543,9 +544,9 @@
       "ecp.tenancy": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Audit": "[1.0.0, )",
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "Microsoft.EntityFrameworkCore": {

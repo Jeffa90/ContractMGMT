@@ -20,6 +20,10 @@ public sealed class DocumentsOptions
 {
     public long MaxFileBytes { get; set; } = 100L * 1024 * 1024;
     public bool AllowSkippedScan { get; set; }
+    /// <summary>How many times a version whose scan failed is tried again before it is left for an administrator (it stays held, never released).</summary>
+    public int MaxScanAttempts { get; set; } = 5;
+    /// <summary>How many held versions one scheduled run examines.</summary>
+    public int ScanBatchSize { get; set; } = 50;
 }
 
 public sealed record AddDocumentRequest(
@@ -66,9 +70,19 @@ internal sealed class DocumentService(
         try
         {
             await using var read = await storage.OpenReadAsync(tenant.RequireTenantId(), storageKey, ct);
-            return await scanner.ScanAsync(read, ct) switch { ScanVerdict.Clean => ScanStatus.Clean, ScanVerdict.Infected => ScanStatus.Infected, ScanVerdict.Skipped => ScanStatus.Skipped, _ => ScanStatus.Error };
+            return DocumentScanning.StatusOf(await scanner.ScanAsync(read, ct));
         }
         catch (Exception ex) when (ex is not OperationCanceledException) { return ScanStatus.Error; }
+    }
+
+    /// <summary>Records the scan made at upload, and audits an infection as a quarantine. Written in the same transaction as the version, so a version never exists without its first scan being recorded.</summary>
+    private void RecordUploadScan(Document document, DocumentVersion version)
+    {
+        db.ScanAttempts.Add(DocumentScanAttempt.Create(version.TenantId, document.OrganisationId, document.Id, version.Id, version.ScanStatus, scanner.Name, "upload",
+            version.ScanStatus == ScanStatus.Error ? "The scan could not be completed." : null, clock.UtcNow));
+        if (version.ScanStatus == ScanStatus.Infected)
+            audit.Record(new AuditEntry("document.quarantined", nameof(DocumentVersion), version.Id.ToString(), OrganisationId: document.OrganisationId, Classification: document.Classification,
+                NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { outcome = "Infected", provider = scanner.Name, trigger = "upload", document = document.Id })));
     }
 
     public async Task<DocumentVersionDto> AddAsync(AddDocumentRequest r, CancellationToken ct = default)
@@ -91,9 +105,10 @@ internal sealed class DocumentService(
         {
             db.Documents.Add(document);
             db.Versions.Add(version);
+            RecordUploadScan(document, version);
             await db.SaveChangesAsync(c);
             audit.Record(new AuditEntry("document.added", nameof(Document), document.Id.ToString(), OrganisationId: document.OrganisationId, Classification: document.Classification,
-                NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { version.FileName, version.Sha256, version.SizeBytes, document.DocumentTypeCode })));
+                NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { version.FileName, version.Sha256, version.SizeBytes, document.DocumentTypeCode, scan = version.ScanStatus.ToString() })));
         }, ct);
         return new DocumentVersionDto(document.Id, version.Id, version.VersionNumber, version.FileName, version.SizeBytes, version.Sha256, version.ScanStatus, version.IsDownloadable(options.Value.AllowSkippedScan));
     }
@@ -108,6 +123,7 @@ internal sealed class DocumentService(
             var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == r.DocumentId, c) ?? throw new DomainException("document_not_found", "The [[document|lower]] was not found.");
             var version = document.AddVersion(r.FileName, r.MimeType, stored.SizeBytes, stored.Sha256, storage.ProviderKey, stored.StorageKey, r.VersionLabel, r.DocumentDate, actor.ActorId ?? "system", clock.UtcNow, scan: scan);
             db.Versions.Add(version);
+            RecordUploadScan(document, version);
             try { await db.SaveChangesAsync(c); }
             catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The [[document|lower]] was changed by someone else at the same time. Reload it and try again."); }
             audit.Record(new AuditEntry("document.version_added", nameof(Document), document.Id.ToString(), OrganisationId: document.OrganisationId, Classification: document.Classification,
@@ -218,6 +234,9 @@ public static class DocumentsModule
         services.AddSingleton<IDocumentStorageProvider>(sp => sp.GetRequiredService<LocalFileSystemStorageProvider>());
         services.AddSingleton<IDocumentStoreInventory>(sp => sp.GetRequiredService<LocalFileSystemStorageProvider>());
         services.AddScoped<IDocumentIntegrity, DocumentIntegrity>();
+        services.AddScoped<DocumentScanning>();
+        services.AddScoped<IDocumentScanning>(sp => sp.GetRequiredService<DocumentScanning>());
+        services.AddScoped<IDocumentScanJob>(sp => sp.GetRequiredService<DocumentScanning>());
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IDocumentMigrationPort, DocumentMigrationPort>();
         services.AddScoped<IDocumentQuery, DocumentQuery>();

@@ -333,3 +333,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Modules/Ecp.Notifications/NotificationsOperationalProbe.cs`, `src/Modules/Ecp.DataMigration/MigrationOperationalProbe.cs`, `src/Modules/Ecp.Configuration/Packs/ConfigurationOperationalProbe.cs`
 - `src/Ecp.Host/DataProtectionKeyRingInspector.cs`, `src/Ecp.Host/HealthBodies.cs`, `src/Ecp.Host/Pages/Admin/Operations/Dashboard.cshtml` (and `.cshtml.cs`)
 - `tests/Ecp.UnitTests/OperationsDashboardTests.cs`, `tests/Ecp.Integration.Tests/OperationsDashboardScenarios.cs`, `tests/Ecp.Api.Tests/OperationsDashboardUiTests.cs`, `tests/Ecp.Architecture.Tests/OperationsDashboardGuardTests.cs`
+
+## Implementation playbook (documentation only, 2026-10-18)
+
+- `docs/IMPLEMENTATION_PLAYBOOK.md`

@@ -23,6 +23,7 @@ public static class ApprovalsModule
         services.AddModuleDbContext<ApprovalsDbContext>(Name, Tier, Schema);
         services.AddScoped<Ecp.Configuration.IConfigurationKind, ApprovalMatrixKind>();
         services.AddScoped<IApprovalMatrixStore, ApprovalMatrixStore>();
+        services.AddSingleton<Ecp.Configuration.Forms.IFormSchemaSource, Definitions.MatrixFormSchemas>();
         services.AddScoped<IApprovalDelegations, ApprovalDelegations>();
         services.AddScoped<ApprovalParticipants>();
         services.AddScoped<IApprovalResolver, ApprovalResolver>();

@@ -107,6 +107,8 @@ public static class NotificationsModule
         services.AddModuleDbContext<NotificationsDbContext>(Name, Tier, Schema);
         services.AddScoped<Ecp.Configuration.IConfigurationKind, NotificationPolicyKind>();
         services.AddScoped<INotificationPolicyStore, NotificationPolicyStore>();
+        services.AddSingleton<Ecp.Configuration.Forms.IFormSchemaSource, Policy.NotificationPolicyFormSchemas>();
+        services.AddScoped<Ecp.Configuration.Forms.IFormInsight, Policy.NotificationPolicyFormInsight>();
         services.AddScoped<NotificationRenderer>();
         services.AddScoped<RecipientResolver>();
         services.AddScoped<NotificationWriter>();

@@ -14,7 +14,7 @@ namespace Ecp.Host.Pages.Admin.Configuration;
 /// editor, not the visual studio; the rules that validate a draft are the same ones that gate publication.
 /// </summary>
 [Authorize(Policy = "perm:config.draft|config.history.read")]
-public sealed class IndexModel(IConfigurationService configuration, IOrganisationStructureService organisations) : EcpPageModel
+public sealed class IndexModel(IConfigurationService configuration, IOrganisationStructureService organisations, ConfigurationOptions options) : EcpPageModel
 {
     public static readonly IReadOnlyList<(string Kind, string Title, string Help)> Kinds =
     [
@@ -29,6 +29,8 @@ public sealed class IndexModel(IConfigurationService configuration, IOrganisatio
     [BindProperty] public string? Definition { get; set; }
     [BindProperty] public string? Note { get; set; }
     [BindProperty] public int? ToRelease { get; set; }
+    /// <summary>The raw document can be edited here only where the installation allows it (not in Production); the form editor is always available.</summary>
+    public bool RawEditingAllowed => options.AllowRawDocumentEditing;
     public IReadOnlyList<OrganisationSummary> Organisations { get; private set; } = [];
     public DraftDto? Draft { get; private set; }
     public ReleaseDto? Latest { get; private set; }
@@ -59,11 +61,13 @@ public sealed class IndexModel(IConfigurationService configuration, IOrganisatio
         await configuration.GetOrCreateDraftAsync(Kind, OrganisationId!.Value, seed, ct);
     }, "A draft is open. Edit it, validate it, then publish.");
 
-    public Task<IActionResult> OnPostSaveAsync(Guid draftId, CancellationToken ct) => Act(async () => await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct), "The draft is saved. Validate it before publishing.");
-    public Task<IActionResult> OnPostValidateAsync(Guid draftId, CancellationToken ct) => Act(async () => { await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct); var d = await configuration.ValidateAsync(draftId, ct); }, "Validated. See the result below.");
+    private void RequireRawEditing() { if (!options.AllowRawDocumentEditing) throw new Ecp.SharedKernel.DomainException("raw_editing_off", "In this environment a draft is changed only through the form editor."); }
+
+    public Task<IActionResult> OnPostSaveAsync(Guid draftId, CancellationToken ct) => Act(async () => { RequireRawEditing(); await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct); }, "The draft is saved. Validate it before publishing.");
+    public Task<IActionResult> OnPostValidateAsync(Guid draftId, CancellationToken ct) => Act(async () => { RequireRawEditing(); await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct); var d = await configuration.ValidateAsync(draftId, ct); }, "Validated. See the result below.");
     public Task<IActionResult> OnPostPublishAsync(Guid draftId, CancellationToken ct) => StepUpRunAsync(async () =>
     {
-        await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct);
+        if (options.AllowRawDocumentEditing) await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct);
         await configuration.ValidateAsync(draftId, ct);
         var outcome = await configuration.SubmitOrPublishAsync(draftId, Note ?? "", ct);
         Flash(outcome.Message("Published. Agreements created from now on use it; agreements already pinned keep the release they started under."));

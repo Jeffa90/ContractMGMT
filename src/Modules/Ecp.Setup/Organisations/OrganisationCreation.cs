@@ -347,9 +347,9 @@ internal sealed class OrganisationCreation(
         catch (ForbiddenException) { groupDetail = "Not visible to you."; }
         items.Add(new("groups", "Approver groups", groupState, groupDetail, "/Admin/ApproverGroups", "Organisation Administrator"));
 
-        items.Add(await Kind("workflow", "Contract workflow", "WorkflowContractLifecycle", $"/Admin/Configuration?kind=WorkflowContractLifecycle&organisationId={org.Id}", "Organisation Administrator", "Not published: contracts cannot move through a lifecycle yet."));
-        items.Add(await Kind("matrix", "Approval matrix", "ApprovalMatrix", "/Admin/Approvals", "Organisation Administrator", "Not published: approvals use the workflow's own approver group."));
-        items.Add(await Kind("notifications", "Notification policy", "NotificationPolicy", "/Admin/Notifications", "Organisation Administrator", "Not published: the pack's default policy applies."));
+        items.Add(await Kind("workflow", "Contract workflow", "WorkflowContractLifecycle", $"/Admin/Forms/Edit?kind=WorkflowContractLifecycle&organisationId={org.Id}", "Organisation Administrator", "Not published: contracts cannot move through a lifecycle yet."));
+        items.Add(await Kind("matrix", "Approval matrix", "ApprovalMatrix", $"/Admin/Forms/Edit?kind=ApprovalMatrix&organisationId={org.Id}", "Organisation Administrator", "Not published: approvals use the workflow's own approver group."));
+        items.Add(await Kind("notifications", "Notification policy", "NotificationPolicy", $"/Admin/Forms/Edit?kind=NotificationPolicy&organisationId={org.Id}", "Organisation Administrator", "Not published: the pack's default policy applies."));
         var waiting = drafts.Values.Count(d => d.Submitted);
         items.Add(new("reviews", "Submitted changes waiting", waiting == 0 ? ChecklistState.Done : ChecklistState.InProgress, waiting == 0 ? "Nothing is waiting for a second person." : $"{waiting} submission(s) wait for a second person.", "/Admin/Reviews", "A second Business Administrator"));
         return items;

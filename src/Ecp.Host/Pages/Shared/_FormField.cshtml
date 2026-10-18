@@ -1,0 +1,166 @@
+@model Ecp.Host.Pages.Admin.Forms.FormFieldView
+@using Ecp.Configuration.Forms
+@using Ecp.Host.Pages.Admin.Forms
+@using System.Text.Json.Nodes
+@* One field of a configuration form, drawn from its schema. Every control is typed and labelled; a list of rows is a group of fields with buttons to add, remove and move; nothing here is a document. *@
+@{
+    var f = Model.Field; var ctx = Model.Context; var path = Model.Path; var id = FormPageContext.IdOf(path);
+    var name = FormBinder.Name(path);
+    var problems = ctx.About(path).ToList();
+    var errors = problems.Where(p => p.IsError).ToList();
+    var hasHelp = !string.IsNullOrEmpty(f.Help) || !string.IsNullOrEmpty(f.Example);
+    var describedBy = (hasHelp ? id + "-hint " : "") + (problems.Count > 0 ? id + "-err" : "");
+    var disabled = ctx.ReadOnly;
+    var required = f.Required ? "aria-required=\"true\"" : "";
+    var current = FormBinder.Scalar(Model.Value);
+}
+@functions {
+    static string Attr(bool on, string text) => on ? text : "";
+}
+@switch (f.Kind)
+{
+    case FormFieldKind.Object:
+        <fieldset class="form-group" id="@id">
+            <legend>@f.Label</legend>
+            @if (!string.IsNullOrEmpty(f.Help)) { <p class="hint">@L[f.Help]</p> }
+            @foreach (var child in f.Children)
+            {
+                <partial name="_FormField" model="new FormFieldView(child, (Model.Value as JsonObject)?[child.Name], FormBinder.Join(path, child.Name), ctx)" />
+            }
+        </fieldset>
+        break;
+
+    case FormFieldKind.Rows:
+    case FormFieldKind.Named:
+    {
+        var rows = f.Kind == FormFieldKind.Rows
+            ? ((Model.Value as JsonArray)?.Select((n, i) => (Node: n, Key: (string?)null)).ToList() ?? [])
+            : ((Model.Value as JsonObject)?.Select(kv => (Node: (JsonNode?)kv.Value, Key: (string?)kv.Key)).ToList() ?? []);
+        <fieldset class="form-list" id="@id" aria-describedby="@describedBy">
+            <legend>@f.Label (@rows.Count)</legend>
+            @if (hasHelp) { <p class="hint" id="@(id + "-hint")">@L[f.Help ?? ""]</p> }
+            @if (problems.Count > 0) { <p class="@(errors.Count > 0 ? "error" : "hint")" id="@(id + "-err")" role="alert">@string.Join(" ", problems.Select(p => Terms.Expand(p.Message)))</p> }
+            <input type="hidden" name="@FormBinder.Name(FormBinder.Join(path, FormBinder.CountName))" value="@rows.Count" />
+            @for (var i = 0; i < rows.Count; i++)
+            {
+                var rowPath = FormBinder.Join(path, i.ToString());
+                var rowNode = rows[i].Node as JsonObject;
+                var title = f.RowLabelField is { } lf ? FormBinder.Scalar(rowNode?[lf]) : "";
+                if (f.Kind == FormFieldKind.Named && string.IsNullOrEmpty(title)) { title = rows[i].Key ?? ""; }
+                <fieldset class="form-row" id="@FormPageContext.IdOf(rowPath)">
+                    <legend>@char.ToUpperInvariant(f.RowNoun[0])@f.RowNoun[1..] @(i + 1)@(string.IsNullOrEmpty(title) ? "" : ": " + title)@if (ctx.ErrorCountUnder(rowPath) > 0) { <span class="badge warning">@ctx.ErrorCountUnder(rowPath) @L["to fix"]</span> }</legend>
+                    @if (f.Kind == FormFieldKind.Named)
+                    {
+                        var keyPath = FormBinder.Join(rowPath, FormBinder.KeyName); var keyId = FormPageContext.IdOf(keyPath);
+                        var keyProblems = ctx.About(keyPath).ToList();
+                        <div class="field"><label for="@keyId">@f.KeyLabel</label>
+                            <input id="@keyId" name="@FormBinder.Name(keyPath)" type="text" maxlength="100" value="@rows[i].Key" disabled="@disabled" aria-describedby="@(keyProblems.Count > 0 ? keyId + "-err" : null)" aria-invalid="@(keyProblems.Count > 0 ? "true" : null)" />
+                            @if (keyProblems.Count > 0) { <p class="error" id="@(keyId + "-err")" role="alert">@string.Join(" ", keyProblems.Select(p => p.Message))</p> }</div>
+                    }
+                    @foreach (var child in f.Children)
+                    {
+                        <partial name="_FormField" model="new FormFieldView(child, rowNode?[child.Name], FormBinder.Join(rowPath, child.Name), ctx)" />
+                    }
+                    @if (!disabled)
+                    {
+                        <div class="row-actions">
+                            <button type="submit" asp-page-handler="Row" name="Op" value="@("up|" + path + "|" + i)" class="secondary" formnovalidate disabled="@(i == 0)" aria-label="@L["Move"] @f.RowNoun @(i + 1) @L["up"]">@L["Move up"]</button>
+                            <button type="submit" asp-page-handler="Row" name="Op" value="@("down|" + path + "|" + i)" class="secondary" formnovalidate disabled="@(i == rows.Count - 1)" aria-label="@L["Move"] @f.RowNoun @(i + 1) @L["down"]">@L["Move down"]</button>
+                            <button type="submit" asp-page-handler="Row" name="Op" value="@("remove|" + path + "|" + i)" class="secondary danger" formnovalidate aria-label="@L["Remove"] @f.RowNoun @(i + 1)">@L["Remove"]</button>
+                        </div>
+                    }
+                </fieldset>
+            }
+            @if (!disabled && rows.Count < f.MaxRows)
+            {
+                <div class="actions"><button type="submit" asp-page-handler="Row" name="Op" value="@("add|" + path)" class="secondary" formnovalidate>@L["Add"] @f.RowNoun</button></div>
+            }
+        </fieldset>
+        break;
+    }
+
+    case FormFieldKind.Boolean:
+    {
+        var on = Model.Value is null ? string.Equals(f.Default, "true", StringComparison.OrdinalIgnoreCase) : FormBinder.Truth(Model.Value);
+        <div class="check field">
+            <input id="@id" name="@name" type="checkbox" value="true" checked="@on" disabled="@disabled" aria-describedby="@describedBy" />
+            <label for="@id">@f.Label</label>
+            @if (hasHelp) { <p class="hint" id="@(id + "-hint")">@L[f.Help ?? ""]</p> }
+            @if (problems.Count > 0) { <p class="error" id="@(id + "-err")" role="alert">@string.Join(" ", problems.Select(p => Terms.Expand(p.Message)))</p> }
+        </div>
+        break;
+    }
+
+    case FormFieldKind.MultiSelect:
+    {
+        var chosen = Model.Value is null ? f.WhenAbsent.ToList() : FormBinder.Strings(Model.Value).ToList();
+        var options = ctx.OptionsFor(f, chosen);
+        <fieldset class="form-choices" id="@id" aria-describedby="@describedBy">
+            <legend>@f.Label@if (f.Required) { <span> (@L["required"])</span> }</legend>
+            @if (hasHelp) { <p class="hint" id="@(id + "-hint")">@L[f.Help ?? ""]</p> }
+            @if (options.Count == 0 && f.LinesWhenNoOptions)
+            {
+                <label for="@(id + "-lines")" class="visually-hidden">@f.Label</label>
+                <textarea id="@(id + "-lines")" name="@name" rows="3" disabled="@disabled">@string.Join("\n", chosen)</textarea>
+                <p class="hint">@L["One per line."]</p>
+            }
+            else
+            {
+                @for (var i = 0; i < options.Count; i++)
+                {
+                    var o = options[i]; var oid = id + "-" + i;
+                    <div class="check"><input id="@oid" name="@name" type="checkbox" value="@o.Value" checked="@chosen.Contains(o.Value)" disabled="@disabled" /><label for="@oid">@o.Label</label></div>
+                }
+            }
+            @if (problems.Count > 0) { <p class="@(errors.Count > 0 ? "error" : "hint")" id="@(id + "-err")" role="alert">@string.Join(" ", problems.Select(p => Terms.Expand(p.Message)))</p> }
+        </fieldset>
+        break;
+    }
+
+    default:
+    {
+        <div class="field">
+            <label for="@id">@f.Label@if (f.Required) { <span> (@L["required"])</span> }</label>
+            @switch (f.Kind)
+            {
+                case FormFieldKind.Select:
+                {
+                    var options = ctx.OptionsFor(f, [current]);
+                    <select id="@id" name="@name" disabled="@disabled" aria-describedby="@describedBy" aria-invalid="@(errors.Count > 0 ? "true" : null)" @Html.Raw(required)>
+                        <option value="">@(f.BlankLabel ?? L["(not set)"].Value)</option>
+                        @foreach (var o in options) { <option value="@o.Value" selected="@(o.Value == current)">@o.Label</option> }
+                    </select>
+                    break;
+                }
+                case FormFieldKind.LongText:
+                    <textarea id="@id" name="@name" rows="4" maxlength="@(f.MaxLength ?? 4000)" disabled="@disabled" aria-describedby="@describedBy" aria-invalid="@(errors.Count > 0 ? "true" : null)" @Html.Raw(required)>@current</textarea>
+                    break;
+                case FormFieldKind.Lines:
+                    <textarea id="@id" name="@name" rows="3" disabled="@disabled" aria-describedby="@describedBy" aria-invalid="@(errors.Count > 0 ? "true" : null)">@string.Join("\n", FormBinder.Strings(Model.Value))</textarea>
+                    break;
+                case FormFieldKind.IntegerList:
+                    <input id="@id" name="@name" type="text" inputmode="numeric" value="@(Model.Value is JsonArray a ? string.Join(", ", a.Select(FormBinder.Scalar)) : "")" disabled="@disabled" aria-describedby="@describedBy" aria-invalid="@(errors.Count > 0 ? "true" : null)" />
+                    break;
+                case FormFieldKind.Date:
+                    <input id="@id" name="@name" type="date" value="@current" disabled="@disabled" aria-describedby="@describedBy" aria-invalid="@(errors.Count > 0 ? "true" : null)" />
+                    break;
+                case FormFieldKind.Integer:
+                    <input id="@id" name="@name" type="text" inputmode="numeric" value="@current" disabled="@disabled" aria-describedby="@describedBy" aria-invalid="@(errors.Count > 0 ? "true" : null)" @Html.Raw(required) />
+                    break;
+                case FormFieldKind.Decimal:
+                    <input id="@id" name="@name" type="text" inputmode="decimal" value="@current" disabled="@disabled" aria-describedby="@describedBy" aria-invalid="@(errors.Count > 0 ? "true" : null)" @Html.Raw(required) />
+                    break;
+                default:
+                {
+                    var listId = f.SuggestionsKey is { } sk ? "dl-" + sk : null;
+                    if (f.SuggestionsKey is { } key) { ctx.SuggestionKeys.Add(key); }
+                    <input id="@id" name="@name" type="text" maxlength="@(f.MaxLength ?? 300)" value="@current" list="@listId" disabled="@disabled" aria-describedby="@describedBy" aria-invalid="@(errors.Count > 0 ? "true" : null)" @Html.Raw(required) />
+                    break;
+                }
+            }
+            @if (hasHelp) { <p class="hint" id="@(id + "-hint")">@L[f.Help ?? ""]@if (!string.IsNullOrEmpty(f.Example)) { <span> @L["Example:"] <em>@f.Example</em></span> }</p> }
+            @if (problems.Count > 0) { <p class="@(errors.Count > 0 ? "error" : "hint")" id="@(id + "-err")" role="alert">@string.Join(" ", problems.Select(p => Terms.Expand(p.Message)))</p> }
+        </div>
+        break;
+    }
+}

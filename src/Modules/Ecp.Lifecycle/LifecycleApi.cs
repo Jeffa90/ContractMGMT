@@ -104,6 +104,10 @@ public static class LifecycleModule
         services.AddScoped<IRegisterAuthorisationService, RegisterAuthorisationService>();
         services.AddScoped<IPendingApprovalSource, PendingApprovalSource>();
         services.AddScoped<Ecp.Identity.IApproverGroupUsageSource, LifecycleApproverGroupUsage>();
+        services.AddSingleton<Ecp.Configuration.Forms.IFormSchemaSource, Definitions.WorkflowFormSchemas>();
+        services.AddScoped<Ecp.Configuration.Forms.IFormInsight>(sp => new Definitions.WorkflowFormInsight(Definitions.WorkflowKinds.ContractLifecycle, sp.GetRequiredService<Persistence.LifecycleDbContext>()));
+        services.AddScoped<Ecp.Configuration.Forms.IFormInsight>(sp => new Definitions.WorkflowFormInsight(Definitions.WorkflowKinds.Variation, sp.GetRequiredService<Persistence.LifecycleDbContext>()));
+        services.AddScoped<Ecp.Configuration.Forms.IFormInsight, Definitions.MatrixFormInsight>();
         services.AddScoped<IRecordUnlockService, RecordUnlockService>();
         services.AddScoped<VariationService>();
         services.AddScoped<IVariationService>(sp => sp.GetRequiredService<VariationService>());

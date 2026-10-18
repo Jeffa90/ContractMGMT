@@ -1,0 +1,116 @@
+@page "/Admin/Forms/Edit"
+@model Ecp.Host.Pages.Admin.Forms.EditModel
+@using Ecp.Configuration.Forms
+@using Ecp.Host.Pages.Admin.Forms
+@{
+    var schema = Model.State?.Schema;
+    ViewData["Title"] = (schema?.Title ?? L["Edit configuration"].Value);
+    var ctx = Model.Context;
+    var problems = ctx?.Problems ?? [];
+    var errorList = problems.Where(p => p.IsError).ToList();
+    var warnings = problems.Where(p => !p.IsError).ToList();
+}
+<h1>@(schema?.Title ?? L["Edit configuration"].Value)</h1>
+<partial name="_Errors" model="ViewData.ModelState" />
+<nav class="tabs" aria-label="@L["Configuration documents"]">
+    @foreach (var s in Model.Schemas) { <a href="/Admin/Forms/Edit?kind=@s.Kind&organisationId=@Model.OrganisationId" aria-current="@(s.Kind == Model.Kind ? "page" : null)">@s.Title</a> }
+</nav>
+@if (schema is not null && Model.State is { } state && ctx is not null)
+{
+    <p class="lede">@L[schema.Intro]</p>
+    <form method="get" class="card"><input type="hidden" name="kind" value="@Model.Kind" />
+        <div class="field"><label for="org">@L["[[organisation]]"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+        <button type="submit" class="secondary">@L["Show"]</button></form>
+
+    @if (state.Latest is { } latest) { <p>@L["In force"]: <strong>@L["release"] @latest.Number</strong> @L["published by"] @latest.PublishedBy, @Fmt.DateTime(latest.PublishedUtc). <a href="/Admin/Configuration?kind=@Model.Kind&organisationId=@Model.OrganisationId">@L["History and rollback"]</a></p> }
+    else { <p class="hint">@L["Nothing has been published yet."]</p> }
+
+    @if (errorList.Count > 0)
+    {
+        <div class="error-summary" role="alert" tabindex="-1" id="error-summary">
+            <strong>@L["Fix these before you submit:"] (@errorList.Count)</strong>
+            <ul>
+            @foreach (var p in errorList)
+            {
+                <li>@if (p.Path.Length > 0) { <a href="#@FormPageContext.IdOf(p.Path)">@Terms.Expand(p.Message)</a> } else { @Terms.Expand(p.Message) }</li>
+            }
+            </ul>
+        </div>
+    }
+    @if (warnings.Count > 0)
+    {
+        <div class="flash" role="status"><strong>@L["Worth a look:"]</strong>
+            <ul>@foreach (var p in warnings) { <li>@Terms.Expand(p.Message)</li> }</ul></div>
+    }
+
+    @if (state.ReadOnly)
+    {
+        <p class="hint" role="status">@L["This is what is in force. To change it, start a draft; the published version stays in force until a draft is submitted and published."]</p>
+        @if (state.Latest is not null || true)
+        {
+            <form method="post" asp-page-handler="Start"><input type="hidden" name="Kind" value="@Model.Kind" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+                <button type="submit">@L["Start a draft"]</button></form>
+        }
+    }
+    else if (state.Draft is { } draft)
+    {
+        <p class="hint">@L["Draft last edited by"] @draft.LastEditedBy, @Fmt.DateTime(draft.UpdatedUtc).</p>
+    }
+
+    <form method="post">
+        <input type="hidden" name="Kind" value="@Model.Kind" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+        <input type="hidden" name="@FormBinder.Name("schemaVersion")" value="1" />
+        @foreach (var block in schema.Sections)
+        {
+            <section class="card" aria-labelledby="sec-@block.Key">
+                <h2 id="sec-@block.Key">@block.Title</h2>
+                @if (!string.IsNullOrEmpty(block.Help)) { <p class="hint">@L[block.Help]</p> }
+                @foreach (var field in block.Fields)
+                {
+                    <partial name="_FormField" model="new FormFieldView(field, ctx.Document[field.Name], field.Name, ctx)" />
+                }
+            </section>
+        }
+        @foreach (var key in ctx.SuggestionKeys)
+        {
+            <datalist id="dl-@key">@foreach (var o in ctx.Suggestions(key)) { <option value="@o.Value">@o.Label</option> }</datalist>
+        }
+
+        @if (!state.ReadOnly)
+        {
+            <section class="card" aria-labelledby="act-h">
+                <h2 id="act-h">@L["Save, check and submit"]</h2>
+                <div class="field"><label for="Note">@L["Note for the release history"]</label><input id="Note" name="Note" type="text" maxlength="500" aria-describedby="note-hint" /><p class="hint" id="note-hint">@L["Say what changed and why. A second person reads it when they review."]</p></div>
+                <div class="actions">
+                    <button type="submit" asp-page-handler="Save" class="secondary">@L["Save"]</button>
+                    <button type="submit" asp-page-handler="Validate" class="secondary">@L["Save and check"]</button>
+                    @{ var pb = new Ecp.Host.Pages.PublishButtonsModel(state.Draft?.Id, state.Governance, "Publish", L["Publish"].Value); }
+                    <partial name="_PublishButtons" model="pb" />
+                    <button type="submit" asp-page-handler="Discard" class="secondary">@L["Discard the draft"]</button>
+                </div>
+            </section>
+        }
+    </form>
+
+    @if (Model.Insight is { } insight)
+    {
+        <section class="card" aria-labelledby="insight-h">
+            <h2 id="insight-h">@L["Preview and impact"]</h2>
+            <p class="hint">@L["This is how the draft reads as it is in the form above, saved or not. Nothing here changes anything."]</p>
+            <h3>@L["What it would affect"]</h3>
+            <ul>@foreach (var line in insight.Impact) { <li>@Terms.Expand(line)</li> }</ul>
+            @if (insight.SimulatorLink is { } link) { <p><a href="@link">@L["Try a sample submission in the simulator"]</a></p> }
+            @foreach (var t in insight.Previews)
+            {
+                <h3>@t.Title</h3>
+                @if (!string.IsNullOrEmpty(t.Help)) { <p class="hint">@t.Help</p> }
+                <div class="table-wrap"><table>
+                    <caption class="visually-hidden">@t.Title</caption>
+                    <thead><tr>@foreach (var c in t.Columns) { <th scope="col">@c</th> }</tr></thead>
+                    <tbody>@foreach (var row in t.Rows) { <tr>@for (var i = 0; i < row.Count; i++) { if (i == 0) { <th scope="row">@row[i]</th> } else { <td>@row[i]</td> } }</tr> }</tbody>
+                </table></div>
+            }
+        </section>
+    }
+    else if (Model.InsightProblem is { } problem) { <p class="hint">@problem</p> }
+}

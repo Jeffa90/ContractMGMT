@@ -9,6 +9,7 @@
     @foreach (var k in Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds) { <a href="/Admin/Configuration?kind=@k.Kind&organisationId=@Model.OrganisationId" aria-current="@(k.Kind == Model.Kind ? "page" : null)">@k.Title</a> }
 </nav>
 <p class="hint">@L[Ecp.Host.Pages.Admin.Configuration.IndexModel.Kinds.First(k => k.Kind == Model.Kind).Help]</p>
+<p><a class="button" href="/Admin/Forms/Edit?kind=@Model.Kind&organisationId=@Model.OrganisationId">@L["Edit with the form"]</a> <span class="hint">@L["The form is the way to change this. It needs no knowledge of the stored document. The raw document below is a diagnostic view."]</span></p>
 <form method="get" class="card"><input type="hidden" name="kind" value="@Model.Kind" />
     <div class="field"><label for="org">@L["[[organisation]]"]</label><select id="org" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
     <button type="submit" class="secondary">@L["Show"]</button></form>
@@ -30,15 +31,26 @@ else { <p class="hint">@L["Nothing has been published yet. The reference definit
         }
         <form method="post">
             <input type="hidden" name="draftId" value="@draft.Id" /><input type="hidden" name="Kind" value="@Model.Kind" /><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
-            <div class="field"><label for="Definition">@L["Definition (JSON)"]</label><textarea id="Definition" name="Definition" rows="26" spellcheck="false" class="code">@draft.ContentJson</textarea></div>
-            <div class="field"><label for="Note">@L["Note for the release history"]</label><input id="Note" name="Note" type="text" maxlength="500" /></div>
-            <div class="actions">
-                <button type="submit" asp-page-handler="Save" class="secondary">@L["Save"]</button>
-                <button type="submit" asp-page-handler="Validate" class="secondary">@L["Save and validate"]</button>
-                @{ var pb = new Ecp.Host.Pages.PublishButtonsModel(draft.Id, Model.Governance, "Publish", L["Publish"].Value); }
-                <partial name="_PublishButtons" model="pb" />
-                <button type="submit" asp-page-handler="Discard" class="secondary">@L["Discard the draft"]</button>
-            </div>
+            @if (Model.RawEditingAllowed)
+            {
+                <div class="field"><label for="Definition">@L["Definition (JSON), advanced diagnostic view"]</label><textarea id="Definition" name="Definition" rows="26" spellcheck="false" class="code">@draft.ContentJson</textarea></div>
+                <div class="field"><label for="Note">@L["Note for the release history"]</label><input id="Note" name="Note" type="text" maxlength="500" /></div>
+                <div class="actions">
+                    <button type="submit" asp-page-handler="Save" class="secondary">@L["Save"]</button>
+                    <button type="submit" asp-page-handler="Validate" class="secondary">@L["Save and validate"]</button>
+                    @{ var pb = new Ecp.Host.Pages.PublishButtonsModel(draft.Id, Model.Governance, "Publish", L["Publish"].Value); }
+                    <partial name="_PublishButtons" model="pb" />
+                    <button type="submit" asp-page-handler="Discard" class="secondary">@L["Discard the draft"]</button>
+                </div>
+            }
+            else
+            {
+                <details><summary>@L["Show the stored document (read-only diagnostic)"]</summary>
+                    <div class="field"><label for="Definition">@L["Stored document"]</label><textarea id="Definition" rows="26" spellcheck="false" class="code" readonly>@draft.ContentJson</textarea></div></details>
+                <p class="hint">@L["In this environment the document is changed only through the form. Use the form to edit, check and submit this draft."]</p>
+                <div class="actions"><a class="button" href="/Admin/Forms/Edit?kind=@Model.Kind&organisationId=@Model.OrganisationId">@L["Open the form"]</a>
+                    <button type="submit" asp-page-handler="Discard" class="secondary">@L["Discard the draft"]</button></div>
+            }
         </form>
     </section>
 }

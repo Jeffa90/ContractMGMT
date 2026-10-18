@@ -40,7 +40,7 @@ public static class ConfigurationKindLabels
         "OrganisationOnboarding" => $"/Onboarding?org={organisationId}",
         "CustomField" => "/Admin/Studio/Fields",
         "ContractListView" => "/Admin/Studio/Views",
-        "WorkflowContractLifecycle" or "WorkflowVariation" or "ApprovalMatrix" or "NotificationPolicy" => $"/Admin/Configuration?kind={kind}&organisationId={organisationId}",
+        "WorkflowContractLifecycle" or "WorkflowVariation" or "ApprovalMatrix" or "NotificationPolicy" => $"/Admin/Forms/Edit?kind={kind}&organisationId={organisationId}",
         _ => null,
     };
 }

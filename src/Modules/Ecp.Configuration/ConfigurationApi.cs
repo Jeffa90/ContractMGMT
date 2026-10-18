@@ -149,6 +149,8 @@ public sealed class ConfigurationOptions
     public bool RequireSecondPersonPublish { get; set; }
     /// <summary>Rolling back needs the person to have signed in recently (the host sets it; the evidence is the verified session, never request input).</summary>
     public bool RequireRecentSignInForRollback { get; set; }
+    /// <summary>The raw-document view of a draft may be edited and saved (a diagnostic for administrators who are shown the document). Off in Production, where the form editors are the way to change a draft and the raw view is read-only.</summary>
+    public bool AllowRawDocumentEditing { get; set; } = true;
     /// <summary>How recent "recent" is.</summary>
     public TimeSpan RecentSignInWindow { get; set; } = TimeSpan.FromMinutes(10);
     /// <summary>The installation default solution pack (<c>Ecp:DefaultPackId</c>), used only for an organisation that has none of its own; unset unless the installer sets it. Terminology reads the pack's wording through it.</summary>
@@ -515,6 +517,7 @@ public static class ConfigurationModule
         services.AddScoped<ConfigurationService>();
         services.AddScoped<IConfigurationService>(sp => sp.GetRequiredService<ConfigurationService>());
         services.AddScoped<IConfigurationBootstrap>(sp => sp.GetRequiredService<ConfigurationService>());
+        services.AddScoped<Forms.IConfigurationFormEditor, Forms.ConfigurationFormEditor>();
         services.AddScoped<IConfigurationReleases>(sp => sp.GetRequiredService<ConfigurationService>());
         services.AddScoped<IConfigurationKind, ClassificationPolicyKind>();
         services.AddScoped<IConfigurationKind, SolutionPackKind>();

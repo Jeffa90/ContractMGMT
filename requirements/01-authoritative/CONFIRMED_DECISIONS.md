@@ -259,3 +259,18 @@ Source: owner instruction for OPS-03; architecture in `decisions/ADR-0036-operat
 
 
 
+
+## D13 Implementation Readiness Gap Closure (owner instruction 2026-10-18)
+
+Source: owner instruction for the Implementation Readiness Gap Closure slice; architecture in `decisions/ADR-0037-implementation-readiness-no-code-journey.md`; the gap register and closure report in `docs/IMPLEMENTATION_READINESS.md`; the proof in `docs/NO_CODE_REHEARSAL.md`. Production approval remains external governance.
+
+| ID | Decision |
+|---|---|
+| D13.1 | **Second-person publication is never weakened.** The fix for G-01 is explicit submission bound to the content hash; saving unchanged content changes nothing; a change after submission voids the submission; a hash mismatch fails; self-publication fails. Demo and Test may be single-person only if explicitly configured, and the release records the mode. |
+| D13.2 | **Rollback follows the same governance:** permission, recent sign-in, reason, second person where required, a new release, immutable history, audit. |
+| D13.3 | **Form editors replace JSON editing** for the workflow, approval matrix and notification policy. Raw documents are a read-only diagnostic in Production. Closed vocabularies only; no code, SQL, scripts or expressions. |
+| D13.4 | **Organisations are created by `organisations.manage`** (Tenant Administrator). Creation publishes nothing. Widening a single-organisation tenant is explicit, audited and one-way. An organisation is never deleted; "reset set-up" is allowed only while nothing has been recorded against it. |
+| D13.5 | **Approver groups have a registry** over the existing role assignments, with protections for groups in use. |
+| D13.6 | **The application never holds a private signing key.** Pack signing is the Pack Publisher's task outside the application; the System Administrator registers public keys only. |
+| D13.7 | **The malware gate fails closed.** Only a connected scanner's Clean result releases a file. No real scanner is claimed (Future / Not Verified). Administration reuses `notifications.administer`, scoped to the administrator's organisations (assumption, reversible). |
+| D13.8 | **"No-code" is claimed only for what `docs/NO_CODE_REHEARSAL.md` proves** (20 steps over real HTTP, on SQLite and on real SQL Server) and is not claimed for installation, identity, secrets, mail, backups, pack signing or a real scanner, which are technical or external tasks. |

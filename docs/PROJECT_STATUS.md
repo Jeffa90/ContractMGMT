@@ -115,6 +115,7 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
 | Workspace after OPS-02, with a SQL Server 2022 container and a shared backup folder: unit 867, architecture 108, API 138, integration 563 (SQLite and SQL Server wrappers) | 1,676 | 0 | 0 | 0 (IIS, Azure and the container build are not tests; see section 7) |
+| CI after OPS-02 (run 61, commit eca7cdc), all three jobs including the N-1 to N rehearsal and the container smoke test | success | 0 | 0 | 0 |
 | CI after OPS-01 (run 60, commit 67b1cee), all three jobs | success | 0 | 0 | 0 |
 | CI after S9 (run 56, commit 626877d), SQL Server 2022 container | 244 | 0 | 0 | 0 |
 | Workspace after S9, no SQL Server: unit 713, architecture 80, API 107, integration on SQLite 245 | 1,145 | 0 | 0 | 244 (the SQL Server wrappers, including 11 new Harborline wrappers) |

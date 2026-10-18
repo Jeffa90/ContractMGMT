@@ -12,7 +12,7 @@ Role separation is asserted, not assumed: the ledger records the role and the pa
 
 ## Where the evidence is
 
-The test writes the ledger as a table to `rehearsal-evidence/no-code-rehearsal-sqlite.md` or `no-code-rehearsal-sqlserver.md` beside the test binaries; the table below is the SQL Server run of this slice. Tests: `NoCodeRehearsalSqliteTests` and `NoCodeRehearsalSqlServerTests` in the API test project (`NoCodeRehearsalTests.cs`, `NoCodeRehearsal.cs`); the SQL Server host is `DemoApp.StartSqlServer()`.
+The test writes the ledger as a table to the file rehearsal-evidence/no-code-rehearsal-sqlite.md or no-code-rehearsal-sqlserver.md beside the test binaries; the table below is the SQL Server run of this slice. Tests: `NoCodeRehearsalSqliteTests` and `NoCodeRehearsalSqlServerTests` in the API test project (`NoCodeRehearsalTests.cs`, `NoCodeRehearsal.cs`); the SQL Server host is `DemoApp.StartSqlServer()`.
 
 ## The twenty steps (SQL Server run)
 

@@ -10,7 +10,22 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-18, end of OPS-03: operations dashboard and observability foundation)
+## Current state (2026-10-18, end of the Implementation Readiness Gap Closure slice)
+
+**Implementation Readiness Gap Closure (this pass; `decisions/ADR-0037-implementation-readiness-no-code-journey.md`, owner decision D13, `docs/IMPLEMENTATION_READINESS.md`, `docs/NO_CODE_REHEARSAL.md`).** Objective: a trained non-developer Business Administrator can do the supported company-implementation journey through the pages, without editing JSON, running SQL, changing source or using Git.
+
+* **G-01 second-person publication (Implemented, Verified on SQLite and SQL Server).** Every configuration page saves as the author, submits the exact content hash, and a different person publishes from `/Admin/Reviews`; rollback is governed the same way for every kind (permission, recent sign-in, reason, second person, new release, audit).
+* **Organisation creation (G-02) and approver groups (G-04) (Implemented, Verified).** `/Admin/Organisations` (Check then Create, set-up checklist, reset while unused); `/Admin/ApproverGroups` registry with members, preview, in-use and last-member protections.
+* **Form editors (G-03) (Implemented, Verified).** One schema-driven editor for the two workflows, the approval matrix and the notification policy; raw JSON remains only as an authorised diagnostic.
+* **Pack-signing journey (G-07) and malware-scanning gate (G-25).** Signing stays outside the application (an architecture test guards it). The scanning gate is fail-closed with quarantine, a repeat-safe retry job, an admin page and readiness check R-DOC-01; **no real scanner exists (Future, Not Verified)**; the mock scanner is for Demo and Test only.
+* **New tables only** (DraftReview, ReleaseEvidence, ConfigurationReviewEvent, ApproverGroup, DocumentScanAttempt); the upgrade manifest was regenerated.
+* **Guides.** Eight click-by-click guides plus `docs/DOCUMENT_SCANNING.md`; Not Verified by an unaided non-developer.
+* **No-code rehearsal (Verified over real HTTP, SQLite and real SQL Server).** 20 steps: 18 by business roles, 2 needing a technical role (see `docs/NO_CODE_REHEARSAL.md`).
+* **Full local run:** @@TOTALS@@
+* **Not done, by design:** OPS-04, INT-03, reporting, public API, AI, marketplace, another pack, customer-specific production deployment. Deferred gaps (G-06, G-08 to G-12, G-14, G-16, G-17, G-22 to G-24, G-26 to G-30) are in the register; the highest are G-12 (e-mail) and G-25 (no real scanner).
+* **First incomplete product task:** unchanged (INT-03's live e-signature adapter). **First incomplete operational task:** OPS-04.
+
+## Previous state (2026-10-18, end of OPS-03: operations dashboard and observability foundation)
 
 **OPS-03 (this pass; `decisions/ADR-0036-operations-dashboard-and-observability.md`, owner decisions D12, `docs/OPERATIONS_DASHBOARD.md`, `docs/OPS03_REQUIREMENTS_MATRIX.md`).** OPS-02's CI results (runs 61 and 62, all jobs green) are recorded in `deploy/STATUS.md`.
 

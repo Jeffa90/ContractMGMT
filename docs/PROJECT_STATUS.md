@@ -1,6 +1,6 @@
 # Project Status
 
-Status date: **2026-10-18** (after PER-002, portability remediation S1 to S10, the operational resilience slice OPS-01, the upgrade-safety slice OPS-02 and the operations dashboard slice OPS-03; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
+Status date: **2026-10-18** (after the Implementation Readiness Gap Closure slice, PER-002, portability remediation S1 to S10, the operational resilience slice OPS-01, the upgrade-safety slice OPS-02 and the operations dashboard slice OPS-03; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
 
 **Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 10 and 11 are an engineering assessment of evidence, not an approval.
 
@@ -9,6 +9,10 @@ Status date: **2026-10-18** (after PER-002, portability remediation S1 to S10, t
 Labels follow `CLAUDE.md`: **Implemented** (works and has tests), **Mocked** (a stand-in that behaves, for tests and demonstration), **Disabled** (present, off by default), **Scaffolded** (files exist, cannot be run here), **Future** (not built). **Verified** always names where: *workspace* (this cloud workspace, SQLite and the in-process host), *CI* (GitHub-hosted runner with a real SQL Server 2022 container and a container image build). SQLite results are lightweight checks and are never presented as SQL Server proof.
 
 `TASKS.md` ticks a task only when every acceptance test in its row exists and passes. A row can therefore be unticked while most of it works; section 4 separates **built but not ticked** from **not started** so that unticked does not read as missing.
+
+## Implementation readiness (gap closure slice)
+
+`docs/IMPLEMENTATION_READINESS.md` holds the G-01 to G-30 register. Implemented and Verified (SQLite and real SQL Server): second-person publication on every configuration page and rollback governance, the Configuration Reviews inbox, organisation creation and set-up checklist, approver-group administration, form editors for workflow, approval matrix and notification policy, the pack-publisher journey (signing stays outside the application), the fail-closed malware-scanning gate, and an automated 20-step no-code rehearsal over real HTTP (18 steps by business roles, 2 needing a technical role). **Not Verified:** any real malware scanner (none exists), live e-mail, a real identity provider, IIS or Azure, the Production-mode setup wizard end to end, and an unaided non-developer following the guides. Remaining High gaps: G-12 (e-mail delivery) and G-25 (no real scanner; R-DOC-01 is Unhealthy in Production until one is connected). Production approval is external governance and is not declared here.
 
 ## 2. Completed modules
 
@@ -189,7 +193,7 @@ Known shortcuts and gaps in what is built, each with where it is tracked. None i
 | The architecture guard scanned C# only (stage A) | **Stage B done in S4**: every shipped text file is scanned, with a narrow written allow-list (S10 locale defaults, demo seeder, migration demo script) | P-09; slice S4 |
 | Configured-field text search: a selective second word costs about 0.8 s, every statement scans the contract table once, the missing-index suggestion is unapplied, small tenancy reads repeat, offset paging only | Fine at 10,000 contracts, unknown at 100,000 | `docs/PERFORMANCE_REVIEW.md` section 10; PRF-01 |
 | `RegisterFilters` keeps two copies of the sort lambda (open and closed access) | Two places to keep in step | PER-002 follow-up, no ID |
-| Workflows, notification policies and approval matrices are edited as JSON; no schema-validation framework; no designers | Usable by an administrator who can edit JSON, not by a business user | CFG-01, STU-03 to STU-06, WFE-01 |
+| Workflows, notification policies and approval matrices now have a form editor (`/Admin/Forms/Edit`, G-03); there is still no schema-validation framework, rules designer or visual workflow designer | A trained Business Administrator can edit them without JSON; graphical designers and simulation against records remain Future | CFG-01, STU-03 to STU-06, WFE-01; `docs/IMPLEMENTATION_READINESS.md` |
 | Contracts pinned to a workflow release cannot be moved to a newer one; a migrated, non-legacy contract is not pinned to a workflow | Workflow changes apply to new contracts only | Recorded as Future in the lifecycle slice |
 | Emergency unlock changes core fields only; person and file-reference fields cannot be migrated | Narrower than the requirement | Lifecycle slice, migration slice |
 | CI actions are tagged, not pinned to commit SHAs | Supply-chain exposure on the build | `TODO(SEC-060)` in `.github/workflows/ci.yml` |

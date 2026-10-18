@@ -52,7 +52,7 @@ internal sealed class WorkflowFormSchemas : IFormSchemaSource
     {
         ["initial"] = "Where new records start", ["legalQueue"] = "Waiting for Legal", ["legalReview"] = "With Legal", ["legalRework"] = "Returned by Legal for rework", ["legalCleared"] = "Cleared by Legal",
         ["drafting"] = "Being drafted", ["signature"] = "Out for signature", ["approval"] = "Awaiting register authorisation", ["effective"] = "In force", ["variation"] = "Being varied", ["renewal"] = "Being renewed",
-        ["suspended"] = "Suspended", ["terminated"] = "Terminated", ["ended"] = "Ended", ["flagged"] = "Flagged", ["archived"] = "Archived", ["withdrawn"] = "Withdrawn", ["applied"] = "Applied",
+        ["suspended"] = "Suspended", ["terminated"] = "Terminated", ["ended"] = "Has ended", ["flagged"] = "Flagged", ["archived"] = "Archived", ["withdrawn"] = "Withdrawn", ["applied"] = "Applied",
         ["rejected"] = "Rejected", ["cancelled"] = "Cancelled",
     };
 
@@ -89,8 +89,8 @@ internal sealed class WorkflowFormSchemas : IFormSchemaSource
             [
                 Rows("states", "Stages", "stage", "display",
                 [
-                    Text("code", "Stage code", "Letters and digits only. Transitions refer to this code, so do not change it once records use it. Example: Draft.", "Draft", required: true),
-                    Text("display", "Name people see", "Shown on screens and in messages. Example: Draft.", "Draft", required: true),
+                    Text("code", "Stage code", "Letters and digits only. Transitions refer to this code, so do not change it once records use it. Example: Intake.", "Intake", required: true),
+                    Text("display", "Name people see", "Shown on screens and in messages. Example: Intake.", "Intake", required: true),
                     Select("role", "What this stage means to the platform", Meaning(WorkflowVocabulary.StateRoles, StateRoleMeaning), "Some steps (legal review, signature, approval, variations, renewals) look for the stage that has this meaning. Leave blank for a plain stage."),
                     Boolean("initial", "Starting stage", "New records start here. Exactly one stage is the starting stage, and it cannot be locked."),
                     Boolean("terminal", "Final stage", "Nothing can happen after this stage."),

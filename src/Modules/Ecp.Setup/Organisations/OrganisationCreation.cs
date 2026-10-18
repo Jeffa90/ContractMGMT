@@ -62,7 +62,7 @@ public interface IOrganisationCreation
 
 internal sealed class OrganisationCreation(
     IAccessService access, ITenantContext tenant, ITenantDirectory directory, ITenantProvisioningService provisioning, IOrganisationStructureService structure, IRoleAssignmentService assignments,
-    IClassificationScaleProvider scales, ISolutionPackCatalogue catalogue, IPackAssignments packAssignments, IConfigurationReleases releases, IConfigurationBootstrap bootstrap,
+    IClassificationScaleProvider scales, ISolutionPackCatalogue catalogue, IPackAssignments packAssignments, IConfigurationReleases releases, ICapabilityAdministration capabilityAdmin, IConfigurationBootstrap bootstrap,
     IEnumerable<IOrganisationUsageSource> usageSources, IPeopleDirectory people, IApproverGroupService groups, IUnitOfWork uow, IAuditWriter audit, CurrentUser currentUser, ActorContext actor, IClock clock, ReauthenticationContext reauth, ConfigurationOptions options) : IOrganisationCreation
 {
     private const string Permission = "organisations.manage";
@@ -148,8 +148,8 @@ internal sealed class OrganisationCreation(
             Error("Key", $"The key '{rule.Prefix}' is already used by another organisation in this tenant. Keys must be unique because they begin every reference number.");
 
         if (!string.IsNullOrWhiteSpace(i.Country) && !RegionalCatalogue.IsCountry(i.Country.Trim().ToUpperInvariant())) Error("Country", "That country or region is not recognised. Use the list.");
-        if (!RegionalCatalogue.IsLocale(i.Culture)) Error("Culture", "That locale is not recognised. Use a language-and-region tag such as en-AU or en-US.");
-        if (!TimeZones.TryFind(i.TimeZone ?? "", out _)) Error("TimeZone", "That time zone is not recognised. Use an IANA name such as Australia/Sydney.");
+        if (!RegionalCatalogue.IsLocale(i.Culture)) Error("Culture", "That locale is not recognised. Use a language-and-region tag such as fr-FR or pt-BR.");
+        if (!TimeZones.TryFind(i.TimeZone ?? "", out _)) Error("TimeZone", "That time zone is not recognised. Use an IANA name such as Europe/Paris.");
         if (!RegionalCatalogue.IsCurrency((i.Currency ?? "").ToUpperInvariant())) Error("Currency", "That currency is not an ISO 4217 code the platform offers.");
 
         var info = await directory.FindAsync(tenant.RequireTenantId(), ct);
@@ -313,6 +313,20 @@ internal sealed class OrganisationCreation(
             return new(key, title, ChecklistState.NotStarted, whenNone, link, owner);
         }
 
+        async Task<ChecklistItem> CapabilitiesItem()
+        {
+            const string key = "capabilities", title = "Capabilities", link = "/Admin/Capabilities", owner = "Organisation Administrator";
+            try
+            {
+                var overview = await capabilityAdmin.OverviewAsync(org.Id, ct);
+                if (overview.Draft is { ReviewState: Ecp.Configuration.Domain.ReviewState.Submitted }) return new(key, title, ChecklistState.InProgress, "Submitted: waiting for a second person to publish it.", "/Admin/Reviews", owner);
+                if (overview.Draft is not null) return new(key, title, ChecklistState.InProgress, "A draft is open and not yet submitted.", link, owner);
+                if (overview.ReleaseNumber is { } number) return new(key, title, ChecklistState.Done, $"Release {number} is published.", link, owner);
+                return new(key, title, ChecklistState.NotStarted, "Not published: the pack's defaults apply.", link, owner);
+            }
+            catch (ForbiddenException) { return new(key, title, ChecklistState.Unknown, "Not visible to you.", link, owner); }
+        }
+
         items.Add(new("organisation", "Organisation created", ChecklistState.Done, $"{org.Name} ({org.ReferencePrefix}), {org.CultureCode}, {org.TimeZoneId}, {org.DefaultCurrencyCode}.", null, "Tenant Administrator"));
 
         ChecklistState adminState = ChecklistState.Unknown; var adminDetail = "Not visible to you.";
@@ -335,7 +349,7 @@ internal sealed class OrganisationCreation(
             "/Admin/Packs/Assign?organisationId=" + org.Id, "Organisation Administrator"));
         items.Add(await Kind("regional", "Regional profile", RegionalKinds.Name, "/Admin/Regional", "Organisation Administrator", "Not published: the organisation falls back to the values entered at creation."));
         items.Add(await Kind("terminology", "Terminology", TerminologyKinds.Name, "/Admin/Terminology", "Organisation Administrator", "Not published: the pack's wording is used."));
-        items.Add(await Kind("capabilities", "Capabilities", CapabilityKinds.Name, "/Admin/Capabilities", "Organisation Administrator", "Not published: the pack's defaults apply."));
+        items.Add(await CapabilitiesItem());
 
         var groupDetail = ""; var groupState = ChecklistState.Unknown;
         try

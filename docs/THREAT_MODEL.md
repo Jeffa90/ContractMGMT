@@ -304,3 +304,19 @@ Assets: the dashboard and its JSON form (a map of the installation), the metrics
 | T-DSH-07 | **Denial of service by repeated dashboard builds** | A build is counts and a handful of queries per tenant; it takes no lease and changes nothing; only the System Administrator can call it | Very many tenants make a build slower (documented) |
 | T-DSH-08 | **Support bundle abuse** (bulk data, path tricks, unaudited download) | Recent sign-in; allow-listed entry names; 2 MB per entry and 5 MB total; fixed archive timestamps; hashed manifest; one audit event with size, hash and correlation id; secret scan | The recipient's handling is the organisation's |
 | T-DSH-09 | **Stale facts mistaken for current** | Each integrity line shows the time and correlation id of the validation it came from; gauges are labelled "from the last dashboard build" | |
+
+## Implementation readiness (ADR-0037; `docs/IMPLEMENTATION_READINESS.md`)
+
+Assets: configuration releases, the review inbox, the organisation list, approver-group membership, the form editors, uploaded files. Boundaries: the administration pages; the configuration lifecycle; the document store. Tests: `ConfigurationGovernanceScenarios`, `ConfigurationRollbackKindsScenarios`, `ConfigurationReviewUiTests`, `OrganisationCreationScenarios`, `ApproverGroupScenarios`, `FormEditorTests`, `FormEditorScenarios`, `FormEditorUiTests`, `DocumentScanningScenarios`, `NoCodeRehearsal*`.
+
+| ID | Threat | Control | Residual |
+|---|---|---|---|
+| T-IRG-01 | **Self-approval of a configuration change**, or publication of content other than what was reviewed | Submission bound to the content hash; publisher differs from creator, last editor and submitter; any edit voids the submission; hash mismatch fails; refusals audited | Two colluding administrators; the audit trail is the control |
+| T-IRG-02 | **Re-saving to become "last editor" or to slip in a change after review** | Saving identical content changes nothing; a changed save voids the submission and says so | |
+| T-IRG-03 | **Rollback as a back door** around second-person publication | Same permission, recent sign-in, reason and second person; creates a new release; earlier releases immutable | |
+| T-IRG-04 | **Organisation creation abused** (duplicate keys, cross-tenant collision, privilege escalation through the initial administrator) | `organisations.manage` only; names and keys unique per tenant and checked field by field; administrator scoped to the new organisation; widening one-way and audited; reset refused once anything is recorded | A Tenant Administrator is trusted by design |
+| T-IRG-05 | **Injection through form fields** (JSON structure, script, expression, template logic) | The document is built from the schema, field by field; closed vocabularies; templates allow `{{placeholders}}` from a fixed list; the validator rejects logic and markup at publication; tests feed hostile text | |
+| T-IRG-06 | **Approver group emptied from under live work** | Registry with in-use and last-member protections and a preview of who could approve before and after | A group not yet referenced can be emptied |
+| T-IRG-07 | **Private signing key in the application** | None is created, held or requested; an architecture test fails otherwise; the Packs page refuses a pasted private key | A user pasting a key into an unrelated free-text field |
+| T-IRG-08 | **Unscanned or infected file used as evidence** | Fail-closed gate: only Clean releases; guards count only downloadable documents; infected files quarantined; scan history audited | No real scanner in this product (Not Verified) |
+| T-IRG-09 | **Reading another organisation's held files** | The scanning service is scoped to the organisations the person administers; outside them a file is not found | |

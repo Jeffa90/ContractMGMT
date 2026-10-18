@@ -13,7 +13,7 @@
 <details class="card"><summary>@L["Who does what when a pack comes to this installation"]</summary>
     <ol>
         <li><strong>@L["The publisher"]</strong> @L["(a Pack Publisher, outside this application) builds the pack with the pack tool and signs it with a private key. The key is held in the publisher's own key store and never reaches this application or its administrators."]</li>
-        <li><strong>@L["A system administrator"]</strong> @L["decides which publisher keys the installation trusts and registers only the public key, under Trusted publishers. Production accepts nothing signed by any other key."]</li>
+        <li><strong>@L["A tenant administrator"]</strong> @L["registers the public key of each publisher the installation trusts, under Trusted publishers, on the instruction of the system administrator or security team (the system administrator can instead set it in host configuration). Only the public key is ever entered. Production accepts nothing signed by any other key."]</li>
         <li><strong>@L["A business administrator"]</strong> @L["uploads the signed file, reads the checks, installs it, and assigns it to an organisation. The pack prepares drafts; a second person publishes them."]</li>
         <li><strong>@L["Key custody"]</strong> @L["(your security team, or the publisher) keeps the private key, rotates it and revokes it. A revoked key stops its packs being accepted for new installs."]</li>
     </ol>

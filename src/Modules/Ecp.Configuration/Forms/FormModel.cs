@@ -50,7 +50,7 @@ public sealed class FormField
     /// <summary>Suggestions for a text field; any value may still be typed.</summary>
     public string? SuggestionsKey { get; init; }
     public IReadOnlyList<FormField> Children { get; init; } = [];
-    /// <summary>The child whose value titles a row ("Draft" in "State 3: Draft").</summary>
+    /// <summary>The child whose value titles a row (the stage name in "State 3: Intake").</summary>
     public string? RowLabelField { get; init; }
     /// <summary>What one row is called ("state", "transition").</summary>
     public string RowNoun { get; init; } = "item";

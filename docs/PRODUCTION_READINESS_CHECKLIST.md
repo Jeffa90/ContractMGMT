@@ -60,3 +60,15 @@ The platform provides the dashboard (`docs/OPERATIONS_DASHBOARD.md`). Monitoring
 - [ ] Retention of operation history and audit data is decided
 
 Not covered here and therefore Not Verified: IIS and Azure deployment models, exporters and alerting, TLS certificate monitoring, clock-skew measurement.
+
+## Implementation readiness (ADR-0037; `docs/IMPLEMENTATION_READINESS.md`, `docs/NO_CODE_REHEARSAL.md`)
+
+- [ ] Second-person publication is on (it is on in Production) and at least two people hold publish rights for every organisation; the Configuration reviews inbox is part of the weekly routine
+- [ ] The initial administrator and a second configuration administrator are named for every organisation (see the set-up checklist)
+- [ ] Nobody expects a private signing key to be held in the application; the Pack Publisher and the key custodian are named (`docs/PACK_IMPLEMENTATION_GUIDE.md`)
+- [ ] **A real malware scanner is connected** (readiness check R-DOC-01 is Healthy), or the organisation has decided in writing that attachments will not be used until one is. **Not Verified in this product: no scanner adapter exists**
+- [ ] E-mail delivery has been tested with a real message (the setup page does not set the delivery provider: gap G-12)
+- [ ] A business person (not a developer) has followed the guides on a rehearsal tenant; the automated rehearsal proves the pages, not the wording
+- [ ] The deferred gaps in `docs/IMPLEMENTATION_READINESS.md` section 2.3 have been read and accepted or scheduled
+
+Not covered here and therefore Not Verified: identity provider and secrets handling in a customer environment, a real restore inside the rehearsal, a real scanner.

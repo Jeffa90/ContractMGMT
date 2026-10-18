@@ -21,7 +21,7 @@ internal sealed class NotificationPolicyFormInsight(NotificationRenderer rendere
         var scale = await scales.GetAsync(ct);
         var terms = await terminology.GetAsync(organisationId, ct: ct);
         var sample = new RenderContext("REF-000123", "Sample services agreement", scale.DefaultLevel, "Alex Sample", "https://example.invalid/contracts/sample", DueOn: new DateOnly(2027, 3, 31), DaysRemaining: 45, WindowDays: 90, StepName: "Commercial review",
-            NowUtc: new DateTime(2027, 2, 14, 1, 0, 0, DateTimeKind.Utc), Amount: 250000m, CurrencyCode: "AUD");
+            NowUtc: new DateTime(2027, 2, 14, 1, 0, 0, DateTimeKind.Utc), Amount: 250000m, CurrencyCode: "CHF");
 
         var rows = new List<IReadOnlyList<string>>();
         foreach (var e in policy.Events)
@@ -31,7 +31,7 @@ internal sealed class NotificationPolicyFormInsight(NotificationRenderer rendere
                 (subject, body) = renderer.Render(policy, template, sample, scale, terms);
             rows.Add([e.Event, string.Join(", ", e.Recipients), string.Join(" and ", e.Channels) + (e.Mandatory ? " (cannot be switched off)" : ""), subject, body]);
         }
-        var previews = new List<InsightTable> { new("What would be sent", "Each message is shown for a sample contract (REF-000123, \"Sample services agreement\", 250,000 AUD, due 31 March 2027). Real messages use the real contract's details and the organisation's own date and currency formats.",
+        var previews = new List<InsightTable> { new("What would be sent", "Each message is shown for a sample contract (REF-000123, \"Sample services agreement\", 250,000 CHF, due 31 March 2027). Real messages use the real contract's details and the organisation's own date and currency formats.",
             ["Event", "Who is told", "How", "Subject", "Message"], rows) };
 
         var impact = new List<string>

@@ -22,15 +22,15 @@ internal sealed class MatrixFormSchemas : IFormSchemaSource
                 [
                     Rows("matrices", "Matrices", "matrix", "name",
                     [
-                        Text("code", "Matrix code", "Lower-case letters, digits and hyphens (up to 50). Workflows refer to this code. Example: subcontract-approvals.", "subcontract-approvals", required: true),
-                        Text("name", "Name", "Up to 200 characters. Example: Subcontract approvals.", "Subcontract approvals", required: true),
+                        Text("code", "Matrix code", "Lower-case letters, digits and hyphens (up to 50). Workflows refer to this code. Example: standard-approvals.", "standard-approvals", required: true),
+                        Text("name", "Name", "Up to 200 characters. Example: Standard approvals.", "Standard approvals", required: true),
                         LongText("description", "Description", "What this matrix is for (up to 1000 characters).", maxLength: 1000),
-                        Text("currency", "Currency", "Three-letter code. Row value ranges are in this currency. Example: AUD.", "AUD", required: true, maxLength: 3),
+                        Text("currency", "Currency", "Three-letter code. Row value ranges are in this currency. Example: CHF.", "CHF", required: true, maxLength: 3),
                         Date("effectiveFrom", "In force from", "Leave blank for no start date."),
                         Date("effectiveTo", "In force until", "Leave blank for no end date."),
                         Rows("rates", "Exchange rates", "rate", "currency",
                         [
-                            Text("currency", "Foreign currency", "Three-letter code. Example: USD.", "USD", required: true, maxLength: 3),
+                            Text("currency", "Foreign currency", "Three-letter code. Example: JPY.", "JPY", required: true, maxLength: 3),
                             Decimal("rate", "Rate", "Units of the matrix currency for one unit of this currency. Example: 1.5.", "1.5", required: true),
                             Date("effectiveFrom", "From"), Date("effectiveTo", "Until"),
                         ], "Only needed when contracts are valued in other currencies."),

@@ -245,3 +245,11 @@ The Harborline pack adds no code path, permission, route or role. It is data und
 * **Anonymous health**: in Production the readiness answer is the overall status only; Demo and Test list checks (not internet-facing; documented). Detail is on the authorised dashboard.
 * **Support bundle**: recent sign-in plus permission, audited, hashed manifest, allow-listed entry names, size caps, formula-safe summary, secret scan before and after assembly.
 * **Not built, not claimed**: a telemetry exporter or SIEM sink (INT-04), alerting, TLS certificate and secret-expiry inspection.
+
+## 22. Implementation readiness: second-person publication, organisations, forms and the scanning gate (ADR-0037; `docs/IMPLEMENTATION_READINESS.md`)
+
+* **Two people publish.** Where a second person is required (always in Production) a draft must be submitted, and the publisher must differ from the draft's creator, last editor and submitter. The submission holds the SHA-256 of the exact content; any later change voids it; a mismatch fails. Reviewing never changes the last editor. Refusals are audited in their own transaction. Rollback follows the same rule, needs the rollback permission, a reason and a recent sign-in, and creates a new release; history is never edited.
+* **Creating organisations** needs `organisations.manage` (Tenant Administrator) and a recent sign-in; it publishes nothing; the initial administrator receives the Organisation Administrator role for that organisation only; widening a tenant is audited and one-way.
+* **Form editors** build documents from a schema of typed fields. Nothing typed is read as structure, code, SQL, script or expression; unknown form fields are ignored; vocabularies are closed lists. The raw document is a read-only diagnostic in Production.
+* **No private key in the application.** The application only verifies packs with public keys. An architecture test fails if any source creates, holds or asks for a private signing key.
+* **Malware gate.** Only a connected scanner's Clean result releases a file; Pending, Skipped and Error are held; Infected is quarantined and never released; attempts are recorded and audited; no content is written to the audit trail. No real scanner is integrated (Not Verified); R-DOC-01 fails Production readiness without one.

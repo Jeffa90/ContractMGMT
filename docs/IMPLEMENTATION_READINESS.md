@@ -94,8 +94,9 @@ None. Every gap in Appendix D was reproduced in the code except where the table 
 2. **G-25 (High):** no real scanner; attachments cannot be released in Production.
 3. **Identity provider and secrets** (G-09, G-10, G-14, G-16): technical tasks that the System Administrator performs from the installation guide.
 4. **Backups** are proved by the SQL Server recovery tests; the rehearsal opens the page but does not repeat a restore.
-5. **The guides have not been followed by an unaided non-developer**; the rehearsal proves the pages work, not that the wording is sufficient.
-6. **Production approval** is external governance and is not declared anywhere.
+5. **R-DOC-01 in Production (found while writing the guides; read from the code, not run in Production mode).** With no real scanner connected, the platform check is Unhealthy; `/health/ready` should then answer 503, and the setup wizard treats an Unhealthy platform check as blocking, so "Finish setup" would be refused in Production. This is the intended fail-closed result, and it is the same blocker as G-25.
+6. **The guides have not been followed by an unaided non-developer**; the rehearsal proves the pages work, not that the wording is sufficient.
+7. **Production approval** is external governance and is not declared anywhere.
 
 ## 5. Guides created
 
@@ -109,3 +110,17 @@ See `decisions/ADR-0037-implementation-readiness-no-code-journey.md` and `requir
 - An organisation is never deleted; "reset set-up" discards open drafts and ends the structure only while nothing has been recorded against it. Reversible.
 - The organisation wizard assigns the pack and records the choice; the drafts an organisation's administrator is entitled to make are made by that administrator, because a Tenant Administrator holds no organisation-level configuration right by design.
 - Terminology tokens such as `[[organisation]]` are expanded on every new page.
+
+## 7. Findings recorded while writing and checking the guides
+
+Each was read from the code; none was run in a browser. They are limits or contradictions, recorded rather than silently resolved.
+
+- **Who registers a trusted publisher key.** The permission `packs.trust.manage` is held by the Tenant Administrator only (role matrix). The Packs page said a system administrator registers the key. The page text is corrected in this slice; the System Administrator route is host configuration (`Ecp__Packs__TrustFile`), which works before any tenant exists. No permission was changed.
+- **Document scanning administration.** The System Administrator role does not hold `notifications.administer`, so cannot open `/Admin/Documents/Scanning`; the Organisation Administrator can. Nothing notifies anyone when a file is quarantined or a scan errors (the page and the dashboard show it). Deferred.
+- **Skipped scans.** Only a Clean result releases a file unless `Documents:AllowSkippedScan` is true; it defaults to false and R-DOC-01 flags it.
+- **Audit for the System Administrator.** The role matrix gives that role neither `audit.read` nor `audit.read_admin`; how it reads operations audit events on screen is Not Verified.
+- **Time zone.** The shipped JBS pack proposes Australia/Brisbane in its regional profile; the guides' JBS-style examples use Australia/Sydney as the brief asked, and say so.
+- **Harborline date format.** `MM/dd/yyyy` is not covered by a shipped migration sample; the guide tells the reader to confirm the date in the dry-run sample.
+- **Playbook text that was stale** (batch routes, labels, the set-up wizard's tenancy help text, the reference-prefix help text, the SMTP provider setting) is corrected in the guides; the playbook carries a banner pointing to them.
+- **Review buttons.** The on-screen labels are "Approve and publish", "Send back for changes", "Reject" and "Withdraw my submission".
+- **Behaviours worth knowing.** Only people who have signed in once are offered as an initial administrator; after a step-up redirect the Create form comes back empty; Add / Move / Remove in the form editors change the screen only until Save draft; choosing a pack in the onboarding wizard does not assign it (G-08); the Organisation Administrator has no menu entry for the set-up checklist, so the Tenant Administrator passes on the link; the onboarding wizard is not among the 20 rehearsal steps.

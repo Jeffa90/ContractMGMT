@@ -451,14 +451,14 @@
       "ecp.audit": {
         "type": "Project",
         "dependencies": {
-          "Ecp.Persistence": "[1.0.0, )",
-          "Ecp.SharedKernel": "[1.0.0, )"
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )"
         }
       },
       "ecp.persistence": {
         "type": "Project",
         "dependencies": {
-          "Ecp.SharedKernel": "[1.0.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.12, )",

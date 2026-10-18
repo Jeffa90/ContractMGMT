@@ -41,9 +41,9 @@ else
         <fieldset>
             <legend>@L["The organisation"]</legend>
             <div class="field"><label for="Name">@L["Display name"]</label><input id="Name" name="Name" type="text" required maxlength="200" value="@Model.Name" aria-describedby="Name-hint Name-err" />
-                <p class="hint" id="Name-hint">@L["The name people see. Example: Harborline Construction. Must be unique in this tenant."]</p><p class="error" id="Name-err">@Model.ErrorFor("Name")</p></div>
+                <p class="hint" id="Name-hint">@L["The name people see. Example: Northwind Traders. Must be unique in this tenant."]</p><p class="error" id="Name-err">@Model.ErrorFor("Name")</p></div>
             <div class="field"><label for="LegalName">@L["Registered legal name"]</label><input id="LegalName" name="LegalName" type="text" required maxlength="200" value="@Model.LegalName" aria-describedby="LegalName-hint LegalName-err" />
-                <p class="hint" id="LegalName-hint">@L["The company's full legal name. It is recorded as the first legal entity (key MAIN). Example: Harborline Construction Pty Ltd."]</p><p class="error" id="LegalName-err">@Model.ErrorFor("LegalName")</p></div>
+                <p class="hint" id="LegalName-hint">@L["The company's full legal name. It is recorded as the first legal entity (key MAIN). Example: Northwind Traders Ltd."]</p><p class="error" id="LegalName-err">@Model.ErrorFor("LegalName")</p></div>
             <div class="field"><label for="Key">@L["Organisation key"]</label><input id="Key" name="Key" type="text" required maxlength="16" value="@Model.Key" aria-describedby="Key-hint Key-err" />
                 <p class="hint" id="Key-hint">@L["2 to 16 letters or digits, starting with a letter. It begins every reference number and cannot be changed later. Example: HBL gives HBL-000001."]</p><p class="error" id="Key-err">@Model.ErrorFor("Key")</p></div>
             <div class="field"><label for="ReferenceSeparator">@L["Separator in reference numbers"]</label>
@@ -60,11 +60,11 @@ else
                     @foreach (var c in Model.Countries) { <option value="@c.Key" selected="@(Model.Country == c.Key)">@c.Value (@c.Key)</option> }
                 </select><p class="error" id="Country-err">@Model.ErrorFor("Country")</p></div>
             <div class="field"><label for="Culture">@L["Locale"]</label><input id="Culture" name="Culture" type="text" required maxlength="35" value="@Model.Culture" aria-describedby="Culture-hint Culture-err" />
-                <p class="hint" id="Culture-hint">@L["Language and region, for dates and numbers. Examples: en-AU, en-US, en-GB."]</p><p class="error" id="Culture-err">@Model.ErrorFor("Culture")</p></div>
+                <p class="hint" id="Culture-hint">@L["Language and region, for dates and numbers. Examples: fr-FR, pt-BR, de-DE."]</p><p class="error" id="Culture-err">@Model.ErrorFor("Culture")</p></div>
             <div class="field"><label for="TimeZone">@L["Time zone"]</label><input id="TimeZone" name="TimeZone" type="text" required maxlength="100" value="@Model.TimeZone" aria-describedby="TimeZone-hint TimeZone-err" />
-                <p class="hint" id="TimeZone-hint">@L["An IANA name. Examples: Australia/Sydney, America/Chicago. Times are stored in UTC and shown in this zone."]</p><p class="error" id="TimeZone-err">@Model.ErrorFor("TimeZone")</p></div>
+                <p class="hint" id="TimeZone-hint">@L["An IANA name. Examples: Europe/Paris, Asia/Tokyo. Times are stored in UTC and shown in this zone."]</p><p class="error" id="TimeZone-err">@Model.ErrorFor("TimeZone")</p></div>
             <div class="field"><label for="Currency">@L["Default currency"]</label><input id="Currency" name="Currency" type="text" required maxlength="3" value="@Model.Currency" aria-describedby="Currency-hint Currency-err" />
-                <p class="hint" id="Currency-hint">@L["Three letters. Examples: AUD, USD. Each amount keeps its own currency."]</p><p class="error" id="Currency-err">@Model.ErrorFor("Currency")</p></div>
+                <p class="hint" id="Currency-hint">@L["Three letters. Examples: CHF, JPY. Each amount keeps its own currency."]</p><p class="error" id="Currency-err">@Model.ErrorFor("Currency")</p></div>
         </fieldset>
         <fieldset>
             <legend>@L["People and pack"]</legend>
@@ -88,7 +88,7 @@ else
             <details><summary>@L["Example"]</summary><pre>type,key,name,parentKey,timeZone,registrationNumber
 Division,CIVIL,Civil Division,,,
 BusinessUnit,ROADS,Roads and Bridges,CIVIL,,
-Site,SYD,Sydney Office,,Australia/Sydney,</pre></details>
+Site,PAR,Paris Office,,Europe/Paris,</pre></details>
         </fieldset>
         <div class="actions"><button type="submit" asp-page-handler="Check">@L["Check"]</button> <button type="submit" asp-page-handler="Create" disabled="@(Model.Plan is null || !Model.Plan.CanCreate)">@L["Create the organisation"]</button></div>
     </form>

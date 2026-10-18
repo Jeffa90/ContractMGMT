@@ -124,3 +124,20 @@ Each was read from the code; none was run in a browser. They are limits or contr
 - **Playbook text that was stale** (batch routes, labels, the set-up wizard's tenancy help text, the reference-prefix help text, the SMTP provider setting) is corrected in the guides; the playbook carries a banner pointing to them.
 - **Review buttons.** The on-screen labels are "Approve and publish", "Send back for changes", "Reject" and "Withdraw my submission".
 - **Behaviours worth knowing.** Only people who have signed in once are offered as an initial administrator; after a step-up redirect the Create form comes back empty; Add / Move / Remove in the form editors change the screen only until Save draft; choosing a pack in the onboarding wizard does not assign it (G-08); the Organisation Administrator has no menu entry for the set-up checklist, so the Tenant Administrator passes on the link; the onboarding wizard is not among the 20 rehearsal steps.
+
+## 8. Findings from the greenfield rehearsal (G-31 to G-37)
+
+Found while writing `docs/IMPLEMENTATION_REHEARSAL.md` on 2026-10-18, most of them by driving a Production-mode host over HTTP. None is fixed; each is Deferred. The rehearsal document has the evidence.
+
+| ID | Finding | Severity | Workaround |
+|---|---|---|---|
+| **G-31** | The second-person rule is on only in Production and has no setting, so a Demo or Test rehearsal cannot exercise it | High for rehearsals | Follow a written two-person procedure in Test; rely on the automated rehearsal for the rule itself |
+| **G-32** | Terminology tokens such as the one for the solution pack and for notifications are shown raw in the setup wizard's browser title and its "Complete first" text | Low | None needed; cosmetic |
+| **G-33** | `/Setup` in Production behind a proxy that does not forward the scheme returns a bare 500; the cause is only in the log | Medium | Forward `X-Forwarded-Proto`; read the log |
+| **G-34** | Signing a pack needs a repository checkout and the .NET SDK; the pack tool is not in the image or a release artefact | Medium | The Pack Publisher keeps a build host |
+| **G-35** | No aid for masking data and no way to tell masked from real | Medium | The customer's data-protection owner masks and certifies before the first load |
+| **G-36** | Playbook Appendices B and E and section 1.1 still carry statements the readiness slice made untrue; the setup and onboarding guides disagree on who sets classification levels | Low | Read the banner: the guides are authoritative |
+| **G-37** | Rehearsal step 19 asserts only that a pre-flight verdict word appears and records "Blocked" as a pass | Low | The N-1 to N rehearsal in CI is the proof of a Ready pre-flight |
+
+Section 4 (what stands between this product and a company-implementation rehearsal) is unchanged by these findings; item 5 there (R-DOC-01 in Production) was observed on a live Production-mode host in the greenfield rehearsal: `/health/ready` answers 503 while the same database in Test mode answers 200 with every check Healthy.
+

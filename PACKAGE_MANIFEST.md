@@ -337,6 +337,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 ## Implementation playbook (documentation only, 2026-10-18)
 
 - `docs/IMPLEMENTATION_PLAYBOOK.md`
+- `docs/IMPLEMENTATION_REHEARSAL.md`
 - `docs/IMPLEMENTATION_READINESS.md`, `docs/NO_CODE_REHEARSAL.md`, `decisions/ADR-0037-implementation-readiness-no-code-journey.md`
 - `docs/INSTALLATION_GUIDE.md`, `docs/SETUP_WIZARD_GUIDE.md`, `docs/ORGANISATION_ONBOARDING_GUIDE.md`, `docs/BUSINESS_ADMIN_GUIDE.md`, `docs/PACK_IMPLEMENTATION_GUIDE.md`, `docs/MIGRATION_EXECUTION_GUIDE.md`, `docs/UAT_AND_CUTOVER_GUIDE.md`, `docs/OPERATIONS_QUICK_GUIDE.md`, `docs/DOCUMENT_SCANNING.md`
 - `src/Modules/Ecp.Approvals/Definitions/MatrixFormSchema.cs`, `src/Modules/Ecp.Lifecycle/ApproverGroupUsage.cs`, `src/Modules/Ecp.Lifecycle/Definitions/WorkflowFormInsights.cs`, `src/Modules/Ecp.Lifecycle/Definitions/WorkflowFormSchema.cs`, `src/Modules/Ecp.Notifications/Policy/NotificationPolicyFormInsight.cs`, `src/Modules/Ecp.Notifications/Policy/NotificationPolicyFormSchema.cs`

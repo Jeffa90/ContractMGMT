@@ -16,6 +16,8 @@ public interface IScopedConnection : IAsyncDisposable
     Task<DbTransaction> BeginTransactionAsync(CancellationToken ct);
     Task CommitAsync(CancellationToken ct);
     Task RollbackAsync(CancellationToken ct);
+    /// <summary>Opens the connection and applies the current tenant scope to it (SQL Server session context), for code that runs its own fixed, reviewed commands (backup inventories, database integrity checks) instead of an EF context.</summary>
+    Task ApplyTenantScopeAsync(CancellationToken ct);
 }
 
 /// <summary>
@@ -59,6 +61,12 @@ public sealed class ScopedConnection : IScopedConnection
             pragma.CommandText = "PRAGMA foreign_keys = ON;";
             await pragma.ExecuteNonQueryAsync(ct);
         }
+    }
+
+    public async Task ApplyTenantScopeAsync(CancellationToken ct)
+    {
+        await EnsureOpenAsync(ct);
+        await EnsureSessionContextAsync(Connection, Transaction, ct);
     }
 
     public async Task<DbTransaction> BeginTransactionAsync(CancellationToken ct)

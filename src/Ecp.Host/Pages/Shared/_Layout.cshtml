@@ -6,6 +6,7 @@
 @inject Ecp.Host.Setup.BrandingAccessor Brand
 @inject Ecp.Identity.ElevationContext Elevation
 @inject Ecp.Notifications.INotificationInbox Inbox
+@inject Ecp.Operations.IMaintenanceService Maintenance
 @{
     var branding = await Brand.GetAsync();
     var productName = branding.ProductName == Ecp.Configuration.Branding.Default.ProductName ? Terms.Singular("application.name") : branding.ProductName;
@@ -13,6 +14,8 @@
     var path = Context.Request.Path.Value ?? "/";
     var signedIn = User.Identity?.IsAuthenticated == true;
     async Task<bool> Can(params string[] permissions) { foreach (var p in permissions) if (await Access.HoldsAnywhereAsync(p)) return true; return false; }
+    var maintenanceOn = false;
+    try { maintenanceOn = (await Maintenance.GetAsync()).Enabled; } catch (Exception) { /* the flag cannot be read; readiness reports it */ }
     var items = new List<(string Href, string Text, string Match)>();
     if (signedIn)
     {
@@ -39,6 +42,7 @@
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Configuration", L["Workflow configuration"].Value, "/Admin/Configuration"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Studio", L["Configuration Studio"].Value, "/Admin/Studio"));
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
+        if (await Can("operations.read")) items.Add(("/Admin/Operations", L["Operations"].Value, "/Admin/Operations"));
         if (await Can("capabilities.read", "capabilities.draft")) items.Add(("/Admin/Capabilities", L["Capabilities"].Value, "/Admin/Capabilities"));
         if (await Can("terminology.read", "terminology.draft")) items.Add(("/Admin/Terminology", L["Terminology"].Value, "/Admin/Terminology"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Regional", L["Regional settings"].Value, "/Admin/Regional"));
@@ -61,6 +65,10 @@
     @if (HostOptions.Mode != EcpMode.Production)
     {
         <div class="env-banner" role="status">@L["Demonstration environment"] (@HostOptions.Mode): @L["synthetic data only, not for production use."]</div>
+    }
+    @if (maintenanceOn)
+    {
+        <div class="access-banner" role="alert"><strong>@L["The system is in maintenance."]</strong> @L["Changes are paused until an operator ends maintenance."]</div>
     }
     @if (Elevation.Current is { } elevated)
     {

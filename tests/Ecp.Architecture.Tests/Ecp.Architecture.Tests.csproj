@@ -27,5 +27,6 @@
     <ProjectReference Include="../../src/Modules/Ecp.Notifications/Ecp.Notifications.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.Operations/Ecp.Operations.csproj" />
     <ProjectReference Include="../../src/Modules/Ecp.Setup/Ecp.Setup.csproj" />
+    <ProjectReference Include="../../src/Modules/Ecp.Recovery/Ecp.Recovery.csproj" />
   </ItemGroup>
 </Project>

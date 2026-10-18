@@ -1,0 +1,33 @@
+@page "/Admin/Operations/Backups/{id}"
+@model Ecp.Host.Pages.Admin.Operations.BackupDetailsModel
+@{ ViewData["Title"] = L["Backup details"].Value; var m = Model.Manifest; }
+<h1>@L["Backup"] @Model.Summary.BackupId</h1>
+<p><a href="/Admin/Operations/Backups">@L["Back to backups"]</a></p>
+<section class="card" aria-labelledby="state-h">
+    <h2 id="state-h">@L["State"]</h2>
+    <p><span class="badge @(Model.Summary.State is Ecp.Recovery.BackupState.Verified ? "ok" : Model.Summary.State is Ecp.Recovery.BackupState.VerifiedWithWarnings or Ecp.Recovery.BackupState.Unverified ? "warn" : "bad")">@Model.Summary.State</span> @Model.Summary.Detail</p>
+    @if (Model.ManifestProblem is not null) { <p>@Model.ManifestProblem</p> }
+</section>
+@if (m is not null)
+{
+    <section class="card" aria-labelledby="man-h">
+        <h2 id="man-h">@L["Manifest (sanitised)"]</h2>
+        <dl class="facts">
+            <dt>@L["Created"]</dt><dd>@Fmt.DateTime(m.CreatedUtc)</dd>
+            <dt>@L["Platform version"]</dt><dd>@m.PlatformVersion</dd>
+            <dt>@L["Environment"]</dt><dd>@m.EnvironmentMode</dd>
+            <dt>@L["Database"]</dt><dd>@m.Database.Engine @m.Database.EngineVersion, @m.Database.BackupType backup@(m.Database.Encrypted ? ", encrypted" : ""), @m.Database.Bytes.ToString("N0") @L["bytes"]</dd>
+            <dt>@L["Manifest SHA-256"]</dt><dd><code>@Model.Summary.ManifestSha256</code></dd>
+            <dt>@L["Documents"]</dt><dd>@(m.Documents.ContentBackedUp ? m.Documents.ObjectCount + " objects, " + m.Documents.ByteTotal.ToString("N0") + " bytes" : L["Not included in this backup"].Value)</dd>
+            <dt>@L["Installed packages"]</dt><dd>@m.Packs.Installed.Count (@m.Packs.FileCount @L["files"])</dd>
+            <dt>@L["Exact (quiescent) backup"]</dt><dd>@(m.Quiescent ? L["Yes"] : L["No: counts are ranges"])</dd>
+            <dt>@L["Storage protection statement"]</dt><dd>@(string.IsNullOrWhiteSpace(m.Protection.StorageProtectionStatement) ? L["None recorded"].Value : m.Protection.StorageProtectionStatement)</dd>
+        </dl>
+        @if (m.Warnings.Count > 0)
+        {
+            <h3>@L["Warnings recorded"]</h3>
+            <ul>@foreach (var w in m.Warnings) { <li>@w</li> }</ul>
+        }
+    </section>
+    <p><a href="/Admin/Operations/Restore?backupId=@Model.Summary.BackupId">@L["Preview a restore of this backup"]</a></p>
+}

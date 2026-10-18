@@ -58,6 +58,12 @@ retention.manage,Manage retention policies,"Tenant scope; periods [OPEN] (Q-08),
 legalhold.manage,Place and release legal holds,Organisation scope,High,A10 baseline
 ai.use,Use AI assistance on records the user can already read,Same visibility as the user; output is a reviewable proposal only,Business,A10 baseline
 ops.manage,"Backup/restore tasks, maintenance mode, support bundles and upgrade pre-flight",Installation scope,Critical,Master (Audit and operations)
+operations.read,"View the Operations overview, backup and restore history, validation results, maintenance state and operation leases",Installation scope,Critical,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.backup,"Create and verify an installation backup",Installation scope,Critical,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.restore,"Restore an installation backup into a target database (never the active production database unless the disaster-recovery procedure is followed)",Installation scope,Critical,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.validate,"Run post-restore validation and read its technical detail",Installation scope,Critical,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.maintenance,"Enter and leave maintenance mode; take over a stale operation lease",Installation scope,Critical,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.evidence.export,"Download the sanitised evidence report and the support bundle",Installation scope,Critical,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
 records.read_privileged,Read records classified at a privileged level (Legal Privileged),"Held by Legal; may also be granted explicitly to a named assignment by a Tenant Administrator; a sufficient classification ceiling is still required",Critical,DR-2026-10-16 lifecycle slice (owner instruction)
 classification.lower,Lower the classification of a record or document,"Organisation scope; mandatory reason; only within the actor's own ceiling; audited",High,DR-2026-10-16 lifecycle slice (owner instruction)
 contracts.suspend,Suspend and restore an Effective contract,Active category assignment; Procurement Administrator administers,Business,DR-2026-10-16 lifecycle slice (owner instruction)

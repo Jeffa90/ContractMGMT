@@ -1,0 +1,26 @@
+@page "/Admin/Operations/Maintenance"
+@model Ecp.Host.Pages.Admin.Operations.MaintenanceModel
+@{ ViewData["Title"] = L["Maintenance mode"].Value; var s = Model.Status; }
+<h1>@L["Maintenance mode"]</h1>
+<p class="lede">@L["While maintenance mode is on, requests that would change data are refused with a clear message, background jobs take no new work, and every page shows a banner. Health, readiness, sign-in and these Operations pages keep working. Work already running finishes its current step."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<section class="card" aria-labelledby="st-h">
+    <h2 id="st-h">@L["Current state"]</h2>
+    @if (s.Enabled)
+    {
+        <dl class="facts"><dt>@L["State"]</dt><dd><span class="badge warn">@L["On"]</span></dd><dt>@L["Cause"]</dt><dd>@s.Cause</dd><dt>@L["Reason"]</dt><dd>@s.Reason</dd><dt>@L["Since"]</dt><dd>@(s.SinceUtc is { } since ? Fmt.DateTime(since) : "")</dd></dl>
+    }
+    else { <p><span class="badge ok">@L["Off"]</span></p> }
+</section>
+<section class="card" aria-labelledby="chg-h">
+    <h2 id="chg-h">@(s.Enabled ? L["Leave maintenance mode"] : L["Enter maintenance mode"])</h2>
+    <p>@L["You will be asked to confirm your sign-in. Both actions need a reason and are audited."]</p>
+    <form method="post" asp-page-handler="@(s.Enabled ? "Leave" : "Enter")">
+        <div class="field"><label for="Reason">@L["Reason"]</label><input id="Reason" name="Reason" maxlength="500" required /></div>
+        @if (s.RestoreRelated)
+        {
+            <div class="field"><label><input type="checkbox" name="AcknowledgeRestoreState" value="true" /> @L["I understand a restore is in progress, waiting for validation, or failed, and I am releasing the installation knowingly"]</label></div>
+        }
+        <div class="actions"><button type="submit">@(s.Enabled ? L["Leave maintenance mode"] : L["Enter maintenance mode"])</button></div>
+    </form>
+</section>

@@ -194,3 +194,26 @@ Source: owner instruction for slice S10; architecture in `decisions/ADR-0033-reg
 | D9.15 | The platform **does not claim legal validation** of tax identifiers; it validates configured structure and format only. |
 | D9.16 | **No live government registry lookups** in S10. |
 
+## D10 Operational resilience: backup, restore, validation, maintenance and leases (OPS-01 / OPS-02 foundation, owner instruction 2026-10-17)
+
+Source: owner instruction for the Operational Resilience vertical slice; architecture in `decisions/ADR-0034-operational-resilience-backup-restore-maintenance-and-leases.md`; behaviour in `docs/BACKUP_AND_RESTORE.md`, `docs/OPERATIONS_RUNBOOK.md`, `docs/DISASTER_RECOVERY.md`, `docs/MAINTENANCE_MODE.md`, `docs/OPERATION_LEASES.md` and `docs/SUPPORT_BUNDLE.md`.
+
+| ID | Decision |
+|---|---|
+| D10.1 | **SQL Server is authoritative** for operational backup and restore. |
+| D10.2 | A backup includes every module schema and the migration history; tenant and organisation data; configuration drafts and releases; the audit chain; contracts and counterparties; document metadata; document content or an independently verified document-store backup; migration projects and provenance; installed solution packs; pack trust-store public keys and metadata; notifications and outbox data; and regional settings and identifier data. |
+| D10.3 | **No plaintext secrets or private signing keys** are stored in backups. |
+| D10.4 | Secret **references** may be included; secrets stay in the external secret provider. |
+| D10.5 | Restore is **installation-level** in this slice. |
+| D10.6 | Per-tenant backup and restore is **Future**. |
+| D10.7 | Point-in-time recovery is **documented, not implemented** by application code. |
+| D10.8 | **Docker plus external SQL Server plus persistent document storage** is the primary verified operational model. |
+| D10.9 | IIS and Azure remain **Scaffolded or Not Verified** unless executed evidence exists. |
+| D10.10 | A backup is **not successful until its integrity is checked**. |
+| D10.11 | A restore is **not successful until the restored system passes validation**. |
+| D10.12 | A restore is **never tested against the active production database**. |
+| D10.13 | Backup files must be **encrypted or protected by the operator's approved storage process**. |
+| D10.14 | The platform **never claims production readiness merely because backup tooling exists**. |
+| D10.15 | Audit evidence **records backup and restore operations without storing sensitive backup contents**. |
+| D10.16 | Existing Blank, JBS Procurement and Harborline Construction data **must survive a complete backup and restore cycle**. |
+

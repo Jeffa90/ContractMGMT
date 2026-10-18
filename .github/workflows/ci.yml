@@ -76,7 +76,14 @@ jobs:
           set -euo pipefail
           PW="Aa1!$(openssl rand -hex 16)"
           echo "::add-mask::$PW"
-          docker run -d --name ecp-sql -p 14330:1433 -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:2022-latest >/dev/null
+          # The backup and restore tests need the server's .bak files to be readable by the test process: the server runs as root in this disposable container, writes into a bind-mounted directory, and a default ACL on
+          # that directory lets the runner user read whatever the server creates there (docs/BACKUP_AND_RESTORE.md, "Shared backup directory").
+          BK="$RUNNER_TEMP/ecp-backups"; mkdir -p "$BK"; chmod 0777 "$BK"
+          command -v setfacl >/dev/null || sudo apt-get install -y -qq acl >/dev/null
+          sudo setfacl -R -m "u:$(id -u):rwx" "$BK"; sudo setfacl -d -m "u:$(id -u):rwx" "$BK"
+          docker run -d --name ecp-sql --user root -p 14330:1433 -v "$BK:/ecp-backups" -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:2022-latest >/dev/null
+          echo "ECP_TEST_SQL_BACKUP_DIR=$BK" >> "$GITHUB_ENV"
+          echo "ECP_TEST_SQL_BACKUP_DIR_SERVER=/ecp-backups" >> "$GITHUB_ENV"
           for i in $(seq 1 60); do
             if docker exec ecp-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$PW" -Q "SELECT 1" >/dev/null 2>&1; then
               echo "ECP_TEST_SQL=Server=127.0.0.1,14330;User Id=sa;Password=$PW;TrustServerCertificate=True;Encrypt=True" >> "$GITHUB_ENV"
@@ -87,7 +94,7 @@ jobs:
           echo "::warning::SQL Server did not start; SQL Server tests are NOT VERIFIED"
       - run: dotnet restore src/Ecp.sln --locked-mode
       - run: dotnet build src/Ecp.sln -c Release --no-restore
-      - name: SQL Server tests
+      - name: SQL Server tests (includes real BACKUP DATABASE, RESTORE VERIFYONLY and RESTORE DATABASE of a populated synthetic installation, post-restore validation, and the operation-lease race)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category!=Performance" --logger "trx" --results-directory TestResults
       - name: Performance baseline and query plans (SQL Server)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx" --results-directory TestResults

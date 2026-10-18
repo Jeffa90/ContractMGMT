@@ -1,0 +1,41 @@
+@page "/Admin/Operations/Backups"
+@model Ecp.Host.Pages.Admin.Operations.BackupsModel
+@{ ViewData["Title"] = L["Backups"].Value; }
+<h1>@L["Backups"]</h1>
+<partial name="_Errors" model="ViewData.ModelState" />
+<section class="card" aria-labelledby="new-h">
+    <h2 id="new-h">@L["Create a backup"]</h2>
+    @if (!Model.Overview.BackupConfigured || !Model.Overview.DatabaseSupported)
+    {
+        <p>@(Model.Overview.DatabaseSupported ? L["No backup directory is configured, so backups cannot be taken from here. See the runbook."].Value : Model.Overview.UnsupportedReason)</p>
+    }
+    else
+    {
+        <p>@L["A backup is not reported as successful until it has been read back and checked. You will be asked to confirm your sign-in."]</p>
+        <form method="post" asp-page-handler="Start">
+            <div class="field"><label for="Reason">@L["Reason for this backup"]</label><input id="Reason" name="Reason" value="@Model.Reason" maxlength="500" required /></div>
+            <div class="field"><label><input type="checkbox" name="HoldMaintenance" value="true" /> @L["Hold maintenance mode during the backup (gives an exact, content-checked backup but pauses changes)"]</label></div>
+            <div class="actions"><button type="submit">@L["Create backup"]</button></div>
+        </form>
+    }
+</section>
+<h2>@L["Backup history"]</h2>
+<p>@L["Read from the backup directory itself. A folder without a manifest is incomplete or failed and is never a recovery point."]</p>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Backup history"]</caption>
+    <thead><tr><th scope="col">@L["Backup"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Created"]</th><th scope="col">@L["Size"]</th><th scope="col">@L["Warnings"]</th><th scope="col">@L["Detail"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+    <tbody>
+    @foreach (var b in Model.Backups)
+    {
+        <tr>
+            <th scope="row"><a href="/Admin/Operations/Backups/@b.BackupId">@b.BackupId</a></th>
+            <td><span class="badge @(b.State is Ecp.Recovery.BackupState.Verified ? "ok" : b.State is Ecp.Recovery.BackupState.VerifiedWithWarnings or Ecp.Recovery.BackupState.Unverified ? "warn" : "bad")">@b.State</span></td>
+            <td>@(b.CreatedUtc is { } c ? Fmt.DateTime(c) : "")</td><td>@b.Bytes.ToString("N0") @L["bytes"]</td><td>@b.Warnings</td><td>@b.Detail</td>
+            <td>@if (b.State is not (Ecp.Recovery.BackupState.Incomplete or Ecp.Recovery.BackupState.Failed)) { <form method="post" asp-page-handler="Verify"><input type="hidden" name="id" value="@b.BackupId" /><button class="secondary" type="submit">@L["Verify again"]</button></form> }</td>
+        </tr>
+    }
+    @if (Model.Backups.Count == 0) { <tr><td colspan="7">@L["No backups were found."]</td></tr> }
+    </tbody>
+</table>
+</div>

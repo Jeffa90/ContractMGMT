@@ -1,0 +1,47 @@
+@page "/Admin/Operations"
+@model Ecp.Host.Pages.Admin.Operations.IndexModel
+@{ ViewData["Title"] = L["Operations"].Value; var o = Model.Overview; }
+<h1>@L["Operations"]</h1>
+<p class="lede">@L["Back up, verify and restore this installation, and control maintenance mode. Having these tools is not the same as having a recovery plan: the organisation still owns backup frequency, retention, storage protection and restore rehearsal."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (o.Maintenance.Enabled)
+{
+    <div class="error-summary" role="status"><strong>@L["Maintenance mode is on."]</strong> @o.Maintenance.Cause. <a href="/Admin/Operations/Maintenance">@L["Manage maintenance mode"]</a></div>
+}
+<section class="card" aria-labelledby="posture">
+    <h2 id="posture">@L["Recovery readiness"]</h2>
+    <dl class="facts">
+        <dt>@L["Database engine"]</dt><dd>@o.DatabaseEngine @if (!o.DatabaseSupported) { <span class="badge bad">@L["No supported backup"]</span> }</dd>
+        <dt>@L["Backup directory"]</dt><dd>@(o.BackupConfigured ? L["Configured"] : L["Not configured"])</dd>
+        <dt>@L["Restore target directory"]</dt><dd>@(o.RestoreConfigured ? L["Configured"] : L["Not configured"])</dd>
+        <dt>@L["Dedicated backup account"]</dt><dd>@(o.AdminAccountConfigured ? L["Configured"] : L["Not configured: the application account is used"])</dd>
+        <dt>@L["Database backup encryption"]</dt><dd>@(o.EncryptionRequested ? L["Requested"] : L["Not requested"])</dd>
+        <dt>@L["Storage protection statement"]</dt><dd>@(o.StorageProtectionStated ? L["Recorded"] : L["Not recorded"])</dd>
+        <dt>@L["Last verified backup"]</dt><dd>@(o.LastVerified is null ? L["None"].Value : o.LastVerified.BackupId + " (" + Fmt.DateTime(o.LastVerified.CreatedUtc ?? DateTime.UtcNow) + ")")</dd>
+    </dl>
+    @if (!o.DatabaseSupported) { <p>@o.UnsupportedReason</p> }
+</section>
+<nav aria-label="@L["Operations pages"]" class="card">
+    <ul>
+        <li><a href="/Admin/Operations/Backups">@L["Backups: create, verify and review"]</a></li>
+        <li><a href="/Admin/Operations/Restore">@L["Restore: preview, restore and history"]</a></li>
+        <li><a href="/Admin/Operations/Validation">@L["Post-restore validation"]</a></li>
+        <li><a href="/Admin/Operations/Maintenance">@L["Maintenance mode"]</a></li>
+        <li><a href="/Admin/Operations/Leases">@L["Operation leases"]</a></li>
+        <li><a href="/Admin/Operations/Evidence">@L["Evidence report and support bundle"]</a></li>
+    </ul>
+</nav>
+<h2>@L["Recent operations"]</h2>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Recent operations"]</caption>
+    <thead><tr><th scope="col">@L["Started"]</th><th scope="col">@L["Kind"]</th><th scope="col">@L["Reference"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Summary"]</th></tr></thead>
+    <tbody>
+    @foreach (var r in o.Runs)
+    {
+        <tr><td>@Fmt.DateTime(r.StartedUtc)</td><td>@r.Kind</td><th scope="row">@r.Reference</th><td><span class="badge @(r.Status is "Completed" ? "ok" : r.Status is "CompletedWithWarnings" ? "warn" : r.Status is "Running" ? "" : "bad")">@r.Status</span></td><td>@r.Summary</td></tr>
+    }
+    @if (o.Runs.Count == 0) { <tr><td colspan="5">@L["Nothing has been run yet."]</td></tr> }
+    </tbody>
+</table>
+</div>

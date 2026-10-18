@@ -442,6 +442,7 @@ public static class ConfigurationModule
         services.AddScoped<PackKindRegistry>();
         services.AddScoped<PackTrustEvaluator>();
         services.AddScoped<IPackLoader, PackLoader>();
+        services.AddScoped<IConfigurationInventory, ConfigurationInventory>();
         services.AddScoped<PackValidationService>();
         services.AddScoped<IPackManager, PackManager>();
         services.AddScoped<IPackAssignments, PackAssignments>();

@@ -1,0 +1,27 @@
+@page "/Admin/Operations/Leases"
+@model Ecp.Host.Pages.Admin.Operations.LeasesModel
+@{ ViewData["Title"] = L["Operation leases"].Value; }
+<h1>@L["Operation leases"]</h1>
+<p class="lede">@L["A lease lets one instance at a time do work that must not run twice, such as a backup, a restore, or a tenant's background jobs. If an instance stops, its lease expires by itself. Taking one over is for an operator who has established that the owner is gone."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Operation leases"]</caption>
+    <thead><tr><th scope="col">@L["Lease"]</th><th scope="col">@L["Scope"]</th><th scope="col">@L["Owner"]</th><th scope="col">@L["Acquired"]</th><th scope="col">@L["Last renewed"]</th><th scope="col">@L["Expires"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Take over"]</th></tr></thead>
+    <tbody>
+    @foreach (var l in Model.Leases)
+    {
+        <tr>
+            <th scope="row">@l.Name</th><td>@l.ScopeKey</td><td>@l.OwnerDescription</td><td>@Fmt.DateTime(l.AcquiredUtc)</td><td>@Fmt.DateTime(l.HeartbeatUtc)</td><td>@Fmt.DateTime(l.ExpiresUtc)</td>
+            <td><span class="badge @(l.IsActive ? "warn" : "ok")">@(l.IsActive ? L["Held"] : L["Free"])</span></td>
+            <td>@if (l.IsActive)
+                {
+                    <form method="post" asp-page-handler="TakeOver"><input type="hidden" name="name" value="@l.Name" /><input type="hidden" name="scope" value="@l.ScopeKey" />
+                        <label class="visually-hidden" for="r-@l.Name">@L["Reason"]</label><input id="r-@l.Name" name="Reason" maxlength="500" required placeholder="@L["Reason"]" /><button class="secondary" type="submit">@L["Take over"]</button></form>
+                }</td>
+        </tr>
+    }
+    @if (Model.Leases.Count == 0) { <tr><td colspan="8">@L["No lease has been taken yet."]</td></tr> }
+    </tbody>
+</table>
+</div>

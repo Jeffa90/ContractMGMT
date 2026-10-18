@@ -143,8 +143,17 @@ internal sealed class GlobalisationReadinessCheck(LocalisationOptions options) :
 
 public static class OperationsModule
 {
+    public const string Name = "Operations";
+    public const string Schema = "ops";
+    public const int Tier = 8;
+
     public static IServiceCollection AddOperationsModule(this IServiceCollection services, string dataDirectory)
     {
+        services.AddModuleDbContext<Ecp.Operations.Persistence.OperationsDbContext>(Name, Tier, Schema);
+        services.AddSingleton<MaintenanceSnapshot>();
+        services.AddScoped<IOperationLeases, OperationLeases>();
+        services.AddScoped<IMaintenanceService, MaintenanceService>();
+        services.AddScoped<IOperationHistory, OperationHistory>();
         services.AddSingleton(new DataDirectoryOptions { Path = dataDirectory });
         services.AddScoped<IReadinessCheck, DatabaseReadinessCheck>();
         services.AddScoped<IReadinessCheck, DataDirectoryReadinessCheck>();

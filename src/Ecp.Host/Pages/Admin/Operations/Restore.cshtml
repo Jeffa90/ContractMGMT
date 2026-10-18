@@ -1,0 +1,83 @@
+@page "/Admin/Operations/Restore"
+@model Ecp.Host.Pages.Admin.Operations.RestoreModel
+@{ ViewData["Title"] = L["Restore"].Value; var p = Model.Preview; }
+<h1>@L["Restore"]</h1>
+<p class="lede">@L["A restore goes into a new, separate database and file area. It is checked there and released only when the checks pass. It never replaces the database in use, applies no migrations, and rewrites no history."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Result is { } r)
+{
+    <section class="card" role="status" aria-labelledby="res-h">
+        <h2 id="res-h">@L["Restore result"]: <span class="badge @(r.Outcome == "Succeeded" ? "ok" : r.Outcome == "SucceededWithWarnings" ? "warn" : "bad")">@r.Outcome</span></h2>
+        @if (r.Failure is not null) { <p>@r.Failure</p> }
+        <p>@(r.Released ? L["The restored copy passed validation and was released from maintenance mode. Point the application at it deliberately when you are ready; nothing switched over."] : L["The restored copy is held in maintenance mode and has not been released."])</p>
+        @if (r.Validation is { } v)
+        {
+            <p>@L["Post-restore validation"]: <strong>@v.Outcome</strong> (@v.Count(Ecp.Recovery.CheckOutcome.Passed) @L["passed"], @v.Count(Ecp.Recovery.CheckOutcome.Warning) @L["warnings"], @v.Count(Ecp.Recovery.CheckOutcome.Failed) @L["failed"], @v.Count(Ecp.Recovery.CheckOutcome.NotVerified) @L["not verified"]). <a href="/Admin/Operations/Validation">@L["Open validation results"]</a></p>
+        }
+        @if (r.EvidenceFile is not null) { <p>@L["Evidence file"]: <code>@r.EvidenceFile</code></p> }
+    </section>
+}
+<section class="card" aria-labelledby="pre-h">
+    <h2 id="pre-h">@L["Step 1: choose a backup and a target"]</h2>
+    <form method="get">
+        <div class="field"><label for="BackupId">@L["Backup"]</label>
+            <select id="BackupId" name="BackupId">
+                @foreach (var b in Model.Backups) { <option value="@b.BackupId" selected="@(Model.BackupId == b.BackupId)">@b.BackupId (@b.State)</option> }
+            </select></div>
+        <div class="field"><label for="TargetDatabase">@L["New target database name (letters, digits, underscores)"]</label><input id="TargetDatabase" name="TargetDatabase" value="@Model.TargetDatabase" maxlength="64" /></div>
+        <div class="actions"><button type="submit">@L["Preview the restore"]</button></div>
+    </form>
+</section>
+@if (p is not null)
+{
+    <section class="card" aria-labelledby="prev-h">
+        <h2 id="prev-h">@L["Step 2: preview (sanitised)"]</h2>
+        <dl class="facts">
+            <dt>@L["Integrity check"]</dt><dd>@p.Verification.Outcome (@p.Verification.FilesChecked @L["files"])</dd>
+            <dt>@L["Target database"]</dt><dd>@p.TargetDatabase @if (p.TargetIsActive) { <span class="badge bad">@L["This is the active database"]</span> }</dd>
+            @if (p.Summary is { } s)
+            {
+                <dt>@L["Backup made"]</dt><dd>@Fmt.DateTime(s.CreatedUtc) (@s.EnvironmentMode, @L["platform"] @s.PlatformVersion)</dd>
+                <dt>@L["Contents"]</dt><dd>@s.Tenants @L["tenants"], @s.AuditEvents @L["audit events"], @s.DocumentObjects @L["document objects"], @s.Packages @L["package files"]</dd>
+                <dt>@L["Manifest SHA-256"]</dt><dd><code>@s.ManifestSha256</code></dd>
+            }
+        </dl>
+        @if (p.Blockers.Count > 0)
+        {
+            <div class="error-summary" role="alert"><h3>@L["The restore cannot start"]</h3><ul>@foreach (var b in p.Blockers) { <li>@b</li> }</ul></div>
+        }
+        @if (p.Warnings.Count > 0)
+        {
+            <h3>@L["Warnings"]</h3><ul>@foreach (var w in p.Warnings) { <li>@w</li> }</ul>
+        }
+    </section>
+    @if (p.CanRestore || p.Blockers.All(b => b.Contains("Restoring across environments", StringComparison.Ordinal)))
+    {
+        <section class="card" aria-labelledby="go-h">
+            <h2 id="go-h">@L["Step 3: confirm"]</h2>
+            <p>@L["You will be asked to confirm your sign-in. Restoring needs a reason and the confirmation phrase below, typed exactly."]</p>
+            <form method="post" asp-page-handler="Start">
+                <input type="hidden" name="BackupId" value="@p.BackupId" /><input type="hidden" name="TargetDatabase" value="@p.TargetDatabase" />
+                <div class="field"><label for="Reason">@L["Reason"]</label><input id="Reason" name="Reason" maxlength="500" required /></div>
+                <div class="field"><label for="Confirmation">@L["Type"] <code>@p.ConfirmationPhrase</code></label><input id="Confirmation" name="Confirmation" autocomplete="off" required /></div>
+                <div class="field"><label for="ExpectedManifestSha256">@L["Manifest SHA-256 you expect (optional, from your records)"]</label><input id="ExpectedManifestSha256" name="ExpectedManifestSha256" maxlength="64" /></div>
+                <div class="field"><label><input type="checkbox" name="AllowDifferentEnvironment" value="true" /> @L["I accept restoring a backup made in a different environment"]</label></div>
+                <div class="actions"><button type="submit">@L["Restore into the new database"]</button></div>
+            </form>
+        </section>
+    }
+}
+<h2>@L["Restore history"]</h2>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Restore history"]</caption>
+    <thead><tr><th scope="col">@L["Started"]</th><th scope="col">@L["Target"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Summary"]</th></tr></thead>
+    <tbody>
+    @foreach (var h in Model.History)
+    {
+        <tr><td>@Fmt.DateTime(h.StartedUtc)</td><th scope="row">@h.Reference</th><td><span class="badge @(h.Status is "Completed" ? "ok" : h.Status is "CompletedWithWarnings" ? "warn" : "bad")">@h.Status</span></td><td>@h.Summary</td></tr>
+    }
+    @if (Model.History.Count == 0) { <tr><td colspan="4">@L["No restore has been run."]</td></tr> }
+    </tbody>
+</table>
+</div>

@@ -16,6 +16,20 @@ public interface IDocumentStorageProvider
     Task DeleteAsync(Guid tenantId, string storageKey, CancellationToken ct = default);
 }
 
+/// <summary>One stored object as the store itself sees it: whose it is, where it is, how large it is. Nothing about its content.</summary>
+public sealed record StoredObjectRef(Guid TenantId, string StorageKey, long SizeBytes);
+
+/// <summary>
+/// What a document store must offer for a file-level backup (docs/BACKUP_AND_RESTORE.md, section on the document store): list every object. A provider that cannot list its objects (or whose objects another system backs up)
+/// does not implement this, and the backup says plainly that the document content was not backed up by the platform. Only the local file system provider implements it today; SharePoint and Azure Blob providers do not exist.
+/// </summary>
+public interface IDocumentStoreInventory
+{
+    string ProviderKey { get; }
+    /// <summary>Every object in the store. Anything that is not a regular file in the expected layout (a link, an unexpected name) is passed to <paramref name="onSkipped"/> by relative name and is never read.</summary>
+    IAsyncEnumerable<StoredObjectRef> EnumerateAsync(Action<string>? onSkipped = null, CancellationToken ct = default);
+}
+
 public sealed class LocalFileSystemOptions
 {
     /// <summary>Root directory. Must be on persistent storage in Production (readiness R-ST-01).</summary>
@@ -23,7 +37,7 @@ public sealed class LocalFileSystemOptions
 }
 
 /// <summary>Filesystem provider. Content is streamed to a temporary file while hashing, then moved to its content-addressed location.</summary>
-public sealed class LocalFileSystemStorageProvider : IDocumentStorageProvider
+public sealed class LocalFileSystemStorageProvider : IDocumentStorageProvider, IDocumentStoreInventory
 {
     private readonly string _root;
 
@@ -86,6 +100,28 @@ public sealed class LocalFileSystemStorageProvider : IDocumentStorageProvider
         var path = ResolvePath(tenantId, storageKey);
         if (File.Exists(path)) File.Delete(path);
         return Task.CompletedTask;
+    }
+
+    public async IAsyncEnumerable<StoredObjectRef> EnumerateAsync(Action<string>? onSkipped = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.CompletedTask;
+        var top = Path.Combine(_root, "t");
+        if (!Directory.Exists(top)) yield break;
+        foreach (var tenantDirectory in new DirectoryInfo(top).EnumerateFileSystemInfos().OrderBy(d => d.Name, StringComparer.Ordinal))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (tenantDirectory is not DirectoryInfo td || td.LinkTarget is not null || !Guid.TryParseExact(td.Name, "N", out var tenantId)) { onSkipped?.Invoke("t/" + tenantDirectory.Name); continue; }
+            foreach (var prefixDirectory in td.EnumerateFileSystemInfos().OrderBy(d => d.Name, StringComparer.Ordinal))
+            {
+                if (prefixDirectory is not DirectoryInfo pd || pd.LinkTarget is not null) { onSkipped?.Invoke($"t/{td.Name}/{prefixDirectory.Name}"); continue; }
+                foreach (var entry in pd.EnumerateFileSystemInfos().OrderBy(f => f.Name, StringComparer.Ordinal))
+                {
+                    var key = $"t/{td.Name}/{pd.Name}/{entry.Name}";
+                    if (entry is not FileInfo file || file.LinkTarget is not null || !StorageKey.IsValidFor(tenantId, key) || !key.StartsWith($"t/{td.Name}/{entry.Name[..2]}/", StringComparison.Ordinal)) { onSkipped?.Invoke(key); continue; }
+                    yield return new StoredObjectRef(tenantId, key, file.Length);
+                }
+            }
+        }
     }
 
     /// <summary>Validates the key against the tenant and the root; any key that is not exactly a tenant content address is refused.</summary>

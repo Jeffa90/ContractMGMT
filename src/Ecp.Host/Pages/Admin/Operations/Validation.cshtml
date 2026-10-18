@@ -1,0 +1,30 @@
+@page "/Admin/Operations/Validation"
+@model Ecp.Host.Pages.Admin.Operations.ValidationModel
+@{ ViewData["Title"] = L["Post-restore validation"].Value; }
+<h1>@L["Post-restore validation"]</h1>
+<p class="lede">@L["These checks show whether an installation is intact: migrations, referential integrity, tenant isolation, audit chain, documents, packages and signatures, configuration hashes, pinned workflows, regional settings and assigned packs. A restore runs them on the restored copy before releasing it. Here you can run them on the running installation."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<form method="post" asp-page-handler="Run"><button type="submit">@L["Run validation on the running installation"]</button> <span>@L["This reads every document and every table; run it when the installation is quiet."]</span></form>
+@if (Model.Report is { } r)
+{
+    <section class="card" aria-labelledby="out-h">
+        <h2 id="out-h">@L["Outcome"]: <span class="badge @(r.Outcome == Ecp.Recovery.ValidationOutcome.Passed ? "ok" : r.Outcome == Ecp.Recovery.ValidationOutcome.PassedWithWarnings ? "warn" : "bad")">@r.Outcome</span></h2>
+        <p>@Fmt.DateTime(r.CompletedUtc). @L["Correlation id"]: <code>@r.CorrelationId</code></p>
+    </section>
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Validation checks"]</caption>
+        <thead><tr><th scope="col">@L["Check"]</th><th scope="col">@L["Result"]</th><th scope="col">@L["What it means"]</th>@if (Model.CanSeeDetail) { <th scope="col">@L["Technical detail"]</th> }<th scope="col">@L["What to do"]</th></tr></thead>
+        <tbody>
+        @foreach (var c in r.Checks)
+        {
+            <tr><th scope="row"><code>@c.Code</code> @c.Title</th><td><span class="badge @(c.Outcome == Ecp.Recovery.CheckOutcome.Passed ? "ok" : c.Outcome == Ecp.Recovery.CheckOutcome.Warning ? "warn" : "bad")">@c.Outcome</span></td><td>@c.Description</td>@if (Model.CanSeeDetail) { <td>@c.TechnicalDetail</td> }<td>@c.Remediation</td></tr>
+        }
+        </tbody>
+    </table>
+    </div>
+}
+else
+{
+    <p>@L["No validation has been run yet."]</p>
+}

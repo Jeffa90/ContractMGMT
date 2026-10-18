@@ -179,6 +179,30 @@ internal sealed class DocumentClassificationService(DocumentsDbContext db, IUnit
         }, ct);
 }
 
+/// <summary>A stored document version as the database records it: what the content must be, and where it must be.</summary>
+public sealed record DocumentVersionRef(Guid DocumentId, Guid VersionId, string StorageProvider, string StorageKey, string Sha256, long SizeBytes);
+
+/// <summary>
+/// Trusted, read-only listing of the current tenant's document versions for backup and restore verification (docs/BACKUP_AND_RESTORE.md). It carries no content and no file names, and no per-user authorisation:
+/// it is not reachable from request input.
+/// </summary>
+public interface IDocumentIntegrity
+{
+    IAsyncEnumerable<DocumentVersionRef> VersionsAsync(CancellationToken ct = default);
+    Task<int> DocumentCountAsync(CancellationToken ct = default);
+}
+
+internal sealed class DocumentIntegrity(DocumentsDbContext db) : IDocumentIntegrity
+{
+    public async IAsyncEnumerable<DocumentVersionRef> VersionsAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var rows = db.Versions.AsNoTracking().OrderBy(v => v.DocumentId).ThenBy(v => v.VersionNumber).Select(v => new DocumentVersionRef(v.DocumentId, v.Id, v.StorageProvider, v.StorageKey, v.Sha256, v.SizeBytes)).AsAsyncEnumerable();
+        await foreach (var row in rows.WithCancellation(ct)) yield return row;
+    }
+
+    public Task<int> DocumentCountAsync(CancellationToken ct = default) => db.Documents.AsNoTracking().CountAsync(ct);
+}
+
 public static class DocumentsModule
 {
     public const string Name = "Documents";
@@ -190,7 +214,10 @@ public static class DocumentsModule
         services.Configure(configure);
         services.AddModuleDbContext<DocumentsDbContext>(Name, Tier, Schema);
         services.AddSingleton(storageOptions);
-        services.AddSingleton<IDocumentStorageProvider, LocalFileSystemStorageProvider>();
+        services.AddSingleton<LocalFileSystemStorageProvider>();
+        services.AddSingleton<IDocumentStorageProvider>(sp => sp.GetRequiredService<LocalFileSystemStorageProvider>());
+        services.AddSingleton<IDocumentStoreInventory>(sp => sp.GetRequiredService<LocalFileSystemStorageProvider>());
+        services.AddScoped<IDocumentIntegrity, DocumentIntegrity>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IDocumentMigrationPort, DocumentMigrationPort>();
         services.AddScoped<IDocumentQuery, DocumentQuery>();

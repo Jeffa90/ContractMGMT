@@ -10,7 +10,20 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-17, end of S10: regional defaults, locale neutrality and configurable tax identifiers)
+## Current state (2026-10-18, end of OPS-01: operational resilience slice)
+
+**OPS-01 and the OPS-02 foundation (this pass; `decisions/ADR-0034-operational-resilience-backup-restore-maintenance-and-leases.md`, owner decisions D10, `docs/BACKUP_AND_RESTORE.md`, `docs/OPERATIONS_RUNBOOK.md`, `docs/DISASTER_RECOVERY.md`, `docs/MAINTENANCE_MODE.md`, `docs/OPERATION_LEASES.md`, `docs/SUPPORT_BUNDLE.md`).**
+
+* **Backup (Implemented, SQL Server).** Complete installation backup (`BACKUP DATABASE ... WITH CHECKSUM, COPY_ONLY`, optional certificate encryption), tenant-prefixed document store copy through the storage abstraction with hashes, installed packs and trust-store public keys, deterministic manifest written last with a hash anchored in the audit trail; a backup is not successful until it verifies (BKV-001 to BKV-044). No plaintext secret and no private signing key is ever included.
+* **Restore (Implemented).** Seventeen-stage workflow into a new database beside the running installation (never the active database); explicit typed confirmation and re-authentication; no automatic migrations; restricted validation mode; maintenance released only after validation passes. The in-place disaster-recovery restore is a command-line procedure with its own phrase.
+* **Post-restore validation (Implemented).** VAL-001 to VAL-021 with outcomes Passed, Passed with warnings, Failed and Not Verified.
+* **Maintenance mode and operation leases (Implemented).** New `ops` schema (additive migration); SQL-backed leases with a fencing generation, heartbeat, expiry and audited stealing; maintenance causes; middleware answers 503 with Retry-After for changes; background jobs pause.
+* **Operator interface and support bundle (Implemented).** Administration, Operations; six `operations.*` permissions (93 permissions in all); command-line verbs; sanitised evidence report and redacted support bundle (formula-safe downloads).
+* **Not done, by design:** live signature provider, reporting or BI integration, public API, AI, marketplace, billing, tenant control plane, another solution pack, IIS or Azure-specific deployment, zero-downtime upgrades, per-tenant restore (Future), point-in-time restore (documented, not implemented).
+* **Verification.** See `deploy/STATUS.md` and `docs/TESTING.md` section 9.6 for the local and CI results.
+* **First incomplete product task (list order):** INT-03's live e-signature adapter (unchanged; out of scope for this slice). **First incomplete operational task:** OPS-02's upgrade pre-flight and N-1 to N upgrade tests (UPG-001 to UPG-004).
+
+## Previous state (2026-10-17, end of S10: regional defaults, locale neutrality and configurable tax identifiers)
 
 **S10 (this pass; `docs/REGIONAL_SETTINGS.md`, `docs/TAX_IDENTIFIERS.md`, `decisions/ADR-0033-regional-settings-and-counterparty-identifiers.md`, owner decisions D9, `docs/PORTABILITY_AUDIT.md` section 0.9, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.17).**
 
@@ -360,10 +373,10 @@ Gate: BRS-001 to BRS-004; UPG-001 to UPG-004; SEC-030, SEC-031; PER-001 to PER-0
 
 | Done | ID | Task | Depends on | Acceptance / tests | Label |
 |---|---|---|---|---|---|
-| [ ] | OPS-01 | Backup/restore procedures and restore validation script; evidence on dashboard | M9 gate | BRS-001 to BRS-003 | I |
-| [ ] | OPS-02 | Upgrade pre-flight, forward-only migrations in Production, rollback by restore | OPS-01 | UPG-001 to UPG-004 | I |
-| [ ] | OPS-03 | Maintenance mode; operations dashboard (health, readiness, jobs, outbox, certificates) | SET-03 | BRS-004 | I |
-| [ ] | OPS-04 | Support bundle with automatic redaction; DR runbook with RPO/RTO placeholders | OPS-03 | SEC-030, SEC-031 | I |
+| [x] | OPS-01 | Backup/restore procedures and restore validation script; evidence on dashboard | M9 gate | BRS-001 to BRS-003 | I | **Status:** Implemented (OPS-01 slice, ADR-0034, `docs/BACKUP_AND_RESTORE.md`, `docs/DISASTER_RECOVERY.md`): SQL Server backup with checksum, manifest and anchor, document store and pack/configuration backup, independent verification, restore into a new database, 21 post-restore checks, evidence on Administration, Operations. BRS-001 is amended by D10.3 and D10.4 (the key ring is not in a backup; private signing keys and secrets never are). Restore of the Blank, JBS Procurement and Harborline data is proved on SQL Server. Remaining limits: `docs/BACKUP_AND_RESTORE.md` section 16. |
+| [ ] | OPS-02 | Upgrade pre-flight, forward-only migrations in Production, rollback by restore | OPS-01 | UPG-001 to UPG-004 | I | **Status:** Foundation only (restore verification, recovery evidence, in-place disaster-recovery restore by command line). Upgrade pre-flight, the N-1 to N upgrade tests and forward-only enforcement are not built (UPG-001 to UPG-004 open). |
+| [ ] | OPS-03 | Maintenance mode; operations dashboard (health, readiness, jobs, outbox, certificates) | SET-03 | BRS-004 | I | **Status:** Partial: maintenance mode (reason, re-authentication, audit, banner, 503 for changes, jobs paused, BRS-004) and Administration, Operations overview exist; certificates, outbox and job panels beyond the overview are not built. |
+| [ ] | OPS-04 | Support bundle with automatic redaction; DR runbook with RPO/RTO placeholders | OPS-03 | SEC-030, SEC-031 | I | **Status:** Partial: support bundle foundation with redaction (`docs/SUPPORT_BUNDLE.md`) and `docs/DISASTER_RECOVERY.md` with RPO and RTO placeholders; the SEC-030 and SEC-031 catalogue is not complete. |
 | [ ] | DPL-03 | IIS and Azure hardening, parity run of shared behaviour suite where platform available | DPL-01, DPL-02 | DEP-008; PRT-005 | S until run on platform |
 | [ ] | ACC-01 | Accessibility and localisation pass across all page types; accessibility statement template | M9 gate | A11Y-001 to A11Y-020 | I |
 | [ ] | PRF-01 | Performance and scale validation | M9 gate | PER-001 to PER-006 | I |

@@ -300,3 +300,14 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Modules/Ecp.Metadata/MetadataApi.cs`
 - `src/Modules/Ecp.Metadata/ValueCodec.cs`
 - `src/Modules/Ecp.Metadata/packages.lock.json`
+
+## Operational resilience slice (OPS-01 / OPS-02 foundation, 2026-10-17)
+
+- `src/Modules/Ecp.Recovery/` (backup, verification, restore, post-restore validation, evidence, support bundle, operator façade; with `packages.lock.json`)
+- `src/Modules/Ecp.Operations/Persistence/` (the `ops` schema context and its additive migration), `src/Modules/Ecp.Operations/Domain/OperationRecords.cs`, `src/Modules/Ecp.Operations/Leases.cs`, `src/Modules/Ecp.Operations/Maintenance.cs`, `src/Modules/Ecp.Operations/OperationHistory.cs`
+- `src/Modules/Ecp.Configuration/Packs/ConfigurationInventory.cs`
+- `src/Ecp.Host/PlatformComposition.cs`, `src/Ecp.Host/MaintenanceMiddleware.cs`, `src/Ecp.Host/OperationsCli.cs`, `src/Ecp.Host/Pages/Admin/Operations/`
+- `tests/Ecp.UnitTests/RecoveryTests.cs`, `tests/Ecp.Integration.Tests/RecoveryTestKit.cs`, `tests/Ecp.Integration.Tests/SyntheticInstallation.cs`, `tests/Ecp.Integration.Tests/BackupRestoreSqlServerTests.cs`, `tests/Ecp.Integration.Tests/BackupFailureSqlServerTests.cs`, `tests/Ecp.Integration.Tests/OperationsFoundationScenarios.cs`, `tests/Ecp.Api.Tests/OperationsUiTests.cs`
+- `decisions/ADR-0034-operational-resilience-backup-restore-maintenance-and-leases.md`
+- `docs/BACKUP_AND_RESTORE.md`, `docs/OPERATIONS_RUNBOOK.md`, `docs/DISASTER_RECOVERY.md`, `docs/MAINTENANCE_MODE.md`, `docs/OPERATION_LEASES.md`, `docs/SUPPORT_BUNDLE.md`
+

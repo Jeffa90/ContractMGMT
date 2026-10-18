@@ -1,4 +1,5 @@
 using Ecp.Notifications;
+using Ecp.Operations;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Ecp.Tenancy.Domain;
@@ -24,19 +25,34 @@ public sealed class BackgroundJobService(IServiceScopeFactory scopes, IOptions<N
         }
     }
 
-    /// <summary>One cycle across every active tenant. Public so the cycle can be driven directly.</summary>
+    /// <summary>
+    /// One cycle across every active tenant. While maintenance mode is on no new work is taken (work already running finishes its current unit; every job is safe to repeat). Each tenant's cycle holds an operation lease, so two
+    /// instances sharing a database never run the same tenant's jobs at the same time (docs/OPERATION_LEASES.md). Public so the cycle can be driven directly.
+    /// </summary>
     public async Task RunOnceAsync(CancellationToken ct)
     {
         IReadOnlyList<TenantInfo> tenants;
         await using (var registry = scopes.CreateAsyncScope())
         {
+            try
+            {
+                if ((await registry.ServiceProvider.GetRequiredService<IMaintenanceService>().GetAsync(ct)).Enabled)
+                {
+                    log.LogInformation("Background jobs are paused: the installation is in maintenance mode.");
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is System.Data.Common.DbException or InvalidOperationException) { log.LogWarning("The maintenance flag could not be read ({Type}); jobs continue.", ex.GetType().Name); }
             using var _ = registry.ServiceProvider.GetRequiredService<TenantContext>().UseInstallationScope();
             tenants = await registry.ServiceProvider.GetRequiredService<ITenantDirectory>().ListAsync(ct);
         }
+        var owner = $"{Environment.MachineName}:{Environment.ProcessId}";
         foreach (var tenant in tenants.Where(t => t.Status == TenantStatus.Active && t.Id != SystemTenant.Id))
         {
             try
             {
+                await using var lease = await LeaseHolder.TryAcquireAsync(scopes, "background.jobs", tenant.Id.ToString("N"), owner, "background job cycle", TimeSpan.FromMinutes(Math.Max(2, options.Value.JobIntervalSeconds / 20)), ct);
+                if (lease is null) { log.LogInformation("Another instance is running background jobs for tenant {Tenant}; skipped.", tenant.Id); continue; }
                 await using var scope = scopes.CreateAsyncScope();
                 using var token = scope.ServiceProvider.GetRequiredService<TenantContext>().Use(tenant.Id);
                 var actor = scope.ServiceProvider.GetRequiredService<ActorContext>();

@@ -85,3 +85,5 @@ Not verified (cannot be, before code exists): that the proposed test IDs pass, t
 `docs/S9_READINESS.md` (readiness review of the S9 findings G1 to G10: classification, ranking, order, effort and risk).
 
 `docs/REGIONAL_SETTINGS.md` (S10: organisation locale, currency, time zone, address profile, resolver order, formats in pages, messages and exports), `docs/TAX_IDENTIFIERS.md` (S10: configurable counterparty identifier types, structural checks, access, compatibility for ABN data), `decisions/ADR-0033-regional-settings-and-counterparty-identifiers.md`.
+
+`docs/BACKUP_AND_RESTORE.md` (OPS-01: what a backup is, verification, restore workflow, post-restore validation, limits), `docs/OPERATIONS_RUNBOOK.md` (the operator's procedures), `docs/DISASTER_RECOVERY.md` (recovery objectives placeholders, rehearsal, evidence and sign-off template), `docs/MAINTENANCE_MODE.md`, `docs/OPERATION_LEASES.md`, `docs/SUPPORT_BUNDLE.md` (contents, exclusions, redaction), `decisions/ADR-0034-operational-resilience-backup-restore-maintenance-and-leases.md` and `docs/PRODUCTION_READINESS_CHECKLIST.md` (what the organisation must decide and evidence).

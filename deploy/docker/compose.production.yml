@@ -21,10 +21,19 @@ services:
       # First-run setup: the wizard answers 404 to callers that are not on the server. Through a published port, set this to "true" only while
       # you run setup (docker exec ecp dotnet Ecp.Host.dll setup-token), then remove it. The one-time token is still required.
       # Ecp__Setup__AllowRemote: "true"
+      # Backup and restore (docs/BACKUP_AND_RESTORE.md, docs/OPERATIONS_RUNBOOK.md). Mount a protected directory that the database server can also write, point these at it, and keep the
+      # privileged backup account in its own secret. Restores go to a new database and a new directory beside the running installation; nothing here replaces the live database.
+      # Ecp__Recovery__BackupDirectory: "/var/ecp-backups"
+      # Ecp__Recovery__SqlServerBackupDirectory: "/mnt/sqlbackups/ecp"        # the same directory, as the database server sees it
+      # Ecp__Recovery__RestoreTargetDirectory: "/var/ecp-restore"
+      # Ecp__Recovery__AdminConnectionStringRef: "file:/run/secrets/ecp-sql-backup"
+      # Ecp__Recovery__StorageProtection: "Describe how this storage is encrypted and who may read it"
     secrets:
       - ecp-sql
     volumes:
       - ecp-data:/var/ecp
+      # - ecp-backups:/var/ecp-backups     # protected storage shared with the database server; encrypt it and control access (the platform cannot verify this)
+      # - ecp-restore:/var/ecp-restore
     read_only: true
     tmpfs:
       - /tmp
@@ -35,3 +44,5 @@ secrets:
     file: ./secrets/ecp-sql.txt
 volumes:
   ecp-data:
+  # ecp-backups:
+  # ecp-restore:

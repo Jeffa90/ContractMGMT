@@ -1,0 +1,25 @@
+@page "/Admin/Operations/Evidence"
+@model Ecp.Host.Pages.Admin.Operations.EvidenceModel
+@{ ViewData["Title"] = L["Evidence and support bundle"].Value; var r = Model.Report; }
+<h1>@L["Evidence report and support bundle"]</h1>
+<p class="lede">@L["The evidence report states what has been backed up, verified and restored, and what is and is not verified for each way of running the platform. The support bundle lists versions, statuses and counts for diagnosis. Neither contains secrets, connection strings, keys, record content, document content or personal data. Spreadsheet downloads are safe to open."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<ul>
+    <li><a href="/Admin/Operations/Evidence?handler=Json">@L["Download the evidence report (JSON)"]</a></li>
+    <li><a href="/Admin/Operations/Evidence?handler=Csv">@L["Download the evidence report (CSV)"]</a></li>
+    <li><a href="/Admin/Operations/Evidence?handler=Bundle">@L["Download the support bundle (zip)"]</a></li>
+</ul>
+<h2>@L["Deployment models and what is verified"]</h2>
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Deployment models"]</caption>
+    <thead><tr><th scope="col">@L["Model"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Notes"]</th></tr></thead>
+    <tbody>
+    @foreach (var d in r.DeploymentModels)
+    {
+        <tr><th scope="row">@d.Model</th><td><span class="badge @(d.Status == "Verified" ? "ok" : "warn")">@d.Status</span></td><td>@d.Notes</td></tr>
+    }
+    </tbody>
+</table>
+</div>
+<ul>@foreach (var n in r.Notices) { <li>@n</li> }</ul>

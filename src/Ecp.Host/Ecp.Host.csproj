@@ -19,6 +19,7 @@
     <ProjectReference Include="../Modules/Ecp.Notifications/Ecp.Notifications.csproj" />
     <ProjectReference Include="../Modules/Ecp.Operations/Ecp.Operations.csproj" />
     <ProjectReference Include="../Modules/Ecp.Setup/Ecp.Setup.csproj" />
+    <ProjectReference Include="../Modules/Ecp.Recovery/Ecp.Recovery.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Build-time tool only: it builds the shipped solution packs into the output folder. Nothing from it is referenced by the host. -->

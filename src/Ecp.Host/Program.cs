@@ -50,47 +50,14 @@ var demoIdentity = new DemoIdentityOptions();
 builder.Configuration.GetSection("Identity:Demo").Bind(demoIdentity);
 builder.Services.AddSingleton(demoIdentity);
 
-builder.Services.AddEcpPersistence(resolved.Database);
-builder.Services.AddAuditModule();
-builder.Services.AddTenancyModule();
-builder.Services.AddIdentityModule(o => { o.Mode = resolved.Host.Mode; o.RequireEmergencyConfirmation = production; });
-builder.Services.AddConfigurationModule(o => { o.RequireSecondPersonPublish = production; o.DefaultPackId = builder.Configuration["Ecp:DefaultPackId"]; }, packs: o =>
-{
-    builder.Configuration.GetSection("Ecp:Packs").Bind(o);
-    o.Mode = resolved.Host.Mode;                                                       // the host decides the mode; configuration cannot override it
-    if (string.IsNullOrWhiteSpace(o.StorageDirectory)) o.StorageDirectory = Path.Combine(resolved.Host.DataDirectory, "packs");
-    if (production) o.AllowUnsignedSyntheticPacks = false;                              // Production never accepts unsigned packs, whatever the setting says
-});
-builder.Services.AddContractsModule(o => builder.Configuration.GetSection("Contracts").Bind(o));
-builder.Services.AddDocumentsModule(o => builder.Configuration.GetSection("Documents").Bind(o),
-    new LocalFileSystemOptions { RootPath = Path.Combine(resolved.Host.DataDirectory, "documents") });
-builder.Services.AddMigrationModule(o =>
-{
-    builder.Configuration.GetSection("Migration").Bind(o);
-    if (production) o.RequireMalwareScan = true; // no scanner adapter exists yet, so Production holds attachments rather than importing them unscanned (MIG-F014)
-});
-// The mocked scanner stands in for a provider adapter in Demonstration and tests only; Production never gets it.
-if (resolved.Host.Mode != EcpMode.Production) builder.Services.AddSingleton<Ecp.Documents.IMalwareScanner, Ecp.Documents.MockMalwareScanner>();
-// The installation default solution pack applies only to an organisation that has none of its own; it is unset unless the installer sets it (docs/SETUP_AND_ONBOARDING.md).
-var installationDefaultPack = builder.Configuration["Ecp:DefaultPackId"];
-builder.Services.AddLifecycleModule(o => { o.Mode = resolved.Host.Mode; o.DefaultPackId = installationDefaultPack; });
-builder.Services.AddNotificationsModule(o =>
-{
-    builder.Configuration.GetSection("Notifications").Bind(o);
-    o.Mode = resolved.Host.Mode;
-    o.DefaultPackId = installationDefaultPack;
-});
-builder.Services.AddOperationsModule(resolved.Host.DataDirectory);
+var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+builder.Services.AddEcpPlatformModules(builder.Configuration, resolved, PlatformComposition.PathsFor(resolved.Host.DataDirectory, builder.Configuration), hostVersion, builder.Environment.ContentRootPath, builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"));
+builder.Services.AddSingleton<Ecp.Recovery.IRestoreTargetFactory>(new RestoreTargetFactory(builder.Configuration, resolved, hostVersion, builder.Environment.ContentRootPath, builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot")));
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.PackReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.CapabilityReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.RegionalReadinessCheck>();
 builder.Services.AddHostedService<BackgroundJobService>();
 builder.Services.AddSingleton<DemoSeeder>();
-var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
-builder.Services.AddSetupModule(new SetupEnvironment(resolved.Host.Mode, resolved.Host.DataDirectory,
-    DemoIdentityEnabled: resolved.Host.Mode != EcpMode.Production && resolved.Host.DemoTenantResolution, DemoSeedEnabled: resolved.Host.DemoSeed,
-    ConnectionFromSecretReference: resolved.Facts.ConnectionFromSecretReference, DatabaseProvider: resolved.Database.Provider.ToString(), Version: hostVersion,
-    AllowRemoteSetup: builder.Configuration.GetValue("Ecp:Setup:AllowRemote", false)));
 builder.Services.AddSingleton<ISetupProtector, DataProtectionSetupProtector>();
 builder.Services.AddSingleton<IDemoDataApplier, DemoDataApplier>();
 builder.Services.AddScoped<BrandingAccessor>();
@@ -193,8 +160,11 @@ if (args.Length > 0 && !args[0].StartsWith('-'))
                 return 0;
             }
             catch (DomainException ex) { Console.Error.WriteLine(ex.Message); return 1; }
+        case var operation when OperationsCli.Commands.Contains(operation):
+            return await OperationsCli.RunAsync(operation, args, app.Services);
         default:
-            Console.Error.WriteLine("Unknown command. Use: migrate | verify-audit <tenant name> | setup-token");
+            Console.Error.WriteLine("Unknown command. Use: migrate | verify-audit <tenant name> | setup-token | " + string.Join(" | ", OperationsCli.Commands));
+            Console.Error.WriteLine(OperationsCli.Usage);
             return 64;
     }
 }
@@ -240,6 +210,7 @@ app.UseRequestLocalization(o =>
     o.ApplyCurrentCultureToResponseHeaders = true;
 });
 app.UseRateLimiter();
+app.UseMiddleware<MaintenanceMiddleware>();
 app.UseRouting();
 app.UseAuthentication();
 app.UseMiddleware<SessionMiddleware>();

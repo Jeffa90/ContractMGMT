@@ -40,6 +40,7 @@ internal static class Modules
         ("Ecp.Operations", typeof(OperationsModule).Assembly, 8),
         ("Ecp.Notifications", typeof(Ecp.Notifications.NotificationsModule).Assembly, 9),
         ("Ecp.Setup", typeof(SetupModule).Assembly, 9),
+        ("Ecp.Recovery", typeof(Ecp.Recovery.RecoveryModule).Assembly, 9),
         ("Ecp.Host", typeof(Program).Assembly, 10),
     ];
 
@@ -51,7 +52,7 @@ internal static class Modules
         ("Ecp.Metadata", "Ecp.Configuration"),
     ];
 
-    public static readonly string[] ModuleNames = ["Audit", "Tenancy", "Identity", "Configuration", "Metadata", "Contracts", "Documents", "Approvals", "DataMigration", "Lifecycle", "Notifications", "Operations", "Setup"];
+    public static readonly string[] ModuleNames = ["Audit", "Tenancy", "Identity", "Configuration", "Metadata", "Contracts", "Documents", "Approvals", "DataMigration", "Lifecycle", "Notifications", "Operations", "Setup", "Recovery"];
 }
 
 [Trait("Category", "Architecture")]

@@ -58,6 +58,12 @@ retention.manage,,Y,,,,,,,,,,,A10 baseline; periods [OPEN]
 legalhold.manage,,,,,,,,Y,,,,,A10 baseline
 ai.use,,,,,,Y,S,Y,,,,,A10 baseline
 ops.manage,Y,,,,,,,,,,,,Master (Audit and operations)
+operations.read,Y,,,,,,,,,,,,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.backup,Y,,,,,,,,,,,,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.restore,Y,,,,,,,,,,,,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.validate,Y,,,,,,,,,,,,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.maintenance,Y,,,,,,,,,,,,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
+operations.evidence.export,Y,,,,,,,,,,,,OPS-01 owner decisions (CONFIRMED_DECISIONS D10)
 records.read_privileged,,,,,,,,Y,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
 classification.lower,,,,,,Y,,Y,,,,,DR-2026-10-16 lifecycle slice (owner instruction)
 contracts.suspend,,,,,,Y,S,,,,,,DR-2026-10-16 lifecycle slice (owner instruction)

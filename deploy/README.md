@@ -11,5 +11,6 @@ Labels follow `CLAUDE.md`: **Implemented**, **Scaffolded / Not Verified**, **Ver
 | Azure (Bicep) | `deploy/azure/` | Scaffolded / Not Verified | Not compiled or deployed |
 | CI workflow | `.github/workflows/ci.yml` | Verified on a GitHub-hosted runner (3 jobs green at commit 975c5d3) | `deploy/STATUS.md`; it runs on every push to every branch and on pull requests |
 | Host health/readiness | `src/Ecp.Host` | Implemented, tested | `Ecp.Api.Tests` |
+| Backup, restore, maintenance mode (OPS-01) | `src/Modules/Ecp.Recovery`, Administration, Operations, `docs/BACKUP_AND_RESTORE.md` | Implemented; **Verified** for the Docker host with an external SQL Server and persistent document storage (CI job with a shared backup folder); IIS and Azure models **Not Verified** | `deploy/STATUS.md`; the operator supplies protected storage, the secret provider and the rehearsal (`docs/DISASTER_RECOVERY.md`) |
 
 Production approval is external governance and is not declared by any artefact here.

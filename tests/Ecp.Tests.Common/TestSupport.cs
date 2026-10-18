@@ -141,7 +141,11 @@ public sealed class TestApp : IAsyncDisposable
         return sp;
     }
 
-    private static ServiceProvider BuildServices(DatabaseProvider provider, string cs, FakeClock clock, string root, EcpMode setupMode, Action<IServiceCollection>? configure = null)
+    /// <summary>The standard composition over another database, data directory and clock, with no migration and no ownership of any database: a restored copy opened beside the application for validation.</summary>
+    public static ServiceProvider BuildDetached(DatabaseProvider provider, string cs, IClock clock, string root, EcpMode setupMode, Action<IServiceCollection>? configure = null)
+        => BuildServices(provider, cs, clock, root, setupMode, configure);
+
+    private static ServiceProvider BuildServices(DatabaseProvider provider, string cs, IClock clock, string root, EcpMode setupMode, Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();

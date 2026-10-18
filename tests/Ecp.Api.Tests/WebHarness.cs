@@ -14,10 +14,43 @@ namespace Ecp.Api.Tests;
 /// <summary>Hosts the whole application in Demo mode on the lightweight provider with the synthetic demo data seeded, and drives it like a browser.</summary>
 public sealed class DemoApp : IDisposable
 {
-    private readonly SqliteConnection _keeper;
+    private readonly SqliteConnection? _keeper;
+    private readonly Action? _drop;
     public EcpFactory Factory { get; }
+    /// <summary>True when the host runs over real SQL Server (so the run is SQL Server evidence), false on the lightweight provider.</summary>
+    public bool IsSqlServer { get; private init; }
 
-    private DemoApp(EcpFactory factory, SqliteConnection keeper) { Factory = factory; _keeper = keeper; }
+    private DemoApp(EcpFactory factory, SqliteConnection? keeper, Action? drop = null) { Factory = factory; _keeper = keeper; _drop = drop; }
+
+    /// <summary>
+    /// The same Demo host over a new database on the real SQL Server named by <c>ECP_TEST_SQL</c> (created for the run and dropped afterwards). The pages, services and migrations are the same; what changes is the
+    /// provider, so a run here is evidence that the pages work with real constraints, row-level security and concurrency. Without a server the caller's test is skipped as NOT VERIFIED.
+    /// </summary>
+    public static DemoApp StartSqlServer(Action<Dictionary<string, string?>>? configure = null, Action<IServiceCollection>? services = null)
+    {
+        var admin = Ecp.Tests.Common.SqlServerEnvironment.ConnectionString ?? throw new InvalidOperationException(Ecp.Tests.Common.SqlServerEnvironment.NotVerifiedReason);
+        var db = "ecp_api_" + Guid.NewGuid().ToString("N");
+        using (var c = new Microsoft.Data.SqlClient.SqlConnection(admin))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand(); cmd.CommandText = $"CREATE DATABASE [{db}]"; cmd.ExecuteNonQuery();
+        }
+        var settings = EcpFactory.DemoSqlite();
+        settings["Database:Provider"] = "SqlServer";
+        settings["Database:ConnectionString"] = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(admin) { InitialCatalog = db, ConnectTimeout = 15 }.ConnectionString;
+        configure?.Invoke(settings);
+        void Drop()
+        {
+            try
+            {
+                Microsoft.Data.SqlClient.SqlConnection.ClearAllPools();
+                using var c = new Microsoft.Data.SqlClient.SqlConnection(admin); c.Open();
+                using var cmd = c.CreateCommand(); cmd.CommandText = $"ALTER DATABASE [{db}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{db}]"; cmd.ExecuteNonQuery();
+            }
+            catch (Exception) { /* a leftover test database is harmless and named for the run */ }
+        }
+        return new DemoApp(new EcpFactory(settings, services), null, Drop) { IsSqlServer = true };
+    }
 
     public static DemoApp Start(Action<Dictionary<string, string?>>? configure = null, Action<IServiceCollection>? services = null)
     {
@@ -88,5 +121,5 @@ public sealed class DemoApp : IDisposable
         return await client.PostAsync(postUrl ?? pageUrl, new FormUrlEncodedContent(all));
     }
 
-    public void Dispose() { Factory.Dispose(); _keeper.Dispose(); }
+    public void Dispose() { Factory.Dispose(); _keeper?.Dispose(); _drop?.Invoke(); }
 }

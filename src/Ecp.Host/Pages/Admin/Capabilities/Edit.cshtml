@@ -31,7 +31,7 @@
             <div class="actions">
                 <button type="submit" asp-page-handler="Save">@L["Save the draft"]</button>
                 <button type="submit" class="secondary" asp-page-handler="Validate">@L["Save and validate"]</button>
-                @if (Model.CanPublish) { <button type="submit" asp-page-handler="Publish">@L["Publish"]</button> }
+                @if (Model.CanPublish) { var pb = new Ecp.Host.Pages.PublishButtonsModel(Model.Form?.Draft?.Id, Model.Governance, "Publish", L["Publish"].Value); <partial name="_PublishButtons" model="pb" /> }
                 <a class="button secondary" href="/Admin/Capabilities/Preview?organisationId=@f.OrganisationId">@L["Preview"]</a>
             </div>
             <p class="hint">@L["Publishing needs a recent sign-in, and a second person where your installation requires it."]</p>

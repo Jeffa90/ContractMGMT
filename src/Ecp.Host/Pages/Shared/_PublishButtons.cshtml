@@ -1,0 +1,24 @@
+@model Ecp.Host.Pages.PublishButtonsModel
+@* The buttons that put a draft in force, labelled for what will really happen to this person: publish, submit for review, or go and review someone else's submission. The services decide; this only tells the truth about it. *@
+@{ var g = Model.Governance; }
+@if (g is null || !g.SecondPersonRequired)
+{
+    <button type="submit" asp-page-handler="@Model.Handler">@Model.PublishLabel</button>
+}
+else if (g.CanDecide && Model.DraftId is { } id)
+{
+    <a class="button" href="/Admin/Reviews/Details?id=@id">@L["Review and publish"]</a>
+}
+else if (g.State == Ecp.Configuration.Domain.ReviewState.Submitted)
+{
+    <span class="hint" role="status">@L["Waiting for review. A second person publishes it."]</span>
+    @if (Model.DraftId is { } wid) { <a class="button secondary" href="/Admin/Reviews/Details?id=@wid">@L["See the submission"]</a> }
+}
+else
+{
+    <button type="submit" asp-page-handler="@Model.Handler">@L["Submit for review"]</button>
+}
+@if (g is { SecondPersonRequired: true, State: Ecp.Configuration.Domain.ReviewState.Rejected or Ecp.Configuration.Domain.ReviewState.ReturnedForRework })
+{
+    <p class="error-summary" role="status">@L["A reviewer sent this back. Change it, check it and submit it again. Their comment is on the review page."] <a href="/Admin/Reviews/Details?id=@Model.DraftId">@L["Read the comment"]</a></p>
+}

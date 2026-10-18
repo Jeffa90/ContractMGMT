@@ -21,6 +21,9 @@ public interface IContractViewStudio
     Task RemoveViewAsync(Guid organisationId, string key, CancellationToken ct = default);
     Task<ValidationReport> ValidateAsync(Guid organisationId, CancellationToken ct = default);
     Task<ReleaseDto> PublishAsync(Guid organisationId, string note, CancellationToken ct = default);
+    /// <summary>What Publish does for this person: publishes where that is allowed, otherwise submits the draft for a second person to review and publish.</summary>
+    Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default);
+    Task<RollbackOutcome> RequestRollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default);
     Task RollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default);
     Task DiscardDraftAsync(Guid organisationId, CancellationToken ct = default);
     /// <summary>Runs a definition as the signed-in administrator would see it (their own access), so a view can be tried before it is published.</summary>
@@ -95,6 +98,15 @@ internal sealed class ContractViewStudio(IConfigurationService configuration, IC
         await configuration.ValidateAsync(draft.Id, ct);
         return await configuration.PublishAsync(draft.Id, note, ct);
     }
+
+    public async Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default)
+    {
+        var (draft, _) = await OpenAsync(organisationId, ct);
+        await configuration.ValidateAsync(draft.Id, ct);
+        return await configuration.SubmitOrPublishAsync(draft.Id, note, ct);
+    }
+
+    public Task<RollbackOutcome> RequestRollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default) => configuration.RequestRollbackAsync(Kind, organisationId, toRelease, reason, ct);
 
     public Task RollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default) => configuration.RollbackAsync(Kind, organisationId, toRelease, reason, ct);
 

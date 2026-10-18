@@ -94,7 +94,8 @@
             <div class="actions">
                 <button type="submit" asp-page-handler="Save">@L["Save draft"]</button>
                 <button type="submit" asp-page-handler="Validate" class="secondary">@L["Save and validate"]</button>
-                <button type="submit" asp-page-handler="Publish">@L["Validate and publish"]</button>
+                @{ var pb = new Ecp.Host.Pages.PublishButtonsModel(Model.Overview?.Draft?.Id, Model.Governance, "Publish", L["Validate and publish"].Value); }
+                <partial name="_PublishButtons" model="pb" />
                 @if (o.Draft is not null) { <button type="submit" asp-page-handler="Discard" class="secondary">@L["Discard the draft"]</button> }
             </div>
         </form>

@@ -1,4 +1,5 @@
 using Ecp.Configuration;
+using Ecp.Host.Pages.Admin.Reviews;
 using Ecp.Identity;
 using Ecp.SharedKernel;
 using Ecp.SharedKernel.Localisation;
@@ -61,6 +62,7 @@ public sealed class IndexModel(IRegionalAdministration regional, IConfigurationS
     public IReadOnlyList<ValidationMessage> Problems { get; private set; } = [];
     public IReadOnlyList<ReleaseDto> Releases { get; private set; } = [];
     public bool CanHistory { get; private set; }
+    public GovernanceInfo? Governance { get; private set; }
 
     public Task<IActionResult> OnGetAsync(CancellationToken ct) => RunAsync(async () => { await LoadAsync(ct, fromPost: false); return Page(); });
 
@@ -82,6 +84,7 @@ public sealed class IndexModel(IRegionalAdministration regional, IConfigurationS
         var org = await ResolveAsync(ct);
         Overview = await regional.OverviewAsync(org, ct);
         if (Overview.Draft?.Validation is { } report) Problems = report.Messages;
+        Governance = await configuration.TryGovernanceAsync(Overview.Draft?.Id, ct);
         try { Releases = await configuration.ReleasesAsync(RegionalKinds.Name, org, ct); CanHistory = true; }
         catch (ForbiddenException) { CanHistory = false; }
         if (!fromPost)
@@ -137,6 +140,7 @@ public sealed class IndexModel(IRegionalAdministration regional, IConfigurationS
 
     private IActionResult Back(Guid org) => RedirectToPage(new { organisationId = org });
     private Task<IActionResult> Run(Func<Task<IActionResult>> body, CancellationToken ct) => RunAsync(body, () => LoadAsync(ct, fromPost: true));
+    private Task<IActionResult> StepUp(Func<Task<IActionResult>> body, CancellationToken ct) => StepUpRunAsync(body, () => LoadAsync(ct, fromPost: true));
 
     public Task<IActionResult> OnPostSaveAsync(CancellationToken ct) => Run(async () =>
     {
@@ -159,7 +163,7 @@ public sealed class IndexModel(IRegionalAdministration regional, IConfigurationS
         return Back(org);
     }, ct);
 
-    public Task<IActionResult> OnPostPublishAsync(CancellationToken ct) => Run(async () =>
+    public Task<IActionResult> OnPostPublishAsync(CancellationToken ct) => StepUp(async () =>
     {
         var (org, draft) = await SaveAsync(ct);
         var checkedDraft = await configuration.ValidateAsync(draft.Id, ct);
@@ -169,8 +173,8 @@ public sealed class IndexModel(IRegionalAdministration regional, IConfigurationS
             await LoadAsync(ct, fromPost: true);
             return Page();
         }
-        await configuration.PublishAsync(draft.Id, string.IsNullOrWhiteSpace(Note) ? "Regional settings published" : Note!, ct);
-        Flash("Published. Dates, times, numbers and amounts are shown in the new formats from the next page. Stored timestamps stay in UTC and no amount changes.");
+        var outcome = await configuration.SubmitOrPublishAsync(draft.Id, string.IsNullOrWhiteSpace(Note) ? "Regional settings published" : Note!, ct);
+        Flash(outcome.Message("Published. Dates, times, numbers and amounts are shown in the new formats from the next page. Stored timestamps stay in UTC and no amount changes."));
         return Back(org);
     }, ct);
 
@@ -182,11 +186,11 @@ public sealed class IndexModel(IRegionalAdministration regional, IConfigurationS
         return Back(org);
     }, ct);
 
-    public Task<IActionResult> OnPostRollbackAsync(CancellationToken ct) => Run(async () =>
+    public Task<IActionResult> OnPostRollbackAsync(CancellationToken ct) => StepUp(async () =>
     {
         var org = await ResolveAsync(ct);
-        await configuration.RollbackAsync(RegionalKinds.Name, org, ToRelease ?? 0, string.IsNullOrWhiteSpace(Note) ? "Rolled back" : Note!, ct);
-        Flash("The earlier release is published again as a new release. History is kept.");
+        var outcome = await configuration.RequestRollbackAsync(RegionalKinds.Name, org, ToRelease ?? 0, string.IsNullOrWhiteSpace(Note) ? "Rolled back" : Note!, ct);
+        Flash(outcome.Release is not null ? "The earlier release is published again as a new release. History is kept." : "Submitted for review. A second person has to review and publish the rollback; nothing changes until they do.");
         return Back(org);
     }, ct);
 }

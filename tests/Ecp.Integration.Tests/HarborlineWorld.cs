@@ -161,6 +161,13 @@ internal sealed class HarborlineWorld
         await GrantAsync("auditor", RoleCodes.Auditor, null, "Confidential");
     }
 
+    /// <summary>Another person who administers both the organisation and the tenant, so that a change one administrator puts forward can be published by a second.</summary>
+    public async Task AddAdministratorAsync(string key)
+    {
+        await GrantAsync(key, RoleCodes.OrganisationAdministrator, null, "Restricted");
+        await GrantAsync(key, RoleCodes.TenantAdministrator, null, "Restricted", tenantWide: true);
+    }
+
     /// <summary>Uploads the built package through the Pack Manager as the tenant administrator, installs it and returns the validation report.</summary>
     public async Task<PackUploadResult> UploadAndInstallAsync(string version = "1.1.1", byte[]? bytes = null)
     {

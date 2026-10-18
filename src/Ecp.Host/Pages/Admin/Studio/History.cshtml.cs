@@ -50,12 +50,12 @@ public sealed class HistoryModel(IOrganisationStructureService organisations, IA
         return $"{add} field(s) added, {chg} changed ({ret} retired)";
     }
 
-    public Task<IActionResult> OnPostRollbackAsync(CancellationToken ct) => RunAsync(async () =>
+    public Task<IActionResult> OnPostRollbackAsync(CancellationToken ct) => StepUpRunAsync(async () =>
     {
         var org = await ResolveOrganisationAsync(ct) ?? throw new ResourceNotFoundException();
         if (string.IsNullOrWhiteSpace(Reason)) throw new DomainException("reason_required", "Give a reason for restoring the earlier version.");
-        if (Kind == "views") await views.RollbackAsync(org, ToRelease, Reason!, ct); else await fields.RollbackAsync(org, ToRelease, Reason!, ct);
-        Flash("The earlier version is published again as a new release. History is kept.");
+        var outcome = Kind == "views" ? await views.RequestRollbackAsync(org, ToRelease, Reason!, ct) : await fields.RequestRollbackAsync(org, ToRelease, Reason!, ct);
+        Flash(outcome.Release is not null ? "The earlier version is published again as a new release. History is kept." : "Submitted for review. A second person has to review and publish the rollback; nothing changes until they do.");
         return RedirectToPage(new { organisationId = org, kind = Kind });
     }, () => LoadAsync(CancellationToken.None));
 }

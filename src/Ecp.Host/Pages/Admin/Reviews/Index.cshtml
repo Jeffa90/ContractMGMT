@@ -1,0 +1,45 @@
+@page "/Admin/Reviews"
+@model Ecp.Host.Pages.Admin.Reviews.IndexModel
+@using Ecp.Configuration.Domain
+@{ ViewData["Title"] = L["Configuration reviews"].Value; }
+<h1>@L["Configuration reviews"]</h1>
+<p class="lede">@L["Changes to how the platform is set up are put forward by one person and published by another. This is the list of changes waiting for a decision, and of your own changes that are waiting or were sent back. You read a plain-language summary of what would change; you do not need to read any technical document."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<nav class="tabs" aria-label="@L["Show"]">
+    <a href="/Admin/Reviews" aria-current="@(Model.Show is null ? "page" : null)">@L["Waiting for my decision"]</a>
+    <a href="/Admin/Reviews?show=mine" aria-current="@(Model.Show == "mine" ? "page" : null)">@L["Put forward by me"]</a>
+    <a href="/Admin/Reviews?show=returned" aria-current="@(Model.Show == "returned" ? "page" : null)">@L["Sent back or rejected"]</a>
+    <a href="/Admin/Reviews?show=all" aria-current="@(Model.Show == "all" ? "page" : null)">@L["Everything I can see"]</a>
+</nav>
+@if (Model.Items.Count == 0)
+{
+    <p class="hint">@L["Nothing here."]</p>
+}
+else
+{
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Configuration waiting for review or sent back"]</caption>
+        <thead><tr>
+            <th scope="col">@L["What"]</th><th scope="col">@L["For"]</th><th scope="col">@L["Put forward by"]</th><th scope="col">@L["When"]</th><th scope="col">@L["Changes"]</th>
+            <th scope="col">@L["Checks"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Permission needed to publish"]</th><th scope="col">@L["Open"]</th>
+        </tr></thead>
+        <tbody>
+        @foreach (var i in Model.Items)
+        {
+            <tr>
+                <th scope="row">@Ecp.Host.Pages.Admin.Reviews.ConfigurationKindLabels.Of(i.Kind)@if (i.RollbackOfNumber is { } rb) { <span class="hint"> (@L["puts back release"] @rb)</span> }</th>
+                <td>@Model.OrganisationOf(i.OrganisationId)</td>
+                <td>@Model.NameOf(i.SubmittedBy ?? i.LastEditedBy)<span class="hint"> · @L["last edited by"] @Model.NameOf(i.LastEditedBy)</span></td>
+                <td>@(i.SubmittedUtc is { } s ? Fmt.DateTime(s) : "-")</td>
+                <td>@i.ChangeCount</td>
+                <td>@(i.ErrorCount == 0 ? L["Valid"] : L["{0} problems", i.ErrorCount])@if (i.WarningCount > 0) { <span class="hint"> · @L["{0} warnings", i.WarningCount]</span> }</td>
+                <td><span class="badge">@(i.State switch { ReviewState.Submitted => L["Waiting for review"].Value, ReviewState.Rejected => L["Rejected"].Value, ReviewState.ReturnedForRework => L["Sent back for changes"].Value, _ => i.State.ToString() })</span>
+                    @if (i.IsMine && i.State == ReviewState.Submitted) { <span class="hint"> · @L["yours; another person decides"]</span> }
+                    @if (i.DecisionComment is { Length: > 0 } c) { <div class="hint">@c</div> }</td>
+                <td><code>@i.PublishPermission</code></td>
+                <td><a href="/Admin/Reviews/Details?id=@i.DraftId">@(i.CanDecide ? L["Review"] : L["Open"])</a></td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+}

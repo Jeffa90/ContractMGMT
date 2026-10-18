@@ -22,9 +22,11 @@ public sealed record ValidationReport(IReadOnlyList<ValidationMessage> Messages)
 }
 
 public sealed record DraftDto(Guid Id, Guid OrganisationId, string Kind, string ContentJson, DraftStatus Status, bool IsPublishable, int? BasedOnReleaseNumber, string LastEditedBy,
-    DateTime UpdatedUtc, ValidationReport? Validation);
+    DateTime UpdatedUtc, ValidationReport? Validation, string CreatedBy = "", ReviewState ReviewState = ReviewState.None, string? SubmittedBy = null, DateTime? SubmittedUtc = null, string? SubmittedHash = null,
+    string? SubmissionNote = null, string? DecidedBy = null, DateTime? DecidedUtc = null, string? DecisionComment = null, int? RollbackOfNumber = null, string ContentHash = "");
 
-public sealed record ReleaseDto(Guid Id, Guid OrganisationId, string Kind, int Number, string ContentJson, string ContentHash, int? RollbackOfNumber, string Note, string PublishedBy, DateTime PublishedUtc);
+public sealed record ReleaseDto(Guid Id, Guid OrganisationId, string Kind, int Number, string ContentJson, string ContentHash, int? RollbackOfNumber, string Note, string PublishedBy, DateTime PublishedUtc,
+    string CreatedBy = "", string LastEditedBy = "", string? SubmittedBy = null, DateTime? SubmittedUtc = null, string? SubmittedHash = null, string GovernanceMode = "");
 
 /// <summary>
 /// A kind of configuration document (for example organisation onboarding). The Configuration module owns the lifecycle (draft, validate,
@@ -89,8 +91,31 @@ public interface IConfigurationService
     Task<DraftDto?> FindOpenDraftAsync(string kind, Guid organisationId, CancellationToken ct = default);
     Task<DraftDto> SaveDraftAsync(Guid draftId, string contentJson, CancellationToken ct = default);
     Task<DraftDto> ValidateAsync(Guid draftId, CancellationToken ct = default);
+    /// <summary>
+    /// Publishes a validated draft. Where a second person is required, the draft must have been submitted and must still hold exactly the submitted content, and the publisher must be neither
+    /// its creator, its last editor nor its submitter. Publishing never makes the publisher the editor.
+    /// </summary>
     Task<ReleaseDto> PublishAsync(Guid draftId, string note, CancellationToken ct = default);
-    /// <summary>Publishes an earlier release's content as a new release (history is never rewritten).</summary>
+    /// <summary>
+    /// What a page should do when someone presses Publish: publish where that is allowed for this person, otherwise put the draft in front of a reviewer. Saving the same content again never changes the editor.
+    /// </summary>
+    Task<PublishOutcome> SubmitOrPublishAsync(Guid draftId, string note, CancellationToken ct = default);
+    /// <summary>Puts a validated draft in front of a reviewer. The submission is bound to the exact content; any later edit withdraws it.</summary>
+    Task<DraftDto> SubmitForReviewAsync(Guid draftId, string? comment, CancellationToken ct = default);
+    Task<DraftDto> WithdrawSubmissionAsync(Guid draftId, string? reason, CancellationToken ct = default);
+    /// <summary>A reviewer declines the submitted content. The comment is kept; the draft can be changed and submitted again.</summary>
+    Task<DraftDto> RejectAsync(Guid draftId, string comment, CancellationToken ct = default);
+    Task<DraftDto> ReturnForReworkAsync(Guid draftId, string comment, CancellationToken ct = default);
+    Task<GovernanceInfo> GovernanceAsync(Guid draftId, CancellationToken ct = default);
+    /// <summary>Submissions and decisions the caller may see: those they may decide, and their own.</summary>
+    Task<IReadOnlyList<ReviewItem>> ReviewQueueAsync(CancellationToken ct = default);
+    Task<ReviewDetail> GetReviewAsync(Guid draftId, CancellationToken ct = default);
+    /// <summary>
+    /// Puts an earlier release's content back as a new release (history is never rewritten). It needs the rollback permission, a recent sign-in and a reason. Where a second person is required it
+    /// is submitted for review instead and takes effect when that person publishes it.
+    /// </summary>
+    Task<RollbackOutcome> RequestRollbackAsync(string kind, Guid organisationId, int toReleaseNumber, string reason, CancellationToken ct = default);
+    /// <summary>The direct form of <see cref="RequestRollbackAsync"/>, for installations that do not require a second person; where one is required it refuses and says so.</summary>
     Task<ReleaseDto> RollbackAsync(string kind, Guid organisationId, int toReleaseNumber, string reason, CancellationToken ct = default);
     Task<ReleaseDto?> LatestReleaseAsync(string kind, Guid organisationId, CancellationToken ct = default);
     /// <summary>The most recent release of any kind for an organisation (organisation-level and tenant-level), for recording which configuration a long-running operation relied on.</summary>
@@ -116,13 +141,17 @@ public sealed class ConfigurationOptions
 {
     /// <summary>Second-person publish: the publisher must differ from the last editor of the draft (tenant setting; on by default in Production).</summary>
     public bool RequireSecondPersonPublish { get; set; }
+    /// <summary>Rolling back needs the person to have signed in recently (the host sets it; the evidence is the verified session, never request input).</summary>
+    public bool RequireRecentSignInForRollback { get; set; }
+    /// <summary>How recent "recent" is.</summary>
+    public TimeSpan RecentSignInWindow { get; set; } = TimeSpan.FromMinutes(10);
     /// <summary>The installation default solution pack (<c>Ecp:DefaultPackId</c>), used only for an organisation that has none of its own; unset unless the installer sets it. Terminology reads the pack's wording through it.</summary>
     public string? DefaultPackId { get; set; }
 }
 
-internal sealed class ConfigurationService(
+internal sealed partial class ConfigurationService(
     ConfigurationDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IAccessService access, CurrentUser currentUser,
-    IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor, IPublishedConfigurationCache cache, IAfterCommit afterCommit, IMaintenanceGate? maintenanceGate = null) : IConfigurationService, IConfigurationBootstrap, IConfigurationReleases
+    IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor, IPublishedConfigurationCache cache, IAfterCommit afterCommit, ReauthenticationContext reauth, IMaintenanceGate? maintenanceGate = null) : IConfigurationService, IConfigurationBootstrap, IConfigurationReleases
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -142,7 +171,7 @@ internal sealed class ConfigurationService(
         await access.RequireAsync(DraftPermissionOf(kind), Describe(organisationId, kind), ct);
         var d = await db.Drafts.AsNoTracking().Where(x => x.OrganisationId == organisationId && x.Kind == kind && (x.Status == DraftStatus.Draft || x.Status == DraftStatus.Validated))
             .OrderByDescending(x => x.UpdatedUtc).FirstOrDefaultAsync(ct);
-        return d is null ? null : ToDto(d);
+        return d is null ? null : await DtoAsync(d, ct);
     }
 
     public async Task<DraftDto> GetOrCreateDraftAsync(string kind, Guid organisationId, string? initialJson = null, CancellationToken ct = default)
@@ -151,7 +180,7 @@ internal sealed class ConfigurationService(
         await access.RequireAsync(DraftPermissionOf(kind), Describe(organisationId, kind), ct);
         var existing = await db.Drafts.Where(x => x.OrganisationId == organisationId && x.Kind == kind && (x.Status == DraftStatus.Draft || x.Status == DraftStatus.Validated))
             .OrderByDescending(x => x.UpdatedUtc).FirstOrDefaultAsync(ct);
-        if (existing is not null) return ToDto(existing);
+        if (existing is not null) return await DtoAsync(existing, ct);
         return await CreateDraftCoreAsync(kind, organisationId, initialJson, await EditorLabelAsync(ct), ct);
     }
 
@@ -159,13 +188,15 @@ internal sealed class ConfigurationService(
     {
         var latest = await db.Releases.AsNoTracking().Where(r => r.OrganisationId == organisationId && r.Kind == kind).OrderByDescending(r => r.Number).FirstOrDefaultAsync(ct);
         var draft = ConfigurationDraft.Create(tenant.RequireTenantId(), organisationId, kind, initialJson ?? latest?.ContentJson ?? "{}", latest?.Number, editor, clock.UtcNow);
+        var review = DraftReview.Create(draft.TenantId, draft.Id, editor, clock.UtcNow);
         await uow.ExecuteAsync(async c =>
         {
             db.Drafts.Add(draft);
+            db.Reviews.Add(review);
             await db.SaveChangesAsync(c);
             audit.Record(new AuditEntry("config.draft.created", kind, draft.Id.ToString(), OrganisationId: organisationId == Guid.Empty ? null : organisationId));
         }, ct);
-        return ToDto(draft);
+        return ToDto(draft, review);
     }
 
     public async Task<DraftDto> SaveDraftAsync(Guid draftId, string contentJson, CancellationToken ct = default)
@@ -174,15 +205,27 @@ internal sealed class ConfigurationService(
         await access.RequireAsync(DraftPermissionOf(draft.Kind), Describe(draft.OrganisationId, draft.Kind), ct);
         EnsureJsonObject(contentJson);
         var editor = await EditorLabelAsync(ct);
+        DraftReview review = null!;
         await uow.ExecuteAsync(async c =>
         {
-            draft.Edit(contentJson, editor, clock.UtcNow);
-            try { await db.SaveChangesAsync(c); }
-            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The draft was changed by someone else. Reload and try again."); }
+            var previousHash = draft.ContentHash;
+            var changed = draft.Edit(contentJson, editor, clock.UtcNow);                 // the same content again changes nothing: nobody becomes the editor, no validation or submission is lost
+            review = await EnsureReviewAsync(draft, c);
+            var withdrew = false;
+            if (changed)
+            {
+                withdrew = review.ContentChanged(clock.UtcNow);
+                if (withdrew) db.ReviewEvents.Add(ConfigurationReviewEvent.Create(tenant.RequireTenantId(), draft, "Invalidated", editor, "The content was changed after it was submitted.", clock.UtcNow));
+            }
+            if (changed || db.ChangeTracker.HasChanges())
+            {
+                try { await db.SaveChangesAsync(c); }
+                catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "The draft was changed by someone else. Reload and try again."); }
+            }
             audit.Record(new AuditEntry("config.draft.saved", draft.Kind, draft.Id.ToString(), OrganisationId: draft.OrganisationId == Guid.Empty ? null : draft.OrganisationId,
-                NewValuesJson: JsonSerializer.Serialize(new { hash = draft.ContentHash })));
+                NewValuesJson: JsonSerializer.Serialize(new { hash = draft.ContentHash, previousHash, changed, submissionInvalidated = withdrew })));
         }, ct);
-        return ToDto(draft);
+        return ToDto(draft, review);
     }
 
     public async Task<DraftDto> ValidateAsync(Guid draftId, CancellationToken ct = default)
@@ -204,8 +247,20 @@ internal sealed class ConfigurationService(
             audit.Record(new AuditEntry("config.draft.validated", draft.Kind, draft.Id.ToString(), OrganisationId: draft.OrganisationId == Guid.Empty ? null : draft.OrganisationId,
                 NewValuesJson: JsonSerializer.Serialize(new { valid = report.IsValid, errors = report.Messages.Count(m => m.Severity == ValidationSeverity.Error) })));
         }, ct);
-        return ToDto(draft);
+        return await DtoAsync(draft, ct);
     }
+
+    private async Task<DraftReview?> ReviewOfAsync(Guid draftId, CancellationToken ct) => await db.Reviews.AsNoTracking().FirstOrDefaultAsync(r => r.Id == draftId, ct);
+
+    /// <summary>The tracked review row of a draft, added when the draft predates review records (its creator is then the last person known to have edited it). The caller saves.</summary>
+    private async Task<DraftReview> EnsureReviewAsync(ConfigurationDraft draft, CancellationToken ct)
+    {
+        var row = await db.Reviews.FirstOrDefaultAsync(r => r.Id == draft.Id, ct);
+        if (row is null) { row = DraftReview.Create(draft.TenantId, draft.Id, draft.LastEditedBy, clock.UtcNow); db.Reviews.Add(row); }
+        return row;
+    }
+
+    private async Task<DraftDto> DtoAsync(ConfigurationDraft d, CancellationToken ct) => ToDto(d, await ReviewOfAsync(d.Id, ct));
 
     public async Task<ReleaseDto> PublishAsync(Guid draftId, string note, CancellationToken ct = default)
     {
@@ -213,12 +268,15 @@ internal sealed class ConfigurationService(
         var draft = await db.Drafts.FirstOrDefaultAsync(d => d.Id == draftId, ct) ?? throw new ResourceNotFoundException();
         await access.RequireAsync(KindOf(draft.Kind).PublishPermission, Describe(draft.OrganisationId, draft.Kind), ct);
         var publisher = await EditorLabelAsync(ct);
-        if (options.RequireSecondPersonPublish && string.Equals(draft.LastEditedBy, publisher, StringComparison.Ordinal))
-            throw new DomainException("second_person_required", "A second person must publish this configuration; the last editor cannot publish it.");
-        return await PublishCoreAsync(draft, null, note, publisher, ct);
+        var review = await db.Reviews.FirstOrDefaultAsync(r => r.Id == draftId, ct);
+        await RequirePublishableByAsync(draft, review, publisher, ct);
+        return await PublishCoreAsync(draft, review, review?.RollbackOfNumber, NoteFor(review, note), publisher, ct, options.RequireSecondPersonPublish ? "SecondPerson" : "SinglePerson");
     }
 
-    private async Task<ReleaseDto> PublishCoreAsync(ConfigurationDraft draft, int? rollbackOf, string note, string publisher, CancellationToken ct)
+    private static string NoteFor(DraftReview? review, string note)
+        => review?.RollbackOfNumber is { } n ? $"Rollback to release {n}: {review.RollbackReason}" + (string.IsNullOrWhiteSpace(note) ? "" : $" ({note.Trim()})") : note;
+
+    private async Task<ReleaseDto> PublishCoreAsync(ConfigurationDraft draft, DraftReview? review, int? rollbackOf, string note, string publisher, CancellationToken ct, string governanceMode)
     {
         if (!draft.IsPublishable) throw new DomainException("not_validated", "The draft must be validated, and unchanged since validation, before it is published.");
         var kind = KindOf(draft.Kind);
@@ -228,9 +286,14 @@ internal sealed class ConfigurationService(
                 .Select(r => new { r.Number, r.ContentJson }).FirstOrDefaultAsync(c);
             var number = (previous?.Number ?? 0) + 1;
             var release = ConfigurationRelease.Create(draft.TenantId, draft.OrganisationId, draft.Kind, number, draft.ContentJson, draft.Id, rollbackOf, note, publisher, clock.UtcNow);
+            var evidence = ReleaseEvidence.Create(draft.TenantId, release.Id, draft, review, governanceMode);
             db.Releases.Add(release);
+            db.Evidence.Add(evidence);
+            db.ReviewEvents.Add(ConfigurationReviewEvent.Create(draft.TenantId, draft, "Published", publisher, note, clock.UtcNow, number));
+            review?.Touch(clock.UtcNow);           // a reviewer's decision that raced this publication meets this change and one of them is told so
             draft.MarkPublished(clock.UtcNow);
             try { await db.SaveChangesAsync(c); }
+            catch (DbUpdateConcurrencyException) { throw new DomainException("concurrency_conflict", "Someone else decided on this draft at the same time. Reload to see what happened."); }
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("concurrency_conflict", "Another release was published at the same time. Reload and try again."); }
             await kind.ApplyAsync(draft.OrganisationId, draft.ContentJson, previous?.ContentJson, number, release.Id, c);
             // Drop the remembered release now (so a reader that starts during the commit cannot keep the old one) and again once the commit has happened.
@@ -239,23 +302,28 @@ internal sealed class ConfigurationService(
             afterCommit.Register(() => cache.Invalidate(tenantId, organisationId, kindName));
             audit.Record(new AuditEntry(rollbackOf is null ? "config.published" : "config.rolled_back", draft.Kind, release.Id.ToString(),
                 OrganisationId: draft.OrganisationId == Guid.Empty ? null : draft.OrganisationId, Reason: note, ConfigReleaseId: release.Id,
-                NewValuesJson: JsonSerializer.Serialize(new { number, hash = release.ContentHash, rollbackOf })));
-            return ToDto(release);
+                NewValuesJson: JsonSerializer.Serialize(new
+                {
+                    number, hash = release.ContentHash, rollbackOf, sourceVersion = rollbackOf, resultingVersion = number, governance = governanceMode,
+                    createdBy = evidence.CreatedBy, lastEditedBy = evidence.LastEditedBy, submittedBy = evidence.SubmittedBy, submittedUtc = evidence.SubmittedUtc, submittedHash = evidence.SubmittedHash, publishedBy = publisher
+                })));
+            return ToDto(release, evidence);
         }, ct);
     }
 
-    public async Task<ReleaseDto> RollbackAsync(string kind, Guid organisationId, int toReleaseNumber, string reason, CancellationToken ct = default)
+    public Task<ReleaseDto> RollbackAsync(string kind, Guid organisationId, int toReleaseNumber, string reason, CancellationToken ct = default)
+        => RollbackDirectAsync(kind, organisationId, toReleaseNumber, reason, ct);
+
+    private async Task<ReleaseDto> RollbackDirectAsync(string kind, Guid organisationId, int toReleaseNumber, string reason, CancellationToken ct)
     {
-        if (maintenanceGate is not null) await maintenanceGate.EnsureWritableAsync("Rolling back configuration", ct);
-        await access.RequireAsync(KindOf(kind).RollbackPermission, Describe(organisationId, kind), ct);
-        var why = Guard.NotBlank(reason, "Reason", 1000);
-        var target = await db.Releases.AsNoTracking().FirstOrDefaultAsync(r => r.OrganisationId == organisationId && r.Kind == kind && r.Number == toReleaseNumber, ct)
-            ?? throw new DomainException("release_not_found", "That release was not found.");
-        var editor = await EditorLabelAsync(ct);
-        var created = await CreateDraftCoreAsync(kind, organisationId, target.ContentJson, editor, ct);
-        var draft = await db.Drafts.FirstAsync(d => d.Id == created.Id, ct);
-        await ValidateCoreAsync(draft, ct); // the earlier content is re-validated against today's rules before it takes effect again
-        return await PublishCoreAsync(draft, toReleaseNumber, $"Rollback to release {toReleaseNumber}: {why}", editor, ct);
+        if (options.RequireSecondPersonPublish)
+        {
+            // Nothing is created: the caller is told to use the form that puts the rollback in front of a second person.
+            await access.RequireAsync(KindOf(kind).RollbackPermission, Describe(organisationId, kind), ct);
+            throw new DomainException("second_person_required", "A second person must publish a rollback here. Request it so that it is submitted for review; it takes effect when another person publishes it.");
+        }
+        var outcome = await RequestRollbackAsync(kind, organisationId, toReleaseNumber, reason, ct);
+        return outcome.Release!;
     }
 
     public async Task<ReleaseDto> DraftValidatePublishAsync(string kind, Guid organisationId, string contentJson, string publishedBy, string note, CancellationToken ct = default)
@@ -267,7 +335,7 @@ internal sealed class ConfigurationService(
         var validated = await ValidateCoreAsync(draft, ct);
         if (!validated.IsPublishable)
             throw new DomainException("validation_failed", "The configuration did not validate: " + string.Join("; ", validated.Validation!.Messages.Where(m => m.Severity == ValidationSeverity.Error).Select(m => m.Message)));
-        return await PublishCoreAsync(draft, null, note, label, ct);
+        return await PublishCoreAsync(draft, await db.Reviews.FirstOrDefaultAsync(r => r.Id == draft.Id, ct), null, note, label, ct, "System");
     }
 
     public async Task<ReleaseDto?> LatestReleaseAsync(string kind, Guid organisationId, CancellationToken ct = default)
@@ -307,7 +375,10 @@ internal sealed class ConfigurationService(
     public async Task<IReadOnlyList<ReleaseDto>> ReleasesAsync(string kind, Guid organisationId, CancellationToken ct = default)
     {
         await access.RequireAsync(KindOf(kind).HistoryPermission, Describe(organisationId, kind), ct);
-        return (await db.Releases.AsNoTracking().Where(x => x.OrganisationId == organisationId && x.Kind == kind).OrderByDescending(x => x.Number).ToListAsync(ct)).Select(ToDto).ToList();
+        var releases = await db.Releases.AsNoTracking().Where(x => x.OrganisationId == organisationId && x.Kind == kind).OrderByDescending(x => x.Number).ToListAsync(ct);
+        var ids = releases.Select(r => r.Id).ToList();
+        var evidence = (await db.Evidence.AsNoTracking().Where(e => ids.Contains(e.Id)).ToListAsync(ct)).ToDictionary(e => e.Id);
+        return releases.Select(r => ToDto(r, evidence.GetValueOrDefault(r.Id))).ToList();
     }
 
     public async Task DiscardDraftAsync(Guid draftId, CancellationToken ct = default)
@@ -328,10 +399,12 @@ internal sealed class ConfigurationService(
         catch (JsonException) { throw new DomainException("invalid_json", "Configuration is not valid JSON."); }
     }
 
-    private static DraftDto ToDto(ConfigurationDraft d) => new(d.Id, d.OrganisationId, d.Kind, d.ContentJson, d.Status, d.IsPublishable, d.BasedOnReleaseNumber, d.LastEditedBy, d.UpdatedUtc,
-        d.ValidationJson is null ? null : JsonSerializer.Deserialize<ValidationReport>(d.ValidationJson, Json));
+    private static DraftDto ToDto(ConfigurationDraft d, DraftReview? r) => new(d.Id, d.OrganisationId, d.Kind, d.ContentJson, d.Status, d.IsPublishable, d.BasedOnReleaseNumber, d.LastEditedBy, d.UpdatedUtc,
+        d.ValidationJson is null ? null : JsonSerializer.Deserialize<ValidationReport>(d.ValidationJson, Json), r?.CreatedBy ?? "", r?.State ?? ReviewState.None, r?.SubmittedBy, r?.SubmittedUtc, r?.SubmittedHash, r?.SubmissionNote,
+        r?.DecidedBy, r?.DecidedUtc, r?.DecisionComment, r?.RollbackOfNumber, d.ContentHash);
 
-    private static ReleaseDto ToDto(ConfigurationRelease r) => new(r.Id, r.OrganisationId, r.Kind, r.Number, r.ContentJson, r.ContentHash, r.RollbackOfNumber, r.Note, r.PublishedBy, r.PublishedUtc);
+    private static ReleaseDto ToDto(ConfigurationRelease r, ReleaseEvidence? e = null) => new(r.Id, r.OrganisationId, r.Kind, r.Number, r.ContentJson, r.ContentHash, r.RollbackOfNumber, r.Note, r.PublishedBy, r.PublishedUtc,
+        e?.CreatedBy ?? "", e?.LastEditedBy ?? "", e?.SubmittedBy, e?.SubmittedUtc, e?.SubmittedHash, e?.GovernanceMode ?? "");
 }
 
 /// <summary>Tenant classification policy kind: an ordered list of levels and a default. Applying it needs no further action; the scale provider reads the latest release.</summary>

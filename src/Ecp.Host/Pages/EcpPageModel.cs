@@ -1,4 +1,5 @@
 using Ecp.SharedKernel;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,18 @@ public abstract class EcpPageModel : PageModel
             if (reload is not null) await reload(); // redisplay the page with fresh data and the message
             return Page();
         }
+    }
+
+    /// <summary>
+    /// Runs a handler that needs the person to have signed in recently (publishing and rolling back configuration). Without a recent sign-in the person is taken to confirm their identity and returned here.
+    /// The services check again; this only makes the redirect friendly.
+    /// </summary>
+    protected async Task<IActionResult> StepUpRunAsync(Func<Task<IActionResult>> body, Func<Task>? reload = null)
+    {
+        var authorisation = HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>();
+        if (!(await authorisation.AuthorizeAsync(User, Ecp.Host.Security.Policies.RecentAuthentication)).Succeeded)
+            return Redirect("/Reauth?returnUrl=" + Uri.EscapeDataString(Request.Path.Value + Request.QueryString.Value));
+        return await RunAsync(body, reload);
     }
 
     protected static bool IsLocal(string? url) => !string.IsNullOrEmpty(url) && url[0] == '/' && (url.Length == 1 || (url[1] != '/' && url[1] != '\\'));

@@ -39,6 +39,7 @@
         if (await Can("audit.read_admin")) items.Add(("/Admin/Elevations", L["Access to this tenant"].Value, "/Admin/Elevations"));
         if (await Can("notifications.administer")) items.Add(("/Admin/Notifications", L["[[notification]] delivery"].Value, "/Admin/Notifications"));
         if (Terms.UsesAnywhere(CapabilityKeys.RegisterAuthorisation) && await Can("approvals.matrix.read", "approvals.simulate", "approvals.delegate")) items.Add(("/Admin/Approvals", L["[[approval]] matrices"].Value, "/Admin/Approvals"));
+        if (await Can("config.draft", "config.publish", "terminology.draft", "terminology.publish", "capabilities.draft", "capabilities.publish")) items.Add(("/Admin/Reviews", L["Configuration reviews"].Value, "/Admin/Reviews"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Configuration", L["Workflow configuration"].Value, "/Admin/Configuration"));
         if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Studio", L["Configuration Studio"].Value, "/Admin/Studio"));
         if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
@@ -51,7 +52,7 @@
     }
 }
 <!DOCTYPE html>
-<html lang="@CultureInfo.CurrentUICulture.Name">
+<html lang="@(string.IsNullOrEmpty(CultureInfo.CurrentUICulture.Name) ? "en" : CultureInfo.CurrentUICulture.Name)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -1,4 +1,5 @@
 using Ecp.Configuration;
+using Ecp.Host.Pages.Admin.Reviews;
 using Ecp.Identity;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
@@ -48,6 +49,7 @@ public sealed class EditModel(ITerminologyAdministration terminology, IConfigura
     public TerminologyEditModel? Form { get; private set; }
     public IReadOnlyList<ValidationMessage> Problems { get; private set; } = [];
     public bool CanPublish { get; private set; }
+    public GovernanceInfo? Governance { get; private set; }
 
     public Task<IActionResult> OnGetAsync(CancellationToken ct) => RunAsync(async () => { await LoadAsync(ct, fromPost: false); return Page(); });
 
@@ -68,6 +70,7 @@ public sealed class EditModel(ITerminologyAdministration terminology, IConfigura
             RoleRows = Form.Roles.Select(r => new RoleRowInput { Code = r.Code, Choice = r.Choice is null ? "inherit" : r.Choice.Value ? "offered" : "hidden" }).ToList();
         }
         CanPublish = await HoldsAsync("terminology.publish");
+        Governance = await configuration.TryGovernanceAsync(Form.Draft?.Id, ct);
         if (Form.Draft?.Validation is { } report) Problems = report.Messages;
     }
 
@@ -140,8 +143,8 @@ public sealed class EditModel(ITerminologyAdministration terminology, IConfigura
             ShowProblems(report.Messages);
             return Page();
         }
-        await configuration.PublishAsync(draft.Id, string.IsNullOrWhiteSpace(Note) ? "Terminology published" : Note!, ct);
-        Flash("Published. People see the new wording from their next page. Permissions, workflows and records are unchanged.");
+        var outcome = await configuration.SubmitOrPublishAsync(draft.Id, string.IsNullOrWhiteSpace(Note) ? "Terminology published" : Note!, ct);
+        Flash(outcome.Message("Published. People see the new wording from their next page. Permissions, workflows and records are unchanged."));
         return RedirectToPage("Index", new { organisationId = org, locale = Locale });
     }, () => LoadAsync(ct, fromPost: true));
 

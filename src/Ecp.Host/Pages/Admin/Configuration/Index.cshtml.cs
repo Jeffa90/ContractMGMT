@@ -1,5 +1,6 @@
 using Ecp.Approvals;
 using Ecp.Configuration;
+using Ecp.Host.Pages.Admin.Reviews;
 using Ecp.Lifecycle.Definitions;
 using Ecp.Notifications.Policy;
 using Ecp.Tenancy;
@@ -31,6 +32,7 @@ public sealed class IndexModel(IConfigurationService configuration, IOrganisatio
     public IReadOnlyList<OrganisationSummary> Organisations { get; private set; } = [];
     public DraftDto? Draft { get; private set; }
     public ReleaseDto? Latest { get; private set; }
+    public GovernanceInfo? Governance { get; private set; }
     public IReadOnlyList<ReleaseDto> Releases { get; private set; } = [];
     public string? ReleasesDenied { get; private set; }
 
@@ -43,6 +45,7 @@ public sealed class IndexModel(IConfigurationService configuration, IOrganisatio
         if (OrganisationId is not { } org) return;
         Latest = await configuration.LatestReleaseAsync(Kind, org, ct);
         Draft = await configuration.FindOpenDraftAsync(Kind, org, ct);
+        Governance = await configuration.TryGovernanceAsync(Draft?.Id, ct);
         try { Releases = await configuration.ReleasesAsync(Kind, org, ct); }
         catch (Ecp.SharedKernel.ForbiddenException) { ReleasesDenied = "You cannot read the version history."; }
     }
@@ -58,8 +61,19 @@ public sealed class IndexModel(IConfigurationService configuration, IOrganisatio
 
     public Task<IActionResult> OnPostSaveAsync(Guid draftId, CancellationToken ct) => Act(async () => await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct), "The draft is saved. Validate it before publishing.");
     public Task<IActionResult> OnPostValidateAsync(Guid draftId, CancellationToken ct) => Act(async () => { await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct); var d = await configuration.ValidateAsync(draftId, ct); }, "Validated. See the result below.");
-    public Task<IActionResult> OnPostPublishAsync(Guid draftId, CancellationToken ct) => Act(async () => { await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct); await configuration.ValidateAsync(draftId, ct); await configuration.PublishAsync(draftId, Note ?? "", ct); },
-        "Published. Agreements created from now on use it; agreements already pinned keep the release they started under.");
+    public Task<IActionResult> OnPostPublishAsync(Guid draftId, CancellationToken ct) => StepUpRunAsync(async () =>
+    {
+        await configuration.SaveDraftAsync(draftId, Definition ?? "{}", ct);
+        await configuration.ValidateAsync(draftId, ct);
+        var outcome = await configuration.SubmitOrPublishAsync(draftId, Note ?? "", ct);
+        Flash(outcome.Message("Published. Agreements created from now on use it; agreements already pinned keep the release they started under."));
+        return RedirectToPage(new { kind = Kind, organisationId = OrganisationId });
+    }, () => LoadAsync(CancellationToken.None));
     public Task<IActionResult> OnPostDiscardAsync(Guid draftId, CancellationToken ct) => Act(() => configuration.DiscardDraftAsync(draftId, ct), "The draft is discarded.");
-    public Task<IActionResult> OnPostRollbackAsync(CancellationToken ct) => Act(async () => await configuration.RollbackAsync(Kind, OrganisationId!.Value, ToRelease ?? 0, Note ?? "", ct), "The earlier release is published again as a new release. History is kept.");
+    public Task<IActionResult> OnPostRollbackAsync(CancellationToken ct) => StepUpRunAsync(async () =>
+    {
+        var outcome = await configuration.RequestRollbackAsync(Kind, OrganisationId!.Value, ToRelease ?? 0, Note ?? "", ct);
+        Flash(outcome.Release is not null ? "The earlier release is published again as a new release. History is kept." : "Submitted for review. A second person has to review and publish the rollback; nothing changes until they do.");
+        return RedirectToPage(new { kind = Kind, organisationId = OrganisationId });
+    }, () => LoadAsync(CancellationToken.None));
 }

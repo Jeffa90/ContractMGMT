@@ -1,3 +1,4 @@
+using Ecp.Host.Pages.Admin.Reviews;
 using Ecp.Identity;
 using Ecp.Configuration;
 using Ecp.Contracts.Register;
@@ -26,6 +27,6 @@ public sealed class ViewsModel(IOrganisationStructureService organisations, IAcc
     public Task<IActionResult> OnPostStartAsync(CancellationToken ct) => Act(org => studio.StartDraftAsync(org, ct), "A draft is open. Add or change views, then validate and publish.", Reload);
     public Task<IActionResult> OnPostRemoveAsync(string key, CancellationToken ct) => Act(org => studio.RemoveViewAsync(org, key, ct), "The view is removed from the draft.", Reload);
     public Task<IActionResult> OnPostValidateAsync(CancellationToken ct) => Act(async org => { await studio.ValidateAsync(org, ct); }, "Validated. The results are below.", Reload);
-    public Task<IActionResult> OnPostPublishAsync(CancellationToken ct) => Act(async org => { await studio.PublishAsync(org, Note ?? "", ct); }, "Published. The views are available to everyone in the organisation.", Reload);
+    public Task<IActionResult> OnPostPublishAsync(CancellationToken ct) => ActSensitive(async org => (await studio.SubmitOrPublishAsync(org, Note ?? "", ct)).Message("Published. The views are available to everyone in the organisation."), Reload);
     public Task<IActionResult> OnPostDiscardAsync(CancellationToken ct) => Act(org => studio.DiscardDraftAsync(org, ct), "The draft is discarded.", Reload);
 }

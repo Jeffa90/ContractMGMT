@@ -323,6 +323,9 @@ internal static class TerminologyScenarios
         var draft = await w.W.AsAsync(editor, s => s.Get<IConfigurationService>().GetOrCreateDraftAsync(Kind, org.Org, Overrides(("site", "Plant", "Plants"))));
         await w.W.AsAsync(editor, s => s.Get<IConfigurationService>().SaveDraftAsync(draft.Id, Overrides(("site", "Plant", "Plants"))));
         await w.W.AsAsync(editor, s => s.Get<IConfigurationService>().ValidateAsync(draft.Id));
+        var notSubmitted = await Assert.ThrowsAsync<DomainException>(() => w.W.AsAsync(editor, s => s.Get<IConfigurationService>().PublishAsync(draft.Id, "my own change")));
+        Assert.Equal("not_submitted", notSubmitted.Code);                     // a change is put forward for review first
+        await w.W.AsAsync(editor, s => s.Get<IConfigurationService>().SubmitForReviewAsync(draft.Id, "Please review"));
         var refused = await Assert.ThrowsAsync<DomainException>(() => w.W.AsAsync(editor, s => s.Get<IConfigurationService>().PublishAsync(draft.Id, "my own change")));
         Assert.Equal("second_person_required", refused.Code);
         Assert.Equal("Site", (await TermsAsync(w, editor, org.Org)).Singular("site"));

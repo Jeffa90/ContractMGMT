@@ -36,7 +36,7 @@ public static class PlatformComposition
         services.AddAuditModule();
         services.AddTenancyModule();
         services.AddIdentityModule(o => { o.Mode = resolved.Host.Mode; o.RequireEmergencyConfirmation = production; });
-        services.AddConfigurationModule(o => { o.RequireSecondPersonPublish = production; o.DefaultPackId = configuration["Ecp:DefaultPackId"]; }, packs: o =>
+        services.AddConfigurationModule(o => { o.RequireSecondPersonPublish = production; o.RequireRecentSignInForRollback = true; o.DefaultPackId = configuration["Ecp:DefaultPackId"]; }, packs: o =>
         {
             configuration.GetSection("Ecp:Packs").Bind(o);
             o.Mode = resolved.Host.Mode;                                                       // the host decides the mode; configuration cannot override it

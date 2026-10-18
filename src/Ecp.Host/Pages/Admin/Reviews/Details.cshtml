@@ -1,0 +1,112 @@
+@page "/Admin/Reviews/Details"
+@model Ecp.Host.Pages.Admin.Reviews.DetailsModel
+@using Ecp.Configuration.Domain
+@{
+    ViewData["Title"] = L["Review a change"].Value;
+    var r = Model.Review;
+}
+<h1>@L["Review a change"]</h1>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (r is not null)
+{
+    var d = r.Draft; var g = r.Governance;
+    <section class="card" aria-labelledby="sum-h">
+        <h2 id="sum-h">@Ecp.Host.Pages.Admin.Reviews.ConfigurationKindLabels.Of(d.Kind) <span class="hint">· @Model.OrganisationOf(d.OrganisationId)</span></h2>
+        <dl class="facts">
+            <dt>@L["Status"]</dt><dd><span class="badge">@(d.ReviewState switch { ReviewState.Submitted => L["Waiting for review"].Value, ReviewState.Rejected => L["Rejected"].Value, ReviewState.ReturnedForRework => L["Sent back for changes"].Value, _ => L["Not submitted"].Value })</span></dd>
+            <dt>@L["Created by"]</dt><dd>@Model.NameOf(d.CreatedBy)</dd>
+            <dt>@L["Last edited by"]</dt><dd>@Model.NameOf(d.LastEditedBy)</dd>
+            <dt>@L["Put forward by"]</dt><dd>@(d.SubmittedBy is null ? "-" : Model.NameOf(d.SubmittedBy)) @(d.SubmittedUtc is { } s ? "· " + Fmt.DateTime(s) : "")</dd>
+            @if (d.SubmissionNote is { Length: > 0 } sn) { <dt>@L["Their note"]</dt><dd>@sn</dd> }
+            @if (d.RollbackOfNumber is { } rb) { <dt>@L["Puts back"]</dt><dd>@L["Release {0}. It is published as a new release; no earlier release is changed.", rb]</dd> }
+            <dt>@L["Replaces"]</dt><dd>@(r.Current is null ? L["Nothing has been published yet."].Value : L["Release {0}, published {1}", r.Current.Number, Fmt.DateTime(r.Current.PublishedUtc)].Value)</dd>
+            <dt>@L["Needs permission"]</dt><dd><code>@r.PublishPermission</code></dd>
+        </dl>
+        @if (r.BaseIsStale && r.Current is not null)
+        {
+            <p class="error-summary" role="status">@L["A newer release was published after this change was started. Read the list below carefully: it shows what this change would do to what is in force now."]</p>
+        }
+        @if (d.DecisionComment is { Length: > 0 } dc)
+        {
+            <p role="status"><strong>@(d.ReviewState == ReviewState.Rejected ? L["Rejected by {0}", Model.NameOf(d.DecidedBy)] : L["Sent back by {0}", Model.NameOf(d.DecidedBy)]):</strong> @dc</p>
+        }
+    </section>
+
+    <section class="card" aria-labelledby="chk-h">
+        <h2 id="chk-h">@L["Checks"]</h2>
+        @if (d.Validation is { } v)
+        {
+            <div class="@(v.IsValid ? "flash" : "error-summary")" role="status">
+                <strong>@(v.IsValid ? L["Valid: it passed every check."] : L["Not valid: it cannot be published until these are fixed."])</strong>
+                @if (v.Messages.Count > 0) { <ul>@foreach (var m in v.Messages) { <li>[@(m.Severity == Ecp.Configuration.ValidationSeverity.Error ? L["Problem"] : L["Note"])] @m.Message</li> } </ul> }
+            </div>
+        }
+        else { <p class="hint">@L["Not checked yet."]</p> }
+    </section>
+
+    <section class="card" aria-labelledby="chg-h">
+        <h2 id="chg-h">@L["What would change"]</h2>
+        @if (r.Changes.Count == 0) { <p class="hint">@L["Nothing differs from what is in force."]</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Differences between what is in force and this change"]</caption>
+                <thead><tr><th scope="col">@L["Where"]</th><th scope="col">@L["Change"]</th><th scope="col">@L["Now"]</th><th scope="col">@L["Would become"]</th></tr></thead>
+                <tbody>@foreach (var c in r.Changes) { <tr><th scope="row">@c.Where</th><td>@(c.Change switch { "Added" => L["Added"].Value, "Removed" => L["Removed"].Value, "Reordered" => L["Reordered"].Value, _ => L["Changed"].Value })</td><td>@c.Before</td><td>@c.After</td></tr> }</tbody>
+            </table></div>
+            @if (r.ChangesTruncated) { <p class="hint">@L["Only the first changes are listed."]</p> }
+        }
+    </section>
+
+    <section class="card" aria-labelledby="act-h">
+        <h2 id="act-h">@L["Your decision"]</h2>
+        @if (g.Explanation is { Length: > 0 } why && !g.CanPublish) { <p class="hint">@why</p> }
+        @if (g.CanDecide || g.CanPublish || g.CanWithdraw)
+        {
+            <form method="post">
+                <input type="hidden" name="Id" value="@d.Id" />
+                @if (g.CanPublish)
+                {
+                    <div class="field"><label for="Note">@L["Note for the release history (optional)"]</label><input id="Note" name="Note" type="text" maxlength="500" /></div>
+                }
+                @if (g.CanDecide || g.CanWithdraw)
+                {
+                    <div class="field"><label for="Comment">@L["Comment"]</label><textarea id="Comment" name="Comment" rows="3" maxlength="2000" aria-describedby="comment-hint"></textarea>
+                        <p class="hint" id="comment-hint">@L["Required to reject or send back. Kept with the change for good."]</p></div>
+                }
+                <div class="actions">
+                    @if (g.CanPublish) { <button type="submit" asp-page-handler="Publish">@L["Approve and publish"]</button> }
+                    @if (g.CanDecide) { <button type="submit" class="secondary" asp-page-handler="Return">@L["Send back for changes"]</button> <button type="submit" class="danger" asp-page-handler="Reject">@L["Reject"]</button> }
+                    @if (g.CanWithdraw) { <button type="submit" class="secondary" asp-page-handler="Withdraw">@L["Withdraw my submission"]</button> }
+                </div>
+            </form>
+            <p class="hint">@L["Publishing needs a recent sign-in. It publishes exactly the content that was put forward; if it was changed since, it has to be put forward again."]</p>
+        }
+        else if (g.Explanation is null) { <p class="hint">@L["There is nothing for you to decide on this change."]</p> }
+        @{ var edit = Ecp.Host.Pages.Admin.Reviews.ConfigurationKindLabels.EditPath(d.Kind, d.OrganisationId); }
+        @if (edit is not null && (d.ReviewState is ReviewState.Rejected or ReviewState.ReturnedForRework or ReviewState.None)) { <p><a href="@edit">@L["Open the editor to change it"]</a></p> }
+    </section>
+
+    <section class="card" aria-labelledby="his-h">
+        <h2 id="his-h">@L["History"]</h2>
+        @if (r.History.Count == 0) { <p class="hint">@L["Nothing has happened to this change yet."]</p> }
+        else
+        {
+            <ol class="timeline">@foreach (var e in r.History) { <li><strong>@(e.EventType switch { "Submitted" => L["Put forward"].Value, "Withdrawn" => L["Withdrawn"].Value, "Rejected" => L["Rejected"].Value, "ReturnedForRework" => L["Sent back for changes"].Value, "Invalidated" => L["Changed after it was put forward"].Value, "Published" => L["Published"].Value, _ => e.EventType })</strong>
+                @L["by"] @Model.NameOf(e.Actor), @Fmt.DateTime(e.OccurredUtc)@if (e.ReleaseNumber is { } n) { <text> · @L["release"] @n</text> }@if (e.Comment is { Length: > 0 } c) { <div class="hint">@c</div> }</li> }</ol>
+        }
+    </section>
+
+    @if (r.CanSeeTechnicalDetail)
+    {
+        <details class="card"><summary>@L["Technical detail"]</summary>
+            <dl class="facts">
+                <dt>@L["Content checksum now"]</dt><dd><code>@d.ContentHash</code></dd>
+                <dt>@L["Checksum when put forward"]</dt><dd><code>@(d.SubmittedHash ?? "-")</code></dd>
+                <dt>@L["Based on release"]</dt><dd>@(d.BasedOnReleaseNumber?.ToString() ?? "-")</dd>
+            </dl>
+            <p class="hint">@L["The content is not shown as a raw document here. People who maintain solution packs can read it from the release history."]</p>
+        </details>
+    }
+}
+<p><a href="/Admin/Reviews">@L["Back to the review list"]</a></p>

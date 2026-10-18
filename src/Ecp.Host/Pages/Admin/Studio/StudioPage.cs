@@ -22,6 +22,14 @@ public abstract class StudioPage(IOrganisationStructureService organisations, IA
         return OrganisationId;
     }
 
+    /// <summary>Publishing and rolling back: needs a recent sign-in, and the message depends on whether it took effect or went to a reviewer.</summary>
+    protected Task<IActionResult> ActSensitive(Func<Guid, Task<string>> action, Func<Task> reload, object? route = null, string? page = null) => StepUpRunAsync(async () =>
+    {
+        var org = await ResolveOrganisationAsync(CancellationToken.None) ?? throw new ResourceNotFoundException();
+        Flash(await action(org));
+        return page is null ? RedirectToPage(route ?? new { organisationId = org }) : RedirectToPage(page, route ?? new { organisationId = org });
+    }, reload);
+
     protected Task<IActionResult> Act(Func<Guid, Task> action, string flash, Func<Task> reload, object? route = null, string? page = null) => RunAsync(async () =>
     {
         var org = await ResolveOrganisationAsync(CancellationToken.None) ?? throw new ResourceNotFoundException();

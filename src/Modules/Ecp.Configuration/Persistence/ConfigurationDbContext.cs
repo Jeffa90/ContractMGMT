@@ -9,6 +9,9 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
 {
     public DbSet<ConfigurationDraft> Drafts => Set<ConfigurationDraft>();
     public DbSet<ConfigurationRelease> Releases => Set<ConfigurationRelease>();
+    public DbSet<DraftReview> Reviews => Set<DraftReview>();
+    public DbSet<ReleaseEvidence> Evidence => Set<ReleaseEvidence>();
+    public DbSet<ConfigurationReviewEvent> ReviewEvents => Set<ConfigurationReviewEvent>();
     public DbSet<InstalledPack> InstalledPacks => Set<InstalledPack>();
     public DbSet<PackAssignment> PackAssignments => Set<PackAssignment>();
     public DbSet<TrustedPublisherKey> TrustedKeys => Set<TrustedPublisherKey>();
@@ -44,6 +47,49 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             e.Property(x => x.PublishedBy).HasMaxLength(200).IsRequired();
             // Release numbers are unique per tenant, scope and kind: concurrent publishers cannot both take the same number.
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.Kind, x.Number }).IsUnique();
+        });
+
+        // The review and the evidence live in tables of their own: the draft and release tables are exactly what they were, so nothing that reads them (backup, inventory, the upgrade checks) changes with this.
+        mb.Entity<DraftReview>(e =>
+        {
+            e.ToTable("DraftReview");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.CreatedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.State).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.SubmittedBy).HasMaxLength(200);
+            e.Property(x => x.SubmittedHash).HasMaxLength(64).IsFixedLength();
+            e.Property(x => x.SubmissionNote).HasMaxLength(1000);
+            e.Property(x => x.DecidedBy).HasMaxLength(200);
+            e.Property(x => x.DecisionComment).HasMaxLength(2000);
+            e.Property(x => x.RollbackReason).HasMaxLength(1000);
+            e.Property(x => x.RowVersion);
+            e.HasIndex(x => new { x.TenantId, x.State });
+        });
+
+        mb.Entity<ReleaseEvidence>(e =>
+        {
+            e.ToTable("ReleaseEvidence");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.CreatedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.LastEditedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.SubmittedBy).HasMaxLength(200);
+            e.Property(x => x.SubmittedHash).HasMaxLength(64).IsFixedLength();
+            e.Property(x => x.GovernanceMode).HasMaxLength(20).IsRequired();
+        });
+
+        mb.Entity<ConfigurationReviewEvent>(e =>
+        {
+            e.ToTable("ConfigurationReviewEvent");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Kind).HasMaxLength(100).IsRequired();
+            e.Property(x => x.EventType).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Actor).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ContentHash).HasMaxLength(64).IsFixedLength();
+            e.Property(x => x.Comment).HasMaxLength(2000);
+            e.HasIndex(x => new { x.TenantId, x.DraftId, x.OccurredUtc });
         });
 
         mb.Entity<InstalledPack>(e =>

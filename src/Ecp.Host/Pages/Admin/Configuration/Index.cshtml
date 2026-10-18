@@ -35,7 +35,8 @@ else { <p class="hint">@L["Nothing has been published yet. The reference definit
             <div class="actions">
                 <button type="submit" asp-page-handler="Save" class="secondary">@L["Save"]</button>
                 <button type="submit" asp-page-handler="Validate" class="secondary">@L["Save and validate"]</button>
-                <button type="submit" asp-page-handler="Publish">@L["Publish"]</button>
+                @{ var pb = new Ecp.Host.Pages.PublishButtonsModel(draft.Id, Model.Governance, "Publish", L["Publish"].Value); }
+                <partial name="_PublishButtons" model="pb" />
                 <button type="submit" asp-page-handler="Discard" class="secondary">@L["Discard the draft"]</button>
             </div>
         </form>

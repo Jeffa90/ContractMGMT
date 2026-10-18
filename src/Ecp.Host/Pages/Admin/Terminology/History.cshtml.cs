@@ -30,8 +30,8 @@ public sealed class HistoryModel(ITerminologyAdministration terminology, IConfig
     {
         var org = await ResolveOrganisationAsync(ct);
         if (string.IsNullOrWhiteSpace(Reason)) throw new DomainException("reason_required", "Give a reason for restoring the earlier release.");
-        await configuration.RollbackAsync(TerminologyKinds.Name, org, ToRelease, Reason!, ct);
-        Flash("The earlier release is published again as a new release. History is kept, and no permission or workflow changed.");
+        var outcome = await configuration.RequestRollbackAsync(TerminologyKinds.Name, org, ToRelease, Reason!, ct);
+        Flash(outcome.Release is not null ? "The earlier release is published again as a new release. History is kept, and no permission or workflow changed." : "Submitted for review. A second person has to review and publish the rollback; nothing changes until they do.");
         return RedirectToPage(new { organisationId = org });
     }, () => LoadAsync(ct));
 }

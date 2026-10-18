@@ -8,7 +8,7 @@
     "1.0.0"
   ],
   "sourceLedgerSha256": "dc6242cab14aa459f345e553cdd3a7d90e249fba69552e6ef552750c3c5aa64f",
-  "targetLedgerSha256": "5d224013832847c039542c8c7895b31983d8b817e11a1083cd1b6d2d9a4081a9",
+  "targetLedgerSha256": "b5a75b475c328e4111dddb77a00100207a7e9f60923def46aa79b26885724e51",
   "moduleOrder": [
     "Audit",
     "Tenancy",
@@ -179,7 +179,7 @@
       "module": "Configuration",
       "tier": 5,
       "schema": "configuration",
-      "schemaVersion": "20261017024249_AddSolutionPacks",
+      "schemaVersion": "20261018094305_AddConfigurationReview",
       "migrations": [
         {
           "id": "20261016010627_Initial",
@@ -222,6 +222,26 @@
             "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
           ],
           "operations": 12
+        },
+        {
+          "id": "20261018094305_AddConfigurationReview",
+          "checksum": "5ca523a214eb783854acb15d271ec08c36f7ea496e5436d3e363c182281565f0",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index configuration.ConfigurationReviewEvent.IX_ConfigurationReviewEvent_TenantId_DraftId_OccurredUtc",
+            "create index configuration.DraftReview.IX_DraftReview_TenantId_State",
+            "create table configuration.ConfigurationReviewEvent",
+            "create table configuration.DraftReview",
+            "create table configuration.ReleaseEvidence",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ConfigurationReviewEvent] ADD \u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_DraftReview] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ReleaseEvidence] ADD FILTER PR\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
+          ],
+          "operations": 9
         }
       ]
     },
@@ -863,6 +883,28 @@
   ],
   "newMigrations": [
     {
+      "module": "Configuration",
+      "id": "20261018094305_AddConfigurationReview",
+      "checksum": "5ca523a214eb783854acb15d271ec08c36f7ea496e5436d3e363c182281565f0",
+      "categories": [
+        "IndexOrConstraint",
+        "RowLevelSecurity"
+      ],
+      "objects": [
+        "create index configuration.ConfigurationReviewEvent.IX_ConfigurationReviewEvent_TenantId_DraftId_OccurredUtc",
+        "create index configuration.DraftReview.IX_DraftReview_TenantId_State",
+        "create table configuration.ConfigurationReviewEvent",
+        "create table configuration.DraftReview",
+        "create table configuration.ReleaseEvidence",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ConfigurationReviewEvent] ADD \u2026",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_DraftReview] ADD FILTER PREDIC\u2026",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ReleaseEvidence] ADD FILTER PR\u2026",
+        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
+      ],
+      "reviewRequired": false,
+      "reviewed": true
+    },
+    {
       "module": "Operations",
       "id": "20261018003226_AddMigrationRecords",
       "checksum": "20276a7b97c1094f06867474fac4bfdb86c9890c33554575da6203a1f913f651",
@@ -961,5 +1003,5 @@
     ],
     "dataLossStatement": "Rolling back discards everything created after the pre-upgrade backup, including anything done after the upgrade finished. It cannot be recovered from the backup."
   },
-  "manifestSha256": "66a28cfb8879cf68c82cf20fb9b734c15d0764f0da774afc8b75a9634781f23f"
+  "manifestSha256": "d0eaa7e0485c8330053f940d7e87bc70c1906eea6ecb42015fd2f2490dbbb38b"
 }

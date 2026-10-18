@@ -65,6 +65,10 @@ public interface IOnboardingService
     Task<IReadOnlyList<PlanLine>> PlanAsync(Guid organisationId, CancellationToken ct = default);
     Task<ReleaseDto> PublishAsync(Guid organisationId, string note, CancellationToken ct = default);
     Task<ReleaseDto> RollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default);
+    /// <summary>Publishes where this person may, otherwise submits the draft for a second person to review and publish.</summary>
+    Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default);
+    Task<RollbackOutcome> RequestRollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default);
+    Task<GovernanceInfo?> GovernanceAsync(Guid organisationId, CancellationToken ct = default);
     Task<IReadOnlyList<OnboardingRelease>> ReleasesAsync(Guid organisationId, CancellationToken ct = default);
     Task DiscardDraftAsync(Guid organisationId, CancellationToken ct = default);
     string Export(OnboardingDocument document, string step);
@@ -174,6 +178,26 @@ internal sealed class OnboardingService(IConfigurationService configuration, IAc
     {
         var state = await GetAsync(organisationId, ct);
         return await configuration.PublishAsync(state.DraftId, note, ct);
+    }
+
+    public async Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default)
+    {
+        var state = await GetAsync(organisationId, ct);
+        return await configuration.SubmitOrPublishAsync(state.DraftId, note, ct);
+    }
+
+    public async Task<RollbackOutcome> RequestRollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default)
+    {
+        await RequireAsync(organisationId, ct);
+        return await configuration.RequestRollbackAsync(Kind, organisationId, toRelease, reason, ct);
+    }
+
+    public async Task<GovernanceInfo?> GovernanceAsync(Guid organisationId, CancellationToken ct = default)
+    {
+        var state = await GetAsync(organisationId, ct);
+        try { return await configuration.GovernanceAsync(state.DraftId, ct); }
+        catch (ResourceNotFoundException) { return null; }
+        catch (ForbiddenException) { return null; }
     }
 
     public async Task<ReleaseDto> RollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default)

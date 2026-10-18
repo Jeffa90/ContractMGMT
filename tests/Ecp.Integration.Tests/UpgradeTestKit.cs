@@ -23,10 +23,14 @@ internal sealed class N1Installation : IAsyncDisposable
     public static async Task<N1Installation> CreateAsync(Action<IServiceCollection>? more = null)
     {
         var layout = new RecoveryTestKit.Layout();
-        var app = await TestApp.CreateSqlServerAsync(migrate: false, configure: RecoveryTestKit.Configure(layout, services => { LifecycleScenarios.Scanner(services); more?.Invoke(services); }));
+        // This build's services write the tables they know, so the businesses are populated at this build's schema and the schema is then returned to the frozen baseline by reverting the migrations this build
+        // added (a test-only use of the migration runner; the product has no downgrade). What the installation holds at the end is the frozen N-1 schema with the data the services wrote; the columns and tables
+        // added since carry nothing, exactly as they would not on a genuine N-1 installation.
+        var app = await TestApp.CreateSqlServerAsync(migrate: true, configure: RecoveryTestKit.Configure(layout, services => { LifecycleScenarios.Scanner(services); more?.Invoke(services); }));
+        var data = await SyntheticInstallation.BuildAsync(app);
         var baseline = UpgradeCatalogue.Embedded().Baseline(SourceVersion) ?? throw new InvalidOperationException("The frozen baseline for " + SourceVersion + " is missing.");
         await app.Services.GetRequiredService<MigrationRunner>().RunToAsync(baseline.Modules.ToDictionary(m => m.Module, m => (string?)m.SchemaVersion));
-        return new N1Installation { App = app, Layout = layout, Data = await SyntheticInstallation.BuildAsync(app) };
+        return new N1Installation { App = app, Layout = layout, Data = data };
     }
 
     public static string NewTargetName() => "ecp_upg_" + Guid.NewGuid().ToString("N")[..12];

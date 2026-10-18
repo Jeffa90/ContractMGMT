@@ -1,4 +1,5 @@
 using Ecp.Configuration;
+using Ecp.Host.Pages.Admin.Reviews;
 using Ecp.Identity;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
@@ -27,6 +28,7 @@ public sealed class EditModel(ICapabilityAdministration capabilities, IConfigura
     public CapabilityEditModel? Form { get; private set; }
     public IReadOnlyList<ValidationMessage> Problems { get; private set; } = [];
     public bool CanPublish { get; private set; }
+    public GovernanceInfo? Governance { get; private set; }
 
     public Task<IActionResult> OnGetAsync(CancellationToken ct) => RunAsync(async () => { await LoadAsync(ct, fromPost: false); return Page(); });
 
@@ -37,6 +39,7 @@ public sealed class EditModel(ICapabilityAdministration capabilities, IConfigura
         if (!fromPost || Rows.Count == 0)
             Rows = Form.Rows.Select(r => new RowInput { Key = r.Key, Choice = r.Choice is null ? "inherit" : r.Choice.Value ? "on" : "off", Note = r.Note }).ToList();
         CanPublish = await HoldsAsync("capabilities.publish");
+        Governance = await configuration.TryGovernanceAsync(Form.Draft?.Id, ct);
         if (Form.Draft?.Validation is { } report) Problems = report.Messages;
     }
 
@@ -90,8 +93,8 @@ public sealed class EditModel(ICapabilityAdministration capabilities, IConfigura
             ShowProblems(report.Messages);
             return Page();
         }
-        await configuration.PublishAsync(draft.Id, string.IsNullOrWhiteSpace(Note) ? "Capabilities published" : Note!, ct);
-        Flash("Published. The pages, lists and lifecycle follow the new choices from the next request. Permissions and records are unchanged.");
+        var outcome = await configuration.SubmitOrPublishAsync(draft.Id, string.IsNullOrWhiteSpace(Note) ? "Capabilities published" : Note!, ct);
+        Flash(outcome.Message("Published. The pages, lists and lifecycle follow the new choices from the next request. Permissions and records are unchanged."));
         return RedirectToPage("Index", new { organisationId = org });
     }, () => LoadAsync(ct, fromPost: true));
 

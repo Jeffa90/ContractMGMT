@@ -1,3 +1,4 @@
+using Ecp.Host.Pages.Admin.Reviews;
 using Ecp.Configuration;
 using Ecp.Identity;
 using Ecp.Metadata;
@@ -29,6 +30,6 @@ public sealed class FieldsModel(IOrganisationStructureService organisations, IAc
     public Task<IActionResult> OnPostReinstateAsync(string key, CancellationToken ct) => Act(org => studio.SetRetiredAsync(org, key, false, ct), "The field is reinstated in the draft.", Reload);
     public Task<IActionResult> OnPostRemoveAsync(string key, CancellationToken ct) => Act(org => studio.RemoveDraftFieldAsync(org, key, ct), "The field is removed from the draft.", Reload);
     public Task<IActionResult> OnPostValidateAsync(CancellationToken ct) => Act(async org => { await studio.ValidateAsync(org, ct); }, "Validated. The results are below.", Reload);
-    public Task<IActionResult> OnPostPublishAsync(CancellationToken ct) => Act(async org => { await studio.PublishAsync(org, Note ?? "", ct); }, "Published. The new definitions apply to forms, search and exports from now on; every stored value is kept.", Reload);
+    public Task<IActionResult> OnPostPublishAsync(CancellationToken ct) => ActSensitive(async org => (await studio.SubmitOrPublishAsync(org, Note ?? "", ct)).Message("Published. The new definitions apply to forms, search and exports from now on; every stored value is kept."), Reload);
     public Task<IActionResult> OnPostDiscardAsync(CancellationToken ct) => Act(org => studio.DiscardDraftAsync(org, ct), "The draft is discarded.", Reload);
 }

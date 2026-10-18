@@ -31,6 +31,9 @@ public interface ICustomFieldStudio
     Task SaveListAsync(Guid organisationId, LookupList list, CancellationToken ct = default);
     Task<ValidationReport> ValidateAsync(Guid organisationId, CancellationToken ct = default);
     Task<ReleaseDto> PublishAsync(Guid organisationId, string note, CancellationToken ct = default);
+    /// <summary>What Publish does for this person: publishes where that is allowed, otherwise submits the draft for a second person to review and publish.</summary>
+    Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default);
+    Task<RollbackOutcome> RequestRollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default);
     Task RollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default);
     Task DiscardDraftAsync(Guid organisationId, CancellationToken ct = default);
 }
@@ -163,6 +166,15 @@ internal sealed class CustomFieldStudio(IConfigurationService configuration, ISe
         await configuration.ValidateAsync(draft.Id, ct);
         return await configuration.PublishAsync(draft.Id, note, ct);
     }
+
+    public async Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default)
+    {
+        var (draft, _) = await OpenAsync(organisationId, ct);
+        await configuration.ValidateAsync(draft.Id, ct);
+        return await configuration.SubmitOrPublishAsync(draft.Id, note, ct);
+    }
+
+    public Task<RollbackOutcome> RequestRollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default) => configuration.RequestRollbackAsync(Kind, organisationId, toRelease, reason, ct);
 
     public Task RollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default) => configuration.RollbackAsync(Kind, organisationId, toRelease, reason, ct);
 

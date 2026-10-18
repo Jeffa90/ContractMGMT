@@ -70,7 +70,8 @@
     <form method="post" asp-page-handler="Publish">
         <input type="hidden" name="Org" value="@Model.OrganisationId" />
         <div class="field"><label for="note">@L["Note for the release history"]</label><input id="note" name="Note" type="text" maxlength="500" /></div>
-        <button type="submit" disabled="@(!s.IsPublishable)">@L["Publish"]</button>
+        @if (s.IsPublishable) { var pb = new Ecp.Host.Pages.PublishButtonsModel(s.DraftId, Model.Governance, "Publish", L["Publish"].Value); <partial name="_PublishButtons" model="pb" /> }
+        else { <button type="submit" disabled>@L["Publish"]</button> }
         @if (!s.IsPublishable) { <p class="hint">@L["Publishing needs a draft that validated without errors and has not been changed since."]</p> }
     </form>
     <form method="post" asp-page-handler="Discard"><input type="hidden" name="Org" value="@Model.OrganisationId" /><button type="submit" class="secondary">@L["Discard this draft"]</button></form>

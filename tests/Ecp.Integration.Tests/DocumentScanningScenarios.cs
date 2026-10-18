@@ -65,7 +65,8 @@ internal static class DocumentScanningScenarios
         Assert.Null(await w.AsAsync("admin", s => s.Get<IDocumentQuery>().OpenAsync(held.DocumentId)));
 
         // The scheduled retry tries again, up to the limit, then stops and leaves it to an administrator.
-        for (var i = 0; i < 4; i++) await w.AsAsync("admin", s => s.Get<IDocumentScanJob>().RunAsync());
+        // The test clock stands still, so each step moves it on: attempts are then ordered by the time they were made.
+        for (var i = 0; i < 4; i++) { app.Clock.Advance(TimeSpan.FromMinutes(1)); await w.AsAsync("admin", s => s.Get<IDocumentScanJob>().RunAsync()); }
         var item = await w.AsAsync("admin", async s => (await s.Get<IDocumentScanning>().HeldAsync()).Single(h => h.VersionId == version));
         Assert.Equal(3, item.Attempts);                                                        // the upload and two retries: the limit is 3 failures
         Assert.True(item.GivenUp);
@@ -75,6 +76,7 @@ internal static class DocumentScanningScenarios
 
         // The scanner recovers: an administrator scans it again and it is released; the job and the page agree.
         scanner.Mode = SwitchableScanner.Behaviour.Clean;
+        app.Clock.Advance(TimeSpan.FromMinutes(1));
         Assert.Equal(ScanStatus.Clean, await w.AsAsync("admin", s => s.Get<IDocumentScanning>().RescanOneAsync(version)));
         Assert.True((await DocumentAsync(w, contract, "Held agreement"))!.Downloadable);
         var overview = await w.AsAsync("admin", s => s.Get<IDocumentScanning>().OverviewAsync());

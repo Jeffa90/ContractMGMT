@@ -221,3 +221,7 @@ Tests that need a shared backup directory report **NOT VERIFIED** (skipped with 
 * Per-tenant restore, differential and log backups, point-in-time recovery, Azure SQL, SharePoint and Blob providers, scheduled backups, retention enforcement and off-site copy are Future. Scheduling and retention are the operator's (a cron job calling the `backup` command is the supported pattern).
 * An encrypted backup needs its certificate on the server that restores it.
 * The restored database's application login may be orphaned on a different server; remap it (`docs/OPERATIONS_RUNBOOK.md`).
+
+## 17. Seeing it on the dashboard (OPS-03)
+
+The newest verified backup and its age, the last backup failure, the last restore and the last validation appear on the operations dashboard (`docs/OPERATIONS_DASHBOARD.md`, panel *Backup and restore*, codes `REC-001` to `REC-004`) with their correlation ids. No restore recorded is shown as **Not Verified**, not as passed.

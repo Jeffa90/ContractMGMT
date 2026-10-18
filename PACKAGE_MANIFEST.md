@@ -322,3 +322,14 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `tests/Ecp.UnitTests/UpgradeTests.cs`, `tests/Ecp.Integration.Tests/UpgradeTestKit.cs`, `tests/Ecp.Integration.Tests/UpgradeJourneys.cs`, `tests/Ecp.Integration.Tests/UpgradeSqlServerTests.cs`, `tests/Ecp.Integration.Tests/UpgradeFoundationScenarios.cs`, `tests/Ecp.Api.Tests/UpgradeUiTests.cs`
 - `decisions/ADR-0035-upgrade-safety-preflight-and-rollback-by-restore.md`
 - `docs/UPGRADES.md`, `docs/UPGRADE_RUNBOOK.md`, `docs/ROLLBACK_BY_RESTORE.md`
+
+## Operations dashboard slice (OPS-03, 2026-10-18)
+
+- `docs/OPS03_REQUIREMENTS_MATRIX.md`
+- `docs/OPERATIONS_DASHBOARD.md`, `decisions/ADR-0036-operations-dashboard-and-observability.md`
+- `src/Ecp.SharedKernel/UpgradeProbes.cs` (operational probe types added)
+- `src/Modules/Ecp.Recovery/Dashboard/` (model, builder, fact collector, export)
+- `src/Modules/Ecp.Operations/OperationalTelemetry.cs`, `src/Modules/Ecp.Operations/KeyRing.cs`
+- `src/Modules/Ecp.Notifications/NotificationsOperationalProbe.cs`, `src/Modules/Ecp.DataMigration/MigrationOperationalProbe.cs`, `src/Modules/Ecp.Configuration/Packs/ConfigurationOperationalProbe.cs`
+- `src/Ecp.Host/DataProtectionKeyRingInspector.cs`, `src/Ecp.Host/HealthBodies.cs`, `src/Ecp.Host/Pages/Admin/Operations/Dashboard.cshtml` (and `.cshtml.cs`)
+- `tests/Ecp.UnitTests/OperationsDashboardTests.cs`, `tests/Ecp.Integration.Tests/OperationsDashboardScenarios.cs`, `tests/Ecp.Api.Tests/OperationsDashboardUiTests.cs`, `tests/Ecp.Architecture.Tests/OperationsDashboardGuardTests.cs`

@@ -277,7 +277,7 @@ internal static class OperationsFoundationScenarios
         var admin = s.Get<IOperationsAdministration>();
         var bundle = await admin.SupportBundleAsync();
         using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(bundle));
-        Assert.Equal(["README.txt", "bundle.json"], zip.Entries.Select(e => e.FullName).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(["README.txt", "bundle.json", "manifest.json", "summary.csv"], zip.Entries.Select(e => e.FullName).Order(StringComparer.Ordinal).ToArray());      // OPS-03 added the hashed manifest and the formula-safe summary
         string text;
         using (var reader = new StreamReader(zip.GetEntry("bundle.json")!.Open())) text = await reader.ReadToEndAsync();
         Assert.False(Redaction.ContainsSecret(text));

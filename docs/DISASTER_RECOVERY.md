@@ -50,6 +50,10 @@ An upgrade is rehearsed on a restored copy, applied in maintenance mode after a 
 | Maximum acceptable time to roll back by restore | |
 | Rollback evidence last produced (date, file) | |
 
+## 5b. Seeing recovery readiness at a glance (OPS-03)
+
+The operations dashboard (`docs/OPERATIONS_DASHBOARD.md`) shows, in one place, whether a verified backup exists and how old it is, whether a restore has ever been rehearsed, the last validation, the state of maintenance mode and leases, and the last failures. Each is Verified, Warning, Failed or **Not Verified**; a recovery capability that has never been exercised is Not Verified, not Verified. It does not state the organisation's RPO and RTO; those stay with the organisation (section 5a above).
+
 ## 6. Not Verified
 
 IIS and Azure recovery; Azure SQL as a source or target; SharePoint or Blob document stores; restoring onto a different SQL Server version or edition than the backup's (SQL Server restores to the same or a newer version; downgrade is not possible); restoring a backup older than the previous major platform version; scale (multi-gigabyte databases and millions of documents have not been rehearsed); point-in-time recovery.

@@ -27,3 +27,22 @@ public interface IMaintenanceGate
     /// <summary>Throws a <see cref="DomainException"/> with code <c>maintenance_mode</c> when the installation is in maintenance mode.</summary>
     Task EnsureWritableAsync(string what, CancellationToken ct = default);
 }
+
+/// <summary>How the dashboard combines the same fact reported by several tenants.</summary>
+public enum FactCombine { Sum, Earliest, Latest }
+
+/// <summary>
+/// One operational fact a module reports about its own data for the operations dashboard (docs/OPERATIONS_DASHBOARD.md): a count and, optionally, a time. Counts and timestamps only, never record content, names,
+/// addresses or error text. <see cref="Key"/> is stable and machine-readable. Facts from several tenants are combined by <see cref="Combine"/>: counts are always summed, times by the rule.
+/// </summary>
+public sealed record OperationalFact(string Area, string Key, long Value, DateTime? Utc = null, FactCombine Combine = FactCombine.Sum);
+
+/// <summary>
+/// Implemented by a module that can describe the health of its own background work or queues without exposing content. A probe is called once per tenant, inside that tenant's scope (so row-level security applies
+/// exactly as in normal use), is read-only, and returns nothing it cannot count. The installation dashboard never reads another tenant's records except through such a probe.
+/// </summary>
+public interface IOperationalProbe
+{
+    string Area { get; }
+    Task<IReadOnlyList<OperationalFact>> ProbeAsync(DateTime nowUtc, CancellationToken ct = default);
+}

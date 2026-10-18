@@ -239,4 +239,23 @@ Source: owner instruction for OPS-02; architecture in `decisions/ADR-0035-upgrad
 | D11.14 | A path the manifest does not list, or a database that is ahead of, partial against or inconsistent with this build, is **never described as safe**. |
 | D11.15 | The N-1 fixture is a **frozen-schema fixture populated by the current services**, not a historical binary; this is stated wherever the rehearsal is reported. |
 
+## D12 Operations dashboard and observability foundation (OPS-03, owner instruction 2026-10-18)
+
+Source: owner instruction for OPS-03; architecture in `decisions/ADR-0036-operations-dashboard-and-observability.md`; scope, contradictions and the criteria matrix in `docs/OPS03_REQUIREMENTS_MATRIX.md`; behaviour in `docs/OPERATIONS_DASHBOARD.md`. Production approval remains external governance.
+
+| ID | Decision |
+|---|---|
+| D12.1 | OPS-03 is implemented **as defined in `TASKS.md` and `requirements/12-operations/`**; no other operational feature is added because it seems useful. |
+| D12.2 | The dashboard **reuses existing services** (readiness, history, leases, maintenance, backups, validation, migration inventory) and puts **no operational logic in page models**. |
+| D12.3 | Every line is **Verified, Warning, Failed or Not Verified**, shown distinctly. **Not Verified is never presented or counted as Passed.** |
+| D12.4 | Installation-level operators see **counts and times only** for tenant data, read per tenant inside that tenant's scope. No cross-tenant record, content or action. |
+| D12.5 | Reading the dashboard needs `operations.read` in the installation tenant; technical detail needs `operations.validate`. The specification's `ops.manage` is read as the D10 permission set. |
+| D12.6 | Critical failures are **never hidden or downgraded**. A failed restore or upgrade is **never retried automatically**, keeps maintenance mode on, and the dashboard offers a new attempt only where one is valid. |
+| D12.7 | The **TLS certificate and secret expiry are Not Verified** (the platform cannot read them). Backup-encryption certificate expiry is Not Verified. Only pack-signing keys and the key ring are judged. |
+| D12.8 | Observability is the standard .NET Meter and structured, correlation-carrying log events with a local reader. **OpenTelemetry, syslog and SIEM sinks are not built or verified** (INT-04) and are labelled Not Verified / Future. |
+| D12.9 | A support bundle needs a recent sign-in and is audited; it carries a hashed manifest, size and entry limits and safe names; it contains no secret, token, connection string, key, contract or document content, callback payload or unapproved personal data. Completing the SEC-030/SEC-031 catalogue stays with OPS-04. |
+| D12.10 | The readiness catalogue's checks that are not built (SET-03) are shown as **Not Verified: not built**. OPS-03 does not claim them. |
+| D12.11 | Anonymous `/health/ready` returns the overall status only in Production; Demo and Test list checks (documented difference). |
+
+
 

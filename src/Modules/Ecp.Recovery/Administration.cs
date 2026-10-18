@@ -194,9 +194,11 @@ internal sealed class OperationsAdministration(
 
     public async Task<byte[]> SupportBundleAsync(CancellationToken ct = default)
     {
-        await RequireAsync(OperationsPermissions.EvidenceExport);
+        // A support bundle is the most information-dense thing the platform hands out, so it needs a recent sign-in as well as the permission, and generation and download are one audited act (nothing is kept on the server).
+        await RequireAsync(OperationsPermissions.EvidenceExport, recentSignIn: true);
         var bytes = await bundle.BuildAsync(ct);
-        await audit.RecordAsync(new Ecp.Audit.AuditEntry("operations.supportbundle.exported", "SupportBundle", "zip", NewValuesJson: JsonSerializer.Serialize(new { bytes = bytes.Length })), ct);
+        var sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+        await audit.RecordAsync(new Ecp.Audit.AuditEntry("operations.supportbundle.exported", "SupportBundle", sha[..16], NewValuesJson: JsonSerializer.Serialize(new { bytes = bytes.Length, sha256 = sha, correlationId = actor.CorrelationId })), ct);
         return bytes;
     }
 }

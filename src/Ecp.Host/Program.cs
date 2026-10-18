@@ -66,6 +66,7 @@ builder.Services.AddScoped<BrandingAccessor>();
 var dataProtection = builder.Services.AddDataProtection().SetApplicationName("EnterpriseContractPlatform")
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(resolved.Host.DataDirectory, "keyring")));
 if (OperatingSystem.IsWindows()) dataProtection.ProtectKeysWithDpapi();
+builder.Services.AddSingleton<Ecp.Operations.IKeyRingInspector, DataProtectionKeyRingInspector>();
 
 // Sessions: a signed cookie issued after a verified sign-in. Organisation identity providers register their own schemes at run time.
 builder.Services.AddSingleton<SessionIssuer>();
@@ -232,10 +233,8 @@ app.MapGet("/health/startup", async (MigrationRunner runner) =>
 app.MapGet("/health/ready", async (ReadinessService readiness, EcpHostOptions options) =>
 {
     var report = await readiness.RunAsync();
-    // Unauthenticated callers never receive dependency detail in Production.
-    object body = options.Mode == EcpMode.Production
-        ? new { status = report.Overall.ToString() }
-        : new { status = report.Overall.ToString(), checks = report.Results.Select(r => new { id = r.Id, status = r.Status.ToString(), message = r.Message }) };
+    // Unauthenticated callers never receive dependency detail in Production (the shaping is HealthBodies.Ready, which is unit tested). Authorised operators see the detail on the operations dashboard.
+    var body = HealthBodies.Ready(report, options.Mode);
     return Results.Json(body, statusCode: report.Overall == ReadinessStatus.Unhealthy ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status200OK);
 }).AllowAnonymous();
 app.MapGet("/api/v1/info", (EcpHostOptions options) => Results.Json(new { name = "Enterprise Contract Platform", version, mode = options.Mode.ToString() })).AllowAnonymous();

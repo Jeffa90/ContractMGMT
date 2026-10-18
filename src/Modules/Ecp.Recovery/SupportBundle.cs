@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Ecp.Configuration;
+using Ecp.Formats;
 using Ecp.Operations;
 using Ecp.Operations.Domain;
 using Ecp.Persistence;
@@ -48,12 +49,13 @@ public sealed class RecentLogBuffer : ILoggerProvider
 
 public interface ISupportBundle
 {
-    /// <summary>A zip holding bundle.json (counts, versions, statuses, redacted log lines) and a README. Never secrets, connection strings, keys, contract or document content, or personal data.</summary>
+    /// <summary>A zip holding bundle.json (counts, versions, statuses, redacted log lines), summary.csv (formula-safe), a README and manifest.json (every entry's name, size and SHA-256, in a fixed order). Never secrets, connection strings, keys, contract or document content, or personal data.</summary>
     Task<byte[]> BuildAsync(CancellationToken ct = default);
 }
 
 internal sealed class SupportBundle(IServiceScopeFactory scopes, ReadinessService readiness, IBackupCatalogue catalogue, IOperationHistory history, IMaintenanceService maintenance, IOperationLeases leases,
-    IOptions<RecoveryOptions> recovery, StartupFacts facts, IClock clock, IEnumerable<RecentLogBuffer> logs) : ISupportBundle
+    IOptions<RecoveryOptions> recovery, StartupFacts facts, IClock clock, IEnumerable<RecentLogBuffer> logs, OperationalFactCollector collector, IActorContext actor,
+    ILogger<SupportBundle> log) : ISupportBundle
 {
     public async Task<byte[]> BuildAsync(CancellationToken ct = default)
     {
@@ -93,6 +95,8 @@ internal sealed class SupportBundle(IServiceScopeFactory scopes, ReadinessServic
             }
         }
 
+        var operational = await collector.CollectAsync(clock.UtcNow, ct);
+        var operationalFacts = operational is null ? null : operational.Select(f => new { f.Area, f.Key, count = f.Value, utc = f.Utc }).ToList();
         var failures = (await history.ListAsync(null, 100, ct)).Where(r => r.Status is OperationStatuses.Failed or OperationStatuses.Incomplete).Take(20)
             .Select(r => new { r.Kind, r.Status, reference = Redaction.Clean(r.Reference), summary = Redaction.Clean(r.Summary), r.StartedUtc, r.CorrelationId }).ToList();
         var correlations = (await history.ListAsync(null, 20, ct)).Select(r => r.CorrelationId).Distinct().ToList();
@@ -107,26 +111,69 @@ internal sealed class SupportBundle(IServiceScopeFactory scopes, ReadinessServic
             backupAndRestore = new { backupConfigured = recovery.Value.BackupConfigured, encryptionRequested = recovery.Value.EncryptionRequested, maintenance = m.Enabled ? m.Cause : "Off", recentBackups = backups, recentRestores = lastRestore,
                 leases = (await leases.ListAsync(ct)).Select(l => new { l.Name, l.ScopeKey, l.IsActive, l.AcquiredUtc, l.ExpiresUtc, l.Generation }) },
             recentFailures = failures, recentCorrelationIds = correlations,
+            generationCorrelationId = actor.CorrelationId,
+            operationalFacts = operationalFacts is null ? (object)new { status = "Not Verified", reason = "The operational facts could not be read." } : operationalFacts,
+            metrics = OperationalTelemetry.GaugeSnapshot(),
+            observability = new { meter = OperationalTelemetry.MeterName, exporters = "None configured or verified here (INT-04): OpenTelemetry, syslog and SIEM sinks are Not Verified." },
             deploymentModels = DeploymentModels.All,
             recentLogLines = logs.SelectMany(l => l.Snapshot()).OrderByDescending(l => l.Utc).Take(100).Select(l => new { l.Utc, l.Level, l.Category, message = Redaction.Clean(l.Message), l.ExceptionType }),
             excluded = new[] { "secrets", "tokens", "passwords", "connection strings", "private keys", "contract content", "document content", "personal data", "provider callback payloads", "raw configuration content" },
         };
         var json = JsonSerializer.Serialize(bundle, ManifestJson.Options) + "\n";
         if (Redaction.ContainsSecret(json)) throw new DomainException("secret_in_bundle", "The support bundle was not produced because it appears to contain a secret.");
+
+        // A small tabular summary for people who prefer a spreadsheet. Every cell goes through the formula-safe writer.
+        var rows = new List<IReadOnlyList<object?>> { new object?[] { "Area", "Item", "Value", "Time (UTC)" } };
+        foreach (var f in operational ?? []) rows.Add([f.Area, f.Key, f.Value, f.Utc?.ToString("u")]);
+        foreach (var r in report.Results) rows.Add(["Readiness", r.Id, r.Status.ToString(), ""]);
+        foreach (var asm in modules) rows.Add(["Module", asm.name, asm.version, ""]);
+        var csv = CsvWriter.Write(rows);
+        var csvText = Encoding.UTF8.GetString(csv);
+        if (Redaction.ContainsSecret(csvText)) throw new DomainException("secret_in_bundle", "The support bundle was not produced because it appears to contain a secret.");
+
+        var entries = new SortedDictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            ["README.txt"] = Utf8("Support bundle\n\nThis bundle lists versions, statuses, counts and redacted log lines to help diagnose a problem. It contains no secrets, connection strings, private keys, contract content, document content or personal data. manifest.json lists every file in this bundle with its size and SHA-256 so that you can check that nothing was changed after it was made. Look through it before you send it on; you remain responsible for where it goes.\n"),
+            ["bundle.json"] = Utf8(json),
+            ["summary.csv"] = csv,
+        };
+        // Limits, so a bundle can never become a way to move large data: a fixed set of entries with safe names and a size cap per entry and in total.
+        foreach (var name in entries.Keys) if (!SafeEntryName(name)) throw new DomainException("bundle_entry_name", "A bundle entry name was not safe.");
+        if (entries.Values.Any(b => b.Length > MaxEntryBytes) || entries.Values.Sum(b => (long)b.Length) > MaxTotalBytes) throw new DomainException("bundle_too_large", "The support bundle was not produced because it exceeded its size limit.");
+        var manifest = JsonSerializer.Serialize(new
+        {
+            formatVersion = 1, purpose = "Hashes of the files in this support bundle. Not an approval of anything.", maxEntryBytes = MaxEntryBytes, maxTotalBytes = MaxTotalBytes,
+            entries = entries.Select(e => new { name = e.Key, bytes = e.Value.Length, sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(e.Value)).ToLowerInvariant() }).ToList(),
+        }, ManifestJson.Options) + "\n";
+        entries["manifest.json"] = Utf8(manifest);
+
         using var stream = new MemoryStream();
         using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
-        {
-            Add(zip, "bundle.json", json);
-            Add(zip, "README.txt", "Support bundle\n\nThis bundle lists versions, statuses, counts and redacted log lines to help diagnose a problem. It contains no secrets, connection strings, private keys, contract content, document content or personal data.\nCheck it before you send it anywhere; you remain responsible for where it goes.\n");
-        }
+            foreach (var e in entries) AddBytes(zip, e.Key, e.Value);
+        OperationalLog.SupportBundleGenerated(log, entries.Count, actor.CorrelationId);
         return stream.ToArray();
     }
 
-    private static void Add(ZipArchive zip, string name, string text)
+    public const int MaxEntryBytes = SupportBundleRules.MaxEntryBytes;
+    public const long MaxTotalBytes = SupportBundleRules.MaxTotalBytes;
+    private static byte[] Utf8(string text) => new UTF8Encoding(false).GetBytes(text);
+    private static bool SafeEntryName(string name) => SupportBundleRules.SafeEntryName(name);
+
+    private static void AddBytes(ZipArchive zip, string name, byte[] bytes)
     {
         var entry = zip.CreateEntry(name, CompressionLevel.Optimal);
-        using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
-        writer.Write(text);
+        entry.LastWriteTime = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);          // fixed, so the archive does not leak the host's clock or time zone
+        using var s = entry.Open();
+        s.Write(bytes, 0, bytes.Length);
     }
 }
 
+/// <summary>The fixed rules a support bundle obeys: a short allow-list for entry names and a size cap per entry and in total, so a bundle can never become a way to move large data or write outside where it is extracted.</summary>
+public static class SupportBundleRules
+{
+    public const int MaxEntryBytes = 2 * 1024 * 1024;
+    public const long MaxTotalBytes = 5L * 1024 * 1024;
+
+    /// <summary>An archive entry name is a plain file name from a short allow-list of characters: no path, no separators, no leading dot, no dots-only parts.</summary>
+    public static bool SafeEntryName(string name) => name.Length is > 0 and <= 40 && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_') && !name.StartsWith('.') && !name.Contains("..", StringComparison.Ordinal);
+}

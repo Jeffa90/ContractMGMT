@@ -58,3 +58,7 @@ The evidence states the data-loss window in words and numbers, the manifest hash
 * An encrypted backup needs its certificate on the restoring server. A restored database's application login may be orphaned on another server.
 * Per-tenant rollback does not exist; restore is installation-level (D10.5, D11.1).
 * Secrets and private signing keys are not in backups (D10.3); re-supply them from the secret provider as for any restore.
+
+## 6. Dashboard (OPS-03)
+
+A failed upgrade is shown as Failed on the operations dashboard, in the failure register (no new attempt offered) and in the health panel, and maintenance mode stays on, until the operator acknowledges the restore state after rolling back (`docs/OPERATIONS_DASHBOARD.md` section 6).

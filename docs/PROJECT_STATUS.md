@@ -1,6 +1,6 @@
 # Project Status
 
-Status date: **2026-10-18** (after PER-002, portability remediation S1 to S10, the operational resilience slice OPS-01 and the upgrade-safety slice OPS-02; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
+Status date: **2026-10-18** (after PER-002, portability remediation S1 to S10, the operational resilience slice OPS-01, the upgrade-safety slice OPS-02 and the operations dashboard slice OPS-03; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
 
 **Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 10 and 11 are an engineering assessment of evidence, not an approval.
 
@@ -58,6 +58,7 @@ Each is a slice that runs end to end from the page through the services to the d
 | Portability remediation S1 | Solution pack resolved by organisation; neutral Blank lifecycle, Variation workflow and notification policy; no compiled default pack (installation default is host configuration, unset); stronger ARC-010; first PRT-002 proof test. Role identifiers untouched | ADR-0024, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.6 |
 
 | Operational resilience: backup, restore, maintenance mode (OPS-01, OPS-02 foundation) | A trained operator creates, verifies and restores a complete installation backup from Administration, Operations or the command line; the Blank, JBS Procurement and Harborline data survive a full cycle and answer identically; maintenance mode and leases; sanitised evidence and a redacted support bundle. Production readiness is still not declared | ADR-0034, `docs/BACKUP_AND_RESTORE.md`, `docs/OPERATIONS_RUNBOOK.md`, `docs/DISASTER_RECOVERY.md` |
+| Operations dashboard (OPS-03) | One operator page that shows installation health, the readiness catalogue (with the checks that are not built shown as Not Verified), schema versions, upgrade state, backup and restore evidence, background jobs and leases, the notification outbox, packs and configuration, document store and audit chain, certificates and secret expiry, and recent failures with a correlation id and the next step; four distinct states, Not Verified never a pass; counts and times only across tenants; retry only where valid (never for restore or upgrade); Meter and structured events with a local reader; support bundle needs a recent sign-in, is hashed and limited. Telemetry exporters (INT-04) and the remaining readiness checks (SET-03) are not built. Production readiness is still not declared | ADR-0036, `docs/OPERATIONS_DASHBOARD.md`, `docs/OPS03_REQUIREMENTS_MATRIX.md` |
 | Upgrade safety (OPS-02) | A trained operator can tell whether an installation can be upgraded safely (pre-flight with stable codes, deterministic hashed manifest, frozen baselines, schema-drift and checksum checks, backup and maintenance prerequisites, pack and configuration compatibility), rehearse the upgrade on a restored copy, apply it under maintenance mode with leases and quiescence, validate the result and the three businesses' journeys, and prove rollback by restore with the data-loss window stated. Forward-only; no downgrade exists. The N-1 fixture is a frozen schema populated by current services, not a historical binary. Production readiness is still not declared | ADR-0035, `docs/UPGRADES.md`, `docs/UPGRADE_RUNBOOK.md`, `docs/ROLLBACK_BY_RESTORE.md` |
 
 ## 4. Open tasks
@@ -88,11 +89,11 @@ Each is a slice that runs end to end from the page through the services to the d
 | Portability | PKM-01 to PKM-04 (packages, signing, upgrade, second pack), EXP-01 (full tenant export), DOCS-JBS |
 | Governance and reporting | GOV-01 (end-to-end classification pass; partly delivered by the lifecycle slice), GOV-02 (retention, legal hold, disposition), GOV-03 (Audit Explorer), RPT-01 (reporting projections and views; a column projection stub exists) |
 | API and integrations | API-01 (`/api/v1`), INT-04 (monitoring sinks), DOCS-API |
-| Operations and release | OPS-03 remainder (certificate and job panels), OPS-04 remainder (SEC-030 and SEC-031 catalogue), DPL-03, ACC-01, PRF-01 (scale), DOCS-OPS, DOCS-A11Y, DOCS-DICT, REL-01, DOCS-INSTALL |
+| Operations and release | OPS-04 remainder (SEC-030 and SEC-031 catalogue), DPL-03, ACC-01, PRF-01 (scale), DOCS-OPS, DOCS-A11Y, DOCS-DICT, REL-01, DOCS-INSTALL |
 
 ### 4.3 First incomplete task
 
-The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. (Out of scope for the operational resilience slice, which did not begin it.) OPS-02 (upgrade safety) is built; its closure status is in `TASKS.md`. The first incomplete **operational** task is the remainder of **OPS-03** (certificate, outbox and job panels). CFG-03 was ticked once the PER-002 plan check was done (section 3). The portability remediation list S1 to S10 is complete (open: R-01, R-02; P-02b, the compiled role catalogue, Medium, remains open).
+The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. (Out of scope for the operational resilience slice, which did not begin it.) OPS-02 (upgrade safety) is built; its closure status is in `TASKS.md`. OPS-03 (operations dashboard) is built; the first incomplete **operational** task is **OPS-04** (the SEC-030/SEC-031 catalogue and the DR sign-off). SET-03 (the remaining readiness checks) and INT-04 (telemetry sinks) stay open. CFG-03 was ticked once the PER-002 plan check was done (section 3). The portability remediation list S1 to S10 is complete (open: R-01, R-02; P-02b, the compiled role catalogue, Medium, remains open).
 
 ## 5. Deferred tasks
 
@@ -114,6 +115,7 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| Workspace after OPS-03, with a SQL Server 2022 container and a shared backup folder: unit 889, architecture 112, API 143, integration 579 (SQLite and SQL Server wrappers) | 1,723 | 0 | 0 | 0 (IIS, Azure, exporters, TLS and secret expiry are not tests; see section 7) |
 | Workspace after OPS-02, with a SQL Server 2022 container and a shared backup folder: unit 867, architecture 108, API 138, integration 563 (SQLite and SQL Server wrappers) | 1,676 | 0 | 0 | 0 (IIS, Azure and the container build are not tests; see section 7) |
 | CI after OPS-02 (run 61, commit eca7cdc), all three jobs including the N-1 to N rehearsal and the container smoke test | success | 0 | 0 | 0 |
 | CI after OPS-01 (run 60, commit 67b1cee), all three jobs | success | 0 | 0 | 0 |
@@ -164,6 +166,7 @@ Never reported as passed:
 | Browser accessibility (WCAG 2.2 AA) | ACC-01 not done; no automated audit run |
 | Scale: 100,000 contracts, concurrency, cold start, HTTP and rendering time | Only the 10,000-contract in-process baseline exists |
 | Backup, restore and disaster recovery on IIS and Azure, remote object stores, offline media, point-in-time restore, per-tenant restore, and any restore rehearsal with a customer's real data and storage | The tooling is Implemented and verified on Docker with an external SQL Server (`docs/BACKUP_AND_RESTORE.md` section 2); the rest is Not Verified or Future. An operator's own rehearsal is required before reliance (`docs/DISASTER_RECOVERY.md`) |
+| Telemetry exporters (OpenTelemetry, syslog, SIEM, alerting), TLS-certificate and secret-expiry inspection, clock-skew measurement, and the readiness-catalogue checks that are not built (SET-03) | Shown as Not Verified on the operations dashboard (`docs/OPERATIONS_DASHBOARD.md` sections 4 and 5) |
 | Upgrades on IIS and Azure, zero-downtime or mixed-version upgrade, a previous-release binary as the N-1 source (the fixture is a frozen schema populated by current services), and an upgrade rehearsal with a customer's real data and storage | Tooling Implemented and verified on Docker with an external SQL Server (`docs/UPGRADES.md` sections 3 and 15) |
 | Penetration test and external security review | Not performed |
 | Deployment-model parity (PRT-005), configuration and tenant export round trips (PRT-006, PRT-011), pack upgrade preserving local changes (PRT-009) | Not built or not tested; S9 did not touch them. Real-world fitness of the Harborline pack for a construction company is not claimed |

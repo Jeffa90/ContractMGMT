@@ -453,6 +453,8 @@ public static class ConfigurationModule
         services.AddScoped<IConfigurationInventory, ConfigurationInventory>();
         services.AddScoped<IUpgradeProbe, ConfigurationUpgradeProbe>();
         services.AddScoped<IUpgradeProbe, PackUpgradeProbe>();
+        services.AddScoped<PackUpgradeProbe>();
+        services.AddScoped<IOperationalProbe, ConfigurationOperationalProbe>();
         services.AddScoped<PackValidationService>();
         services.AddScoped<IPackManager, PackManager>();
         services.AddScoped<IPackAssignments, PackAssignments>();

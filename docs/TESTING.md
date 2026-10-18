@@ -559,6 +559,21 @@ Status: **Implemented**. Tests marked *needs backup folder* use `[SqlServerBacku
 
 Result (2026-10-18, workspace with a disposable SQL Server 2022 container and a shared backup folder, Release, warnings as errors, locked restore): unit 867, architecture 108, API 138, integration 563 (SQLite and SQL Server wrappers): **1,676 Passed, 0 Failed, 0 Skipped, 0 Not Verified**. Evidence files written by the rehearsal carry no secret marker. CI results: `deploy/STATUS.md`.
 
+### 9.8 Operations dashboard and observability (OPS-03, ADR-0036)
+
+Status: **Implemented**. Scenarios run on SQLite and on real SQL Server (the wrappers are `[SqlServerFact]`). No test in this section needs the shared backup folder.
+
+| Area | Tests |
+|---|---|
+| Status rules, catalogue, bundle rules, telemetry | `tests/Ecp.UnitTests/OperationsDashboardTests.cs` (22 with theory cases): Failed wins, then Not Verified, then Warning, then Verified, and an empty set is Not Verified; the four states have four different words and styles; **the readiness catalogue equals the specification's table** (ids, severity, start-up flag); support-bundle entry names (traversal, separators, leading dot, drive letters, NUL, length) and size limits; gauges are read in a fixed order and tagged with fixed words; an operation event counts once by kind and status and logs failures as warnings with only the correlation id; the JSON export carries what the page shows |
+| Pack probe (reused) | `UpgradeProbeTests` (OPS-02) |
+| Dashboard behaviour | `OperationsDashboardScenarios` (8 on SQLite and the SQL Server wrapper): installation administrator only, refused from a customer tenant and for the installation administrator acting inside one; every panel is its worst item and nothing Not Verified is Verified; the catalogue is whole, unbuilt and elsewhere-only checks are Not Verified with reasons, TLS and secret expiry always Not Verified; jobs and outbox counted across two tenants and equal to each tenant's own figures, with no address, subject, title or reference in the output; a stale job, an expired lease and a run with no live lease are flagged and nothing is changed; failures show last result, time and correlation id, restore and upgrade offer no retry, maintenance stays on and health says Failed; expiring and expired signing keys, key identifiers never shown; metrics and events carry the correlation id and no canary; the support bundle needs a recent sign-in, is refused to a tenant administrator, lists four files whose manifest hashes are true, holds no canary (secret, token, personal address, job error text with a contract title, log line) and is audited once with size, hash and correlation id |
+| Through the real host | `tests/Ecp.Api.Tests/OperationsDashboardUiTests.cs` (5): only the installation administrator opens the page or its JSON, anonymous is redirected, no menu entry for others; four states in words, every panel present, captions and scoped headers, "never a pass" and "not an approval to go live" on the page; the JSON agrees with the page, holds no secret, and unbuilt or unreadable items are Not Verified; the page stays open in maintenance mode and says why; the anonymous readiness body is status-only in Production and lists checks in Demo and Test |
+| Architecture | `tests/Ecp.Architecture.Tests/OperationsDashboardGuardTests.cs` (4): Operations page models call services only (no database, connection, readiness check, lease or file access); the operational fact type can carry only a count and a time; probes never read text columns; the dashboard builder reads no module table and each tenant is read inside its own scope |
+| Regression | `OperationsFoundationScenarios` bundle test updated (four files instead of two); `OperationsUiTests`, `OperationsCommandLineTests` and all OPS-01/OPS-02 tests unchanged and green |
+
+Result (2026-10-18, workspace with a disposable SQL Server 2022 container and a shared backup folder, Release, warnings as errors, locked restore): unit 889, architecture 112, API 143, integration 579 (SQLite and SQL Server wrappers): **1,723 Passed, 0 Failed, 0 Skipped, 0 Not Verified**. CI results: `deploy/STATUS.md`.
+
 ## 10. Security regression suite (`Category=Security`)
 
 | ID | Test |

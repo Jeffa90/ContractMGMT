@@ -18,7 +18,7 @@ public interface IOperationHistory
     Task<OperationRunDto?> FindByReferenceAsync(string kind, string reference, CancellationToken ct = default);
 }
 
-internal sealed class OperationHistory(OperationsDbContext db, IUnitOfWork uow, TenantContext tenant, IActorContext actor, IClock clock) : IOperationHistory
+internal sealed class OperationHistory(OperationsDbContext db, IUnitOfWork uow, TenantContext tenant, IActorContext actor, IClock clock, Microsoft.Extensions.Logging.ILogger<OperationHistory> log) : IOperationHistory
 {
     private static OperationRunDto Map(OperationRun r) => new(r.Id, r.Kind, r.Status, r.Reference, r.Reason, r.OperatorId, r.OperatorName, r.CorrelationId, r.StartedUtc, r.CompletedUtc, r.Summary, r.DetailJson);
 
@@ -42,6 +42,7 @@ internal sealed class OperationHistory(OperationsDbContext db, IUnitOfWork uow, 
             var run = await db.Runs.FirstOrDefaultAsync(r => r.Id == id, c) ?? throw new ResourceNotFoundException();
             run.Finish(status, summary, detailJson, clock.UtcNow);
             await db.SaveChangesAsync(c);
+            OperationalLog.OperationFinished(log, run.Kind, status, run.CorrelationId);
         }, ct);
     }
 

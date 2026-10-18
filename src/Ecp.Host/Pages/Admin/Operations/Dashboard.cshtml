@@ -1,0 +1,120 @@
+@page "/Admin/Operations/Dashboard"
+@model Ecp.Host.Pages.Admin.Operations.DashboardModel
+@using Ecp.Recovery
+@{ ViewData["Title"] = L["Operations dashboard"].Value; var v = Model.View; }
+@functions { static string Word(OpsStatus s) => OpsStatuses.Label(s); }
+<h1>@L["Operations dashboard"]</h1>
+<p class="lede">@L["Everything an operator needs to see in one place: health, readiness, versions, upgrades, backups, jobs, the outbox, packs, document store, audit chain and certificates. Each line says Verified, Warning, Failed or Not Verified. Not Verified means nobody has looked, or it cannot be looked at here; it is never a pass. This page reads and changes nothing, and it is not an approval to go live."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<section class="card" role="status" aria-labelledby="overall-h">
+    <h2 id="overall-h">@L["Overall"]: <span class="badge @OpsStatuses.Css(v.Overall)">@Word(v.Overall)</span></h2>
+    <dl class="facts">
+        <dt>@L["Platform version"]</dt><dd>@v.PlatformVersion (@v.EnvironmentMode, @v.DatabaseEngine)</dd>
+        <dt>@L["Maintenance mode"]</dt><dd>@(v.Maintenance.Enabled ? v.Maintenance.Cause : L["Off"].Value)</dd>
+        <dt>@L["Built at"]</dt><dd>@Fmt.DateTime(v.GeneratedUtc)</dd>
+        <dt>@L["Correlation id"]</dt><dd><code>@v.CorrelationId</code></dd>
+        <dt>@L["Readiness catalogue"]</dt><dd>@v.Coverage.RunHere @L["of"] @v.Coverage.Total @L["run here;"] @v.Coverage.RunElsewhere @L["only in the setup wizard or at start-up;"] @v.Coverage.NotBuilt @L["not built (shown as Not Verified)"]</dd>
+    </dl>
+    <p>
+        @foreach (var p in v.Panels) { <a href="#@p.Key" class="badge @OpsStatuses.Css(p.Status)">@p.Title: @Word(p.Status)</a> }
+    </p>
+    <ul>
+        <li><a href="/Admin/Operations/Dashboard?handler=Json">@L["Download this dashboard as JSON (for monitoring)"]</a></li>
+        <li><a href="/Admin/Operations/Evidence">@L["Evidence report and support bundle (needs a recent sign-in)"]</a></li>
+        <li><a href="/Admin/Operations">@L["Back to Operations"]</a></li>
+    </ul>
+</section>
+
+<section class="card" aria-labelledby="fail-h">
+    <h2 id="fail-h">@L["Recent operational failures"]</h2>
+    @if (v.Failures.Count == 0) { <p>@L["No failed or incomplete operation is recorded."]</p> }
+    else
+    {
+        <div class="table-wrap">
+        <table>
+            <caption class="visually-hidden">@L["Recent operational failures"]</caption>
+            <thead><tr><th scope="col">@L["When"]</th><th scope="col">@L["Operation"]</th><th scope="col">@L["Result"]</th><th scope="col">@L["What happened"]</th><th scope="col">@L["What to do"]</th><th scope="col">@L["Correlation id"]</th></tr></thead>
+            <tbody>
+            @foreach (var f in v.Failures)
+            {
+                <tr>
+                    <td>@(f.WhenUtc is { } w ? Fmt.DateTime(w) : "")</td><th scope="row">@f.Kind</th><td><span class="badge bad">@f.Status</span></td><td>@f.Summary</td>
+                    <td>@f.NextStep @if (f.Link is not null) { <a href="@f.Link">@(f.RetryValid ? f.RetryLabel : L["Open"].Value)</a> } @if (!f.RetryValid) { <em>@L["Not retried automatically."]</em> }</td>
+                    <td><code>@f.CorrelationId</code></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+</section>
+
+@foreach (var p in v.Panels)
+{
+    <section class="card" id="@p.Key" aria-labelledby="h-@p.Key">
+        <h2 id="h-@p.Key">@p.Title: <span class="badge @OpsStatuses.Css(p.Status)">@Word(p.Status)</span></h2>
+        <p>@p.Summary</p>
+        <div class="table-wrap">
+        <table>
+            <caption class="visually-hidden">@p.Title</caption>
+            <thead><tr><th scope="col">@L["Check"]</th><th scope="col">@L["Result"]</th><th scope="col">@L["What it means"]</th>@if (v.DetailVisible) { <th scope="col">@L["Technical detail"]</th> }<th scope="col">@L["When"]</th><th scope="col">@L["What to do"]</th></tr></thead>
+            <tbody>
+            @foreach (var i in p.Items)
+            {
+                <tr>
+                    <th scope="row">@i.Title <small>(<code>@i.Code</code>)</small></th>
+                    <td><span class="badge @OpsStatuses.Css(i.Status)">@Word(i.Status)</span></td>
+                    <td>@i.Explanation</td>
+                    @if (v.DetailVisible) { <td>@i.Detail</td> }
+                    <td>@(i.LastUtc is { } t ? Fmt.DateTime(t) : "")@if (i.CorrelationId is not null) { <br /><code>@i.CorrelationId</code> }</td>
+                    <td>@i.NextStep @if (i.Link is not null && i.Link.StartsWith('/')) { <a href="@i.Link">@L["Open"]</a> }</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    </section>
+}
+
+<section class="card" aria-labelledby="lease-h">
+    <h2 id="lease-h">@L["Operation leases"]</h2>
+    @if (v.Leases.Count == 0) { <p>@L["No lease has been taken yet."]</p> }
+    else
+    {
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Operation leases"]</caption>
+            <thead><tr><th scope="col">@L["Lease"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Last renewed"]</th><th scope="col">@L["Expires"]</th></tr></thead>
+            <tbody>
+            @foreach (var l in v.Leases.Take(30))
+            {
+                <tr><th scope="row">@l.Name</th><td>@(l.IsActive ? L["Held"].Value : l.ReleasedUtc is null ? L["Expired without release"].Value : L["Free"].Value)</td><td>@Fmt.DateTime(l.HeartbeatUtc)</td><td>@Fmt.DateTime(l.ExpiresUtc)</td></tr>
+            }
+            </tbody>
+        </table></div>
+        <p><a href="/Admin/Operations/Leases">@L["Manage leases"]</a></p>
+    }
+</section>
+
+<section class="card" aria-labelledby="mod-h">
+    <h2 id="mod-h">@L["Schema versions by module"]</h2>
+    @if (v.Modules.Count == 0) { <p>@L["Not Verified: the applied migrations are read on SQL Server only."]</p> }
+    else
+    {
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Schema versions by module"]</caption>
+            <thead><tr><th scope="col">@L["Module"]</th><th scope="col">@L["Applied"]</th><th scope="col">@L["This build expects"]</th><th scope="col">@L["Pending"]</th></tr></thead>
+            <tbody>
+            @foreach (var m in v.Modules) { <tr><th scope="row">@m.Module</th><td>@m.Applied</td><td>@m.Compiled</td><td>@m.Pending</td></tr> }
+            </tbody>
+        </table></div>
+    }
+</section>
+
+<section class="card" aria-labelledby="metrics-h">
+    <h2 id="metrics-h">@L["Operational metrics (local reader)"]</h2>
+    <p>@L["These values are also published as .NET metrics under the meter Ecp.Operations. No OpenTelemetry, syslog or SIEM exporter is configured or verified in this installation."]</p>
+    <dl class="facts">
+        @foreach (var kv in v.Metrics) { <dt>@kv.Key</dt><dd>@kv.Value</dd> }
+        @if (v.Metrics.Count == 0) { <dd>@L["No value yet."]</dd> }
+    </dl>
+</section>

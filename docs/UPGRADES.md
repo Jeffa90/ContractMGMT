@@ -165,3 +165,7 @@ Tests that need a shared backup directory report **NOT VERIFIED** (skipped with 
 * IIS and Azure deployments are **Scaffolded / Not Verified** for upgrades, as for backup. The container + external SQL Server model is the one with executed evidence.
 * The container image build is verified in CI only (it cannot be built in the authoring sandbox); `upgrades/` is copied into the build stage.
 * RPO, RTO, change windows, approval and sign-off are the organisation's (`docs/DISASTER_RECOVERY.md`, `docs/PRODUCTION_READINESS_CHECKLIST.md`).
+
+## 16. Seeing it on the dashboard (OPS-03)
+
+Schema versions per module, pending migrations, the last upgrade, rehearsal and rollback evidence, a failed upgrade (Failed, maintenance kept on) and data-migration batches in progress appear on the operations dashboard (`docs/OPERATIONS_DASHBOARD.md`, panel *Upgrade readiness and migrations*, codes `UPR-001` to `UPR-006`). The full pre-flight is still run on request from Upgrade Readiness; the dashboard does not run it on every page load.

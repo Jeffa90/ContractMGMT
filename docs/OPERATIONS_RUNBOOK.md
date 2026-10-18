@@ -168,3 +168,17 @@ Run as `dotnet Ecp.Host.dll <command>` (inside the container: `docker exec ecp d
 | `VAL-010` Failed | Document content is missing or damaged beyond what the backup recorded. Restore again; do not release the copy |
 | `VAL-009` Failed | An audit chain does not verify. Investigate who changed the records |
 | Encrypted backup cannot be restored | The certificate (and its key) is not on the restoring server. Restore it there first |
+
+## 13. Failure map (OPS-03)
+
+| Dashboard shows | Meaning | Do |
+|---|---|---|
+| Failed: *A migration failed* / maintenance *Upgrade failed* | The schema may be part-way | Roll back by restore (`docs/ROLLBACK_BY_RESTORE.md`). Do not retry |
+| Failed: *Restore failed* | A restore stopped; maintenance mode kept on | Section 7. Do not retry blindly; acknowledge the restore state only when you know it |
+| Failed: *recorded as running with no live lease* | The process stopped part-way | Read the operation's evidence and the application log by correlation id. Treat the result as unknown |
+| Warning: *Lease expired without release* | A holder stopped | Nothing is blocked; check the history for an interrupted run |
+| Warning: *no verified backup / older than the limit* | Recovery would lose more than intended | Take and verify a backup |
+| Warning: *dead-lettered messages* | E-mail could not be delivered after retries | The tenant's administrator retries them once the provider is fixed |
+| Failed: *pack in use would be refused* | A pack no longer satisfies the platform or the trust policy | Resolve before any upgrade (`docs/UPGRADES.md` section 9) |
+| Failed: *signing key expired* | Packs signed by that key are refused | Register the publisher's new key; revoke the old one |
+| Not Verified: anything | Not looked at, or not readable here | Decide: do it, or accept the gap in writing. It is never a pass |

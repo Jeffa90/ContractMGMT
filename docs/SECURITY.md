@@ -235,3 +235,13 @@ The Harborline pack adds no code path, permission, route or role. It is data und
 * **What it never does**: execute operator-supplied SQL, rewrite audit events, configuration releases or signed pack bytes, republish, move a pin, or retry a failed migration.
 * **What leaves the platform**: identifiers, counts, hashes and outcomes in reports and evidence; no secret, connection string, key, record or document content. Reports are scanned and refused if a secret is found; CSV is formula-safe.
 * **Residual and operator-owned**: change control, window, approval, sign-off, backup storage protection and retention, and keeping the previous release for rollback.
+
+## 21. Operations dashboard and observability (OPS-03; ADR-0036; `docs/OPERATIONS_DASHBOARD.md`)
+
+* **Who**: `operations.read` in the installation tenant reads the dashboard; `operations.validate` also reveals technical detail. The service re-checks the permission **and** the tenant; a tenant, organisation or business administrator, an auditor, and the installation administrator acting from inside a customer tenant are refused. No new permission.
+* **Tenant isolation**: customer-tenant data is reached only through module probes (`IOperationalProbe`) that can return a count and a time and nothing else; each runs inside its own tenant's scope. There is no cross-tenant action: retrying another tenant's message stays with that tenant's administrator.
+* **No content**: the dashboard, its JSON form, the metrics and the structured events carry fixed words, counts, times, correlation ids and operation kinds and statuses. Error text from job runs and deliveries is never read; operator free text is redacted before it reaches an event or a bundle. Metric tags are fixed words; no tenant, person or record is ever a tag.
+* **Honest states**: Not Verified is never shown as, or counted as, a pass (D12.3); a critical failure is never hidden or downgraded.
+* **Anonymous health**: in Production the readiness answer is the overall status only; Demo and Test list checks (not internet-facing; documented). Detail is on the authorised dashboard.
+* **Support bundle**: recent sign-in plus permission, audited, hashed manifest, allow-listed entry names, size caps, formula-safe summary, secret scan before and after assembly.
+* **Not built, not claimed**: a telemetry exporter or SIEM sink (INT-04), alerting, TLS certificate and secret-expiry inspection.

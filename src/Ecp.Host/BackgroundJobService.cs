@@ -39,6 +39,7 @@ public sealed class BackgroundJobService(IServiceScopeFactory scopes, IOptions<N
                 if ((await registry.ServiceProvider.GetRequiredService<IMaintenanceService>().GetAsync(ct)).Enabled)
                 {
                     log.LogInformation("Background jobs are paused: the installation is in maintenance mode.");
+                    OperationalLog.BackgroundCycle(log, 0, 0, paused: true);
                     return;
                 }
             }
@@ -47,6 +48,7 @@ public sealed class BackgroundJobService(IServiceScopeFactory scopes, IOptions<N
             tenants = await registry.ServiceProvider.GetRequiredService<ITenantDirectory>().ListAsync(ct);
         }
         var owner = $"{Environment.MachineName}:{Environment.ProcessId}";
+        int ran = 0, failed = 0;
         foreach (var tenant in tenants.Where(t => t.Status == TenantStatus.Active && t.Id != SystemTenant.Id))
         {
             try
@@ -58,8 +60,10 @@ public sealed class BackgroundJobService(IServiceScopeFactory scopes, IOptions<N
                 var actor = scope.ServiceProvider.GetRequiredService<ActorContext>();
                 actor.Type = ActorType.System; actor.ActorId = "system"; actor.Source = "Job";
                 await scope.ServiceProvider.GetRequiredService<INotificationJobs>().RunAllAsync(ct);
+                ran++;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException) { log.LogError(ex, "Background jobs failed for tenant {Tenant}.", tenant.Id); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { failed++; log.LogError(ex, "Background jobs failed for tenant {Tenant}.", tenant.Id); }
         }
+        OperationalLog.BackgroundCycle(log, ran, failed, paused: false);
     }
 }

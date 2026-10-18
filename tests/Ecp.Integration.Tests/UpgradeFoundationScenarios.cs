@@ -30,7 +30,7 @@ internal static class UpgradeFoundationScenarios
         return await work(scope.ServiceProvider);
     }
 
-    private static async Task<Guid> SystemAdministratorAsync(TestApp app)
+    internal static async Task<Guid> SystemAdministratorAsync(TestApp app)
     {
         await using var s = app.ScopeFor(SystemTenant.Id);
         var id = await s.Get<IUserService>().CreateActiveTrustedAsync("Sysadmin", "sys" + Guid.NewGuid().ToString("N")[..6] + "@installation.example.test", "demo", "https://demo.example.test", "sys|" + Guid.NewGuid(), "t");
@@ -38,7 +38,7 @@ internal static class UpgradeFoundationScenarios
         return id;
     }
 
-    private static TenantScope As(TestApp app, Guid tenant, Guid user, bool recentSignIn)
+    internal static TenantScope As(TestApp app, Guid tenant, Guid user, bool recentSignIn)
     {
         var s = app.ScopeFor(tenant);
         s.Get<CurrentUser>().Set(user);

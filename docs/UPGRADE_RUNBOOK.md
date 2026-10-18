@@ -129,3 +129,7 @@ Packs and configuration findings (`UPG-PCK-*`, `UPG-CFG-*`) are resolved by the 
 | Upgrade accepted by | | |
 
 The platform does not fill these in and does not declare production readiness.
+
+## 11. Dashboard cross-check (OPS-03)
+
+Before the window and after the upgrade, open the operations dashboard (`docs/OPERATIONS_DASHBOARD.md`) and file its JSON form with the change record: before, no Failed line you did not expect; after, schema versions at the target, no pending migrations, maintenance released, jobs and outbox draining. A failed upgrade is never retried; see `docs/ROLLBACK_BY_RESTORE.md`.

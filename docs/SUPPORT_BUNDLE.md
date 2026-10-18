@@ -28,3 +28,18 @@ Secrets, tokens, passwords, connection strings, private keys, contract content, 
 ## Responsibility
 
 Look at the bundle before you send it. The platform checks it; you remain responsible for where it goes.
+
+## Completion for OPS-03 (what changed, 2026-10-18)
+
+| Item | Status |
+|---|---|
+| Generation needs `operations.evidence.export` **and a recent sign-in** (previously the permission only). The command line `support-bundle <file>` is unchanged: it runs on the server for an operator who already has access to it | **Implemented**, **Verified locally** |
+| One audit event per generation and download, `operations.supportbundle.exported`: size, SHA-256, correlation id. Nothing is stored on the server, so there is nothing to expire or clean up | **Implemented**, **Verified locally** |
+| Contents are now four files: bundle.json, summary.csv (formula-safe: cells starting `=`, `+`, `-`, `@`, tab or carriage return are neutralised), README.txt and manifest.json | **Implemented** |
+| manifest.json lists every other file with its size and SHA-256, in a fixed order, and its limits; the hashes are checked by a test | **Implemented**, **Verified locally** |
+| Entry names are an allow-list (plain file names, no path, no leading dot); each entry is capped at 2 MB and the bundle at 5 MB; archive timestamps are fixed so the archive does not reveal the host's clock | **Implemented**, **Verified locally** (unit tests on the rules) |
+| New content: operational facts (outbox counts and times, job counts and times, data-migration batches in progress, releases in force, pack compatibility counts, signing-key expiry counts), the metrics snapshot, the correlation id of the generation, and a statement that no telemetry exporter is configured | **Implemented**, **Verified locally** |
+| Canaries: a secret in an operation summary, a token, a connection string, a personal e-mail address, a failed job's own error text with a contract title, and a log line are all absent from every file | **Verified locally** (`OperationsDashboardScenarios`, SQLite and SQL Server) |
+| The SEC-030 and SEC-031 catalogue of cases and a fuller redaction rule set belong to **OPS-04** and are **not** claimed here | OPS-04 open |
+
+The bundle is evidence for the person who supports the installation. Look through it before you send it on; where it goes is the organisation's responsibility.

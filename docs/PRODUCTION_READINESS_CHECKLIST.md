@@ -46,3 +46,17 @@ The platform provides the tooling (`docs/UPGRADES.md`, `docs/UPGRADE_RUNBOOK.md`
 - [ ] Sign-off recorded by a named person (`docs/UPGRADE_RUNBOOK.md` section 10)
 
 Not covered by the tooling and therefore not verified here: IIS and Azure deployment models, zero-downtime or mixed-version operation, a previous-release binary as the N-1 source (the N-1 fixture is a frozen schema populated by current services), and an upgrade rehearsal with the organisation's own data and storage.
+
+## Operations dashboard and monitoring (OPS-03)
+
+The platform provides the dashboard (`docs/OPERATIONS_DASHBOARD.md`). Monitoring, alerting and on-call are the organisation's.
+
+- [ ] The people who will operate the installation can open the operations dashboard and have read each panel's explanation; nobody treats **Not Verified** as passed
+- [ ] Every line currently Not Verified has been either done or accepted in writing (TLS certificate and secret expiry tracked where they live; clock skew; deployment-model checks; the unbuilt readiness-catalogue checks, SET-03)
+- [ ] A named person looks at the dashboard on a schedule the organisation chooses, and before and after every maintenance window
+- [ ] Alert thresholds, on-call duty and the incident process are decided and written down; the platform does not alert by itself
+- [ ] A telemetry exporter (OpenTelemetry, syslog or SIEM) is chosen and verified if the organisation needs one; none is built or verified in the platform (INT-04)
+- [ ] The support-bundle procedure is agreed: who may generate one (recent sign-in required), where it may be sent, and how long the recipient keeps it
+- [ ] Retention of operation history and audit data is decided
+
+Not covered here and therefore Not Verified: IIS and Azure deployment models, exporters and alerting, TLS certificate monitoring, clock-skew measurement.

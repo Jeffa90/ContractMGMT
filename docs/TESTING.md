@@ -724,6 +724,10 @@ Automated axe-core checks plus scripted keyboard tests on every page type; manua
 3. Milestone exit: the gate in `IMPLEMENTATION_PLAN.md`, plus skill-based reviews (`.claude/skills/`), plus updated threat model.
 4. Every run produces a test report listing run / not run / failed by ID. `TASKS.md` references report IDs, not opinions.
 
+## 17. Implementation readiness suite (IRG)
+
+Reported as Passed, Failed, Skipped and Not Verified separately. Passed locally (SQLite always, real SQL Server where marked): second-person publication and rollback governance for every configuration kind (`ConfigurationGovernanceScenarios`, `ConfigurationRollbackKindsScenarios`, `ConfigurationReviewUiTests`); organisation creation, checklist and approver groups (`OrganisationCreationScenarios`, `OrganisationAndGroupUiTests`); form editors (`FormEditorTests`, `FormEditorScenarios`, `FormEditorUiTests`); malware-scanning gate (`DocumentScanningScenarios`, `DocumentScanningUiTests`); no private signing key outside the pack projects (architecture test); and the 20-step no-code rehearsal over real HTTP (`NoCodeRehearsalTests`, SQLite and `[SqlServerFact]`, evidence in `docs/NO_CODE_REHEARSAL.md`). Totals at the end of the slice: unit 895, architecture 113, API 157, integration 634, none failed or skipped. **Not Verified:** a real malware scanner, live e-mail, a real identity provider, IIS or Azure, the Production-mode setup wizard end to end, an unaided non-developer following the guides, assistive-technology use of the new pages.
+
 ## 16. Traceability to Master "Testing" and the Definition of Done
 
 | Master test family | IDs |

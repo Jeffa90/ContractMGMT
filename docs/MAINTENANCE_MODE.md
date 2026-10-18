@@ -30,7 +30,12 @@ It is a **server-side** control (middleware plus job gating), not a UI hint. A c
 | `RestoreValidationPending` | A restore, on the restored copy | The restore workflow when validation passes |
 | `RestoreFailed` | A restore that failed, on the installation (and the copy, if it exists) | **Only an operator who acknowledges the restore state knowingly** (checkbox on the page, `--acknowledge-restore-state` on the command line), with a reason |
 
-So a failed restore leaves the installation protected until a person decides otherwise; "just let me in" is refused with the code `restore_state`.
+| `UpgradeInProgress` | An upgrade (OPS-02), on the installation | The upgrade when it has validated successfully; an operator only with an explicit acknowledgement |
+| `UpgradeFailed` | An upgrade that stopped or did not validate | **Only an operator who acknowledges the restore state knowingly**, with a reason; the way forward is rollback by restore (`docs/ROLLBACK_BY_RESTORE.md`) |
+
+So a failed restore or a failed upgrade leaves the installation protected until a person decides otherwise; "just let me in" is refused with the code `restore_state` (restore) or `upgrade_state` (upgrade).
+
+Maintenance mode is also enforced **inside the process** by `IMaintenanceGate`: configuration publication and rollback and the commit of a data-migration batch are refused with the code `maintenance_mode` whoever calls them (a page, an API, a job or another service), so a migration of the schema never races a change to configuration. Quiescence: an upgrade waits for background-job leases to drain before it migrates (`docs/UPGRADES.md` section 7).
 
 ## 4. Several instances
 

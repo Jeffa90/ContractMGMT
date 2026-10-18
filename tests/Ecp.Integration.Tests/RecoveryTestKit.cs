@@ -57,17 +57,17 @@ internal static class RecoveryTestKit
     {
         var database = (DatabaseOptions)services.Last(d => d.ServiceType == typeof(DatabaseOptions)).ImplementationInstance!;
         services.AddRecoveryModule(OptionsFor(layout), database);
-        services.AddSingleton<IRestoreTargetFactory>(sp => new TargetFactory(sp.GetRequiredService<IClock>(), layout));
+        services.AddSingleton<IRestoreTargetFactory>(sp => new TargetFactory(sp.GetRequiredService<IClock>(), layout, more));
         more?.Invoke(services);
     };
 
-    private sealed class TargetFactory(IClock clock, Layout layout) : IRestoreTargetFactory
+    private sealed class TargetFactory(IClock clock, Layout layout, Action<IServiceCollection>? more) : IRestoreTargetFactory
     {
         public IRestoreTargetHost Open(RestoreTarget target)
         {
             var root = Path.GetDirectoryName(target.DocumentsDirectory)!;
             var provider = TestApp.BuildDetached(DatabaseProvider.SqlServer, target.ConnectionString, clock, root, EcpMode.Test,
-                services => services.AddRecoveryModule(OptionsFor(layout), new DatabaseOptions { Provider = DatabaseProvider.SqlServer, ConnectionString = target.ConnectionString }));
+                services => { services.AddRecoveryModule(OptionsFor(layout), new DatabaseOptions { Provider = DatabaseProvider.SqlServer, ConnectionString = target.ConnectionString }); more?.Invoke(services); });
             return new Host(provider);
         }
 

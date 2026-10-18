@@ -74,6 +74,8 @@ internal sealed class InstallationInventory : IInstallationInventory
         var connection = scope.GetRequiredService<IScopedConnection>();
         var result = new List<TableEntry>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        // A database one release behind this build (an upgrade candidate) lacks the tables the newer migrations add; they are not counted, and pre-flight reports the pending migrations.
+        var existing = await ExistingTablesAsync(connection, ct);
         foreach (var module in scope.GetServices<ModuleDescriptor>().OrderBy(m => m.Tier).ThenBy(m => m.Name))
         {
             var context = (DbContext)scope.GetRequiredService(module.DbContextType);
@@ -82,6 +84,7 @@ internal sealed class InstallationInventory : IInstallationInventory
                 var hasTenant = type.FindProperty("TenantId") is not null;
                 if (hasTenant == registryTables) continue;
                 var name = TableName(connection, type);
+                if (existing is not null && !existing.Contains(name)) continue;
                 if (!seen.Add(name)) continue;
                 var sql = $"SELECT COUNT_BIG(*){(checksums && connection.Provider == DatabaseProvider.SqlServer && !VolatileTables.Is(name) ? ", CHECKSUM_AGG(BINARY_CHECKSUM(*))" : ", NULL")} FROM {Qualified(connection, type.GetSchema(), type.GetTableName()!)}";
                 await connection.ApplyTenantScopeAsync(ct);
@@ -94,6 +97,20 @@ internal sealed class InstallationInventory : IInstallationInventory
             }
         }
         return result;
+    }
+
+    /// <summary>The "schema.table" names that exist in the database (SQL Server only; null elsewhere, meaning every mapped table is expected).</summary>
+    internal static async Task<HashSet<string>?> ExistingTablesAsync(IScopedConnection connection, CancellationToken ct)
+    {
+        if (connection.Provider != DatabaseProvider.SqlServer) return null;
+        await connection.ApplyTenantScopeAsync(ct);
+        await using var cmd = connection.Connection.CreateCommand();
+        cmd.Transaction = connection.Transaction;
+        cmd.CommandText = "SELECT s.name + N'.' + t.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id";
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct)) set.Add(r.GetString(0));
+        return set;
     }
 
     private static async Task<long> ScalarAsync(IServiceProvider scope, string sql, CancellationToken ct)

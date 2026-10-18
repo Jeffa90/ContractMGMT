@@ -1,0 +1,38 @@
+@page "/Admin/Operations/RollbackEvidence"
+@model Ecp.Host.Pages.Admin.Operations.RollbackEvidenceModel
+@{ ViewData["Title"] = L["Rollback evidence"].Value; }
+<h1>@L["Rollback evidence"]</h1>
+<p class="lede">@L["Rolling back means restoring the verified pre-upgrade backup and running the version that made it. This page proves that the backup restores into a clean database, is the pre-upgrade state and is intact. It never runs an older version against an upgraded database, and there is no downgrade."]</p>
+<div class="error-summary" role="note"><strong>@L["A rollback discards everything created after the backup it restores."]</strong> @L["That includes work done after the upgrade finished. It cannot be recovered from the backup."]</div>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Result is { } r)
+{
+    <section class="card" role="status" aria-labelledby="res-h">
+        <h2 id="res-h">@L["Rollback evidence"]: <span class="badge @(r.Outcome == "Succeeded" ? "ok" : r.Outcome == "SucceededWithWarnings" ? "warn" : "bad")">@r.Outcome</span></h2>
+        @if (r.Failure is not null) { <p>@r.Failure</p> }
+        <p>@L["Rolling back to this backup would discard"] <strong>@r.EventsDiscarded</strong> @L["audited event(s) recorded after it."] @L["Run the platform version"] <strong>@r.RequiredApplicationVersion</strong> @L["against the restored database; this build is"] @r.RunningApplicationVersion.</p>
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Rollback checks"]</caption>
+            <thead><tr><th scope="col">@L["Check"]</th><th scope="col">@L["Result"]</th><th scope="col">@L["What it means"]</th></tr></thead>
+            <tbody>@foreach (var c in r.Checks) { <tr><th scope="row"><code>@c.Code</code> @c.Title</th><td><span class="badge @(c.Outcome == Ecp.Recovery.CheckOutcome.Passed ? "ok" : c.Outcome == Ecp.Recovery.CheckOutcome.Warning ? "warn" : "bad")">@c.Outcome</span></td><td>@c.Description</td></tr> }</tbody>
+        </table></div>
+        @if (r.EvidenceFile is not null) { <p>@L["Evidence file"]: <code>@r.EvidenceFile</code></p> }
+    </section>
+}
+<section class="card" aria-labelledby="go-h">
+    <h2 id="go-h">@L["Prove the rollback"]</h2>
+    <p>@L["The backup is restored into a new database beside the installation (the installation in use is not changed). You will be asked to confirm your sign-in."]</p>
+    <form method="post" asp-page-handler="Prove">
+        <div class="field"><label for="BackupId">@L["Verified pre-upgrade backup"]</label>
+            <select id="BackupId" name="BackupId">@foreach (var b in Model.Backups) { <option value="@b.BackupId" selected="@(Model.BackupId == b.BackupId)">@b.BackupId (@b.State)</option> }</select></div>
+        <div class="field"><label for="TargetDatabase">@L["New database name for the restored copy (letters, digits, underscores)"]</label><input id="TargetDatabase" name="TargetDatabase" maxlength="64" required /></div>
+        <div class="field"><label for="Reason">@L["Reason"]</label><input id="Reason" name="Reason" maxlength="500" required /></div>
+        <div class="field"><label for="Confirmation">@L["Type"] <code>PROVE ROLLBACK TO @(Model.BackupId ?? "<backup id>")</code></label><input id="Confirmation" name="Confirmation" autocomplete="off" required /></div>
+        <div class="actions"><button type="submit">@L["Prove the rollback"]</button></div>
+    </form>
+</section>
+@if (Model.Last is { } l)
+{
+    <section class="card" aria-labelledby="last-h"><h2 id="last-h">@L["Most recent proof"]</h2><p><span class="badge @(l.Status is "Completed" ? "ok" : l.Status is "CompletedWithWarnings" ? "warn" : "bad")">@l.Status</span> @l.BackupId: @l.Summary (@Fmt.DateTime(l.StartedUtc))</p></section>
+}
+<p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

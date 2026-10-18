@@ -1,0 +1,82 @@
+@page "/Admin/Operations/UpgradePreview"
+@model Ecp.Host.Pages.Admin.Operations.UpgradePreviewModel
+@{ ViewData["Title"] = L["Upgrade preview"].Value; var p = Model.Plan; }
+<h1>@L["Upgrade preview"]</h1>
+<p class="lede">@L["An upgrade moves this installation to the version now running. It needs a verified backup to roll back to, maintenance mode, and a passing pre-flight. It only goes forward: there is no downgrade. If it goes wrong, the way back is to restore the verified backup and run the matching version. Rehearse it on a restored copy first."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Result is { } u)
+{
+    <section class="card" role="status" aria-labelledby="res-h">
+        <h2 id="res-h">@L["Upgrade result"]: <span class="badge @(u.Outcome == "Succeeded" ? "ok" : u.Outcome == "SucceededWithWarnings" ? "warn" : "bad")">@u.Outcome</span></h2>
+        @if (u.Failure is not null) { <p>@u.Failure</p> }
+        <p>@(u.MaintenanceReleased ? L["The upgrade passed validation and maintenance mode was released."] : L["The installation is held in maintenance mode. It is not released until an operator decides, knowingly, what to do next (normally: roll back by restore)."])</p>
+        <ul>@foreach (var s in u.Steps) { <li><strong>@s.Module</strong>: @s.Outcome, @s.Migrations @L["migration(s)"], @s.Milliseconds ms</li> }</ul>
+        @if (u.EvidenceFile is not null) { <p>@L["Evidence file"]: <code>@u.EvidenceFile</code></p> }
+        <p><a href="/Admin/Operations/PostUpgradeValidation">@L["Open the post-upgrade validation"]</a></p>
+    </section>
+}
+@if (Model.Rehearsal is { } rh)
+{
+    <section class="card" role="status" aria-labelledby="reh-h">
+        <h2 id="reh-h">@L["Rehearsal result"]: <span class="badge @(rh.Outcome == "Succeeded" ? "ok" : rh.Outcome == "SucceededWithWarnings" ? "warn" : "bad")">@rh.Outcome</span></h2>
+        @if (rh.Failure is not null) { <p>@rh.Failure</p> }
+        <p>@L["The upgrade was run on a restored copy in the new database"] <code>@rh.TargetDatabase</code>. @L["The installation in use was not changed. Remove the copy when you have finished with it."]</p>
+        @if (rh.EvidenceFile is not null) { <p>@L["Evidence file"]: <code>@rh.EvidenceFile</code></p> }
+    </section>
+}
+<section class="card" aria-labelledby="pre-h">
+    <h2 id="pre-h">@L["Step 1: choose the backup you can roll back to"]</h2>
+    <form method="get">
+        <div class="field"><label for="BackupId">@L["Verified backup"]</label>
+            <select id="BackupId" name="BackupId">
+                @foreach (var b in Model.Backups) { <option value="@b.BackupId" selected="@(Model.BackupId == b.BackupId)">@b.BackupId (@b.State)</option> }
+            </select></div>
+        <div class="actions"><button type="submit">@L["Preview the upgrade"]</button></div>
+    </form>
+</section>
+@if (p is not null)
+{
+    <section class="card" aria-labelledby="plan-h">
+        <h2 id="plan-h">@L["Step 2: what would run"]</h2>
+        <dl class="facts">
+            <dt>@L["From"]</dt><dd>@p.FromVersion</dd><dt>@L["To"]</dt><dd>@p.ToVersion</dd>
+            <dt>@L["Pre-flight"]</dt><dd><span class="badge @(p.Preflight.Outcome == Ecp.Recovery.PreflightOutcome.Ready ? "ok" : p.Preflight.Outcome == Ecp.Recovery.PreflightOutcome.ReadyWithWarnings ? "warn" : "bad")">@p.Preflight.Outcome</span> (@p.Preflight.Count(Ecp.Recovery.CheckOutcome.Failed) @L["blockers"], @p.Preflight.Count(Ecp.Recovery.CheckOutcome.Warning) @L["warnings"])</dd>
+            <dt>@L["Manifest SHA-256"]</dt><dd><code>@(p.Manifest?.ManifestSha256 ?? "none")</code></dd>
+        </dl>
+        @if (p.Manifest is { } m && m.BreakingChanges.Count > 0) { <div class="error-summary" role="alert"><h3>@L["Breaking changes"]</h3><ul>@foreach (var b in m.BreakingChanges) { <li><code>@b.Code</code> @b.Text</li> }</ul></div> }
+        <h3>@L["Migrations to apply"]</h3>
+        <ul>@foreach (var x in p.Migrations) { <li><code>@x.Module / @x.Id</code> (@string.Join(", ", x.Categories)) @if (x.ReviewRequired) { <span class="badge @(x.Reviewed ? "ok" : "bad")">@(x.Reviewed ? "review recorded" : "review missing")</span> }</li> }
+            @if (p.Migrations.Count == 0) { <li>@L["None."]</li> }</ul>
+        <p><a href="/Admin/Operations/MigrationReport">@L["Open the migration report"]</a> · <a href="/Admin/Operations/UpgradeReadiness?BackupId=@p.Preflight.BackupId">@L["Open the pre-flight"]</a></p>
+        @if (p.Preflight.Blockers.Any()) { <div class="error-summary" role="alert"><h3>@L["The upgrade cannot start"]</h3><ul>@foreach (var b in p.Preflight.Blockers) { <li><code>@b.Code</code> @b.Title: @b.Description @b.Remediation</li> }</ul></div> }
+        @if (p.Preflight.Warnings.Any()) { <h3>@L["Warnings that need the owner's acceptance"]</h3><ul>@foreach (var w in p.Preflight.Warnings) { <li><code>@w.Code</code> @w.Title: @w.Description</li> }</ul> }
+    </section>
+    <section class="card" aria-labelledby="reh2-h">
+        <h2 id="reh2-h">@L["Step 3: rehearse on a restored copy (recommended)"]</h2>
+        <p>@L["The backup is restored into a new database and the upgrade is run on the copy, with the same checks. Nothing in use is changed. You will be asked to confirm your sign-in."]</p>
+        <form method="post" asp-page-handler="Rehearse">
+            <input type="hidden" name="BackupId" value="@p.Preflight.BackupId" />
+            <div class="field"><label for="TargetDatabase">@L["New database name for the copy (letters, digits, underscores)"]</label><input id="TargetDatabase" name="TargetDatabase" maxlength="64" required /></div>
+            <div class="field"><label for="RReason">@L["Reason"]</label><input id="RReason" name="Reason" maxlength="500" required /></div>
+            <div class="field"><label for="RConfirmation">@L["Type"] <code>REHEARSE UPGRADE FROM @p.Preflight.BackupId</code></label><input id="RConfirmation" name="Confirmation" autocomplete="off" required /></div>
+            @foreach (var w in p.Preflight.Warnings) { <div class="field"><label><input type="checkbox" name="Accepted" value="@w.Code" /> @L["I accept"] @w.Code</label></div> }
+            <div class="actions"><button type="submit">@L["Rehearse the upgrade"]</button></div>
+        </form>
+    </section>
+    @if (p.Preflight.Outcome is Ecp.Recovery.PreflightOutcome.Ready or Ecp.Recovery.PreflightOutcome.ReadyWithWarnings)
+    {
+        <section class="card" aria-labelledby="go-h">
+            <h2 id="go-h">@L["Step 4: upgrade this installation"]</h2>
+            <p>@L["Maintenance mode must be on. You will be asked to confirm your sign-in. The upgrade needs a reason and the confirmation phrase below, typed exactly. It stops at the first failure and leaves maintenance mode on."]</p>
+            <form method="post" asp-page-handler="Apply">
+                <input type="hidden" name="BackupId" value="@p.Preflight.BackupId" />
+                <div class="field"><label for="Reason">@L["Reason"]</label><input id="Reason" name="Reason" maxlength="500" required /></div>
+                <div class="field"><label for="Confirmation">@L["Type"] <code>@p.ConfirmationPhrase</code></label><input id="Confirmation" name="Confirmation" autocomplete="off" required /></div>
+                <div class="field"><label for="ExpectedManifestSha256">@L["Manifest SHA-256 you expect (optional, from the release notes)"]</label><input id="ExpectedManifestSha256" name="ExpectedManifestSha256" maxlength="64" /></div>
+                @foreach (var w in p.Preflight.Warnings) { <div class="field"><label><input type="checkbox" name="Accepted" value="@w.Code" /> @L["I accept"] @w.Code @w.Title</label></div> }
+                <div class="actions"><button type="submit">@L["Upgrade this installation"]</button></div>
+            </form>
+        </section>
+    }
+}
+<p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

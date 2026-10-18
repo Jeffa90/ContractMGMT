@@ -61,6 +61,7 @@ public static class LifecycleModule
 
     public static IServiceCollection AddLifecycleModule(this IServiceCollection services, Action<LifecycleOptions>? configure = null)
     {
+        services.AddScoped<Ecp.SharedKernel.IUpgradeProbe, LifecycleUpgradeProbe>();
         services.AddOptions<LifecycleOptions>();
         if (configure is not null) services.Configure(configure);
         services.AddApprovalsModule();

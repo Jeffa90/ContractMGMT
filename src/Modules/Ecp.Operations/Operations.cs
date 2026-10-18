@@ -153,7 +153,9 @@ public static class OperationsModule
         services.AddSingleton<MaintenanceSnapshot>();
         services.AddScoped<IOperationLeases, OperationLeases>();
         services.AddScoped<IMaintenanceService, MaintenanceService>();
+        services.AddScoped<Ecp.SharedKernel.IMaintenanceGate, MaintenanceGate>();
         services.AddScoped<IOperationHistory, OperationHistory>();
+        services.AddScoped<IMigrationRecords, MigrationRecords>();
         services.AddSingleton(new DataDirectoryOptions { Path = dataDirectory });
         services.AddScoped<IReadinessCheck, DatabaseReadinessCheck>();
         services.AddScoped<IReadinessCheck, DataDirectoryReadinessCheck>();

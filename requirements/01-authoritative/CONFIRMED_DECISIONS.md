@@ -217,3 +217,26 @@ Source: owner instruction for the Operational Resilience vertical slice; archite
 | D10.15 | Audit evidence **records backup and restore operations without storing sensitive backup contents**. |
 | D10.16 | Existing Blank, JBS Procurement and Harborline Construction data **must survive a complete backup and restore cycle**. |
 
+## D11 Upgrade safety, pre-flight validation, N-1 to N testing and rollback evidence (OPS-02, owner instruction 2026-10-18)
+
+Source: owner instruction for OPS-02; architecture in `decisions/ADR-0035-upgrade-safety-preflight-and-rollback-by-restore.md`; behaviour in `docs/UPGRADES.md`, `docs/UPGRADE_RUNBOOK.md`, `docs/ROLLBACK_BY_RESTORE.md`. Production approval remains external governance.
+
+| ID | Decision |
+|---|---|
+| D11.1 | Upgrades are **installation-level only**. A per-tenant upgrade does not exist. |
+| D11.2 | **SQL Server is authoritative** for upgrade safety. SQLite (Demo and Test) is never evidence that an upgrade is safe. |
+| D11.3 | Upgrade **testing runs only against a restored copy**, never the active production database. |
+| D11.4 | A **verified backup is required** before a Production upgrade. |
+| D11.5 | A Production upgrade **requires maintenance mode**. |
+| D11.6 | Schema migrations are **forward-only**. |
+| D11.7 | **Application downgrade after a schema upgrade is not assumed safe.** |
+| D11.8 | **Rollback means restoring the verified pre-upgrade backup together with the matching application version.** The platform offers no downgrade operation. |
+| D11.9 | No migration may **silently rewrite audit events, immutable configuration releases, signed pack bytes or pinned workflow identifiers**. |
+| D11.10 | **Blank, JBS Procurement and Harborline Construction must survive an upgrade unchanged** (data, releases, packs, documents, wording, capabilities, regional settings, audit heads). |
+| D11.11 | **Installed packs are checked for platform-version compatibility**, and **published configuration is checked for schema compatibility**, before an upgrade; the upgrade never mutates signed bytes, republishes or moves pins to make them fit. |
+| D11.12 | **Upgrade readiness fails closed** on a critical issue. A warning may proceed only with the owner's explicit, recorded acceptance of that warning. |
+| D11.13 | **Upgrade tooling is not production approval.** A Ready outcome, a passed rehearsal or retained evidence never declares production readiness. |
+| D11.14 | A path the manifest does not list, or a database that is ahead of, partial against or inconsistent with this build, is **never described as safe**. |
+| D11.15 | The N-1 fixture is a **frozen-schema fixture populated by the current services**, not a historical binary; this is stated wherever the rehearsal is reported. |
+
+

@@ -17,6 +17,7 @@ public static class OperationsPermissions
     public const string Validate = "operations.validate";
     public const string Maintenance = "operations.maintenance";
     public const string EvidenceExport = "operations.evidence.export";
+    public const string Upgrade = "operations.upgrade";
 }
 
 public sealed record OperationsOverview(bool BackupConfigured, bool RestoreConfigured, bool DatabaseSupported, string DatabaseEngine, string UnsupportedReason, bool EncryptionRequested, bool StorageProtectionStated,

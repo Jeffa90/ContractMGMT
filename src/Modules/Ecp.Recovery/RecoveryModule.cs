@@ -34,6 +34,13 @@ public static class RecoveryModule
         services.AddScoped<IEvidenceReports, EvidenceReports>();
         services.AddScoped<ISupportBundle, SupportBundle>();
         services.AddScoped<IOperationsAdministration, OperationsAdministration>();
+        services.AddSingleton(_ => UpgradeCatalogue.Embedded());
+        services.AddScoped<IUpgradePreflight, UpgradePreflight>();
+        services.AddScoped<UpgradeService>();
+        services.AddScoped<IUpgradeService>(sp => sp.GetRequiredService<UpgradeService>());
+        services.AddScoped<IUpgradeRehearsal, UpgradeRehearsal>();
+        services.AddScoped<IRollbackEvidence, RollbackEvidenceService>();
+        services.AddScoped<IUpgradeAdministration, UpgradeAdministration>();
         services.AddScoped<IReadinessCheck, BackupReadinessCheck>();
         return services;
     }

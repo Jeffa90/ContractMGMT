@@ -1,0 +1,41 @@
+@page "/Admin/Operations/MigrationReport"
+@model Ecp.Host.Pages.Admin.Operations.MigrationReportModel
+@{ ViewData["Title"] = L["Migration report"].Value; var r = Model.Report; }
+<h1>@L["Migration report"]</h1>
+<p class="lede">@L["Every database migration of every module: applied or pending, what kind of change it makes, and whether a change that removes, rewrites or alters existing structure or data has a recorded review. Tenant security policy changes are shown too. Migrations only go forward; none is run from this page."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<section class="card" aria-labelledby="sum-h">
+    <h2 id="sum-h">@L["Summary"]</h2>
+    <dl class="facts">
+        <dt>@L["Platform version"]</dt><dd>@r.TargetVersion</dd>
+        <dt>@L["Installation is at"]</dt><dd>@r.DetectedSourceVersion (@r.State)</dd>
+        <dt>@L["Upgrade manifest SHA-256"]</dt><dd><code>@(r.ManifestSha256 ?? "none")</code></dd>
+        <dt>@L["Schema drift"]</dt><dd>@(r.Drift is null ? L["Not verified (SQL Server only)"].Value : r.Drift.Count == 0 ? L["None: the database matches the schema its history says it has"].Value : r.Drift.Count + " difference(s)")</dd>
+    </dl>
+    @foreach (var p in r.ManifestProblems) { <p><span class="badge @(p.Critical ? "bad" : "warn")">@(p.Critical ? "Critical" : "Warning")</span> <code>@p.Code</code> @p.Message</p> }
+    @if (r.Drift is { Count: > 0 } drift) { <div class="error-summary" role="alert"><h3>@L["Differences from the expected schema"]</h3><ul>@foreach (var d in drift) { <li><code>@d.Object</code>: @d.Problem</li> }</ul></div> }
+</section>
+@if (r.BreakingChanges.Count > 0) { <div class="error-summary" role="alert"><h2>@L["Breaking changes"]</h2><ul>@foreach (var b in r.BreakingChanges) { <li><code>@b.Code</code> @b.Text</li> }</ul></div> }
+@if (r.OperationalActions.Count > 0) { <section class="card"><h2>@L["Actions for the operator"]</h2><ol>@foreach (var a in r.OperationalActions) { <li><code>@a.Code</code> @a.Text</li> }</ol></section> }
+@if (r.CompatibilityWarnings.Count > 0) { <section class="card"><h2>@L["Compatibility notes"]</h2><ul>@foreach (var a in r.CompatibilityWarnings) { <li><code>@a.Code</code> @a.Text</li> }</ul></section> }
+@foreach (var m in r.Modules)
+{
+    <section class="card" aria-labelledby="m-@m.Module">
+        <h2 id="m-@m.Module">@m.Module <span class="badge @(m.Pending == 0 ? "ok" : "warn")">@m.Applied @L["applied"], @m.Pending @L["pending"]</span></h2>
+        @if (m.Pending > 0) { <p><a href="/Admin/Operations/MigrationReport?handler=Script&amp;module=@m.Module">@L["Download the SQL of the pending migrations (for review)"]</a></p> }
+        <div class="table-wrap">
+        <table>
+            <caption class="visually-hidden">@m.Module @L["migrations"]</caption>
+            <thead><tr><th scope="col">@L["Migration"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Kind of change"]</th><th scope="col">@L["Review"]</th><th scope="col">@L["Recorded checksum"]</th><th scope="col">@L["Objects touched"]</th></tr></thead>
+            <tbody>
+            @foreach (var row in m.Migrations)
+            {
+                <tr><th scope="row"><code>@row.Id</code></th><td><span class="badge @(row.Status == "Applied" ? "ok" : "warn")">@row.Status</span></td><td>@string.Join(", ", row.Categories)</td>
+                    <td>@(row.ReviewRequired ? (row.Reviewed ? "Review recorded" : "REVIEW MISSING") : "Not needed")</td><td>@(row.RecordedChecksumState ?? "-")</td><td>@string.Join("; ", row.Objects.Take(6))@(row.Objects.Count > 6 ? "…" : "")</td></tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    </section>
+}
+<p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

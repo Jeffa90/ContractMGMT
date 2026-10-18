@@ -30,3 +30,19 @@ The platform provides the tooling (`docs/BACKUP_AND_RESTORE.md`). The organisati
 - [ ] Rehearsals repeated on the organisation's chosen schedule and after a major upgrade
 
 Not covered by the tooling and therefore not verified here: IIS and Azure deployment models, point-in-time restore, per-tenant restore, remote object-store backup, offline encrypted media, and a rehearsal with the organisation's own data and storage.
+
+## Upgrade evidence (OPS-02)
+
+The platform provides the tooling (`docs/UPGRADES.md`, `docs/UPGRADE_RUNBOOK.md`, `docs/ROLLBACK_BY_RESTORE.md`). Tooling does not replace the organisation's change control, and a Ready pre-flight is not an approval to upgrade or to go live.
+
+- [ ] Upgrade policy understood: installation-level, forward-only, rollback only by restoring the verified pre-upgrade backup with the matching application version; no downgrade exists
+- [ ] The previous release's files or image are kept until each upgrade is accepted
+- [ ] Pre-flight run against the real installation and every blocker and warning read; warnings accepted by a named person, by code
+- [ ] Upgrade rehearsed on a **restored copy** (never the production database) from a verified backup; the rehearsal evidence and duration filed with the change record
+- [ ] A fresh backup taken and verified in maintenance mode immediately before the upgrade; its id recorded
+- [ ] Maintenance window, communication and change approval arranged by the organisation
+- [ ] Post-upgrade validation read and the organisation's own acceptance checks performed
+- [ ] Rollback evidence produced for the pre-upgrade backup; data-loss window and recovery time recorded against the organisation's RPO and RTO
+- [ ] Sign-off recorded by a named person (`docs/UPGRADE_RUNBOOK.md` section 10)
+
+Not covered by the tooling and therefore not verified here: IIS and Azure deployment models, zero-downtime or mixed-version operation, a previous-release binary as the N-1 source (the N-1 fixture is a frozen schema populated by current services), and an upgrade rehearsal with the organisation's own data and storage.

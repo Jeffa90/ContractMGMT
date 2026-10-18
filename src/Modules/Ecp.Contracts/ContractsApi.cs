@@ -224,6 +224,7 @@ public static class ContractsModule
 
     public static IServiceCollection AddContractsModule(this IServiceCollection services, Action<ContractsOptions> configure)
     {
+        services.AddScoped<Ecp.SharedKernel.IUpgradeProbe, ContractsUpgradeProbe>();
         services.Configure(configure);
         services.AddMetadataModule();
         services.AddModuleDbContext<ContractsDbContext>(Name, Tier, Schema);

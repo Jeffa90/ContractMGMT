@@ -1,0 +1,34 @@
+@page "/Admin/Operations/PostUpgradeValidation"
+@model Ecp.Host.Pages.Admin.Operations.PostUpgradeValidationModel
+@{ ViewData["Title"] = L["Post-upgrade validation"].Value; var v = Model.Validation; }
+<h1>@L["Post-upgrade validation"]</h1>
+<p class="lede">@L["After an upgrade the installation is held in maintenance mode until these checks pass: schema versions, migration records, tenant isolation policies, data unchanged from before the upgrade, audit chains, documents, packs and signatures, configuration hashes, pinned workflows, regional settings and assigned packs."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (v is null)
+{
+    <p>@L["No upgrade has been run on this installation yet."]</p>
+}
+else
+{
+    <section class="card" role="status" aria-labelledby="out-h">
+        <h2 id="out-h">@L["Last upgrade"]: <span class="badge @(v.Status is "Completed" ? "ok" : v.Status is "CompletedWithWarnings" ? "warn" : "bad")">@v.Status</span></h2>
+        <p>@v.Summary</p>
+        <p>@Fmt.DateTime(v.StartedUtc) @if (v.Evidence is not null) { <span>· @L["Evidence file"]: <code>@v.Evidence</code></span> }</p>
+    </section>
+    @if (v.Checks.Count > 0)
+    {
+        <div class="table-wrap">
+        <table>
+            <caption class="visually-hidden">@L["Post-upgrade validation checks"]</caption>
+            <thead><tr><th scope="col">@L["Check"]</th><th scope="col">@L["Result"]</th><th scope="col">@L["What it means"]</th><th scope="col">@L["What to do"]</th></tr></thead>
+            <tbody>
+            @foreach (var c in v.Checks)
+            {
+                <tr><th scope="row"><code>@c.Code</code> @c.Title</th><td><span class="badge @(c.Outcome == Ecp.Recovery.CheckOutcome.Passed ? "ok" : c.Outcome == Ecp.Recovery.CheckOutcome.Warning ? "warn" : "bad")">@c.Outcome</span></td><td>@c.Description</td><td>@c.Remediation</td></tr>
+            }
+            </tbody>
+        </table>
+        </div>
+    }
+}
+<p><a href="/Admin/Operations/UpgradeHistory">@L["Upgrade history"]</a> · <a href="/Admin/Operations">@L["Back to Operations"]</a></p>

@@ -61,7 +61,7 @@ Prefer a **side-by-side** restore followed by a deliberate cut-over: it keeps th
    2. Re-map the application's database login to the restored database if the login is orphaned: `ALTER USER [ecp_app] WITH LOGIN = [ecp_app];` in the restored database (and grant the `ecp_runtime` role it already holds).
    3. Change `Database__ConnectionStringRef` to a connection string for the restored database, `Ecp__DataDirectory` to `<RestoreTargetDirectory>/<database>`, and `Ecp__Packs__StorageDirectory` to `<RestoreTargetDirectory>/<database>/packs` (or move the restored folders to the usual locations).
    4. Supply the **same secrets and the same data-protection key ring** as before (backups contain neither; without the key ring, sessions and protected setup state cannot be read).
-   5. Start the application. If the restored database predates this platform version, run `dotnet Ecp.Host.dll migrate` deliberately and then validate again.
+   5. Start the application. If the restored database predates this platform version, do **not** run `migrate` on it in Production (it is refused on an existing installation): upgrade it by the procedure in `docs/UPGRADE_RUNBOOK.md` (pre-flight, then `upgrade-apply` with the backup you restored from), or restore a backup made by the version that is running. Then validate again.
    6. Run **Operations, Validation** on the running installation. Release traffic only when it passes.
 3. Write down the incident and attach the evidence (section 9).
 
@@ -133,6 +133,20 @@ This record is evidence of what ran. **It is not approval for production use**; 
 | `maintenance on\|off --reason "<why>" [--acknowledge-restore-state]` | Maintenance mode |
 | `support-bundle <file>` | Write a sanitised support bundle (`docs/SUPPORT_BUNDLE.md`) |
 | `evidence <file> [--csv]` | Write the sanitised evidence report |
+
+Upgrade commands (`docs/UPGRADE_RUNBOOK.md`; policy `docs/UPGRADES.md`):
+
+| Command | Purpose |
+|---|---|
+| `upgrade-preflight [--backup <id>] [--apply-phase] [--json <file>] [--csv <file>]` | Read-only readiness report; exit 0 only when Ready or Ready with warnings |
+| `upgrade-plan [--backup <id>]` | What would run and the words to type |
+| `migration-report` | Every migration: applied or pending, category, review, checksum agreement |
+| `upgrade-script <module> [<file>]` | The SQL pending migrations of a module would run, for review |
+| `upgrade-rehearse <id> <new database> --reason "<why>" --confirm "REHEARSE UPGRADE FROM <id>" [--accept <codes>]` | Upgrade a restored copy; the installation is untouched |
+| `upgrade-apply <id> --reason "<why>" --confirm "UPGRADE <from> TO <to>" [--accept <codes>] [--expect-sha256 <hash>]` | Upgrade the installation (verified backup and maintenance mode required) |
+| `upgrade-rollback-evidence <id> <new database> --reason "<why>" --confirm "PROVE ROLLBACK TO <id>"` | Prove rollback by restore into a new database |
+| `upgrade-history` | Rehearsals, upgrades and rollback evidence |
+| `upgrade-manifest-verify` | Check the manifest this build carries |
 
 Run as `dotnet Ecp.Host.dll <command>` (inside the container: `docker exec ecp dotnet Ecp.Host.dll <command>`). Exit codes: 0 success, 2 refused or failed, 64 usage.
 

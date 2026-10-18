@@ -10,7 +10,7 @@ namespace Ecp.Operations;
 public sealed record MaintenanceStatus(bool Enabled, string Cause, string Reason, DateTime? SinceUtc, string ChangedBy)
 {
     public static readonly MaintenanceStatus Off = new(false, MaintenanceCauses.Manual, "", null, "");
-    public bool RestoreRelated => Enabled && MaintenanceCauses.IsRestoreRelated(Cause);
+    public bool RestoreRelated => Enabled && MaintenanceCauses.IsGuarded(Cause);
 }
 
 /// <summary>The identity recorded against an operator action. Taken from the verified session by the host, never from request input.</summary>
@@ -94,6 +94,10 @@ internal sealed class MaintenanceService(OperationsDbContext db, IUnitOfWork uow
         {
             var row = await db.Maintenance.FirstOrDefaultAsync(c);
             if (row is null || !row.Enabled) return MaintenanceStatus.Off;
+            if (MaintenanceCauses.IsUpgradeRelated(row.Cause) && !acknowledgeRestoreState)
+                throw new DomainException("upgrade_state", row.Cause == MaintenanceCauses.UpgradeFailed
+                    ? "An upgrade stopped before it finished and the installation is held in maintenance mode. It stays held until an operator confirms, knowingly, that it should be released (normally after rolling back by restore)."
+                    : "An upgrade is changing the schema. Maintenance mode is released by the upgrade when its validation passes, or by an operator who confirms, knowingly, that it should be released.");
             if (MaintenanceCauses.IsRestoreRelated(row.Cause) && !acknowledgeRestoreState)
                 throw new DomainException("restore_state", row.Cause == MaintenanceCauses.RestoreFailed
                     ? "A restore failed and the installation is held in maintenance mode. It stays held until an operator confirms, knowingly, that it should be released."
@@ -108,5 +112,17 @@ internal sealed class MaintenanceService(OperationsDbContext db, IUnitOfWork uow
         }, ct);
         snapshot.Set(status);
         return status;
+    }
+}
+
+/// <summary>Refuses work that must not start while the installation is in maintenance mode, wherever it is called from (the web layer refuses requests; this covers services called by jobs and tools).</summary>
+internal sealed class MaintenanceGate(IMaintenanceService maintenance) : IMaintenanceGate
+{
+    public async Task EnsureWritableAsync(string what, CancellationToken ct = default)
+    {
+        MaintenanceStatus status;
+        try { status = await maintenance.GetAsync(ct); }
+        catch (Exception ex) when (ex is Microsoft.Data.SqlClient.SqlException or Microsoft.Data.Sqlite.SqliteException) { return; }   // the operational tables do not exist yet (before the first upgrade): nothing can be in maintenance
+        if (status.Enabled) throw new DomainException("maintenance_mode", $"{what} is not available while the installation is in maintenance mode ({status.Reason}).");
     }
 }

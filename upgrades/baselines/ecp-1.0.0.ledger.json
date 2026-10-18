@@ -1,0 +1,830 @@
+{
+  "formatVersion": 1,
+  "platformVersion": "1.0.0",
+  "generator": "10.0.12",
+  "note": "Schema state of platform 1.0.0 at the OPS-01 release (commit 67b1cee), the last release before the upgrade tooling. Frozen from the compiled migrations; never regenerated.",
+  "modules": [
+    {
+      "module": "Audit",
+      "tier": 1,
+      "schema": "audit",
+      "schemaVersion": "20261016050743_AuditEventClassification",
+      "migrations": [
+        {
+          "id": "20261016000541_Initial",
+          "checksum": "b528798c2027cd108de548e3600301744857f67535125078b6bf28b1dccdb8ae",
+          "categories": [
+            "IndexOrConstraint",
+            "RawSql",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index audit.AuditEvent.IX_AuditEvent_TenantId_CorrelationId",
+            "create index audit.AuditEvent.IX_AuditEvent_TenantId_EntityType_EntityId",
+            "create index audit.AuditEvent.IX_AuditEvent_TenantId_Sequence",
+            "create table audit.AuditEvent",
+            "ensure schema audit",
+            "sql: CREATE FUNCTION security.fn_TenantPredicate(@TenantId uniqueidentifier) RETURNS TABLE WITH\u2026",
+            "sql: CREATE FUNCTION security.fn_TenantRegistryPredicate(@TenantId uniqueidentifier) RETURNS TA\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_audit_AuditEvent] ADD FILTER PREDICATE secur\u2026",
+            "sql: CREATE TRIGGER audit.TR_AuditEvent_AppendOnly ON audit.AuditEvent INSTEAD OF UPDATE, DELET\u2026",
+            "sql: DENY UPDATE, DELETE ON audit.AuditEvent TO [ecp_runtime];",
+            "sql: GRANT SELECT ON OBJECT::security.fn_TenantPredicate TO [ecp_runtime];",
+            "sql: GRANT SELECT ON OBJECT::security.fn_TenantRegistryPredicate TO [ecp_runtime];",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[audit] TO [ecp_runtime];",
+            "sql: IF DATABASE_PRINCIPAL_ID(N\u0027ecp_runtime\u0027) IS NULL CREATE ROLE [ecp_runtime];",
+            "sql: IF SCHEMA_ID(N\u0027security\u0027) IS NULL EXEC(N\u0027CREATE SCHEMA security\u0027);"
+          ],
+          "operations": 15
+        },
+        {
+          "id": "20261016050743_AuditEventClassification",
+          "checksum": "3111223fde95a6848c6cc7eb1e3f3bdc531b0878df76b442850210418e9605a6",
+          "categories": [],
+          "objects": [
+            "add column audit.AuditEvent.Classification"
+          ],
+          "operations": 1
+        }
+      ]
+    },
+    {
+      "module": "Tenancy",
+      "tier": 2,
+      "schema": "tenancy",
+      "schemaVersion": "20261016005319_OrganisationStructure",
+      "migrations": [
+        {
+          "id": "20261016000544_Initial",
+          "checksum": "7da3f19415948ea328986d726d789f68ce5e93e3912e75ad293dfb4fe68d9778",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index tenancy.Organisation.IX_Organisation_TenantId_Name",
+            "create index tenancy.Organisation.IX_Organisation_TenantId_ReferencePrefix",
+            "create index tenancy.Tenant.IX_Tenant_Name",
+            "create table tenancy.Organisation",
+            "create table tenancy.Tenant",
+            "ensure schema tenancy",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_Organisation] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_Tenant] ADD FILTER PREDICATE securit\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[tenancy] TO [ecp_runtime];"
+          ],
+          "operations": 9
+        },
+        {
+          "id": "20261016005319_OrganisationStructure",
+          "checksum": "93d7372261946c56e7e38dd7add3d87e545000ea2ad6bd74441949ab7b01b5f2",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index tenancy.BusinessUnit.IX_BusinessUnit_TenantId_DivisionId",
+            "create index tenancy.BusinessUnit.IX_BusinessUnit_TenantId_OrganisationId_Key",
+            "create index tenancy.Division.IX_Division_TenantId_OrganisationId_Key",
+            "create index tenancy.LegalEntity.IX_LegalEntity_TenantId_OrganisationId_Key",
+            "create index tenancy.Site.IX_Site_TenantId_OrganisationId_Key",
+            "create table tenancy.BusinessUnit",
+            "create table tenancy.Division",
+            "create table tenancy.LegalEntity",
+            "create table tenancy.Site",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_BusinessUnit] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_Division] ADD FILTER PREDICATE secur\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_LegalEntity] ADD FILTER PREDICATE se\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_Site] ADD FILTER PREDICATE security.\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[tenancy] TO [ecp_runtime];"
+          ],
+          "operations": 14
+        }
+      ]
+    },
+    {
+      "module": "Identity",
+      "tier": 3,
+      "schema": "identity",
+      "schemaVersion": "20261016050707_ElevationAndPrivilegedAccess",
+      "migrations": [
+        {
+          "id": "20261016010618_Initial",
+          "checksum": "1d75eb8354dc922b0a754f36fef23c954ee99fd9e80d8b5772d4733a9b2d356d",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index identity.ExternalIdentity.IX_ExternalIdentity_TenantId_Issuer_Subject",
+            "create index identity.ExternalIdentity.IX_ExternalIdentity_TenantId_UserId",
+            "create index identity.GroupRoleMapping.IX_GroupRoleMapping_TenantId_ProviderKey_GroupKey",
+            "create index identity.IdentityProvider.IX_IdentityProvider_TenantId_Key",
+            "create index identity.RoleAssignment.IX_RoleAssignment_TenantId_RoleCode",
+            "create index identity.RoleAssignment.IX_RoleAssignment_TenantId_UserId",
+            "create index identity.UserProfile.IX_UserProfile_TenantId_EmailNormalised",
+            "create table identity.ExternalIdentity",
+            "create table identity.GroupRoleMapping",
+            "create table identity.IdentityProvider",
+            "create table identity.RoleAssignment",
+            "create table identity.UserProfile",
+            "ensure schema identity",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_ExternalIdentity] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_GroupRoleMapping] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_IdentityProvider] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_RoleAssignment] ADD FILTER PREDICAT\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_UserProfile] ADD FILTER PREDICATE s\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
+          ],
+          "operations": 19
+        },
+        {
+          "id": "20261016050707_ElevationAndPrivilegedAccess",
+          "checksum": "81d67955ce69b10d71b5930d2f6143f76181f3135b27b662850f95ed8757c323",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "add column identity.RoleAssignment.PrivilegedAccess",
+            "create index identity.Elevation.IX_Elevation_TenantId_RequestedUtc",
+            "create table identity.Elevation",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_Elevation] ADD FILTER PREDICATE sec\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
+          ],
+          "operations": 5
+        }
+      ]
+    },
+    {
+      "module": "Configuration",
+      "tier": 5,
+      "schema": "configuration",
+      "schemaVersion": "20261017024249_AddSolutionPacks",
+      "migrations": [
+        {
+          "id": "20261016010627_Initial",
+          "checksum": "36f6f98c824e62af4657749ebec2664256de637c207a72262f22fc46a8484bb1",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index configuration.ConfigurationDraft.IX_ConfigurationDraft_TenantId_OrganisationId_Kind_Status",
+            "create index configuration.ConfigurationRelease.IX_ConfigurationRelease_TenantId_OrganisationId_Kind_Number",
+            "create table configuration.ConfigurationDraft",
+            "create table configuration.ConfigurationRelease",
+            "ensure schema configuration",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ConfigurationDraft] ADD FILTER\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ConfigurationRelease] ADD FILT\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
+          ],
+          "operations": 8
+        },
+        {
+          "id": "20261017024249_AddSolutionPacks",
+          "checksum": "93a23c8f19537f390541e26d88f402ca03be97470d8b80e4fe935b06a9525439",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index configuration.InstalledPack.IX_InstalledPack_TenantId_PackKey_Version",
+            "create index configuration.InstalledPack.IX_InstalledPack_TenantId_PackageSha256",
+            "create index configuration.PackAssignment.IX_PackAssignment_TenantId_OrganisationId_Status",
+            "create index configuration.PackAssignment.IX_PackAssignment_TenantId_PackKey_Version",
+            "create index configuration.TrustedPublisherKey.IX_TrustedPublisherKey_TenantId_KeyId",
+            "create table configuration.InstalledPack",
+            "create table configuration.PackAssignment",
+            "create table configuration.TrustedPublisherKey",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_InstalledPack] ADD FILTER PRED\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_PackAssignment] ADD FILTER PRE\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_TrustedPublisherKey] ADD FILTE\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
+          ],
+          "operations": 12
+        }
+      ]
+    },
+    {
+      "module": "Approvals",
+      "tier": 6,
+      "schema": "approvals",
+      "schemaVersion": "20261016074930_Initial",
+      "migrations": [
+        {
+          "id": "20261016074930_Initial",
+          "checksum": "25b1d35b80c2ef8d59b95ded6b23a4af48068fa785efa2646f56dcbbba9f0d91",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index approvals.ApprovalDelegation.IX_ApprovalDelegation_TenantId_FromUserId_ValidToUtc",
+            "create index approvals.ApprovalDelegation.IX_ApprovalDelegation_TenantId_OrganisationId_GroupKey_ValidToUtc",
+            "create index approvals.ApprovalDelegation.IX_ApprovalDelegation_TenantId_ToUserId_ValidToUtc",
+            "create table approvals.ApprovalDelegation",
+            "ensure schema approvals",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_approvals_ApprovalDelegation] ADD FILTER PRE\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[approvals] TO [ecp_runtime];"
+          ],
+          "operations": 7
+        }
+      ]
+    },
+    {
+      "module": "Contracts",
+      "tier": 6,
+      "schema": "contracts",
+      "schemaVersion": "20261017151009_SupplierIdentifiers",
+      "migrations": [
+        {
+          "id": "20261016000547_Initial",
+          "checksum": "d30eb1ba72c026cb2ada9393648cdd2b32011b0e7a59193033f6f6beca6fd754",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index contracts.Category.IX_Category_TenantId_OrganisationId_Code",
+            "create index contracts.Category.IX_Category_TenantId_ParentCategoryId",
+            "create index contracts.Contract.IX_Contract_TenantId_AgreementReference",
+            "create index contracts.Contract.IX_Contract_TenantId_CategoryId",
+            "create index contracts.Contract.IX_Contract_TenantId_OrganisationId_CategoryId",
+            "create index contracts.Contract.IX_Contract_TenantId_OrganisationId_SourceSystem_SourceRecordId",
+            "create index contracts.Contract.IX_Contract_TenantId_SupplierId",
+            "create index contracts.Supplier.IX_Supplier_TenantId_OrganisationId_NormalisedName",
+            "create index contracts.Supplier.IX_Supplier_TenantId_OrganisationId_VendorNumber",
+            "create table contracts.Category",
+            "create table contracts.Contract",
+            "create table contracts.Supplier",
+            "ensure schema contracts",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_Category] ADD FILTER PREDICATE sec\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_Contract] ADD FILTER PREDICATE sec\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_Supplier] ADD FILTER PREDICATE sec\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];"
+          ],
+          "operations": 17
+        },
+        {
+          "id": "20261016010330_AccessScopes",
+          "checksum": "cc00084bf11c65e656f5f2630961ce3d33ba503230f35e5c2861a6e4c73d627e",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "add column contracts.Category.DivisionId",
+            "add column contracts.Contract.BusinessUnitId",
+            "add column contracts.Contract.SiteId",
+            "create index contracts.CategoryAssignment.IX_CategoryAssignment_TenantId_CategoryId_EffectiveToUtc",
+            "create index contracts.CategoryAssignment.IX_CategoryAssignment_TenantId_UserId",
+            "create table contracts.CategoryAssignment",
+            "create table contracts.ReferenceCounter",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_CategoryAssignment] ADD FILTER PRE\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_ReferenceCounter] ADD FILTER PREDI\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];"
+          ],
+          "operations": 10
+        },
+        {
+          "id": "20261016034846_MigrationSupport",
+          "checksum": "89849ed1acf2bba5a7687ac7356cb0b0151219f4f426352beade77e2bfa8291c",
+          "categories": [
+            "IndexOrConstraint"
+          ],
+          "objects": [
+            "add column contracts.Contract.ArchiveReason",
+            "add column contracts.Contract.ArchivedByBatchId",
+            "add column contracts.Contract.ArchivedUtc",
+            "add column contracts.Contract.IsArchived",
+            "create index contracts.Contract.IX_Contract_TenantId_MigrationBatchId",
+            "create index contracts.Supplier.IX_Supplier_TenantId_MigrationBatchId"
+          ],
+          "operations": 6
+        },
+        {
+          "id": "20261016051447_LifecycleSupport",
+          "checksum": "a45a692acccd3847f09d6802f25021389051d863f5a58f14058f2ec30c6e66dd",
+          "categories": [
+            "IndexOrConstraint"
+          ],
+          "objects": [
+            "add column contracts.Contract.ActiveUnlockId",
+            "add column contracts.Contract.ConfigReleaseId",
+            "add column contracts.Contract.ContentFrozen",
+            "add column contracts.Contract.CriticalNotice",
+            "add column contracts.Contract.DocumentPolicy",
+            "add column contracts.Contract.LockReason",
+            "add column contracts.Contract.LockedBy",
+            "add column contracts.Contract.NoticePeriodDays",
+            "add column contracts.Contract.PredecessorContractId",
+            "add column contracts.Contract.ReminderLeadDays",
+            "add column contracts.Contract.SuccessorContractId",
+            "add column contracts.Contract.UnlockExpiresUtc",
+            "add column contracts.Contract.WorkflowRef",
+            "create index contracts.Contract.IX_Contract_TenantId_EndDate",
+            "create index contracts.Contract.IX_Contract_TenantId_OrganisationId_Status",
+            "create index contracts.Contract.IX_Contract_TenantId_PredecessorContractId",
+            "create index contracts.Contract.IX_Contract_TenantId_ReviewDate",
+            "create index contracts.Contract.IX_Contract_TenantId_SuccessorContractId"
+          ],
+          "operations": 18
+        },
+        {
+          "id": "20261016113856_CoreMetadata",
+          "checksum": "0abc05a565601242e3d8e7731aee8b9a9cebbe476d3f88303d58cd780304526e",
+          "categories": [
+            "DataRewrite",
+            "IndexOrConstraint"
+          ],
+          "objects": [
+            "add column contracts.Contract.AgreementType",
+            "add column contracts.Contract.ContractType",
+            "add column contracts.Contract.FunctionCode",
+            "add column contracts.Contract.LegalEntityId",
+            "add column contracts.Contract.NoticePeriodUnit",
+            "add column contracts.Contract.NoticePeriodValue",
+            "add column contracts.Contract.RiskLevel",
+            "add column contracts.Contract.SapOutlineAgreementNumber",
+            "add column contracts.Supplier.SupplierType",
+            "create index contracts.Contract.IX_Contract_TenantId_OrganisationId_BusinessUnitId",
+            "create index contracts.Contract.IX_Contract_TenantId_OrganisationId_ContractType",
+            "create index contracts.Contract.IX_Contract_TenantId_OrganisationId_LegalEntityId",
+            "create index contracts.Contract.IX_Contract_TenantId_OrganisationId_RiskLevel",
+            "create index contracts.Contract.IX_Contract_TenantId_OrganisationId_SiteId",
+            "create index contracts.Supplier.IX_Supplier_TenantId_OrganisationId_SupplierType",
+            "sql: UPDATE [contracts].[Contract] SET [NoticePeriodValue] = [NoticePeriodDays], [NoticePeriodU\u2026"
+          ],
+          "operations": 16
+        },
+        {
+          "id": "20261016114641_CustomFieldValues",
+          "checksum": "70526e67379bfb49a1dcc0a2e0dd1dac906aebd1a6b80d6af19c95e311b55bef",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index contracts.ContractCustomValue.IX_ContractCustomValue_TenantId_MigrationBatchId",
+            "create index contracts.ContractCustomValue.IX_ContractCustomValue_TenantId_OrganisationId_FieldKey",
+            "create index contracts.ContractCustomValue.IX_CustomValue_Bool",
+            "create index contracts.ContractCustomValue.IX_CustomValue_Date",
+            "create index contracts.ContractCustomValue.IX_CustomValue_DateTime",
+            "create index contracts.ContractCustomValue.IX_CustomValue_Number",
+            "create index contracts.ContractCustomValue.IX_CustomValue_Ref",
+            "create index contracts.ContractCustomValue.IX_CustomValue_Text",
+            "create table contracts.ContractCustomValue",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_ContractCustomValue] ADD FILTER PR\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];"
+          ],
+          "operations": 11
+        },
+        {
+          "id": "20261016122859_SavedViews",
+          "checksum": "9f54a5f16b759457c5f1326482b313b53a8aaeb29ae683a94fa03d242c7c7656",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index contracts.SavedView.IX_SavedView_TenantId_OwnerUserId_Name",
+            "create table contracts.SavedView",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_SavedView] ADD FILTER PREDICATE se\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];"
+          ],
+          "operations": 4
+        },
+        {
+          "id": "20261017151009_SupplierIdentifiers",
+          "checksum": "4e7badf3a0ec6e31d51244b288b5470515b0666a90a04003e016a21ea6d5e90f",
+          "categories": [
+            "DataRewrite",
+            "IndexOrConstraint",
+            "RowLevelSecurity",
+            "SchemaAlteration"
+          ],
+          "objects": [
+            "ALTER COLUMN contracts.Supplier.Abn",
+            "add column contracts.Supplier.AddressCountry",
+            "add column contracts.Supplier.AddressLine1",
+            "add column contracts.Supplier.AddressLine2",
+            "add column contracts.Supplier.AddressLocality",
+            "add column contracts.Supplier.AddressPostal",
+            "add column contracts.Supplier.AddressRegion",
+            "create index contracts.SupplierIdentifier.IX_SupplierIdentifier_TenantId_MigrationBatchId",
+            "create index contracts.SupplierIdentifier.IX_SupplierIdentifier_TenantId_OrganisationId_TypeKey_NormalisedValue",
+            "create index contracts.SupplierIdentifier.IX_SupplierIdentifier_TenantId_SupplierId_TypeKey",
+            "create table contracts.SupplierIdentifier",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_SupplierIdentifier] ADD FILTER PRE\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];",
+            "sql: INSERT INTO [contracts].[SupplierIdentifier] ([Id], [TenantId], [OrganisationId], [Supplie\u2026"
+          ],
+          "operations": 14
+        }
+      ]
+    },
+    {
+      "module": "Documents",
+      "tier": 6,
+      "schema": "documents",
+      "schemaVersion": "20261016034900_MigrationSupport",
+      "migrations": [
+        {
+          "id": "20261016000551_Initial",
+          "checksum": "04ef7c87b249988ffeb050c2805ef94999f0a172d1497cdd3f32d065350ddf2f",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index documents.Document.IX_Document_TenantId_ContractId",
+            "create index documents.Document.IX_Document_TenantId_OrganisationId_SourceSystem_DocumentSourceId",
+            "create index documents.DocumentVersion.IX_DocumentVersion_TenantId_DocumentId_VersionNumber",
+            "create index documents.DocumentVersion.IX_DocumentVersion_TenantId_Sha256",
+            "create table documents.Document",
+            "create table documents.DocumentVersion",
+            "ensure schema documents",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_documents_DocumentVersion] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_documents_Document] ADD FILTER PREDICATE sec\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[documents] TO [ecp_runtime];"
+          ],
+          "operations": 10
+        },
+        {
+          "id": "20261016034900_MigrationSupport",
+          "checksum": "a8e8fc6d1a1864a8a7359b507024be2ca83937ac3b22705f1554ade7093948de",
+          "categories": [
+            "IndexOrConstraint"
+          ],
+          "objects": [
+            "add column documents.Document.ArchiveReason",
+            "add column documents.Document.ParentDocumentId",
+            "add column documents.DocumentVersion.MigrationBatchId",
+            "create index documents.Document.IX_Document_TenantId_MigrationBatchId",
+            "create index documents.DocumentVersion.IX_DocumentVersion_TenantId_MigrationBatchId"
+          ],
+          "operations": 5
+        }
+      ]
+    },
+    {
+      "module": "Lifecycle",
+      "tier": 7,
+      "schema": "lifecycle",
+      "schemaVersion": "20261017040140_SignatureRequestVocabulary",
+      "migrations": [
+        {
+          "id": "20261016060002_Initial",
+          "checksum": "a1b621fad61027006269e9d36778f92dc3842b96db84f37fd470eadcc1efed94",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index lifecycle.ApprovalRequest.IX_ApprovalRequest_TenantId_ContractId_SubmittedUtc",
+            "create index lifecycle.ApprovalRequest.IX_ApprovalRequest_TenantId_Status_SubmittedUtc",
+            "create index lifecycle.ApprovalRequest.IX_ApprovalRequest_TenantId_SubjectKind_SubjectId",
+            "create index lifecycle.ExecutionRecord.IX_ExecutionRecord_TenantId_Provider_EnvelopeId",
+            "create index lifecycle.ExecutionRecord.IX_ExecutionRecord_TenantId_SubjectKind_SubjectId_IsCurrent",
+            "create index lifecycle.LegalAttachment.IX_LegalAttachment_TenantId_RoundId",
+            "create index lifecycle.LegalComment.IX_LegalComment_TenantId_RoundId_CreatedUtc",
+            "create index lifecycle.LegalEvent.IX_LegalEvent_TenantId_ReviewId_Sequence",
+            "create index lifecycle.LegalReview.IX_LegalReview_TenantId_ContractId",
+            "create index lifecycle.LegalReview.IX_LegalReview_TenantId_Status_LastActivityUtc",
+            "create index lifecycle.LegalReview.IX_LegalReview_TenantId_SubjectKind_SubjectId",
+            "create index lifecycle.LegalRound.IX_LegalRound_TenantId_ReviewId_Number",
+            "create index lifecycle.LifecycleEvent.IX_LifecycleEvent_TenantId_ContractId_CreatedUtc",
+            "create index lifecycle.LifecycleEvent.IX_LifecycleEvent_TenantId_DispatchedUtc_CreatedUtc",
+            "create index lifecycle.RecordUnlock.IX_RecordUnlock_TenantId_ClosedUtc_ExpiresUtc",
+            "create index lifecycle.RecordUnlock.IX_RecordUnlock_TenantId_ContractId_OpenedUtc",
+            "create index lifecycle.Renewal.IX_Renewal_TenantId_PredecessorContractId_Status",
+            "create index lifecycle.Renewal.IX_Renewal_TenantId_SuccessorContractId",
+            "create index lifecycle.Renewal.UX_Renewal_OneInProgress",
+            "create index lifecycle.StatusHistory.IX_StatusHistory_TenantId_ContractId_Sequence",
+            "create index lifecycle.StatusHistory.IX_StatusHistory_TenantId_SubjectId_ClientRequestId",
+            "create index lifecycle.StatusHistory.IX_StatusHistory_TenantId_SubjectId_OccurredUtc",
+            "create index lifecycle.SubjectDocument.IX_SubjectDocument_TenantId_SubjectKind_SubjectId_DocumentId",
+            "create index lifecycle.Variation.IX_Variation_TenantId_ContractId_Sequence",
+            "create index lifecycle.Variation.IX_Variation_TenantId_IsOpen_UpdatedUtc",
+            "create index lifecycle.Variation.IX_Variation_TenantId_Reference",
+            "create index lifecycle.Variation.UX_Variation_OneOpen",
+            "create table lifecycle.ApprovalRequest",
+            "create table lifecycle.ExecutionRecord",
+            "create table lifecycle.LegalAttachment",
+            "create table lifecycle.LegalComment",
+            "create table lifecycle.LegalEvent",
+            "create table lifecycle.LegalReview",
+            "create table lifecycle.LegalRound",
+            "create table lifecycle.LifecycleEvent",
+            "create table lifecycle.RecordUnlock",
+            "create table lifecycle.Renewal",
+            "create table lifecycle.StatusHistory",
+            "create table lifecycle.SubjectDocument",
+            "create table lifecycle.Variation",
+            "ensure schema lifecycle",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_ApprovalRequest] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_ExecutionRecord] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalAttachment] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalComment] ADD FILTER PREDICATE\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalEvent] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalReview] ADD FILTER PREDICATE \u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalRound] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LifecycleEvent] ADD FILTER PREDICA\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_RecordUnlock] ADD FILTER PREDICATE\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_Renewal] ADD FILTER PREDICATE secu\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_StatusHistory] ADD FILTER PREDICAT\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_SubjectDocument] ADD FILTER PREDIC\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_Variation] ADD FILTER PREDICATE se\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[lifecycle] TO [ecp_runtime];"
+          ],
+          "operations": 55
+        },
+        {
+          "id": "20261016074947_AddApprovalPlans",
+          "checksum": "e6ba70e588471c3accc7769bd69596a563742f7579b5c206ef76c4d223f04a82",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "add column lifecycle.ApprovalRequest.ActiveGroupKeys",
+            "add column lifecycle.ApprovalRequest.MatrixCode",
+            "add column lifecycle.ApprovalRequest.MatrixRelease",
+            "add column lifecycle.ApprovalRequest.PlanJson",
+            "add column lifecycle.ApprovalRequest.PlanSha256",
+            "add unique constraint lifecycle.ApprovalRequest.AK_ApprovalRequest_TenantId_Id",
+            "create index lifecycle.ApprovalStepResponse.IX_ApprovalStepResponse_TenantId_RequestId_Sequence",
+            "create index lifecycle.ApprovalStepResponse.IX_ApprovalStepResponse_TenantId_RequestId_StepKey_UserId",
+            "create table lifecycle.ApprovalStepResponse",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_ApprovalStepResponse] ADD FILTER P\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[lifecycle] TO [ecp_runtime];"
+          ],
+          "operations": 11
+        },
+        {
+          "id": "20261017040140_SignatureRequestVocabulary",
+          "checksum": "2be2bd753353b0bba94ba3c2cac9142e75385e91db1934420d5b9a887f99e1ee",
+          "categories": [
+            "IndexOrConstraint",
+            "RawSql",
+            "RowLevelSecurity",
+            "SchemaAlteration"
+          ],
+          "objects": [
+            "DROP INDEX lifecycle.ExecutionRecord.IX_ExecutionRecord_TenantId_Provider_EnvelopeId",
+            "RENAME COLUMN lifecycle.SignatureRequest.EnvelopeId",
+            "RENAME COLUMN lifecycle.SignatureRequest.ExecutedUtc",
+            "RENAME COLUMN lifecycle.SignatureRequest.StartedBy",
+            "RENAME COLUMN lifecycle.SignatureRequest.StartedUtc",
+            "RENAME TABLE lifecycle.ExecutionRecord",
+            "add column lifecycle.SignatureRequest.CorrelationId",
+            "add column lifecycle.SignatureRequest.FailureCode",
+            "add column lifecycle.SignatureRequest.FailureMessage",
+            "add column lifecycle.SignatureRequest.IdempotencyKey",
+            "add column lifecycle.SignatureRequest.LastProviderEventUtc",
+            "add column lifecycle.SignatureRequest.ProviderStatus",
+            "create index lifecycle.SignatureProviderEvent.IX_SignatureProviderEvent_TenantId_Outcome_ReceivedUtc",
+            "create index lifecycle.SignatureProviderEvent.IX_SignatureProviderEvent_TenantId_Provider_ProviderEventId",
+            "create index lifecycle.SignatureRequest.IX_SignatureRequest_TenantId_IdempotencyKey",
+            "create index lifecycle.SignatureRequest.IX_SignatureRequest_TenantId_Provider_ProviderRequestId",
+            "create table lifecycle.SignatureProviderEvent",
+            "rename index lifecycle.SignatureRequest.IX_ExecutionRecord_TenantId_SubjectKind_SubjectId_IsCurrent",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_SignatureProviderEvent] ADD FILTER\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_SignatureRequest] ADD FILTER PREDI\u2026",
+            "sql: DROP SECURITY POLICY IF EXISTS security.[TenantPolicy_lifecycle_ExecutionRecord];",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[lifecycle] TO [ecp_runtime];",
+            "sql: IF OBJECT_ID(N\u0027[lifecycle].[PK_ExecutionRecord]\u0027, N\u0027PK\u0027) IS NOT NULL EXEC sp_rename N\u0027[lif\u2026"
+          ],
+          "operations": 23
+        }
+      ]
+    },
+    {
+      "module": "Migration",
+      "tier": 7,
+      "schema": "migration",
+      "schemaVersion": "20261016034919_MigrationSlice",
+      "migrations": [
+        {
+          "id": "20261016000554_Initial",
+          "checksum": "bbb680aca2b318c3f0378e38e56afa708bfba4a607e4d267bab4934a4c626b23",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index migration.MigrationBatch.IX_MigrationBatch_TenantId_ProjectId",
+            "create index migration.MigrationProject.IX_MigrationProject_TenantId_OrganisationId_Name",
+            "create table migration.MigrationBatch",
+            "create table migration.MigrationProject",
+            "ensure schema migration",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MigrationBatch] ADD FILTER PREDICA\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MigrationProject] ADD FILTER PREDI\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
+          ],
+          "operations": 8
+        },
+        {
+          "id": "20261016034919_MigrationSlice",
+          "checksum": "49335c5bd7d6bd096991c1a2623ea4dd92711465b7cade3183bb2c2882596439",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "add column migration.MigrationBatch.AcceptanceNote",
+            "add column migration.MigrationBatch.CommitCompletedUtc",
+            "add column migration.MigrationBatch.CommitStartedUtc",
+            "add column migration.MigrationBatch.CommittedBy",
+            "add column migration.MigrationBatch.CommittedByUserId",
+            "add column migration.MigrationBatch.ConfigReleaseNumber",
+            "add column migration.MigrationBatch.ConfirmedBy",
+            "add column migration.MigrationBatch.ConfirmedByUserId",
+            "add column migration.MigrationBatch.ConfirmedFingerprint",
+            "add column migration.MigrationBatch.ConfirmedUtc",
+            "add column migration.MigrationBatch.CreatedBy",
+            "add column migration.MigrationBatch.CreatedByUserId",
+            "add column migration.MigrationBatch.LeaseExpiresUtc",
+            "add column migration.MigrationBatch.LeaseOwner",
+            "add column migration.MigrationBatch.Name",
+            "add column migration.MigrationBatch.RollbackReason",
+            "add column migration.MigrationBatch.RolledBackBy",
+            "add column migration.MigrationBatch.RolledBackUtc",
+            "add column migration.MigrationBatch.ValidatedUtc",
+            "add column migration.MigrationBatch.ValidationFingerprint",
+            "add column migration.MigrationBatch.ValidationSummaryJson",
+            "add column migration.MigrationProject.CreatedBy",
+            "add column migration.MigrationProject.LegacyAllowOverwriteLocked",
+            "add column migration.MigrationProject.LegacyAllowedStatusCodes",
+            "add column migration.MigrationProject.LegacyOverwriteReason",
+            "add column migration.MigrationProject.ReferencePolicy",
+            "add column migration.MigrationProject.Status",
+            "add column migration.MigrationProject.TargetFreezeEnabled",
+            "add foreign key migration.MigrationBatch.FK_MigrationBatch_MappingProfileVersion_TenantId_MappingProfileVersionId",
+            "add unique constraint migration.MigrationBatch.AK_MigrationBatch_TenantId_Id",
+            "create index migration.AttachmentManifestEntry.IX_AttachmentManifestEntry_TenantId_BatchId_Sequence",
+            "create index migration.Checkpoint.IX_Checkpoint_TenantId_BatchId_Phase",
+            "create index migration.MappingProfile.IX_MappingProfile_TenantId_OrganisationId_Name",
+            "create index migration.MappingProfileVersion.IX_MappingProfileVersion_TenantId_ProfileId_VersionNumber",
+            "create index migration.MatchProposal.IX_MatchProposal_TenantId_BatchId_StagedFileId",
+            "create index migration.MatchProposal.IX_MatchProposal_TenantId_ContractStagingRowId",
+            "create index migration.MatchProposal.IX_MatchProposal_TenantId_StagedFileId",
+            "create index migration.MigrationBatch.IX_MigrationBatch_TenantId_MappingProfileVersionId",
+            "create index migration.ProvenanceRecord.IX_ProvenanceRecord_TenantId_BatchId_ReversalState",
+            "create index migration.ProvenanceRecord.IX_ProvenanceRecord_TenantId_BatchId_TargetEntityType_TargetEntityId_Action",
+            "create index migration.ProvenanceRecord.IX_ProvenanceRecord_TenantId_TargetEntityType_TargetEntityId",
+            "create index migration.ReconciliationReport.IX_ReconciliationReport_TenantId_BatchId_Sequence",
+            "create index migration.SourceFile.IX_SourceFile_TenantId_BatchId_Role",
+            "create index migration.StagedFile.IX_StagedFile_TenantId_BatchId_RelativePath",
+            "create index migration.StagedFile.IX_StagedFile_TenantId_BatchId_State",
+            "create index migration.StagedFile.IX_StagedFile_TenantId_Sha256",
+            "create index migration.StagingMessage.IX_StagingMessage_TenantId_BatchId_Phase_Severity_Code",
+            "create index migration.StagingMessage.IX_StagingMessage_TenantId_BatchId_SubjectId",
+            "create index migration.StagingRow.IX_StagingRow_TenantId_BatchId_Outcome",
+            "create index migration.StagingRow.IX_StagingRow_TenantId_BatchId_Sequence",
+            "create table migration.AttachmentManifestEntry",
+            "create table migration.Checkpoint",
+            "create table migration.MappingProfile",
+            "create table migration.MappingProfileVersion",
+            "create table migration.MatchProposal",
+            "create table migration.ProvenanceRecord",
+            "create table migration.ReconciliationReport",
+            "create table migration.SourceFile",
+            "create table migration.StagedFile",
+            "create table migration.StagingMessage",
+            "create table migration.StagingRow",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_AttachmentManifestEntry] ADD FILTE\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_Checkpoint] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MappingProfileVersion] ADD FILTER \u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MappingProfile] ADD FILTER PREDICA\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MatchProposal] ADD FILTER PREDICAT\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_ProvenanceRecord] ADD FILTER PREDI\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_ReconciliationReport] ADD FILTER P\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_SourceFile] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_StagedFile] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_StagingMessage] ADD FILTER PREDICA\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_StagingRow] ADD FILTER PREDICATE s\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
+          ],
+          "operations": 73
+        }
+      ]
+    },
+    {
+      "module": "Operations",
+      "tier": 8,
+      "schema": "ops",
+      "schemaVersion": "20261017231302_Initial",
+      "migrations": [
+        {
+          "id": "20261017231302_Initial",
+          "checksum": "be03fb7bbc96b6a37325c0d63241f13b3c1f3d253f9a28c021a422631968eef8",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index ops.OperationLease.IX_OperationLease_TenantId_Name_ScopeKey",
+            "create index ops.OperationRun.IX_OperationRun_TenantId_Kind_StartedUtc",
+            "create index ops.OperationRun.IX_OperationRun_TenantId_Reference",
+            "create table ops.MaintenanceState",
+            "create table ops.OperationLease",
+            "create table ops.OperationRun",
+            "ensure schema ops",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_MaintenanceState] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_OperationLease] ADD FILTER PREDICATE sec\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_OperationRun] ADD FILTER PREDICATE secur\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
+          ],
+          "operations": 11
+        }
+      ]
+    },
+    {
+      "module": "Notifications",
+      "tier": 9,
+      "schema": "notifications",
+      "schemaVersion": "20261016061227_Initial",
+      "migrations": [
+        {
+          "id": "20261016061227_Initial",
+          "checksum": "67a8606cb23e736a1610c0a4ea585d70cdc2106d83d54f1cf7dabe54db4b2c74",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index notifications.CapturedEmail.IX_CapturedEmail_TenantId_CapturedUtc",
+            "create index notifications.DeliveryAttempt.IX_DeliveryAttempt_TenantId_DeliveryId_Number",
+            "create index notifications.DispatchCursor.IX_DispatchCursor_TenantId_Source",
+            "create index notifications.JobRun.IX_JobRun_TenantId_JobName_StartedUtc",
+            "create index notifications.Notification.IX_Notification_TenantId_ContractId_CreatedUtc",
+            "create index notifications.Notification.IX_Notification_TenantId_DedupeKey",
+            "create index notifications.Notification.IX_Notification_TenantId_RecipientUserId_CreatedUtc",
+            "create index notifications.NotificationDelivery.IX_NotificationDelivery_TenantId_NotificationId_Channel",
+            "create index notifications.NotificationDelivery.IX_NotificationDelivery_TenantId_Status_NextAttemptUtc",
+            "create index notifications.ReminderTracking.IX_ReminderTracking_TenantId_ContractId",
+            "create index notifications.ReminderWindow.IX_ReminderWindow_TenantId_ContractId_Kind_WindowDays_DueDate",
+            "create table notifications.CapturedEmail",
+            "create table notifications.DeliveryAttempt",
+            "create table notifications.DispatchCursor",
+            "create table notifications.JobRun",
+            "create table notifications.Notification",
+            "create table notifications.NotificationDelivery",
+            "create table notifications.ReminderTracking",
+            "create table notifications.ReminderWindow",
+            "ensure schema notifications",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_CapturedEmail] ADD FILTER PRED\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_DeliveryAttempt] ADD FILTER PR\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_DispatchCursor] ADD FILTER PRE\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_JobRun] ADD FILTER PREDICATE s\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_NotificationDelivery] ADD FILT\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_Notification] ADD FILTER PREDI\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_ReminderTracking] ADD FILTER P\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_ReminderWindow] ADD FILTER PRE\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[notifications] TO [ecp_runtime];"
+          ],
+          "operations": 29
+        }
+      ]
+    },
+    {
+      "module": "Setup",
+      "tier": 9,
+      "schema": "setup",
+      "schemaVersion": "20261016020943_OnboardingLedger",
+      "migrations": [
+        {
+          "id": "20261016015437_Initial",
+          "checksum": "bc7ee670bea42dd4af0187d6000cc115681c732b575a5a78b58c82f958343a92",
+          "categories": [
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create table setup.SetupRecord",
+            "ensure schema setup",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_setup_SetupRecord] ADD FILTER PREDICATE secu\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[setup] TO [ecp_runtime];"
+          ],
+          "operations": 4
+        },
+        {
+          "id": "20261016020943_OnboardingLedger",
+          "checksum": "9d0e1c2a6521d5302460a60a8c20844de8416edbfd2ca5833b2a8cbb3a5afd84",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index setup.OnboardingItem.IX_OnboardingItem_TenantId_OrganisationId_ItemType_ItemKey",
+            "create table setup.OnboardingItem",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_setup_OnboardingItem] ADD FILTER PREDICATE s\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[setup] TO [ecp_runtime];"
+          ],
+          "operations": 4
+        }
+      ]
+    }
+  ],
+  "ledgerSha256": "dc6242cab14aa459f345e553cdd3a7d90e249fba69552e6ef552750c3c5aa64f"
+}

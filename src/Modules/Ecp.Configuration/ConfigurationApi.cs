@@ -42,6 +42,12 @@ public interface IConfigurationKind
     Task ApplyAsync(Guid organisationId, string contentJson, string? previousContentJson, int releaseNumber, Guid releaseId, CancellationToken ct);
 
     /// <summary>The permissions the lifecycle asks for on this kind. Most kinds share the general configuration permissions; a kind whose content is low-risk and separately administered (terminology) names its own, so it can be delegated without handing out the general ones.</summary>
+    /// <summary>
+    /// The check the upgrade pre-flight makes of a published release or open draft of this kind: can the version being upgraded to still read it? It runs with no signed-in person, so a kind whose full validation needs one
+    /// (for example, to see the fields a person may use) overrides this with the structural checks that do not. The default is the full validation.
+    /// </summary>
+    Task<ValidationReport> ValidateForUpgradeAsync(Guid organisationId, string contentJson, CancellationToken ct) => ValidateAsync(organisationId, contentJson, ct);
+
     string DraftPermission => "config.draft";
     string PublishPermission => "config.publish";
     string RollbackPermission => "config.rollback";
@@ -116,7 +122,7 @@ public sealed class ConfigurationOptions
 
 internal sealed class ConfigurationService(
     ConfigurationDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IAccessService access, CurrentUser currentUser,
-    IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor, IPublishedConfigurationCache cache, IAfterCommit afterCommit) : IConfigurationService, IConfigurationBootstrap, IConfigurationReleases
+    IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor, IPublishedConfigurationCache cache, IAfterCommit afterCommit, IMaintenanceGate? maintenanceGate = null) : IConfigurationService, IConfigurationBootstrap, IConfigurationReleases
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -203,6 +209,7 @@ internal sealed class ConfigurationService(
 
     public async Task<ReleaseDto> PublishAsync(Guid draftId, string note, CancellationToken ct = default)
     {
+        if (maintenanceGate is not null) await maintenanceGate.EnsureWritableAsync("Publishing configuration", ct);
         var draft = await db.Drafts.FirstOrDefaultAsync(d => d.Id == draftId, ct) ?? throw new ResourceNotFoundException();
         await access.RequireAsync(KindOf(draft.Kind).PublishPermission, Describe(draft.OrganisationId, draft.Kind), ct);
         var publisher = await EditorLabelAsync(ct);
@@ -239,6 +246,7 @@ internal sealed class ConfigurationService(
 
     public async Task<ReleaseDto> RollbackAsync(string kind, Guid organisationId, int toReleaseNumber, string reason, CancellationToken ct = default)
     {
+        if (maintenanceGate is not null) await maintenanceGate.EnsureWritableAsync("Rolling back configuration", ct);
         await access.RequireAsync(KindOf(kind).RollbackPermission, Describe(organisationId, kind), ct);
         var why = Guard.NotBlank(reason, "Reason", 1000);
         var target = await db.Releases.AsNoTracking().FirstOrDefaultAsync(r => r.OrganisationId == organisationId && r.Kind == kind && r.Number == toReleaseNumber, ct)
@@ -443,6 +451,8 @@ public static class ConfigurationModule
         services.AddScoped<PackTrustEvaluator>();
         services.AddScoped<IPackLoader, PackLoader>();
         services.AddScoped<IConfigurationInventory, ConfigurationInventory>();
+        services.AddScoped<IUpgradeProbe, ConfigurationUpgradeProbe>();
+        services.AddScoped<IUpgradeProbe, PackUpgradeProbe>();
         services.AddScoped<PackValidationService>();
         services.AddScoped<IPackManager, PackManager>();
         services.AddScoped<IPackAssignments, PackAssignments>();

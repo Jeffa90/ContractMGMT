@@ -42,6 +42,17 @@ internal sealed class HarborlineWorld
 
     private HarborlineWorld(TestApp app) { App = app; }
 
+    /// <summary>The same business (its tenant, organisation, people, sites and trades) as seen through another installation of the same data: a restored or upgraded copy. Nothing is created.</summary>
+    public HarborlineWorld On(TestApp other)
+    {
+        var copy = new HarborlineWorld(other) { TenantId = TenantId, Org = Org, Subcontractor = Subcontractor, PackVersion = PackVersion, _n = _n + 1000 };
+        foreach (var (k, v) in Users) copy.Users[k] = v;
+        foreach (var (k, v) in Categories) copy.Categories[k] = v;
+        foreach (var (k, v) in Sites) copy.Sites[k] = v;
+        foreach (var (k, v) in Divisions) copy.Divisions[k] = v;
+        return copy;
+    }
+
     /// <summary>The bytes of the pack exactly as the build produces them (unsigned; the signed copy is a separate test).</summary>
     public static byte[] PackBytes() => File.ReadAllBytes(Path.Combine(TestShippedPacks.UnsignedDirectory, $"{PackKey}-{ShippedVersion}.ecpkg"));
 

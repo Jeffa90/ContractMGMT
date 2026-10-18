@@ -100,6 +100,7 @@ public static class NotificationsModule
 
     public static IServiceCollection AddNotificationsModule(this IServiceCollection services, Action<NotificationsOptions>? configure = null)
     {
+        services.AddScoped<Ecp.SharedKernel.IUpgradeProbe, NotificationsUpgradeProbe>();
         services.AddOptions<NotificationsOptions>();
         if (configure is not null) services.Configure(configure);
         services.AddModuleDbContext<NotificationsDbContext>(Name, Tier, Schema);

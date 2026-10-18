@@ -32,7 +32,7 @@ public sealed class FrozenIdentifierTests
             "contracts.suspend", "contracts.unlock_emergency", "disposition.administer", "disposition.approve", "disposition.request", "documents.download",
             "documents.upload", "identity.configure", "integrations.manage", "legal.clear", "legal.markup", "legal.respond", "legal.review", "legalhold.manage",
             "migration.accept", "migration.commit", "migration.legacy_load", "migration.rollback", "migration.stage", "notifications.administer", "onboarding.run",
-            "operations.backup", "operations.evidence.export", "operations.maintenance", "operations.read", "operations.restore", "operations.validate", "ops.manage", "org.structure.manage", "organisations.manage", "packages.export", "packages.import", "packs.assign", "packs.audit.read", "packs.install",
+            "operations.backup", "operations.evidence.export", "operations.maintenance", "operations.read", "operations.restore", "operations.upgrade", "operations.validate", "ops.manage", "org.structure.manage", "organisations.manage", "packages.export", "packages.import", "packs.assign", "packs.audit.read", "packs.install",
             "packs.read", "packs.retire", "packs.trust.manage", "packs.upload", "packs.validate", "records.export", "records.read_privileged", "reminders.configure",
             "renewals.create", "reporting.external", "retention.manage", "rolemappings.manage", "roles.delegate", "secrets.manage", "settings.operational", "setup.run",
             "suppliers.manage", "suppliers.read", "support.elevate", "system.configure", "templates.manage", "tenant.configure", "tenants.manage",

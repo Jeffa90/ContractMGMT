@@ -26,7 +26,8 @@ One row per (name, scope): `Name` (lower-case letters, digits and `. _ : -`), `S
 
 | Lease | Scope | Held by |
 |---|---|---|
-| `recovery.exclusive` | `installation` | Backup, restore, and validation of the running installation |
+| `recovery.exclusive` | `installation` | Backup, restore, validation of the running installation, and an upgrade |
+| `upgrade.exclusive` | `installation` | An upgrade (OPS-02), held together with `recovery.exclusive`: names the upgrade in progress and keeps a second upgrade, backup, restore or validation out. A lease lost mid-run aborts the upgrade |
 | `background.jobs` | the tenant id | One tenant's background-job cycle (notification generation, delivery, reminders, unlock expiry), so two instances sharing a database never run the same tenant's jobs at once |
 
 Not leased (and documented, not hidden): jobs inside one instance run one tenant at a time already, and every job is safe to repeat, so a lease is a protection against duplicate work, not the only one.

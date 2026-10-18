@@ -1,5 +1,7 @@
 # Backup and restore (OPS-01, OPS-02 foundation)
 
+> Upgrades (OPS-02) build on this document: a verified backup is required before a Production upgrade, and rollback is restoring one. See `docs/UPGRADES.md` and `docs/ROLLBACK_BY_RESTORE.md`.
+
 Status: **Implemented** for SQL Server with the local file system document store, verified in CI against a real SQL Server (see section 15). Owner decisions: `requirements/01-authoritative/CONFIRMED_DECISIONS.md`, section D10. Architecture decision: `decisions/ADR-0034-operational-resilience-backup-restore-maintenance-and-leases.md`. Companions: `docs/OPERATIONS_RUNBOOK.md` (what to do, step by step), `docs/DISASTER_RECOVERY.md`, `docs/MAINTENANCE_MODE.md`, `docs/OPERATION_LEASES.md`, `docs/SUPPORT_BUNDLE.md`.
 
 > **Having backup tooling is not having a recovery plan, and it is not production approval.** This platform gives a trained operator the means to create, verify and restore a complete installation backup, and it records evidence of doing so. It does **not** decide how often to back up, how long to keep backups (retention), what the recovery point and recovery time objectives are, how backup storage is encrypted and who may read it, when to rehearse a restore, or who signs off. Those are the organisation's decisions and responsibilities (section 13 and the sign-off template in `docs/OPERATIONS_RUNBOOK.md`). Tooling never replaces organisational backup governance, and nothing here declares that an installation is ready for production.
@@ -157,6 +159,10 @@ Constraints honoured: a restore cannot target another tenant (it has no tenant p
 
 **Cut-over is yours.** A validated copy is a database, a document directory and a package directory. Pointing the application at them (connection string, `Ecp:DataDirectory`, `Ecp:Packs:StorageDirectory`), re-mapping the application's database login to the restored database user if the server is different, supplying the same secrets, and re-opening traffic are deliberate steps in `docs/OPERATIONS_RUNBOOK.md`.
 
+### 10.1 Restoring a backup from an earlier platform version
+
+A backup made by platform N-1 restores into a build at N with its migrations still pending (restore applies none; `VAL-003` reports a warning, not a failure, for tables that the pending migrations will create). It is a *copy at the older schema*: run the upgrade procedure on it (`upgrade-rehearse` for a rehearsal) rather than `migrate`, which Production refuses on an installation. To return the live installation to an older state, restore the backup and run the **matching older application** (`docs/ROLLBACK_BY_RESTORE.md`).
+
 ## 11. Post-restore validation
 
 Run automatically on a restored copy, and on demand on the running installation (**Operations, Validation**, `operations.validate`, or `validate`). Each result has a stable code, a plain-language description, technical detail (shown only to holders of `operations.validate`), a severity, a suggested remediation and a correlation id.
@@ -201,6 +207,7 @@ Audit events (system chain): the backup events (started, completed, failed, veri
 | `BackupFailureSqlServerTests` | Changed component, forged manifest and the anchor, invalid manifests, wrong environment, source documents missing or damaged, document lost from a backup, concurrent backups, held and stale leases, a failed restore left in maintenance, secrets masked, backup directory rules, the active database never a target (including aliases and system names), disaster-recovery path, encrypted backup, planted links, readiness (missing, fresh, stale), a broken audit chain |
 | `OperationsFoundationScenarios` (SQLite and SQL Server) and `Many_contenders_on_many_instances_at_once_produce_exactly_one_owner` | Leases, takeover, expiry, audit, maintenance semantics, history, tenant isolation of operational tables, permissions, recent sign-in, support-bundle and evidence redaction; 16 contenders on 4 instances produce one owner |
 | `OperationsUiTests`, `OperationsCommandLineTests` | Who can open each page, maintenance enforcement by the host (503, banner, jobs paused), downloads, command-line verbs |
+| `UpgradeSqlServerTests` and the OPS-02 tests | Restore feeds the N-1 to N rehearsal and the rollback evidence (`docs/UPGRADES.md` section 14) |
 | `RecoveryTests` (unit) | Path and name safety, links, manifest strictness, determinism, redaction, document and package copying, formula safety, outcome rules |
 
 Tests that need a shared backup directory report **NOT VERIFIED** (skipped with that reason), never Passed, when `ECP_TEST_SQL_BACKUP_DIR` and `ECP_TEST_SQL_BACKUP_DIR_SERVER` are not both set.

@@ -27,6 +27,16 @@ public interface IRestoreTargetFactory
     IRestoreTargetHost Open(RestoreTarget target);
 }
 
+/// <summary>Where a side-by-side restore puts its files: one directory per target database under the restore area.</summary>
+internal static class RestoreLayout
+{
+    public static (string Documents, string Packs) For(RecoveryOptions options, string targetDatabase)
+    {
+        var root = Path.Combine(Path.GetFullPath(options.RestoreTargetDirectory), targetDatabase);
+        return (Path.Combine(root, "documents"), Path.Combine(root, "packs"));
+    }
+}
+
 public static class RestorePhrases
 {
     /// <summary>The words an operator types to confirm a restore. They name the backup, so a restore cannot be confirmed by habit.</summary>
@@ -115,9 +125,9 @@ internal sealed class RestoreService(
         if (!Options.RestoreConfigured) { blockers.Add("No restore target directory is configured (Ecp:Recovery:RestoreTargetDirectory)."); return ("", ""); }
         if (!SafeFiles.IsTargetDatabaseName(targetDatabase)) return ("", "");
         var root = Path.Combine(Path.GetFullPath(Options.RestoreTargetDirectory), targetDatabase);
-        foreach (var directory in new[] { Path.Combine(root, "documents"), Path.Combine(root, "packs") })
+        foreach (var directory in new[] { RestoreLayout.For(Options, targetDatabase).Documents, RestoreLayout.For(Options, targetDatabase).Packs })
             if (Directory.Exists(directory) && Directory.EnumerateFileSystemEntries(directory).Any()) blockers.Add($"The target directory {Path.GetFileName(root)}/{Path.GetFileName(directory)} is not empty. A restore never merges into existing files.");
-        return (Path.Combine(root, "documents"), Path.Combine(root, "packs"));
+        return RestoreLayout.For(Options, targetDatabase);
     }
 
     public async Task<RestoreResult> RestoreAsync(RestoreRequest request, CancellationToken ct = default)
@@ -171,6 +181,7 @@ internal sealed class RestoreService(
 
             // 4. Open the restored copy and hold it in maintenance until validation passes.
             await using var host = targets.Open(target);
+            await ReleaseCopiedLeasesAsync(host, request, ct);
             var operationsAvailable = await SetTargetMaintenanceAsync(host, $"Restored from {request.BackupId}; validation pending", MaintenanceCauses.RestoreValidationPending, request.Operator, enable: true, ct);
 
             // 5. Validate.
@@ -263,6 +274,18 @@ internal sealed class RestoreService(
             count++;
         }
         return count;
+    }
+
+    /// <summary>The backup was made while the backup itself held the recovery lease; that lease row came along in the copy. It belongs to a process that does not exist here, so it is released (and the release is audited in the copy).</summary>
+    private static async Task ReleaseCopiedLeasesAsync(IRestoreTargetHost host, RestoreRequest request, CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = host.Services.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<ActorContext>().ActorId = request.Operator.Id;
+            await scope.ServiceProvider.GetRequiredService<IOperationLeases>().ReleaseAllAsync($"Restored from {request.BackupId}: leases recorded in the backup belong to the process that made it", ct);
+        }
+        catch (Exception ex) when (ex is Microsoft.Data.SqlClient.SqlException or Microsoft.EntityFrameworkCore.DbUpdateException or InvalidOperationException) { /* a copy without operational tables has no leases */ }
     }
 
     /// <summary>Sets the maintenance flag inside the restored copy. Returns false if the copy predates the operational tables (restore never migrates it).</summary>

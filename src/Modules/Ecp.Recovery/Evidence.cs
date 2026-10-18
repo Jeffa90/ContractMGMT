@@ -111,4 +111,19 @@ internal sealed class EvidenceWriter(IOptions<RecoveryOptions> recovery)
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
     }
+
+    /// <summary>Writes any evidence document next to the backups, under <c>_evidence</c>, refusing it if a scan finds a secret. Returns the relative name, or null if it could not be written.</summary>
+    public async Task<string?> WriteDocumentAsync(string fileName, object document, CancellationToken ct)
+    {
+        try
+        {
+            if (!SafeFiles.IsRelativeName(fileName) || fileName.Contains('/', StringComparison.Ordinal)) return null;
+            var directory = Path.Combine(Path.GetFullPath(recovery.Value.BackupDirectory), "_evidence");
+            Directory.CreateDirectory(directory);
+            var bytes = UpgradeEvidence.ToJson(document);
+            await File.WriteAllBytesAsync(Path.Combine(directory, fileName), bytes, ct);
+            return "_evidence/" + fileName;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DomainException) { return null; }
+    }
 }

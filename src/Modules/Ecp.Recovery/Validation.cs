@@ -37,8 +37,15 @@ public sealed record ValidationReport(string Subject, DateTime StartedUtc, DateT
     }
 }
 
+/// <summary>How much validation to do. Full is the post-restore profile. Preflight judges an installation that is about to be upgraded (so it does not expect the tables a newer build adds, and skips the physical check). PostUpgrade judges an installation that has just been upgraded against the backup it came from and the upgrade manifest.</summary>
+public enum ValidationProfile { Full, Preflight, PostUpgrade }
+
+/// <summary>What an upgrade was supposed to produce, for the post-upgrade profile: the manifest that governs it, the inventory and isolation policies taken immediately before the first migration ran (what the upgraded data is compared with).</summary>
+public sealed record UpgradeExpectation(UpgradeManifest Manifest, InventorySnapshot? BeforeInventory, IReadOnlyList<string>? PoliciesBefore);
+
 /// <summary>What validation looks at: an installation reachable through <see cref="Services"/> (the running application, or a restored copy opened beside it) and, for a restore, the manifest it was restored from.</summary>
-public sealed record ValidationTarget(IServiceProvider Services, string ConnectionString, string DatabaseName, bool Restored, BackupManifest? Manifest, bool HashDocumentContent, string Subject);
+public sealed record ValidationTarget(IServiceProvider Services, string ConnectionString, string DatabaseName, bool Restored, BackupManifest? Manifest, bool HashDocumentContent, string Subject,
+    ValidationProfile Profile = ValidationProfile.Full, UpgradeExpectation? Upgrade = null);
 
 public interface IInstallationValidator
 {
@@ -75,12 +82,13 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
         }
 
         InventorySnapshot? snapshot = null;
-        await Run("VAL-002", "Migration history", () => MigrationsAsync(target, ct));
-        await Run("VAL-003", "Module schemas and tables", () => TablesAsync(target, ct));
+        var preflight = target.Profile == ValidationProfile.Preflight;
+        if (!preflight) await Run("VAL-002", "Migration history", () => MigrationsAsync(target, ct));
+        if (!preflight) await Run("VAL-003", "Module schemas and tables", () => TablesAsync(target, ct));
         await Run("VAL-005", "Counts and content against the backup", async () =>
         {
-            snapshot = await inventory.CollectAsync(target.Services, recovery.Value.TableChecksums, ct);
-            return CompareInventory(target, snapshot);
+            snapshot = await inventory.CollectAsync(target.Services, recovery.Value.TableChecksums && !preflight, ct);
+            return preflight ? [] : CompareInventory(target, snapshot);
         });
         await Run("VAL-006", "Referential integrity", () => ConstraintsAsync(target, ct));
         await Run("VAL-007", "Row-level security policies", () => PoliciesAsync(target, ct));
@@ -96,7 +104,7 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
         await Run("VAL-014", "Pinned workflows and links", () => LinksAsync(target, ct));
         await Run("VAL-016", "Notification and outbox consistency", () => OutboxAsync(target, ct));
         await Run("VAL-019", "Organisation readiness (assigned packs resolve)", () => ReadinessAsync(target, snapshot, ct));
-        await Run("VAL-021", "Database physical consistency", () => PhysicalAsync(target, ct));
+        if (!preflight) await Run("VAL-021", "Database physical consistency", () => PhysicalAsync(target, ct));
         return Finish(target, started, checks);
     }
 
@@ -152,6 +160,21 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
             return [Check("VAL-002", "Migration history", CheckOutcome.NotVerified, CheckSeverity.Medium, "Migration history is only kept by SQL Server, so it is not verified for this provider.", "", "Use SQL Server for any installation whose recovery matters.")];
         var results = new List<ValidationCheck>();
         var schema = await SchemaInspector.ReadAsync(scope.ServiceProvider, ct);
+        if (t.Profile == ValidationProfile.PostUpgrade && t.Upgrade is { } upgrade)
+        {
+            // After an upgrade the applied migrations are exactly the target inventory of the manifest: nothing missing, nothing extra, in the declared order.
+            var wrong = new List<string>();
+            foreach (var expected in upgrade.Manifest.TargetModules)
+            {
+                var actual = schema.Modules.FirstOrDefault(m => m.Module == expected.Module);
+                if (actual is null) { wrong.Add($"{expected.Module}: module not found"); continue; }
+                if (!actual.AppliedMigrations.SequenceEqual(expected.Migrations.Select(m => m.Id))) wrong.Add($"{expected.Module}: applied {actual.AppliedMigrations.Count}, expected {expected.Migrations.Count} (schema version {actual.AppliedMigrations.LastOrDefault() ?? "none"}, expected {expected.SchemaVersion})");
+            }
+            foreach (var extra in schema.Modules.Where(m => upgrade.Manifest.TargetModules.All(e => e.Module != m.Module))) wrong.Add($"{extra.Module}: not in the manifest");
+            return [wrong.Count == 0
+                ? Pass("VAL-002", "Migration history", $"Every module is at the schema version the upgrade manifest declares ({upgrade.Manifest.TargetModules.Sum(m => m.Migrations.Count)} migrations, applied in order).")
+                : Check("VAL-002", "Migration history", CheckOutcome.Failed, CheckSeverity.Critical, "The database is not at the schema version the upgrade manifest declares.", string.Join("; ", wrong.Take(10)), "Do not release this installation. Roll back by restoring the verified pre-upgrade backup.")];
+        }
         var problems = new List<string>(); var pending = new List<string>(); var differs = new List<string>();
         foreach (var module in schema.Modules)
         {
@@ -190,10 +213,19 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct)) existing.Add(r.GetString(0));
         }
-        var missing = new List<string>();
+        var missing = new List<string>(); var awaiting = new List<string>();
+        var applied = await UpgradeScopes.AppliedAsync(scope.ServiceProvider, ct);
         foreach (var module in scope.ServiceProvider.GetServices<ModuleDescriptor>())
-            foreach (var type in ((DbContext)scope.ServiceProvider.GetRequiredService(module.DbContextType)).Model.GetEntityTypes().Where(e => e.GetTableName() is not null && !e.IsOwned()))
-                if (!existing.Contains($"{type.GetSchema()}.{type.GetTableName()}")) missing.Add($"{type.GetSchema()}.{type.GetTableName()}");
+        {
+            var context = (DbContext)scope.ServiceProvider.GetRequiredService(module.DbContextType);
+            // A module with migrations still to apply (a backup from an earlier version) legitimately lacks the tables they create: that is reported by the pending-migrations note, not as damage.
+            var pending = context.Database.GetMigrations().Count() > (applied.TryGetValue(module.Name, out var ids) ? ids.Count : 0);
+            foreach (var type in context.Model.GetEntityTypes().Where(e => e.GetTableName() is not null && !e.IsOwned()))
+                if (!existing.Contains($"{type.GetSchema()}.{type.GetTableName()}")) (pending ? awaiting : missing).Add($"{type.GetSchema()}.{type.GetTableName()}");
+        }
+        if (missing.Count == 0 && awaiting.Count > 0)
+            return [Check("VAL-003", "Module schemas and tables", CheckOutcome.Warning, CheckSeverity.Low, $"{awaiting.Count} table(s) that this version expects are not there yet; they are created by migrations this database has not applied (the backup is from an earlier version).", string.Join(", ", awaiting),
+                "Rehearse the upgrade on this copy before upgrading the installation (docs/UPGRADE_RUNBOOK.md).")];
         return [missing.Count == 0 ? Pass("VAL-003", "Module schemas and tables", "Every table that this version expects exists in the restored database.")
             : Check("VAL-003", "Module schemas and tables", CheckOutcome.Failed, CheckSeverity.High, $"{missing.Count} table(s) that this version expects are missing. The backup may predate them; migrations are not applied automatically.", string.Join(", ", missing.Take(15)),
                 "If the backup is from an older version, run the migrate command deliberately after accepting the restore.")];
@@ -203,6 +235,17 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
     {
         var list = new List<ValidationCheck>();
         var totals = $"tenants {actual.Tenants_ - 0}, organisations {actual.Total("tenancy.Organisation") + actual.Total("Organisation")}, contracts {actual.Total("contracts.Contract") + actual.Total("Contract")}, counterparties {actual.Total("contracts.Supplier") + actual.Total("Supplier")}, audit events {actual.Total("audit.AuditEvent") + actual.Total("AuditEvent")}";
+        if (t.Profile == ValidationProfile.PostUpgrade && t.Upgrade is { BeforeInventory: not null } upgraded)
+        {
+            // Every table holds what it held immediately before the first migration, except the tables the upgrade created, and the system tenant's own chain, which gains the upgrade's own events.
+            var created = upgraded.Manifest.NewMigrations.SelectMany(n => n.Objects).Where(o => o.StartsWith("create table ", StringComparison.Ordinal)).Select(o => o["create table ".Length..]).ToHashSet(StringComparer.Ordinal);
+            var changed = InventoryComparer.Differences(upgraded.BeforeInventory, actual, allowRestoreEvents: true)
+                .Where(d => !d.StartsWith("tenant Installation", StringComparison.Ordinal) && !created.Any(c => d.StartsWith(c + ": not expected", StringComparison.Ordinal))).ToList();
+            return [changed.Count == 0
+                ? Pass("VAL-005", "Counts and content against the pre-upgrade data", "Every table, in every tenant, holds the same rows as immediately before the upgrade (counts and content checksums), apart from the tables the upgrade created.", totals)
+                : Check("VAL-005", "Counts and content against the pre-upgrade data", CheckOutcome.Failed, CheckSeverity.Critical, $"{changed.Count} difference(s) between the data after the upgrade and the data before it. A migration changed something it was not declared to change.",
+                    string.Join("; ", changed.Take(10)), "Do not release this installation. Roll back by restoring the verified pre-upgrade backup.")];
+        }
         if (t.Manifest is null)
             return [Pass("VAL-005", "Counts and content against the backup", "No backup manifest was supplied, so counts were recorded but not compared.", totals)];
         var m = t.Manifest;
@@ -277,6 +320,17 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
             return [Check("VAL-007", "Row-level security policies", CheckOutcome.NotVerified, CheckSeverity.Medium, "Row-level security exists on SQL Server only.", "", "")];
         var policies = await SchemaInspector.PoliciesAsync(scope.ServiceProvider, ct);
         if (policies.Count == 0) return [Check("VAL-007", "Row-level security policies", CheckOutcome.Failed, CheckSeverity.Critical, "No tenant isolation policy is enabled in this database.", "", "Do not use this copy.")];
+        if (t.Profile == ValidationProfile.PostUpgrade && t.Upgrade is { PoliciesBefore: not null } upgraded)
+        {
+            // An upgrade may add policies (for the tables it creates) and must never remove one.
+            var before = upgraded.PoliciesBefore.ToHashSet(StringComparer.Ordinal);
+            var removed = before.Where(p => !policies.Contains(p)).ToList();
+            var created = upgraded.Manifest.NewMigrations.SelectMany(n => n.Objects).Where(o => o.StartsWith("create table ", StringComparison.Ordinal)).Select(o => o["create table ".Length..].Replace('.', '_')).ToHashSet(StringComparer.Ordinal);
+            var unexplained = policies.Where(p => !before.Contains(p) && !created.Any(c => p.EndsWith("TenantPolicy_" + c, StringComparison.Ordinal))).ToList();
+            return removed.Count == 0 && unexplained.Count == 0
+                ? [Pass("VAL-007", "Row-level security policies", $"{policies.Count} tenant isolation policies are enabled: all {before.Count} from before the upgrade, and {policies.Count - before.Count} added for the tables the upgrade created.")]
+                : [Check("VAL-007", "Row-level security policies", CheckOutcome.Failed, CheckSeverity.Critical, "The isolation policies after the upgrade are not the ones before it plus those the manifest explains.", $"removed: {string.Join(", ", removed.Take(5))}; unexplained: {string.Join(", ", unexplained.Take(5))}", "Do not release this installation. Roll back by restoring the verified pre-upgrade backup.")];
+        }
         if (t.Manifest is not null && !t.Manifest.Schema.SecurityPolicies.OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(policies.OrderBy(p => p, StringComparer.Ordinal)))
             return [Check("VAL-007", "Row-level security policies", CheckOutcome.Failed, CheckSeverity.Critical, "The enabled isolation policies are not the ones the backup had.", $"{policies.Count} enabled, {t.Manifest.Schema.SecurityPolicyCount} expected", "Do not use this copy.")];
         return [Pass("VAL-007", "Row-level security policies", $"{policies.Count} tenant isolation policies are enabled" + (t.Manifest is null ? "." : ", the same as the backup."))];

@@ -1,6 +1,6 @@
 # Project Status
 
-Status date: **2026-10-18** (after PER-002, portability remediation S1 to S10 and the operational resilience slice OPS-01 with the OPS-02 foundation; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
+Status date: **2026-10-18** (after PER-002, portability remediation S1 to S10, the operational resilience slice OPS-01 and the upgrade-safety slice OPS-02; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
 
 **Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 10 and 11 are an engineering assessment of evidence, not an approval.
 
@@ -26,7 +26,7 @@ All modules are .NET 10 projects in a modular monolith whose dependency tiers ar
 | `Ecp.Configuration` | Draft, validate, publish, release, rollback, second-person publish, audit for every configuration kind; classification policy; packs and branding records | Implemented (kernel partial: no schema-validation framework) | workspace, CI |
 | `Ecp.Setup` | First-run wizard, setup protection token, readiness checks, organisation onboarding as a configuration kind | Implemented | workspace, CI, container smoke |
 | `Ecp.Operations` | Health and readiness endpoints, platform checks; the `ops` schema: SQL-backed operation leases with a fencing generation, the maintenance-mode record, operation history | Implemented (OPS-01; ADR-0034) | workspace, CI |
-| `Ecp.Recovery` (9) | Installation backup (SQL Server checksum backup, document store, packs and trust-store public keys, deterministic manifest with an audit anchor), independent verification, restore into a new database, post-restore validation VAL-001 to VAL-021, evidence report, support bundle | Implemented on SQL Server (OPS-01); IIS and Azure models Not Verified | workspace (SQLite parts), CI (SQL Server) |
+| `Ecp.Recovery` (9) | Installation backup (SQL Server checksum backup, document store, packs and trust-store public keys, deterministic manifest with an audit anchor), independent verification, restore into a new database, post-restore validation VAL-001 to VAL-021, evidence report, support bundle; **upgrade safety (OPS-02): upgrade manifest, pre-flight UPF-nnn, migration inventory and drift check, upgrade with leases, quiescence and maintenance, rehearsal on a restored copy, post-upgrade validation, rollback-by-restore evidence** | Implemented on SQL Server (OPS-01); IIS and Azure models Not Verified | workspace (SQLite parts), CI (SQL Server) |
 | `Ecp.Documents` | Document and version model, local storage with tenant prefix, streaming limits, signature sniffing, SHA-256, scan-hook interface with mock | Implemented (real scanner Mocked) | workspace, CI |
 | `Ecp.Contracts` | Suppliers, categories and ownership, the contract aggregate and its core fields, secured services, the typed register, list views (11 shipped, personal, shared), CSV and XLSX export | Implemented | workspace, CI |
 | `Ecp.Metadata` | The additional-field engine: 17 types, strict validation, typed value rows, visibility, calculated display fields, the form-based Studio services | Implemented | workspace, CI |
@@ -58,6 +58,7 @@ Each is a slice that runs end to end from the page through the services to the d
 | Portability remediation S1 | Solution pack resolved by organisation; neutral Blank lifecycle, Variation workflow and notification policy; no compiled default pack (installation default is host configuration, unset); stronger ARC-010; first PRT-002 proof test. Role identifiers untouched | ADR-0024, `docs/PORTABILITY_REMEDIATION_PLAN.md` section 8.6 |
 
 | Operational resilience: backup, restore, maintenance mode (OPS-01, OPS-02 foundation) | A trained operator creates, verifies and restores a complete installation backup from Administration, Operations or the command line; the Blank, JBS Procurement and Harborline data survive a full cycle and answer identically; maintenance mode and leases; sanitised evidence and a redacted support bundle. Production readiness is still not declared | ADR-0034, `docs/BACKUP_AND_RESTORE.md`, `docs/OPERATIONS_RUNBOOK.md`, `docs/DISASTER_RECOVERY.md` |
+| Upgrade safety (OPS-02) | A trained operator can tell whether an installation can be upgraded safely (pre-flight with stable codes, deterministic hashed manifest, frozen baselines, schema-drift and checksum checks, backup and maintenance prerequisites, pack and configuration compatibility), rehearse the upgrade on a restored copy, apply it under maintenance mode with leases and quiescence, validate the result and the three businesses' journeys, and prove rollback by restore with the data-loss window stated. Forward-only; no downgrade exists. The N-1 fixture is a frozen schema populated by current services, not a historical binary. Production readiness is still not declared | ADR-0035, `docs/UPGRADES.md`, `docs/UPGRADE_RUNBOOK.md`, `docs/ROLLBACK_BY_RESTORE.md` |
 
 ## 4. Open tasks
 
@@ -87,11 +88,11 @@ Each is a slice that runs end to end from the page through the services to the d
 | Portability | PKM-01 to PKM-04 (packages, signing, upgrade, second pack), EXP-01 (full tenant export), DOCS-JBS |
 | Governance and reporting | GOV-01 (end-to-end classification pass; partly delivered by the lifecycle slice), GOV-02 (retention, legal hold, disposition), GOV-03 (Audit Explorer), RPT-01 (reporting projections and views; a column projection stub exists) |
 | API and integrations | API-01 (`/api/v1`), INT-04 (monitoring sinks), DOCS-API |
-| Operations and release | OPS-02 remainder (upgrade pre-flight, N-1 to N tests), OPS-03 remainder (certificate and job panels), OPS-04 remainder (SEC-030 and SEC-031 catalogue), DPL-03, ACC-01, PRF-01 (scale), DOCS-OPS, DOCS-A11Y, DOCS-DICT, REL-01, DOCS-INSTALL |
+| Operations and release | OPS-03 remainder (certificate and job panels), OPS-04 remainder (SEC-030 and SEC-031 catalogue), DPL-03, ACC-01, PRF-01 (scale), DOCS-OPS, DOCS-A11Y, DOCS-DICT, REL-01, DOCS-INSTALL |
 
 ### 4.3 First incomplete task
 
-The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. (Out of scope for the operational resilience slice, which did not begin it.) The first incomplete **operational** task is the remainder of **OPS-02**: the upgrade pre-flight and the N-1 to N upgrade tests (UPG-001 to UPG-004). CFG-03 was ticked once the PER-002 plan check was done (section 3). The portability remediation list S1 to S10 is complete (open: R-01, R-02; P-02b, the compiled role catalogue, Medium, remains open).
+The first incomplete **product** task is **INT-03: the live e-signature adapter (signed callbacks, inbox)**, the next buildable integration item. (Out of scope for the operational resilience slice, which did not begin it.) OPS-02 (upgrade safety) is built; its closure status is in `TASKS.md`. The first incomplete **operational** task is the remainder of **OPS-03** (certificate, outbox and job panels). CFG-03 was ticked once the PER-002 plan check was done (section 3). The portability remediation list S1 to S10 is complete (open: R-01, R-02; P-02b, the compiled role catalogue, Medium, remains open).
 
 ## 5. Deferred tasks
 
@@ -113,6 +114,8 @@ Test totals at the end of this pass (details and history in `docs/TESTING.md`; C
 
 | Where | Passed | Failed | Skipped | NOT VERIFIED |
 |---|---:|---:|---:|---:|
+| Workspace after OPS-02, with a SQL Server 2022 container and a shared backup folder: unit 867, architecture 108, API 138, integration 563 (SQLite and SQL Server wrappers) | 1,676 | 0 | 0 | 0 (IIS, Azure and the container build are not tests; see section 7) |
+| CI after OPS-01 (run 60, commit 67b1cee), all three jobs | success | 0 | 0 | 0 |
 | CI after S9 (run 56, commit 626877d), SQL Server 2022 container | 244 | 0 | 0 | 0 |
 | Workspace after S9, no SQL Server: unit 713, architecture 80, API 107, integration on SQLite 245 | 1,145 | 0 | 0 | 244 (the SQL Server wrappers, including 11 new Harborline wrappers) |
 | CI after the S9 readiness prerequisites (run 53), SQL Server 2022 container | 233 | 0 | 0 | 0 |
@@ -160,6 +163,7 @@ Never reported as passed:
 | Browser accessibility (WCAG 2.2 AA) | ACC-01 not done; no automated audit run |
 | Scale: 100,000 contracts, concurrency, cold start, HTTP and rendering time | Only the 10,000-contract in-process baseline exists |
 | Backup, restore and disaster recovery on IIS and Azure, remote object stores, offline media, point-in-time restore, per-tenant restore, and any restore rehearsal with a customer's real data and storage | The tooling is Implemented and verified on Docker with an external SQL Server (`docs/BACKUP_AND_RESTORE.md` section 2); the rest is Not Verified or Future. An operator's own rehearsal is required before reliance (`docs/DISASTER_RECOVERY.md`) |
+| Upgrades on IIS and Azure, zero-downtime or mixed-version upgrade, a previous-release binary as the N-1 source (the fixture is a frozen schema populated by current services), and an upgrade rehearsal with a customer's real data and storage | Tooling Implemented and verified on Docker with an external SQL Server (`docs/UPGRADES.md` sections 3 and 15) |
 | Penetration test and external security review | Not performed |
 | Deployment-model parity (PRT-005), configuration and tenant export round trips (PRT-006, PRT-011), pack upgrade preserving local changes (PRT-009) | Not built or not tested; S9 did not touch them. Real-world fitness of the Harborline pack for a construction company is not claimed |
 | Performance at 100,000 contracts, selective multi-word configured-field text search | Not measured; the second word of a text search still costs about 0.8 s when it is selective (`docs/PERFORMANCE_REVIEW.md` section 10) |
@@ -276,7 +280,7 @@ Conditions a pilot should set: an external SQL Server with backups owned by the 
 | Billing, metering, plans, quotas | Not built |
 | Business portability (a second business without source change) | P-01 and P-03 fixed (packs import as drafts through the Pack Manager); P-02b open; no pack upgrade workflow or pack export (S7d/e), no tenant export (EXP-01) |
 | Scale, concurrency and noisy-neighbour protection | Unmeasured beyond 10,000 contracts; per-tenant rate and size limits are not built |
-| Availability, backup, restore, disaster recovery, upgrade without downtime | Not built; forward-only migrations with rollback by restore are planned (OPS-02) |
+| Availability, backup, restore, disaster recovery, upgrade without downtime | Backup, restore, disaster recovery and upgrade with rollback by restore are built (OPS-01, OPS-02); upgrade needs a maintenance window; zero-downtime upgrade is Future |
 | Observability (metrics, tracing, SIEM sinks) | Structured logging with redaction exists; sinks not built (INT-04) |
 | Public API and webhooks | Not built (API-01) |
 | Compliance evidence (retention, legal hold, audit explorer, evidence export, data residency) | Audit chain exists; retention, legal hold and export are not built (GOV-02, GOV-03) |

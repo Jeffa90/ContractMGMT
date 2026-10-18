@@ -1,0 +1,79 @@
+{
+  "formatVersion": 1,
+  "releaseId": "ecp-1.1.0",
+  "from": "1.0.0",
+  "to": "1.1.0",
+  "minimumSupportedSourceVersion": "1.0.0",
+  "supportedSourceVersions": [
+    "1.0.0"
+  ],
+  "maximumBackupAgeHours": 24,
+  "configurationChanges": [
+    {
+      "code": "CFG-NONE",
+      "text": "No configuration schema changes. Every configuration kind keeps schema version 1. Published releases, signed pack bytes, workflow pins and drafts are not read, rewritten or republished by this upgrade."
+    }
+  ],
+  "operationalActions": [
+    {
+      "code": "OPA-001",
+      "text": "Take and verify a backup with the version that is running now (platform 1.0.0), in maintenance mode, immediately before the upgrade, so that rollback loses nothing."
+    },
+    {
+      "code": "OPA-002",
+      "text": "Deploy the platform 1.1.0 files without admitting users, then run the pre-flight from them. Read every blocker and warning; a warning needs the owner's explicit acceptance."
+    },
+    {
+      "code": "OPA-003",
+      "text": "Rehearse the upgrade on a restored copy of the backup and keep the rehearsal evidence before upgrading the real installation."
+    },
+    {
+      "code": "OPA-004",
+      "text": "Run the upgrade with the privileged migration account, in maintenance mode. After it validates, maintenance mode is released by the upgrade itself."
+    },
+    {
+      "code": "OPA-005",
+      "text": "Prove rollback by restoring the pre-upgrade backup into a clean database and keep the rollback evidence."
+    }
+  ],
+  "compatibilityWarnings": [
+    {
+      "code": "CMP-001",
+      "text": "A backup made by platform 1.0.0 restores into platform 1.1.0 with the migrations still pending (restore applies none). Run the upgrade on the restored copy to bring it current."
+    },
+    {
+      "code": "CMP-002",
+      "text": "The upgrade adds one table (the migration record) to the operations schema, with row-level security. It changes no existing table, row, audit event, configuration release, pack or document."
+    }
+  ],
+  "breakingChanges": [],
+  "postUpgradeChecks": [
+    "VAL-002",
+    "VAL-005",
+    "VAL-006",
+    "VAL-007",
+    "VAL-008",
+    "VAL-009",
+    "VAL-010",
+    "VAL-011",
+    "VAL-013",
+    "VAL-014",
+    "VAL-016",
+    "VAL-017",
+    "VAL-018",
+    "VAL-019",
+    "UPV-001",
+    "UPV-002",
+    "UPV-003"
+  ],
+  "rollback": {
+    "method": "restore",
+    "steps": [
+      "Stop the platform 1.1.0 application and keep the installation in maintenance mode.",
+      "Restore the verified pre-upgrade backup into a clean database and a clean document and package area.",
+      "Deploy platform 1.0.0 (the build that made the backup) against the restored database. Never start an older application against the upgraded database.",
+      "Run the installation validation, then release maintenance mode."
+    ],
+    "dataLossStatement": "Rolling back discards everything created after the pre-upgrade backup, including anything done after the upgrade finished. It cannot be recovered from the backup."
+  }
+}

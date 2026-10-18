@@ -311,3 +311,14 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0034-operational-resilience-backup-restore-maintenance-and-leases.md`
 - `docs/BACKUP_AND_RESTORE.md`, `docs/OPERATIONS_RUNBOOK.md`, `docs/DISASTER_RECOVERY.md`, `docs/MAINTENANCE_MODE.md`, `docs/OPERATION_LEASES.md`, `docs/SUPPORT_BUNDLE.md`
 
+## Upgrade safety slice (OPS-02, 2026-10-18)
+
+- `src/Modules/Ecp.Recovery/Upgrade/` (upgrade manifest, state detection, pre-flight, upgrade service, evidence, rehearsal and rollback evidence, administration façade)
+- `src/Ecp.Persistence/MigrationInventory.cs`, `src/Ecp.SharedKernel/UpgradeProbes.cs`
+- `src/Modules/Ecp.Operations/MigrationRecords.cs`, `src/Modules/Ecp.Operations/Persistence/Migrations/20261018003226_AddMigrationRecords.cs`, `src/Modules/Ecp.Operations/Persistence/Migrations/20261018003226_AddMigrationRecords.Designer.cs`
+- `src/Modules/Ecp.Configuration/Packs/ConfigurationUpgradeProbes.cs`, `src/Modules/Ecp.Lifecycle/LifecycleUpgradeProbe.cs`, `src/Modules/Ecp.DataMigration/MigrationUpgradeProbe.cs`, `src/Modules/Ecp.Notifications/NotificationsUpgradeProbe.cs`, `src/Modules/Ecp.Contracts/ContractsUpgradeProbe.cs`
+- `src/Ecp.Host/UpgradeCli.cs`, `src/Ecp.Host/Pages/Admin/Operations/UpgradeReadiness.cshtml` (and `.cs`), `UpgradePreview`, `MigrationReport`, `UpgradeHistory`, `PostUpgradeValidation`, `RollbackEvidence` (each `.cshtml` and `.cshtml.cs`)
+- `upgrades/baselines/ecp-1.0.0.ledger.json`, `upgrades/migration-reviews.json`, `upgrades/release-notes/ecp-1.1.0.notes.json`, `upgrades/manifests/ecp-1.0.0-to-1.1.0.manifest.json`
+- `tests/Ecp.UnitTests/UpgradeTests.cs`, `tests/Ecp.Integration.Tests/UpgradeTestKit.cs`, `tests/Ecp.Integration.Tests/UpgradeJourneys.cs`, `tests/Ecp.Integration.Tests/UpgradeSqlServerTests.cs`, `tests/Ecp.Integration.Tests/UpgradeFoundationScenarios.cs`, `tests/Ecp.Api.Tests/UpgradeUiTests.cs`
+- `decisions/ADR-0035-upgrade-safety-preflight-and-rollback-by-restore.md`
+- `docs/UPGRADES.md`, `docs/UPGRADE_RUNBOOK.md`, `docs/ROLLBACK_BY_RESTORE.md`

@@ -20,6 +20,31 @@ public sealed class MigrationRunner(IServiceProvider root, IEnumerable<ModuleDes
 {
     private const string SqliteMarkerTable = "__ecp_modules";
 
+    /// <summary>The modules in the order they migrate: lowest tier first, then by name.</summary>
+    public IReadOnlyList<ModuleDescriptor> OrderedModules => modules.OrderBy(m => m.Tier).ThenBy(m => m.Name, StringComparer.Ordinal).ToList();
+
+    /// <summary>
+    /// Migrates one module on SQL Server, up to <paramref name="targetMigration"/> or to the latest when it is null. Used by the upgrade procedure (one module at a time, so a failure names the module) and by the rehearsal fixture
+    /// that builds an earlier schema. SQLite (Demo and Test only) has no migration history and is not supported here.
+    /// </summary>
+    public async Task MigrateModuleAsync(string module, string? targetMigration, CancellationToken ct = default)
+    {
+        if (options.Provider != DatabaseProvider.SqlServer) throw new InvalidOperationException("Module migration is only available on SQL Server.");
+        var descriptor = modules.Single(m => m.Name == module);
+        await using var scope = root.CreateAsyncScope();
+        var tenant = scope.ServiceProvider.GetRequiredService<TenantContext>();
+        using var _ = tenant.UseInstallationScope();
+        var context = (DbContext)scope.ServiceProvider.GetRequiredService(descriptor.DbContextType);
+        await Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>(context).MigrateAsync(targetMigration, ct);
+        logger.LogInformation("Migrations applied for module {Module}", module);
+    }
+
+    /// <summary>Migrates every module in order, each to the named migration (modules not named go to their latest).</summary>
+    public async Task RunToAsync(IReadOnlyDictionary<string, string?> targets, CancellationToken ct = default)
+    {
+        foreach (var module in OrderedModules) await MigrateModuleAsync(module.Name, targets.TryGetValue(module.Name, out var t) ? t : null, ct);
+    }
+
     public async Task RunAsync(CancellationToken ct = default)
     {
         await using var scope = root.CreateAsyncScope();

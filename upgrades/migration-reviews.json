@@ -1,0 +1,36 @@
+{
+  "formatVersion": 1,
+  "entries": [
+    {
+      "module": "Contracts",
+      "migration": "20261016113856_CoreMetadata",
+      "categories": [
+        "DataRewrite"
+      ],
+      "basis": "baseline-accepted",
+      "summary": "Adds the notice-period value and unit columns and copies each contract's existing notice period in days into them. Value-preserving; the old column is kept.",
+      "evidence": "Recorded when the upgrade ledger was introduced (OPS-02). The migration shipped in an earlier slice and was exercised by the CFG-03 SQL Server tests; this entry records that it was accepted as part of the platform 1.0.0 baseline, not a fresh review."
+    },
+    {
+      "module": "Contracts",
+      "migration": "20261017151009_SupplierIdentifiers",
+      "categories": [
+        "DataRewrite",
+        "SchemaAlteration"
+      ],
+      "basis": "baseline-accepted",
+      "summary": "Adds typed counterparty identifiers, copies each existing identifier held in the legacy column into a typed row (au.abn), and widens the legacy column. Existing values are preserved and remain readable; the legacy column stays as the projection.",
+      "evidence": "Recorded when the upgrade ledger was introduced (OPS-02). Exercised by the S10 SQL Server scenarios (backfill, projection and search). Accepted as part of the platform 1.0.0 baseline, not a fresh review."
+    },
+    {
+      "module": "Lifecycle",
+      "migration": "20261017040140_SignatureRequestVocabulary",
+      "categories": [
+        "SchemaAlteration"
+      ],
+      "basis": "baseline-accepted",
+      "summary": "Renames the execution record table and its columns to the provider-neutral signature-request vocabulary and replaces one index. Data-preserving renames; no rows are changed.",
+      "evidence": "Recorded when the upgrade ledger was introduced (OPS-02). Exercised by the S3 SQL Server scenarios. Accepted as part of the platform 1.0.0 baseline, not a fresh review."
+    }
+  ]
+}

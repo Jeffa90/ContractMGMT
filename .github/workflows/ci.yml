@@ -94,6 +94,21 @@ jobs:
           echo "::warning::SQL Server did not start; SQL Server tests are NOT VERIFIED"
       - run: dotnet restore src/Ecp.sln --locked-mode
       - run: dotnet build src/Ecp.sln -c Release --no-restore
+      - name: N-1 to N upgrade rehearsal on SQL Server (populate the frozen 1.0.0 schema, back up, restore, pre-flight, upgrade, post-upgrade validation, journeys, rollback-by-restore evidence)
+        env:
+          ECP_TEST_EVIDENCE_DIR: ${{ runner.temp }}/ecp-upgrade-evidence
+        run: |
+          mkdir -p "$ECP_TEST_EVIDENCE_DIR"
+          dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&FullyQualifiedName~Upgrade" --logger "trx;LogFileName=upgrade-rehearsal.trx" --results-directory TestResults
+          ls -l "$ECP_TEST_EVIDENCE_DIR"
+          # The evidence must hold no secret: refuse the build if any file names a password, key or connection string.
+          if grep -rEil 'Password=|User Id=|MSSQL_SA_PASSWORD|BEGIN [A-Z ]*PRIVATE KEY' "$ECP_TEST_EVIDENCE_DIR"; then echo "::error::Upgrade evidence appears to contain a secret"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upgrade-rehearsal-evidence
+          path: ${{ runner.temp }}/ecp-upgrade-evidence
+          if-no-files-found: warn
       - name: SQL Server tests (includes real BACKUP DATABASE, RESTORE VERIFYONLY and RESTORE DATABASE of a populated synthetic installation, post-restore validation, and the operation-lease race)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category!=Performance" --logger "trx" --results-directory TestResults
       - name: Performance baseline and query plans (SQL Server)

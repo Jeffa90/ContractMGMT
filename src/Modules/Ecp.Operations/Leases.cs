@@ -31,6 +31,11 @@ public interface IOperationLeases
     /// <summary>Takes a lease from its current owner, whatever its state. For an operator who has established that the owner is gone. Requires a reason and is audited; the previous owner's next renewal fails.</summary>
     Task<LeaseGrant> StealAsync(string name, string scopeKey, string newOwnerId, string ownerDescription, string reason, TimeSpan ttl, CancellationToken ct = default);
     Task<IReadOnlyList<LeaseInfo>> ListAsync(CancellationToken ct = default);
+    /// <summary>
+    /// Releases every lease that is still active. For a restored copy: a lease recorded in a backup belongs to the process that was running when the backup was made, which does not exist in the copy, so none of them may
+    /// stand in the way of the work done on the copy. Audited; returns how many were released.
+    /// </summary>
+    Task<int> ReleaseAllAsync(string reason, CancellationToken ct = default);
 }
 
 internal sealed partial class OperationLeases(OperationsDbContext db, IUnitOfWork uow, IAuditWriter audit, TenantContext tenant, IClock clock) : IOperationLeases
@@ -138,6 +143,22 @@ internal sealed partial class OperationLeases(OperationsDbContext db, IUnitOfWor
                 NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { name, scope = scopeKey, previousOwnerWasActive = previous is not null, newOwner = newOwnerId, generation = lease.Generation })));
             await db.SaveChangesAsync(c);
             return Grant(lease);
+        }, ct);
+    }
+
+    public async Task<int> ReleaseAllAsync(string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) throw new DomainException("reason_required", "A reason is required to release leases.");
+        using var _ = tenant.UseInstallationScope();
+        return await uow.ExecuteAsync(async c =>
+        {
+            var now = clock.UtcNow;
+            var active = (await db.Leases.ToListAsync(c)).Where(l => l.IsActiveAt(now)).ToList();
+            foreach (var l in active) l.Release(now);
+            if (active.Count > 0)
+                audit.Record(new AuditEntry("operations.lease.released_all", "OperationLease", "all", Reason: reason.Trim(), NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { released = active.Select(l => l.Name + "/" + l.ScopeKey).Order(StringComparer.Ordinal) })));
+            await db.SaveChangesAsync(c);
+            return active.Count;
         }, ct);
     }
 

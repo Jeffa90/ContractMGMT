@@ -83,6 +83,7 @@ public static class MigrationModule
 
     public static IServiceCollection AddMigrationModule(this IServiceCollection services, Action<MigrationOptions>? configure = null)
     {
+        services.AddScoped<Ecp.SharedKernel.IUpgradeProbe, MigrationUpgradeProbe>();
         services.AddOptions<MigrationOptions>();
         if (configure is not null) services.Configure(configure);
         services.AddModuleDbContext<MigrationDbContext>(Name, Tier, Schema);

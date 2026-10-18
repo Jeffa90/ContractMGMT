@@ -1,0 +1,20 @@
+@page "/Admin/Operations/UpgradeHistory"
+@model Ecp.Host.Pages.Admin.Operations.UpgradeHistoryModel
+@{ ViewData["Title"] = L["Upgrade history"].Value; }
+<h1>@L["Upgrade history"]</h1>
+<p class="lede">@L["Pre-flights, rehearsals, upgrades and rollback proofs, newest first. Each is also recorded in the audit trail. Evidence files hold no secrets, record content or personal data."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["Upgrade history"]</caption>
+    <thead><tr><th scope="col">@L["Started"]</th><th scope="col">@L["Kind"]</th><th scope="col">@L["Reference"]</th><th scope="col">@L["Outcome"]</th><th scope="col">@L["Summary"]</th><th scope="col">@L["Correlation id"]</th></tr></thead>
+    <tbody>
+    @foreach (var e in Model.Entries)
+    {
+        <tr><td>@Fmt.DateTime(e.StartedUtc)</td><td>@e.Kind</td><th scope="row">@e.Reference</th><td><span class="badge @(e.Status is "Completed" ? "ok" : e.Status is "CompletedWithWarnings" ? "warn" : e.Status is "Running" ? "" : "bad")">@e.Status</span></td><td>@e.Summary</td><td><code>@e.CorrelationId</code></td></tr>
+    }
+    @if (Model.Entries.Count == 0) { <tr><td colspan="6">@L["Nothing has been run yet."]</td></tr> }
+    </tbody>
+</table>
+</div>
+<p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

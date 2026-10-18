@@ -44,7 +44,7 @@ public interface IMigrationCommit
 }
 
 internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime runtime, IContractMigrationPort contracts, IDocumentMigrationPort documents, IDocumentStorageProvider storage,
-    IMigrationFaults faults, MigrationReconciler reconciler) : IMigrationCommit
+    IMigrationFaults faults, MigrationReconciler reconciler, IMaintenanceGate? maintenanceGate = null) : IMigrationCommit
 {
     private const string ContractsPhase = "Contracts";
     private const string DocumentsPhase = "Documents";
@@ -63,6 +63,7 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
 
     public async Task<CommitProgress> CommitAsync(Guid batchId, CancellationToken ct = default)
     {
+        if (maintenanceGate is not null) await maintenanceGate.EnsureWritableAsync("Committing a migration batch", ct);
         var (batch, project) = await k.BatchAsync(batchId, MigrationPermissions.Commit, track: true, ct);
         if (batch.IsLegacyLoad) await k.Access.RequireAsync(MigrationPermissions.LegacyLoad, MigrationKernel.Describe(project.TenantId, project.OrganisationId, project.Id.ToString()), ct);
         if (batch.Status is BatchStatus.Committed or BatchStatus.Reconciled or BatchStatus.Accepted) return Progress(batch, null, 0, 0); // idempotent

@@ -12,6 +12,10 @@
     <ProjectReference Include="../Ecp.Operations/Ecp.Operations.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The frozen baselines, release notes, review register and release manifests (docs/UPGRADES.md) travel inside the platform and are read-only at run time. -->
+    <EmbeddedResource Include="..\..\..\upgrades\**\*.json" LogicalName="upgrades/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>

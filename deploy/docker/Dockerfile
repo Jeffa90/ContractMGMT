@@ -10,6 +10,8 @@ COPY src/ src/
 COPY templates/packs/ templates/packs/
 COPY sample-data/ sample-data/
 COPY requirements/02-reference/ requirements/02-reference/
+# upgrades/ holds the frozen migration baselines, the migration review register and the upgrade manifest; the Recovery module embeds them as resources (docs/UPGRADES.md).
+COPY upgrades/ upgrades/
 RUN dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release -o /out --no-self-contained /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

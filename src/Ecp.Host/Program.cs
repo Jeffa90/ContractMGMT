@@ -137,6 +137,7 @@ if (args.Length > 0 && !args[0].StartsWith('-'))
     switch (args[0])
     {
         case "migrate":
+            if (await UpgradeCli.GuardMigrateAsync(app.Services, resolved.Host.Mode) is { } refusal) { Console.Error.WriteLine(refusal); return 2; }
             await app.Services.GetRequiredService<MigrationRunner>().RunAsync();
             Console.WriteLine("Migrations applied.");
             return 0;
@@ -162,9 +163,12 @@ if (args.Length > 0 && !args[0].StartsWith('-'))
             catch (DomainException ex) { Console.Error.WriteLine(ex.Message); return 1; }
         case var operation when OperationsCli.Commands.Contains(operation):
             return await OperationsCli.RunAsync(operation, args, app.Services);
+        case var upgrade when UpgradeCli.Commands.Contains(upgrade):
+            return await UpgradeCli.RunAsync(upgrade, args, app.Services);
         default:
-            Console.Error.WriteLine("Unknown command. Use: migrate | verify-audit <tenant name> | setup-token | " + string.Join(" | ", OperationsCli.Commands));
+            Console.Error.WriteLine("Unknown command. Use: migrate | verify-audit <tenant name> | setup-token | " + string.Join(" | ", OperationsCli.Commands.Concat(UpgradeCli.Commands)));
             Console.Error.WriteLine(OperationsCli.Usage);
+            Console.Error.WriteLine(UpgradeCli.Usage);
             return 64;
     }
 }

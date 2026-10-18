@@ -50,7 +50,13 @@ public static class MaintenanceCauses
     public const string RestoreInProgress = "RestoreInProgress";
     public const string RestoreValidationPending = "RestoreValidationPending";
     public const string RestoreFailed = "RestoreFailed";
+    /// <summary>An upgrade is applying migrations (the schema is changing) or has stopped part-way and is waiting for an operator.</summary>
+    public const string UpgradeInProgress = "UpgradeInProgress";
+    public const string UpgradeFailed = "UpgradeFailed";
     public static bool IsRestoreRelated(string cause) => cause is RestoreInProgress or RestoreValidationPending or RestoreFailed;
+    public static bool IsUpgradeRelated(string cause) => cause is UpgradeInProgress or UpgradeFailed;
+    /// <summary>Causes that cannot be left by accident: leaving needs an explicit acknowledgement.</summary>
+    public static bool IsGuarded(string cause) => IsRestoreRelated(cause) || IsUpgradeRelated(cause);
 }
 
 /// <summary>The single installation-wide maintenance flag. One row, replaced in place; every transition is audited.</summary>
@@ -91,6 +97,10 @@ public static class OperationKinds
     public const string Validation = "Validation";
     public const string SupportBundle = "SupportBundle";
     public const string Evidence = "Evidence";
+    public const string Upgrade = "Upgrade";
+    public const string UpgradeRehearsal = "UpgradeRehearsal";
+    public const string RollbackEvidence = "RollbackEvidence";
+    public const string UpgradePreflight = "UpgradePreflight";
 }
 
 public static class OperationStatuses
@@ -137,4 +147,30 @@ public sealed class OperationRun : ITenantOwned
     }
 
     private static string Clip(string s, int max) => s.Length <= max ? s : s[..max];
+}
+
+/// <summary>
+/// What the upgrade tooling knows about a migration it has verified or applied: its identifier and the checksum of the SQL it generates, so a migration that is later modified in place is detected. One row per module and
+/// migration; rows are added and never changed (docs/UPGRADES.md, "Migration safety"). An installation upgraded before this table existed has none until the first upgrade adopts its history after checking it against the frozen baseline.
+/// </summary>
+public sealed class MigrationRecord : ITenantOwned
+{
+    private MigrationRecord() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; } = SystemTenant.Id;
+    public string Module { get; private set; } = "";
+    public string MigrationId { get; private set; } = "";
+    public string Checksum { get; private set; } = "";
+    public string Generator { get; private set; } = "";
+    public string PlatformVersion { get; private set; } = "";
+    /// <summary>"applied" when the upgrade tooling applied it, "adopted" when it was already applied and was checked against the frozen baseline.</summary>
+    public string Origin { get; private set; } = "";
+    public Guid? UpgradeRunId { get; private set; }
+    public DateTime RecordedUtc { get; private set; }
+
+    public static MigrationRecord Create(string module, string migrationId, string checksum, string generator, string platformVersion, string origin, Guid? upgradeRunId, DateTime nowUtc) => new()
+    {
+        Id = Guid.NewGuid(), Module = module, MigrationId = migrationId, Checksum = checksum, Generator = generator, PlatformVersion = platformVersion, Origin = origin, UpgradeRunId = upgradeRunId,
+        RecordedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
+    };
 }

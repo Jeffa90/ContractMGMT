@@ -166,6 +166,18 @@ internal sealed class ContractListViewKind(IServiceProvider services, IAuditWrit
     public const string KindName = "ContractListView";
     public string Kind => KindName;
 
+    /// <summary>The structure of the shared views, which needs no signed-in person: they parse, use schema version 1, stay within the limits and have unique keys. Field and classification references are checked when a view is opened, by the person opening it.</summary>
+    public Task<ValidationReport> ValidateForUpgradeAsync(Guid organisationId, string contentJson, CancellationToken ct)
+    {
+        var (set, messages) = ViewParser.Parse(contentJson);
+        if (set is null) return Task.FromResult(new ValidationReport(messages));
+        if (set.SchemaVersion != 1) messages.Add(new(ValidationSeverity.Error, "$.schemaVersion", "schema_version", "The schema version must be 1."));
+        if (set.Views.Count > ViewParser.MaxViews) messages.Add(new(ValidationSeverity.Error, "$.views", "too_many", $"At most {ViewParser.MaxViews} shared views are allowed."));
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < set.Views.Count; i++) if (!keys.Add(set.Views[i].Key)) messages.Add(new(ValidationSeverity.Error, $"$.views[{i}].key", "duplicate_view", $"The view key '{set.Views[i].Key}' is used twice."));
+        return Task.FromResult(new ValidationReport(messages));
+    }
+
     public async Task<ValidationReport> ValidateAsync(Guid organisationId, string contentJson, CancellationToken ct)
     {
         var (set, messages) = ViewParser.Parse(contentJson);

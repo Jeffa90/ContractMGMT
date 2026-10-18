@@ -141,6 +141,13 @@ public sealed class TestApp : IAsyncDisposable
         return sp;
     }
 
+    /// <summary>
+    /// Wraps an installation that someone else owns (a restored copy opened beside the application) so the test worlds can drive it through the same helpers. Disposing the wrapper does not drop a database or delete files:
+    /// the owner of the copy does that.
+    /// </summary>
+    public static TestApp Attach(ServiceProvider services, string connectionString, FakeClock clock, string root)
+        => new(services, DatabaseProvider.SqlServer, connectionString, null, null, null, clock, root) { SetupMode = EcpMode.Test };
+
     /// <summary>The standard composition over another database, data directory and clock, with no migration and no ownership of any database: a restored copy opened beside the application for validation.</summary>
     public static ServiceProvider BuildDetached(DatabaseProvider provider, string cs, IClock clock, string root, EcpMode setupMode, Action<IServiceCollection>? configure = null)
         => BuildServices(provider, cs, clock, root, setupMode, configure);

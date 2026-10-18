@@ -10,7 +10,7 @@ namespace Ecp.Host;
 /// </summary>
 public static class OperationsCli
 {
-    public static readonly string[] Commands = ["backup", "list-backups", "verify-backup", "restore", "validate", "maintenance", "support-bundle", "evidence"];
+    public static readonly string[] Commands = ["backup", "list-backups", "verify-backup", "restore", "validate", "maintenance", "support-bundle", "evidence", "upgrade-baseline"];
 
     public const string Usage = """
         Operations commands:
@@ -23,6 +23,7 @@ public static class OperationsCli
           maintenance on|off --reason "<why>" [--acknowledge-restore-state]
           support-bundle <file>
           evidence <file> [--csv]
+          upgrade-baseline <platform version> <file> --note "<what this baseline is>"      (release engineering: freeze the migration inventory of a release)
         """;
 
     private static string? Option(string[] args, string name)
@@ -109,6 +110,13 @@ public static class OperationsCli
                     var report = await reports.BuildAsync(ct);
                     await File.WriteAllBytesAsync(args[1], Flag(args, "--csv") ? reports.ToCsv(report) : reports.ToJson(report), ct);
                     Console.WriteLine("Evidence report written.");
+                    return 0;
+                }
+                case "upgrade-baseline" when args.Length > 2:
+                {
+                    var ledger = Ecp.Persistence.MigrationInventory.Build(provider.GetServices<Ecp.Persistence.ModuleDescriptor>());
+                    await File.WriteAllBytesAsync(args[2], UpgradeJson.Serialise(UpgradeManifestBuilder.Baseline(args[1], Option(args, "--note") ?? "", ledger)), ct);
+                    Console.WriteLine($"Baseline for {args[1]} written ({ledger.Modules.Sum(m => m.Migrations.Count)} migrations in {ledger.Modules.Count} modules).");
                     return 0;
                 }
                 default:

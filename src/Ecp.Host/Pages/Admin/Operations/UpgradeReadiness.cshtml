@@ -1,0 +1,48 @@
+@page "/Admin/Operations/UpgradeReadiness"
+@model Ecp.Host.Pages.Admin.Operations.UpgradeReadinessModel
+@{ ViewData["Title"] = L["Upgrade readiness"].Value; var r = Model.Report; }
+<h1>@L["Upgrade readiness"]</h1>
+<p class="lede">@L["The pre-flight says whether this installation can be upgraded safely to the version now running, and why not if it cannot. It reads and changes nothing. A blocker stops the upgrade; a warning needs the owner's explicit acceptance. Passing the pre-flight is not an approval to upgrade or to go live."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<section class="card" aria-labelledby="run-h">
+    <h2 id="run-h">@L["Run the pre-flight"]</h2>
+    <form method="post" asp-page-handler="Run">
+        <div class="field"><label for="BackupId">@L["Verified backup to roll back to"]</label>
+            <select id="BackupId" name="BackupId"><option value="">@L["(the most recent verified backup)"]</option>
+                @foreach (var b in Model.Backups) { <option value="@b.BackupId" selected="@(Model.BackupId == b.BackupId)">@b.BackupId</option> }
+            </select></div>
+        <div class="actions"><button type="submit">@L["Run the pre-flight"]</button> <span>@L["This reads every document and many tables; run it when the installation is quiet."]</span></div>
+    </form>
+</section>
+@if (r is not null)
+{
+    <section class="card" role="status" aria-labelledby="out-h">
+        <h2 id="out-h">@L["Outcome"]: <span class="badge @(r.Outcome == Ecp.Recovery.PreflightOutcome.Ready ? "ok" : r.Outcome == Ecp.Recovery.PreflightOutcome.ReadyWithWarnings ? "warn" : "bad")">@(r.Outcome switch { Ecp.Recovery.PreflightOutcome.Ready => "Ready", Ecp.Recovery.PreflightOutcome.ReadyWithWarnings => "Ready with warnings", Ecp.Recovery.PreflightOutcome.Blocked => "Blocked", _ => "Not Verified" })</span></h2>
+        <dl class="facts">
+            <dt>@L["Installation is at"]</dt><dd>@r.SourceVersion (@r.State)</dd>
+            <dt>@L["Version to upgrade to"]</dt><dd>@r.TargetVersion</dd>
+            <dt>@L["Upgrade manifest SHA-256"]</dt><dd><code>@(r.ManifestSha256 ?? "none")</code></dd>
+            <dt>@L["Migrations pending"]</dt><dd>@r.PendingMigrations.Count</dd>
+            <dt>@L["Correlation id"]</dt><dd><code>@r.CorrelationId</code></dd>
+        </dl>
+        <p>@r.Count(Ecp.Recovery.CheckOutcome.Passed) @L["passed"], @r.Count(Ecp.Recovery.CheckOutcome.Warning) @L["warnings"], @r.Count(Ecp.Recovery.CheckOutcome.Failed) @L["blockers"], @r.Count(Ecp.Recovery.CheckOutcome.NotVerified) @L["not verified"].</p>
+        <ul>
+            <li><a href="/Admin/Operations/UpgradeReadiness?handler=Json&amp;BackupId=@r.BackupId">@L["Download this report (JSON)"]</a></li>
+            <li><a href="/Admin/Operations/UpgradeReadiness?handler=Csv&amp;BackupId=@r.BackupId">@L["Download this report (CSV, safe to open in a spreadsheet)"]</a></li>
+            <li><a href="/Admin/Operations/UpgradePreview?BackupId=@r.BackupId">@L["Preview the upgrade"]</a></li>
+        </ul>
+    </section>
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Pre-flight findings"]</caption>
+        <thead><tr><th scope="col">@L["Code"]</th><th scope="col">@L["Result"]</th><th scope="col">@L["What it means"]</th><th scope="col">@L["Technical detail"]</th><th scope="col">@L["What to do"]</th></tr></thead>
+        <tbody>
+        @foreach (var c in r.Checks)
+        {
+            <tr><th scope="row"><code>@c.Code</code> @c.Title</th><td><span class="badge @(c.Outcome == Ecp.Recovery.CheckOutcome.Passed ? "ok" : c.Outcome == Ecp.Recovery.CheckOutcome.Warning ? "warn" : "bad")">@(c.Outcome == Ecp.Recovery.CheckOutcome.Failed ? "Blocker" : c.Outcome.ToString())</span></td><td>@c.Description</td><td>@c.TechnicalDetail</td><td>@c.Remediation</td></tr>
+        }
+        </tbody>
+    </table>
+    </div>
+}
+<p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

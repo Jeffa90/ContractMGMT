@@ -50,7 +50,7 @@ public sealed class PermissionMatrixTests
     public void The_confirmed_matrix_and_catalogue_load_with_twelve_roles()
     {
         var m = PermissionMatrix.Instance;
-        Assert.Equal(93, m.Permissions.Count);
+        Assert.Equal(94, m.Permissions.Count);
         Assert.Equal(12, RoleCodes.All.Count);
         Assert.Equal(Grant.Scoped, m.Of(RoleCodes.Viewer, "contracts.read"));      // Viewer is scoped, never a global read role
         Assert.Equal(Grant.Yes, m.Of(RoleCodes.CategoryOwner, "contracts.read"));  // Category Owner reads all within scope
@@ -518,6 +518,6 @@ public sealed class MatrixDrivenAuthorisationTests
                 Assert.True(decision.Allowed == (cell != Grant.None), $"{role} / {permission}: matrix says {cell}, evaluator said {(decision.Allowed ? "allowed" : decision.Reason)}");
                 checkedCells++;
             }
-        Assert.Equal(12 * 93, checkedCells);
+        Assert.Equal(12 * 94, checkedCells);
     }
 }

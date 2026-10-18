@@ -11,6 +11,7 @@ public sealed class OperationsDbContext(DbContextOptions<OperationsDbContext> op
     public DbSet<OperationLease> Leases => Set<OperationLease>();
     public DbSet<MaintenanceState> Maintenance => Set<MaintenanceState>();
     public DbSet<OperationRun> Runs => Set<OperationRun>();
+    public DbSet<MigrationRecord> MigrationRecords => Set<MigrationRecord>();
     protected override string SchemaName => OperationsModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
@@ -36,6 +37,19 @@ public sealed class OperationsDbContext(DbContextOptions<OperationsDbContext> op
             e.Property(x => x.Reason).HasMaxLength(500).IsRequired();
             e.Property(x => x.ChangedBy).HasMaxLength(200).IsRequired();
             e.Property(x => x.RowVersion);
+        });
+        mb.Entity<MigrationRecord>(e =>
+        {
+            e.ToTable("MigrationRecord");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Module).HasMaxLength(100).IsRequired();
+            e.Property(x => x.MigrationId).HasMaxLength(150).IsRequired();
+            e.Property(x => x.Checksum).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Generator).HasMaxLength(30).IsRequired();
+            e.Property(x => x.PlatformVersion).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Origin).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => new { x.TenantId, x.Module, x.MigrationId }).IsUnique();
         });
         mb.Entity<OperationRun>(e =>
         {

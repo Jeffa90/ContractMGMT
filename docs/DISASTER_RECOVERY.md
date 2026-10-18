@@ -13,7 +13,7 @@ Status: guidance plus an **Implemented and Verified** in-place restore path (`Ba
 | Server or host lost | Build a new host from your deployment definition; restore the **database** to the new SQL Server, the **documents and packages** from the backup directory, supply the **secrets and the data-protection key ring** from their own backups, then validate (runbook section 5) |
 | Region or site lost | As above in the second location; requires copies of backups, secrets, certificates and the key ring kept there (organisation's process) |
 | Ransomware or malicious change | Restore into a clean environment, verify the manifest hash against your records, compare with the audit chain anchors, investigate before reconnecting. A backup in the same place as the attack may be affected: keep an offline or immutable copy |
-| A bad release or migration | Restore the pre-release backup (take one **before** every release), validate, and run the previous platform version |
+| A bad release or migration | Rollback by restore: restore the verified pre-upgrade backup (the upgrade procedure requires one), validate, and run the **previous** platform version (`docs/ROLLBACK_BY_RESTORE.md`). Everything after the backup is discarded; migrations never run backwards |
 
 ## 2. What a backup contains, and what it does not
 
@@ -38,6 +38,17 @@ The platform takes full, COPY_ONLY backups and does not manage SQL Server log ba
 ## 5. Rehearsal
 
 Rehearse at the frequency your organisation chooses, with the people who would do it in earnest, from the backup storage you would really use, into a database and directories that are not production's, and record the time against your RTO. The platform's own proof (the CI backup and restore of a populated three-business installation) shows the tooling works; only your rehearsal shows your **process, storage, permissions and people** work.
+
+## 5a. Upgrades and rollback (OPS-02)
+
+An upgrade is rehearsed on a restored copy, applied in maintenance mode after a verified backup, and rolled back only by restoring that backup (`docs/UPGRADES.md`, `docs/UPGRADE_RUNBOOK.md`, `docs/ROLLBACK_BY_RESTORE.md`). The **data-loss window** of a rollback is the time between the backup and the failure. RPO and RTO for upgrades are the organisation's to set; the rehearsal and rollback evidence record the measured durations against them:
+
+| Item | Organisation's value (placeholder) |
+|---|---|
+| Maximum acceptable data-loss window for an upgrade rollback | |
+| Maximum acceptable time to complete an upgrade window | |
+| Maximum acceptable time to roll back by restore | |
+| Rollback evidence last produced (date, file) | |
 
 ## 6. Not Verified
 

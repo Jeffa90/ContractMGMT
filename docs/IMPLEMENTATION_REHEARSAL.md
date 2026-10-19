@@ -1,6 +1,6 @@
 # Implementation rehearsal: a greenfield customer, start to finish
 
-Status: **desk rehearsal with live protocol checks, 2026-10-18, against the branch claude/stoic-volta-dvszm5 at commit d6920b0** (platform version 1.1.0). It is evidence for a go or no-go conversation about the first real customer implementation. It is **not** a production approval: production approval is external governance and nothing here declares it.
+Status: **desk rehearsal with live protocol checks, 2026-10-18, against the branch claude/stoic-volta-dvszm5 at commit d6920b0** (platform version 1.1.0), **re-run on 2026-10-19 after the Company Rehearsal Enablement slice (ADR-0038); sections 1 and 9 hold the current verdicts, and sections 5 and 6 are kept as the record of the original review**. It is evidence for a go or no-go conversation about the first real customer implementation. It is **not** a production approval: production approval is external governance and nothing here declares it.
 
 ## 0. What this document is, and is not
 
@@ -27,10 +27,12 @@ Status: **desk rehearsal with live protocol checks, 2026-10-18, against the bran
 | Grade | Meaning |
 |---|---|
 | **LIVE** | Observed in this review, on 2026-10-18, by driving the real host over HTTP: a Production-mode `Ecp.Host` against SQL Server 2022 (Docker), `migrate` run first, TLS simulated by sending `X-Forwarded-Proto: https` as a reverse proxy does. Not a browser; not a person. |
-| **AUTO** | Passed in an automated test. The 20-step no-code rehearsal (`docs/NO_CODE_REHEARSAL.md`) runs over real HTTP on SQLite and on real SQL Server, in **Test mode with the second-person rule switched on by the test**. Totals: unit 895, architecture 113, API 157, integration 634, 0 failed, 0 skipped. |
+| **AUTO** | Passed in an automated test. The 23-step no-code rehearsal (`docs/NO_CODE_REHEARSAL.md`) runs over real HTTP on SQLite and on real SQL Server, in **Test mode with `Ecp:Governance:SecondPerson=Enforced`**, which applies the Production second-person rule (it was switched on inside the test before the slice). Totals: unit 895, architecture 113, API 157, integration 634, 0 failed, 0 skipped. |
 | **CI** | Green in CI run 69 (commit `5985995`), all three jobs, including the container image build and smoke test and the N-1 to N upgrade rehearsal on SQL Server. |
 | **READ** | Read from the guides and the code. Not executed. |
 | **NOT VERIFIED** | Nobody has checked it, or it cannot be checked here. Never a pass. |
+
+**Reading the steps in section 3.** They record what the 2026-10-18 review observed, including since-resolved gaps (marked in section 9.1); where section 9 differs, section 9 is current.
 
 **What this rehearsal cannot show.** No person followed any guide in a browser. No assistive-technology test was run. No real identity provider, mail server, malware scanner, IIS or Azure host was available. A trained non-developer working unaided has not been observed. Those gaps are carried into the verdicts.
 
@@ -43,7 +45,7 @@ Status: **desk rehearsal with live protocol checks, 2026-10-18, against the bran
 | S1 | Trained Business Administrator (Organisation Administrator, Business Configuration Administrator, Procurement Administrator) | Everything on the application's pages for their organisation. No command line |
 | S2 | Business Lead, data owner, Legal lead, tester | Decides and signs; uses the pages that match their role |
 | S3 | System Administrator | Command line, server, container, SQL Server logins, secret files, proxy, identity-provider portal |
-| S4 | Pack Publisher / key custodian | Runs the pack command-line tool with a .NET SDK and a source checkout; guards a private key |
+| S4 | Pack Publisher / key custodian | Ran the pack command-line tool with a .NET SDK and a source checkout at the time of the review (now the standalone `ecp-pack` tool, section 9); guards a private key |
 | S5 | Developer | Changes and rebuilds the product |
 
 *Complexity* (replaces time estimates)
@@ -59,11 +61,17 @@ Status: **desk rehearsal with live protocol checks, 2026-10-18, against the bran
 
 ## 1. Verdicts at a glance
 
-| Question | Verdict | One-line reason |
-|---|---|---|
-| Can a new customer be implemented in **Demo/Test** today? | **Yes, with conditions** (section 6.1) | The whole journey works through pages on real SQL Server (AUTO), but the installation, identity, mail and signing steps need a technical role and are not exercised by a person |
-| Can a new customer be implemented with **masked production data** today? | **Yes, with conditions, in Test mode only** (section 6.2) | Migration, reconciliation, backup and restore are proved; but Test mode does not enforce the second-person rule, the scanner is a mock, and masking is the customer's own job |
-| Can a new customer be implemented in **Production** today? | **No** (section 6.3) | A Production installation cannot get through setup or report ready without a real malware scanner, which does not exist, and several external pieces are Not Verified |
+Current verdicts after the Company Rehearsal Enablement slice. Each is **Supported**, **Supported with conditions**, **Blocked** or **Not Verified**; none is inferred from another and none is a production approval.
+
+| # | Question | Verdict | One-line reason |
+|---|---|---|---|
+| 1 | A synthetic company in **Demo** mode | **Supported with conditions** | Works end to end, but Demo keeps simplified governance (second-person rule not enforced), sends no real email and uses the demonstration scanner (section 9.3) |
+| 2 | A synthetic company in **Test** mode | **Supported with conditions** | All 23 steps pass on real SQL Server with Production-equivalent governance (`Ecp:Governance:SecondPerson=Enforced`); a real mail service, identity provider and scanner are Not Verified, and no unaided person has followed the guides |
+| 3 | A **masked-data** company in Test mode | **Supported with conditions** | Needs an approved masked-data declaration, the mock scanner accepted on the record, and the customer's own masking; the platform cannot verify masking |
+| 4 | **Production-mode setup** | **Blocked** | No connected, healthy malware scanner exists, so a Production installation cannot report ready or finish setup; live email, identity and signed packs are also Not Verified |
+| 5 | **Production use with confidential contracts** | **Blocked** | Blocked by the same scanner gap and by Production-mode rehearsal that has not been run; governance approval is external |
+
+The reasons, conditions and evidence are in section 9. Sections 5 and 6 record the original review of 2026-10-18 and are superseded by section 9 where they differ.
 
 ---
 
@@ -409,7 +417,7 @@ Each step has the same rows. **Observed** says what this review saw. **Remaining
 
 ## 5. Findings from this review (new gaps G-31 to G-37)
 
-They extend the register in `docs/IMPLEMENTATION_READINESS.md` (section 8). None was fixed here: this task produced a document.
+They extend the register in `docs/IMPLEMENTATION_READINESS.md` (section 8). None was fixed by the review itself, which produced a document; the Company Rehearsal Enablement slice then closed them (status table in section 9.1).
 
 | ID | Finding | Severity | Evidence | Suggested resolution |
 |---|---|---|---|---|
@@ -425,7 +433,9 @@ Also confirmed rather than new: the Pack guide's recorded contradiction about wh
 
 ---
 
-## 6. Final verdicts, with evidence
+## 6. Original verdicts of 2026-10-18 (superseded by section 9)
+
+These are kept unchanged as the record of the first review. Where they say the second-person rule is off in Test, a rehearsal needs a switch for it, a scanner is a mock or a pack tool needs a source checkout, section 9 states what changed.
 
 ### 6.1 Can a new customer be implemented in Demo/Test today?
 
@@ -513,7 +523,7 @@ Production approval remains external governance. A "yes" at that point would be 
 
 | Evidence | Where |
 |---|---|
-| The 20-step automated rehearsal ledger | `docs/NO_CODE_REHEARSAL.md`; the two ledger files named in that document, written beside the API test binaries |
+| The 23-step automated rehearsal ledger | `docs/NO_CODE_REHEARSAL.md`; the two ledger files named in that document, written beside the API test binaries |
 | Full local test totals | `deploy/STATUS.md` (row for the readiness slice), `TASKS.md` |
 | CI run 69 | `deploy/STATUS.md`; <https://github.com/Jeffa90/ContractMGMT/actions/runs/39137676309> |
 | Gap register | `docs/IMPLEMENTATION_READINESS.md` (G-01 to G-30, and G-31 to G-37 from this document) |
@@ -529,3 +539,50 @@ Production approval remains external governance. A "yes" at that point would be 
 - The thirteen steps are not timed; the complexity words are the authors' judgement, to be replaced by what a real rehearsal measures.
 - The verdicts do not depend on anything marked NOT VERIFIED being true. Where a verdict is "No" or "Yes, with conditions", the Not Verified items are named as the conditions or the blockers.
 - Production approval is external governance. Neither this document nor the platform declares it.
+
+---
+
+## 9. Re-run after the Company Rehearsal Enablement slice (2026-10-19)
+
+The slice (ADR-0038, CONFIRMED_DECISIONS D14.1 to D14.15) closed G-31 to G-37 and added email, scanner, masked-data, network and evidence capabilities. The rehearsal was re-run with the corrected rules.
+
+### 9.1 Gap status
+
+| ID | Resolution | Status | Evidence |
+|---|---|---|---|
+| **G-31** | `Ecp:Governance:SecondPerson` (`Default` or `Enforced`). Production always enforces and cannot lower it. Test can enforce exactly the Production rule; Demo ignores the setting. The effective mode (`Production`, `TestEnforced`, `TestSimplified`, `DemoSimplified`) is shown on the setup report, `/Admin/Health` and the operations dashboard, and recorded on configuration audit events and releases | **Implemented and Verified** (SQLite and SQL Server) | `GovernanceModeTests`, `GovernanceModeUiTests`, the 23-step rehearsal |
+| **G-32** | Titles and messages are expanded at their origin; a response guard replaces any remaining token with a neutral marker and logs a stable code; a render sweep over the Blank, JBS Procurement and Construction Subcontracts packs asserts no `[[` token reaches a reader | **Implemented and Verified** | `TerminologyTests`, `RenderedPageSweepTests`, `SetupHostTests` |
+| **G-33** | A Production request that arrives as plain HTTP is answered with a short safe page and the code `ECP-NET-001` (no scheme forwarded) or `ECP-NET-002` (forwarded headers not trusted); readiness check `R-NET-01` and a setup check report the posture; `docs/REVERSE_PROXY.md` explains the proxy and Docker settings | **Implemented and Verified** (five test cases); a real reverse proxy is Not Verified | `NetworkDiagnosticsTests` |
+| **G-34** | `ecp-pack` is a standalone .NET tool package (`Ecp.PackTool`) that needs no source checkout: build, validate, report, hash, inspect, sign, verify, compare, keygen; the private key is referenced by `env:` or `file:`, never typed; exit codes 0, 1, 2 and 3. CI packs it, installs that artefact alone and exercises it | **Implemented and Verified** locally; the CI step is Scaffolded until it has run on a runner | `PackToolArtefactTests`; `.github/workflows/ci.yml` |
+| **G-35** | Masked-data declaration (owner, source, method, fields, attachments, personal and confidential data, approval reference, approver, expiry, permitted environment and users) gates commit of a batch marked Masked Company Data in Test mode. The platform never states the data is safe | **Implemented and Verified** | `MaskedDataDeclarationTests`, rehearsal step 16 |
+| **G-36** | Guides reconciled; `tools/check-docs.py` fails the build when a guide names a page or a permission that does not exist, repeats a retired statement or tells a business role to run a command | **Implemented and Verified** | `python3 -I tools/check-docs.py .`, `tools/tests/test_check_docs.py` |
+| **G-37** | Evidence semantics in one place (`EvidenceSemantics`, codes EVD-nnn); the ledger and the pre-flight pages keep the operational outcome beside the verdict; warnings are accepted on the record (`AcceptedWarningTests`) | **Implemented and Verified** | `EvidenceSemanticsTests`, `RehearsalLedgerSemanticsTests`, rehearsal steps 21 to 23 |
+| G-12 | Email is one installation configuration for setup and administration; readiness is proved by a connectivity probe and a synthetic test message; unreachable is never Healthy; results expire; SMTP and Graph stay Not Verified against real services | **Implemented**; SMTP **Verified only against a loopback test relay**; Graph **Scaffolded, Not Verified** | `EmailRulesTests`, `EmailEnablementTests`, rehearsal step 23 |
+| G-25 | Scanner contract, configuration, provider-neutral readiness test, labelled mock only in Demo/Test by explicit configuration, mock acceptance recorded for masked-data rehearsals (who, reason, scope, expiry), alerts on quarantine, infection and exhausted retries | **Implemented**; no real scanner exists (**Blocked** for Production) | `ScannerReadinessTests`, `DocumentScanningUiTests`, rehearsal step 17 |
+
+### 9.2 What the re-run showed
+
+* Steps 1 to 23 pass on SQLite and on real SQL Server; four steps need a technical role (17, 21, 22, 23). The upgrade pre-flight (step 22) is **Ready with warnings** with each warning accepted on the record, so it counts as Passed (EVD-010); it is no longer possible to record a Blocked pre-flight as a pass. Ledger: `docs/NO_CODE_REHEARSAL.md`.
+* A Production installation still answers Unhealthy without a connected scanner (R-DOC-01). The slice does not weaken this.
+* The email readiness page reports Healthy only after a real interaction with a mail server; in the test that server is a loopback relay.
+
+### 9.3 Final verdicts, with evidence and conditions
+
+**1. Synthetic company in Demo: Supported with conditions.**
+Evidence: the business journey runs over real HTTP in Demo-style hosts (AUTO). Conditions: governance is simplified (the second-person setting is ignored in Demo), email is simulated, the scanner is the demonstration scanner, only synthetic data is used. Do not read a Demo pass of a second-person step as proof of Production governance.
+
+**2. Synthetic company in Test: Supported with conditions.**
+Evidence: 23 of 23 steps Passed on real SQL Server with `Ecp:Governance:SecondPerson=Enforced` (AUTO); the dashboard and setup report show `TestEnforced`. Conditions: a technical lead installs and sets the Test-mode settings (including the governance setting); a supervised session records every hesitation, because no unaided person has followed the guides (Not Verified); a real mail service, real identity provider and real scanner are Not Verified; synthetic data only.
+
+**3. Masked-data company in Test: Supported with conditions.**
+Evidence: steps 14 to 19 (declaration gate, scanner acceptance, second-person confirmation, reconciliation). Conditions, all required: (a) the customer masks the data and a named owner signs the declaration, because the platform cannot verify masking and does no automatic de-identification; (b) the declaration is approved, current and permits the environment and the users; (c) the Test mode installation enforces second-person governance; (d) the demonstration scanner is accepted on the record for the scope and period, because it is no protection; (e) real SQL Server, a verified backup and a restore rehearsal are included; (f) volume beyond 10,000 contracts is unmeasured; (g) any real identity provider uses a non-production directory.
+
+**4. Production-mode setup: Blocked.**
+Evidence: no real scanner adapter exists, the mock is refused in Production and R-DOC-01 is Unhealthy (AUTO, `DocumentScanningUiTests`); a Production email test requires a real mail server (Not Verified); a real identity provider, signed packs (the tool now exists; no publisher key exists) and the Production-mode rehearsal in a non-production environment are outstanding.
+
+**5. Production use with confidential contracts: Blocked.**
+Same blockers as 4, and attachments cannot be used in Production without a scanner. Production approval is external governance and is not declared by this document or the platform.
+
+### 9.4 What would change the Production verdicts
+
+A real scanner adapter connected and healthy; a Production-mode rehearsal in a non-production environment with the customer's identity provider and mail relay taken through setup and a day of use; signed packs with a custodied key; a least-privilege database login and a restore-in-place rehearsal; one unaided run by a trained non-developer. Any "yes" would be a recommendation to the customer's governance body, not an approval.

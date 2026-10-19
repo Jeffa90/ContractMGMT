@@ -14,8 +14,7 @@ Usage: python3 -I tools/check-docs.py [repo-root]       Exit 0 when consistent, 
 """
 import json, os, re, sys
 
-ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-ROOT = os.path.abspath(ROOT)
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 GUIDES = [
     'docs/IMPLEMENTATION_PLAYBOOK.md', 'docs/INSTALLATION_GUIDE.md', 'docs/SETUP_WIZARD_GUIDE.md', 'docs/ORGANISATION_ONBOARDING_GUIDE.md', 'docs/BUSINESS_ADMIN_GUIDE.md',
@@ -58,26 +57,30 @@ def known_identifiers():
             ds[:] = [x for x in ds if x not in ('bin', 'obj')]
             for f in files:
                 if not f.endswith(('.cs', '.csv', '.cshtml')): continue
-                try: text = open(os.path.join(d, f), encoding='utf-8-sig').read()
+                try:
+                    with open(os.path.join(d, f), encoding='utf-8-sig') as fh: text = fh.read()
                 except OSError: continue
                 ids.update(re.findall(r'[a-z]+(?:\.[a-z_]+){1,3}', text))
     return ids
 
 
-def check(root=ROOT, guides=None, config=None):
+def check(root=None, guides=None, config=None):
+    root = root or ROOT
     problems = []
     guides = guides if guides is not None else GUIDES
     routes = [route_regex(r) for r in page_routes()]
     known = known_identifiers()
     if config is None:
         cfg_path = os.path.join(ROOT, 'docs', 'doc-consistency.json')
-        config = json.load(open(cfg_path, encoding='utf-8')) if os.path.exists(cfg_path) else {}
+        config = {}
+        if os.path.exists(cfg_path):
+            with open(cfg_path, encoding='utf-8') as fh: config = json.load(fh)
     for rel in guides:
         path = os.path.join(root, rel)
         if not os.path.exists(path):
             problems.append(f'{rel}: the guide does not exist')
             continue
-        text = open(path, encoding='utf-8').read()
+        with open(path, encoding='utf-8') as fh: text = fh.read()
         lines = text.split('\n')
         in_fence = False
         for no, line in enumerate(lines, 1):
@@ -100,14 +103,18 @@ def check(root=ROOT, guides=None, config=None):
                         problems.append(f'{rel}:{no}: out-of-date statement ({rule["why"]})')
     for rule in config.get('required', []):
         path = os.path.join(root, rule['file'])
-        text = open(path, encoding='utf-8').read() if os.path.exists(path) else ''
+        text = ''
+        if os.path.exists(path):
+            with open(path, encoding='utf-8') as fh: text = fh.read()
         if not re.search(rule['pattern'], text, re.MULTILINE | re.DOTALL):
             problems.append(f'{rule["file"]}: missing statement ({rule["why"]})')
     return problems
 
 
 def main():
-    problems = check()
+    global ROOT
+    if len(sys.argv) > 1: ROOT = os.path.abspath(sys.argv[1])
+    problems = check(root=ROOT)
     for p in problems: print('DOC', p)
     print(f'{"FAILED" if problems else "OK"}: {len(problems)} documentation problem(s) in {len(GUIDES)} guides.')
     return 1 if problems else 0

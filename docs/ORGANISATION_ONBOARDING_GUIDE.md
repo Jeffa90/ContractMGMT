@@ -26,7 +26,8 @@
 | G | Configuration reviews, page **/Admin/Reviews** | A second person with publishing rights | see the Business Administrator guide |
 
 **Design points to know before you start.**
-- Creating an organisation **publishes nothing**. Every setting stays a draft until a person other than the author publishes it (in Production).
+- Creating an organisation **publishes nothing**. Every setting stays a draft until a person other than the author publishes it (in Production, and in Test when governance is Enforced; see the next point).
+- **Governance in Test.** In Production the second-person publish rule is always on. In **Test** it is on only when the System Administrator has set the governance mode to `Enforced` (a **Technical task: System Administrator**; the setting is `Ecp:Governance:SecondPerson`, `Default` or `Enforced`). `Enforced` applies exactly the Production rule: the author, last editor and submitter cannot publish, a submission is bound to the content submitted, and a rollback is also submitted for a second person. With `Default`, publishing is immediate and simplified. In **Demo** the setting is ignored and governance is always simplified. Ask the System Administrator which mode applies; it is shown on the setup report and the Health and Operations dashboard pages. To rehearse governance in Test you need at least two Business Configuration or Organisation Administrators. Nothing in Test is approved for real confidential data.
 - A Tenant Administrator holds no organisation-level configuration rights by design. After creation, the organisation's own administrator does the configuration.
 - Organisations are never deleted. Their audit history stays whole.
 - Recent sign-in (step-up): widening, creating and resetting set-up each send you to a **Confirm it is you** page if your sign-in is not recent (the default window is 10 minutes). After you confirm, you return to the page with an empty form and must re-enter and re-Check. See "If something goes wrong".
@@ -217,7 +218,7 @@ Each step page opens with the purpose, a **Help for this step** panel with the e
 | **Also add the pack's categories and contract types to this draft** | No | Ticked for JBS-style and Harborline-style; unticked for Blank | Merges; nothing existing is removed; duplicates by code are skipped. Wrong tick: you can delete extras by re-saving the categories list |
 | Button **Save** | | | Flash "The draft was updated." plus a wording note |
 
-Classification levels are not edited here; they were set at installation (a System Administrator task).
+Classification levels are not edited here or on any other onboarding or organisation screen. They are one scale for the whole installation: set in the first-run setup wizard (stage 10, Classification levels), and afterwards changed only by an installation administrator on **Installation setup** (**/Admin/Setup**, permission setup.run).
 
 ### Step 2. Organisation structure (page /Onboarding/Step/structure)
 Columns: type, key, name, parentKey, timeZone, registrationNumber. Keys are up to 40 letters, digits or hyphens and underscores (avoid a full stop; they are not case sensitive and are stored upper-case).
@@ -258,13 +259,13 @@ Columns: providerKey, groupKey, role, viewerKind, categories, businessUnits, sit
 | **Discard this draft** | Press it | Discards with no confirmation question; a new draft starts from the current release |
 | **Release history and rollback** | **Go back to release**, **Reason (required)** up to 500, **Roll back** | Publishes the old content as a **new** release and ends only what a later release introduced and this wizard created. In Production it is submitted for a second person |
 
-**Second-person rule.** In Production, the person who created, last edited or submitted the draft cannot publish it; any change after submission voids the submission; the submitted checksum must match at publication. Details are in the Business Administrator guide.
+**Second-person rule.** In Production, and in Test when governance is `Enforced` (see the design points), the person who created, last edited or submitted the draft cannot publish it; any change after submission voids the submission; the submitted checksum must match at publication. Details are in the Business Administrator guide.
 
 **Evidence.** The Validate result, the plan table, the preview table (screenshots), the release number, and the Configuration reviews history entry.
 
 ## Part G. A second person publishes
 
-In Production, the Onboarding Review, and every other draft you submit, appears in **Configuration reviews** (menu entry **Configuration reviews**, page **/Admin/Reviews**). The second person opens it, reads the plain-language **What would change**, and presses **Approve and publish**. See the Business Administrator guide, "The review inbox".
+In Production (and in Test with governance `Enforced`), the Onboarding Review, and every other draft you submit, appears in **Configuration reviews** (menu entry **Configuration reviews**, page **/Admin/Reviews**). The second person opens it, reads the plain-language **What would change**, and presses **Approve and publish**. See the Business Administrator guide, "The review inbox".
 
 ---
 
@@ -273,8 +274,9 @@ In Production, the Onboarding Review, and every other draft you submit, appears 
 |---|---|
 | Installing the platform, identity provider registration, secrets, mail settings, backups and restore | **[Technical task: System Administrator]** |
 | Signing a pack; holding the private key | **[Technical task: Pack Publisher]** and key custody, outside the application |
-| Registering a pack publisher's public key | **[Technical task: System Administrator]** |
-| Setting classification levels at installation | **[Technical task: System Administrator]** |
+| Trusting a pack publisher's public key by host configuration (a Tenant Administrator can instead register it on the **Trusted publishers** screen, **/Admin/Packs/TrustKeys**) | **[Technical task: System Administrator]** |
+
+Classification levels are not a technical task and not an onboarding setting: see the note at Part F, step 1.
 
 ## Evidence to keep
 - The Check panel and the "organisation was created" panel (Part B), with date and your name.

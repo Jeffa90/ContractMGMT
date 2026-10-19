@@ -6,7 +6,7 @@
 
 **Prerequisites.**
 - The organisation exists and you hold an administrator role for it (see "Roles and permissions at a glance").
-- In Production, at least **two** people who can publish the kind of configuration you change (see "Who can publish what").
+- In Production, and in Test when governance is Enforced, at least **two** people who can publish the kind of configuration you change (see "Who can publish what").
 - You can sign in recently enough to publish (the default window is 10 minutes).
 
 **Status label.** Implemented. Read from the page source and services on this branch; the draft, submit, review, publish and form-editor path was exercised over real HTTP by the no-code rehearsal (docs/NO_CODE_REHEARSAL.md, steps 5 to 12). **Not Verified:** an unaided non-developer following this guide; a live identity provider; real e-mail delivery. Nothing here approves an installation for production use; that is external governance.
@@ -38,12 +38,12 @@ Examples use three synthetic cases: **Blank** (neutral, no pack), **JBS-style** 
 | **Discard the draft** | Throws the draft away. A new draft starts from the release in force | No |
 
 ### 1.3 The second-person rule, explained
-Where the installation requires it (**Production does; Demonstration and Test environments do not**), no one publishes their own work.
+Where the installation requires it, no one publishes their own work. **Production always requires it.** **Test** requires it when the System Administrator has set the governance setting to **Enforced** (a **[Technical task: System Administrator]**); Test then applies exactly the Production rule, so it is the place to rehearse governance, and at least two Business Configuration or Organisation Administrators are needed. With the setting left at **Default**, Test keeps the simplified behaviour (publish immediately). **Demonstration** ignores the setting and always keeps the simplified behaviour. The setting can never lower Production. The mode in force (Production, Test enforced, Test simplified or Demonstration simplified) is shown on **/Admin/Health** and **/Admin/Operations/Dashboard**, and is recorded on configuration audit events and releases.
 - **Who counts as the author.** The person who created the draft, the person who last edited it and the person who submitted it. None of them can approve, send back or reject it. A reviewer who opens or decides on a draft does not become its editor.
 - **Submitting.** Your submission is for the exact saved content. **Any edit after submission voids the submission** (the review page then shows "Changed after it was put forward"); submit again so the reviewer sees what will be published. Saving unchanged content changes nothing.
 - **Matching content.** At publication the submitted checksum must equal the draft's checksum. If not, publication is refused ("The content is no longer the content that was submitted for review…") and the refusal is audited.
 - **Withdrawing.** Only the author or submitter can **Withdraw my submission**. A reviewer who does not want it **rejects** it.
-- **Rollback is also a change.** In Production a rollback is submitted and another person publishes it (see section 11).
+- **Rollback is also a change.** Wherever the second-person rule applies (Production, and Test with **Enforced**) a rollback is submitted and another person publishes it (see section 11).
 - **Recent sign-in (step-up).** Publishing, publishing a rollback and a few tenant-level actions need a recent sign-in. If yours is not recent you are sent to **Confirm it is you**; afterwards you return to the page, and **anything you had not saved is lost**. Save first.
 - **Audit.** Every step is recorded: who, what, when and the reason or note.
 
@@ -366,7 +366,7 @@ Each area has a version history: **Terminology** and **Capabilities** have **Ver
 
 **Who / permission.** The rollback permission for that kind (config.rollback, terminology.rollback, capabilities.rollback). **Needs a recent sign-in.**
 **What it does.** It **creates a new release** with the old content. It never edits or removes history. Records in progress keep the release they started under; terminology rollbacks change no permission or workflow.
-**In Production** the rollback is **submitted for a second person**: the flash reads "Submitted for review. A second person has to review and publish the rollback; nothing changes until they do." It appears in the review inbox as "(puts back release N)". Elsewhere it is published at once: "The earlier release is published again as a new release. History is kept."
+**Where the second-person rule applies (Production, and Test with Enforced governance)** the rollback is **submitted for a second person**: the flash reads "Submitted for review. A second person has to review and publish the rollback; nothing changes until they do." It appears in the review inbox as "(puts back release N)". Where it does not apply (Demonstration, and Test with Default governance) it is published at once: "The earlier release is published again as a new release. History is kept."
 **Errors.** A blank reason; "release not found"; the sign-in step-up; a pack or capability that the old content needs but is now off (the check reports it).
 **Evidence.** The history table showing the new release marked "republishes N", the reason, and the review entry.
 
@@ -386,6 +386,7 @@ Each area has a version history: **Terminology** and **Capabilities** have **Ver
 | "A second person must publish…" | You authored it. Ask another eligible person; check the review column for the permission needed |
 | You edited after submitting and the reviewer cannot publish | Submit again |
 | A rollback is waiting | A second person must publish it from **Configuration reviews** |
+| A raw terminology marker such as double square brackets around a word is visible on a Setup, Onboarding, Pack Manager or Administration page | That is a defect, not something to fix by editing wording. A neutral marker is shown and a stable code is logged; report the page and the time to the System Administrator |
 | A button is missing | You lack the permission, or you are the author. The review page explains |
 | Pages say the system is in maintenance | Changes are paused until a System Administrator ends maintenance (**[Technical task: System Administrator]**) |
 | A pack, e-mail or sign-in problem | **[Technical task: System Administrator]** / **[Technical task: Pack Publisher]**. Do not work around it |

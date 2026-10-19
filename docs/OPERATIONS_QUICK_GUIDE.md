@@ -1,6 +1,6 @@
 # Operations quick guide for the System Administrator
 
-**Purpose.** Do the routine and the planned operations tasks through the application's own pages: read the Operations dashboard, create and verify backups, rehearse a restore, run validation, use maintenance mode and operation leases, download evidence and the support bundle, and carry out an upgrade (readiness, preview, rehearsal, migration report, history, post-upgrade validation, rollback evidence). It also covers the Health page, the Document scanning page, and where audit fits.
+**Purpose.** Do the routine and the planned operations tasks through the application's own pages: read the Operations dashboard, create and verify backups, rehearse a restore, run validation, use maintenance mode and operation leases, download evidence and the support bundle, and carry out an upgrade (readiness, preview, rehearsal, migration report, history, post-upgrade validation, rollback evidence). It also covers the Health page, the Email provider and Malware scanner pages, the implementation evidence pack, accepted warnings, HTTPS and reverse-proxy diagnostics (R-NET-01), the Document scanning page, and where audit fits.
 
 **Who it is for.** The System Administrator: a trained operator who does not need to write code, SQL or JSON, edit source or use Git. Business roles (Tenant Administrator, Organisation Administrator and the rest) cannot open the Operations pages, by design.
 
@@ -10,7 +10,7 @@
 - Installation-level settings are done once, outside the application, **[Technical task: System Administrator]**: backup directory shared with the database server, restore target directory, a dedicated backup account, the encryption or storage-protection statement. See `docs/OPERATIONS_RUNBOOK.md` section 1 and `docs/BACKUP_AND_RESTORE.md` sections 3 and 4.
 - The organisation has decided backup frequency, retention, recovery objectives, where copies live and who may read them. The platform does not decide these (`docs/OPERATIONS_RUNBOOK.md` section 9).
 
-**Status label.** Operations pages, backup, verify, restore, validation, maintenance, leases, evidence, support bundle, upgrade pages: **Implemented**, verified locally on SQL Server for the container model (`deploy/STATUS.md`). IIS and Azure: **Scaffolded / Not Verified**. Per-tenant restore and automatic backup scheduling: **Future**. Document scanning gate: **Implemented**; a real scanner: **Future / Not Verified** (`docs/DOCUMENT_SCANNING.md`).
+**Status label.** Operations pages, backup, verify, restore, validation, maintenance, leases, evidence, support bundle, upgrade pages: **Implemented**, verified locally on SQL Server for the container model (`deploy/STATUS.md`). IIS and Azure: **Scaffolded / Not Verified**. Per-tenant restore and automatic backup scheduling: **Future**. Document scanning gate: **Implemented**; a real scanner: **Future / Not Verified** (`docs/DOCUMENT_SCANNING.md`). Email page (SMTP): **Implemented**, verified only against a loopback test relay inside the automated tests, **Not Verified** against any customer mail service; Microsoft Graph: **Scaffolded / Not Verified**; dev-capture and demo-log: **Mocked** (deliver nothing). Scanner page and self-test: **Implemented**; the demonstration scanner: **Mocked**; no real scanner adapter exists. Evidence pack and accepted warnings: **Implemented**. HTTPS and proxy diagnostics: **Implemented**; a real reverse proxy end to end: **Not Verified** (`docs/REVERSE_PROXY.md`).
 
 > **Tooling is not governance, and nothing here is production approval.** A green dashboard, a verified backup and a passing pre-flight are evidence for your change process. Production approval is external governance.
 
@@ -26,8 +26,8 @@ The System Administrator holds all of these. A custom operator role would need e
 | `operations.backup` | Create a backup; **Verify again** | Create: yes. Verify: no |
 | `operations.restore` | Preview and run a restore into a new database; run an upgrade rehearsal; prove a rollback | Run: yes. Preview: no |
 | `operations.validate` | Run validation on the running installation; see technical detail columns; download pending migration SQL | No |
-| `operations.maintenance` | Enter and leave maintenance mode; take over a lease; tick "hold maintenance" on a backup | Yes (enter, leave, take over) |
-| `operations.evidence.export` | Download the evidence report (JSON, CSV), upgrade pre-flight reports, and the support bundle | Support bundle: yes. Others: no |
+| `operations.maintenance` | Enter and leave maintenance mode; take over a lease; tick "hold maintenance" on a backup; change the Email provider settings; accept, or revoke the acceptance of, a warning, an exception or the demonstration scanner | Yes (enter, leave, take over, change, accept) |
+| `operations.evidence.export` | Download the evidence report (JSON, CSV), upgrade pre-flight reports, and the support bundle; open and download the implementation evidence pack | Support bundle: yes. Others: no |
 | `operations.upgrade` | Apply the upgrade | Yes |
 | `ops.manage` | Open **Health and readiness** | No |
 
@@ -268,6 +268,23 @@ The page lists **Deployment models and what is verified** (Verified, or Scaffold
 
 **Look at the bundle before you send it.** The platform scans it for secrets and produces none if it finds one, but you remain responsible for where it goes. Send it only to whoever supports the installation.
 
+### 9.1 Implementation evidence pack
+
+| | |
+|---|---|
+| Navigation | Operations, then "Implementation evidence pack (for the sign-off)" |
+| Page | **/Admin/Operations/EvidencePack** |
+| Who | System Administrator |
+| Permission | `operations.evidence.export` |
+
+Shows an **Overall** badge (the worst section), then Generated (UTC), Platform version, Mode, Governance mode and a reference (correlation id), and a table of sections: environment, version, deployment, pack, organisation set-up, governance, identity, e-mail, scanner, masked-data status, configuration publication, migration and reconciliation, UAT, backup, upgrade pre-flight and operational readiness. Each row has a stable code, a status (Verified, Warning, Failed or Not Verified), what it **counts as**, and what the platform found. Below the table are **Accepted exceptions** (code, kind, scope, who accepted, until when, reason), **Open risks** and **Sign-off**.
+
+* **What counts as a pass.** Only Verified counts. A Warning is not a pass until every warning has been accepted on the record. Failed is a failure. Not Verified is never a pass. The operation's own outcome is shown unchanged beside the verdict.
+* **Download the pack (ZIP with JSON, CSV, Markdown and file hashes).** It holds no secrets and no contract or document content, uses formula-safe CSV, and carries stable codes, hashes and correlation ids.
+* **Sign-off.** The lines (Implementation lead, Business owner, Security reviewer, System Administrator, Data owner) are **blank placeholders** for people to complete outside the platform. The platform never says the environment is ready for Production.
+
+**Evidence to keep:** the downloaded ZIP and its hashes, filed with the change record, with the sign-off lines completed by the named people.
+
 ---
 
 ## 10. Health and readiness
@@ -284,10 +301,52 @@ Shows an **Overall** badge (Healthy, Degraded, Unhealthy), a table of every read
 | Check | What Unhealthy or Degraded means | Do |
 |---|---|---|
 | Backup check (R-BKP-01) | Backup not configured, no verified backup, or the newest is older than the limit | Section 4 |
-| R-DOC-01 "Uploaded files are scanned before anyone can use them" | In Production: no real connected scanner, or the demonstration scanner, or skipped scans allowed | See section 11 and `docs/DOCUMENT_SCANNING.md`. Not ready until a real scanner is connected, and none is supplied |
+| R-DOC-01 "Uploaded files are scanned before anyone can use them" | In Production: no real connected scanner, or the demonstration scanner, or skipped scans allowed. Attachments are held | See section 11, the Scanner page (section 11.1) and `docs/DOCUMENT_SCANNING.md`. Not ready until a real scanner is connected, and none is supplied |
+| R-EML-01 "Email provider verified" | Healthy only after a test message really reached the provider with the **current** settings. Anything else is Degraded and says why: not configured, not tested, a changed setting, a failed connection or delivery, or a pass older than the limit. Outside Production a simulated or untested provider is not raised as a fault, but the detail text states the state ("Simulated", "Not configured", "Not Verified") and it is never verified email | Section 10.1. Run the test on the Email page |
+| R-NET-01 "HTTPS and reverse-proxy configuration" | Degraded for 15 minutes after a request was refused because it did not arrive over HTTPS (the detail names ECP-NET-001 or ECP-NET-002 and how many). Degraded, not Unhealthy, so a wrong proxy setting does not take the health page down | Section 10.2 |
 | Database, storage, operations checks | The named dependency is not working | Open the check's detail; fix the setting **[Technical task: System Administrator]** |
 
 Nothing here approves an installation for production.
+
+### 10.1 Email provider
+
+| | |
+|---|---|
+| Navigation | Operations, then "Email provider: settings, test message and readiness" |
+| Page | **/Admin/Operations/Email** |
+| Permission | Read: `operations.read`. Saving settings and sending the test message: `operations.maintenance`, with a recent sign-in |
+
+This is the **one** e-mail configuration for the installation. The setup wizard (the notifications stage) and Administration both use it, so there is nothing to keep in step.
+
+| Provider | What it is | Status |
+|---|---|---|
+| smtp | A real SMTP service | **Implemented.** Verified only against a loopback test relay inside the automated tests. **Not Verified** against your mail service |
+| graph | Microsoft Graph | **Scaffolded, Not Verified**, not connected |
+| dev-capture, demo-log | Capture or log messages and deliver nothing | **Mocked.** Demonstration and Test only; refused in Production |
+| disabled | No e-mail | Not allowed in Production |
+
+**The page shows** a **Readiness** badge (Healthy, Failed, or a warning state such as Simulated, Not configured or Not Verified), the provider and whether its settings are saved in the application or come from the host's starting configuration, what that means with a stable code, what it **counts as** as evidence, last success, last failure and **A pass expires**. Then a **Settings** form (Provider, From address, SMTP host, SMTP port, Require TLS, SMTP user and SMTP password as **secret references**), **Send a test message**, and **Recent tests**.
+
+| Field | Rule |
+|---|---|
+| SMTP user, SMTP password | A **secret reference** only: `env:NAME`, `file:/path` or `keyvault:name`. A secret typed into the form is refused and never echoed. Only non-secret settings and references are stored |
+| Require TLS | Production needs it |
+| Test recipient | A mailbox you control. The test connects to the provider (the **connectivity probe**) and sends a **synthetic message with fixed text** that contains no contract information. The Recent tests table shows Connection and Delivery outcomes with codes, the recipient masked, whether the result is for the current settings, and a reference |
+
+**What counts as ready.** Readiness is proved by an actual provider interaction. A pass is tied to the settings: **changing any setting makes it stale** ("No (settings changed)") and it must be tested again. A pass **expires** after 168 hours by default (set by `Ecp:Email:ReadinessMaxAgeHours`, a **[Technical task: System Administrator]**). A configured but unreachable provider is never Healthy. A simulated provider reads "Simulated: nothing delivered" and is never counted as verified e-mail. In Production, setup cannot finish the e-mail stage without a passing test.
+
+**Evidence to keep:** the Readiness panel and the Recent tests row (reference, time), not the mailbox contents.
+
+### 10.2 HTTPS and reverse-proxy diagnostics (R-NET-01, ECP-NET-001, ECP-NET-002)
+
+Production needs HTTPS. A request that arrives over plain HTTP is refused with a short, safe page that gives a stable code and a reference (the page carries no addresses or headers). Give both to the person who runs the installation. The setup wizard also shows TLS and proxy failures in plain language. Full detail: `docs/REVERSE_PROXY.md`.
+
+| Code | Meaning | What to do (**[Technical task: System Administrator]**) |
+|---|---|---|
+| ECP-NET-001 | The request reached the server over plain HTTP and no HTTPS scheme was forwarded | Use the https address. If a reverse proxy already handles HTTPS, make the proxy forward the scheme (`X-Forwarded-Proto`), and tell the application to trust it |
+| ECP-NET-002 | The proxy's forwarded headers arrived but were **not trusted** | Set `Ecp:Network:ForwardedHeaders:Enabled`, and name the proxy in `KnownProxies` (or its network in `KnownNetworks`); then restart |
+
+R-NET-01 on **/Admin/Health** goes Degraded for 15 minutes after a refusal and otherwise states the transport the host expects. **Status:** the diagnostics are Implemented and tested without a server; a real reverse proxy has **Not Verified** end to end.
 
 ---
 
@@ -310,6 +369,25 @@ Nothing here approves an installation for production.
 | Tune the retry job (maximum attempts, batch size) | **[Technical task: System Administrator]** host settings, see `docs/DOCUMENT_SCANNING.md` |
 
 What the business administrator sees on the page, the fail-closed rule, the retry job, the audit actions and the honest status table are in `docs/DOCUMENT_SCANNING.md`.
+
+### 11.1 Malware scanner page (System Administrator)
+
+| | |
+|---|---|
+| Navigation | Operations, then "Malware scanner: configuration, self-test and readiness" |
+| Page | **/Admin/Operations/Scanner** |
+| Permission | Read: `operations.read`. Running the self-test and accepting the demonstration scanner: `operations.maintenance` and a recent sign-in |
+
+**The page shows** a **Readiness** badge, the scanner and its provider key, what that means with a stable code, what it **counts as** as evidence, the last self-test and when a pass expires, and whether skipped scans are released (not allowed in Production). The **Configuration** panel is read-only: it shows `Documents:Scanner:*` as set in the host (Provider: none, mock or a provider key; Endpoint; Credential reference, a secret reference only; Timeout 30 seconds; Largest file scanned 100 MB; Retry every 60 seconds up to `Documents:MaxScanAttempts`; self-test valid for 24 hours). Changing them is a **[Technical task: System Administrator]**.
+
+* **Self-test** (**Run the scanner self-test**): asks whether the scanner is reachable, calls harmless content clean, and detects the standard anti-malware test file (EICAR, harmless). It proves the scanner responds and recognises that file; it does not prove the scanner is good.
+* **Status.** No real scanner adapter exists (**Not Verified / not built**). The platform defines the integration boundary and a provider-neutral self-test; the connect-a-provider checklist is in `docs/DOCUMENT_SCANNING.md`.
+* **The demonstration scanner (mock)** is registered in Demonstration by default, in Test **only** when Provider is set to mock on purpose, and never in Production. The page shows a prominent **TEST MODE** warning. **The mock is no protection.**
+* **Accept the demonstration scanner for a masked-data rehearsal** (Test mode only, and only while the mock is the scanner): enter **Scope**, **Why this is acceptable for the rehearsal** and **Valid for (days, at most 90)**, then **Record the acceptance**. It records who, why, for what scope and until when, and it does not make the scanner real. Masked company data cannot be committed behind the mock without it (refusal MDD-006 in `docs/MIGRATION_EXECUTION_GUIDE.md` section 8.5). The acceptance history shows Active, Expired or Revoked.
+* **Production** is Unhealthy on R-DOC-01 and cannot finish setup without a connected, healthy scanner; attachments are held.
+* **Notifications.** Quarantine, infection, provider unavailability and exhausted retries raise operational notifications to the recipients already defined in the notification configuration. Nothing is added here.
+
+**Evidence to keep:** the Readiness panel and the last self-test reference; for a masked-data rehearsal, the acceptance row (who, scope, reason, until).
 
 ---
 
@@ -337,11 +415,13 @@ An upgrade moves the installation to the version now running. It needs a verifie
 | Outcome | Meaning | Do |
 |---|---|---|
 | Ready | Nothing found | Continue |
-| Ready with warnings | Each warning needs your explicit acceptance, by code, at rehearsal and apply | Decide with the owner, record, continue |
-| Blocked | A critical issue (database newer than the build, schema drift, a changed historical migration, a pack or workflow in use that would fail, a bad backup) | Fix it; never work around; run again |
+| Ready with warnings | Each warning needs your explicit acceptance, by code, at rehearsal and apply. It counts as **Passed** only when every warning has been accepted on the record (see below) | Decide with the owner, accept on the record, continue |
+| Blocked (a failure, never a pass) | A critical issue (database newer than the build, schema drift, a changed historical migration, a pack or workflow in use that would fail, a bad backup) | Fix it; never work around; run again |
 | Not Verified | A check could not be made (for example SQLite) | Resolve it, or accept the gap in writing. It is not a pass |
 
 At this early stage "not in maintenance mode" is expected. Keep the JSON.
+
+**Accepted warnings (who, why, expiry).** Under a warning in the findings table, **Accept this warning** opens a small form: **Why it is acceptable (kept on the record)** (required, up to 500 characters) and **Valid for (days, at most 90)**, then **Accept the warning**. Only a System Administrator with a recent sign-in (`operations.maintenance`) can do it. The **Accepted warnings** table lists Code, Accepted by, Reason, Until and State (Active, Expired or Revoked), with **Revoke** on an active row. Accepting does not remove the warning: the pre-flight still reports Ready with warnings, and the evidence counts it as Passed only while **every** warning has a current acceptance. Run the pre-flight again to see it counted. A Blocked pre-flight, or a Not Verified one, is never counted as a pass. Accepted exceptions appear in the evidence pack (section 9.1).
 
 ### 12.2 Upgrade preview, rehearsal and apply
 
@@ -475,7 +555,8 @@ Other host tasks that are never on a screen: installing and renewing the identit
 - Backup id, manifest SHA-256 (in your own records), outcome and warnings.
 - Restore: result, validation outcome, evidence file, elapsed time against your recovery objective.
 - Dashboard JSON before and after significant work; evidence report; support bundle only when support requested it.
-- Upgrade: pre-flight JSON, rehearsal and rollback-proof evidence, accepted warnings with who accepted, post-upgrade validation, upgrade history entries.
+- Implementation evidence pack (ZIP) with sign-off lines completed by people; Email and Scanner page readiness (reference and time); any scanner acceptance (who, scope, reason, expiry).
+- Upgrade: pre-flight JSON, rehearsal and rollback-proof evidence, accepted warnings with who accepted, why and until when, post-upgrade validation, upgrade history entries.
 - Maintenance and lease reasons with times (UTC).
 - A signed record by the owner of each decision the platform does not make. This record is evidence of what ran, **not approval for production use**.
 
@@ -492,7 +573,9 @@ Other host tasks that are never on a screen: installing and renewing the identit
 | Pre-flight Blocked | Fix the cause named; never work around it |
 | Upgrade failed | Maintenance mode stays on. Do not retry. Roll back by restore with the previous version (section 12.6) |
 | Dashboard shows Not Verified | Decide: look at it, or accept the gap in writing. It is never a pass |
-| Attachments held | See `docs/DOCUMENT_SCANNING.md`; expected until a real scanner is connected |
+| Attachments held | See `docs/DOCUMENT_SCANNING.md` and the Scanner page (section 11.1); expected until a real scanner is connected |
+| Email says Simulated, Not Verified or Failed | Section 10.1. Only a test that really reached the provider with the current settings is a pass; a changed setting or an expired pass needs a new test |
+| A visitor sees ECP-NET-001 or ECP-NET-002 | Section 10.2 and `docs/REVERSE_PROXY.md`. Use the https address, or fix the proxy's forwarded scheme and trust settings |
 | Anything unexplained | Note the correlation id on the page, download the support bundle (recent sign-in), review it, send it to whoever supports you |
 
 ## What was and was not verified
@@ -500,4 +583,4 @@ Other host tasks that are never on a screen: installing and renewing the identit
 - **Verified by reading the code:** every page, field, button, permission and recent-sign-in rule above (Operations pages and their handlers, the Operations and Upgrade administration services, the menu, the Health, Audit and Document scanning pages, the role-permission matrix), and the command names.
 - **Verified by the project's own tests (as recorded in `deploy/STATUS.md`):** backup, restore, validation, maintenance, leases and upgrade on SQL Server for the container model. I did not run them for this guide.
 - **Not run:** no live installation was driven for this guide.
-- **Not Verified:** IIS and Azure; real identity provider; real e-mail; a real malware scanner; how a System Administrator reads installation-tenant audit events on screen (section 13); the label on the Rollback evidence page before a backup is chosen (section 12.6); whether the evidence files can be downloaded from a page (the Upgrade history page has a handler but no link, so treat the backup folder as the source).
+- **Not Verified:** IIS and Azure; real identity provider; real e-mail (SMTP is verified only against a loopback test relay, Graph is not connected); a real malware scanner (none is built); a real reverse proxy end to end; how a System Administrator reads installation-tenant audit events on screen (section 13); the label on the Rollback evidence page before a backup is chosen (section 12.6); whether the evidence files can be downloaded from a page (the Upgrade history page has a handler but no link, so treat the backup folder as the source).

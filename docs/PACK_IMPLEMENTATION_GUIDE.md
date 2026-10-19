@@ -11,7 +11,7 @@
 * You have a pack file from a publisher you trust, or you will use one of the packs shipped with the installation.
 * A second person with the right to publish configuration exists, so the drafts the pack prepares can be published (section 9).
 
-**Status label.** Pack Manager screens: **Implemented** as server-rendered forms (read from the page code; not driven by a person in a browser for this guide). Signing and key custody: **external, by design** (the application holds no private key and cannot sign). Upgrade across pack versions, pack export, marketplace or online catalogue: **Future**. No real publisher key or signed Production pack is supplied with this repository: **Not Verified** end to end for Production. Nothing here declares production approval; that is external governance.
+**Status label.** Pack Manager screens: **Implemented** as server-rendered forms (read from the page code; not driven by a person in a browser for this guide). Signing and key custody: **external, by design** (the application holds no private key and cannot sign; the Pack Publisher signs with the standalone `ecp-pack` tool, Implemented, and the Tenant Administrator registers the public key). Upgrade across pack versions, pack export, marketplace or online catalogue: **Future**. No real publisher key or signed Production pack is supplied with this repository: **Not Verified** end to end for Production. Nothing here declares production approval; that is external governance.
 
 How this journey was proved without code: docs/NO_CODE_REHEARSAL.md (steps 4 to 12 cover assigning a pack and publishing the drafts; run over real HTTP on SQLite and on SQL Server by automated tests, not by an unaided non-developer). Background: docs/PACK_MANAGER.md, docs/PACK_SIGNING.md, docs/PACK_AUTHORING.md and docs/PACK_SECURITY.md.
 
@@ -23,12 +23,12 @@ A solution pack is data only. It never runs code. The application deliberately s
 
 | Who | Does what | Where | Cannot do |
 |---|---|---|---|
-| **Pack Publisher** (external to the application) | Builds the pack and signs it with a private key using the pack command-line tool. Hands over the signed file, the key identifier and the public key. | Outside the application. **[Technical task: Pack Publisher]**, see docs/PACK_AUTHORING.md and docs/PACK_SIGNING.md | Cannot install or assign; the application never sees the private key |
+| **Pack Publisher** (external to the application) | Builds the pack and signs it with a private key using the standalone `ecp-pack` tool (installed from the tool package; no source checkout of the repository is needed). Hands over the signed file, the key identifier and the **public** key only. Never signs through the application. | Outside the application. **[Technical task: Pack Publisher]**, see docs/PACK_AUTHORING.md and docs/PACK_SIGNING.md | Cannot install, assign or register their own key; the application never sees the private key |
 | **Key custody** (your security team, or the publisher) | Generates and guards the private key (ideally in a hardware module or key vault), rotates it, backs it up, decides who may sign, revokes it if lost. | Outside the application. **[Technical task: key custody]** | The application cannot hold, show or accept a private key. If anything asks you to paste one, stop and tell your security team |
 | **System Administrator** (technical role) | Decides which publisher keys the installation trusts. Can set trusted public keys in the host configuration (a technical task). Runs the installation, backups and upgrades under Operations. | Host configuration, **[Technical task: System Administrator]**; Operations pages | In the role-permission matrix the System Administrator role holds none of the pack permissions (see the note after this table) |
-| **Business Administrator** (Tenant Administrator, Business Configuration Administrator, Organisation Administrator) | Chooses the pack, uploads the signed file, reads the checks, installs it, assigns it to an organisation, reviews the drafts and (with a second person) publishes them. | The Pack Manager pages in section 2 | Cannot sign a pack. Cannot publish their own draft |
+| **Business Administrator** (Tenant Administrator, Business Configuration Administrator, Organisation Administrator) | Chooses the pack, uploads the signed file, reads the checks, installs it, assigns it to an organisation, reviews the drafts and (with a second person) publishes them. | The Pack Manager pages in section 2 | Business administrators never sign a pack and never hold or handle a private key. The **Tenant Administrator** (holds `packs.trust.manage`) registers the publisher's public key; no one can publish their own draft |
 
-**Note on the Trusted publishers page (a recorded contradiction).** The panel on the pack catalogue says a system administrator registers the public key under Trusted publishers. The page itself is protected by the permission "packs.trust.manage", and the role-permission matrix (requirements/02-reference/role-permission-matrix.csv) grants it to the **Tenant Administrator** role only, not to the System Administrator role. In practice: the System Administrator or security team decides which key to trust; a person who holds the Tenant Administrator role enters its public key on the page, or the System Administrator sets the key in host configuration (a technical task). Confirm which route your installation uses before the go-live date.
+**Who registers a trusted key (resolved).** The **Tenant Administrator**, who holds the permission `packs.trust.manage`, registers the publisher's public key on the Trusted publishers page (/Admin/Packs/TrustKeys). The decision to trust a publisher is made by the System Administrator or security team and is given to the Tenant Administrator in writing. The platform operator may instead trust a key by host configuration (`Ecp:Packs:TrustFile`, a **[Technical task: System Administrator]**); keys set that way are read-only on the page. The role-permission matrix (requirements/02-reference/role-permission-matrix.csv) grants `packs.trust.manage` to the Tenant Administrator role only, and the System Administrator role holds none of the pack permissions. What the publisher does with the tool, and its exit codes, are in section 3.
 
 ### Permissions used on these screens
 
@@ -90,7 +90,16 @@ This step happens outside the application. Ask the Pack Publisher for, through *
 
 Do not accept a private key from anyone. A key file or text that says "PRIVATE" is refused by the application, and you should tell your security team.
 
-**[Technical task: Pack Publisher]** builds, validates and signs the pack. **[Technical task: key custody]** guards the private key. Neither is a screen in this application.
+**[Technical task: Pack Publisher]** builds, validates and signs the pack. **[Technical task: key custody]** guards the private key. Neither is a screen in this application, and a business administrator never runs either.
+
+**For the Pack Publisher: the `ecp-pack` tool (Technical task: Pack Publisher; full detail in docs/PACK_SIGNING.md and docs/PACK_AUTHORING.md).**
+
+* **Install.** `ecp-pack` is a standalone .NET tool package (`Ecp.PackTool`), installed with `dotnet tool install Ecp.PackTool --tool-path <dir> --add-source <folder holding the .nupkg>`. It needs the .NET runtime on the publisher's machine. It does **not** need a checkout of the repository or its SDK sources. Running it from a source checkout is for developers of the platform only.
+* **Commands.** version, build, build-all, validate, report, hash, inspect, sign, verify, compare, keygen. Builds are deterministic (the same source gives the same bytes). `report` writes a sanitised JSON report (identity, hashes and findings; no pack content, no key, no signature bytes, no local paths) that can be sent to the business.
+* **Key references.** `sign` takes `--key-ref env:VARIABLE` (the variable holds the key text) or `--key-ref file:/path/to/private.pem` (a file outside the repository); `--key-file` and `--key-env` are shorter spellings. The key is never typed, printed, stored or logged. The application never holds a private key and there is no signing in the browser.
+* **Exit codes.** 0 success; 1 the package or request is not acceptable (including a failed verification); 2 usage error; 3 the key reference could not be used.
+* **Hand over.** The signed `.ecpkg` files and the **public** key with its key identifier, plus the checksum and fingerprint by a separate route (see above).
+* **Status.** Implemented. The tool package is built by CI, which installs that artefact alone and exercises it end to end. A single-file build for a machine without the .NET runtime, and signing with a key held in a hardware module or key vault, are Future. A real publisher key and a signed Production pack are Not Verified.
 
 **Evidence to keep:** where and when each item arrived and by which channel; the checksum and fingerprint as the publisher stated them.
 
@@ -102,7 +111,7 @@ Do not accept a private key from anyone. A key file or text that says "PRIVATE" 
 
 **Purpose.** Tell the installation which publisher keys it will accept. Production accepts a pack only if it is signed by a trusted, active, in-date key listed here or set by the host configuration.
 
-**Who.** The holder of the Tenant Administrator role, on the instruction of the System Administrator or security team (see the note in section 1). **Permission:** packs.trust.manage. **Step-up:** yes (recent sign-in).
+**Who.** The **Tenant Administrator** (the role that holds `packs.trust.manage`), on the written instruction of the System Administrator or security team (see section 1). Business Configuration and Organisation Administrators cannot register keys, and the publisher never registers their own. **Permission:** packs.trust.manage. **Step-up:** yes (recent sign-in).
 
 **Prerequisites.** You hold the public key and key identifier from section 3 and have the decision to trust this publisher in writing.
 
@@ -320,7 +329,7 @@ Never keep or send a private key, a password or real customer data as evidence.
 | You trusted the wrong key | Revoke it on Trusted publishers with a reason. Revoking is immediate and deletes nothing |
 | You installed the wrong pack | Retire that version on its Details page. Organisations already using it are unchanged; assign the right pack instead |
 | You assigned to the wrong organisation | Nothing is published. Discard the unwanted drafts in their editors and assign correctly |
-| A published change is wrong | Use release history (/Admin/Configuration) to publish an earlier release again with a reason; it needs a recent sign-in, creates a new release and, in Production, goes to a second person |
+| A published change is wrong | Use release history (/Admin/Configuration) to publish an earlier release again with a reason; it needs a recent sign-in, creates a new release and, in Production (and in Test with Enforced governance), goes to a second person |
 | The page sends you to sign in again | Your sign-in is older than 10 minutes; confirm it and repeat the action |
 | "Forbidden" on a button | Your role lacks that permission (section 1); ask a person who holds it |
 | Production refuses every pack | Expected until a trusted, signed pack is installed (Checks page); this is by design |

@@ -6,7 +6,7 @@
 
 **Prerequisites.**
 - A non-production installation (Demo or Test mode, or a restored rehearsal copy) set up by the same steps as production, loaded with synthetic or approved data. Never use live confidential data in a Demo or Test installation.
-- Configuration for every organisation published (by a second person), so that the pages below show it as "in force". See `docs/NO_CODE_REHEARSAL.md` for the 20-step journey that is the proof this set-up can be done through pages alone.
+- Configuration for every organisation published (by a second person), so that the pages below show it as "in force". See `docs/NO_CODE_REHEARSAL.md` for the 23-step journey (Test mode, Enforced governance) that is the proof this set-up can be done through pages alone.
 - A named tester for each role (section 2) and the "expected results" documents (approval design, workflow list, notification list, terminology list, regional settings).
 - A way to record results and defects outside the application (section 3). The application has no defect tracker and no test-result page.
 
@@ -20,11 +20,12 @@
 
 | Rule | What it means for a tester |
 |---|---|
-| Second-person publication | The person who last edited or submitted a configuration draft cannot publish it. Changing a draft after it was submitted voids the submission; a submitted change can be published only if its content hash still matches. A defect fix in configuration therefore needs two people: one to correct and submit, a different one to approve. |
+| Second-person publication | Production always applies it; Test applies it when the System Administrator has set governance to Enforced (a **[Technical task: System Administrator]**), which is the setting to rehearse with; Demonstration always keeps simplified governance. Check the mode shown on **/Admin/Health** before you start. Where it applies, the person who last edited or submitted a configuration draft cannot publish it. Changing a draft after it was submitted voids the submission; a submitted change can be published only if its content hash still matches. A defect fix in configuration therefore needs two people: one to correct and submit, a different one to approve. |
 | Recent sign-in (step-up) | Publishing, rolling back, creating organisations, emergency unlock, backups, restores, maintenance, upgrades and the support bundle ask you to confirm it is you (a **Confirm it is you** page at **/Reauth**), then return you. This is normal; the default window is 10 minutes. |
 | Audit | Every key action is in **Audit events** (**/Admin/Audit**). Capture the entry for each action you test. |
 | Times | Stored in UTC; pages show the organisation's configured time zone. Note both when you record a time. |
-| Synthetic data | Use invented suppliers, people and contract titles. Never paste live confidential data into this environment or into a defect record. |
+| Synthetic data | Use invented suppliers, people and contract titles. Never paste live confidential data into this environment or into a defect record. If company data is used in Test, it must be masked by your organisation and declared first (`docs/MIGRATION_EXECUTION_GUIDE.md` section 8.5, **/Migration/MaskedData**). The platform does not mask or check the data and never says it is safe. |
+| What counts as a pass | Use the same reading for every report, rehearsal and pre-flight result, and always keep the operation's own outcome (Ready, Blocked ...) beside your verdict. **Ready** is a pass. **Ready with warnings** is a pass **only when every warning was explicitly accepted on the record** (who, reason, expiry of at most 90 days; accepted by a System Administrator on the page that shows the warning, for upgrade pre-flight warnings **/Admin/Operations/UpgradeReadiness**). **Blocked** and **Failed** are failures. **Not Verified** is Not Verified, never a pass. The pages show a stable code (EVD-nnn) with each verdict. |
 
 ---
 
@@ -242,10 +243,10 @@ Spot-check ten screens and two exports (the contract list, a lifecycle page, an 
 
 | Step | Do | Expect |
 |---|---|---|
-| 1 | Upload an ordinary synthetic file to a test contract | Demo and Test (mock scanner): released and downloadable. Production without a real scanner: held, cannot be downloaded |
+| 1 | Upload an ordinary synthetic file to a test contract | Demo, and Test only where the demonstration scanner was set up on purpose: released and downloadable. Test with no scanner, and Production without a real scanner: held, cannot be downloaded |
 | 2 | Open **/Admin/Documents/Scanning** | The Scanner panel states what is connected ("Demonstration scanner", "No scanner connected" or the provider); counts by result; **Files that are held** |
 | 3 | Demo or Test only: upload a harmless text file that contains the standard antivirus test text (see `docs/DOCUMENT_SCANNING.md`) | Quarantined (infected); **Scan again** is not offered for it; the audit shows `document.quarantined` |
-| 4 | **/Admin/Health** | Check R-DOC-01. In Production it is Unhealthy until a real scanner is connected |
+| 4 | **/Admin/Health**, and **/Admin/Operations/Scanner** | Check R-DOC-01. In Production it is Unhealthy until a real scanner is connected. The Scanner page shows a TEST MODE warning when the demonstration scanner is in use; it is no protection |
 
 **Production decision.** No real scanner adapter exists; attachments cannot be used in Production until one is supplied. Record this as an open item in the go/no-go table (section 6). A Demo pass of this script proves the gate, not protection.
 
@@ -313,7 +314,7 @@ The application shows facts; people decide. Gather each item, record where it ca
 | 2 | Configuration release numbers and checksums in force, per kind and organisation | **/Admin/Configuration**, "Release history" (Release, Published, By, Note, Checksum shows the first 12 characters). Terminology, Capabilities, Regional and Studio have their own History pages | Business Configuration Administrator | Note the highest release number for each kind. The configuration is frozen at these numbers |
 | 3 | No change waiting for a decision | **/Admin/Reviews**, tab **Waiting for my decision**, and **Put forward by me** | Business Configuration Administrator | An unreviewed submission is not in force |
 | 4 | Organisation set-up checklist complete | **/Admin/Organisations/Setup** for each organisation | Organisation Administrator | |
-| 5 | Pack installed, trusted and assigned | **/Admin/Packs** | Business Administrator | Signing is done by the Pack Publisher outside the application (`docs/PACK_SIGNING.md`); the System Administrator registers only the public key |
+| 5 | Pack installed, trusted and assigned | **/Admin/Packs** | Business Administrator | Signing is done by the Pack Publisher outside the application (`docs/PACK_SIGNING.md`); the Tenant Administrator (permission `packs.trust.manage`) registers only the public key; business administrators never sign |
 | 6 | Health and readiness | **/Admin/Health** | System Administrator | Read every check. A Production installation with R-DOC-01 Unhealthy cannot use attachments |
 | 7 | Operations dashboard saved as JSON | **/Admin/Operations/Dashboard**, "Download this dashboard as JSON" | System Administrator | Nothing Failed that you cannot explain |
 | 8 | Verified backup and manifest hash | **/Admin/Operations/Backups** | System Administrator | Within the agreed frequency |
@@ -323,9 +324,14 @@ The application shows facts; people decide. Gather each item, record where it ca
 | 12 | Migration reconciliation and acceptance | Batch page and Reconciliation page | Data owner | Rollback tested once |
 | 13 | Document scanning decision | **/Admin/Documents/Scanning**, R-DOC-01 | Business Lead and security owner | Real scanner **Future / Not Verified** |
 | 14 | Open Not Verified items, with owners | UAT log | Project Manager | e-mail provider, identity provider, scanner, IIS or Azure if used |
+| 14a | Implementation evidence pack | **/Admin/Operations/EvidencePack** (permission `operations.evidence.export`) | System Administrator | See below. Counts as evidence for people to read, not approval |
 | 15 | Decisions the platform does not make | Your records | Business Lead | Backup frequency, retention, recovery objectives, who may read backups |
 
 **Go/no-go rule (suggested).** *Go* only when rows 1 to 4, 6 to 9 and 12 are complete and Verified, there are no open Severity 1 or 2 defects, and every Not Verified item has a named owner and a written acceptance. This rule is yours to set; the platform does not check it. The result is a recommendation to your governance body, **not** production approval.
+
+**The implementation evidence pack (row 14a).** **/Admin/Operations/EvidencePack** shows a sanitised summary of the whole implementation: environment, version, deployment, pack, organisation set-up, governance, identity, e-mail, scanner, masked-data status, configuration publication, migration and reconciliation, UAT, backup, upgrade pre-flight, operational readiness, open risks and accepted exceptions. Each section shows its status, what it counts as (by the rule in section 1: only Verified counts as a pass; a Warning is not a pass until accepted) and a stable code. **Download the pack** gives a ZIP of JSON, CSV, Markdown and file hashes, with correlation ids; it holds no secrets and no contract or document content, and spreadsheet cells that look like formulas are defused. The page ends with **Sign-off** lines (Implementation lead, Business owner, Security reviewer, System Administrator, Data owner) that are **blank placeholders**: the people complete and sign them outside the platform. The page never says the environment is ready for Production, and a pack with every line green is still not production approval.
+
+**Where the overall verdicts are recorded.** The five rehearsal verdicts (Demo synthetic, Test synthetic, Test masked data, Production-mode setup, Production use with confidential contracts) and the reasons behind them are in `docs/IMPLEMENTATION_REHEARSAL.md` section 1 and section 9. Two are Supported with conditions for Demonstration and Test with made-up data, one is Supported with conditions for masked data in Test, and the last two (Production-mode setup and Production use with confidential contracts) are **Blocked** until a connected, healthy malware scanner exists. Use them as inputs to your own decision; they are not approval.
 
 ---
 
@@ -336,7 +342,7 @@ The application shows facts; people decide. Gather each item, record where it ca
 ### 7.1 Two weeks before
 
 - UAT signed; configuration frozen; final mapping profile version used in a successful rehearsal.
-- Production installation in Production mode with single sign-on working for every group, a mail provider, the backup folder and backup account configured, and a verified restore rehearsal. **[Technical task: System Administrator]** for installation, identity provider, secrets and mail settings (see `docs/OPERATIONS_RUNBOOK.md`).
+- Production installation in Production mode with single sign-on working for every group, a mail provider with a passing test on **/Admin/Operations/Email** (not just a saved setting), the backup folder and backup account configured, and a verified restore rehearsal. **[Technical task: System Administrator]** for installation, identity provider, secrets and mail settings (see `docs/OPERATIONS_RUNBOOK.md`).
 - All organisation configuration published through **Configuration reviews** by a second person. Check **/Admin/Reviews**: nothing waiting.
 - A decision recorded on attachments (section 4, U11).
 - Users told of the freeze window, training and who to call.
@@ -416,6 +422,8 @@ No open top-severity issues; two consecutive weeks of green dashboards; a verifi
 - Migration reconciliation download and acceptance record.
 - Audit export for the test and cutover period.
 - The Document scanning page counts and the R-DOC-01 result on cutover day.
+- The implementation evidence pack (ZIP) with its sign-off lines completed by the named people, and the list of accepted exceptions (who, reason, expiry) with the pre-flight warnings that were accepted.
+- For masked data in Test: the declaration, its approval reference and review-by date, and the scanner acceptance record.
 - The cutover record: who did each step, with times (UTC), and the back-out decision.
 - Hypercare log and sign-off.
 
@@ -430,7 +438,8 @@ Store these with the project records. They show what ran; they do not approve an
 | A submitted change will not publish ("changed after submission") | Editing after submission voided it. Resubmit, then have a second person approve |
 | "Confirm it is you" appears | Click **Confirm**; you return to the page. Repeat the action |
 | A page says forbidden | You do not hold the permission, or you are outside the installation tenant for an Operations page. Ask the Tenant Administrator (business pages) or confirm with the System Administrator |
-| Commit refused | Check maintenance mode is off, the batch is validated, nothing is waiting for a decision, and a legacy load is confirmed by a different person |
+| Commit refused | Check maintenance mode is off, the batch is validated, nothing is waiting for a decision, and a legacy load is confirmed by a different person. In Test mode, a batch marked Masked Company Data may be refused with an MDD code: see `docs/MIGRATION_EXECUTION_GUIDE.md` section 8.5 |
+| A report says Ready with warnings | Not a pass until every warning is accepted on the record (who, reason, expiry). Until then record it as a Warning, not a pass |
 | Attachments are held | Expected where no real scanner is connected. See `docs/DOCUMENT_SCANNING.md` |
 | Backup, restore or upgrade failed | Do not retry blindly. Follow `docs/OPERATIONS_QUICK_GUIDE.md`, section "If something goes wrong", and `docs/OPERATIONS_RUNBOOK.md` |
 | Cutover cannot proceed | Use the written back-out tree. Before business acceptance: roll back the batch. After: compensate. Platform-wide: restore the pre-cutover backup (data since then is lost) |
@@ -442,4 +451,4 @@ Store these with the project records. They show what ran; they do not approve an
 - Verified by reading the code: every page route, button label, field, permission and menu entry named above (Operations, Document scanning, Configuration reviews, Contracts, Approvals, Legal, Variations, Notifications, Migration batch, Audit, Health, Regional, Configuration release history).
 - Not run: no live installation was driven for this guide. Specific screen wording in other business pages (for example the exact buttons the workflow offers on a lifecycle page) depends on your published workflow and terminology and is shown by the page itself.
 - Not Verified by anyone: a run of these scripts by an unaided non-developer; a real malware scanner; a real identity provider; real e-mail delivery; IIS and Azure deployments.
-- The 20-step journey in `docs/NO_CODE_REHEARSAL.md` is the project's own automated proof that the set-up journey works over real HTTP; it is not a substitute for your UAT.
+- The 23-step journey in `docs/NO_CODE_REHEARSAL.md` is the project's own automated proof that the set-up journey works over real HTTP; it is not a substitute for your UAT.

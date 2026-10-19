@@ -6,7 +6,7 @@
 
 **Prerequisites.** Read-only reading of this guide needs none. To use the page you need the permission `notifications.administer` (held by the Tenant Administrator and the Procurement Administrator in the role matrix; **not** by the System Administrator). See section 6.
 
-**Status label.** The gate (hold, retry, quarantine, history, audit, page, readiness check): **Implemented**. A demonstration scanner: **Mocked** (Demo and Test only). A real scanner adapter: **Future / Not Verified**. No real scanner is integrated, so in Production every uploaded file stays held.
+**Status label.** The gate (hold, retry, quarantine, history, audit, page, readiness check): **Implemented**. The integration boundary (provider configuration, provider-neutral self-test, Scanner page at `/Admin/Operations/Scanner`, recorded acceptance of the demonstration scanner, operational alerts): **Implemented** (ADR-0038). A demonstration scanner: **Mocked** (Demo by default; Test only when asked for by name; never Production). A real scanner adapter: **Future / Not Verified**: none is built, none has been exercised, and no real scanner is claimed anywhere in this product. So in Production every uploaded file stays held and Production cannot report ready.
 
 > Nothing here is a security certification or production approval. Production approval is external governance. A passing readiness check R-DOC-01 means the gate is wired to a real, connected scanner; it does not mean the scanner is good.
 
@@ -44,7 +44,7 @@ Verdicts and the status they set on the file version:
 Registration (what is actually in the host):
 
 - The Documents module registers a default scanner named **none** that is not connected and answers Skipped (`DisabledMalwareScanner`).
-- Outside Production (Demo and Test), the host registers the demonstration scanner after it, which replaces the default (`MockMalwareScanner`, named "mock (demonstration only)").
+- In **Demo** the host registers the demonstration scanner after it by default (`MockMalwareScanner`, named "mock (demonstration only)"). In **Test** it is registered only when `Documents:Scanner:Provider` is set to `mock` on purpose; otherwise Test reads "No scanner connected" like Production. A Production host refuses to register it, whatever the setting says.
 - In Production the demonstration scanner is never registered. A real provider adapter must replace the default registration. **No adapter is supplied.** Writing and registering one is a development task, not a configuration setting: **[Technical task: System Administrator]** with a developer.
 
 The same interface is used in three places: when a file is uploaded to a contract (new document or new version), by the scheduled retry job, and by the migration module when it stages attachments. In migration, with `Migration:RequireMalwareScan` (forced on in Production) a file that could not be scanned is held (`MIG-F014`) and an infected file is rejected (`MIG-F013`); see `docs/MIGRATION.md`.
@@ -178,6 +178,44 @@ An organisation's administrators see only their own files. The role names in a b
 
 ---
 
+## 6A. The Scanner page and the provider contract
+
+The page `/Admin/Operations/Scanner` (permission `operations.read` to look; the System Administrator acts) shows the scanner as a whole: which provider is configured, its endpoint or service name, whether a secret reference is set (never the secret), its limits, the last self-test and when it goes stale, and the state: **Not connected**, **Demonstration** (prominent TEST MODE warning, Not Verified), **Connected, not tested** (Not Verified), **Healthy**, **Failed**, **Stale** or **Refused** (the configuration asks for something this mode refuses, such as the demonstration scanner in Production).
+
+Configuration (`Documents:Scanner`, all **[Technical task: System Administrator]**; secrets only as references):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `Provider` | empty (Demo: `mock`; otherwise `none`) | `none`, `mock`, or the key a provider adapter registers under |
+| `Endpoint` | none | A host and port or URL for the adapter. Not a secret |
+| `SecretRef` | none | A secret reference (`env:`, `file:`, `keyvault:`); the value is never stored or shown |
+| `TimeoutSeconds` | 30 | How long one scan may take |
+| `MaxFileSizeBytes` | 100 MB | A larger file is held, not released |
+| `RetryBackoffSeconds` | 60 | Wait before a failed scan is tried again; the number of tries is `Documents:MaxScanAttempts` |
+| `SelfTestMaxAgeHours` | 24 | How long a passed self-test counts before the state reads Stale |
+
+The **self-test** is provider-neutral: it asks the scanner whether it is reachable, expects Clean for harmless content and Infected for the standard anti-malware test file (assembled at run time; harmless). It proves the scanner responds and detects the standard test file; it does not prove the scanner is good. The result is kept in memory, so after a restart the scanner reads Not Verified until it is tested again, which is the honest state. Only a connected, real scanner that passed its self-test with the current configuration counts as Passed in evidence; the demonstration scanner, a missing scanner and an untested one are Not Verified, and a failed or refused one is Failed.
+
+### Accepting the demonstration scanner for a masked-data rehearsal (Test only)
+
+In Test the demonstration scanner is no protection. A migration batch marked as masked company data cannot be committed while the demonstration scanner is in use unless a System Administrator has recorded an **acceptance** on the Scanner page (recent sign-in, `operations.maintenance`): who accepted, the reason, the scope (for example "masked-data rehearsal for organisation X") and an expiry of at most 90 days. The acceptance is audited, can be revoked, expires by itself, and is listed on the evidence pack. Demo cannot record one (nothing there needs it) and Production refuses the demonstration scanner outright. The Scanner page still labels the scanner Not Verified after acceptance: acceptance records a decision, not protection.
+
+### Operational alerts
+
+Quarantine of an infected file, a scan that failed, and a file still unscanned after the allowed number of attempts (`document.quarantined`, `document.scan.failed`, `document.scan.retry_exhausted`) raise in-app and email notifications to the Tenant Administrators and Procurement Administrators of the organisation, linking to the Document scanning page. A scanner outage produces one message per person per day, not one per file. Email delivery follows the email configuration (`docs/OPERATIONS_QUICK_GUIDE.md`); the alert text never names the file's content.
+
+### Checklist: connecting a real provider (a development and security task)
+
+1. Write an adapter implementing `IMalwareScanner` (section 2) in an adapter project, register it in the host under a provider key, and set `Documents:Scanner:Provider` to that key. Nothing in the contract changes.
+2. Put the endpoint in `Endpoint` and the credential in a secret provider referenced by `SecretRef`.
+3. Make the adapter report `IsConnected` and `IsDemonstrationOnly = false`, and implement a health probe if the provider has one.
+4. Run the self-test on the Scanner page: expect Healthy.
+5. Upload a harmless file (released) and the standard test string (quarantined) in a non-production environment; keep the evidence.
+6. Confirm R-DOC-01 is Healthy, `AllowSkippedScan` is false and the alerts reach the right people.
+7. Record the adapter's own test evidence outside this product. It remains **Not Verified** here until that evidence exists.
+
+---
+
 ## 7. The readiness check R-DOC-01
 
 Name: "Uploaded files are scanned before anyone can use them". It runs with the other readiness checks and appears on **/Admin/Health** (System Administrator) and in the health panel of the Operations dashboard.
@@ -185,11 +223,13 @@ Name: "Uploaded files are scanned before anyone can use them". It runs with the 
 | Mode | Situation | Result |
 |---|---|---|
 | Production | No scanner connected | **Unhealthy**: every uploaded file is held and cannot be downloaded, copied or counted as evidence until a scanner provider is connected |
-| Production | Demonstration scanner connected | **Unhealthy**: not protection |
+| Production | Demonstration scanner configured | **Unhealthy** (Refused): not protection, and it is never registered |
 | Production | Skipped scans allowed | **Unhealthy**: turn it off so only Clean files are released |
-| Not Production | No scanner connected | **Degraded**: expected in a trial |
+| Not Production | No scanner connected (or connected but untested, stale or failed) | **Degraded**: expected in a trial |
 | Any | Real scanner connected (and the cases above do not apply) | **Healthy**: "Scanner '[name]' is connected." |
-| Demo or Test | Demonstration scanner | **Healthy**: "The demonstration scanner is connected (trial only)." |
+| Demo | Demonstration scanner | **Healthy**: "The demonstration scanner is connected (trial only)." |
+| Test | Demonstration scanner | **Degraded** until an acceptance is recorded on the Scanner page; with one, the message names who accepted it, until when and for what scope. It is never presented as protection |
+| Production | Connected scanner that has not passed its self-test, or whose test is stale or failed | **Unhealthy**; only a Healthy scanner makes the check Healthy |
 
 An Unhealthy check in Production does not stop the application. It stops attachments being usable, and it must be explained in go/no-go evidence.
 
@@ -217,6 +257,7 @@ Each event records the organisation, the classification, and a small JSON of out
 | `Documents:ScanBatchSize` (env `Documents__ScanBatchSize`) | 50 | Held versions examined per tenant per job run |
 | `Notifications:JobIntervalSeconds` | 60 | Timer for all background jobs; 0 turns them off |
 | `Migration:RequireMalwareScan` | forced on in Production | Migration holds files it could not scan (`MIG-F014`) |
+| `Documents:Scanner:*` | see section 6A | Provider, endpoint, secret reference, timeout, size limit, retry backoff, self-test age |
 
 The default file `src/Ecp.Host/appsettings.json` sets `AllowSkippedScan` to false. Do not put a provider's credentials in a settings file; use the secret provider (`docs/OPERATIONS_RUNBOOK.md`).
 
@@ -236,7 +277,9 @@ The default file `src/Ecp.Host/appsettings.json` sets `AllowSkippedScan` to fals
 | Readiness check R-DOC-01 | **Implemented** | Section 7 |
 | Demonstration scanner (standard test string only) | **Mocked** | Demo and Test only; never registered in Production; not protection |
 | **A real scanner adapter** | **Future / Not Verified** | None is supplied or tested. Until one is added and connected, no uploaded file can be released in Production |
-| Notification to administrators on quarantine or repeated failure | **Future** | Not built |
+| Notification to administrators on quarantine, failure or exhausted retries | **Implemented** | Section 6A; recipients are the organisation's Tenant and Procurement Administrators; a real mail service is Not Verified |
+| Scanner page, provider configuration, provider-neutral self-test, Stale/Refused states | **Implemented** | Section 6A; tested with a fake provider, not a real scanner |
+| Acceptance of the demonstration scanner for a masked-data rehearsal | **Implemented** (Test only) | Who, reason, scope, expiry (90 days at most), audited, revocable |
 | Release or delete of a quarantined file from the page | **Not provided** by design | Handle under your security policy |
 | Scanning of already-stored files in bulk when a scanner is first connected | **Implemented via the retry job** | Held files are picked up in batches, oldest first; not separately tested at scale (**Not Verified**) |
 | Production use of attachments | **Blocked until a real scanner is connected** | Or the organisation decides in writing not to use attachments (see `docs/PRODUCTION_READINESS_CHECKLIST.md`) |
@@ -255,7 +298,8 @@ The default file `src/Ecp.Host/appsettings.json` sets `AllowSkippedScan` to fals
 
 | Symptom | What to do |
 |---|---|
-| Every upload is held in Production | Expected with no real scanner. Check R-DOC-01. Connect a provider (technical) or do not use attachments |
+| Every upload is held in Production | Expected with no real scanner. Check R-DOC-01 and the Scanner page. Connect a provider (technical, section 6A checklist) or do not use attachments |
+| A masked-data batch will not commit in Test because of the scanner | The demonstration scanner has not been accepted. A System Administrator records an acceptance on the Scanner page (reason, scope, expiry) |
 | "Failed: needs an administrator" | The scanner repeatedly failed on that file. Check the scanner service, then use **Scan again** (recent sign-in) |
 | Files stay Waiting and nothing happens | Check: a scanner is connected; background jobs are on (`Notifications:JobIntervalSeconds` greater than 0); maintenance mode is off; the Operations dashboard shows jobs running |
 | A file is quarantined | Do not try to release it. Follow your security policy; ask for a clean replacement |

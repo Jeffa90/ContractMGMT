@@ -2,9 +2,11 @@
 
 For: Project Managers, Business Leads, System Administrators and Business Administrators. **No programming knowledge is assumed.**
 
-Status: written 2026-10-18 from the platform as built at that date (platform version 1.1.0). Every page, field, rule and message in this playbook was read from the product's source code and documentation by people (and research assistants) who did not run a live installation for this document; where something is a reading of the code rather than something observed, it says so. Production approval is **external governance**: nothing in this playbook, and nothing the platform shows, approves an installation for production use.
+Status: written 2026-10-18 from the platform as built at that date (platform version 1.1.0); reconciled on 2026-10-19 with the Implementation Readiness Gap Closure and Company Rehearsal Enablement slices (see the two update notes below and section 1.4). Every page, field, rule and message in this playbook was read from the product's source code and documentation by people (and research assistants) who did not run a live installation for this document; where something is a reading of the code rather than something observed, it says so. Production approval is **external governance**: nothing in this playbook, and nothing the platform shows, approves an installation for production use.
 
-> **Update (Implementation Readiness Gap Closure, 2026-10-18).** After this playbook was written, the slice described in `docs/IMPLEMENTATION_READINESS.md` fixed gaps G-01, G-02, G-03, G-04, G-19, G-20 and G-21, added the Configuration reviews inbox, the organisation wizard, the approver-group pages, the workflow / approval matrix / notification policy form editors, rollback governance and the document-scanning gate, and wrote eight click-by-click guides (`docs/INSTALLATION_GUIDE.md`, `docs/SETUP_WIZARD_GUIDE.md`, `docs/ORGANISATION_ONBOARDING_GUIDE.md`, `docs/BUSINESS_ADMIN_GUIDE.md`, `docs/PACK_IMPLEMENTATION_GUIDE.md`, `docs/MIGRATION_EXECUTION_GUIDE.md`, `docs/UAT_AND_CUTOVER_GUIDE.md`, `docs/OPERATIONS_QUICK_GUIDE.md`). **Where this playbook says a screen does not exist or that JSON must be edited for a workflow, matrix or notification policy, the gap register and the guides are now authoritative**; the rest of the playbook (decisions, workshops, data collection, sequencing) is unchanged. The twenty-step journey is proved by `docs/NO_CODE_REHEARSAL.md`. Appendix D below is kept as it was written; its status column is in the register.
+> **Update (Implementation Readiness Gap Closure, 2026-10-18).** After this playbook was written, the slice described in `docs/IMPLEMENTATION_READINESS.md` fixed gaps G-01, G-02, G-03, G-04, G-19, G-20 and G-21, added the Configuration reviews inbox, the organisation wizard, the approver-group pages, the workflow / approval matrix / notification policy form editors, rollback governance and the document-scanning gate, and wrote eight click-by-click guides (`docs/INSTALLATION_GUIDE.md`, `docs/SETUP_WIZARD_GUIDE.md`, `docs/ORGANISATION_ONBOARDING_GUIDE.md`, `docs/BUSINESS_ADMIN_GUIDE.md`, `docs/PACK_IMPLEMENTATION_GUIDE.md`, `docs/MIGRATION_EXECUTION_GUIDE.md`, `docs/UAT_AND_CUTOVER_GUIDE.md`, `docs/OPERATIONS_QUICK_GUIDE.md`). **Where this playbook says a screen does not exist or that JSON must be edited for a workflow, matrix or notification policy, the gap register and the guides are now authoritative**; the rest of the playbook (decisions, workshops, data collection, sequencing) is unchanged. The journey is proved by the 23-step ledger in `docs/NO_CODE_REHEARSAL.md` (originally 20 steps). Appendix D below keeps the original findings as written; each row that has since been closed carries a status note, and the full status column is in the register.
+
+> **Update 2 (Company Rehearsal Enablement, 2026-10-19; ADR-0038).** A second slice closed G-31 to G-37 and added a governance setting for Test mode, evidence semantics, a real email readiness test, a scanner boundary, a masked-data declaration, a standalone pack tool, proxy/HTTPS diagnostics and an evidence pack. Section 1.4 states each in a few lines. The verdicts for each kind of rehearsal are in `docs/IMPLEMENTATION_REHEARSAL.md` section 9 (see 1.4). Statements below that contradict section 1.4 are history. Nothing here, and nothing the platform shows, is a production approval.
 
 ## How to use this playbook
 
@@ -48,12 +50,12 @@ Status: written 2026-10-18 from the platform as built at that date (platform ver
 | Item | Why | Who provides it |
 |---|---|---|
 | A named **Project Manager** and **Business Lead** | Decisions and dates | Sponsor |
-| At least **two** Business Administrators trained on the platform | In Production, a configuration change must be published by a **second person** (**read Appendix D, G-01 before go-live: on most configuration pages the Publish button cannot succeed in Production today**) | Business Lead |
+| At least **two** Business Administrators trained on the platform | In Production, a configuration change must be published by a **second person**. The form pages submit a draft for review and a second person approves and publishes it at `/Admin/Reviews` (G-01 is fixed; Appendix D keeps the original finding as history). Rehearse this in Test with governance set to Enforced (section 1.4) | Business Lead |
 | A **System Administrator** with access to the server, database and identity provider | Installation, secrets, backups, upgrades | IT |
 | An **identity provider administrator** (for example Microsoft Entra ID) | To register the platform, create groups, read the group names | IT |
 | A **data owner** for the old system | To extract and clean the contract data | Business Lead |
-| A **Legal / compliance lead** | To decide classification levels and review rules | Business Lead |
-| Access to a **pack author** (the supplier or a trained person) | Any change to workflows, approval rules, reminder rules or a new pack is authored in a data format (JSON), not on a form (see Appendix B) | Supplier |
+| A **Legal / compliance lead** | To decide classification levels (entered at setup stage 10; see 1.4) and review rules | Business Lead |
+| Access to a **Pack Publisher** (technical; the supplier or a trained person) | Only to build and sign a whole new or customer-specific pack for Production. Changes to workflows, approval matrices and notification policies are made by Business Administrators on forms at `/Admin/Forms/Edit` (G-03 is fixed; Appendix B) | Supplier |
 
 ### 1.2 Technology (System Administrator)
 
@@ -69,13 +71,29 @@ Status: written 2026-10-18 from the platform as built at that date (platform ver
 | Web address and TLS | A real HTTPS address and a reverse proxy or ingress that ends TLS. The application itself listens on plain HTTP port 8080. In Production the site only works over HTTPS | |
 | Storage | A persistent volume for the data directory (documents, packs, key ring). A **shared backup folder** that both the database server and the application can read and write (needs file-permission work on Linux), and a second folder with room for restore rehearsals | |
 | Identity | A Microsoft Entra ID tenant or another standard OpenID Connect provider. The live Entra sign-in has **not** been tested against a real directory | **Not Verified** (tested against a built-in stand-in only) |
-| Email | An SMTP server with TLS (port 587). Microsoft Graph email is a placeholder that fails every send | SMTP **Not Verified** against a real mail server |
+| Email | An SMTP server with TLS (port 587). Microsoft Graph email is a scaffold, not connected. Readiness is proved by a real provider interaction (section 1.4) | SMTP **Implemented**, verified only against a loopback test relay in the automated tests; **Not Verified** against a customer's mail service. Graph **Scaffolded, Not Verified** |
 | Secrets | Somewhere to keep the database connection string, the identity client secret and the mail password as files or environment variables. The names `keyvault:` and `dpapi:` are accepted as notations but **do not work** today (Appendix D, G-14) | |
-| Signed packs | In Production only **signed** packs are accepted. The three shipped packs are unsigned samples. Someone must sign them (or the supplier's own signed packs must be installed) using a command-line tool, and the public key must be trusted | **Developer-level task** (Appendix B) |
+| Signed packs | In Production only **signed** packs are accepted. The three shipped packs are unsigned samples. Someone must sign them (or the supplier's own signed packs must be installed) using the standalone `ecp-pack` tool (a **Technical task** for the Pack Publisher; section 1.4), and the public key must be registered or trusted | **Technical task** (Appendix B); signing and key custody are **Not Verified** in any customer environment |
 
 ### 1.3 Decisions to have made before installation
 
 These are in the decision register (Appendix C). The blocking ones are: which pack to start from, the mode (Production or not), the identity provider, the email provider, the list of classification level names (open decision Q-06), who the first administrator is, and who the second publisher is.
+
+### 1.4 What the Company Rehearsal Enablement slice changed (2026-10-19)
+
+Concise statements; the guides give the click-by-click detail. Anything marked **Technical task** is for the System Administrator or Pack Publisher, never a Business Administrator.
+
+- **Test-mode governance (`Ecp:Governance:SecondPerson`).** The setting is `Default` or `Enforced`. Production **always** enforces the second-person publish rule and the setting cannot lower it. In Test, `Enforced` applies exactly the Production rule: the author, last editor and submitter cannot publish, a submission is bound to the content hash, and a rollback is also submitted for a second person. `Default` keeps the simplified behaviour (publish immediately). Demo ignores the setting and always keeps simplified governance. The effective mode (Production, TestEnforced, TestSimplified or DemoSimplified) is shown on the setup report, `/Admin/Health` and `/Admin/Operations/Dashboard`, and recorded on configuration audit events and releases. **Technical task:** the System Administrator sets `Enforced` for a governance rehearsal; at least two Business Configuration or Organisation Administrators are needed.
+- **Evidence semantics (every report, rehearsal and pre-flight).** Ready is a pass. Ready with warnings is a pass **only** when every warning was accepted on the record (who, reason, expiry of at most 90 days; by a System Administrator with a recent sign-in, permission `operations.maintenance`; for pre-flight warnings the page is `/Admin/Operations/UpgradeReadiness`). Blocked and Failed are a fail. Not Verified is Not Verified, never a pass. The operational outcome is always shown unchanged beside the verdict. Codes are EVD-nnn. A pre-flight that is Blocked is never counted as a pass.
+- **Email readiness (`/Admin/Operations/Email`).** One installation-level configuration is used by both the setup wizard's email stage and Administration. Reading needs `operations.read`; changing needs the System Administrator (`operations.maintenance`) with a recent sign-in. Providers: `smtp`; `graph` (scaffold, Not Verified, not connected); `dev-capture` and `demo-log` (Demo and Test only, deliver nothing, refused in Production); `disabled` (not allowed in Production). Only non-secret settings and secret references (`env:`, `file:`, `keyvault:`) are stored; a secret typed into the form is refused and never echoed. Readiness is proved by an **actual provider interaction**: a connectivity probe plus a synthetic test message with fixed text (no contract information). A result is tied to the settings (a change makes it stale) and expires after 168 hours by default (`Ecp:Email:ReadinessMaxAgeHours`). A configured but unreachable provider is never Healthy; simulated providers read "Simulated: nothing delivered". Production setup cannot finish the email stage without a passing test. Email is therefore **not** "ready once configured".
+- **Malware scanner (`/Admin/Operations/Scanner`).** The platform defines the integration boundary (`IMalwareScanner`) and a provider-neutral readiness self-test. **No real scanner adapter exists** (not built, Not Verified). Configuration is `Documents:Scanner:*` (Provider none, mock or a provider key; Endpoint; SecretRef as a reference only; TimeoutSeconds 30; MaxFileSizeBytes 100 MB; RetryBackoffSeconds 60; SelfTestMaxAgeHours 24) and `Documents:MaxScanAttempts`. The labelled mock ("demonstration scanner") is registered in Demo by default, in Test **only** when Provider is set to mock on purpose, and never in Production; it protects nothing and the page carries a TEST MODE warning. Using the mock for a masked-data rehearsal must also be **accepted on the record** (kind `scanner.mock`: who, reason, scope, expiry of at most 90 days; System Administrator with a recent sign-in). Production is Unhealthy on R-DOC-01 and cannot finish setup without a connected, healthy scanner; attachments are held. Quarantine, infection, provider unavailability and exhausted retries raise operational notifications to recipients already defined in notification configuration. The connect-a-provider checklist is `docs/DOCUMENT_SCANNING.md`.
+- **Masked-data declaration (`/Migration/MaskedData`; Test mode only).** The customer masks the data; the platform does not mask, detect or de-identify, and never states the data is safe. A Procurement Administrator (migration permission) records a declaration: dataset owner, source system, masking method, fields masked, attachments included, personal data included, confidential data included, approval reference, approved by, approved on, review-by date (expiry) and permitted users. On the batch page ("Data handling") the batch is marked Masked Company Data (or Synthetic) and linked to a declaration. In Test mode a batch marked Masked Company Data cannot be committed without a current, approved, unrevoked declaration that permits the environment and the user, and not while the mock scanner is unaccepted; each refusal gives a code and a sentence. A declaration can be revoked (reason required), which blocks dependent batches. Second-person confirmation of a legacy load still applies. The Test-mode acknowledgement tick on setup stage 1 is **not** the masked-data control. Production data follows separate governance.
+- **Standalone pack tool (`ecp-pack`; Technical task, Pack Publisher).** `Ecp.PackTool` is a .NET tool package installed with `dotnet tool install Ecp.PackTool --tool-path <dir> --add-source <folder holding the .nupkg>`. It needs the .NET runtime, not a source checkout or the repository's SDK. Commands: version, build, build-all, validate, report, hash, inspect, sign, verify, compare, keygen. Sign takes `--key-ref env:VARIABLE` or `--key-ref file:/path/to/private.pem`; the key is never typed, printed, stored or logged, the application never holds a private key, and there is no browser signing. Builds are deterministic. `report` writes a sanitised JSON report (identity, hashes, findings; no content, key, signature bytes or local paths). Exit codes: 0 success, 1 package or request not acceptable (including failed verification), 2 usage error, 3 key reference or key could not be used. The Pack Publisher hands over signed packs and the **public** key only; the Tenant Administrator (holds `packs.trust.manage`) registers the public key at `/Admin/Packs/TrustKeys`, or the platform operator trusts a key by host configuration (`Ecp:Packs:TrustFile`). Verified locally; the CI step that installs and exercises the packaged tool is recorded in `docs/IMPLEMENTATION_REHEARSAL.md` section 9.1 with its own label.
+- **Proxy and HTTPS diagnostics.** Production needs HTTPS. A plain-HTTP request in Production gets a short safe page with `ECP-NET-001` (no HTTPS scheme was forwarded: use the https address or make the proxy forward `X-Forwarded-Proto`) or `ECP-NET-002` (forwarded headers arrived but were not trusted: set `Ecp:Network:ForwardedHeaders:Enabled` and the KnownProxies or KnownNetworks). Readiness check R-NET-01 reports the posture and the setup wizard shows plain-language TLS and proxy failures. Detail: `docs/REVERSE_PROXY.md`. A real reverse proxy remains **Not Verified** end to end (**Technical task**: System Administrator).
+- **Evidence pack (`/Admin/Operations/EvidencePack`, permission `operations.evidence.export`).** Exports a sanitised company implementation evidence pack covering environment, version, deployment, pack, organisation setup, governance, identity, email, scanner, masked-data status, configuration publication, migration and reconciliation, UAT, backup, upgrade pre-flight, operational readiness, open risks and accepted exceptions, with sign-off placeholders. No secrets and no contract or document content; formula-safe CSV; stable codes, hashes and correlation ids. The sign-off lines are placeholders for people to complete; the platform declares no approval.
+- **Terminology tokens.** No raw `[[...]]` token should ever be visible on Setup, Onboarding, Pack Manager or Administration pages. If one is, it is a defect (a neutral marker appears and a stable code is logged).
+- **Who sets classification levels (one answer; the setup and onboarding guides had disagreed).** The Legal / compliance lead and Business Lead decide the names (open decision Q-06). They are entered **once, at setup stage 10** (`/Setup/Step/classification`), by a Business Administrator while the System Administrator holds the setup session (no one is signed in during setup; the stage publishes through the trusted setup path). They are **not** edited in the onboarding wizard or on any business configuration page. After setup they can be amended **only** at `/Admin/Setup` (stage "Classification levels") by an installation administrator, that is the System Administrator holding `setup.run`, with a recent sign-in. A Business Administrator therefore cannot change them alone after setup. (Read from `ClassificationStage` in `src/Modules/Ecp.Setup` and the `/Admin/Setup` pages; not run in a browser for this document.)
+- **Rehearsal verdicts.** The current verdicts are in `docs/IMPLEMENTATION_REHEARSAL.md` section 9 (the ledger is `docs/NO_CODE_REHEARSAL.md`, 23 steps, Test mode, Enforced governance): a synthetic company in Demo, **Supported with conditions**; in Test, **Supported with conditions**; a masked-data company in Test, **Supported with conditions**; Production-mode setup, **Blocked**; Production use with confidential contracts, **Blocked**. Production approval is external governance.
 
 ---
 
@@ -93,7 +111,7 @@ These are in the decision register (Appendix C). The blocking ones are: which pa
 | **Data owner** | Extracts, cleans and certifies the legacy data; approves reconciliation | |
 | **Legal / compliance lead** | Classification levels, legal review rules, retention decisions | |
 | **Identity provider administrator** | Registers the application, creates groups, supplies group names | |
-| **Pack author** | Writes or changes packs, workflows, approval rules, notification rules, and signs packs (see Appendix B) | |
+| **Pack Publisher** (technical; formerly "pack author") | Builds and signs packs with `ecp-pack` and hands over signed packs and the public key only (see 1.4 and Appendix B). Workflows, approval matrices and notification policies are edited by Business Administrators on forms | |
 
 ### 2.2 Product roles (what the people are called inside the platform)
 
@@ -134,7 +152,7 @@ Hold one workshop per organisation (or one combined session if the businesses ar
 
 **The business**
 - [ ] What do we call the things we manage: contract, agreement, subcontract? What do we call the other party: supplier, counterparty, subcontractor, vendor? (Terminology, section 9.)
-- [ ] How many separate businesses (organisations) will use the platform? Do they share people, categories or approval rules? (If more than one, read Appendix D, G-02: adding a second organisation has no screen today.)
+- [ ] How many separate businesses (organisations) will use the platform? Do they share people, categories or approval rules? (If more than one: a Tenant Administrator adds further organisations at `/Admin/Organisations/New`; G-02 is fixed.)
 - [ ] Which country or region, language-and-region tag (for example en-AU, en-US), currency, time zone? One per organisation. (Section 10.)
 - [ ] Which tax or company identifier do you record for the other party, and in what shape (length, mask, checksum)?
 - [ ] What address fields do you need, and which are required?
@@ -195,7 +213,7 @@ Use one spreadsheet file with one sheet per table below. **Save the list sheets 
 | BusinessUnit | FIN | Finance | OPS | | |
 | Site | HQ | Head office | | Australia/Brisbane | |
 
-Rules: type is one of LegalEntity, Division, BusinessUnit, Site. Key: 1 to 40 letters, digits, `_` or `-`, starting with a letter or digit (**do not use a full stop in a key**: the checker accepts it but publishing then fails, Appendix D, G-21). Name 1 to 200 characters. parentKey is used only by a BusinessUnit (its Division). Time zone is used only by a Site. Registration number is used only by a LegalEntity.
+Rules: type is one of LegalEntity, Division, BusinessUnit, Site. Key: 1 to 40 letters, digits, `_` or `-`, starting with a letter or digit (**do not use a full stop in a key**: the check now rejects it, as publishing does; G-21 is fixed). Name 1 to 200 characters. parentKey is used only by a BusinessUnit (its Division). Time zone is used only by a Site. Registration number is used only by a LegalEntity.
 
 ### Sheet 3: Categories (step 3, `code,name,parentCode`)
 Code 1 to 40 characters; name 1 to 200; parent optional; no cycles; no more than six levels.
@@ -277,7 +295,7 @@ Rating for the whole section: **C**. A Business Administrator cannot do any of i
 | `Database__AutoMigrate` = `false` | Production never migrates by itself | No |
 | `Ecp__DataDirectory` = `/var/ecp` | Documents, packs, key ring, setup state. **Must be a persistent volume**, not a temporary folder; losing the key ring loses sessions and protected setup state | No |
 | `Ecp__Setup__AllowRemote` = `true` | Only while running setup through a published port (setup is otherwise reachable only from the server itself). Remove afterwards | No |
-| `Notifications__EmailProvider` = `smtp` | **This is what actually sends mail.** The setup wizard's email page does **not** set it (Appendix D, G-12). The default `dev-capture` is refused in Production | No |
+| `Notifications__EmailProvider` = `smtp` | Host-level starting value. Email is now one installation configuration at `/Admin/Operations/Email`, shared by the setup wizard and Administration (section 1.4); confirm on that page which settings are in force, and run its test. The default `dev-capture` is refused in Production | No |
 | `Notifications__Smtp__From`, `__Host`, `__Port` (587), `__UseTls` (true), `__UserRef`, `__PasswordRef` | Mail server settings; user and password are secret references (`env:` or `file:`) | References only |
 | `Notifications__BaseUrl` | Web address used in links inside emails | No |
 | `Notifications__JobIntervalSeconds` | How often background work runs (default 60; 0 turns it off) | No |
@@ -419,7 +437,7 @@ Creates the organisation, publishes the first regional settings as release 1 (on
 | "Footer text" | No | Short legal or contact line | At most 200 characters | Cosmetic |
 
 ### Stage 10: Classification levels (`/Setup/Step/classification`)
-**Purpose:** the sensitivity scale. **Button:** "Save and continue". **Rating:** B (the names are an owner decision, Q-06). Amendable later.
+**Purpose:** the sensitivity scale. **Button:** "Save and continue". **Rating:** B (the names are an owner decision, Q-06). Amendable later **only** at `/Admin/Setup` by the System Administrator (permission `setup.run`, recent sign-in); this is the only place the levels are entered or changed, not the onboarding wizard (section 1.4).
 
 | Field | Required | Recommended | Rules | If wrong |
 |---|---|---|---|---|
@@ -442,7 +460,7 @@ The page itself says the final names are an open owner decision (Q-06). Decide t
 | "SMTP user reference" / "SMTP password reference" | Both or neither | `env:ECP_SMTP_USER`, `file:/run/secrets/smtp-pass` | Must be a reference; "Set both the SMTP user and password references, or neither." In Production an unresolved reference blocks | A pasted secret is refused |
 | "Send a test message to" | Yes (except Disabled) | Your own address | "Enter a valid test recipient address." The test is sent on **every** save | If you skip it, you do not know mail works |
 
-**Important:** this stage proves a provider works but does **not** make live delivery use it. Live delivery reads `Notifications__EmailProvider` and the `Notifications__Smtp__…` host settings (section 5.2). Set both consistently.
+**Important (updated 2026-10-19):** the stage now uses the same installation email configuration as `/Admin/Operations/Email`, and readiness is proved by a connectivity probe plus a synthetic test message, tied to the settings and expiring (section 1.4). Production setup cannot finish this stage without a passing test. The original finding (the stage did not change live delivery; G-12) is history; SMTP stays Not Verified against a customer's mail service.
 
 ### Stage 12: Demonstration data (`/Setup/Step/demo`)
 Demo/Test only; absent in Production. Buttons "Add demonstration data" and "Skip this step". Adds synthetic tenants alongside yours. **Never** use in an installation that will hold real data.
@@ -464,7 +482,7 @@ After a run, each warning shows a text box "Acknowledge <check id>: <description
 - If the state file becomes unreadable (damaged or key ring lost) everything except the live health check returns 503 and there is no documented recovery (G-11).
 
 ### 6.2 Setup checkpoint
-- [ ] The report was saved. [ ] A second administrator exists (a Production configuration change needs two people). [ ] Email works from the live settings (send a test again after setting `Notifications__EmailProvider`). [ ] The Business Lead has seen the classification levels and reference prefix.
+- [ ] The report was saved. [ ] A second administrator exists (a Production configuration change needs two people). [ ] Email readiness passed on `/Admin/Operations/Email` (a real provider test that is not stale or expired). [ ] The Business Lead has seen the classification levels and reference prefix.
 
 ---
 
@@ -496,7 +514,7 @@ Shows "Current release: N." or "Nothing has been published yet.", an organisatio
 | Pack (select) | No | "None (start from the Blank configuration)" for Blank; the matching pack for the other two | Must be installed, trusted and not retired: "That solution pack is not available here…" | **Does not re-point the organisation** (G-08). It records the choice and prepares a terminology draft only; assigning a pack to an organisation is done in Administration, Packs |
 | "Also add the pack's categories and contract types to this draft" | No | Ticked for JBS-style and Harborline-style; unticked for Blank | Merges; nothing existing is removed; duplicates by code are skipped | You get categories you then delete by re-saving the list |
 
-Classification levels are **not** edited here (they were set in setup stage 10).
+Classification levels are **not** edited here (they were set in setup stage 10 and can be amended only at `/Admin/Setup` by the System Administrator; section 1.4).
 
 ### Step 2: Organisation structure (`/Onboarding/Step/structure`)
 Columns `type,key,name,parentKey,timeZone,registrationNumber` (see workbook sheet 2). **Rating:** B.
@@ -545,7 +563,7 @@ Columns `providerKey,groupKey,role,viewerKind,categories,businessUnits,sites,cei
 ### 7.5 Onboarding items outside the wizard
 - **People:** `/Admin/Users` ("Invite a person": Name, Email; "Send invitation"). **No email is sent** — someone must tell the person. In demonstration mode an invited person cannot sign in (only pre-made active users can).
 - **Roles:** the same page, "Grant a role" (role, scope, ceiling, approver group for Approver roles, reason). This is the only place for administrator and approver roles. Approver group keys are free text and **permanent**.
-- **Second organisation:** no screen exists (G-02).
+- **Second organisation:** `/Admin/Organisations` and `/Admin/Organisations/New` (Tenant Administrator; Check, then Create; set-up checklist at `/Admin/Organisations/Setup`). G-02 is fixed.
 - **Delegated administrators and role templates:** not in the wizard (not built).
 
 ### 7.6 Onboarding checkpoint
@@ -574,7 +592,7 @@ Columns `providerKey,groupKey,role,viewerKind,categories,businessUnits,sites,cei
 All three are **synthetic examples**, not advice. Harborline's value tiers are invented numbers. In Production none can be used until it is **signed with your key and the key is trusted** (or the supplier's signed packs are installed). Until then readiness shows a Degraded solution-pack check.
 
 ### 8.2 Pack Manager pages (`/Admin/Packs`)
-Rating: **B** for choosing, assigning and retiring; **D** for creating or signing a pack.
+Rating: **B** for choosing, assigning and retiring; **C** for building or signing a pack (a Pack Publisher's **Technical task** with `ecp-pack`; section 1.4).
 
 | Page | Purpose | Fields and buttons | Rules and messages | If wrong |
 |---|---|---|---|---|
@@ -606,7 +624,7 @@ Rules: turning on Variations needs Registration approval on (`capability_require
 1. Do you need Legal review as a formal step? Yes → JBS-style. No → Blank or Harborline-style.
 2. Do you approve by value tiers with several people? Yes → Harborline-style (matrices).
 3. Is your vocabulary closer to procurement or to subcontracts? Choose the nearer; terminology (section 9) fixes the rest.
-4. None fits closely: start from Blank and change wording, capabilities and regional settings through forms. Changing workflow, approval or reminder rules requires a pack author (section 12) — if you need a materially different workflow, budget for that.
+4. None fits closely: start from Blank and change wording, capabilities and regional settings through forms. Workflow, approval matrix and notification policy are changed on forms at `/Admin/Forms/Edit` (sections 11 to 13); a Pack Publisher is needed only to build and sign a new pack.
 
 ---
 
@@ -620,7 +638,7 @@ Rating: **A** for entering wording, **B** for deciding it. Permissions: Tenant, 
 | Page | Fields and buttons | Rules and messages | If wrong |
 |---|---|---|---|
 | Overview | "Organisation", "Locale" (hint: a language such as `en`, or language and region such as `fr-CA`, max 20), "Show". Facts: Locale, Solution pack, "Published terminology" (Release N, or "None yet: the pack's and the platform's wording apply"), Draft. Table "Wording in force": stable key, label, plural, source ("Organisation override" / "Copied from pack" / "Pack default" / "Platform neutral"). Also approver group names and roles offered | | |
-| Edit | Per term: checkbox "Use my own wording for {key}"; "Singular", "Plural" (max 80 each); optional "Short label" (30), "Description" (300), "Help text" (600). Approver group names: "Stable group key" (new rows only), "Name shown" (80), "Description (optional)" (300). "Roles offered when assigning": Inherit / Offered / Not offered (administrative roles cannot be hidden). "Note for the history" (500). Buttons: "Save the draft", "Save and validate", "Publish" (needs a sign-in within 10 minutes, and a second person in Production, **but see G-01: the button saves the draft under your name first, so in Production it is refused**), "Preview", "Discard the draft" | Blocking errors: singular and plural both required; length limits; no leading or trailing space; no line breaks; **no markup, script or template syntax** (`<`, `>`, `{{ }}`, `${ }`, `javascript:` …); key shaped like `contract.type`; no duplicates; not more than 600 terms. An unknown key is only a warning and has no effect | A wrong word is visible to everyone immediately after publish; permissions are not affected. Acronyms (ABN) are kept as typed |
+| Edit | Per term: checkbox "Use my own wording for {key}"; "Singular", "Plural" (max 80 each); optional "Short label" (30), "Description" (300), "Help text" (600). Approver group names: "Stable group key" (new rows only), "Name shown" (80), "Description (optional)" (300). "Roles offered when assigning": Inherit / Offered / Not offered (administrative roles cannot be hidden). "Note for the history" (500). Buttons: "Save the draft", "Save and validate", "Publish" (needs a sign-in within 10 minutes; in Production, and in Test with governance Enforced, you submit the draft and a second person approves and publishes it at `/Admin/Reviews`; G-01 is fixed), "Preview", "Discard the draft" | Blocking errors: singular and plural both required; length limits; no leading or trailing space; no line breaks; **no markup, script or template syntax** (`<`, `>`, `{{ }}`, `${ }`, `javascript:` …); key shaped like `contract.type`; no duplicates; not more than 600 terms. An unknown key is only a warning and has no effect | A wrong word is visible to everyone immediately after publish; permissions are not affected. Acronyms (ABN) are kept as typed |
 | Preview | Tables of representative text now and after publishing; role and group names | Shows that only wording changes | Read it with a real contract owner |
 | History | Releases with changes; "Release to publish again" and "Reason (recorded)" (required, max 1,000), "Publish it again" | "Give a reason for restoring the earlier release." | Rollback publishes the old wording as a new release |
 | Audit | Who changed what | | |
@@ -644,7 +662,7 @@ Do the wording workshop with real contract owners; wording is the most visible p
 **Principle.** The platform assumes no country, language, currency, time zone, identifier format or address layout; each is a per-organisation setting. The pack proposes; you decide. Precedence: your published regional settings → the pinned pack version → stored organisation values → the installation fallback (only when no organisation exists) → machine-safe invariant output.
 
 ### 10.1 Page `/Admin/Regional`
-Rating: **B** (the decisions are the work; the form is simple). Permissions: configuration draft/publish/rollback (Organisation and Business Configuration Administrators). **There is no sign-in re-check on this page** (G-19).
+Rating: **B** (the decisions are the work; the form is simple). Permissions: configuration draft/publish/rollback (Organisation and Business Configuration Administrators). Publish and rollback need a recent sign-in (G-19 is fixed).
 
 | Field | Required | Recommended (Blank / JBS / Harborline) | Rules | If wrong |
 |---|---|---|---|---|
@@ -678,11 +696,11 @@ Buttons: "Save draft", "Save and validate", "Validate and publish", "Discard the
 3. For each tier, name the **approver groups** (and a different backup group), whether steps run one after another or together, and whether one or all must respond.
 4. List exceptions (for example high risk adds a Safety and Risk step; a bond adds a bond check).
 5. Make sure every value is covered (no gaps) and no two rows can apply at the same priority (no ties).
-6. Create the approver groups: they exist only as a **text key typed into a person's role assignment** (Approver / Backup Approver) on `/Admin/Users/Details/…`. Group keys are permanent. Nothing else in the product lists or creates groups (G-04).
+6. Create the approver groups at `/Admin/ApproverGroups` (key, description, organisation scope, primary and backup members with dates, preview of who can approve, in-use and last-member protections; G-04 is fixed). Group keys are permanent. Approver and Backup Approver roles are still granted on `/Admin/Users/Details/…`.
 
 ### 11.3 Where it is entered
 - **Single group:** part of the workflow document (`settings.approval.approverGroupKey`).
-- **Matrix:** `/Admin/Configuration?kind=ApprovalMatrix` — a **plain text box labelled "Definition (JSON)"**, 26 lines. There is **no form**. A first draft starts as `{}` unless you copy the shipped example. Rating: **D** for writing it; **B** if a pack author supplies the document and you only review it with the simulator.
+- **Matrix:** the form editor at `/Admin/Forms/Edit` (approval matrix kind), with closed vocabularies, add / remove / move buttons, validation on the field, preview and impact analysis, then the ordinary draft, second-person publication, history and rollback (G-03 is fixed). Raw JSON at `/Admin/Configuration?kind=ApprovalMatrix` is a read-only diagnostic in Production. Rating: **B** (the design is the work).
 - The matrix pages `/Admin/Approvals` (read-only plain-language view), `/Admin/Approvals/Simulate`, `/Admin/Approvals/Delegations`, `/Admin/Approvals/History` are forms.
 
 ### 11.4 Validation you will meet (matrix)
@@ -698,7 +716,7 @@ Fields: "Matrix code" (required), "Version to try" (the release in force / a num
 `/Admin/Approvals/Delegations`: "My approver group", "Delegate to" (a member of the same group or its backup), "From", "Until" (at most 90 days), "Reason" (max 500), "Delegate". No circles or duplicates; not transitive. Ending: a "Why" and "End it".
 
 ### 11.7 Consequences
-A gap or tie stops a real submission, not just a test. A wrong approver key means nobody can approve. A matrix change affects the **next** submission that resolves it (matrix text is not pinned to a contract's workflow release; the resulting plan is fixed at submission). In Production a matrix needs a second person to publish, and today the page that edits matrices cannot satisfy that rule (G-01).
+A gap or tie stops a real submission, not just a test. A wrong approver key means nobody can approve. A matrix change affects the **next** submission that resolves it (matrix text is not pinned to a contract's workflow release; the resulting plan is fixed at submission). In Production (and in Test with governance Enforced) a matrix needs a second person to publish, through `/Admin/Reviews` (G-01 is fixed).
 
 ### 11.8 Recommended by profile
 - **Blank:** one approver group (for example Approvers) with two or more members.
@@ -710,13 +728,13 @@ A gap or tie stops a real submission, not just a test. A wrong approver key mean
 ## 12. Workflow design
 
 ### 12.1 What you can and cannot do alone
-The contract workflow (states, allowed moves, locks, what must exist before each move) and the Variation workflow are **JSON documents** edited at `/Admin/Configuration` (tabs "Contract workflow" and "Variation workflow"). There is no form editor, no diagram, no preview and no simulator for workflows (G-03). The only check is the validator. Rating: **D** to write or change a workflow; **B** to review a workflow a pack author supplies against your design sheet.
+The contract workflow (states, allowed moves, locks, what must exist before each move) and the Variation workflow are edited on the form editor at `/Admin/Forms/Edit` (workflow kinds), with closed vocabularies, validation on the field, preview and impact analysis, then the ordinary draft, second-person publication, history and rollback (G-03 is fixed). Raw JSON at `/Admin/Configuration` is a read-only diagnostic in Production. There is still no diagram. Rating: **B** (the design is the work; a Business Administrator can do it with the design sheet).
 
 ### 12.2 Design steps
 1. Draw the states on paper from the workshop (sheet 12). Mark which are **locked** (no edits while Effective, in Variation, Suspended, Terminated, Ended and so on) and what documents may be added in each (Open / LegalOnly / Closed).
 2. Draw the moves: from, to, who may do it (a permission from the catalogue), what must be true (the 23 conditions such as "legal review required", "final document exists", "executed copy exists", "comment required", "authorised approver", "submitter is not the approver", "classification clearance").
 3. Decide which moves need Legal review and whether the approval is a single group or a matrix.
-4. Give the document to the pack author with the design sheet; the author supplies JSON; you validate it, test it on a non-production installation with real roles, and publish.
+4. Enter the design on the workflow form editor from the design sheet; validate, preview, test it on a non-production installation with real roles, submit, and have a second person publish.
 5. Agree what happens to contracts already in flight: they stay on the workflow release they **started under**; moving them to a newer release is not built (Future).
 
 ### 12.3 What the validator rejects (plain words)
@@ -735,7 +753,7 @@ Locked states cannot be edited. An emergency unlock needs a special permission (
 ## 13. Notification design
 
 ### 13.1 What you can do
-- **Wording and who is told** are in the **notification policy**, a JSON document (tab "Notification policy" at `/Admin/Configuration`): rating **D** to write, **B** to review.
+- **Wording and who is told** are in the **notification policy**, a document (edited on the form editor at `/Admin/Forms/Edit`, notification policy kind; G-03 is fixed): rating **B**.
 - **Reminder lead time per contract** is a form on the contract page ("Remind this many days ahead", then "Save the lead time"): rating **A** (needs `reminders.configure`).
 - **Delivery monitoring** (`/Admin/Notifications`): summary (provider, waiting, failed, dead-lettered, sent in 24 hours), deliveries filter, "Retry", background jobs table, "Run the background work now": rating **A**.
 - **Email provider, server, secrets, link address and schedule** are server settings (section 5.2): rating **C**. The admin page only shows them.
@@ -761,7 +779,7 @@ Allowed lead times 1 to 3,650 and the default among them; offsets 0 to 3,650; un
 - While maintenance mode is on, background work pauses and queued mail is sent after release.
 
 ### 13.5 Test before go-live
-Send a test from the setup email page; trigger one event of each kind with a test contract on a non-production installation; confirm the recipient list, wording and link; confirm a dead-lettered delivery shows on `/Admin/Notifications` and "Retry" works after fixing the provider.
+Run the email readiness test at `/Admin/Operations/Email` (a **Technical task** for the System Administrator); trigger one event of each kind with a test contract on a non-production installation; confirm the recipient list, wording and link; confirm a dead-lettered delivery shows on `/Admin/Notifications` and "Retry" works after fixing the provider.
 
 
 ---
@@ -827,7 +845,7 @@ A **mapping profile** is a versioned recipe: for each source column, which platf
 - Give every file a row in the **manifest** (columns `SourceRecordId, AgreementReference, RelativePath, FileName, DocumentType, DocumentDate, VersionLabel, IsExecutedCopy, ParentDocumentSourceId, Sha256, Notes`). Files with no manifest row are matched by folder or file name only when the profile has a naming rule; otherwise they wait in the unmatched queue.
 - Matching order is fixed: manifest SourceRecordId, manifest AgreementReference, naming rule, exact parent-folder name. If more than one contract fits, the file is **ambiguous** and a person decides; the platform never breaks a tie.
 - Allowed file types are a fixed list; the file content must match its type; traversal paths, encrypted or corrupt archives and decompression bombs are refused.
-- **Malware scanning:** there is **no real scanner** behind the platform today (Mocked for demonstration; Disabled otherwise). In Production the setting that requires a scan is forced on, so **files that cannot be scanned are held** and not imported. Final migration of attachments in Production therefore needs a decision (Appendix C, D-17) and a scanner adapter from the supplier (Appendix D, G-25).
+- **Malware scanning:** there is **no real scanner** behind the platform today (a labelled mock exists for Demo, and for Test only when chosen on purpose and, for masked data, accepted on the record; section 1.4). In Production the setting that requires a scan is forced on, so **files that cannot be scanned are held** and not imported. Final migration of attachments in Production therefore needs a decision (Appendix C, D-17) and a scanner adapter from the supplier (Appendix D, G-25).
 
 ### 14.6 Choosing the duplicate rules
 | Rule | When to use | Consequence |
@@ -898,7 +916,7 @@ On the project page also set the **reference policy** (keep the source reference
 | Author the first mapping profile | B | CSV with a closed catalogue; coaching on the first attempt (G-24) |
 | Resolve rows and files | A | Forms |
 | Legacy-load policy and confirmation | B | Needs a second authorised person (Appendix C, D-11) |
-| Attachments in Production | D | No real malware scanner (G-25) |
+| Attachments in Production | D | No real malware scanner adapter exists (G-25); Production is Blocked until one is connected |
 | Owners, business units, sites, users | D | Not migration targets (G-23) |
 | Reconcile and accept | A | Needs the data owner |
 
@@ -937,7 +955,7 @@ Class each defect: **Configuration** (a Business Administrator fixes it by publi
 A signed UAT report, the evidence folder, the list of accepted deviations with owners, and the date of the final configuration release (note its **release numbers** and hashes). Freeze configuration changes until cutover unless the Business Lead approves a change.
 
 ### 16.5 Unaided?
-Executing scenarios: **A**. Designing them: **B**. Fixing a defect found: **A** if it is wording, a choice, a threshold or a recipient; **D** if it is a workflow, approval, notification or pack change authored as JSON (G-03).
+Executing scenarios: **A**. Designing them: **B**. Fixing a defect found: **A** if it is wording, a choice, a threshold or a recipient; **B** if it is a workflow, approval or notification change on the form editors (G-03 is fixed); **C** if it needs a new or re-signed pack (Pack Publisher).
 
 ---
 
@@ -948,7 +966,7 @@ Executing scenarios: **A**. Designing them: **B**. Fixing a defect found: **A** 
 ### 17.1 Two weeks before
 - UAT signed (section 16). Configuration frozen. Final mapping profile version published and used in a successful rehearsal.
 - Production installation in **Production mode** with: single sign-on working for every group, mail provider working, backup folder and admin connection configured (section 5), signed pack (or an approved decision about the pack, D-04), a verified **restore rehearsal** (section 19) and an **upgrade rehearsal** if a newer build is expected (section 20).
-- Organisation onboarding **published by the second person** (G-01: the onboarding wizard's own Publish step is the one publish route a second person can complete in Production; the form pages cannot yet).
+- Organisation onboarding **published by the second person** (a second person publishes through `/Admin/Reviews` or the wizard's Publish step; G-01 is fixed).
 - Communication sent to users: freeze window, training, who to call.
 - A written back-out decision tree and the "point of no return" (usually: business acceptance of the final batch).
 
@@ -1003,7 +1021,7 @@ Not Verified is not a pass: some checks are not built or cannot run on this inst
 - Keep a **change log**: every configuration change in hypercare is a published release with a note; the release number is the evidence.
 
 ### 18.4 Changing configuration during hypercare
-The safe loop is always draft, validate, preview or simulate, publish (second person in Production), observe. Roll back is available for most kinds (a rollback publishes an earlier release as a new release; the rollback route does not ask for the second person in Production, so it is the one route that works for a single administrator: G-01). Do not batch up changes: one change per release makes rollback meaningful.
+The safe loop is always draft, validate, preview or simulate, publish (second person in Production), observe. Roll back is available for every kind (a rollback publishes an earlier release as a new release; it needs a recent sign-in and a reason, and in Production it is submitted for a second person like any other publication: G-01 is fixed). Do not batch up changes: one change per release makes rollback meaningful.
 
 ### 18.5 Exit criteria
 No open top-severity issues; two consecutive weeks of green dashboards; a verified backup and a restored-and-validated copy within the agreed period; a lessons-learned list; handover to business-as-usual support; the Business Lead signs.
@@ -1101,7 +1119,7 @@ These are **plans**, not scripts: they say which choice to make at each step and
 | Capabilities | Pack defaults: Registration approval and Variations on; Legal review, Renewals, Signature requests off. Turn on only what you will use | 8.3 |
 | Workflow | The five-state workflow as shipped (Open, Active, Amending, Closed, Cancelled) | 12 |
 | Approvals | The one approver group; no value tiers. If you need tiers later this becomes a **D** task | 11 |
-| Notifications | Four events with lead times 30/60/90/120 days and a 90-day default. **There is no fallback if a category has no owner**: either give every category an owner or have a pack author add a fallback | 13 |
+| Notifications | Four events with lead times 30/60/90/120 days and a 90-day default. **There is no fallback if a category has no owner**: either give every category an owner or add a fallback in the notification policy form editor | 13 |
 | Migration | Profile with the status lookup to Open or Active; usually no legacy load because the workflow has no Effective lock state | 14, 15 |
 | UAT, cutover, hypercare, backups, upgrade rehearsal | As sections 16 to 20 | 16 to 20 |
 
@@ -1118,7 +1136,7 @@ These are **plans**, not scripts: they say which choice to make at each step and
 | Onboarding | Organisation, structure (legal entities, divisions, business units, sites), five starting categories (add your own), four contract types (recorded only: G-22), approver groups, regional (ABN shown as 11 digits), branding | 7 |
 | Terminology | Keep Supplier, Category Owner, Procurement Administrator and Group Head of Procurement; adjust role display names and approver group names; check that every user-facing screen uses them | 9 |
 | Capabilities | All five on | 8.3 |
-| Workflow | The shipped 17-state workflow **unchanged for first release**. Any change is a **D** task (JSON) and is tested in UAT | 12 |
+| Workflow | The shipped 17-state workflow **unchanged for first release**. Any change is made on the workflow form editor and is tested in UAT | 12 |
 | Approvals | One approver group (Group Head, or backup) at the approval step; a delegation form for absences | 11 |
 | Notifications | 28 events; fallback to organisation administrators when a category has no owner; look at the wording of the legal and approval events with Legal | 13 |
 | Migration | Legacy load likely, because the old register holds effective contracts. Needs the legacy-load policy, second-person confirmation, the status lookup to Effective, Expired, and so on; attachments are held in Production until a scanner decision (D-17) | 14, 15 |
@@ -1138,7 +1156,7 @@ These are **plans**, not scripts: they say which choice to make at each step and
 | Terminology | Keep Subcontract, Subcontractor, Trade Package, Change Order, Project, Region; review that e-mails and exports use them | 9 |
 | Capabilities | Legal review off, Renewals off, Signature requests on, Registration approval on, Variations on | 8.3 |
 | Workflow | The 11-state workflow unchanged; confirm Internal review, Stop work and Change order open match practice | 12 |
-| Approvals | **The core of this implementation.** Two matrices (activation, change orders): fill in the real value tiers and approver groups; run the **approval simulator** for a case in each tier, a high-risk case and a bond case; remember a gap or tie stops a real submission. Writing the matrix is a **D** task (JSON); simulating it is **A** | 11 |
+| Approvals | **The core of this implementation.** Two matrices (activation, change orders): fill in the real value tiers and approver groups; run the **approval simulator** for a case in each tier, a high-risk case and a bond case; remember a gap or tie stops a real submission. Entering the matrix is a **B** task on the form editor; simulating it is **A** | 11 |
 | Notifications | 16 events; lead time 30 days (14/30/60/90) and offsets 14/7/3/1; fallback to administrators | 13 |
 | Migration | Usually a legacy load of active subcontracts, then change orders created in the platform. 25 custom fields in the pack: map them with `custom.<key>` targets and lookups for choices | 14, 15 |
 | UAT | Add scenarios for each value tier, a change order, stop work, completion and termination | 16 |
@@ -1150,7 +1168,7 @@ These are **plans**, not scripts: they say which choice to make at each step and
 | | Blank | JBS-style | Harborline-style |
 |---|---|---|---|
 | People who must decide | 2 to 3 | 6 to 8 (Legal, Procurement, Finance, IT) | 6 to 8 (Commercial, Project, Finance, IT) |
-| Developer or pack-author work if you keep the shipped configuration | None beyond signing a pack for Production | None beyond signing | Value tiers need a pack author unless the shipped numbers are acceptable |
+| Developer or pack-author work if you keep the shipped configuration | None beyond signing a pack for Production | None beyond signing | Value tiers are entered by a Business Administrator on the matrix form editor; the shipped numbers are invented and must be replaced |
 | Biggest risk | Under-configured (no tiers, no fallback owner) | Legal scope and data volume | Wrong tiers and approvers |
 | First thing to rehearse | Installation and sign-in | Legacy load | Approval simulator |
 
@@ -1166,7 +1184,7 @@ Each row is a point where implementation still needs a **System Administrator (C
 |---|---|---|---|
 | B-01 | Install the platform; database; storage; reverse proxy and TLS | Server work and environment settings | 5 |
 | B-02 | Run the setup wizard's first step: obtain the one-time token and use the loopback address (or allow remote setup deliberately) | The token is issued by a server command (G-09) | 6 |
-| B-03 | Set the mode (Demonstration, Test, Production), the e-mail provider, the link address, secrets | Environment settings; the wizard does not set them (G-09, G-12) | 5.2, 6 |
+| B-03 | Set the mode (Demonstration, Test, Production), the test-mode governance setting, the e-mail provider settings, the link address, secrets | Environment settings and `/Admin/Operations/Email` are System Administrator tasks (G-09); email readiness needs a real provider test (1.4) | 1.4, 5.2, 6 |
 | B-04 | Register redirect addresses in the identity provider | The page does not show them (G-10) | 6 |
 | B-05 | Create the least-privilege database login | Not documented (G-16) | 5 |
 | B-06 | Back up, verify, restore, upgrade, maintenance mode, operations dashboard | Operations permissions belong to the System Administrator role by design | 17 to 20 |
@@ -1175,20 +1193,22 @@ Each row is a point where implementation still needs a **System Administrator (C
 
 ### B.2 Needs a developer, pack author or product owner (D)
 
+> **Status 2026-10-19.** Rows B-20 to B-23, B-26 and B-31 were closed by the Implementation Readiness Gap Closure slice and are kept as history with their current position. B-25 and B-30 changed as described in section 1.4.
+
 | # | Task | Why | Section |
 |---|---|---|---|
-| B-20 | Write or change a workflow (states, moves, guards) | JSON only; no editor, no preview, no simulator (G-03) | 12 |
-| B-21 | Write or change a notification policy (events, recipients, templates) | JSON only (G-03) | 13 |
-| B-22 | Write or change an approval matrix | JSON only; simulator exists but only for testing (G-03) | 11 |
-| B-23 | Create approver groups beyond those in the pack | Groups are keys typed on a user page; no list or create page (G-04) | 11 |
+| B-20 | Write or change a workflow (states, moves, guards) | **Closed (rating now B).** A Business Administrator uses the form editor at `/Admin/Forms/Edit` with preview and impact analysis; second person publishes (G-03 fixed) | 12 |
+| B-21 | Write or change a notification policy (events, recipients, templates) | **Closed (rating now B).** Form editor at `/Admin/Forms/Edit` (G-03 fixed) | 13 |
+| B-22 | Write or change an approval matrix | **Closed (rating now B).** Form editor at `/Admin/Forms/Edit`, plus the simulator (G-03 fixed) | 11 |
+| B-23 | Create approver groups beyond those in the pack | **Closed (rating now B).** `/Admin/ApproverGroups` registry (G-04 fixed) | 11 |
 | B-24 | Add a terminology key that does not exist | Keys come from the catalogue (G-18) | 9 |
-| B-25 | Create, edit or sign a solution pack; trust a new signing key and apply it in Production | Command-line pack tool and key management (G-07) | 8 |
-| B-26 | Add a second organisation, or widen a single-organisation setup to several | No screen; not changeable after setup (G-02) | 6, 7 |
+| B-25 | Create, edit or sign a solution pack; trust a new signing key and apply it in Production | **Technical task for the Pack Publisher** using the standalone `ecp-pack` tool (no source checkout needed); the Tenant Administrator registers the public key. Signing is deliberately outside the application (G-07 by design); key custody Not Verified | 1.4, 8 |
+| B-26 | Add a second organisation, or widen a single-organisation setup to several | **Closed (rating now B).** Tenant Administrator at `/Admin/Organisations/New`; widening is done once, with a reason, and never narrowed (G-02 fixed) | 6, 7 |
 | B-27 | Re-point an organisation to another pack in onboarding | The wizard records the choice but does not assign it (G-08); use Pack Manager | 7, 8 |
-| B-28 | Set the reference number format (digits, separator) | Not a field (G-20) | 7 |
+| B-28 | Set the reference number format (digits, separator) | A field for **new** organisations at `/Admin/Organisations/New` (G-20 fixed); no screen changes an existing organisation's format | 7 |
 | B-29 | Load contract owners, users, business units and sites with a migration | Not mapping targets (G-23) | 14 |
-| B-30 | Scan attachments for malware in Production | No scanner adapter (G-25) | 14 |
-| B-31 | Publish configuration in Production through the form pages | The second-person rule currently blocks every form page's Publish button (G-01) | 6 to 13 |
+| B-30 | Scan attachments for malware in Production | Still open: the scanner boundary, gate and readiness self-test exist, but **no real scanner adapter** (G-25; Production Blocked) | 1.4, 14 |
+| B-31 | Publish configuration in Production through the form pages | **Closed.** Form pages submit for review; a second person publishes at `/Admin/Reviews` (G-01 fixed) | 6 to 13 |
 
 ### B.3 Product-owner decisions
 Decisions the supplier's product owner or your governance must make, not a developer: see Appendix C, rows marked **Owner**.
@@ -1205,8 +1225,8 @@ Fill this in during discovery (section 3). "Owner" is who decides. "If undecided
 | D-02 | Mode for this installation (Demonstration, Test, Production) and which environments exist (rehearsal, UAT, production) | Business Lead | Before install | Production for the live one; rehearse on a separate installation | 5 |
 | D-03 | Identity provider and how users are created and removed | System Administrator + Business Lead | Before setup | Sign-in is invite-only; no sign-in without a provider | 6 |
 | D-04 | Which pack to start from, and, for Production, who signs it and which key is trusted (or whether the supplier's signed pack is used) | Business Lead + **Developer** | Before setup | Unsigned packs cannot be used in Production | 8 |
-| D-05 | One organisation or several (cannot be widened later through any screen, G-02) | Business Lead | Setup, stage on tenancy | One organisation | 6 |
-| D-06 | Reference prefix and numbering | Business Lead | Onboarding | Prefix required; six digits and a separator are fixed (G-20) | 7 |
+| D-05 | One organisation or several (more can be added at `/Admin/Organisations/New`; G-02 fixed) | Business Lead | Setup, stage on tenancy | One organisation | 6 |
+| D-06 | Reference prefix and numbering | Business Lead | Onboarding | Prefix required; digits and separator are fields for new organisations (G-20 fixed) | 7 |
 | D-07 | Regional profile: country, locale, currency, time zone, tax identifier type | Business Lead | Onboarding | The Blank pack proposes nothing | 10 |
 | D-08 | Terminology: which words change | Business Lead | Before UAT | Pack words | 9 |
 | D-09 | Capabilities: which steps are on | Business Lead | Before UAT | Pack defaults | 8.3 |
@@ -1229,42 +1249,44 @@ Fill this in during discovery (section 3). "Owner" is who decides. "If undecided
 | D-26 | Who are the two (or more) people who can publish in Production | Business Lead | Before onboarding | At least two Organisation Administrators | 1, 7 |
 | D-27 | Who is the installation (System) administrator, and is it a separate person from the Tenant Administrator | Business Lead | Setup | Separate account recommended | 6 |
 | D-28 | Support access: whether the supplier may be given time-limited support access | Business Lead + Security | Before go-live | Off | 2 |
-| D-29 | Classification levels in use and who may see privileged material | Legal + Business Lead | Onboarding | Pack levels | 7 |
+| D-29 | Classification levels in use and who may see privileged material | Legal + Business Lead | Setup stage 10 (amended later only by the System Administrator at `/Admin/Setup`; 1.4) | Pack levels | 6, 7 |
 | D-30 | Production approval and go-live authority | **External governance** | Before go-live | The platform never declares it | all |
 
 ---
 
 ## Appendix D. Gap list: what still prevents a true no-code implementation
 
+**Status note (2026-10-19).** This appendix is the original gap list as written on 2026-10-18. Rows closed since carry a **Status** note at the start of the Shortcoming cell; the register in `docs/IMPLEMENTATION_READINESS.md` and `docs/IMPLEMENTATION_REHEARSAL.md` (section 9.1) is authoritative, and "Impact" and "Suggested remedy" are history for those rows.
+
 **Basis:** **C** = confirmed by reading the source code in preparing this playbook; **R** = reported by the research reading of the wizards and documents and **not yet exercised in a live installation**: confirm each during your rehearsal. **Severity:** High = stops or blocks a Business Administrator from finishing the step in Production; Medium = needs a workaround or a developer; Low = confusing or missing guidance. "Fix by" is who would resolve it (supplier product team unless stated).
 
 | ID | Area | Shortcoming | Impact | Sev. | Basis | Suggested remedy |
 |---|---|---|---|---|---|---|
-| G-01 | Publishing | In Production the platform requires a **second person** to publish. The form pages (Configuration, Terminology, Capabilities, Regional and the Studio pages that save before publishing) save the draft under the clicking user's name and then publish, so the clicker is always the last editor and the rule always refuses. The onboarding wizard's Publish step does not re-save and can be completed by a second person; the rollback route does not check the rule at all | Form-page configuration cannot be published in Production; the second-person control is inconsistent (blocks one route, absent on another) | High | C | Publish without re-saving when the draft is unchanged; apply the rule uniformly, including rollback; test in Production mode |
-| G-02 | Organisations | No screen adds an organisation or widens single-organisation tenancy to several; help text promises this but there is no path | Growth into a second business unit needs a developer or a rebuild | High | R | Add "New organisation" in administration; add a tenancy-widening operation |
-| G-03 | Authoring | Workflow, notification policy and approval matrix are edited only as JSON in a text box; no form editor, diagram, preview or workflow simulator (the approval simulator tests, but does not author) | The three most business-specific parts need a pack author | High | R | Form-based editors with the validator inline, preview and simulation for each |
-| G-04 | Approvers | Approver groups are typed keys on a user page; no list of groups, no create page, no check that every key in a matrix has a member | A matrix can name a group nobody belongs to; a wrong key blocks approval | High | R | Groups page with members, usage and an "empty group" check |
+| G-01 | Publishing | **Status: Fixed (2026-10-18); no longer a blocker.** The form pages now save a content-hashed draft, submit it for review, and a second person publishes at `/Admin/Reviews`; rollback follows the same rule; refusals are audited (`docs/IMPLEMENTATION_READINESS.md` 2.1). *Original finding:* In Production the platform requires a **second person** to publish. The form pages (Configuration, Terminology, Capabilities, Regional and the Studio pages that save before publishing) save the draft under the clicking user's name and then publish, so the clicker is always the last editor and the rule always refuses. The onboarding wizard's Publish step does not re-save and can be completed by a second person; the rollback route does not check the rule at all | Form-page configuration cannot be published in Production; the second-person control is inconsistent (blocks one route, absent on another) | High | C | Publish without re-saving when the draft is unchanged; apply the rule uniformly, including rollback; test in Production mode |
+| G-02 | Organisations | **Status: Fixed (2026-10-18)** at `/Admin/Organisations`. *Original finding:* No screen adds an organisation or widens single-organisation tenancy to several; help text promises this but there is no path | Growth into a second business unit needs a developer or a rebuild | High | R | Add "New organisation" in administration; add a tenancy-widening operation |
+| G-03 | Authoring | **Status: Fixed (2026-10-18)** by the form editor at `/Admin/Forms/Edit` with preview and impact analysis. *Original finding:* Workflow, notification policy and approval matrix are edited only as JSON in a text box; no form editor, diagram, preview or workflow simulator (the approval simulator tests, but does not author) | The three most business-specific parts need a pack author | High | R | Form-based editors with the validator inline, preview and simulation for each |
+| G-04 | Approvers | **Status: Fixed (2026-10-18)** at `/Admin/ApproverGroups`. *Original finding:* Approver groups are typed keys on a user page; no list of groups, no create page, no check that every key in a matrix has a member | A matrix can name a group nobody belongs to; a wrong key blocks approval | High | R | Groups page with members, usage and an "empty group" check |
 | G-05 | Onboarding access | A Tenant Administrator holds the permission to start the onboarding wizard but cannot save or publish it; the blocked panel names a role that is also refused | A business lead's delegate is told to proceed and then blocked | Medium | R | Align permissions and wording |
 | G-06 | Users | "Send invitation" records the invitation only; no message is sent (the platform's own confirmation says "Invitation recorded") | An administrator must tell each person separately; bulk onboarding of users is manual | Medium | C | Send an invitation message through the mail provider; bulk invite from a list |
-| G-07 | Packs | Creating, validating, signing and installing a signed pack needs the pack tool, key handling and a trusted key; Production refuses unsigned packs | Every customer-specific change to workflows, approvals or reminders in Production is a developer-assisted release | High | R | A supplier-operated signing service or a pack builder in the product |
+| G-07 | Packs | **Status: By design; journey documented and guarded.** The pack tool is now a standalone `ecp-pack` package (G-34 closed). *Original finding:* Creating, validating, signing and installing a signed pack needs the pack tool, key handling and a trusted key; Production refuses unsigned packs | Every customer-specific change to workflows, approvals or reminders in Production is a developer-assisted release | High | R | A supplier-operated signing service or a pack builder in the product |
 | G-08 | Onboarding and packs | The onboarding "pack" step records the choice but does not assign the pack to the organisation | The wizard seems to finish a step it has not finished | Medium | R | Assign the pack from the wizard, or relabel the step |
 | G-09 | Setup | The setup wizard cannot set the mode, bind to a non-loopback address or create the token; those are environment settings and a command | Cannot start the wizard without a System Administrator | Medium | R | Document in the page; offer a guided pre-check |
 | G-10 | Single sign-on | The page says it shows the redirect addresses after saving; it does not | Admin must derive the address; sign-in test fails confusingly | Medium | R | Show the exact addresses on the page |
 | G-11 | Key ring | If the data-protection key ring is lost, everything but the live health check fails (503) and no recovery is documented | Loss of sessions and protected values with no procedure | Medium | R | Document back-up and recovery of the key ring; add to backup |
-| G-12 | E-mail | The setup wizard's e-mail page does not set the delivery provider (an environment setting does); implicit-TLS port 465 is probably unsupported | A tested page that does not change delivery | Medium | R | Make the page authoritative or explain loudly; support 465 |
+| G-12 | E-mail | **Status: Implemented (2026-10-19)**: one email configuration, real provider test, expiry; SMTP verified only against a loopback relay, Not Verified against a customer's service; Graph Scaffolded. *Original finding:* The setup wizard's e-mail page does not set the delivery provider (an environment setting does); implicit-TLS port 465 is probably unsupported | A tested page that does not change delivery | Medium | R | Make the page authoritative or explain loudly; support 465 |
 | G-13 | Installation | No installation guide in the product; steps assembled from deployment files | Unaided install by a non-developer is not realistic | Medium | R | Publish a step-by-step installation guide with screenshots |
 | G-14 | Secrets | The notations for Key Vault and DPAPI are accepted but do not work | A System Administrator may believe secrets are stored safely when they are not | Medium | R | Reject unsupported notations or implement them |
 | G-15 | Container | The container runs as a fixed user id that is not documented | Volume permission failures | Low | R | Document it |
 | G-16 | Database | No instructions for a least-privilege runtime login; tested setup used an administrator account | Over-privileged production database account | Medium | R | Provide the exact grants and a script for the database owner to run |
 | G-17 | Sign-in re-check | The configurable minutes for a recent sign-in are not read from settings in every place; behaviour is a fixed ten minutes | An organisation cannot tighten or relax it as the documentation implies | Low | R | Wire the setting or correct the documentation |
 | G-18 | Terminology | An administrator cannot add a new term key; role labels come from fixed mappings | New vocabulary (a new object name) needs a developer | Low | R | Allow custom keys that only pages built by the supplier use, or document the closed catalogue |
-| G-19 | Regional | The regional page has no sign-in re-check, unlike terminology and capabilities | Inconsistent safety for a setting that changes how every date and amount is shown | Low | R | Add the check |
-| G-20 | Numbering | Reference format (digits, separator) is not a field; the wizard asks only for a prefix | Cannot match an existing numbering scheme | Medium | R | Expose pattern, digits and separator, validated |
-| G-21 | Structure | A code with a full stop is accepted by the wizard's check but publishing then fails | A whole onboarding publish fails at the end | Medium | R | Reject at entry |
+| G-19 | Regional | **Status: Fixed (2026-10-18).** *Original finding:* The regional page has no sign-in re-check, unlike terminology and capabilities | Inconsistent safety for a setting that changes how every date and amount is shown | Low | R | Add the check |
+| G-20 | Numbering | **Status: Fixed for new organisations (2026-10-18); existing organisations keep their format.** *Original finding:* Reference format (digits, separator) is not a field; the wizard asks only for a prefix | Cannot match an existing numbering scheme | Medium | R | Expose pattern, digits and separator, validated |
+| G-21 | Structure | **Status: Fixed (2026-10-18).** *Original finding:* A code with a full stop is accepted by the wizard's check but publishing then fails | A whole onboarding publish fails at the end | Medium | R | Reject at entry |
 | G-22 | Contract types | Types entered in onboarding are recorded and used by nothing yet | Staff think the types drive behaviour | Low | R | Use or hide |
 | G-23 | Migration | Migration cannot set contract owners, legal entity, business unit or site; user accounts cannot be migrated | Registers lose ownership; owners are set by hand after load | Medium | C | Add as mapping targets with a lookup to existing people and units |
 | G-24 | Migration | No mapping designer: the profile is built from CSV files; no automatic column matching, no preview of sample rows before the first dry run | The first profile needs coaching | Medium | R | A guided mapping screen with suggestions and sample rows |
-| G-25 | Migration | No real malware scanner exists; in Production unscanned attachments are held and not imported | Attachment migration cannot complete in Production | High | C | Provide a scanner adapter, or a documented owner-accepted bypass (D-17) |
+| G-25 | Migration | **Status: Gate, readiness test and labelled mock implemented; no real scanner adapter (Production Blocked).** *Original finding:* No real malware scanner exists; in Production unscanned attachments are held and not imported | Attachment migration cannot complete in Production | High | C | Provide a scanner adapter, or a documented owner-accepted bypass (D-17) |
 | G-26 | Migration | Freeze window times are entered in UTC rather than the organisation's time zone | Freeze starts or ends at the wrong local time | Low | C | Accept local time with the zone shown |
 | G-27 | Operations | No built-in schedule for backups or reminders to rehearse restores; relies on the organisation's scheduler | Backups may simply not happen | Medium | C | A simple schedule and "last verified backup" warning on the dashboard |
 | G-28 | Documentation | Counts and statements differ between some documents and the product (for example numbers of readiness checks or permissions in different places) | Reviewers lose trust and miss real differences | Low | R | One generated reference for pages, fields, rules and messages |
@@ -1272,7 +1294,7 @@ Fill this in during discovery (section 3). "Owner" is who decides. "If undecided
 | G-30 | Access to technical health | A Business Administrator cannot see operations or health at all, by design | Business cannot check the daily dashboard | Low | R | A read-only business summary of delivery and backup freshness |
 
 ### D.1 What a true no-code experience would need (in priority order)
-1. Fix **G-01** so a second person can publish from the page they are on, and rollback follows the same rule.
+1. Fix **G-01** so a second person can publish from the page they are on, and rollback follows the same rule. *(Done 2026-10-18; items 2 and 3 were also done except sent invitations (G-06); item 4 is addressed by the standalone pack tool; the real malware scanner in item 5 is still open.)*
 2. Form-based editors with preview and simulation for workflows, approvals and notifications (**G-03**), with an approver-group page (**G-04**).
 3. A way to add organisations and widen tenancy (**G-02**) and to create users by invitation that is sent (**G-06**).
 4. A way to author and install a customer's own pack in Production without a developer (**G-07**).
@@ -1293,15 +1315,15 @@ Ratings: **A** unaided; **B** unaided with preparation; **C** needs a System Adm
 | 3 | Discovery workshop | A | Facilitated by the Project Manager |
 | 4 | Data collection workbook | B | Needs source data owners |
 | 5 | Installation | C | Server, database, secrets, TLS |
-| 6 | Setup wizard | C | Token, mode, identity provider portal, mail provider (G-09, G-10, G-12) |
-| 7 | Onboarding wizard | B (D for a second organisation or the Production publish) | CSV lists; G-01, G-02, G-05, G-08 |
-| 8 | Pack selection and assignment | B (D to create or sign) | G-07 |
+| 6 | Setup wizard | C | Token, mode, identity provider portal, email provider settings and test (G-09, G-10; email readiness is a real provider test, 1.4) |
+| 7 | Onboarding wizard | B (second organisation: B, Tenant Administrator; Production publish: a second person at `/Admin/Reviews`) | CSV lists; G-05, G-08 remain; G-01 and G-02 fixed |
+| 8 | Pack selection and assignment | B (C to build or sign: a Pack Publisher's technical task with `ecp-pack`) | G-07 by design |
 | 8.3 | Capabilities | A | Form, with a decision |
 | 9 | Terminology | A (D for a new key) | Form with limits; G-18 |
-| 10 | Regional | A | Form; G-19 |
-| 11 | Approval design | D to write a matrix; A to simulate and delegate | G-03, G-04 |
-| 12 | Workflow design | D to change; B to review | G-03 |
-| 13 | Notification design | D to write; A to monitor and retry | G-03 |
+| 10 | Regional | A | Form; G-19 fixed |
+| 11 | Approval design | B to enter a matrix on the form editor; A to simulate and delegate | G-03, G-04 fixed |
+| 12 | Workflow design | B on the form editor (design is the work); a second person publishes | G-03 fixed |
+| 13 | Notification design | B to write on the form editor; A to monitor and retry | G-03 fixed |
 | 14 | Migration preparation | B | G-23, G-24 |
 | 15 | Migration execution | B (D for Production attachments) | G-25 |
 | 16 | UAT | A to run; B to design | None |
@@ -1310,7 +1332,7 @@ Ratings: **A** unaided; **B** unaided with preparation; **C** needs a System Adm
 | 19 | Backup and restore rehearsal | C | By design |
 | 20 | Upgrade rehearsal | C | By design |
 
-**Overall reading.** For a business that keeps the shipped configuration of a pack and has a System Administrator for installation and operations, a trained Business Administrator can complete roughly three-quarters of the configuration steps unaided (ratings A and B), *once* G-01 is dealt with or a workaround is accepted. Anything that changes a workflow, an approval matrix or a notification policy, adds an organisation, or needs a customer-signed pack in Production still needs a pack author or developer. That is the core of the gap between today's product and a true no-code experience. These are the authors' ratings, not measurements: confirm them in your rehearsal.
+**Overall reading.** For a business that keeps the shipped configuration of a pack and has a System Administrator for installation and operations, a trained Business Administrator can complete roughly three-quarters of the configuration steps unaided (ratings A and B). *Update 2026-10-19:* G-01 to G-04 are fixed, so changing a workflow, an approval matrix or a notification policy, and adding an organisation, are now form tasks (rating B). What still needs another person is building and signing a customer-specific pack (a Pack Publisher's technical task), the installation and operations steps (System Administrator), and a real malware scanner, which does not exist (Production is Blocked until one is connected). These are the authors' ratings, not measurements: confirm them in your rehearsal, and see `docs/IMPLEMENTATION_REHEARSAL.md` section 9 for the verdicts.
 
 ---
 

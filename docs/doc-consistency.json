@@ -1,0 +1,106 @@
+{
+ "_comment": "Rules for tools/check-docs.py (G-36). 'forbidden' statements must not appear in the listed guides (history sections of IMPLEMENTATION_REHEARSAL.md are excluded by not listing it). 'required' statements must be present in the named file.",
+ "forbidden": [
+  {
+   "pattern": "dotnet run --project src/Ecp\\.PackTool",
+   "files": [
+    "docs/PACK_SIGNING.md",
+    "docs/INSTALLATION_GUIDE.md",
+    "docs/PACK_IMPLEMENTATION_GUIDE.md",
+    "docs/IMPLEMENTATION_PLAYBOOK.md",
+    "docs/UAT_AND_CUTOVER_GUIDE.md"
+   ],
+   "why": "signing uses the standalone ecp-pack tool and needs no source checkout (G-34)"
+  },
+  {
+   "pattern": "Publish button cannot succeed in Production",
+   "files": [
+    "docs/IMPLEMENTATION_PLAYBOOK.md",
+    "docs/BUSINESS_ADMIN_GUIDE.md",
+    "docs/INSTALLATION_GUIDE.md"
+   ],
+   "why": "G-01 is fixed: form pages submit for review and a second person publishes"
+  },
+  {
+   "pattern": "Production does; Demonstration and Test do not",
+   "files": [
+    "docs/BUSINESS_ADMIN_GUIDE.md",
+    "docs/IMPLEMENTATION_PLAYBOOK.md"
+   ],
+   "why": "Test can enforce the second-person rule with Ecp:Governance:SecondPerson (G-31)"
+  },
+  {
+   "pattern": "second-person rule is off in Test",
+   "files": [
+    "docs/IMPLEMENTATION_PLAYBOOK.md",
+    "docs/BUSINESS_ADMIN_GUIDE.md",
+    "docs/UAT_AND_CUTOVER_GUIDE.md",
+    "docs/MIGRATION_EXECUTION_GUIDE.md"
+   ],
+   "why": "Test can enforce the second-person rule (G-31)"
+  },
+  {
+   "pattern": "Notifications__EmailProvider.*(sets|set the|authoritative)",
+   "files": [
+    "docs/SETUP_WIZARD_GUIDE.md",
+    "docs/OPERATIONS_QUICK_GUIDE.md"
+   ],
+   "why": "email is configured once, on /Admin/Operations/Email and the setup email stage (G-12)"
+  },
+  {
+   "pattern": "\\[\\[[a-z.]+\\|[a-z|]+\\]\\].*(is shown|appears|shows)",
+   "files": [
+    "docs/SETUP_WIZARD_GUIDE.md",
+    "docs/ORGANISATION_ONBOARDING_GUIDE.md"
+   ],
+   "why": "raw terminology tokens are a defect, not a documented behaviour (G-32)"
+  }
+ ],
+ "required": [
+  {
+   "file": "docs/PACK_SIGNING.md",
+   "pattern": "--key-ref.*Exit codes",
+   "why": "standalone tool, key references and exit codes (G-34)"
+  },
+  {
+   "file": "docs/DOCUMENT_SCANNING.md",
+   "pattern": "Documents:Scanner.*acceptance.*connecting a real provider",
+   "why": "scanner configuration, mock acceptance and the connect-a-provider checklist (G-25)"
+  },
+  {
+   "file": "docs/IMPLEMENTATION_REHEARSAL.md",
+   "pattern": "Production-mode setup\\*\\*.*Blocked",
+   "why": "the five final verdicts"
+  },
+  {
+   "file": "docs/NO_CODE_REHEARSAL.md",
+   "pattern": "twenty-three steps",
+   "why": "the rehearsal has 23 steps"
+  },
+  {
+   "file": "docs/SETUP_WIZARD_GUIDE.md",
+   "pattern": "ECP-NET-001",
+   "why": "plain-language proxy and TLS failures (G-33)"
+  },
+  {
+   "file": "docs/INSTALLATION_GUIDE.md",
+   "pattern": "Ecp__Governance__SecondPerson|Ecp:Governance:SecondPerson",
+   "why": "the Test-mode governance setting (G-31)"
+  },
+  {
+   "file": "docs/MIGRATION_EXECUTION_GUIDE.md",
+   "pattern": "MDD-006",
+   "why": "the masked-data checkpoint and its refusal codes (G-35)"
+  },
+  {
+   "file": "docs/OPERATIONS_QUICK_GUIDE.md",
+   "pattern": "(?=.*/Admin/Operations/Email)(?=.*/Admin/Operations/Scanner)(?=.*/Admin/Operations/EvidencePack)",
+   "why": "the new operations pages"
+  },
+  {
+   "file": "docs/UAT_AND_CUTOVER_GUIDE.md",
+   "pattern": "Ready with warnings",
+   "why": "evidence semantics (G-37)"
+  }
+ ]
+}

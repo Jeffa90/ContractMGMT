@@ -308,7 +308,31 @@ internal static class NoCodeJourney
             // With a current declaration the next gate is the scanner: the only one connected is the labelled demonstration scanner, which nobody has accepted for this rehearsal.
             var behindMock = await Send(procurement, batchUrl, "Commit", []);
             Assert.Contains("MDD-006", Words(behindMock.Status == HttpStatusCode.Redirect ? await GetAsync(procurement, batchUrl) : behindMock.Body));
-            return "Commit was refused three ways in turn (no classification, then, with the declaration made and linked, the unaccepted demonstration scanner); each gave a code and a sentence. The declaration records owner, source, method, fields, approval and expiry, and holds no data.";
+
+            // A declaration can be withdrawn: the batch that depends on it can no longer be committed. One that limits who may load the data refuses everybody else. A fresh, unrestricted declaration restores the path.
+            async Task<Guid> Declare(string owner, string permitted)
+            {
+                ExpectDone(await Send(procurement, $"/Migration/MaskedData?organisationId={org}", "Declare", Fields(("OrganisationId", org.ToString()), ("DatasetOwner", owner), ("SourceSystem", "Legacy register"),
+                    ("MaskingMethod", "Counterparty names and contract values replaced with generated values by the data owner before extraction"), ("FieldsMasked", "Counterparty name, Contact email, Contract value"),
+                    ("ApprovalReference", "CHG-2026-0418"), ("ApprovedBy", "Head of Data Governance"), ("ApprovedOn", DateTime.UtcNow.ToString("yyyy-MM-dd")), ("ReviewBy", DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd")),
+                    ("PermittedUsers", permitted))), "declaration " + owner);
+                var id = FirstGuid(await GetAsync(procurement, batchUrl), $"<option value=\"({Pattern})\">{owner}");
+                ExpectDone(await Send(procurement, batchUrl, "Classify", Fields(("DataClass", "MaskedCompanyData"), ("DeclarationId", id.ToString()))), "classification " + owner);
+                return id;
+            }
+            async Task Expect(string code)
+            {
+                var r = await Send(procurement, batchUrl, "Commit", []);
+                Assert.Contains(code, Words(r.Status == HttpStatusCode.Redirect ? await GetAsync(procurement, batchUrl) : r.Body));
+            }
+            ExpectDone(await Send(procurement, $"/Migration/MaskedData?organisationId={org}", "Revoke", Fields(("OrganisationId", org.ToString()), ("DeclarationId", declaration.ToString()), ("Reason", "Dataset withdrawn for re-masking"))), "revocation");
+            await Expect("MDD-002");
+            var restricted = await Declare("Restricted Dataset", "someone.else@a.example.test");
+            await Expect("MDD-005");
+            _ = restricted;
+            await Declare("Replacement Dataset", ProcAdmin + ", " + ProcAdmin2);
+            await Expect("MDD-006");
+            return "Commit was refused in turn for no classification, a revoked declaration, a declaration that does not name the committer and, with a good declaration linked, the unaccepted demonstration scanner; each gave a code and a sentence. The declaration records owner, source, method, fields, approval and expiry, and holds no data.";
         });
 
         await ledger.Step(17, "Operations: accept the demonstration scanner for this masked-data rehearsal, on the record", "System Administrator", "SystemAdministrator (technical)", "/Admin/Operations/Scanner", async () =>

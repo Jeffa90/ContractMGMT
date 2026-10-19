@@ -41,7 +41,7 @@ Kinds a pack may carry today: `SolutionPack`, `WorkflowContractLifecycle`, `Work
 
 ## 2. Commands
 
-Run the tool from the repository: `dotnet run --project src/Ecp.PackTool -- <command> ...` (or the built `Ecp.PackTool.dll`).
+Run the installed tool (`ecp-pack <command> ...`; installation is in `docs/PACK_SIGNING.md`, section 3, and needs no source checkout). From a repository checkout the same commands run as `dotnet run --project src/Ecp.PackTool -- <command> ...`, which is for developers of the platform only.
 
 | Command | Purpose |
 |---|---|
@@ -50,12 +50,14 @@ Run the tool from the repository: `dotnet run --project src/Ecp.PackTool -- <com
 | `validate --package <file> [--platform-version x.y.z]` | Archive, manifest, hashes, content safety and compatibility |
 | `hash --package <file>` | Print the package SHA-256 and the content digest |
 | `inspect --package <file> [trust options]` | Show the manifest summary and, with a trust file or public key, the signature result |
-| `sign --package <file> --out <file> --key-id <id> (--key-file <private.pem> \| --key-env <VARIABLE>)` | Add a signature (see `docs/PACK_SIGNING.md`) |
+| `sign --package <file> --out <file> --key-id <id> --key-ref <env:VARIABLE \| file:PATH>` | Add a signature (see `docs/PACK_SIGNING.md`; `--key-file` and `--key-env` are shorter spellings) |
+| `report --package <file> [--out <file>] [trust options]` | Sanitised JSON report: identity, hashes, findings, signature facts; no content or key |
+| `version` | Tool version and the pack format it reads and writes |
 | `verify --package <file> (--trust-file keys.json \| --public-key key.pem --key-id id) [--production]` | Check the signature as Production would |
 | `compare --a <file> --b <file>` | Reproducibility check: equal when everything except the signature is identical |
 | `keygen --out-private <file> --out-public <file>` | Make a **new** key pair for testing; keep the private key out of source control |
 
-Exit codes: 0 success, 1 the package or request is not acceptable, 2 usage error. Output never contains key material.
+Exit codes: 0 success, 1 the package or request is not acceptable, 2 usage error, 3 the key reference could not be used. Output never contains key material.
 
 ## 3. Building and checking the shipped packs
 

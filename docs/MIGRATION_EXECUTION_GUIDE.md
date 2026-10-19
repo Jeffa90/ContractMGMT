@@ -10,9 +10,9 @@
 * You hold the Procurement Administrator role for that organisation. All five migration permissions (stage, commit, legacy load, rollback, accept) belong to that role only; the Tenant Administrator, Organisation Administrator and Business Configuration Administrator roles hold none of them.
 * For a legacy load (contracts that are already Effective or later) a **second person** holds the legacy-load permission too, so two separate Procurement Administrator accounts are needed.
 * A recent backup exists around the final load (a **[Technical task: System Administrator]**, see docs/OPERATIONS_RUNBOOK.md and docs/BACKUP_AND_RESTORE.md) and the installation is not in maintenance mode (commit is refused during maintenance).
-* Rehearsals use synthetic or approved data only. Never load live confidential data into a test installation.
+* Rehearsals use synthetic data, or company data your organisation has masked and declared (section 8.5). Never load live confidential data into a test installation. In Test mode the platform checks that a declaration exists before it lets masked company data be committed; it does not mask, detect or de-identify anything, and it never says the data is safe.
 
-**Status label.** Contracts, suppliers, categories, additional fields, documents, dry run, reconciliation, provenance, rollback: **Implemented** (docs/MIGRATION.md; a scripted run of the real screens and automated tests). Malware scanning of attachments: **Mocked** outside Production (recognises only the standard test string) and **Disabled** as a real scanner; in Production files that cannot be scanned are held and not imported (**Not Verified / Future adapter**). Mapping legal entity, business unit, site, owners and users; JSON or ZIP-package sources; a background worker for commits: **Future**. Nothing here declares production approval.
+**Status label.** Contracts, suppliers, categories, additional fields, documents, dry run, reconciliation, provenance, rollback: **Implemented** (docs/MIGRATION.md; a scripted run of the real screens and automated tests). Masked-data declarations and the commit checkpoint (/Migration/MaskedData, Data handling on the batch page): **Implemented**, Test mode only, proved by automated tests and not by an unaided person; **Not Verified** that any particular masking method is adequate (that is the customer's responsibility). Malware scanning of attachments: **Mocked** outside Production (recognises only the standard test string) and **Disabled** as a real scanner; in Production files that cannot be scanned are held and not imported (**Not Verified / Future adapter**). Mapping legal entity, business unit, site, owners and users; JSON or ZIP-package sources; a background worker for commits: **Future**. Nothing here declares production approval.
 
 Proof that the journey works without code: docs/NO_CODE_REHEARSAL.md, steps 13 to 18 (run over real HTTP on SQLite and on SQL Server by automated tests; not by an unaided non-developer).
 
@@ -45,6 +45,7 @@ Governance that applies:
 | 5. Source files | Batch page, section 1 | Contracts file, manifest, archive staged |
 | 6. Dry run | Batch page, section 3 | Nothing written; counts and errors |
 | 7. Review and fix | Messages, Rows, Files pages | Errors fixed at source; decisions recorded |
+| 7a. Data handling (Test mode) | Batch page, Data handling; **/Migration/MaskedData** | Batch marked Synthetic or Masked Company Data, linked to a declaration |
 | 8. Confirm and commit | Batch page, section 5 | Records written in checked chunks |
 | 9. Reconcile | Batch page, section 6 | Totals balance or exceptions approved |
 | 10. Accept | Batch page, section 7 | Final for rollback |
@@ -283,38 +284,64 @@ The full list is in docs/MIGRATION.md section 11.
 
 **Attachments and the unmatched queue** (**/Migration/Batches/{id}/Files**). Each file is matched in a fixed order: the manifest's SourceRecordId, the manifest's AgreementReference, the profile's naming rule, then the exact folder name; the reason is shown and **the platform never breaks a tie**. For a file in the queue (Unmatched, with its reason) you can: choose a contract from the list and press **Match to this contract**; press **Import it as a separate document** (only for a file held as a duplicate); or enter a reason and press **Discard** (recorded; the file stays in staging marked discarded). Filters: State and "Only files waiting for a person". Each decision changes the plan, so run the dry run again. The manifest table is shown below the files.
 
-**Provenance** (**/Migration/Batches/{id}/Provenance**): what the batch created, updated or linked (see section 8.8). Available at any time.
+**Provenance** (**/Migration/Batches/{id}/Provenance**): what the batch created, updated or linked (see section 8.9). Available at any time.
 
-### 8.5 Confirm and commit (section 5)
+### 8.5 Data handling and the masked-data checkpoint (Test mode only)
+
+**Navigation.** Declarations: **Data migration**, then **Masked-data declarations** (**/Migration/MaskedData**). Classification: the **Data handling** section of the batch page (**/Migration/Batches/{id}**). **Who / permission.** A Procurement Administrator with `migration.stage` for the organisation. **Status.** Implemented, Test mode only. Demonstration has no checkpoint (synthetic data only). In Production the section says that Production data follows Production governance, and a batch marked Masked Company Data is refused.
+
+**Customer responsibility.** The **customer masks the data, outside the platform**. The platform does not mask, detect or de-identify, and it never states that data is safe. A declaration is a record that your organisation did the masking and that a named person approved loading it; it is not evidence that the masking was good. Nothing here is automatic: no field is scanned, nothing is classified for you, and nothing is blocked or allowed unless a person recorded a classification.
+
+1. **Make a declaration** on **/Migration/MaskedData** (choose the organisation, then **Make a declaration**). The fields are: dataset owner, source system, how it was masked, names of the fields masked, whether attachments, personal data and confidential commercial data remain, your approval reference, approved by, approval date, **Expires (review by) on**, and the people who may load it (email addresses; empty means anyone who may commit a batch). Press **Record the declaration**. The list shows each declaration as Current, Expired or Revoked with the number of batches using it.
+2. **Classify the batch** in **Data handling**: choose **Synthetic data (made up for the rehearsal)** or **Masked Company Data (needs a declaration)**, choose the declaration, press **Save classification**. The batch shows who set it and when, and the declaration's state. A batch that has started committing cannot be re-classified. Some installations require every batch to be classified before it is committed; the page says so.
+3. **If the scanner is the demonstration scanner**, a person with the System Administrator role must first accept its use for the rehearsal on the record (who, reason, scope and an expiry of at most 90 days) on **Administration, Operations, Scanner** (**/Admin/Operations/Scanner**; see docs/OPERATIONS_QUICK_GUIDE.md section 11.1). The mock checks nothing real and is no protection. Ask them; a Procurement Administrator cannot do it.
+4. **Commit.** In Test mode a batch marked Masked Company Data is refused unless the declaration is current, approved and not revoked, permits this environment and, if it lists people, lists you, and the mock scanner (if that is all there is) has been accepted. A refusal is recorded on the audit trail and shown as a code and a sentence:
+
+| Code | Meaning | What to do |
+|---|---|---|
+| MDD-001 | The declaration cannot be found, or belongs to another organisation | Choose or make a declaration for this organisation |
+| MDD-002 | The declaration has expired or been revoked | Make a new declaration and link it |
+| MDD-003 | The installation requires a classification and the batch has none | Choose Synthetic, or Masked Company Data with a declaration |
+| MDD-004 | The declaration does not permit this environment | Make a declaration that permits Test |
+| MDD-005 | The declaration limits who may load, and you are not listed | Ask the dataset owner to make a declaration that names you |
+| MDD-006 | Only the demonstration scanner is connected and its use has not been accepted | The System Administrator records the acceptance, or a real scanner is connected |
+| MDD-010 | Masked company data is a Test classification and this is Production | Remove the classification; Production data follows Production governance |
+| MDD-011 | The batch has started committing and cannot be re-classified | Create a new batch |
+
+5. **Revoke** a declaration on the same list (a **Reason** is required, up to 500 characters). Revoking blocks every batch that depends on it from committing, with MDD-002. A legacy load still needs its second-person confirmation as in section 8.6; the declaration does not replace it.
+
+**Evidence to keep.** The declaration (screenshot), the batch's Data handling section, the scanner acceptance record, and any MDD refusal code with its time.
+
+### 8.6 Confirm and commit (section 5)
 
 For a dry run the page says it never commits. For a mock or final load:
 
 1. **Legacy load only.** The page shows "Not confirmed" until a **different person** with the legacy-load permission opens the same batch and presses **Confirm this legacy load** ("You confirmed this legacy load. Someone else must now commit it."). The badge then reads "Confirmed by ... on ...". The person who confirms cannot commit.
-2. The committer presses **Commit this batch**. The text above it tells you how many rejected and skipped rows will not be loaded and how many unmatched files will stay in the queue. The button is offered only when: the batch is Validated, nothing is waiting for a decision, the legacy confirmation is current, and the installation is not in maintenance mode. If you cannot see it, the page says why.
+2. The committer presses **Commit this batch**. The text above it tells you how many rejected and skipped rows will not be loaded and how many unmatched files will stay in the queue. The button is offered only when: the batch is Validated, nothing is waiting for a decision, the legacy confirmation is current, and the installation is not in maintenance mode. In Test mode a batch marked Masked Company Data also needs the checkpoint in section 8.5; if it refuses, you get an MDD code and a sentence. If you cannot see the button, the page says why.
 3. The commit runs in chunks of 500 with a checkpoint each, so a stopped commit carries on and never creates a record or file twice. A progress table shows each stage (Contracts, then Documents), the last completed item and whether it is done.
 4. If it stops, the status reads "Failed (can be resumed)" and "The commit stopped" gives the reason. Fix the cause and press **Resume the commit**. Nothing is lost or duplicated.
 
 Success: "The batch was committed. Reconcile the totals next."
 
-### 8.6 Reconcile (section 6)
+### 8.7 Reconcile (section 6)
 
 Available once Committed. The page shows Balanced or "Does not balance" with the arithmetic: source rows = accepted + rejected + skipped; accepted = created + updated. **Open the reconciliation report** (**/Migration/Batches/{id}/Reconciliation**) for rows, manifest and files totals, source against target by status, category and value by currency, outstanding items, and **Download Excel** / **Download CSV**. Press **Save the reconciliation** (needs migration.commit).
 
 If it does not balance, fix the cause if you can. Otherwise a person with migration.accept enters **Reason for approving these exceptions (recorded)**, ticks "I approve the exceptions listed and accept that the batch is reconciled with them", and presses **Save the reconciliation**. Success: "The totals balance. The batch is reconciled." or "The exceptions were approved and recorded. The batch is reconciled."
 
-### 8.7 Business acceptance (section 7)
+### 8.8 Business acceptance (section 7)
 
 Available once Reconciled, to a person with migration.accept. Field **What the business owner checked (recorded)** (required, at least a sentence; ten characters minimum): say which records and documents were compared with the source and by whom, naming the data owner. Tick "I accept any rejected rows and unresolved files as exceptions" if any remain. Press **Accept this batch**: "Business acceptance was recorded. The batch is final and can no longer be rolled back."
 
 Examples of an acceptance note: Blank, "Head of Operations compared 20 records and their documents with the old spreadsheet on 2026-11-22; no differences." JBS-style, "Group Head of Procurement's delegate compared 25 contracts across all categories; two rejected rows accepted as exceptions." Harborline-style, "Commercial Administrator lead compared 15 subcontracts across all trade packages; no differences."
 
-**Acceptance is final for rollback.** After it only compensating archival is possible (section 8.9).
+**Acceptance is final for rollback.** After it only compensating archival is possible (section 8.10).
 
-### 8.8 Provenance and evidence
+### 8.9 Provenance and evidence
 
 **Provenance** (**/Migration/Batches/{id}/Provenance**) lists every supplier, category, contract and document the batch created, updated or linked, with the source system and source record id, a content hash, and the rollback state, with **Download Excel**. Contract record names link to the contract; a contract's own page shows "Migration provenance" (source system, source record id, batch, and whether the registered date came from the source system or from this platform). The audit screen can be filtered by batch (**/Admin/Audit**).
 
-### 8.9 Roll back or compensate (section 8)
+### 8.10 Roll back or compensate (section 8)
 
 * **Roll back (before acceptance).** The panel "What a rollback would do" lists, per kind of record, the action, the count and why: untouched records the batch created are removed; contracts or documents that have since moved on (workflow activity, later versions, attachments) are **archived, never deleted**; suppliers and categories other records use are **kept**; updates are restored from their before-images only if nothing changed since. Records that were there before and other batches are never touched. Enter **Reason (recorded)** and press **Roll back this batch**: "The batch was rolled back: n reversed, n archived, n kept, n could not be reversed."
 * **Compensating archival (after acceptance).** Enter a reason and press **Archive this batch's records**. Nothing is deleted; the batch's contracts and documents are archived with the reason and the batch identifier; shared suppliers and categories stay.
@@ -348,6 +375,7 @@ For each batch, keep with the migration runbook (docs/MIGRATION_RUNBOOK_TEMPLATE
 | The commit stopped | Read "The commit stopped", fix the cause, **Resume the commit** |
 | Commit button missing | The page says why: not validated, a row waits for a decision, a legacy load is unconfirmed, the confirmer is also the committer, or maintenance mode is on |
 | Totals do not balance | Fix the source and re-run; otherwise approve the listed exceptions with a reason |
+| Commit refused with an MDD code (Test mode) | Section 8.5: read the code, fix the declaration, classification or scanner acceptance, and try again |
 | Attachments held in Production | No real malware scanner is supplied (**Not Verified / Future adapter**); a Production decision is needed before attachments can be imported |
 | Accepted a batch by mistake | Rollback is no longer possible; use compensating archival with a reason, then load correctly in a new batch |
 | "Forbidden" or "not found" | Your role lacks the permission or the organisation is outside your scope; ask the Tenant Administrator |
@@ -355,4 +383,4 @@ For each batch, keep with the migration runbook (docs/MIGRATION_RUNBOOK_TEMPLATE
 ## 12. What was verified and what was not
 
 * **Verified by reading the code and samples:** every screen, field, button, label, message and permission above was checked against src/Ecp.Host/Pages/Migration (the project, profile, batch, messages, rows, files, provenance and reconciliation pages), the batch capability rules in src/Modules/Ecp.DataMigration, docs/MIGRATION.md, section 14 and 15 of docs/IMPLEMENTATION_PLAYBOOK.md, and the files under migration-samples. The category-creation behaviour (name from the mapped value, code derived from it) and the commit gating were read in the module code.
-* **Not verified:** nobody has followed this guide unaided in a browser; no assistive-technology test; the Harborline-style date format MM/dd/yyyy is not covered by a shipped sample (only yyyy-MM-dd is), so test it on a dry run; the JBS-style and Harborline-style values in the examples are synthetic illustrations, not tested files; attachments through a real malware scanner (none is supplied); SQL Server proof depends on the disposable test container (docs/MIGRATION.md section 12.2); the exact wording of some messages generated by the service is paraphrased.
+* **Not verified:** nobody has followed this guide unaided in a browser; no assistive-technology test; the Harborline-style date format MM/dd/yyyy is not covered by a shipped sample (only yyyy-MM-dd is), so test it on a dry run; the JBS-style and Harborline-style values in the examples are synthetic illustrations, not tested files; attachments through a real malware scanner (none is supplied); that any customer's masking method is adequate (the platform neither checks nor claims it); the masked-data pages driven by an unaided person; SQL Server proof depends on the disposable test container (docs/MIGRATION.md section 12.2); the exact wording of some messages generated by the service is paraphrased.

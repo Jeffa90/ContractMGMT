@@ -12,11 +12,12 @@
 - Production only: a pack is available that your installation trusts (otherwise stage 5 cannot continue), and the identity provider application is registered (installation guide, section 8.2).
 - The business answers are decided and written down before you start (see "Gather your answers" below).
 
-**Status label.** The wizard is **Implemented**. It is Verified end to end over HTTP in **Test mode** with the demonstration sign-in, the mock email provider and a SQLite file database (host tests). It is **Not Verified** in Production mode with a real identity provider, real mail server and SQL Server together; and a Production-mode run is expected to be stopped at the end by the malware-scanner check (stage 13, "Production readiness note"). It has not been followed by a non-developer on a clean machine.
+**Status label.** The wizard is **Implemented**. It is Verified end to end over HTTP in **Test mode** with the demonstration sign-in, the mock email provider and a SQLite file database (host tests). It is **Not Verified** in Production mode with a real identity provider, real mail server and SQL Server together; and a Production-mode run is expected to be stopped at the end by the malware-scanner check (stage 13, "Production readiness note"). The email stage sends a real test through the provider: SMTP is verified only against a loopback test relay in the automated tests and is **Not Verified** against a customer's mail service; Microsoft Graph is Scaffolded. It has not been followed by a non-developer on a clean machine.
 
 **Governance in the wizard.**
 - The wizard publishes its settings (the first regional settings, the pack choice, branding, classification levels) through a trusted installation path: validated, versioned and audited, but with **no signed-in user**. The second-person rule for publication and the recent sign-in (step-up) rule therefore do **not** apply to what the wizard publishes. They apply from the first sign-in onward, to every business configuration screen.
 - After setup, six stages can be reopened by an installation administrator at **Installation setup** (**/Admin/Setup**), which needs a recent sign-in (within 10 minutes) and records the change in the audit trail under the signed-in person. That path uses the same trusted publication, so it does not ask for a second person; agree a procedure for that.
+- **Governance mode.** The setup report and the notes on stage 1 show the effective governance mode: Production, TestEnforced, TestSimplified or DemoSimplified. Production always enforces the second-person publish rule. In Test, `Ecp:Governance:SecondPerson` set to `Enforced` applies exactly the Production rule from the first sign-in onward; `Default` keeps the simplified behaviour. Demo ignores the setting and is always simplified. The wizard's own publication is a trusted installation path and does not use a second person in any mode. The setting is a host setting changed by the System Administrator (a technical task; installation guide, section 5.1).
 - Setup actions are audited (for example setup.tenant.created, setup.organisation.created, setup.completed, and the configuration releases and identity provider changes the stages make). Nothing here approves the installation for production use; that is external governance.
 
 ---
@@ -34,6 +35,7 @@
 | End this setup session | A secondary button on the stage list. It closes your session without finishing. To come back, the System Administrator issues a new token |
 | Wording | A few labels use the platform's terminology (for example "Organisation" and "Solution pack"). Before any organisation exists they show the platform's neutral words; the spelling can differ if your locale or pack changes them |
 | Setup report | Link "View the setup report" on the stage list. Evidence for the owner, **not** an approval |
+| Wording tokens | No raw token of the form `[[...]]` should ever be visible on a setup page. If you see one, it is a defect: a neutral marker appears instead and a stable code is logged. Report the page and the time to the supplier; do not type it into a field |
 
 ### Gather your answers (business) before you start
 
@@ -79,6 +81,8 @@ All names, addresses and values in this guide are synthetic.
 | "Too many incorrect tokens. Wait a few minutes, or issue a new token from the command line." | Wait five minutes or issue a new token |
 | "Setup is already complete." | Nothing to do here; setup has been closed (see "After setup") |
 | The page is simply not found | You are not on the server and remote setup is not allowed, or setup is already complete |
+| A short page with `ECP-NET-001` ("not an HTTPS request") | In Production the wizard needs HTTPS. Open the https:// address; if you already did, the proxy ends TLS but does not tell the application (it must send `X-Forwarded-Proto`). Technical task for the System Administrator: `docs/REVERSE_PROXY.md` |
+| A short page with `ECP-NET-002` ("forwarded headers not trusted") | The proxy did tell the application, but the application does not yet trust that proxy. Technical task for the System Administrator: enable forwarded headers and name the proxy (`docs/REVERSE_PROXY.md`). The page shows a reference to quote and never shows an address, a header or a secret |
 
 The token form is rate-limited. If the setup page asks for the token again after a long pause, the session expired: ask for a new token. Your stage progress is not lost.
 
@@ -105,6 +109,8 @@ The page tells you the mode the host is running in (Demo, Test or Production). *
 | "I understand this installation is for demonstration or testing only and must not hold real confidential data" | Demo and Test only (not shown in Production) | Tick | Tick | Tick | "Acknowledge that this installation is not for real data." | You cannot continue |
 
 **About the Tenancy field.** The help text says tenancy "can only be widened later by an installation administrator". That text is out of date: after setup, a Tenant Administrator (permission organisations.manage) can widen a one-organisation tenant to several organisations once, on **Organisations** (**/Admin/Organisations**), with a reason and a recent sign-in. It is one-way and audited; an installation never goes back to a single organisation. Choose carefully, but a wrong choice of "one organisation" is recoverable by widening.
+
+The page also shows a **Governance** line naming the effective governance mode and what it means (see "Governance in the wizard"). It is information; the wizard cannot change it.
 
 **Production only.** The stage also runs the Production guard. If something is wrong the page says "Production configuration is not acceptable: [rule id] message…". The rules: demonstration sign-in or tenant resolution must be off (R-ID-01), the database must be SQL Server (R-DB-01), the connection string must be a secret reference (R-SEC-02), demonstration data must be off (R-DEMO-01), and the data folder must be persistent (R-ST-01). Fix these in host configuration (System Administrator) and press the button again.
 
@@ -327,23 +333,32 @@ Success: "N classification levels published." (or "unchanged"). **Amendable late
 |---|---|
 | Navigation | "Email notifications"; **/Setup/Step/notifications** |
 | Who | System Administrator |
-| Purpose | Prove an email provider works by sending a real test message |
+| Purpose | Save the email configuration and prove the provider works with an actual test through it |
 | Prerequisite | Stage 4 complete |
-| Button | **Save and continue** (it sends the test message every time it is pressed) |
+| Button | **Save and continue** (it saves the settings and runs the test every time it is pressed) |
+
+**One configuration, not two.** This stage reads and writes the **same** installation-level email configuration that Administration uses (**/Admin/Operations/Email**; anyone with `operations.read` can see it, and changing it needs the System Administrator, `operations.maintenance`, with a recent sign-in). Live delivery reads it. There is no second set of host settings to keep in step; host settings are only a fallback used when nothing has been stored. Only non-secret settings and secret references are stored. A secret typed into a field is refused and never shown back.
 
 | Field | Required | Blank / JBS-style / Harborline-style | Rule | If wrong |
 |---|---|---|---|---|
-| Provider (list: SMTP server; Mock and Disabled appear only in Demo and Test) | Yes | SMTP server | Production refuses Mock ("The mock email provider never delivers mail and is refused in Production.") and Disabled ("Production requires a delivering email provider (R-NOT-01).") | No email |
-| From address | For SMTP and Mock | contracts@example.test (Blank), procurement-register@example.test (JBS-style), subcontracts@example.test (Harborline-style) | "A valid From address is required." | Replies are lost; mail may be rejected as spoofed |
+| Provider (list: SMTP server; in Demo and Test also "Development capture (simulated; delivers nothing)" and "Disabled (no email is sent)") | Yes | SMTP server | Production refuses the simulated providers ("The demonstration and development-capture providers deliver nothing and are refused in Production.") and Disabled ("Production requires a delivering email provider.") | No email |
+| From address | For SMTP | contracts@example.test (Blank), procurement-register@example.test (JBS-style), subcontracts@example.test (Harborline-style) | "A valid From address is required." | Replies are lost; mail may be rejected as spoofed |
 | SMTP host | SMTP | smtp.example.test | Host name only: "Enter the SMTP host name (no scheme or path)." | Test fails |
 | SMTP port | SMTP | 587 | 1 to 65535. **A blank or non-numeric value is silently turned into 587** | Test fails or hits the wrong port |
-| Use TLS | | Ticked | Production requires TLS: "Production requires TLS for SMTP." Port 587 with STARTTLS is what is expected to work; port 465 (implicit TLS) is probably unsupported | Mail refused |
-| SMTP user reference, SMTP password reference | Both or neither | env:ECP_SMTP_USER and a file: reference | Must be references, never values; "Set both the SMTP user and password references, or neither." In Production an unresolved reference blocks | A pasted secret is refused |
-| Send a test message to | Yes (except Disabled) | first.admin@example.test | "Enter a valid test recipient address." | If you skip it you do not know mail works |
+| Use TLS | | Ticked | Production requires TLS. Port 587 with STARTTLS is what is expected to work; port 465 (implicit TLS) is probably unsupported | Mail refused |
+| SMTP user reference, SMTP password reference | Production: both | env:ECP_SMTP_USER and a file: reference | Must be references, never values. Production requires both; an unresolved reference fails the test | A pasted secret is refused |
+| Send a test message to | Yes (except Disabled) | first.admin@example.test | "Enter a valid test recipient address." | Without a passing test email is not ready |
 
-Success: "The test message was accepted by the mail server." (SMTP), "The mock provider accepted the test message (nothing was delivered)." (Mock), "Email notifications are disabled." (Disabled). A failure reads "The test message could not be sent: …".
+**The test is real and required.** Saving settings proves nothing. The button connects to the provider (a connectivity probe, including TLS) and then sends a synthetic test message whose text is fixed and contains no contract information. Results:
 
-**Important: this stage proves a provider works but does not make live delivery use it.** Live delivery reads host settings that only the System Administrator can change (installation guide, section 5: the email provider, the SMTP provider and the SMTP host settings). Both must say the same thing. This is a known gap (G-12 in the readiness register, docs/IMPLEMENTATION_READINESS.md); SMTP is Not Verified against a real mail server. **Amendable later.**
+| Message | Meaning |
+|---|---|
+| "The mail server was reached and accepted the test message." | A real provider interaction passed. Shown with a test reference |
+| "The simulated provider accepted the test message. Nothing was delivered to a real mailbox, so email is Not Verified until a real provider is configured and tested." | Demo and Test only. A simulated provider **never** reads Healthy; Administration shows "Simulated: nothing delivered" |
+| "The email test did not pass, so email is not ready. …" with a diagnostic code (for example EML-CONN-001 cannot connect, EML-TLS-002 certificate not trusted) and a reference | The settings are saved but email is **not** ready. A configured provider that cannot be reached is never Healthy. Correct the settings and press the button again |
+| "Email notifications are disabled." | Disabled provider: nothing is sent. Not allowed in Production |
+
+A passing result is tied to the settings (a changed setting makes it **stale**) and expires (168 hours by default, `Ecp:Email:ReadinessMaxAgeHours`), after which email reads as not ready until it is tested again. Check R-NOT-01 in stage 13 reads this result: in **Production, Finish setup cannot complete without a passing test**; outside Production a missing, simulated, stale or failed test is a warning that must be acknowledged. SMTP is Implemented and **Not Verified** against a customer's mail service; Graph is Scaffolded and is not connected. **Amendable later.**
 
 ---
 
@@ -376,7 +391,7 @@ The page lists the checks in a table (Check, Result, Detail). Results are Pass, 
 
 | Check | Passes when | If not | Who fixes |
 |---|---|---|---|
-| R-OPS-01 | Database, data folder, globalisation and the platform's other readiness checks are all Healthy | Blocking if any is Unhealthy; a warning if only Degraded (for example no backup configured or no trusted pack) | System Administrator (installation guide, section 9) |
+| R-OPS-01 | Database, data folder, globalisation and the platform's other readiness checks are all Healthy. These include the malware-scanner check R-DOC-01 and the transport check R-NET-01 | Blocking if any is Unhealthy; a warning if only Degraded (for example no backup configured, no trusted pack, no scanner or only the demonstration scanner in Test, or a recent HTTPS or proxy refusal) | System Administrator (installation guide, section 9) |
 | R-ST-01 | Stage 3 was done | Blocking | Run stage 3 |
 | R-SEC-01 | The Production guard finds nothing wrong (always passes outside Production) | Blocking | System Administrator, host settings |
 | R-DEMO-01 | No demonstration sign-in, seeding or data in Production | Blocking | System Administrator |
@@ -386,14 +401,16 @@ The page lists the checks in a table (Check, Result, Detail). Results are Pass, 
 | R-ADM-02 | An installation administrator was named | Warning | Tick the box in stage 7, or accept with a reason |
 | R-ORG-01 | The organisation exists | Blocking | Stage 8 |
 | R-CFG-01 | The pack choice, branding and classification are published | Blocking | Stages 8 to 10 |
-| R-NOT-01 | SMTP is configured and its test message was accepted | Blocking if email was never set up; a Mock or Disabled provider is blocking in Production, a warning elsewhere | Stage 11 |
+| R-NOT-01 | The email provider was reached by a real, recent test through the saved settings | Blocking in Production, a warning elsewhere, if email was never set up or the test is missing, failed, stale or from a simulated provider | Stage 11 |
 | R-AUD-01 | The audit chain verifies | Blocking | Contact the supplier with the report |
 
-**Warnings need a reason.** After a run that has warnings, one text box appears for each: "Acknowledge R-xx-nn: description". Type a reason (at most 300 characters; longer is cut) and press **Run checks** again. Who, when and why are recorded and appear in the report. Messages: "N blocking check(s) failed." and "Acknowledge each warning with a reason, then run the checks again." **A blocking check cannot be acknowledged**; it must be fixed. Do not acknowledge a warning you do not understand.
+**Warnings need a reason.** After a run that has warnings, one text box appears for each, named by check id: "Acknowledge R-xx-nn: description" (for example R-OPS-01, R-ADM-02 or R-NOT-01). Type a reason (at most 300 characters; longer is cut) and press **Run checks** again. Finish setup refuses while any warning has no acknowledgement. Who, when and why are recorded and appear in the report.
+
+**The scanner.** In Test with no scanner connected, or with the labelled demonstration scanner (only when `Documents:Scanner:Provider` is `mock`), R-DOC-01 is Degraded, so it arrives as a warning inside **R-OPS-01** and you must acknowledge R-OPS-01 with a reason that names the scanner, for example "No real malware scanner exists; the demonstration scanner is no protection; synthetic data only". That acknowledgement is not the on-the-record acceptance of the mock that masked-data rehearsals need (**/Admin/Operations/Scanner**, System Administrator). In Production, R-DOC-01 is Unhealthy without a connected, healthy scanner and is blocking. Messages: "N blocking check(s) failed." and "Acknowledge each warning with a reason, then run the checks again." **A blocking check cannot be acknowledged**; it must be fixed. Do not acknowledge a warning you do not understand.
 
 Examples of reasons (synthetic): for R-OPS-01 when only the backup check is degraded, "Backup folder is being provisioned; verified backup due before go-live (owner: System Administrator, 2026-11-01)"; for R-ADM-02 in a rehearsal, "A separate System Administrator will be added by the System Administrator after setup."
 
-**Production readiness note (from reading the code; not run in Production).** The platform's own checks include R-DOC-01, which is **Unhealthy** in Production while no real malware scanner is connected, and none is supplied. R-OPS-01 treats an Unhealthy platform check as **blocking**. So a Production run is expected to stop at this stage until a scanner adapter exists. See the installation guide, section 9.3. Raise it with the owner; do not try to bypass it.
+**Production readiness note (from reading the code; not run in Production).** The platform's own checks include R-DOC-01, which is **Unhealthy** in Production while no real malware scanner is connected, and **no real scanner adapter exists** (not built; Not Verified). R-OPS-01 treats an Unhealthy platform check as **blocking**, and R-NOT-01 is blocking without a passing email test. So a Production run is expected to stop at this stage until a scanner adapter is built and connected. See the installation guide, section 9.3. Raise it with the owner; do not try to bypass it. Production-mode setup is therefore **Blocked**; a Test-mode rehearsal with acknowledged warnings is the supported use.
 
 **Evidence.** Screenshot of the table with all rows Pass or acknowledged, and the reasons you typed.
 
@@ -435,8 +452,8 @@ Keep a copy with the date. It is evidence for the owner; it is **not** an approv
 
 1. **Sign in.** The sign-in page shows "Sign in with" and your provider's display name. The first administrator signs in and becomes active. They hold Tenant Administrator and, for the first organisation, Organisation Administrator.
 2. **Installation setup (/Admin/Setup).** Main menu entry **Installation setup**, visible only to installation administrators (permission setup.run). It shows "Steps you can reopen" and the report. Reopening needs a recent sign-in (within 10 minutes; otherwise you are sent to confirm who you are again). **Amendable stages:** document storage, identity provider, branding, classification levels, email notifications, readiness review. The tenant, administrator and organisation stages are closed for good; use user administration and the organisation screens. Each change is audited.
-3. **Second administrator.** Create another administrator so that a configuration change can be published by a second person. In Production the person who last edited or submitted a draft cannot publish it, and a change after submission voids the submission.
-4. **Live email.** Ask the System Administrator to confirm the live email settings match stage 11 (stage 11 note).
+3. **Second administrator.** Create another administrator so that a configuration change can be published by a second person. In Production, and in Test when `Ecp:Governance:SecondPerson` is `Enforced`, the person who last edited or submitted a draft cannot publish it, and a change after submission voids the submission.
+4. **Live email.** Nothing to copy: live delivery reads the configuration saved in stage 11. Ask the System Administrator to re-run the test on **/Admin/Operations/Email** before go-live and whenever it reads stale.
 5. **Next guides.** Organisation onboarding (ORGANISATION_ONBOARDING_GUIDE.md), the business administrator guide (BUSINESS_ADMIN_GUIDE.md), pack implementation (PACK_IMPLEMENTATION_GUIDE.md), and the proof that the business journey works without code, `docs/NO_CODE_REHEARSAL.md`.
 
 ---
@@ -448,7 +465,8 @@ Keep a copy with the date. It is evidence for the owner; it is **not** an approv
 | Date, time and operator of the session; nothing of the token | You |
 | A screenshot of each stage's success message, or the saved setup report | Each stage; section C |
 | The setup report (JSON) before and after Finish setup | Section C |
-| The reasons typed for acknowledged warnings | Stage 13 and the report |
+| The reasons typed for acknowledged warnings, by check id (including the scanner) | Stage 13 and the report |
+| The governance mode line and the email test reference | Stage 1 and stage 11, and the setup report |
 | The registered redirect addresses and the provider key | Technical sheet (installation guide) |
 | The names of the first administrator and the installation administrator | Stage 7 |
 
@@ -464,6 +482,9 @@ Keep a copy with the date. It is evidence for the owner; it is **not** an approv
 | The provider save fails with "The provider settings are not valid." | Fields or an unresolved secret reference | Fix the field named; in Production the secret file or variable must exist inside the container |
 | Test sign-in fails | Redirect address mismatch, or the administrator's email does not match, or stage 7 not done | Installation guide, section 8.2; compare the email to what the provider asserts |
 | Readiness shows a blocking row | A real problem | Fix it; blocking rows cannot be acknowledged |
+| Email stage says "The email test did not pass, so email is not ready" | The provider could not be reached, TLS failed, a secret reference did not resolve, or delivery was refused | Read the diagnostic code and reference; the System Administrator corrects the settings (also on **/Admin/Operations/Email**) and the test is run again |
+| A page shows `ECP-NET-001` or `ECP-NET-002` | HTTPS or proxy settings (installation guide, section 8.1) | Technical task for the System Administrator: `docs/REVERSE_PROXY.md`. Quote the reference |
+| A `[[...]]` token is visible | A wording defect | Report the page and time; it should never be shown |
 | Finish setup refused | Unresolved checks | Return to stage 13 |
 | The session ended | 60 minutes idle, or a new token was issued | The System Administrator issues a new token; your progress is kept |
 | You made a wrong choice that is closed for good (tenant name, reference prefix, provider key) | By design | For tenancy, widen on **Organisations**. For the others there is no screen; ask the supplier before you continue. For a rehearsal, start again with an empty database |

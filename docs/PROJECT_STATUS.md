@@ -1,6 +1,6 @@
 # Project Status
 
-Status date: **2026-10-18** (after the Implementation Readiness Gap Closure slice, PER-002, portability remediation S1 to S10, the operational resilience slice OPS-01, the upgrade-safety slice OPS-02 and the operations dashboard slice OPS-03; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
+Status date: **2026-10-19** (after the Company Rehearsal Enablement slice, ADR-0038, and the Implementation Readiness Gap Closure slice, PER-002, portability remediation S1 to S10, the operational resilience slice OPS-01, the upgrade-safety slice OPS-02 and the operations dashboard slice OPS-03; CI results are recorded in `deploy/STATUS.md`). Development branch: claude/stoic-volta-dvszm5. This page summarises; it builds, changes and approves nothing. The sources of truth are `TASKS.md` (task state), `deploy/STATUS.md` (what was run where), `docs/TESTING.md` (test results) and the per-slice documents named below. Where this page and those disagree, they win.
 
 **Production approval is external governance and is not declared anywhere in this repository or on this page.** Sections 10 and 11 are an engineering assessment of evidence, not an approval.
 
@@ -13,6 +13,12 @@ Labels follow `CLAUDE.md`: **Implemented** (works and has tests), **Mocked** (a 
 ## Implementation readiness (gap closure slice)
 
 `docs/IMPLEMENTATION_READINESS.md` holds the G-01 to G-30 register. Implemented and Verified (SQLite and real SQL Server): second-person publication on every configuration page and rollback governance, the Configuration Reviews inbox, organisation creation and set-up checklist, approver-group administration, form editors for workflow, approval matrix and notification policy, the pack-publisher journey (signing stays outside the application), the fail-closed malware-scanning gate, and an automated 20-step no-code rehearsal over real HTTP (18 steps by business roles, 2 needing a technical role). **Not Verified:** any real malware scanner (none exists), live e-mail, a real identity provider, IIS or Azure, the Production-mode setup wizard end to end, and an unaided non-developer following the guides. Remaining High gaps: G-12 (e-mail delivery) and G-25 (no real scanner; R-DOC-01 is Unhealthy in Production until one is connected). Production approval is external governance and is not declared here.
+
+## Company rehearsal enablement (ADR-0038)
+
+Implemented and Verified locally (SQLite and real SQL Server): Test-mode Production-equivalent governance (`Ecp:Governance:SecondPerson`), one evidence-semantics rule, shared email configuration with readiness proved by a test message, the scanner integration boundary with a self-test and recorded acceptance of the demonstration scanner, the masked-data declaration checkpoint, plain-language HTTPS and proxy diagnostics, no raw terminology tokens, the standalone `ecp-pack` tool, the sanitised implementation evidence pack, reconciled guides with a consistency check, and the 23-step rehearsal. Local run: unit 966, architecture 113, API 208 and integration 637 (including every real-SQL-Server wrapper) = **1,924 passed, 0 failed, 0 skipped**. **Not Verified:** a real mail service, Microsoft Graph (Scaffolded), a real malware scanner (none exists), a real identity provider, a real reverse proxy product, IIS and Azure, the CI steps added by this slice until they have run, a Windows 11 installation, and an unaided non-developer following the guides.
+
+Verdicts (`docs/IMPLEMENTATION_REHEARSAL.md` section 9.3): Demo synthetic, Test synthetic and Test masked data are **Supported with conditions**; Production-mode setup and Production use with confidential contracts are **Blocked**. Production approval is external governance and is not declared.
 
 ## 2. Completed modules
 

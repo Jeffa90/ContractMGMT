@@ -10,7 +10,24 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-18, end of the Implementation Readiness Gap Closure slice)
+## Current state (2026-10-19, end of the Company Rehearsal Enablement slice)
+
+**Company Rehearsal Enablement (this pass; `decisions/ADR-0038-company-rehearsal-enablement.md`, owner decisions D14.1 to D14.15, `docs/IMPLEMENTATION_REHEARSAL.md` section 9).** Objective: a trained implementation team can deploy a non-production company environment, complete Setup, configure realistic governance, validate email and identity readiness and run the documented rehearsal without misleading passes or raw technical errors.
+
+* **G-31 governance mode (Implemented, Verified on SQLite and SQL Server).** `Ecp:Governance:SecondPerson` (`Default`/`Enforced`): Production always enforces; Test can enforce exactly the Production rule; Demo stays simplified. Shown on the setup report, health (R-GOV-01) and dashboard; stamped on audit events and releases.
+* **G-32 tokens and G-33 proxy diagnostics (Implemented, Verified).** No raw terminology token reaches a reader (render sweep over three packs); `ECP-NET-001`/`002` safe page, R-NET-01, `docs/REVERSE_PROXY.md`. A real proxy product is Not Verified.
+* **G-34 Pack Publisher tool (Implemented; CI step Scaffolded until it runs).** `ecp-pack` .NET tool package with key references, deterministic builds, sanitised report, exit codes 0 to 3; `PackToolArtefactTests` installs the artefact alone.
+* **G-12 email and G-25 scanner boundary (Implemented).** One shared email configuration, readiness by a real test message, results go stale, simulated never Healthy; scanner configuration, self-test, Scanner page, mock only in Demo/Test, acceptance on the record, alerts. SMTP verified only against a loopback relay; Graph a scaffold; **no real scanner exists (Production Blocked)**.
+* **G-35 masked data (Implemented as a checkpoint).** Declaration gates commit in Test; the platform does not mask, detect or de-identify.
+* **G-36 documentation and G-37 evidence semantics (Implemented, Verified).** All implementation guides reconciled; `tools/check-docs.py` runs in CI; one evidence-semantics rule; the rehearsal is 23 steps; the sanitised implementation evidence pack is at `/Admin/Operations/EvidencePack`.
+* **New tables only** (email configuration and results, accepted exceptions, masked-data declarations and batch classifications); three migrations; the upgrade manifest was regenerated.
+* **Full local run:** locked restore and Release build with warnings as errors (0 warnings, 0 errors); unit 966, architecture 113, API 208 and integration 637 (including every real-SQL-Server wrapper) = **1,924 passed, 0 failed, 0 skipped**. A defect found by the run (email environment defaults captured once at start-up) was fixed and the affected suites rerun.
+* **Verdicts (`docs/IMPLEMENTATION_REHEARSAL.md` section 9.3):** synthetic company in Demo: Supported with conditions; in Test: Supported with conditions; masked-data company in Test: Supported with conditions; Production-mode setup: **Blocked**; Production use with confidential contracts: **Blocked**. Production approval is external governance and is not declared.
+* **Also added:** `docs/WINDOWS_LAPTOP_QUICKSTART.md` (single-laptop Test-mode trial; not run on Windows).
+* **Not done, by design:** OPS-04, INT-03, reporting, public API, AI, marketplace, SaaS control plane, another pack, a named-company Production deployment.
+* **First incomplete product task:** unchanged (INT-03's live e-signature adapter). **First incomplete operational task:** OPS-04.
+
+## Previous state (2026-10-18, end of the Implementation Readiness Gap Closure slice)
 
 **Implementation Readiness Gap Closure (this pass; `decisions/ADR-0037-implementation-readiness-no-code-journey.md`, owner decision D13, `docs/IMPLEMENTATION_READINESS.md`, `docs/NO_CODE_REHEARSAL.md`).** Objective: a trained non-developer Business Administrator can do the supported company-implementation journey through the pages, without editing JSON, running SQL, changing source or using Git.
 

@@ -121,6 +121,40 @@ internal static class DocumentScanningScenarios
         Assert.Equal(1, overview.Infected);
     }
 
+    public static async Task Quarantine_scanner_trouble_and_exhausted_retries_alert_the_administrators_without_naming_the_file(TestApp app, SwitchableScanner scanner)
+    {
+        var w = await HarborlineWorld.ReadyAsync(app);
+        var contract = await w.NewSubcontractAsync();
+        // The first pass only marks where the alerts start; events from before are history, not news.
+        await w.AsAsync("admin", s => s.Get<Ecp.Notifications.INotificationDispatcher>().DispatchAsync());
+
+        await AddAsync(w, contract, "Confidential supplier terms", "EICAR-STANDARD-ANTIVIRUS-TEST-FILE");
+        app.Clock.Advance(TimeSpan.FromMinutes(1));
+        await w.AsAsync("admin", s => s.Get<Ecp.Notifications.INotificationDispatcher>().DispatchAsync());
+        var quarantined = (await w.InboxAsync("admin")).Where(n => n.EventType == "scanning.quarantined").ToList();
+        var alert = Assert.Single(quarantined);
+        Assert.Equal("/Admin/Documents/Scanning", alert.LinkPath);
+        Assert.DoesNotContain("Confidential supplier terms", alert.Title + alert.Body);          // the alert never names the file, the contract or the content
+        Assert.DoesNotContain("EICAR", alert.Title + alert.Body);
+        Assert.Contains(await w.InboxAsync("commercial"), n => n.EventType == "scanning.quarantined");   // the Procurement Administrator is told as well
+        Assert.DoesNotContain(await w.InboxAsync("packageManagerA"), n => n.EventType.StartsWith("scanning."));   // and nobody else is
+
+        // Running the dispatcher again makes no second alert for the same event.
+        await w.AsAsync("admin", s => s.Get<Ecp.Notifications.INotificationDispatcher>().DispatchAsync());
+        Assert.Single(await w.InboxAsync("admin"), n => n.EventType == "scanning.quarantined");
+
+        // A scanner outage: the failures make one message per person per day, and a file given up on makes its own message.
+        scanner.Mode = SwitchableScanner.Behaviour.Fails;
+        await AddAsync(w, contract, "First held file", "ordinary text");
+        await AddAsync(w, contract, "Second held file", "more ordinary text");
+        for (var i = 0; i < 4; i++) { app.Clock.Advance(TimeSpan.FromMinutes(1)); await w.AsAsync("admin", s => s.Get<IDocumentScanJob>().RunAsync()); }
+        await w.AsAsync("admin", s => s.Get<Ecp.Notifications.INotificationDispatcher>().DispatchAsync());
+        var inbox = await w.InboxAsync("admin");
+        Assert.Single(inbox, n => n.EventType == "scanning.provider_unavailable");
+        Assert.Contains(inbox, n => n.EventType == "scanning.retry_exhausted");
+        Assert.All(inbox.Where(n => n.EventType.StartsWith("scanning.")), n => Assert.DoesNotContain("held file", n.Title + n.Body));
+    }
+
     public static async Task With_no_scanner_connected_every_file_is_held_and_connecting_one_releases_what_it_finds_clean(TestApp app, SwitchableScanner scanner)
     {
         var w = await HarborlineWorld.ReadyAsync(app);
@@ -173,6 +207,7 @@ public sealed class DocumentScanningSqliteTests
     [Fact] public Task Held_and_retried() => Run(DocumentScanningScenarios.A_file_the_scanner_cannot_check_is_held_retried_a_bounded_number_of_times_and_released_only_by_a_clean_result);
     [Fact] public Task Quarantine() => Run(DocumentScanningScenarios.An_infected_file_stays_in_quarantine_is_never_released_or_copied_and_is_audited);
     [Fact] public Task No_scanner() => Run(DocumentScanningScenarios.With_no_scanner_connected_every_file_is_held_and_connecting_one_releases_what_it_finds_clean);
+    [Fact] public Task Alerts() => Run(DocumentScanningScenarios.Quarantine_scanner_trouble_and_exhausted_retries_alert_the_administrators_without_naming_the_file);
     [Fact] public Task Isolation() => Run(DocumentScanningScenarios.Only_an_administrator_of_the_organisation_sees_or_retries_its_files_and_another_tenant_sees_nothing);
 }
 
@@ -187,5 +222,6 @@ public sealed class DocumentScanningSqlServerTests
     [SqlServerFact] public Task Held_and_retried() => Run(DocumentScanningScenarios.A_file_the_scanner_cannot_check_is_held_retried_a_bounded_number_of_times_and_released_only_by_a_clean_result);
     [SqlServerFact] public Task Quarantine() => Run(DocumentScanningScenarios.An_infected_file_stays_in_quarantine_is_never_released_or_copied_and_is_audited);
     [SqlServerFact] public Task No_scanner() => Run(DocumentScanningScenarios.With_no_scanner_connected_every_file_is_held_and_connecting_one_releases_what_it_finds_clean);
+    [SqlServerFact] public Task Alerts() => Run(DocumentScanningScenarios.Quarantine_scanner_trouble_and_exhausted_retries_alert_the_administrators_without_naming_the_file);
     [SqlServerFact] public Task Isolation() => Run(DocumentScanningScenarios.Only_an_administrator_of_the_organisation_sees_or_retries_its_files_and_another_tenant_sees_nothing);
 }

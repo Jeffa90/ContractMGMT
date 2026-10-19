@@ -104,7 +104,7 @@ public static class NotificationsModule
         services.AddScoped<Ecp.SharedKernel.IOperationalProbe, NotificationsOperationalProbe>();
         services.AddOptions<NotificationsOptions>();
         // Where the host states them itself these are replaced; otherwise the notification settings say what email the installation starts with and which mode it runs in.
-        services.TryAddSingleton(sp => { var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<NotificationsOptions>>().Value; return new EmailEnvironmentDefaults(o.EmailProvider, o.Smtp); });
+        services.TryAddTransient(sp => { var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<NotificationsOptions>>().Value; return new EmailEnvironmentDefaults(o.EmailProvider, o.Smtp); });
         services.TryAddSingleton(sp => new HostModeAccessor(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<NotificationsOptions>>().Value.Mode));
         if (configure is not null) services.Configure(configure);
         services.AddModuleDbContext<NotificationsDbContext>(Name, Tier, Schema);

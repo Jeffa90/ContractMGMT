@@ -8,7 +8,7 @@
     "1.0.0"
   ],
   "sourceLedgerSha256": "dc6242cab14aa459f345e553cdd3a7d90e249fba69552e6ef552750c3c5aa64f",
-  "targetLedgerSha256": "46397e57e8fb3ab6fd3e12270b477840158bb0c57c072c8807a135cfa4484e69",
+  "targetLedgerSha256": "851a54e4960cb025f3abeb9fabd3fc805b05b57aa0b48b155d49e0ce5de92769",
   "moduleOrder": [
     "Audit",
     "Tenancy",
@@ -674,7 +674,7 @@
       "module": "Migration",
       "tier": 7,
       "schema": "migration",
-      "schemaVersion": "20261016034919_MigrationSlice",
+      "schemaVersion": "20261018233142_AddMaskedDataDeclarations",
       "migrations": [
         {
           "id": "20261016000554_Initial",
@@ -778,6 +778,25 @@
             "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
           ],
           "operations": 73
+        },
+        {
+          "id": "20261018233142_AddMaskedDataDeclarations",
+          "checksum": "20b85c4700ab3f8dabe7f6910f998cdc408ca186a841568073c99e58aab3de39",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index migration.BatchDataClassification.IX_BatchDataClassification_TenantId_BatchId",
+            "create index migration.BatchDataClassification.IX_BatchDataClassification_TenantId_DeclarationId",
+            "create index migration.MaskedDataDeclaration.IX_MaskedDataDeclaration_TenantId_OrganisationId_DeclaredUtc",
+            "create table migration.BatchDataClassification",
+            "create table migration.MaskedDataDeclaration",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_BatchDataClassification] ADD FILTE\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MaskedDataDeclaration] ADD FILTER \u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
+          ],
+          "operations": 8
         }
       ]
     },
@@ -785,7 +804,7 @@
       "module": "Operations",
       "tier": 8,
       "schema": "ops",
-      "schemaVersion": "20261018003226_AddMigrationRecords",
+      "schemaVersion": "20261018225821_AddEmailAndAcceptedExceptions",
       "migrations": [
         {
           "id": "20261017231302_Initial",
@@ -823,6 +842,26 @@
             "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
           ],
           "operations": 4
+        },
+        {
+          "id": "20261018225821_AddEmailAndAcceptedExceptions",
+          "checksum": "691ea9420246815cdeeb04d777c9dd6e4e32a68c3c696816f9a0d12278a9e931",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index ops.AcceptedException.IX_AcceptedException_TenantId_Kind_Code",
+            "create index ops.EmailTestResult.IX_EmailTestResult_TenantId_TestedUtc",
+            "create table ops.AcceptedException",
+            "create table ops.EmailConfiguration",
+            "create table ops.EmailTestResult",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_AcceptedException] ADD FILTER PREDICATE \u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_EmailConfiguration] ADD FILTER PREDICATE\u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_EmailTestResult] ADD FILTER PREDICATE se\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
+          ],
+          "operations": 9
         }
       ]
     },
@@ -971,6 +1010,27 @@
       "reviewed": true
     },
     {
+      "module": "Migration",
+      "id": "20261018233142_AddMaskedDataDeclarations",
+      "checksum": "20b85c4700ab3f8dabe7f6910f998cdc408ca186a841568073c99e58aab3de39",
+      "categories": [
+        "IndexOrConstraint",
+        "RowLevelSecurity"
+      ],
+      "objects": [
+        "create index migration.BatchDataClassification.IX_BatchDataClassification_TenantId_BatchId",
+        "create index migration.BatchDataClassification.IX_BatchDataClassification_TenantId_DeclarationId",
+        "create index migration.MaskedDataDeclaration.IX_MaskedDataDeclaration_TenantId_OrganisationId_DeclaredUtc",
+        "create table migration.BatchDataClassification",
+        "create table migration.MaskedDataDeclaration",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_BatchDataClassification] ADD FILTE\u2026",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MaskedDataDeclaration] ADD FILTER \u2026",
+        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
+      ],
+      "reviewRequired": false,
+      "reviewed": true
+    },
+    {
       "module": "Operations",
       "id": "20261018003226_AddMigrationRecords",
       "checksum": "20276a7b97c1094f06867474fac4bfdb86c9890c33554575da6203a1f913f651",
@@ -982,6 +1042,28 @@
         "create index ops.MigrationRecord.IX_MigrationRecord_TenantId_Module_MigrationId",
         "create table ops.MigrationRecord",
         "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_MigrationRecord] ADD FILTER PREDICATE se\u2026",
+        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
+      ],
+      "reviewRequired": false,
+      "reviewed": true
+    },
+    {
+      "module": "Operations",
+      "id": "20261018225821_AddEmailAndAcceptedExceptions",
+      "checksum": "691ea9420246815cdeeb04d777c9dd6e4e32a68c3c696816f9a0d12278a9e931",
+      "categories": [
+        "IndexOrConstraint",
+        "RowLevelSecurity"
+      ],
+      "objects": [
+        "create index ops.AcceptedException.IX_AcceptedException_TenantId_Kind_Code",
+        "create index ops.EmailTestResult.IX_EmailTestResult_TenantId_TestedUtc",
+        "create table ops.AcceptedException",
+        "create table ops.EmailConfiguration",
+        "create table ops.EmailTestResult",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_AcceptedException] ADD FILTER PREDICATE \u2026",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_EmailConfiguration] ADD FILTER PREDICATE\u2026",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_EmailTestResult] ADD FILTER PREDICATE se\u2026",
         "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
       ],
       "reviewRequired": false,
@@ -1069,5 +1151,5 @@
     ],
     "dataLossStatement": "Rolling back discards everything created after the pre-upgrade backup, including anything done after the upgrade finished. It cannot be recovered from the backup."
   },
-  "manifestSha256": "dfad53dc40c90c48816fce13611ce92ac460683e905fea667b1acb08b25d838f"
+  "manifestSha256": "ca3fd1a3edde2ec8b1d3551bdb0d9ca3e8443fe73e7e4505c08fa70c3ce5b1b6"
 }

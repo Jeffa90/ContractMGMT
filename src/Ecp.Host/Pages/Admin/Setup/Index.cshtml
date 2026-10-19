@@ -8,7 +8,7 @@
 <ul>
 @foreach (var s in Model.Snapshot!.Stages.Where(s => s.Available))
 {
-    <li><a href="/Admin/Setup/Step/@s.Id">@s.Title</a></li>
+    <li><a href="/Admin/Setup/Step/@s.Id">@Terms.Expand(s.Title)</a></li>
 }
 </ul>
 <partial name="_SetupReport" model="Model.Report" />

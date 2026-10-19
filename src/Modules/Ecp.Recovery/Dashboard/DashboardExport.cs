@@ -5,7 +5,7 @@ public static class DashboardExport
 {
     public static object Of(OperationsDashboard d) => new
     {
-        generatedUtc = d.GeneratedUtc, correlationId = d.CorrelationId, overall = OpsStatuses.Label(d.Overall), platformVersion = d.PlatformVersion, environmentMode = d.EnvironmentMode,
+        generatedUtc = d.GeneratedUtc, correlationId = d.CorrelationId, overall = OpsStatuses.Label(d.Overall), platformVersion = d.PlatformVersion, environmentMode = d.EnvironmentMode, governance = d.Governance,
         maintenance = new { d.Maintenance.Enabled, d.Maintenance.Cause },
         panels = d.Panels.Select(p => new
         {

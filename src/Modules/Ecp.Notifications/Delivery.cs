@@ -64,14 +64,15 @@ internal sealed class DevCaptureProvider(NotificationsDbContext db, ITenantConte
 /// <summary>
 /// SMTP delivery through the platform's email sender. Credentials are secret references resolved at send time. Implemented; Not Verified against a live mail server in this release.
 /// </summary>
-internal sealed class SmtpProvider(IEmailSenderFactory factory, IOptions<NotificationsOptions> options) : IEmailDeliveryProvider
+internal sealed class SmtpProvider(IEmailSenderFactory factory, IOptions<NotificationsOptions> options, IEmailConfigurationService email) : IEmailDeliveryProvider
 {
     public string Key => "smtp";
     public string Label => "SMTP";
     public bool IsSimulated => false;
     public async Task SendAsync(EmailDelivery m, CancellationToken ct = default)
     {
-        var settings = options.Value.Smtp;
+        var effective = await email.EffectiveAsync(ct);
+        var settings = effective.ProviderKey == EmailProviderKeys.Smtp ? effective.ToSettings() : null;
         if (settings is null || settings.Provider != EmailProviderKind.Smtp) throw new DomainException("provider_not_configured", "SMTP settings are not configured.");
         var issues = factory.Validate(settings, options.Value.Mode);
         if (issues.Count > 0) throw new DomainException("provider_not_configured", "SMTP settings are not usable: " + string.Join(" ", issues.Select(i => i.Message)));
@@ -106,7 +107,7 @@ internal sealed class EmailDeliveryProviderFactory : IEmailDeliveryProviderFacto
 }
 
 internal sealed class DeliveryRunner(
-    NotificationsDbContext db, IUnitOfWork uow, ITenantContext tenant, IClock clock, IUserService users, INotificationPolicyStore policies, IOptions<NotificationsOptions> options, IServiceProvider services) : IDeliveryRunner
+    NotificationsDbContext db, IUnitOfWork uow, ITenantContext tenant, IClock clock, IUserService users, INotificationPolicyStore policies, IOptions<NotificationsOptions> options, IEmailConfigurationService email, IServiceProvider services) : IDeliveryRunner
 {
     private IEmailDeliveryProvider Provider(string key)
     {
@@ -117,6 +118,7 @@ internal sealed class DeliveryRunner(
             "dev-capture" => ActivatorUtilities.CreateInstance<DevCaptureProvider>(services),
             "smtp" => ActivatorUtilities.CreateInstance<SmtpProvider>(services),
             "graph" => new GraphProvider(),
+            "disabled" => throw new DomainException("email_disabled", "Email is disabled for this installation; the message stays in the in-app inbox."),
             _ => throw new DomainException("unknown_provider", $"Email provider '{key}' is not recognised.")
         };
     }
@@ -135,7 +137,8 @@ internal sealed class DeliveryRunner(
                 if (d is null || d.Status is DeliveryStatus.Sent or DeliveryStatus.DeadLetter) return;
                 var n = await db.Notifications.AsNoTracking().FirstAsync(x => x.Id == d.NotificationId, c);
                 var policy = await policies.CurrentAsync(n.OrganisationId, c);
-                if (options.Value.EmailProvider != d.Provider) d.UseProvider(options.Value.EmailProvider);
+                var providerKey = (await email.EffectiveAsync(c)).ProviderKey;
+                if (providerKey != d.Provider) d.UseProvider(providerKey);
                 var started = Stopwatch.StartNew();
                 var startedUtc = clock.UtcNow;
                 string? error = null;

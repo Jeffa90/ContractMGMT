@@ -115,6 +115,46 @@ namespace Ecp.DataMigration.Persistence.Migrations
                     b.ToTable("AttachmentManifestEntry", "migration");
                 });
 
+            modelBuilder.Entity("Ecp.DataMigration.Domain.BatchDataClassification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DataClass")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<Guid?>("DeclarationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LinkedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("LinkedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BatchId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "DeclarationId");
+
+                    b.ToTable("BatchDataClassification", "migration");
+                });
+
             modelBuilder.Entity("Ecp.DataMigration.Domain.Checkpoint", b =>
                 {
                     b.Property<Guid>("Id")
@@ -263,6 +303,104 @@ namespace Ecp.DataMigration.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("MappingProfileVersion", "migration");
+                });
+
+            modelBuilder.Entity("Ecp.DataMigration.Domain.MaskedDataDeclaration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ApprovalReference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ApprovedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("ApprovedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("AttachmentsIncluded")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("ConfidentialDataIncluded")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("DatasetOwner")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DeclaredBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("DeclaredByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DeclaredUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FieldsMasked")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("MaskingMethod")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PermittedEnvironment")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("PermittedUsers")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("PersonalDataIncluded")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("ReviewByUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RevokedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("RevokedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "OrganisationId", "DeclaredUtc");
+
+                    b.ToTable("MaskedDataDeclaration", "migration");
                 });
 
             modelBuilder.Entity("Ecp.DataMigration.Domain.MatchProposal", b =>

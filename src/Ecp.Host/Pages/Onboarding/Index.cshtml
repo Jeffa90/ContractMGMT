@@ -20,7 +20,7 @@
     <li>
         <span class="badge @(item.Status is "Entered" or "Chosen" or "Valid" ? "ok" : item.Status == "Needs attention" ? "bad" : "")">@Terms.Expand(item.Status)</span>
         <a href="/Onboarding/@(item.Id == "review" ? "Review" : "Step/" + item.Id)?org=@Model.OrganisationId">@Terms.Expand(item.Title)</a>
-        <span class="hint">@item.Detail</span>
+        <span class="hint">@Terms.Expand(item.Detail)</span>
     </li>
 }
 </ol>

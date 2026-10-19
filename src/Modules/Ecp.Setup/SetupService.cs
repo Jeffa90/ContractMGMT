@@ -286,6 +286,7 @@ internal sealed class SetupService(ISetupStore store, SetupEnvironment env, IEnu
         var integrations = new SortedDictionary<string, string>(StringComparer.Ordinal)
         {
             ["database"] = env.DatabaseProvider + (env.ConnectionFromSecretReference ? " (connection from secret reference)" : ""),
+            ["governance"] = env.GovernanceName ?? "not reported",
             ["identity"] = doc.Get("identity", "in.kind") ?? "not configured",
             ["email"] = doc.Get("notifications", "in.provider") ?? "not configured",
             ["storage"] = doc.Get("storage", "provider") ?? "not verified",

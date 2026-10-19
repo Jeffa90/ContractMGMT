@@ -1,0 +1,64 @@
+@page "/Admin/Operations/Email"
+@model Ecp.Host.Pages.Admin.Operations.EmailModel
+@{
+    ViewData["Title"] = L["Email provider"].Value;
+    var v = Model.View; var r = v.Readiness;
+    var badge = r.State switch { Ecp.Operations.EmailState.Healthy => "ok", Ecp.Operations.EmailState.Failed => "bad", _ => "warn" };
+}
+<h1>@L["Email provider"]</h1>
+<p class="lede">@L["Choose how the platform sends email and prove it works. Passwords are never typed here: give a secret reference such as env:ECP_SMTP_PASSWORD. Email counts as ready only after a test message has really been accepted by the provider with the current settings."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+<section class="card" role="status" aria-labelledby="rd-h">
+    <h2 id="rd-h">@L["Readiness"]: <span class="badge @badge">@r.State</span></h2>
+    <dl class="facts">
+        <dt>@L["Provider"]</dt><dd>@r.ProviderKey (@(r.Source == "saved" ? L["saved in the application"] : L["from the host's starting configuration"]))</dd>
+        <dt>@L["What this means"]</dt><dd>@r.Summary @if (r.Code is { Length: > 0 }) { <code>@r.Code</code> }</dd>
+        <dt>@L["Counts as evidence"]</dt><dd>@r.Verdict</dd>
+        <dt>@L["Last success"]</dt><dd>@(r.LastSuccessUtc is { } ok ? Fmt.DateTime(ok) : L["Never"].Value)</dd>
+        <dt>@L["Last failure"]</dt><dd>@(r.LastFailureUtc is { } bad ? Fmt.DateTime(bad) : L["None"].Value)</dd>
+        <dt>@L["A pass expires"]</dt><dd>@(r.ExpiresUtc is { } ex ? Fmt.DateTime(ex) : L["After "].Value + (int)v.MaxAge.TotalDays + L[" days without a new test"].Value)</dd>
+    </dl>
+    @if (r.State == Ecp.Operations.EmailState.Simulated) { <p><strong>@L["Simulated:"]</strong> @L["this provider delivers nothing to a real mailbox. It is allowed in Demo and Test only and is never counted as verified email."]</p> }
+</section>
+<section class="card" aria-labelledby="cfg-h">
+    <h2 id="cfg-h">@L["Settings"]</h2>
+    <form method="post" asp-page-handler="Save">
+        <div class="field"><label for="Provider">@L["Provider"]</label>
+            <select id="Provider" name="Provider">@foreach (var (key, label) in Model.Providers()) { <option value="@key" selected="@(Model.Provider == key)">@label</option> }</select></div>
+        <div class="field"><label for="From">@L["From address"]</label><input id="From" name="From" type="email" maxlength="320" value="@Model.From" autocomplete="off" /></div>
+        <div class="field"><label for="Host">@L["SMTP host"]</label><input id="Host" name="Host" maxlength="255" value="@Model.Host" autocomplete="off" /><p class="hint">@L["Host name only, for example smtp.example.com."]</p></div>
+        <div class="field"><label for="Port">@L["SMTP port"]</label><input id="Port" name="Port" type="number" min="1" max="65535" value="@Model.Port" /></div>
+        <div class="field"><label><input type="checkbox" name="UseTls" value="true" checked="@Model.UseTls" /> @L["Require TLS (STARTTLS). Production needs this."]</label><input type="hidden" name="UseTls" value="false" /></div>
+        <div class="field"><label for="UserRef">@L["SMTP user (secret reference)"]</label><input id="UserRef" name="UserRef" maxlength="300" value="@Model.UserRef" autocomplete="off" /></div>
+        <div class="field"><label for="PasswordRef">@L["SMTP password (secret reference)"]</label><input id="PasswordRef" name="PasswordRef" maxlength="300" value="@Model.PasswordRef" autocomplete="off" /><p class="hint">@L["For example env:ECP_SMTP_PASSWORD or keyvault:ecp-smtp-password. The value itself is never shown or stored."]</p></div>
+        <div class="actions"><button type="submit">@L["Save settings"]</button> <span>@L["Saving needs a recent sign-in and resets the test result: changed settings must be tested again."]</span></div>
+    </form>
+</section>
+<section class="card" aria-labelledby="test-h">
+    <h2 id="test-h">@L["Send a test message"]</h2>
+    <p>@L["The test connects to the provider and sends a fixed message that contains no contract information. Use a mailbox you control."]</p>
+    <form method="post" asp-page-handler="Test">
+        <div class="field"><label for="TestRecipient">@L["Test recipient"]</label><input id="TestRecipient" name="TestRecipient" type="email" maxlength="320" required autocomplete="off" /></div>
+        <div class="actions"><button type="submit">@L["Send test message"]</button></div>
+    </form>
+</section>
+<section class="card" aria-labelledby="hist-h">
+    <h2 id="hist-h">@L["Recent tests"]</h2>
+    @if (v.RecentTests.Count == 0) { <p>@L["No test has been run."]</p> }
+    else
+    {
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Recent email tests"]</caption>
+            <thead><tr><th scope="col">@L["When"]</th><th scope="col">@L["Provider"]</th><th scope="col">@L["Recipient"]</th><th scope="col">@L["Connection"]</th><th scope="col">@L["Delivery"]</th><th scope="col">@L["Current settings"]</th><th scope="col">@L["Reference"]</th></tr></thead>
+            <tbody>
+            @foreach (var t in v.RecentTests)
+            {
+                <tr><th scope="row">@Fmt.DateTime(t.TestedUtc)</th><td>@t.ProviderKey @if (t.Simulated) { <span class="badge warn">@L["simulated"]</span> }</td><td>@t.RecipientMasked</td>
+                    <td>@t.ConnectivityOutcome @if (t.ConnectivityCode.Length > 0) { <code>@t.ConnectivityCode</code> } <br />@t.ConnectivityDetail</td>
+                    <td>@t.DeliveryOutcome @if (t.DeliveryCode.Length > 0) { <code>@t.DeliveryCode</code> } <br />@t.DeliveryDetail</td>
+                    <td>@(t.ForCurrentSettings ? L["Yes"] : L["No (settings changed)"])</td><td><code>@t.CorrelationId</code></td></tr>
+            }
+            </tbody></table></div>
+    }
+</section>
+<p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

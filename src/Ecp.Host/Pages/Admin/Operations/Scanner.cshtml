@@ -1,0 +1,71 @@
+@page "/Admin/Operations/Scanner"
+@model Ecp.Host.Pages.Admin.Operations.ScannerModel
+@{
+    ViewData["Title"] = L["Malware scanner"].Value;
+    var v = Model.View; var r = v.Readiness;
+    var badge = r.State switch { Ecp.Documents.ScannerState.Healthy => "ok", Ecp.Documents.ScannerState.Failed or Ecp.Documents.ScannerState.Refused => "bad", _ => "warn" };
+}
+<h1>@L["Malware scanner"]</h1>
+<p class="lede">@L["Uploaded files are held until a connected scanner calls them clean. This page shows how the scanner is configured and whether it has been tested. No real scanner is supplied with this product: a provider adapter has to be connected before Production."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (r.State == Ecp.Documents.ScannerState.Demonstration && v.Mode == Ecp.SharedKernel.EcpMode.Test)
+{
+    <div class="error-summary" role="status"><h2>@L["Test mode: demonstration scanner"]</h2><p>@r.Summary</p></div>
+}
+<section class="card" role="status" aria-labelledby="rd-h">
+    <h2 id="rd-h">@L["Readiness"]: <span class="badge @badge">@r.State</span></h2>
+    <dl class="facts">
+        <dt>@L["Scanner"]</dt><dd>@r.ProviderName (@L["provider key"] <code>@r.ProviderKey</code>)</dd>
+        <dt>@L["What this means"]</dt><dd>@r.Summary @if (r.Code is { Length: > 0 }) { <code>@r.Code</code> }</dd>
+        <dt>@L["Counts as evidence"]</dt><dd>@r.Verdict</dd>
+        <dt>@L["Last self-test"]</dt><dd>@(r.LastTest is { } t ? $"{t.Outcome} on {Fmt.DateTime(t.TestedUtc)}" + (t.Code.Length > 0 ? $" ({t.Code})" : "") + $", reference {t.CorrelationId}" : L["Never (or since the last restart)"].Value)</dd>
+        <dt>@L["A pass expires"]</dt><dd>@(r.ExpiresUtc is { } ex ? Fmt.DateTime(ex) : L["After "].Value + v.Settings.SelfTestMaxAgeHours + L[" hours without a new test"].Value)</dd>
+        <dt>@L["Skipped scans are released"]</dt><dd>@(v.AllowSkippedScan ? L["Yes (not allowed in Production)"].Value : L["No"].Value)</dd>
+    </dl>
+</section>
+<section class="card" aria-labelledby="cfg-h">
+    <h2 id="cfg-h">@L["Configuration"]</h2>
+    <p class="hint">@L["Set in the host's configuration (Documents:Scanner), not here. Values are shown so you can see what the adapter will use; a credential is a secret reference and is never shown."]</p>
+    <dl class="facts">
+        <dt>@L["Provider"]</dt><dd><code>@v.Settings.EffectiveProvider</code></dd>
+        <dt>@L["Endpoint or service"]</dt><dd>@(string.IsNullOrWhiteSpace(v.Settings.Endpoint) ? L["Not set"].Value : v.Settings.Endpoint)</dd>
+        <dt>@L["Credential reference"]</dt><dd>@(string.IsNullOrWhiteSpace(v.Settings.SecretRef) ? L["Not set"].Value : v.Settings.SecretRef)</dd>
+        <dt>@L["Timeout"]</dt><dd>@v.Settings.TimeoutSeconds @L["seconds"]</dd>
+        <dt>@L["Largest file scanned"]</dt><dd>@(v.Settings.MaxFileSizeBytes / (1024 * 1024)) MB</dd>
+        <dt>@L["Retry"]</dt><dd>@L["every"] @v.Settings.RetryBackoffSeconds @L["seconds, up to the attempt limit (Documents:MaxScanAttempts)"]</dd>
+    </dl>
+</section>
+<section class="card" aria-labelledby="test-h">
+    <h2 id="test-h">@L["Self-test"]</h2>
+    <p>@L["The self-test asks the scanner whether it is reachable, whether it calls harmless content clean, and whether it detects the standard anti-malware test file (EICAR, harmless). It proves the scanner responds and recognises that file; it does not prove the scanner is good."]</p>
+    <form method="post" asp-page-handler="Test"><div class="actions"><button type="submit">@L["Run the scanner self-test"]</button> <span>@L["Needs a recent sign-in."]</span></div></form>
+</section>
+@if (v.Mode == Ecp.SharedKernel.EcpMode.Test)
+{
+    <section class="card" aria-labelledby="acc-h">
+        <h2 id="acc-h">@L["Accept the demonstration scanner for a masked-data rehearsal"]</h2>
+        @if (v.Acceptance is { } a)
+        {
+            <p><span class="badge warn">@L["Accepted"]</span> @a.AcceptedBy @L["until"] @Fmt.DateTime(a.ExpiresUtc). @L["Scope:"] @a.Scope. @L["Reason:"] @a.Reason</p>
+        }
+        else { <p>@L["Masked company data may be loaded in Test behind the demonstration scanner only if a named person accepts that for this rehearsal. It records who, why, for what scope and until when. It does not make the scanner real."]</p> }
+        @if (r.State == Ecp.Documents.ScannerState.Demonstration)
+        {
+            <form method="post" asp-page-handler="Accept">
+                <div class="field"><label for="Scope">@L["Scope"]</label><input id="Scope" name="Scope" maxlength="200" value="@Model.Scope" required /></div>
+                <div class="field"><label for="Reason">@L["Why this is acceptable for the rehearsal"]</label><input id="Reason" name="Reason" maxlength="500" required /></div>
+                <div class="field"><label for="ValidDays">@L["Valid for (days, at most 90)"]</label><input id="ValidDays" name="ValidDays" type="number" min="1" max="90" value="@Model.ValidDays" /></div>
+                <div class="actions"><button type="submit">@L["Record the acceptance"]</button></div>
+            </form>
+        }
+        @if (v.AcceptanceHistory.Count > 0)
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Acceptance history"]</caption>
+                <thead><tr><th scope="col">@L["Accepted by"]</th><th scope="col">@L["Scope"]</th><th scope="col">@L["Reason"]</th><th scope="col">@L["Until"]</th><th scope="col">@L["State"]</th></tr></thead>
+                <tbody>@foreach (var h in v.AcceptanceHistory) { <tr><th scope="row">@h.AcceptedByName</th><td>@h.Scope</td><td>@h.Reason</td><td>@Fmt.DateTime(h.ExpiresUtc)</td><td>@(h.RevokedUtc is not null ? L["Revoked"].Value : h.Active ? L["Active"].Value : L["Expired"].Value)</td></tr>}</tbody>
+            </table></div>
+        }
+    </section>
+}
+<p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

@@ -10,6 +10,7 @@
     <h2 id="overall-h">@L["Overall"]: <span class="badge @OpsStatuses.Css(v.Overall)">@Word(v.Overall)</span></h2>
     <dl class="facts">
         <dt>@L["Platform version"]</dt><dd>@v.PlatformVersion (@v.EnvironmentMode, @v.DatabaseEngine)</dd>
+        @if (!string.IsNullOrEmpty(v.Governance)) { <dt>@L["Governance"]</dt><dd>@v.Governance</dd> }
         <dt>@L["Maintenance mode"]</dt><dd>@(v.Maintenance.Enabled ? v.Maintenance.Cause : L["Off"].Value)</dd>
         <dt>@L["Built at"]</dt><dd>@Fmt.DateTime(v.GeneratedUtc)</dd>
         <dt>@L["Correlation id"]</dt><dd><code>@v.CorrelationId</code></dd>

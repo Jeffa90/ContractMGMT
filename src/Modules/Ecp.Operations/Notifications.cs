@@ -53,8 +53,19 @@ internal sealed class SmtpEmailSender(EmailSettings settings, ISecretProvider se
             client.Credentials = new NetworkCredential(secrets.Resolve(user), secrets.Resolve(password));
         using var mail = new MailMessage(settings.From!, message.To, message.Subject, message.Body);
         try { await client.SendMailAsync(mail, ct); }
-        catch (SmtpException) { throw new DomainException("email_failed", "The mail server did not accept the message."); }
+        catch (SmtpException ex) { throw Classify(ex); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new EmailDeliveryException("EML-CONN-001", "The mail server did not answer in time."); }
+        catch (Exception ex) when (ex is System.Security.Authentication.AuthenticationException or IOException) { throw new EmailDeliveryException("EML-TLS-002", "A secure connection to the mail server could not be made. Check the server's certificate and the TLS setting."); }
     }
+
+    /// <summary>Turns a mail library failure into a stable code and a sentence that is safe to show: never the server's own text, never a credential.</summary>
+    private static EmailDeliveryException Classify(SmtpException ex) => ex.StatusCode switch
+    {
+        SmtpStatusCode.ClientNotPermitted or SmtpStatusCode.MustIssueStartTlsFirst => new("EML-AUTH-001", "The mail server refused the sign-in or requires a secure connection first. Check the user and password references and the TLS setting."),
+        SmtpStatusCode.MailboxUnavailable or SmtpStatusCode.MailboxNameNotAllowed => new("EML-DLV-002", "The mail server refused the recipient or sender address."),
+        SmtpStatusCode.GeneralFailure when ex.InnerException is not null => new("EML-CONN-002", "The connection to the mail server failed while sending."),
+        _ => new("EML-DLV-001", "The mail server did not accept the message.")
+    };
 }
 
 internal sealed class EmailSenderFactory(ISecretProvider secrets, DataDirectoryOptions data) : IEmailSenderFactory

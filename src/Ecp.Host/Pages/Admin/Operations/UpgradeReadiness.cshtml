@@ -24,6 +24,10 @@
             <dt>@L["Upgrade manifest SHA-256"]</dt><dd><code>@(r.ManifestSha256 ?? "none")</code></dd>
             <dt>@L["Migrations pending"]</dt><dd>@r.PendingMigrations.Count</dd>
             <dt>@L["Correlation id"]</dt><dd><code>@r.CorrelationId</code></dd>
+            @if (Model.Judgement is { } j)
+            {
+                <dt>@L["Counts as evidence"]</dt><dd><span class="badge @(j.Verdict == Ecp.Recovery.EvidenceVerdict.Passed ? "ok" : j.Verdict == Ecp.Recovery.EvidenceVerdict.Warning ? "warn" : j.Verdict == Ecp.Recovery.EvidenceVerdict.NotVerified ? "warn" : "bad")">@Ecp.Recovery.EvidenceSemantics.Label(j.Verdict)</span> <code>@j.Code</code> @j.Reason</dd>
+            }
         </dl>
         <p>@r.Count(Ecp.Recovery.CheckOutcome.Passed) @L["passed"], @r.Count(Ecp.Recovery.CheckOutcome.Warning) @L["warnings"], @r.Count(Ecp.Recovery.CheckOutcome.Failed) @L["blockers"], @r.Count(Ecp.Recovery.CheckOutcome.NotVerified) @L["not verified"].</p>
         <ul>
@@ -39,10 +43,39 @@
         <tbody>
         @foreach (var c in r.Checks)
         {
-            <tr><th scope="row"><code>@c.Code</code> @c.Title</th><td><span class="badge @(c.Outcome == Ecp.Recovery.CheckOutcome.Passed ? "ok" : c.Outcome == Ecp.Recovery.CheckOutcome.Warning ? "warn" : "bad")">@(c.Outcome == Ecp.Recovery.CheckOutcome.Failed ? "Blocker" : c.Outcome.ToString())</span></td><td>@c.Description</td><td>@c.TechnicalDetail</td><td>@c.Remediation</td></tr>
+            <tr><th scope="row"><code>@c.Code</code> @c.Title</th><td><span class="badge @(c.Outcome == Ecp.Recovery.CheckOutcome.Passed ? "ok" : c.Outcome == Ecp.Recovery.CheckOutcome.Warning ? "warn" : "bad")">@(c.Outcome == Ecp.Recovery.CheckOutcome.Failed ? "Blocker" : c.Outcome.ToString())</span>
+                @if (c.Outcome == Ecp.Recovery.CheckOutcome.Warning && Model.AcceptedCodes.Contains(c.Code)) { <span class="badge ok">@L["Accepted"]</span> }</td><td>@c.Description</td><td>@c.TechnicalDetail</td><td>@c.Remediation
+                @if (c.Outcome == Ecp.Recovery.CheckOutcome.Warning && !Model.AcceptedCodes.Contains(c.Code))
+                {
+                    <details><summary>@L["Accept this warning"]</summary>
+                        <form method="post" asp-page-handler="Accept">
+                            <input type="hidden" name="Code" value="@c.Code" /><input type="hidden" name="BackupId" value="@r.BackupId" />
+                            <div class="field"><label for="reason-@c.Code">@L["Why it is acceptable (kept on the record)"]</label><input id="reason-@c.Code" name="Reason" maxlength="500" required /></div>
+                            <div class="field"><label for="days-@c.Code">@L["Valid for (days, at most 90)"]</label><input id="days-@c.Code" name="ValidDays" type="number" min="1" max="90" value="30" /></div>
+                            <div class="actions"><button type="submit">@L["Accept the warning"]</button></div>
+                        </form></details>
+                }</td></tr>
         }
         </tbody>
     </table>
     </div>
 }
+<section class="card" aria-labelledby="acc-h">
+    <h2 id="acc-h">@L["Accepted warnings"]</h2>
+    <p>@L["Accepting a warning records who accepted it, why and until when. It does not remove the warning: the pre-flight still reports Ready with warnings, and evidence counts it as Passed only while every warning has a current acceptance."]</p>
+    @if (Model.Acceptances.Count == 0) { <p>@L["Nothing has been accepted."]</p> }
+    else
+    {
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Accepted warnings"]</caption>
+            <thead><tr><th scope="col">@L["Code"]</th><th scope="col">@L["Accepted by"]</th><th scope="col">@L["Reason"]</th><th scope="col">@L["Until"]</th><th scope="col">@L["State"]</th><th scope="col"><span class="visually-hidden">@L["Actions"]</span></th></tr></thead>
+            <tbody>
+            @foreach (var a in Model.Acceptances)
+            {
+                <tr><th scope="row"><code>@a.Code</code></th><td>@a.AcceptedByName</td><td>@a.Reason</td><td>@Fmt.DateTime(a.ExpiresUtc)</td><td>@(a.RevokedUtc is not null ? L["Revoked"] : a.Active ? L["Active"] : L["Expired"])</td>
+                    <td>@if (a.Active) { <form method="post" asp-page-handler="Revoke"><input type="hidden" name="id" value="@a.Id" /><button type="submit">@L["Revoke"]</button></form> }</td></tr>
+            }
+            </tbody></table></div>
+    }
+</section>
 <p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

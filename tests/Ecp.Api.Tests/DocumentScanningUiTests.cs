@@ -23,8 +23,23 @@ public sealed class DocumentScanningUiTests
 
     private static StartupFacts Facts(EcpMode mode) => new(mode, Ecp.Persistence.DatabaseProvider.SqlServer, true, false, false, false, "/data");
 
-    private static Task<ReadinessResult> Check(EcpMode mode, bool connected, bool demo, bool allowSkipped)
-        => new DocumentScanReadinessCheck(new Scanner("provider x", connected, demo), Options.Create(new DocumentsOptions { AllowSkippedScan = allowSkipped }), Facts(mode)).RunAsync(CancellationToken.None);
+    /// <summary>The readiness the real service would report for a scanner in this mode; the self-test is stood in for by saying whether it has passed.</summary>
+    private sealed class StubReadiness(IMalwareScanner scanner, EcpMode mode, bool selfTestPassed) : IScannerReadiness
+    {
+        public Task<ScannerReadinessInfo> EvaluateAsync(CancellationToken ct = default)
+        {
+            var state = mode == EcpMode.Production && scanner.IsDemonstrationOnly ? ScannerState.Refused : !scanner.IsConnected ? ScannerState.NotConnected : scanner.IsDemonstrationOnly ? ScannerState.Demonstration
+                : selfTestPassed ? ScannerState.Healthy : ScannerState.NotVerified;
+            return Task.FromResult(new ScannerReadinessInfo(state, scanner.Name, scanner.ProviderKey, $"Scanner '{scanner.Name}' is {state}.", null, null, null, scanner.IsDemonstrationOnly));
+        }
+        public Task<ScannerTestResult> RunSelfTestAsync(string by, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    private static Task<ReadinessResult> Check(EcpMode mode, bool connected, bool demo, bool allowSkipped, bool selfTested = true)
+    {
+        var scanner = new Scanner("provider x", connected, demo);
+        return new DocumentScanReadinessCheck(new StubReadiness(scanner, mode, selfTested), Options.Create(new DocumentsOptions { AllowSkippedScan = allowSkipped }), Facts(mode)).RunAsync(CancellationToken.None);
+    }
 
     [Fact]
     public async Task Production_is_not_ready_without_a_real_connected_scanner_and_trials_say_what_they_have()
@@ -32,11 +47,17 @@ public sealed class DocumentScanningUiTests
         Assert.Equal(ReadinessStatus.Unhealthy, (await Check(EcpMode.Production, connected: false, demo: false, allowSkipped: false)).Status);
         Assert.Equal(ReadinessStatus.Unhealthy, (await Check(EcpMode.Production, connected: true, demo: true, allowSkipped: false)).Status);
         Assert.Equal(ReadinessStatus.Unhealthy, (await Check(EcpMode.Production, connected: true, demo: false, allowSkipped: true)).Status);
+        // A connected real scanner that has not passed the self-test is not ready either: connected is not the same as working.
+        Assert.Equal(ReadinessStatus.Unhealthy, (await Check(EcpMode.Production, connected: true, demo: false, allowSkipped: false, selfTested: false)).Status);
         var good = await Check(EcpMode.Production, connected: true, demo: false, allowSkipped: false);
         Assert.Equal(ReadinessStatus.Healthy, good.Status);
         Assert.Contains("provider x", good.Message);
         Assert.Equal(ReadinessStatus.Degraded, (await Check(EcpMode.Test, connected: false, demo: false, allowSkipped: false)).Status);
         Assert.Equal(ReadinessStatus.Healthy, (await Check(EcpMode.Demo, connected: true, demo: true, allowSkipped: false)).Status);
+        // In Test the demonstration scanner is allowed but is a prominent warning, never healthy.
+        var test = await Check(EcpMode.Test, connected: true, demo: true, allowSkipped: false);
+        Assert.Equal(ReadinessStatus.Degraded, test.Status);
+        Assert.Contains("Nobody has recorded an acceptance", test.Message);
     }
 
     [Fact]

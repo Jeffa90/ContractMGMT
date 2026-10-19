@@ -187,6 +187,7 @@ internal sealed class NotificationDispatcher(
             }
         }
         made += await DispatchOwnershipChangesAsync(ct);
+        made += await DispatchScanAlertsAsync(ct);
         return made;
     }
 
@@ -272,6 +273,65 @@ internal sealed class NotificationDispatcher(
         var (subject, body) = renderer.Render(policy, template, new RenderContext("", "", "Internal", "", link, NowUtc: clock.UtcNow, Formatter: await regional.FormatterAsync(org, ct)), scale, await terminology.GetAsync(org, ct: ct));
         var draft = new NotificationDraft(org, userId, type, "Event", null, null, null, null, "Internal", subject, body, link, rule, false, $"own:{sequence}:{userId:N}", correlationId);
         var made = await writer.AddAsync(draft, ct) is not null ? 1 : 0;
+        await db.SaveChangesAsync(ct);
+        return made;
+    }
+
+    // ---- document scanning alerts (G-25) -------------------------------------------------------------------------------------------------------------
+
+    private const string ScanAuditSource = "audit-scanning";
+    private static readonly string[] ScanActions = ["document.quarantined", "document.scan.failed", "document.scan.retry_exhausted"];
+
+    private static (string Type, string Title, string Body)? ScanMessage(string action) => action switch
+    {
+        "document.quarantined" => ("scanning.quarantined", "Document scanning: an infected file was quarantined", "A scanner found an infected file. It has been quarantined and cannot be downloaded or used. Open Document scanning to review it."),
+        "document.scan.failed" => ("scanning.provider_unavailable", "Document scanning: the scanner could not complete a scan", "The malware scanner could not give a verdict, so the file is held and will be tried again. If this keeps happening the scanner may be unavailable. Open Document scanning for the detail."),
+        "document.scan.retry_exhausted" => ("scanning.retry_exhausted", "Document scanning: a file could not be scanned after repeated attempts", "A file is still held because the scanner could not scan it after the allowed number of attempts. It will not be released. Open Document scanning to scan it again once the scanner is working."),
+        _ => null
+    };
+
+    /// <summary>
+    /// Tells the people who administer document scanning (the administrators of the organisation who hold the notifications.administer permission) when a file was quarantined, the scanner could not complete a scan, or a file ran out of retries. The message
+    /// never names the file or the contract; it points to the Document scanning page, which applies the viewer's own access. Always delivered in the inbox and by email where email is a delivering provider.
+    /// </summary>
+    private async Task<int> DispatchScanAlertsAsync(CancellationToken ct)
+    {
+        var cursor = await db.Cursors.FirstOrDefaultAsync(x => x.Source == ScanAuditSource, ct);
+        if (cursor is null)
+        {
+            var newest = await auditSource.Events.Select(x => (long?)x.Sequence).MaxAsync(ct) ?? 0;
+            await uow.ExecuteAsync(async c => { db.Cursors.Add(DispatchCursor.Start(tenant.RequireTenantId(), ScanAuditSource, newest)); await db.SaveChangesAsync(c); }, ct);
+            return 0;
+        }
+        var rows = await auditSource.Events.Where(x => x.Sequence > cursor.LastSequence && ScanActions.Contains(x.Action)).OrderBy(x => x.Sequence).Take(options.Value.BatchSize).ToListAsync(ct);
+        var made = 0;
+        foreach (var row in rows)
+        {
+            made += await uow.ExecuteAsync(async c =>
+            {
+                var count = row.OrganisationId is { } org && ScanMessage(row.Action) is { } m ? await WriteScanAlertAsync(org, row.Action, row.Sequence, m, row.CorrelationId, c) : 0;
+                var tracked = await db.Cursors.FirstAsync(x => x.Source == ScanAuditSource, c);
+                tracked.Advance(row.Sequence);
+                await db.SaveChangesAsync(c);
+                return count;
+            }, ct);
+        }
+        return made;
+    }
+
+    private async Task<int> WriteScanAlertAsync(Guid org, string action, long sequence, (string Type, string Title, string Body) m, string correlationId, CancellationToken ct)
+    {
+        var people = new List<Guid>();
+        foreach (var role in new[] { RoleCodes.TenantAdministrator, RoleCodes.ProcurementAdministrator }) people.AddRange(await directory.HoldersOfRoleAsync(role, org, ct));
+        var rule = new EventRule(m.Type, ["Operational"], "scanning", ["InApp", "Email"], true);
+        var made = 0;
+        // A scanner outage produces one failure per file; the same day's failures for an organisation make one message per person.
+        var key = action == "document.scan.failed" ? $"scan-failed:{org:N}:{clock.UtcNow:yyyyMMdd}" : $"scan:{sequence}";
+        foreach (var person in people.Where(p => p != Guid.Empty).Distinct())
+        {
+            var draft = new NotificationDraft(org, person, m.Type, "Event", null, null, null, null, "Internal", m.Title, m.Body, "/Admin/Documents/Scanning", rule, false, $"{key}:{person:N}", correlationId);
+            if (await writer.AddAsync(draft, ct) is not null) made++;
+        }
         await db.SaveChangesAsync(ct);
         return made;
     }

@@ -13,13 +13,19 @@ namespace Ecp.Host.Pages.Migration;
 [RequestSizeLimit(2_147_483_648)]
 [RequestFormLimits(MultipartBodyLengthLimit = 2_147_483_648)]
 public sealed class BatchModel(IMigrationBatches batches, IMigrationIntake intake, IMigrationValidation validation, IMigrationCommit commit, IMigrationRollback rollback,
-    IMigrationReports reports, IMappingProfiles profiles, IOrganisationStructureService organisations) : MigrationPageModel
+    IMigrationReports reports, IMappingProfiles profiles, IOrganisationStructureService organisations, IMaskedDataDeclarations masked, Microsoft.Extensions.Options.IOptions<MigrationOptions> migrationOptions) : MigrationPageModel
 {
     public BatchDetail Batch { get; private set; } = null!;
     public IReadOnlyList<(Guid VersionId, string Label)> ProfileChoices { get; private set; } = [];
     public RollbackPreview? Preview { get; private set; }
     public ReconciliationDto? Reconciliation { get; private set; }
     public string? ProjectName => Batch.ProjectName;
+    public BatchClassificationDto? Classification { get; private set; }
+    public IReadOnlyList<MaskedDeclarationDto> Declarations { get; private set; } = [];
+    public Ecp.SharedKernel.EcpMode Mode => migrationOptions.Value.Mode;
+    public bool ClassificationRequired => migrationOptions.Value.RequireDataClassification && Mode == Ecp.SharedKernel.EcpMode.Test;
+    [BindProperty] public string? DataClass { get; set; }
+    [BindProperty] public Guid? DeclarationId { get; set; }
 
     [BindProperty] public string Delimiter { get; set; } = "";
     [BindProperty] public string Encoding { get; set; } = "";
@@ -73,6 +79,8 @@ public sealed class BatchModel(IMigrationBatches batches, IMigrationIntake intak
         Flash($"The dry run is complete: {summary.Accepted} row(s) would load, {summary.Rejected} would be rejected, {summary.Skipped} skipped. Nothing was written to the platform.");
     });
 
+    public Task<IActionResult> OnPostClassifyAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await masked.ClassifyBatchAsync(id, DataClass ?? "", DeclarationId, ct); Flash("The data classification was saved on this [[migration.batch|lower]]."); });
+
     public Task<IActionResult> OnPostConfirmAsync(Guid id, CancellationToken ct) => Act(id, ct, async () => { await commit.ConfirmLegacyLoadAsync(id, ct); Flash("You confirmed this legacy load. Someone else must now commit it."); });
 
     public Task<IActionResult> OnPostCommitAsync(Guid id, CancellationToken ct) => Act(id, ct, async () =>
@@ -121,6 +129,11 @@ public sealed class BatchModel(IMigrationBatches batches, IMigrationIntake intak
             foreach (var v in (await profiles.GetAsync(p.Id, ct)).Versions.Where(v => v.Status == ProfileVersionStatus.Published)) choices.Add((v.Id, $"{p.Name}, version {v.VersionNumber}"));
         ProfileChoices = choices;
         Strategy = Batch.DuplicateStrategy; DocumentOption = Batch.DocumentOption;
+        if (Mode != Ecp.SharedKernel.EcpMode.Production)
+        {
+            try { Classification = await masked.ClassificationAsync(id, ct); Declarations = [.. (await masked.ListAsync(Batch.OrganisationId, ct)).Where(d => d.Current)]; }
+            catch (Ecp.SharedKernel.ForbiddenException) { /* the section is simply not shown to someone who may not stage */ }
+        }
         if (Batch.Status is BatchStatus.Committed or BatchStatus.Reconciled or BatchStatus.Accepted) Reconciliation = await commit.PreviewReconciliationAsync(id, ct);
         if (Batch.Can.CanRollBack) Preview = await rollback.PreviewAsync(id, ct);
     }

@@ -90,7 +90,7 @@ public sealed record SetupReport(
 /// <summary>Facts about how the host was started that setup needs (no secrets, no connection strings).</summary>
 public sealed record SetupEnvironment(
     EcpMode HostMode, string DataDirectory, bool DemoIdentityEnabled, bool DemoSeedEnabled, bool ConnectionFromSecretReference, string DatabaseProvider,
-    string Version, bool AllowRemoteSetup);
+    string Version, bool AllowRemoteSetup, string? GovernanceName = null, string? GovernanceLabel = null, string? GovernanceNote = null);
 
 /// <summary>Protects the bootstrap file. Implemented over ASP.NET Data Protection by the host.</summary>
 public interface ISetupProtector

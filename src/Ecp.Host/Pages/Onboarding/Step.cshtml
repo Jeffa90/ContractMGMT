@@ -1,6 +1,6 @@
 @page "/Onboarding/Step/{id}"
 @model Ecp.Host.Pages.Onboarding.StepModel
-@{ ViewData["Title"] = Model.Help.Title; }
+@{ ViewData["Title"] = Terms.Expand(Model.Help.Title); }
 @if (Model.Blocked) { <partial name="_OnboardingBlocked" /> return; }
 <p><a href="/Onboarding?org=@Model.OrganisationId">&larr; @L["Checklist"]</a></p>
 <h1>@Terms.Expand(Model.Help.Title)</h1>

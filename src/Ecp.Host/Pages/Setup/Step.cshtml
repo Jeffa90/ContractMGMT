@@ -2,7 +2,7 @@
 @model Ecp.Host.Pages.Setup.StepModel
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @using Ecp.Setup
-@{ ViewData["Title"] = Model.Stage?.Title ?? "Setup"; var st = Model.Stage!; }
+@{ ViewData["Title"] = Terms.Expand(Model.Stage?.Title ?? "Setup"); var st = Model.Stage!; }
 <p><a href="/Setup">&larr; @L["All steps"]</a></p>
 <h1>@Terms.Expand(st.Title)</h1>
 <p class="lede">@Terms.Expand(st.Summary)</p>
@@ -20,12 +20,12 @@
 }
 else if (st.LastMessage is not null && st.Status != StageStatus.NotStarted)
 {
-    <p class="hint">@L["Last result"]: @st.LastMessage</p>
+    <p class="hint">@L["Last result"]: @Terms.Expand(st.LastMessage)</p>
 }
 @foreach (var n in st.Notes) { <p class="hint">@Terms.Expand(n)</p> }
 @if (!st.Available)
 {
-    <p class="error" role="alert">@st.UnavailableReason</p>
+    <p class="error" role="alert">@Terms.Expand(st.UnavailableReason)</p>
 }
 else
 {
@@ -40,7 +40,7 @@ else
                 <tbody>
                 @foreach (var c in Model.Checks)
                 {
-                    <tr><th scope="row"><code>@c.Id</code> @c.Description</th>
+                    <tr><th scope="row"><code>@c.Id</code> @Terms.Expand(c.Description)</th>
                         <td><span class="badge @(c.Status == "Pass" ? "ok" : c.Severity == "Blocking" ? "bad" : "warn")">@(c.Status == "Pass" ? "Pass" : c.Severity == "Blocking" ? "Blocking" : "Warning")</span></td>
                         <td>@Terms.Expand(c.Message)</td></tr>
                 }

@@ -102,6 +102,24 @@ internal sealed class DatabaseReadinessCheck(MigrationRunner runner) : IReadines
     }
 }
 
+/// <summary>R-EML-01: reports whether email delivery has been proved. Healthy only after a test that reached the provider and delivered the synthetic message; anything else is Degraded and says why.</summary>
+public sealed class EmailReadinessCheck(IEmailConfigurationService email, HostModeAccessor? hostMode = null) : IReadinessCheck
+{
+    public string Id => "R-EML-01";
+
+    public async Task<ReadinessResult> RunAsync(CancellationToken ct)
+    {
+        const string description = "Email provider verified";
+        var info = await email.ReadinessAsync(ct);
+        var code = info.Code is { Length: > 0 } c ? $" [{c}]" : "";
+        // Outside Production a simulated or untested provider is an expected trial state; it is labelled, not hidden.
+        var mode = hostMode ?? new HostModeAccessor(EcpMode.Production);
+        var trial = mode.Mode != EcpMode.Production && (info.State is EmailState.Simulated or EmailState.NotConfigured || (info.State == EmailState.NotVerified && EmailProviderKeys.IsSimulated(info.ProviderKey)));
+        var status = info.State == EmailState.Healthy || trial ? ReadinessStatus.Healthy : ReadinessStatus.Degraded;
+        return new ReadinessResult(Id, description, status, $"{info.State}: {info.Summary}{code}");
+    }
+}
+
 public sealed class DataDirectoryOptions { public string Path { get; set; } = ""; }
 
 /// <summary>R-ST-01 (part): the data directory exists and a write/read/delete round trip succeeds.</summary>
@@ -163,6 +181,10 @@ public static class OperationsModule
         services.AddScoped<IReadinessCheck, GlobalisationReadinessCheck>();
         services.AddScoped<ReadinessService>();
         services.AddSingleton<IEmailSenderFactory, EmailSenderFactory>();
+        services.TryAddSingleton(new EmailReadinessOptions());
+        services.AddScoped<IEmailConfigurationService, EmailConfigurationService>();
+        services.AddScoped<IAcceptedExceptions, AcceptedExceptions>();
+        services.AddScoped<Ecp.SharedKernel.IMockScannerAcceptance, MockScannerAcceptance>();
         services.TryAddSingleton<ISecretProvider>(new Ecp.SharedKernel.Secrets.EnvironmentAndFileSecretProvider());
         return services;
     }

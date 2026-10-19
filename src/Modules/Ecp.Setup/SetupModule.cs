@@ -15,6 +15,8 @@ public static class SetupModule
     public static IServiceCollection AddSetupModule(this IServiceCollection services, SetupEnvironment environment)
     {
         services.AddSingleton(environment);
+        // The email and scanner services judge a setting by the installation's mode. The installation's mode is the one setup runs in.
+        services.AddSingleton(new Ecp.Operations.HostModeAccessor(environment.HostMode));
         services.AddModuleDbContext<SetupDbContext>(Name, Tier, Schema);
         services.AddSingleton<ISetupStore, SetupStore>();
         services.AddSingleton<ISetupService, SetupService>();

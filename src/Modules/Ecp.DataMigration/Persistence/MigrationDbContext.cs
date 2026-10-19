@@ -20,10 +20,44 @@ public sealed class MigrationDbContext(DbContextOptions<MigrationDbContext> opti
     public DbSet<Checkpoint> Checkpoints => Set<Checkpoint>();
     public DbSet<ProvenanceRecord> Provenance => Set<ProvenanceRecord>();
     public DbSet<ReconciliationReport> Reconciliations => Set<ReconciliationReport>();
+    public DbSet<MaskedDataDeclaration> MaskedDeclarations => Set<MaskedDataDeclaration>();
+    public DbSet<BatchDataClassification> BatchClassifications => Set<BatchDataClassification>();
     protected override string SchemaName => MigrationModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
     {
+        mb.Entity<MaskedDataDeclaration>(e =>
+        {
+            e.ToTable("MaskedDataDeclaration");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.DatasetOwner).HasMaxLength(200).IsRequired();
+            e.Property(x => x.SourceSystem).HasMaxLength(200).IsRequired();
+            e.Property(x => x.MaskingMethod).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.FieldsMasked).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.ApprovalReference).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ApprovedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.PermittedEnvironment).HasMaxLength(20).IsRequired();
+            e.Property(x => x.PermittedUsers).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.DeclaredBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RevokedReason).HasMaxLength(500);
+            e.Property(x => x.CorrelationId).HasMaxLength(100).IsRequired();
+            e.Ignore(x => x.PermittedUserList);
+            e.HasAlternateKey(x => new { x.TenantId, x.Id });
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.DeclaredUtc });
+        });
+
+        mb.Entity<BatchDataClassification>(e =>
+        {
+            e.ToTable("BatchDataClassification");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.DataClass).HasMaxLength(30).IsRequired();
+            e.Property(x => x.LinkedBy).HasMaxLength(200).IsRequired();
+            e.HasIndex(x => new { x.TenantId, x.BatchId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.DeclarationId });
+        });
+
         mb.Entity<MigrationProject>(e =>
         {
             e.ToTable("MigrationProject");

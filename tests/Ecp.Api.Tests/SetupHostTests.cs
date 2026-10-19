@@ -54,7 +54,19 @@ public sealed class SetupHostTests
         var response = await DemoApp.PostFormAsync(client, $"/Setup/Step/{id}", fields ?? Steps[id]);
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.OK, $"{id}: {(int)response.StatusCode}");
-        Assert.DoesNotContain("This step was not completed", body);
+        Assert.True(!body.Contains("This step was not completed"), $"{id} was not completed: " + System.Text.RegularExpressions.Regex.Replace(System.Text.RegularExpressions.Regex.Match(body, "This step was not completed.*?</div>", System.Text.RegularExpressions.RegexOptions.Singleline).Value, "<[^>]+>", " "));
+        Assert.True(!RenderedPageSweepTests.RawTokens(body).Any(), $"{id}: raw term token in the page after the step: {string.Join(", ", RenderedPageSweepTests.RawTokens(body))}");   // G-32: neutral wording before any organisation exists
+    }
+
+    private static async Task AssertWizardPagesShowNoRawTokensAsync(HttpClient client, IEnumerable<string> ids)
+    {
+        foreach (var url in new[] { "/Setup", "/Setup/Report" }.Concat(ids.Select(id => $"/Setup/Step/{id}")))
+        {
+            var response = await client.GetAsync(url);
+            if (response.StatusCode != HttpStatusCode.OK) continue;
+            var leaks = RenderedPageSweepTests.RawTokens(await response.Content.ReadAsStringAsync()).ToList();
+            Assert.True(leaks.Count == 0, $"{url}: raw term token(s) rendered: {string.Join(", ", leaks)}");
+        }
     }
 
     private static async Task WalkAsync(HttpClient client, IEnumerable<string> ids) { foreach (var id in ids) await PostStepAsync(client, id); }
@@ -63,7 +75,7 @@ public sealed class SetupHostTests
     {
         var skip = await DemoApp.PostFormAsync(client, "/Setup/Step/demo", new Dictionary<string, string>(), "/Setup/Step/demo?handler=Skip");
         Assert.Equal(HttpStatusCode.Redirect, skip.StatusCode);
-        var ack = new Dictionary<string, string> { ["ack.R-NOT-01"] = "Mock mail is acceptable for this synthetic installation." };
+        var ack = new Dictionary<string, string> { ["ack.R-NOT-01"] = "Mock mail is acceptable for this synthetic installation.", ["ack.R-OPS-01"] = "No scanner is connected, so files stay held; acceptable for this synthetic installation." };
         await PostStepAsync(client, "readiness", ack);
         var done = await DemoApp.PostFormAsync(client, "/Setup/Step/complete", new Dictionary<string, string>());
         Assert.Equal(HttpStatusCode.Redirect, done.StatusCode);
@@ -149,6 +161,7 @@ public sealed class SetupHostTests
         Assert.Contains("Complete first", await early.Content.ReadAsStringAsync());
 
         await WalkAsync(client, ToReadiness);
+        await AssertWizardPagesShowNoRawTokensAsync(client, ToReadiness.Concat(["demo", "readiness", "complete"]));
         var blocked = await DemoApp.PostFormAsync(client, "/Setup/Step/readiness", new Dictionary<string, string>());
         Assert.Contains("Acknowledge each warning", await blocked.Content.ReadAsStringAsync());
         await FinishAsync(client);
@@ -359,5 +372,31 @@ public sealed class SetupHostTests
         var refused = await svc.BeginSessionAsync(await svc.IssueTokenAsync(), fromLoopback: false);
         Assert.False(refused.Granted);
         Assert.Contains("only be opened from the server itself", refused.Refusal);
+    }
+
+    [Fact]
+    public async Task The_email_step_passes_only_when_the_provider_really_accepts_a_test_message_and_readiness_then_needs_no_acknowledgement()
+    {
+        using var smtp = new Ecp.Tests.Common.FakeSmtpServer();
+        using var app = DemoApp.Start(s => { foreach (var (k, v) in Uninstalled(NewDir())) s[k] = v; });
+        using var client = app.NewClient();
+        Assert.Equal(HttpStatusCode.Redirect, (await OpenSessionAsync(client, await NewTokenAsync(app))).StatusCode);
+        await WalkAsync(client, ToReadiness.Where(id => id != "notifications"));
+
+        Dictionary<string, string> Smtp(int port) => new() { ["provider"] = "Smtp", ["from"] = "platform@setup.example.invalid", ["host"] = "127.0.0.1", ["port"] = port.ToString(), ["useTls"] = "false", ["testRecipient"] = AdminEmail };
+
+        // nothing listens on the port: the step does not pass, says why in plain words with a diagnostic code, and readiness does not count email as ready
+        var down = await DemoApp.PostFormAsync(client, "/Setup/Step/notifications", Smtp(Ecp.Tests.Common.FakeSmtpServer.ClosedPort()));
+        var downBody = await down.Content.ReadAsStringAsync();
+        Assert.Contains("This step was not completed", downBody);
+        Assert.Contains("EML-CONN-001", downBody);
+        Assert.Contains("email is not ready", downBody);
+        Assert.Empty(smtp.Mail);
+
+        // a real mail server accepts the synthetic message: the step passes and R-NOT-01 is a pass, not a warning to acknowledge
+        await PostStepAsync(client, "notifications", Smtp(smtp.Port));
+        Assert.Single(smtp.Mail);
+        var readiness = await client.GetStringAsync("/Setup/Step/readiness");
+        Assert.DoesNotContain("ack.R-NOT-01", readiness);
     }
 }

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Ecp.Configuration;
 using Ecp.Lifecycle.Definitions;
+using Ecp.Recovery;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Ecp.Tests.Common;
@@ -14,11 +15,27 @@ using static Ecp.Api.Tests.NoCodeRehearsal;
 namespace Ecp.Api.Tests;
 
 /// <summary>
-/// The rehearsal itself: twenty steps from "a company has asked for an organisation" to "its register is loaded, checked and backed up", each done by the role that would do it, through the application's pages. See
+/// The rehearsal itself: twenty-three steps from "a company has asked for an organisation" to "its register is loaded, checked and backed up", each done by the role that would do it, through the application's pages. See
 /// docs/NO_CODE_REHEARSAL.md for what each step proves and docs/IMPLEMENTATION_PLAYBOOK.md for the journey it follows.
 /// </summary>
 internal static class NoCodeJourney
 {
+    /// <summary>The host the journey runs against: Test mode with the Production-equivalent second-person rule switched on by the explicit setting, the labelled mock scanner chosen on purpose, and (where the environment provides them) the shared backup folders.</summary>
+    public static void Settings(Dictionary<string, string?> s)
+    {
+        s["Ecp:Mode"] = "Test";
+        s[GovernanceMode.SettingKey] = "Enforced";
+        s["Documents:Scanner:Provider"] = "mock";
+        var host = Environment.GetEnvironmentVariable("ECP_TEST_SQL_BACKUP_DIR");
+        var server = Environment.GetEnvironmentVariable("ECP_TEST_SQL_BACKUP_DIR_SERVER");
+        if (!string.IsNullOrWhiteSpace(host) && !string.IsNullOrWhiteSpace(server))
+        {
+            s["Ecp:Recovery:BackupDirectory"] = host;
+            s["Ecp:Recovery:SqlServerBackupDirectory"] = server;
+            s["Ecp:Recovery:RestoreTargetDirectory"] = Path.Combine(host, "restore-target");
+        }
+    }
+
     public static async Task<RehearsalLedger> RunAsync(DemoApp app)
     {
         var ledger = new RehearsalLedger();
@@ -31,9 +48,12 @@ internal static class NoCodeJourney
         using var bizConfig = await app.SignInAsync(BizConfig);
         using var procurement = await app.SignInAsync(ProcAdmin);
         using var procurementSecond = await app.SignInAsync(ProcAdmin2);
+        using var sysAdmin = await app.SignInAsync(SysAdmin);
+        using var smtp = new FakeSmtpServer();   // a real mail server on a loopback socket, standing in for the company's mail relay
 
-        // The installation requires a second person to publish, exactly as Production does.
-        app.Factory.Services.GetRequiredService<ConfigurationOptions>().RequireSecondPersonPublish = true;
+        // The installation requires a second person to publish, exactly as Production does: the host was started in Test mode with Ecp:Governance:SecondPerson=Enforced (nothing here switches the rule on by hand).
+        Assert.Equal(GovernanceKind.TestEnforced, app.Factory.Services.GetRequiredService<GovernanceMode>().Kind);
+        Assert.True(app.Factory.Services.GetRequiredService<ConfigurationOptions>().RequireSecondPersonPublish);
 
         // 1. The Tenant Administrator makes sure the installation can hold several organisations.
         await ledger.Step(1, "Allow several organisations (only if the installation was set up for one)", "Tenant Administrator", "TenantAdministrator", "/Admin/Organisations", async () =>
@@ -221,7 +241,7 @@ internal static class NoCodeJourney
             return $"{published} submissions reviewed and published by a second person; authors were refused for their own work; the checklist shows them done.";
         });
 
-        // 13-17. The counterparties, contracts and attachments of the old register are loaded by the procurement administrators.
+        // 13-19. The counterparties, contracts and attachments of the old register are loaded by the procurement administrators.
         string projectUrl = "", batchUrl = "", profileUrl = ""; Guid versionId = Guid.Empty;
         await ledger.Step(13, "Migration: create the project and the mapping profile from the sample files", "Procurement Administrator", "ProcurementAdministrator", "/Migration, /Migration/Profiles", async () =>
         {
@@ -272,7 +292,39 @@ internal static class NoCodeJourney
             return "Dry run: nothing written; the page says what would load.";
         });
 
-        await ledger.Step(16, "Migration: a second person confirms the legacy load, then it is committed", "Procurement Administrator (second person)", "ProcurementAdministrator", "/Migration/Batches", async () =>
+        await ledger.Step(16, "Data handling: say the file is masked company data; commit is refused until the declaration exists", "Procurement Administrator", "ProcurementAdministrator", "/Migration/MaskedData, /Migration/Batches", async () =>
+        {
+            // This installation requires every batch to be classified before it commits. Without a classification the commit is refused with a code and a plain sentence.
+            var unclassified = await Send(procurement, batchUrl, "Commit", []);
+            Assert.Contains("MDD-003", Words(unclassified.Status == HttpStatusCode.Redirect ? await GetAsync(procurement, batchUrl) : unclassified.Body));
+            // The company masks its own data; the platform records what the company says about it.
+            ExpectDone(await Send(procurement, $"/Migration/MaskedData?organisationId={org}", "Declare", Fields(("OrganisationId", org.ToString()), ("DatasetOwner", "Finance Systems"), ("SourceSystem", "Legacy register"),
+                ("MaskingMethod", "Counterparty names and contract values replaced with generated values by the data owner before extraction"), ("FieldsMasked", "Counterparty name, Contact email, Contract value"),
+                ("AttachmentsIncluded", "true"), ("ApprovalReference", "CHG-2026-0417"), ("ApprovedBy", "Head of Data Governance"), ("ApprovedOn", DateTime.UtcNow.ToString("yyyy-MM-dd")), ("ReviewBy", DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd")),
+                ("PermittedUsers", ProcAdmin + ", " + ProcAdmin2))), "declaration");
+            var declaration = FirstGuid(await GetAsync(procurement, batchUrl), $"<option value=\"({Pattern})\">Finance Systems");
+            ExpectDone(await Send(procurement, batchUrl, "Classify", Fields(("DataClass", "MaskedCompanyData"), ("DeclarationId", declaration.ToString()))), "classification");
+            Assert.Contains("Masked Company Data", Words(await GetAsync(procurement, batchUrl)));
+            // With a current declaration the next gate is the scanner: the only one connected is the labelled demonstration scanner, which nobody has accepted for this rehearsal.
+            var behindMock = await Send(procurement, batchUrl, "Commit", []);
+            Assert.Contains("MDD-006", Words(behindMock.Status == HttpStatusCode.Redirect ? await GetAsync(procurement, batchUrl) : behindMock.Body));
+            return "Commit was refused three ways in turn (no classification, then, with the declaration made and linked, the unaccepted demonstration scanner); each gave a code and a sentence. The declaration records owner, source, method, fields, approval and expiry, and holds no data.";
+        });
+
+        await ledger.Step(17, "Operations: accept the demonstration scanner for this masked-data rehearsal, on the record", "System Administrator", "SystemAdministrator (technical)", "/Admin/Operations/Scanner", async () =>
+        {
+            var page = Words(await GetAsync(sysAdmin, "/Admin/Operations/Scanner"));
+            Assert.Contains("TEST MODE", page);
+            Assert.Contains("Not Verified", page);            // the demonstration scanner never counts as a verified scanner
+            Assert.Equal(HttpStatusCode.Forbidden, (await tenantAdmin.GetAsync("/Admin/Operations/Scanner")).StatusCode);
+            ExpectDone(await Send(sysAdmin, "/Admin/Operations/Scanner", "Accept", Fields(("Scope", "masked-data rehearsal, Test environment"), ("Reason", "Rehearsal of the migration with masked data; no real protection is claimed."), ("ValidDays", "14"))), "acceptance");
+            var after = Words(await GetAsync(sysAdmin, "/Admin/Operations/Scanner"));
+            Assert.Contains("Accepted", after);
+            Assert.Contains("masked-data rehearsal", after);
+            return "The demonstration scanner was accepted for 14 days with a reason and a scope; the page still labels it TEST MODE and Not Verified.";
+        }, technical: true);
+
+        await ledger.Step(18, "Migration: a second person confirms the legacy load, then it is committed", "Procurement Administrator (second person)", "ProcurementAdministrator", "/Migration/Batches", async () =>
         {
             var tooEarly = await Send(procurement, batchUrl, "Commit", []);
             Assert.Contains("second person", Words(tooEarly.Status == HttpStatusCode.Redirect ? await GetAsync(procurement, batchUrl) : tooEarly.Body));
@@ -283,7 +335,7 @@ internal static class NoCodeJourney
             return "Committed after a different person confirmed; the committer alone was refused.";
         });
 
-        await ledger.Step(17, "Migration: reconcile the counts and record acceptance", "Procurement Administrator", "ProcurementAdministrator", "/Migration/Batches/Reconciliation", async () =>
+        await ledger.Step(19, "Migration: reconcile the counts and record acceptance", "Procurement Administrator", "ProcurementAdministrator", "/Migration/Batches/Reconciliation", async () =>
         {
             ExpectDone(await Send(procurement, batchUrl, "Reconcile", []), "reconciliation");
             Assert.Contains("Balanced", Words(await GetAsync(procurement, $"{batchUrl}/Reconciliation")));
@@ -292,8 +344,8 @@ internal static class NoCodeJourney
             return "Counts balanced; acceptance recorded with a note.";
         });
 
-        // 18. User acceptance: the loaded register is read by the people who will use it.
-        await ledger.Step(18, "UAT: find the loaded contracts, open one, see its documents and where it came from", "Procurement Administrator (second person)", "ProcurementAdministrator", "/Contracts, /Contracts/Details, /Suppliers", async () =>
+        // 20. User acceptance: the loaded register is read by the people who will use it.
+        await ledger.Step(20, "UAT: find the loaded contracts, open one, see its documents and where it came from", "Procurement Administrator (second person)", "ProcurementAdministrator", "/Contracts, /Contracts/Details, /Suppliers", async () =>
         {
             var register = await GetAsync(procurementSecond, $"/Contracts?view=system:all-contracts&q=DEMO-AGR&org={org}");
             var (tenantId, _) = await app.FindUserAsync(ProcAdmin);
@@ -311,62 +363,120 @@ internal static class NoCodeJourney
             return "Both contracts, the counterparties and the attachments are visible; a document downloads; provenance is shown.";
         });
 
-        // 19. The technical steps are named as technical: a System Administrator, in the installation, never a business administrator.
-        using var sysAdmin = await app.SignInAsync(SysAdmin);
-        await ledger.Step(19, "Operations: open the dashboard, run the upgrade pre-flight, take the evidence", "System Administrator", "SystemAdministrator (technical)", "/Admin/Operations, /Admin/Operations/UpgradeReadiness, /Admin/Operations/Evidence", async () =>
+        // 21. The technical steps are named as technical: a System Administrator, in the installation, never a business administrator.
+        // 21. The System Administrator opens the dashboard and takes a verified backup: the way back that the upgrade pre-flight needs. Backups need SQL Server and the operator's shared backup folder.
+        string? backupId = null;
+        await ledger.JudgedStep(21, "Operations: open the dashboard and take a verified backup", "System Administrator", "SystemAdministrator (technical)", "/Admin/Operations, /Admin/Operations/Backups", async () =>
         {
             var dashboard = Words(await GetAsync(sysAdmin, "/Admin/Operations"));
             Assert.Contains("Operations", dashboard);
-            var readiness = await GetAsync(sysAdmin, "/Admin/Operations/UpgradeReadiness");
-            Assert.Contains("is not an approval to upgrade or to go live", readiness);
-            var run = await Send(sysAdmin, "/Admin/Operations/UpgradeReadiness", "Run", []);
-            Assert.Equal(HttpStatusCode.OK, run.Status);
-            var verdict = Regex.Match(Words(run.Body), "(Ready|Blocked|Not verified|NOT VERIFIED)", RegexOptions.IgnoreCase).Value;
-            var evidence = await sysAdmin.GetAsync("/Admin/Operations/Evidence?handler=Json");
-            Assert.Equal(HttpStatusCode.OK, evidence.StatusCode);
+            Assert.Contains("TestEnforced", Words(await GetAsync(sysAdmin, "/Admin/Operations/Dashboard")));
             // A business administrator reaches none of it.
             Assert.Equal(HttpStatusCode.Forbidden, (await orgAdmin.GetAsync("/Admin/Operations")).StatusCode);
-            Assert.Equal(HttpStatusCode.Forbidden, (await tenantAdmin.GetAsync("/Admin/Operations/UpgradeReadiness")).StatusCode);
-            return $"Pre-flight verdict shown as '{verdict}'; the evidence report downloaded; business administrators are refused these pages.";
+            Assert.Equal(HttpStatusCode.Forbidden, (await tenantAdmin.GetAsync("/Admin/Operations/Backups")).StatusCode);
+            var page = await GetAsync(sysAdmin, "/Admin/Operations/Backups");
+            if (!app.IsSqlServer || !page.Contains("name=\"Reason\""))
+                return ("The backup page was opened and says plainly that this database or configuration cannot take a backup here. Nothing was backed up.", EvidenceSemantics.Judge("Not Verified"));
+            var made = await PostAsync(sysAdmin, "/Admin/Operations/Backups", "Start", Fields(("Reason", "No-code rehearsal: the way back before the upgrade check"), ("HoldMaintenance", "false")));
+            Assert.Equal(HttpStatusCode.Redirect, made.StatusCode);
+            var details = await GetAsync(sysAdmin, made.Headers.Location!.OriginalString);
+            backupId = Regex.Match(details, "bk-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}").Value;
+            Assert.NotEmpty(backupId);
+            var state = Regex.Match(Words(details), "State (Verified with warnings|Verified|Unverified|Incomplete|Failed)").Groups[1].Value;
+            return ($"Backup {backupId} was taken and read back; its state is '{state}'.", EvidenceSemantics.Judge(state.Length == 0 ? "Not Verified" : state, warningsAccepted: false));
         }, technical: true);
 
-        // 20. Backups need a real database server and the operator's backup folder: this is where the rehearsal says honestly what it did not do here.
-        await ledger.Step(20, "Operations: backups and restore are the System Administrator's; the page says what this database allows", "System Administrator", "SystemAdministrator (technical)", "/Admin/Operations/Backups", async () =>
+        // 22. The upgrade pre-flight against that backup. Its outcome is kept exactly as reported: Ready is Passed; Ready with warnings is not a pass until each warning is explicitly accepted; Blocked is Failed; Not Verified stays Not Verified.
+        await ledger.JudgedStep(22, "Operations: run the upgrade pre-flight against the verified backup", "System Administrator", "SystemAdministrator (technical)", "/Admin/Operations/UpgradeReadiness", async () =>
         {
-            var backups = Words(await GetAsync(sysAdmin, "/Admin/Operations/Backups"));
-            Assert.Contains("Backups", backups);
-            return app.IsSqlServer
-                ? "Backup page opened on SQL Server; backup and restore with real data are proved by the SQL Server recovery tests (BackupRestoreSqlServerTests), not repeated here."
-                : "NOT VERIFIED on the lightweight provider: backups need SQL Server. The page was opened and states this; the SQL Server recovery tests carry the proof.";
+            var readiness = await GetAsync(sysAdmin, "/Admin/Operations/UpgradeReadiness");
+            Assert.Contains("is not an approval to upgrade or to go live", readiness);
+            Assert.Equal(HttpStatusCode.Forbidden, (await tenantAdmin.GetAsync("/Admin/Operations/UpgradeReadiness")).StatusCode);
+            // The pre-flight reads SQL Server (UPF-003). On the lightweight provider it cannot be run, so the step is recorded as Not Verified: never as a pass and never as a failure of the platform.
+            if (!app.IsSqlServer)
+                return ("The pre-flight page opened and says it is not an approval. It was not run: the pre-flight needs SQL Server.", EvidenceSemantics.Judge(PreflightOutcome.NotVerified));
+            var json = await sysAdmin.GetAsync("/Admin/Operations/UpgradeReadiness?handler=Json" + (backupId is null ? "" : "&backupId=" + backupId));
+            Assert.Equal(HttpStatusCode.OK, json.StatusCode);
+            var doc = System.Text.Json.JsonDocument.Parse(await json.Content.ReadAsStringAsync()).RootElement;
+            var text = doc.GetProperty("outcome").GetString() ?? "";
+            var outcome = Enum.TryParse<PreflightOutcome>(text.Replace(" ", ""), true, out var parsed) ? parsed : PreflightOutcome.NotVerified;
+            List<string> CodesOf(string name) => doc.TryGetProperty("checks", out var checks) ? checks.EnumerateArray().Where(c => string.Equals(c.GetProperty("outcome").GetString(), name, StringComparison.OrdinalIgnoreCase)).Select(c => c.GetProperty("code").GetString() ?? "").ToList() : [];
+            var warnings = CodesOf("Warning");
+            var blockers = CodesOf("Failed");
+            var evidence = await sysAdmin.GetAsync("/Admin/Operations/Evidence?handler=Json");
+            Assert.Equal(HttpStatusCode.OK, evidence.StatusCode);
+
+            // Ready with warnings is a pass only if each warning is explicitly accepted by a named person, with a reason, on the record. The System Administrator does that on the pre-flight page.
+            var before = EvidenceSemantics.Judge(outcome, warnings, acceptedCodes: []);
+            if (outcome == PreflightOutcome.ReadyWithWarnings)
+            {
+                Assert.Equal(EvidenceVerdict.Warning, before.Verdict);   // not a pass before anyone accepts anything
+                foreach (var code in warnings)
+                {
+                    var accepted = await PostAsync(sysAdmin, "/Admin/Operations/UpgradeReadiness", "Accept", Fields(("Code", code), ("Reason", $"Rehearsal: {code} was reviewed by the System Administrator and is acceptable for a supervised non-production rehearsal."), ("ValidDays", "30")));
+                    Assert.Equal(HttpStatusCode.Redirect, accepted.StatusCode);
+                }
+            }
+            // The page itself states what the result counts as, so the person never has to work it out.
+            var shown = Words(await (await PostAsync(sysAdmin, "/Admin/Operations/UpgradeReadiness", "Run", Fields(("BackupId", backupId ?? "")))).Content.ReadAsStringAsync());
+            var judgement = EvidenceSemantics.Judge(outcome, warnings, acceptedCodes: warnings);   // each warning was accepted above
+            Assert.Contains("Counts as evidence " + EvidenceSemantics.Label(judgement.Verdict), shown);
+            return ($"Pre-flight outcome '{judgement.Operational}' ({blockers.Count} blocker(s){(blockers.Count > 0 ? ": " + string.Join(", ", blockers) : "")}; {warnings.Count} warning(s){(warnings.Count > 0 ? ": " + string.Join(", ", warnings) + ", each explicitly accepted with a recorded reason" : "")}); counted as {EvidenceSemantics.Label(judgement.Verdict)} ({judgement.Code}). The evidence report downloaded.", judgement);
+        }, technical: true);
+
+        // 23. Email: the System Administrator connects the company's mail relay, and the platform proves it by delivering a synthetic message.
+        await ledger.JudgedStep(23, "Operations: set up email, send the test message, read the readiness", "System Administrator", "SystemAdministrator (technical)", "/Admin/Operations/Email", async () =>
+        {
+            var before = Words(await GetAsync(sysAdmin, "/Admin/Operations/Email"));
+            Assert.Equal(HttpStatusCode.Forbidden, (await orgAdmin.GetAsync("/Admin/Operations/Email")).StatusCode);
+            ExpectDone(await Send(sysAdmin, "/Admin/Operations/Email", "Save", Fields(("Provider", "smtp"), ("From", "platform@rehearsal.example.test"), ("Host", "127.0.0.1"), ("Port", smtp.Port.ToString()), ("UseTls", "false"))), "email settings");
+            Assert.Contains("NotVerified", await GetAsync(sysAdmin, "/Admin/Operations/Email"));   // saved but not proved
+            ExpectDone(await Send(sysAdmin, "/Admin/Operations/Email", "Test", Fields(("TestRecipient", "ops.mailbox@rehearsal.example.test"))), "test message");
+            var page = await GetAsync(sysAdmin, "/Admin/Operations/Email");
+            var mail = Assert.Single(smtp.Mail);
+            Assert.Contains("contains no contract information", mail.Data);
+            var state = Regex.Match(page, "Readiness: <span class=\"badge [a-z]+\">([A-Za-z]+)</span>").Groups[1].Value;
+            var judgement = state == "Healthy" ? EvidenceSemantics.Judge(CheckOutcome.Passed) : state == "Failed" ? EvidenceSemantics.Judge(CheckOutcome.Failed) : EvidenceSemantics.Judge(CheckOutcome.NotVerified);
+            return ($"Email readiness '{state}': the loopback mail relay received one synthetic test message with no contract information; the page shows its reference, masked recipient and when a pass expires.", judgement);
         }, technical: true);
 
         return ledger;
     }
 }
 
-/// <summary>What the ledger must show for the rehearsal to count: every step passed, every business step used a page, the technical steps are exactly the ones named, and the evidence is written out.</summary>
+/// <summary>
+/// What the ledger must show for the rehearsal to count: no step Failed, none left as an unaccepted Warning, every business step used a page, the technical steps are exactly the ones named, Not Verified appears only where
+/// it is honest (a technical step the environment cannot check) and is reported as Not Verified, and the evidence is written out. A Blocked operation is never counted as a pass (G-37).
+/// </summary>
 internal static class RehearsalVerdict
 {
     public static void Check(RehearsalLedger ledger, DemoApp app)
     {
-        Assert.Equal(20, ledger.Steps.Count);
-        Assert.All(ledger.Steps, s => Assert.True(s.Passed, s.Number + " " + s.Title + ": " + s.Outcome));
+        Assert.Equal(23, ledger.Steps.Count);
+        Assert.All(ledger.Steps, s => Assert.True(s.Verdict is EvidenceVerdict.Passed or EvidenceVerdict.NotVerified, s.Number + " " + s.Title + ": " + s.Operational + " counted as " + s.Verdict + ". " + s.Outcome));
+        Assert.Equal(0, ledger.Count(EvidenceVerdict.Failed));
+        Assert.Equal(0, ledger.Count(EvidenceVerdict.Warning));
+        // The recorded verdict is exactly what the semantics give for the recorded operational outcome: nothing was converted.
+        Assert.All(ledger.Steps, s => Assert.Equal(EvidenceSemantics.Judge(s.Operational, warningsAccepted: s.Operational == "Ready with warnings" && s.Outcome.Contains("explicitly accepted")).Verdict, s.Verdict));
+        Assert.All(ledger.Steps.Where(s => s.Verdict == EvidenceVerdict.NotVerified), s => Assert.True(s.TechnicalRole, $"Step {s.Number} is Not Verified but is not a technical step."));
         var business = ledger.Steps.Where(s => !s.TechnicalRole).ToList();
         var technical = ledger.Steps.Where(s => s.TechnicalRole).ToList();
         // Role separation: the technical steps are the System Administrator's; no business step names a command line, SQL, Git or a document.
-        Assert.Equal([19, 20], technical.Select(s => s.Number));
+        Assert.Equal([17, 21, 22, 23], technical.Select(s => s.Number));
         Assert.All(technical, s => Assert.Contains("SystemAdministrator", s.Role));
         Assert.All(business, s => { Assert.StartsWith("/", s.Via); Assert.DoesNotMatch("(?i)\\b(sql|git|json|cli|ecp-pack|dotnet|powershell|bash)\\b", s.Via + " " + s.Title); Assert.DoesNotContain("SystemAdministrator", s.Role); });
         Assert.Contains(business, s => s.Role == "TenantAdministrator");
         Assert.Contains(business, s => s.Role == "OrganisationAdministrator");
         Assert.Contains(business, s => s.Role == "BusinessConfigurationAdministrator");
         Assert.Contains(business, s => s.Role == "ProcurementAdministrator");
+        if (!app.IsSqlServer) Assert.Equal(EvidenceVerdict.NotVerified, ledger.Steps[20].Verdict);   // step 21: the lightweight provider cannot take a backup, and the ledger says so
         var provider = app.IsSqlServer ? "SQL Server" : "lightweight provider (SQLite)";
         var markdown = ledger.Markdown(provider, app.IsSqlServer ? "real SQL Server: evidence for constraints, row-level security and concurrency" : "NOT SQL Server evidence");
         var folder = Path.Combine(AppContext.BaseDirectory, "rehearsal-evidence");
         Directory.CreateDirectory(folder);
         File.WriteAllText(Path.Combine(folder, app.IsSqlServer ? "no-code-rehearsal-sqlserver.md" : "no-code-rehearsal-sqlite.md"), markdown);
-        Assert.Contains("| 20 |", markdown);
+        Assert.Contains("| 23 |", markdown);
+        Assert.DoesNotContain("| Blocked | Passed |", markdown);
     }
 }
 
@@ -378,7 +488,7 @@ public sealed class NoCodeRehearsalSqliteTests
     [Fact]
     public async Task A_new_company_is_set_up_from_nothing_through_the_pages_by_the_people_who_would_do_it()
     {
-        using var app = DemoApp.Start();
+        using var app = DemoApp.Start(NoCodeJourney.Settings);
         var ledger = await NoCodeJourney.RunAsync(app);
         RehearsalVerdict.Check(ledger, app);
     }
@@ -391,7 +501,7 @@ public sealed class NoCodeRehearsalSqlServerTests
     [SqlServerFact]
     public async Task The_same_journey_over_real_SQL_Server_with_real_constraints_and_row_level_security()
     {
-        using var app = DemoApp.StartSqlServer();
+        using var app = DemoApp.StartSqlServer(NoCodeJourney.Settings);
         var ledger = await NoCodeJourney.RunAsync(app);
         RehearsalVerdict.Check(ledger, app);
     }

@@ -12,6 +12,9 @@ public sealed class OperationsDbContext(DbContextOptions<OperationsDbContext> op
     public DbSet<MaintenanceState> Maintenance => Set<MaintenanceState>();
     public DbSet<OperationRun> Runs => Set<OperationRun>();
     public DbSet<MigrationRecord> MigrationRecords => Set<MigrationRecord>();
+    public DbSet<AcceptedException> AcceptedExceptions => Set<AcceptedException>();
+    public DbSet<EmailConfiguration> EmailConfigurations => Set<EmailConfiguration>();
+    public DbSet<EmailTestResult> EmailTestResults => Set<EmailTestResult>();
     protected override string SchemaName => OperationsModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
@@ -50,6 +53,53 @@ public sealed class OperationsDbContext(DbContextOptions<OperationsDbContext> op
             e.Property(x => x.PlatformVersion).HasMaxLength(40).IsRequired();
             e.Property(x => x.Origin).HasMaxLength(20).IsRequired();
             e.HasIndex(x => new { x.TenantId, x.Module, x.MigrationId }).IsUnique();
+        });
+        mb.Entity<AcceptedException>(e =>
+        {
+            e.ToTable("AcceptedException");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Kind).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Code).HasMaxLength(60).IsRequired();
+            e.Property(x => x.Scope).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            e.Property(x => x.AcceptedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.AcceptedByName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RevokedBy).HasMaxLength(200);
+            e.Property(x => x.CorrelationId).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => new { x.TenantId, x.Kind, x.Code });
+        });
+        mb.Entity<EmailConfiguration>(e =>
+        {
+            e.ToTable("EmailConfiguration");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.ProviderKey).HasMaxLength(20).IsRequired();
+            e.Property(x => x.FromAddress).HasMaxLength(320);
+            e.Property(x => x.Host).HasMaxLength(255);
+            e.Property(x => x.UserRef).HasMaxLength(300);
+            e.Property(x => x.PasswordRef).HasMaxLength(300);
+            e.Property(x => x.Fingerprint).HasMaxLength(64).IsRequired();
+            e.Property(x => x.UpdatedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RowVersion);
+        });
+        mb.Entity<EmailTestResult>(e =>
+        {
+            e.ToTable("EmailTestResult");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.ConfigFingerprint).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ProviderKey).HasMaxLength(20).IsRequired();
+            e.Property(x => x.TestedBy).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RecipientMasked).HasMaxLength(320).IsRequired();
+            e.Property(x => x.ConnectivityOutcome).HasMaxLength(20).IsRequired();
+            e.Property(x => x.ConnectivityCode).HasMaxLength(40).IsRequired();
+            e.Property(x => x.ConnectivityDetail).HasMaxLength(400).IsRequired();
+            e.Property(x => x.DeliveryOutcome).HasMaxLength(20).IsRequired();
+            e.Property(x => x.DeliveryCode).HasMaxLength(40).IsRequired();
+            e.Property(x => x.DeliveryDetail).HasMaxLength(400).IsRequired();
+            e.Property(x => x.CorrelationId).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => new { x.TenantId, x.TestedUtc });
         });
         mb.Entity<OperationRun>(e =>
         {

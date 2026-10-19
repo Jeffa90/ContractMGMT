@@ -25,7 +25,7 @@ public interface IOperationsDashboard
 internal sealed class OperationsDashboardService(
     IAccessService access, ITenantContext tenant, IClock clock, IActorContext actor, IServiceProvider root, ReadinessService readiness, IOperationHistory history, IOperationLeases leases,
     IMaintenanceService maintenance, IBackupCatalogue backups, IDatabaseBackupProvider database, IOptions<RecoveryOptions> recovery, StartupFacts facts, IOperationsAdministration administration,
-    IEnumerable<IKeyRingInspector> keyRings, OperationalFactCollector collector, ILogger<OperationsDashboardService> log) : IOperationsDashboard
+    IEnumerable<IKeyRingInspector> keyRings, OperationalFactCollector collector, ILogger<OperationsDashboardService> log, GovernanceMode? governance = null) : IOperationsDashboard
 {
     private static readonly TimeSpan StaleLeaseGrace = TimeSpan.FromMinutes(5);
 
@@ -70,7 +70,7 @@ internal sealed class OperationsDashboardService(
         OperationalLog.DashboardBuilt(log, OpsStatuses.Label(overall), panels.Count(p => p.Status == OpsStatus.Failed), panels.Count(p => p.Status == OpsStatus.NotVerified), correlation);
 
         return new OperationsDashboard(now, correlation, overall, UpgradeVersions.Current, facts.Mode.ToString(), database.Engine, maint, panels, failures, coverage, leaseList, schema.Select(m => m.Version).ToList(), detail,
-            OperationalTelemetry.GaugeSnapshot());
+            OperationalTelemetry.GaugeSnapshot(), governance is null ? "" : $"{governance.Name}: {governance.Label}");
     }
 
     private static async Task<T?> Safe<T>(Func<Task<T?>> work) where T : class

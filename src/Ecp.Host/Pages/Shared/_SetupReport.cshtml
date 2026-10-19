@@ -23,5 +23,5 @@
     <tbody>@foreach (var c in Model.Checks) { <tr><th scope="row"><code>@c.Id</code> @Terms.Expand(c.Description)</th><td>@c.Severity</td><td><span class="badge @(c.Status == "Pass" ? "ok" : c.Severity == "Blocking" ? "bad" : "warn")">@c.Status</span></td><td>@Terms.Expand(c.Message)@(c.AcknowledgedBy is null ? "" : $" Acknowledged by {c.AcknowledgedBy}: {c.AcknowledgedReason}")</td></tr> }</tbody>
 </table></div>
 <h2>@L["Integrations"]</h2>
-<dl class="facts card">@foreach (var kv in Model.Integrations) { <dt>@kv.Key</dt><dd>@kv.Value</dd> }</dl>
+<dl class="facts card">@foreach (var kv in Model.Integrations) { <dt>@Terms.Expand(kv.Key)</dt><dd>@Terms.Expand(kv.Value)</dd> }</dl>
 <p class="hint">@L["This report contains no secrets, secret references, connection strings or tokens."]</p>

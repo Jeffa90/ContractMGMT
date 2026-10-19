@@ -174,3 +174,115 @@ public sealed class MigrationRecord : ITenantOwned
         RecordedUtc = Guard.Utc(nowUtc, nameof(nowUtc))
     };
 }
+
+/// <summary>
+/// A warning or limit that a named person has accepted on the record: an upgrade pre-flight warning, a readiness warning, a mock scanner. It is the explicit acceptance evidence that lets "Ready with warnings" count as
+/// Passed (D14.13). It never removes the warning: the original outcome stays what it was.
+/// </summary>
+public sealed class AcceptedException : ITenantOwned
+{
+    private AcceptedException() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; } = SystemTenant.Id;
+    /// <summary>What kind of thing was accepted: <c>preflight.warning</c> or <c>readiness.warning</c>.</summary>
+    public string Kind { get; private set; } = "";
+    /// <summary>The stable code of the warning, for example <c>UPF-040</c>.</summary>
+    public string Code { get; private set; } = "";
+    /// <summary>Where it applies: <c>installation</c> or a short description such as an environment name.</summary>
+    public string Scope { get; private set; } = "installation";
+    public string Reason { get; private set; } = "";
+    public string AcceptedBy { get; private set; } = "";
+    public string AcceptedByName { get; private set; } = "";
+    public DateTime AcceptedUtc { get; private set; }
+    public DateTime ExpiresUtc { get; private set; }
+    public DateTime? RevokedUtc { get; private set; }
+    public string? RevokedBy { get; private set; }
+    public string CorrelationId { get; private set; } = "";
+
+    public bool IsActiveAt(DateTime nowUtc) => RevokedUtc is null && ExpiresUtc > nowUtc;
+
+    public static AcceptedException Accept(string kind, string code, string scope, string reason, string by, string byName, DateTime nowUtc, DateTime expiresUtc, string correlationId)
+        => new()
+        {
+            Id = Guid.NewGuid(), Kind = Guard.NotBlank(kind, nameof(kind), 40), Code = Guard.NotBlank(code, nameof(code), 60), Scope = Guard.NotBlank(scope, nameof(scope), 200),
+            Reason = Guard.NotBlank(reason, nameof(reason), 500), AcceptedBy = Guard.NotBlank(by, nameof(by), 200), AcceptedByName = Guard.NotBlank(byName, nameof(byName), 200),
+            AcceptedUtc = Guard.Utc(nowUtc, nameof(nowUtc)), ExpiresUtc = Guard.Utc(expiresUtc, nameof(expiresUtc)), CorrelationId = Guard.NotBlank(correlationId, nameof(correlationId), 100),
+        };
+
+    public void Revoke(string by, DateTime nowUtc) { RevokedUtc = Guard.Utc(nowUtc, nameof(nowUtc)); RevokedBy = Guard.NotBlank(by, nameof(by), 200); }
+}
+
+/// <summary>
+/// The installation's email provider settings: non-secret values and secret <em>references</em> only, never a secret. One row; each save increases <see cref="Revision"/> and changes <see cref="Fingerprint"/>, which
+/// is what a test result is tied to, so a changed setting can never inherit an old pass.
+/// </summary>
+public sealed class EmailConfiguration : ITenantOwned
+{
+    public static readonly Guid RowId = new("00000000-0000-0000-0000-0000000000e1");
+
+    private EmailConfiguration() { }
+    public Guid Id { get; private set; } = RowId;
+    public Guid TenantId { get; private set; } = SystemTenant.Id;
+    /// <summary>smtp, graph, dev-capture, demo-log, mock or disabled.</summary>
+    public string ProviderKey { get; private set; } = "";
+    public string? FromAddress { get; private set; }
+    public string? Host { get; private set; }
+    public int Port { get; private set; } = 587;
+    public bool UseTls { get; private set; } = true;
+    public string? UserRef { get; private set; }
+    public string? PasswordRef { get; private set; }
+    public int Revision { get; private set; }
+    public string Fingerprint { get; private set; } = "";
+    public DateTime UpdatedUtc { get; private set; }
+    public string UpdatedBy { get; private set; } = "";
+    public byte[] RowVersion { get; private set; } = [];
+
+    public static EmailConfiguration Create() => new();
+
+    public void Set(string providerKey, string? from, string? host, int port, bool useTls, string? userRef, string? passwordRef, string fingerprint, string by, DateTime nowUtc)
+    {
+        ProviderKey = Guard.NotBlank(providerKey, nameof(providerKey), 20); FromAddress = Clip(from, 320); Host = Clip(host, 255); Port = port; UseTls = useTls;
+        UserRef = Clip(userRef, 300); PasswordRef = Clip(passwordRef, 300); Fingerprint = Guard.NotBlank(fingerprint, nameof(fingerprint), 64); Revision++;
+        UpdatedBy = Guard.NotBlank(by, nameof(by), 200); UpdatedUtc = Guard.Utc(nowUtc, nameof(nowUtc));
+    }
+
+    private static string? Clip(string? s, int max) => string.IsNullOrWhiteSpace(s) ? null : s.Trim().Length <= max ? s.Trim() : s.Trim()[..max];
+}
+
+/// <summary>
+/// The outcome of one email test: a connectivity probe of the provider and a delivery attempt of a fixed synthetic message. Holds a masked recipient and safe diagnostics only: no secret, no server banner, no message content
+/// beyond the fixed text. It is tied to the configuration fingerprint it tested.
+/// </summary>
+public sealed class EmailTestResult : ITenantOwned
+{
+    private EmailTestResult() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; } = SystemTenant.Id;
+    public string ConfigFingerprint { get; private set; } = "";
+    public string ProviderKey { get; private set; } = "";
+    public DateTime TestedUtc { get; private set; }
+    public string TestedBy { get; private set; } = "";
+    public string RecipientMasked { get; private set; } = "";
+    /// <summary>Passed, Failed or NotVerified.</summary>
+    public string ConnectivityOutcome { get; private set; } = "";
+    public string ConnectivityCode { get; private set; } = "";
+    public string ConnectivityDetail { get; private set; } = "";
+    public string DeliveryOutcome { get; private set; } = "";
+    public string DeliveryCode { get; private set; } = "";
+    public string DeliveryDetail { get; private set; } = "";
+    /// <summary>True when the provider delivers nothing to a real mailbox (development capture, demonstration log, mock outbox).</summary>
+    public bool Simulated { get; private set; }
+    public bool Succeeded { get; private set; }
+    public string CorrelationId { get; private set; } = "";
+
+    public static EmailTestResult Record(string fingerprint, string providerKey, DateTime nowUtc, string by, string recipientMasked, string connectivityOutcome, string connectivityCode, string connectivityDetail,
+        string deliveryOutcome, string deliveryCode, string deliveryDetail, bool simulated, string correlationId) => new()
+    {
+        Id = Guid.NewGuid(), ConfigFingerprint = Guard.NotBlank(fingerprint, nameof(fingerprint), 64), ProviderKey = Guard.NotBlank(providerKey, nameof(providerKey), 20), TestedUtc = Guard.Utc(nowUtc, nameof(nowUtc)),
+        TestedBy = Guard.NotBlank(by, nameof(by), 200), RecipientMasked = Clip(recipientMasked, 320), ConnectivityOutcome = Guard.NotBlank(connectivityOutcome, nameof(connectivityOutcome), 20),
+        ConnectivityCode = Clip(connectivityCode, 40), ConnectivityDetail = Clip(connectivityDetail, 400), DeliveryOutcome = Guard.NotBlank(deliveryOutcome, nameof(deliveryOutcome), 20), DeliveryCode = Clip(deliveryCode, 40),
+        DeliveryDetail = Clip(deliveryDetail, 400), Simulated = simulated, Succeeded = deliveryOutcome == "Passed" && (connectivityOutcome == "Passed" || simulated), CorrelationId = Guard.NotBlank(correlationId, nameof(correlationId), 100),
+    };
+
+    private static string Clip(string s, int max) => s.Length <= max ? s : s[..max];
+}

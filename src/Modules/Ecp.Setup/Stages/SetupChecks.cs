@@ -179,13 +179,14 @@ internal sealed class EmailCheck : ISetupCheck
     public string Id => "R-NOT-01";
     public string Description => "Email notifications can be delivered";
 
-    public Task<CheckOutcome> RunAsync(CheckContext c)
+    public async Task<CheckOutcome> RunAsync(CheckContext c)
     {
-        var provider = c.Doc.Get("notifications", "in.provider");
-        if (provider is null) return Task.FromResult(CheckOutcome.Fail("Email has not been configured."));
-        if (provider == nameof(EmailProviderKind.Smtp) && c.Doc.Done("notifications")) return Task.FromResult(CheckOutcome.Pass("SMTP is configured and the test message was accepted."));
+        if (c.Doc.Get("notifications", "in.provider") is null) return CheckOutcome.Fail("Email has not been configured.", c.Env.HostMode == EcpMode.Production ? CheckLevel.Blocking : CheckLevel.Warning);
+        var info = await c.Services.GetRequiredService<IEmailConfigurationService>().ReadinessAsync(c.Ct);
+        if (info.State == EmailState.Healthy) return CheckOutcome.Pass("The email provider was reached and a test message was accepted. " + info.Summary);
+        // Only a real, recent, passing test counts. A simulated provider, an untested one, a stale pass and a failed test are all "not ready": a warning outside Production, a blocker in it.
         var level = c.Env.HostMode == EcpMode.Production ? CheckLevel.Blocking : CheckLevel.Warning;
-        return Task.FromResult(CheckOutcome.Fail($"The {provider} email provider does not deliver notifications.", level));
+        return CheckOutcome.Fail($"Email is {info.State}: {info.Summary}", level);
     }
 }
 

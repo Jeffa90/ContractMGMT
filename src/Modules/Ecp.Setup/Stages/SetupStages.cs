@@ -46,6 +46,7 @@ internal sealed class ModeStage : SetupStageBase
     public override IReadOnlyList<string> Notes(SetupDocument doc, SetupEnvironment env) =>
     [
         $"This installation runs in {env.HostMode} mode. The mode is set by the host configuration (Ecp:Mode) and cannot be changed from this page.",
+        .. (env.GovernanceName is null ? Array.Empty<string>() : [$"Governance: {env.GovernanceLabel}. {env.GovernanceNote}"]),
         env.HostMode == EcpMode.Production
             ? "Production refuses demonstration identity, demonstration data, the lightweight database and ephemeral storage."
             : "Demonstration and Test modes allow synthetic data and a mock email provider. They are not approved for real data.",
@@ -556,7 +557,7 @@ internal sealed class NotificationsStage : SetupStageBase
     public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)
     {
         var providers = new List<FieldOption> { new("Smtp", "SMTP server") };
-        if (env.HostMode != EcpMode.Production) { providers.Add(new("Mock", "Mock (writes to the outbox folder; delivers nothing)")); providers.Add(new("Disabled", "Disabled (no email is sent)")); }
+        if (env.HostMode != EcpMode.Production) { providers.Add(new("Mock", "Development capture (simulated; delivers nothing)")); providers.Add(new("Disabled", "Disabled (no email is sent)")); }
         return
         [
             new("provider", "Provider", FieldKind.Select, true, Options: providers, Value: providers[0].Value),
@@ -575,22 +576,39 @@ internal sealed class NotificationsStage : SetupStageBase
         if (!Enum.TryParse<EmailProviderKind>(c.Required("provider", "Provider"), out var kind)) throw new DomainException("provider", "Choose one of the listed providers.");
         _ = int.TryParse(c.Value("port"), out var port);
         var settings = new EmailSettings(kind, c.Value("from"), c.Value("host"), port == 0 ? 587 : port, c.Flag("useTls"), c.Value("userRef"), c.Value("passwordRef"));
-        var factory = c.Get<IEmailSenderFactory>();
-        var issues = factory.Validate(settings, c.Env.HostMode);
+        var providerKey = kind switch { EmailProviderKind.Smtp => EmailProviderKeys.Smtp, EmailProviderKind.Mock => EmailProviderKeys.DevCapture, _ => EmailProviderKeys.Disabled };
+        var issues = EmailRules.Validate(c.Get<IEmailSenderFactory>(), settings, providerKey, c.Env.HostMode);
         if (issues.Count > 0) return StageResult.Fail("The email settings are not valid.", [.. issues.Select(i => i.Message)]);
+        var email = c.Get<IEmailConfigurationService>();
+        var by = new OperatorIdentity("setup:" + c.Actor.Label, c.Actor.Label);
         var details = new List<string>();
+        await email.SaveAsync(providerKey, settings, by, c.Ct);
+        StageResult result;
         if (kind != EmailProviderKind.Disabled)
         {
             var to = c.Required("testRecipient", "Test recipient");
             if (!System.Net.Mail.MailAddress.TryCreate(to, out _)) throw new DomainException("recipient", "Enter a valid test recipient address.");
-            try { await factory.Create(settings).SendAsync(new EmailMessage(to, "Setup email test", "This message confirms that email is configured. No action is needed."), c.Ct); }
-            catch (DomainException ex) { return StageResult.Fail("The test message could not be sent: " + ex.Message); }
+            // The test really connects to the provider and delivers a synthetic message; saving settings alone proves nothing (G-12).
+            var test = await email.TestAsync(to, by, c.Ct);
+            if (!test.Succeeded)
+            {
+                var (code, why) = test.ConnectivityOutcome == "Failed" ? (test.ConnectivityCode, test.ConnectivityDetail) : (test.DeliveryCode, test.DeliveryDetail);
+                return StageResult.Fail("The email test did not pass, so email is not ready. " + why, [$"Diagnostic code {code}; reference {test.CorrelationId}.", "Correct the settings and run the step again. Nothing was sent to any real person."]);
+            }
+            details.Add($"Test reference {test.CorrelationId}.");
+            result = test.Simulated
+                ? StageResult.Ok("The simulated provider accepted the test message. Nothing was delivered to a real mailbox, so email is Not Verified until a real provider is configured and tested.", [.. details])
+                : StageResult.Ok("The mail server was reached and accepted the test message.", [.. details]);
         }
-        else details.Add("Email is disabled: no [[notification|plural|lower]] will be delivered.");
+        else
+        {
+            details.Add("Email is disabled: no [[notification|plural|lower]] will be delivered.");
+            result = StageResult.Ok("Email [[notification|plural|lower]] are disabled.", [.. details]);
+        }
         foreach (var (k, v) in new Dictionary<string, string?> { ["provider"] = kind.ToString(), ["from"] = settings.From, ["host"] = settings.Host, ["port"] = settings.Port.ToString(),
             ["useTls"] = settings.UseTls ? "true" : "false", ["userRef"] = settings.UserRef, ["passwordRef"] = settings.PasswordRef })
             c.Remember(k, v);
-        return StageResult.Ok(kind switch { EmailProviderKind.Disabled => "Email [[notification|plural|lower]] are disabled.", EmailProviderKind.Mock => "The mock provider accepted the test message (nothing was delivered).", _ => "The test message was accepted by the mail server." }, [.. details]);
+        return result;
     }
 }
 

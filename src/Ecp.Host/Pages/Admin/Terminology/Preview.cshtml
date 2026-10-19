@@ -10,7 +10,7 @@
     <div class="table-wrap"><table>
         <caption>@L["Representative text"]</caption>
         <thead><tr><th scope="col">@L["Where it appears"]</th><th scope="col">@L["Template"]</th><th scope="col">@L["Now"]</th><th scope="col">@L["After publishing"]</th></tr></thead>
-        <tbody>@foreach (var s in r.Samples) { <tr><th scope="row">@s.Area</th><td><code>@s.Template</code></td><td>@s.Now</td><td>@s.After</td></tr> }</tbody>
+        <tbody>@foreach (var s in r.Samples) { <tr><th scope="row">@s.Area</th><td><code>@Ecp.SharedKernel.TermTokens.Notation(s.Template)</code></td><td>@s.Now</td><td>@s.After</td></tr> }</tbody>
     </table></div>
     <div class="table-wrap"><table>
         <caption>@L["Role names (the stable role code never changes)"]</caption>

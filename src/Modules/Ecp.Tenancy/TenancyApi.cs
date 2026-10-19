@@ -194,6 +194,7 @@ public static class TenancyModule
         services.AddModuleDbContext<TenancyDbContext>(Name, Tier, Schema);
         services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
         services.AddScoped<ITenantDirectory, TenantDirectory>();
+        services.AddScoped<Ecp.SharedKernel.IOperationalProbe, TenancyOperationalProbe>();
         services.AddScoped<IOrganisationStructureService, OrganisationStructureService>();
         return services;
     }

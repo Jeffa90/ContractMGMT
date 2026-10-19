@@ -99,6 +99,7 @@ public static class MigrationModule
         services.AddScoped<IMigrationIntake, MigrationIntakeService>();
         services.AddScoped<IMigrationValidation, MigrationValidationService>();
         services.AddScoped<IMigrationCommit, MigrationCommitService>();
+        services.AddScoped<IMaskedDataDeclarations, MaskedDataDeclarationService>();
         services.AddScoped<IMigrationRollback, MigrationRollbackService>();
         services.AddScoped<IMigrationReports, MigrationReportService>();
         // The real cutover freeze replaces the Contracts module's default (nothing frozen).

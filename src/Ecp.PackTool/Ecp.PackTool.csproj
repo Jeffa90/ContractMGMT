@@ -1,10 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <IsPackable>false</IsPackable>
-    <!-- Not published with the host: it is a build and release tool (docs/PACK_AUTHORING.md, docs/PACK_SIGNING.md). -->
+    <!-- The supported way to get this tool: a .NET tool package (dotnet tool install Ecp.PackTool), so a Pack Publisher needs the .NET runtime and nothing else: no source checkout, no Visual Studio, no SDK.
+         Not published with the host. It is a technical Pack Publisher function (docs/PACK_SIGNING.md, docs/PACK_AUTHORING.md). -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>ecp-pack</ToolCommandName>
+    <PackageId>Ecp.PackTool</PackageId>
+    <IsPackable>true</IsPackable>
+    <Description>Build, validate, sign, verify and inspect Enterprise Contract Platform solution packs (.ecpkg). A technical tool for the Pack Publisher.</Description>
+    <Authors>Enterprise Contract Platform</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- No open-source licence is granted: the package is distributed to licensed publishers only (docs/SUPPLY_CHAIN.md). -->
+    <NoWarn>$(NoWarn);NU5125</NoWarn>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Ecp.Packs/Ecp.Packs.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>

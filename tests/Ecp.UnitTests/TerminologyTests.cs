@@ -179,11 +179,14 @@ public sealed class TerminologyTests
     public void Unknown_tokens_modifiers_and_stray_brackets_are_reported(string text, bool hasProblems) => Assert.Equal(hasProblems, TermTokens.Problems(text).Count > 0);
 
     [Fact]
-    public void An_unknown_token_is_left_as_written_so_nothing_executes()
+    public void An_invalid_token_becomes_a_controlled_diagnostic_never_raw_syntax_and_nothing_executes()
     {
-        Assert.Equal("[[contract|bogus]]", TermTokens.ExpandNeutral("[[contract|bogus]]"));
-        Assert.Equal("[[ contract ]]", TermTokens.ExpandNeutral("[[ contract ]]"));
+        Assert.Equal("(term \"contract\" unavailable)", TermTokens.ExpandNeutral("[[contract|bogus]]"));
+        Assert.Equal("(term \"contract\" unavailable)", TermTokens.ExpandNeutral("[[ contract ]]"));
+        Assert.Equal("Create (term \"Contract\" unavailable) now", TermTokens.ExpandNeutral("Create [[Contract]] now"));
+        Assert.DoesNotContain("[[", TermTokens.ExpandNeutral("[[a]] [[b|c|d|e|f]] [[ ]]"));
         Assert.Equal("{{contract}}", TermTokens.ExpandNeutral("{{contract}}"));
+        Assert.Equal("an unterminated [[ stays text", TermTokens.ExpandNeutral("an unterminated [[ stays text"));   // no closing brackets: not a token, nothing to resolve
     }
 
     [Theory]

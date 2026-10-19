@@ -38,7 +38,7 @@ public sealed record CatalogueCoverage(int Total, int RunHere, int RunElsewhere,
 
 public sealed record OperationsDashboard(DateTime GeneratedUtc, string CorrelationId, OpsStatus Overall, string PlatformVersion, string EnvironmentMode, string DatabaseEngine, MaintenanceStatus Maintenance,
     IReadOnlyList<DashboardPanel> Panels, IReadOnlyList<FailureEntry> Failures, CatalogueCoverage Coverage, IReadOnlyList<LeaseInfo> Leases, IReadOnlyList<ModuleVersion> Modules, bool DetailVisible,
-    IReadOnlyDictionary<string, long> Metrics)
+    IReadOnlyDictionary<string, long> Metrics, string Governance = "")
 {
     public DashboardPanel? Panel(string key) => Panels.FirstOrDefault(p => p.Key == key);
 }

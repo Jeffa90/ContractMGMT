@@ -1,0 +1,45 @@
+@page "/Admin/Operations/EvidencePack"
+@model Ecp.Host.Pages.Admin.Operations.EvidencePackModel
+@using Ecp.Recovery
+@{ ViewData["Title"] = L["Implementation evidence pack"].Value; var p = Model.Pack; }
+<h1>@L["Implementation evidence pack"]</h1>
+<p class="lede">@L["What the platform can state about this implementation, kept as it is: Verified, Warning, Failed or Not Verified. Only Verified counts as a pass. The pack never says the environment is ready for Production, contains no secrets and no contract or document content, and is signed off by people outside the platform."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (p is not null)
+{
+    <section class="card" role="status" aria-labelledby="ov-h">
+        <h2 id="ov-h">@L["Overall (the worst section)"]: <span class="badge @OpsStatuses.Css(p.Overall)">@OpsStatuses.Label(p.Overall)</span></h2>
+        <dl class="facts">
+            <dt>@L["Generated (UTC)"]</dt><dd>@Fmt.DateTime(p.GeneratedUtc)</dd><dt>@L["Platform version"]</dt><dd>@p.PlatformVersion</dd><dt>@L["Mode"]</dt><dd>@p.EnvironmentMode</dd>
+            <dt>@L["Governance"]</dt><dd>@p.Governance</dd><dt>@L["Reference"]</dt><dd><code>@p.CorrelationId</code></dd>
+        </dl>
+        @foreach (var s in p.Statements) { <p class="hint">@s</p> }
+        <p><a class="button" href="/Admin/Operations/EvidencePack?handler=Download">@L["Download the pack (ZIP with JSON, CSV, Markdown and file hashes)"]</a></p>
+    </section>
+    <div class="table-wrap"><table>
+        <caption class="visually-hidden">@L["Evidence sections"]</caption>
+        <thead><tr><th scope="col">@L["Code"]</th><th scope="col">@L["Section"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Counts as"]</th><th scope="col">@L["What the platform found"]</th></tr></thead>
+        <tbody>
+        @foreach (var s in p.Sections)
+        {
+            <tr><th scope="row"><code>@s.Code</code></th><td>@(s.Reference is null ? s.Title : "")@if (s.Reference is not null) { <a href="@s.Reference">@s.Title</a> }</td>
+                <td><span class="badge @OpsStatuses.Css(s.Status)">@OpsStatuses.Label(s.Status)</span></td><td>@s.CountsAs</td>
+                <td>@s.Summary @if (s.Facts.Count > 0) { <details><summary>@L["Facts"]</summary><ul>@foreach (var f in s.Facts) { <li><strong>@f.Name:</strong> @f.Value</li> }</ul></details> }</td></tr>
+        }
+        </tbody>
+    </table></div>
+    <section class="card" aria-labelledby="ex-h"><h2 id="ex-h">@L["Accepted exceptions"]</h2>
+        @if (p.AcceptedExceptions.Count == 0) { <p>@L["None."]</p> }
+        else { <ul>@foreach (var e in p.AcceptedExceptions) { <li><code>@e.Code</code> (@e.Kind), @e.Scope: @L["accepted by"] @e.AcceptedByName @L["until"] @Fmt.DateTime(e.ExpiresUtc) (@(e.RevokedUtc is not null ? L["revoked"].Value : e.Active ? L["active"].Value : L["expired"].Value)). @e.Reason</li> }</ul> }
+    </section>
+    <section class="card" aria-labelledby="rk-h"><h2 id="rk-h">@L["Open risks"]</h2>
+        @if (p.OpenRisks.Count == 0) { <p>@L["None."]</p> }
+        else { <ul>@foreach (var r in p.OpenRisks) { <li><code>@r.Code</code> @r.Title (@OpsStatuses.Label(r.Status)): @r.Why</li> }</ul> }
+    </section>
+    <section class="card" aria-labelledby="so-h"><h2 id="so-h">@L["Sign-off"]</h2>
+        <p>@L["Placeholders. They are completed outside the platform."]</p>
+        <div class="table-wrap"><table><caption class="visually-hidden">@L["Sign-off"]</caption><thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["Name"]</th><th scope="col">@L["Date"]</th><th scope="col">@L["Signature"]</th></tr></thead>
+        <tbody>@foreach (var l in p.SignOff) { <tr><th scope="row">@l.Role</th><td></td><td></td><td></td></tr> }</tbody></table></div>
+    </section>
+}
+<p><a href="/Admin/Operations">@L["Back to Operations"]</a></p>

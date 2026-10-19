@@ -175,8 +175,30 @@ public static partial class TermTokens
     public static string Expand(string text, TermSet terms)
     {
         if (string.IsNullOrEmpty(text) || !text.Contains("[[", StringComparison.Ordinal)) return text;
-        return Token().Replace(text, m => Render(m.Groups[1].Value, m.Groups[2].Value.Split('|', StringSplitOptions.RemoveEmptyEntries), terms) ?? m.Value);
+        // One pass over the original text only, so a label that happens to look like a token is data and is never expanded a second time. Anything in double brackets that is not a valid token (a mistyped key,
+        // an unsupported modifier, stray spaces) is replaced by a short diagnostic: a page never shows the raw syntax.
+        return Any().Replace(text, m =>
+        {
+            var inner = m.Groups[1].Value;
+            var valid = Exact().Match("[[" + inner + "]]");
+            if (valid.Success && Render(valid.Groups[1].Value, valid.Groups[2].Value.Split('|', StringSplitOptions.RemoveEmptyEntries), terms) is { } word) return word;
+            return Diagnostic(inner.Trim());
+        });
     }
+
+    [GeneratedRegex(@"\[\[([^\]\r\n]{0,80})\]\]", RegexOptions.NonBacktracking)]
+    private static partial Regex Any();
+
+    [GeneratedRegex(@"^\[\[([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*){0,4})((?:\|[a-z]+){0,4})\]\]$", RegexOptions.NonBacktracking)]
+    private static partial Regex Exact();
+
+    /// <summary>What a person sees in place of a token that cannot be resolved. It never contains the double brackets and it names the term, so the fault can be reported and fixed.</summary>
+    public static string Diagnostic(string key) => $"(term \"{key.Split('|')[0]}\" unavailable)";
+
+    /// <summary>
+    /// Shows a template's token syntax as notation for an author to read (for example on the terminology preview), without the double brackets that pages must not render: <c>[[contract|plural]]</c> reads <c>⟦contract|plural⟧</c>.
+    /// </summary>
+    public static string Notation(string template) => string.IsNullOrEmpty(template) ? template : template.Replace("[[", "⟦", StringComparison.Ordinal).Replace("]]", "⟧", StringComparison.Ordinal);
 
     /// <summary>Expands with the platform's neutral wording only (for text produced where no organisation is known).</summary>
     public static string ExpandNeutral(string text) => Expand(text, TermSet.Neutral());

@@ -147,6 +147,8 @@ public sealed class ConfigurationOptions
 {
     /// <summary>Second-person publish: the publisher must differ from the last editor of the draft (tenant setting; on by default in Production).</summary>
     public bool RequireSecondPersonPublish { get; set; }
+    /// <summary>The name of the governance mode in force (Production, TestEnforced, TestSimplified, DemoSimplified). Stamped on configuration audit events; the host sets it from the mode and <c>Ecp:Governance:SecondPerson</c>.</summary>
+    public string GovernanceMode { get; set; } = "";
     /// <summary>Rolling back needs the person to have signed in recently (the host sets it; the evidence is the verified session, never request input).</summary>
     public bool RequireRecentSignInForRollback { get; set; }
     /// <summary>The raw-document view of a draft may be edited and saved (a diagnostic for administrators who are shown the document). Off in Production, where the form editors are the way to change a draft and the raw view is read-only.</summary>
@@ -158,10 +160,13 @@ public sealed class ConfigurationOptions
 }
 
 internal sealed partial class ConfigurationService(
-    ConfigurationDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IAccessService access, CurrentUser currentUser,
+    ConfigurationDbContext db, IUnitOfWork uow, IAuditWriter rawAudit, ITenantContext tenant, IClock clock, IAccessService access, CurrentUser currentUser,
     IEnumerable<IConfigurationKind> kinds, ConfigurationOptions options, ActorContext actor, IPublishedConfigurationCache cache, IAfterCommit afterCommit, ReauthenticationContext reauth, IMaintenanceGate? maintenanceGate = null) : IConfigurationService, IConfigurationBootstrap, IConfigurationReleases
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    /// <summary>Every configuration audit event carries the governance mode in force (ADR-0038).</summary>
+    private readonly GovernanceAuditWriter audit = new(rawAudit, options);
 
     private IConfigurationKind KindOf(string kind) => kinds.FirstOrDefault(k => k.Kind == kind) ?? throw new DomainException("unknown_configuration_kind", $"Configuration kind '{kind}' is not recognised.");
     private string DraftPermissionOf(string kind) => (kinds.FirstOrDefault(k => k.Kind == kind)?.DraftPermission) ?? "config.draft";
@@ -568,5 +573,19 @@ public static class ConfigurationModule
         services.AddScoped<IPackTrustKeys, PackTrustKeys>();
         services.AddScoped<IOrganisationPackContent, OrganisationPackContent>();
         services.AddScoped<IPackDiagnostics, PackDiagnostics>();
+    }
+}
+
+/// <summary>Adds the governance mode to the new-values JSON of every configuration audit event, so the evidence says which rule applied (Production, TestEnforced and so on).</summary>
+internal sealed class GovernanceAuditWriter(IAuditWriter inner, ConfigurationOptions options)
+{
+    public void Record(AuditEntry entry)
+    {
+        var mode = string.IsNullOrEmpty(options.GovernanceMode) ? (options.RequireSecondPersonPublish ? "Production" : "Unspecified") : options.GovernanceMode;
+        System.Text.Json.Nodes.JsonObject node;
+        try { node = entry.NewValuesJson is { Length: > 0 } json && System.Text.Json.Nodes.JsonNode.Parse(json) is System.Text.Json.Nodes.JsonObject o ? o : new System.Text.Json.Nodes.JsonObject(); }
+        catch (System.Text.Json.JsonException) { node = new System.Text.Json.Nodes.JsonObject(); }
+        node["governanceMode"] = mode;
+        inner.Record(entry with { NewValuesJson = node.ToJsonString() });
     }
 }

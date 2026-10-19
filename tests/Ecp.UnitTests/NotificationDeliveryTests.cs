@@ -115,6 +115,21 @@ public sealed class EmailProviderTests
         public IEmailSender Create(EmailSettings settings) => sender;
     }
 
+    /// <summary>Stands in for the installation's saved email settings: the SMTP settings given, or "disabled" when none.</summary>
+    private sealed class FakeConfig(EmailSettings? smtp) : IEmailConfigurationService
+    {
+        public Task<EmailConfigView> EffectiveAsync(CancellationToken ct = default) => Task.FromResult(smtp is null
+            ? new EmailConfigView(EmailProviderKeys.Disabled, null, null, 587, true, null, null, "environment", 0, "x")
+            : new EmailConfigView(EmailProviderKeys.Smtp, smtp.From, smtp.Host, smtp.Port, smtp.UseTls, smtp.UserRef, smtp.PasswordRef, "environment", 0, "x"));
+        public Task<IReadOnlyList<EmailIssue>> ValidateAsync(EmailSettings settings, string providerKey, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<EmailConfigView> SaveAsync(string providerKey, EmailSettings settings, OperatorIdentity by, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<EmailReadinessInfo> ReadinessAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<EmailTestView> TestAsync(string recipient, OperatorIdentity by, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<EmailTestView>> RecentTestsAsync(int take = 10, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    private static SmtpProvider Provider(FakeSender sender, EmailSettings? smtp, params EmailIssue[] issues) => new(new FakeFactory(sender, issues), Options(smtp), new FakeConfig(smtp));
+
     private static EmailDelivery Message() => new(Guid.NewGuid(), Guid.NewGuid(), "owner@example.test", "Subject", "Body", "corr-1");
     private static IOptions<NotificationsOptions> Options(EmailSettings? smtp) => Microsoft.Extensions.Options.Options.Create(new NotificationsOptions { Smtp = smtp, Mode = EcpMode.Production });
 
@@ -122,7 +137,7 @@ public sealed class EmailProviderTests
     public async Task Smtp_sends_through_the_platform_sender_once_the_settings_validate()
     {
         var sender = new FakeSender();
-        var provider = new SmtpProvider(new FakeFactory(sender), Options(new EmailSettings(EmailProviderKind.Smtp, "noreply@example.test", "smtp.example.test")));
+        var provider = Provider(sender, new EmailSettings(EmailProviderKind.Smtp, "noreply@example.test", "smtp.example.test"));
         await provider.SendAsync(Message());
         var sent = Assert.Single(sender.Sent);
         Assert.Equal("owner@example.test", sent.To);
@@ -134,9 +149,9 @@ public sealed class EmailProviderTests
     public async Task Smtp_fails_visibly_when_not_configured_or_when_the_settings_are_unusable()
     {
         var sender = new FakeSender();
-        var none = await Assert.ThrowsAsync<DomainException>(() => new SmtpProvider(new FakeFactory(sender), Options(null)).SendAsync(Message()));
+        var none = await Assert.ThrowsAsync<DomainException>(() => Provider(sender, null).SendAsync(Message()));
         Assert.Equal("provider_not_configured", none.Code);
-        var bad = await Assert.ThrowsAsync<DomainException>(() => new SmtpProvider(new FakeFactory(sender, new EmailIssue("tls", "TLS is required in Production.")), Options(new EmailSettings(EmailProviderKind.Smtp, "a@example.test", "h"))).SendAsync(Message()));
+        var bad = await Assert.ThrowsAsync<DomainException>(() => Provider(sender, new EmailSettings(EmailProviderKind.Smtp, "a@example.test", "h"), new EmailIssue("tls", "TLS is required in Production.")).SendAsync(Message()));
         Assert.Equal("provider_not_configured", bad.Code);
         Assert.Contains("TLS", bad.Message);
         Assert.Empty(sender.Sent);

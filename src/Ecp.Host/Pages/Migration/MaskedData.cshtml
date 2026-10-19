@@ -1,0 +1,59 @@
+@page "/Migration/MaskedData"
+@model Ecp.Host.Pages.Migration.MaskedDataModel
+@{ ViewData["Title"] = L["Masked-data declarations"].Value; }
+<h1>@L["Masked-data declarations"]</h1>
+<p class="lede">@L["Before data from your own company is loaded into a Test environment, your organisation masks it and declares what was done. The platform keeps the declaration, ties it to the batch and refuses to commit the batch without a current one. It does not mask or inspect the data and does not say the data is safe. Never put real data in this form: describe the data, do not paste it."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="field"><label for="organisationId">@L["[[organisation]]"]</label>
+        <select id="organisationId" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select>
+        <button type="submit" class="secondary">@L["Show"]</button></form>
+}
+@if (!Model.Available)
+{
+    <p class="card">@L["This is a Production installation. Production data follows Production governance and is not declared this way."]</p>
+}
+else
+{
+    <section class="card" aria-labelledby="new-h">
+        <h2 id="new-h">@L["Make a declaration"]</h2>
+        <form method="post" asp-page-handler="Declare">
+            <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+            <div class="field"><label for="DatasetOwner">@L["Dataset owner (the person or team accountable for the data)"]</label><input id="DatasetOwner" name="DatasetOwner" maxlength="200" required /></div>
+            <div class="field"><label for="SourceSystem">@L["Source system"]</label><input id="SourceSystem" name="SourceSystem" maxlength="200" required /></div>
+            <div class="field"><label for="MaskingMethod">@L["How it was masked"]</label><textarea id="MaskingMethod" name="MaskingMethod" maxlength="1000" required></textarea></div>
+            <div class="field"><label for="FieldsMasked">@L["Names of the fields that were masked"]</label><textarea id="FieldsMasked" name="FieldsMasked" maxlength="2000" required></textarea></div>
+            <div class="field"><label><input type="checkbox" name="AttachmentsIncluded" value="true" /> @L["Attachments (documents) are included"]</label></div>
+            <div class="field"><label><input type="checkbox" name="PersonalDataIncluded" value="true" /> @L["Personal data remains in the data"]</label></div>
+            <div class="field"><label><input type="checkbox" name="ConfidentialDataIncluded" value="true" /> @L["Confidential commercial data remains in the data"]</label></div>
+            <div class="field"><label for="ApprovalReference">@L["Your approval reference (ticket, minute or register number)"]</label><input id="ApprovalReference" name="ApprovalReference" maxlength="200" required /></div>
+            <div class="field"><label for="ApprovedBy">@L["Approved by"]</label><input id="ApprovedBy" name="ApprovedBy" maxlength="200" required /></div>
+            <div class="field"><label for="ApprovedOn">@L["Approval date"]</label><input id="ApprovedOn" name="ApprovedOn" type="date" value="@Model.ApprovedOn.ToString("yyyy-MM-dd")" required /></div>
+            <div class="field"><label for="ReviewBy">@L["Expires (review by) on"]</label><input id="ReviewBy" name="ReviewBy" type="date" value="@Model.ReviewBy.ToString("yyyy-MM-dd")" required /></div>
+            <div class="field"><label for="PermittedUsers">@L["People who may load it (email addresses, separated by commas; empty means anyone who may commit a batch)"]</label><input id="PermittedUsers" name="PermittedUsers" maxlength="2000" /></div>
+            <p class="hint">@L["Permitted environment: Test only."]</p>
+            <div class="actions"><button type="submit">@L["Record the declaration"]</button></div>
+        </form>
+    </section>
+    <section class="card" aria-labelledby="list-h">
+        <h2 id="list-h">@L["Declarations"]</h2>
+        @if (Model.Items.Count == 0) { <p>@L["None yet."]</p> }
+        else
+        {
+            <div class="table-wrap"><table>
+                <caption class="visually-hidden">@L["Masked-data declarations"]</caption>
+                <thead><tr><th scope="col">@L["Dataset owner"]</th><th scope="col">@L["Approval"]</th><th scope="col">@L["Includes"]</th><th scope="col">@L["Review by"]</th><th scope="col">@L["State"]</th><th scope="col">@L["Batches"]</th><th scope="col"><span class="visually-hidden">@L["Actions"]</span></th></tr></thead>
+                <tbody>
+                @foreach (var d in Model.Items)
+                {
+                    <tr><th scope="row">@d.DatasetOwner<br /><span class="hint">@d.SourceSystem</span></th><td>@d.ApprovalReference<br /><span class="hint">@d.ApprovedBy, @Model.When(d.ApprovedUtc)</span></td>
+                        <td>@(d.AttachmentsIncluded ? L["attachments"].Value + " " : "")@(d.PersonalDataIncluded ? L["personal data"].Value + " " : "")@(d.ConfidentialDataIncluded ? L["confidential data"].Value : "")</td>
+                        <td>@Model.When(d.ReviewByUtc)</td><td>@(d.RevokedUtc is not null ? L["Revoked"].Value : d.Current ? L["Current"].Value : L["Expired"].Value)</td><td>@d.BatchCount</td>
+                        <td>@if (d.Current) { <form method="post" asp-page-handler="Revoke"><input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="DeclarationId" value="@d.Id" /><input name="Reason" maxlength="500" placeholder="@L["Reason"]" aria-label="@L["Reason for revoking"]" required /><button type="submit">@L["Revoke"]</button></form> }</td></tr>
+                }
+                </tbody></table></div>
+        }
+    </section>
+}
+<p><a href="/Migration">@L["Back to migration"]</a></p>

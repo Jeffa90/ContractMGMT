@@ -44,7 +44,7 @@ public interface IMigrationCommit
 }
 
 internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime runtime, IContractMigrationPort contracts, IDocumentMigrationPort documents, IDocumentStorageProvider storage,
-    IMigrationFaults faults, MigrationReconciler reconciler, IMaintenanceGate? maintenanceGate = null) : IMigrationCommit
+    IMigrationFaults faults, MigrationReconciler reconciler, IMaskedDataDeclarations masked, IMaintenanceGate? maintenanceGate = null) : IMigrationCommit
 {
     private const string ContractsPhase = "Contracts";
     private const string DocumentsPhase = "Documents";
@@ -72,6 +72,8 @@ internal sealed class MigrationCommitService(MigrationKernel k, BatchRuntime run
         if (batch.IsLegacyLoad && !project.LegacyLoadAllowedAt(k.Clock.UtcNow)) throw new DomainException("legacy_policy_inactive", "MIG-E012: The legacy-load policy has expired or been closed.");
         if (await k.Db.StagingRows.AnyAsync(r => r.BatchId == batchId && r.ReviewDecision == ReviewDecision.Required, ct))
             throw new DomainException("review_required", "Some rows are waiting for a decision. Decide each one (skip, update, create with a new reference, or reject) and validate again.");
+
+        await masked.EnsureCommitAllowedAsync(batchId, ct);   // the data-handling checkpoint: refused with a code and a sentence, and audited (G-35)
 
         var owner = Guid.NewGuid().ToString("N");
         var resumed = batch.Status is not BatchStatus.Validated;

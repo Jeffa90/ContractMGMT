@@ -36,7 +36,9 @@ public static class PlatformComposition
         services.AddAuditModule();
         services.AddTenancyModule();
         services.AddIdentityModule(o => { o.Mode = resolved.Host.Mode; o.RequireEmergencyConfirmation = production; });
-        services.AddConfigurationModule(o => { o.RequireSecondPersonPublish = production; o.RequireRecentSignInForRollback = true; o.AllowRawDocumentEditing = !production; o.DefaultPackId = configuration["Ecp:DefaultPackId"]; }, packs: o =>
+        var governance = GovernanceMode.Resolve(resolved.Host.Mode, configuration[GovernanceMode.SettingKey]);
+        services.AddSingleton(governance);
+        services.AddConfigurationModule(o => { o.RequireSecondPersonPublish = governance.SecondPersonRequired; o.GovernanceMode = governance.Name; o.RequireRecentSignInForRollback = true; o.AllowRawDocumentEditing = !governance.IsProductionEquivalent; o.DefaultPackId = configuration["Ecp:DefaultPackId"]; }, packs: o =>
         {
             configuration.GetSection("Ecp:Packs").Bind(o);
             o.Mode = resolved.Host.Mode;                                                       // the host decides the mode; configuration cannot override it
@@ -48,10 +50,16 @@ public static class PlatformComposition
         services.AddMigrationModule(o =>
         {
             configuration.GetSection("Migration").Bind(o);
+            o.Mode = resolved.Host.Mode;
+            o.RequireDataClassification = resolved.Host.Mode == EcpMode.Test && governance.SecondPersonRequired;
             if (production) o.RequireMalwareScan = true; // no scanner adapter exists yet, so Production holds attachments rather than importing them unscanned (MIG-F014)
         });
-        // The mocked scanner stands in for a provider adapter in Demonstration and tests only; Production never gets it.
-        if (resolved.Host.Mode != EcpMode.Production) services.AddSingleton<IMalwareScanner, MockMalwareScanner>();
+        // The demonstration scanner stands in for a provider adapter. Demo uses it by default; Test only when Documents:Scanner:Provider is set to "mock" on purpose; Production never gets it (G-25).
+        var scannerOptions = new ScannerProviderOptions();
+        configuration.GetSection("Documents:Scanner").Bind(scannerOptions);
+        scannerOptions.Mode = resolved.Host.Mode;
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.Replace(services, ServiceDescriptor.Singleton(scannerOptions));
+        if (resolved.Host.Mode != EcpMode.Production && scannerOptions.EffectiveProvider == "mock") services.AddSingleton<IMalwareScanner, MockMalwareScanner>();
         // The installation default solution pack applies only to an organisation that has none of its own; it is unset unless the installer sets it (docs/SETUP_AND_ONBOARDING.md).
         var installationDefaultPack = configuration["Ecp:DefaultPackId"];
         services.AddLifecycleModule(o => { o.Mode = resolved.Host.Mode; o.DefaultPackId = installationDefaultPack; });
@@ -61,11 +69,17 @@ public static class PlatformComposition
             o.Mode = resolved.Host.Mode;
             o.DefaultPackId = installationDefaultPack;
         });
+        // Email settings saved in the application override these starting values; both are read through IEmailConfigurationService (G-12).
+        var startingNotifications = new NotificationsOptions();
+        configuration.GetSection("Notifications").Bind(startingNotifications);
+        services.AddSingleton(new HostModeAccessor(resolved.Host.Mode));
+        services.AddSingleton(new EmailEnvironmentDefaults(startingNotifications.EmailProvider, startingNotifications.Smtp));
+        services.AddSingleton(new EmailReadinessOptions { MaxAge = TimeSpan.FromHours(Math.Clamp(configuration.GetValue("Ecp:Email:ReadinessMaxAgeHours", 168), 1, 24 * 90)) });
         services.AddOperationsModule(paths.DataDirectory);
         services.AddSetupModule(new SetupEnvironment(resolved.Host.Mode, paths.DataDirectory,
             DemoIdentityEnabled: resolved.Host.Mode != EcpMode.Production && resolved.Host.DemoTenantResolution, DemoSeedEnabled: resolved.Host.DemoSeed,
             ConnectionFromSecretReference: resolved.Facts.ConnectionFromSecretReference, DatabaseProvider: resolved.Database.Provider.ToString(), Version: hostVersion,
-            AllowRemoteSetup: configuration.GetValue("Ecp:Setup:AllowRemote", false)));
+            AllowRemoteSetup: configuration.GetValue("Ecp:Setup:AllowRemote", false), GovernanceName: governance.Name, GovernanceLabel: governance.Label, GovernanceNote: governance.Note));
         services.AddRecoveryModule(o => BindRecovery(o, configuration, resolved, contentRoot, webRoot), resolved.Database);
         return services;
     }

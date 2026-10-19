@@ -34,6 +34,8 @@ public static class RecoveryModule
         services.AddScoped<IEvidenceReports, EvidenceReports>();
         services.AddScoped<ISupportBundle, SupportBundle>();
         services.AddScoped<IOperationsAdministration, OperationsAdministration>();
+        services.AddScoped<IEnablementAdministration, EnablementAdministration>();
+        services.AddScoped<IImplementationEvidence, ImplementationEvidence>();
         services.AddScoped<IOperationsDashboard, OperationsDashboardService>();
         services.AddSingleton<OperationalFactCollector>();
         services.AddSingleton(_ => UpgradeCatalogue.Embedded());

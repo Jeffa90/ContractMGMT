@@ -159,6 +159,39 @@
 </ul>
 </section>
 
+<section id="handling" aria-labelledby="h-handling">
+<h2 id="h-handling">@L["Data handling"]</h2>
+@if (Model.Mode == Ecp.SharedKernel.EcpMode.Production)
+{
+    <p class="card">@L["This is a Production installation. Production data follows Production governance and is not classified as masked company data."]</p>
+}
+else
+{
+    <p class="hint">@L["Say what this [[migration.batch|lower]] contains. The platform does not mask or inspect data and cannot tell whether it is safe: masking is your organisation's responsibility. If the data comes from your company, mask it first, record the declaration, and link it here."]</p>
+    @if (Model.Classification is { } cl)
+    {
+        <p><span class="badge @(cl.DataClass == BatchDataClasses.MaskedCompanyData ? "warn" : "ok")">@cl.DataClassLabel</span> <span class="hint">@L["set by"] @cl.LinkedBy @L["on"] @Model.When(cl.LinkedUtc)</span></p>
+        @if (cl.Declaration is { } dd)
+        {
+            <dl class="facts"><dt>@L["Dataset owner"]</dt><dd>@dd.DatasetOwner</dd><dt>@L["Approval reference"]</dt><dd>@dd.ApprovalReference</dd><dt>@L["Approved by"]</dt><dd>@dd.ApprovedBy</dd><dt>@L["Review by"]</dt><dd>@Model.When(dd.ReviewByUtc)</dd>
+                <dt>@L["Declaration state"]</dt><dd>@(dd.Current ? L["Current"].Value : L["Expired or revoked: the commit will be refused"].Value)</dd></dl>
+        }
+    }
+    else if (Model.ClassificationRequired) { <p class="error-summary" role="status">@L["This installation requires every [[migration.batch|lower]] to be classified before it is committed."]</p> }
+    else { <p class="hint">@L["Not classified."]</p> }
+    @if (can.CanStage && b.Status is not (BatchStatus.Committing or BatchStatus.Committed or BatchStatus.Reconciled or BatchStatus.Accepted))
+    {
+        <form method="post" asp-page-handler="Classify">
+            <div class="field"><label for="DataClass">@L["This [[migration.batch|lower]] contains"]</label>
+                <select id="DataClass" name="DataClass"><option value="@BatchDataClasses.Synthetic">@L["Synthetic data (made up for the rehearsal)"]</option><option value="@BatchDataClasses.MaskedCompanyData">@L["Masked Company Data (needs a declaration)"]</option></select></div>
+            <div class="field"><label for="DeclarationId">@L["Masked-data declaration"]</label>
+                <select id="DeclarationId" name="DeclarationId"><option value="">@L["(none)"]</option>@foreach (var d in Model.Declarations) { <option value="@d.Id">@d.DatasetOwner, @d.ApprovalReference (@L["until"] @Model.When(d.ReviewByUtc))</option> }</select></div>
+            <div class="actions"><button type="submit">@L["Save classification"]</button> <a href="/Migration/MaskedData?organisationId=@b.OrganisationId">@L["Make or review declarations"]</a></div>
+        </form>
+    }
+}
+</section>
+
 <section id="commit" aria-labelledby="h-commit">
 <h2 id="h-commit">5. @L["Confirm and commit"]</h2>
 @if (b.Kind == BatchKind.DryRun)

@@ -72,6 +72,7 @@ public sealed class MockMalwareScanner : IMalwareScanner
 {
     private static readonly byte[] Signature = System.Text.Encoding.ASCII.GetBytes("EICAR-STANDARD-ANTIVIRUS-TEST-FILE");
     public string Name => "mock (demonstration only)";
+    public string ProviderKey => "mock";
     public bool IsDemonstrationOnly => true;
 
     public async Task<ScanVerdict> ScanAsync(Stream content, CancellationToken ct = default)

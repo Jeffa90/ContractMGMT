@@ -17,6 +17,10 @@ public sealed class MigrationOptions
     public long MaxUploadBytes { get; set; } = 2L * 1024 * 1024 * 1024;
     /// <summary>When true (Production), a file the scanner could not clear is held rather than imported.</summary>
     public bool RequireMalwareScan { get; set; }
+    /// <summary>The installation mode. Masked-data declarations apply in Test; Production data follows Production governance and is never marked as masked.</summary>
+    public Ecp.SharedKernel.EcpMode Mode { get; set; } = Ecp.SharedKernel.EcpMode.Production;
+    /// <summary>When true, a batch cannot be committed in Test until it is classified (Synthetic, or Masked Company Data with a declaration). Set when Test enforces Production-equivalent governance.</summary>
+    public bool RequireDataClassification { get; set; }
 }
 
 public sealed record ProjectSummary(Guid Id, Guid OrganisationId, string Name, string SourceSystem, string? SourceSystemVersion, string DataOwner, DateTime ExtractionUtc,

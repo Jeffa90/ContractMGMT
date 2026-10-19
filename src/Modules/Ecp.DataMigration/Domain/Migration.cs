@@ -363,3 +363,97 @@ public sealed class MigrationBatch : ITenantOwned
     private DomainException Invalid(BatchStatus to)
         => new("invalid_batch_transition", $"A batch in state {Status} cannot move to {to}.");
 }
+
+/// <summary>
+/// What kind of data a migration batch carries, for the purpose of the data-handling checkpoint (D14.12). The platform never inspects or de-identifies data: it records what the customer declared and refuses to proceed without
+/// the declaration in the environments where one is required.
+/// </summary>
+public static class BatchDataClasses
+{
+    public const string Synthetic = "Synthetic";
+    public const string MaskedCompanyData = "MaskedCompanyData";
+    public static bool IsKnown(string value) => value is Synthetic or MaskedCompanyData;
+    public static string Label(string value) => value switch { MaskedCompanyData => "Masked Company Data", _ => value };
+}
+
+/// <summary>
+/// A customer's written declaration that a dataset has been masked, by them, before it is loaded into a Test environment. It records who owns the data, where it came from, how it was masked, what it still includes, which approval
+/// covers it, who may load it, where, and until when. It holds descriptions, never data. The platform does not verify the masking and does not say the data is safe; it only refuses to load a batch marked as masked company data
+/// without a current declaration that permits it.
+/// </summary>
+public sealed class MaskedDataDeclaration : ITenantOwned
+{
+    private MaskedDataDeclaration() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid OrganisationId { get; private set; }
+    public string DatasetOwner { get; private set; } = "";
+    public string SourceSystem { get; private set; } = "";
+    public string MaskingMethod { get; private set; } = "";
+    /// <summary>The names of the fields that were masked (not their values).</summary>
+    public string FieldsMasked { get; private set; } = "";
+    public bool AttachmentsIncluded { get; private set; }
+    public bool PersonalDataIncluded { get; private set; }
+    public bool ConfidentialDataIncluded { get; private set; }
+    /// <summary>The customer's own approval reference (a ticket, minute or register number), not a platform approval.</summary>
+    public string ApprovalReference { get; private set; } = "";
+    public string ApprovedBy { get; private set; } = "";
+    public DateTime ApprovedUtc { get; private set; }
+    /// <summary>The date the declaration expires and must be reviewed again.</summary>
+    public DateTime ReviewByUtc { get; private set; }
+    /// <summary>The environment the data may be loaded into. Only Test is accepted.</summary>
+    public string PermittedEnvironment { get; private set; } = "Test";
+    /// <summary>Email addresses of the people who may load it, comma separated. Empty means anyone who may otherwise commit a batch.</summary>
+    public string PermittedUsers { get; private set; } = "";
+    public string DeclaredBy { get; private set; } = "";
+    public Guid? DeclaredByUserId { get; private set; }
+    public DateTime DeclaredUtc { get; private set; }
+    public DateTime? RevokedUtc { get; private set; }
+    public string? RevokedReason { get; private set; }
+    public string CorrelationId { get; private set; } = "";
+
+    public bool IsCurrentAt(DateTime nowUtc) => RevokedUtc is null && ReviewByUtc > nowUtc;
+    public IReadOnlyList<string> PermittedUserList => PermittedUsers.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    public static MaskedDataDeclaration Create(Guid tenantId, Guid organisationId, string datasetOwner, string sourceSystem, string maskingMethod, string fieldsMasked, bool attachments, bool personal, bool confidential,
+        string approvalReference, string approvedBy, DateTime approvedUtc, DateTime reviewByUtc, string permittedUsers, string declaredBy, Guid? declaredByUserId, DateTime nowUtc, string correlationId)
+    {
+        Guard.Utc(approvedUtc, nameof(approvedUtc)); Guard.Utc(reviewByUtc, nameof(reviewByUtc)); Guard.Utc(nowUtc, nameof(nowUtc));
+        if (approvedUtc > nowUtc.AddMinutes(5)) throw new DomainException("approved_in_future", "The approval date cannot be in the future.");
+        if (reviewByUtc <= nowUtc) throw new DomainException("review_in_past", "The expiry (review) date must be in the future.");
+        if (reviewByUtc > nowUtc.AddDays(366)) throw new DomainException("review_too_far", "A declaration can last at most a year; set an earlier review date.");
+        return new()
+        {
+            Id = Ids.New(), TenantId = Guard.NotEmpty(tenantId, nameof(tenantId)), OrganisationId = Guard.NotEmpty(organisationId, nameof(organisationId)),
+            DatasetOwner = Guard.NotBlank(datasetOwner, "Dataset owner", 200), SourceSystem = Guard.NotBlank(sourceSystem, "Source system", 200), MaskingMethod = Guard.NotBlank(maskingMethod, "Masking method", 1000),
+            FieldsMasked = Guard.NotBlank(fieldsMasked, "Fields masked", 2000), AttachmentsIncluded = attachments, PersonalDataIncluded = personal, ConfidentialDataIncluded = confidential,
+            ApprovalReference = Guard.NotBlank(approvalReference, "Approval reference", 200), ApprovedBy = Guard.NotBlank(approvedBy, "Approved by", 200), ApprovedUtc = approvedUtc, ReviewByUtc = reviewByUtc,
+            PermittedEnvironment = "Test", PermittedUsers = Guard.OptionalBounded(permittedUsers, "Permitted users", 2000) ?? "", DeclaredBy = Guard.NotBlank(declaredBy, "Declared by", 200),
+            DeclaredByUserId = declaredByUserId, DeclaredUtc = nowUtc, CorrelationId = Guard.NotBlank(correlationId, nameof(correlationId), 100),
+        };
+    }
+
+    public void Revoke(string reason, DateTime nowUtc) { RevokedUtc = Guard.Utc(nowUtc, nameof(nowUtc)); RevokedReason = Guard.NotBlank(reason, "Reason", 500); }
+}
+
+/// <summary>Marks one batch with a data class and, for masked company data, the declaration that covers it. A batch has at most one.</summary>
+public sealed class BatchDataClassification : ITenantOwned
+{
+    private BatchDataClassification() { }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid BatchId { get; private set; }
+    public Guid OrganisationId { get; private set; }
+    public string DataClass { get; private set; } = "";
+    public Guid? DeclarationId { get; private set; }
+    public string LinkedBy { get; private set; } = "";
+    public DateTime LinkedUtc { get; private set; }
+
+    public static BatchDataClassification Create(Guid tenantId, Guid organisationId, Guid batchId, string dataClass, Guid? declarationId, string linkedBy, DateTime nowUtc)
+    {
+        if (!BatchDataClasses.IsKnown(dataClass)) throw new DomainException("data_class", "Choose Synthetic or Masked Company Data.");
+        if (dataClass == BatchDataClasses.MaskedCompanyData && declarationId is null) throw new DomainException("declaration_required", "Masked Company Data needs a masked-data declaration.");
+        if (dataClass == BatchDataClasses.Synthetic && declarationId is not null) throw new DomainException("declaration_not_needed", "Synthetic data does not use a masked-data declaration.");
+        return new() { Id = Ids.New(), TenantId = tenantId, OrganisationId = organisationId, BatchId = batchId, DataClass = dataClass, DeclarationId = declarationId, LinkedBy = Guard.NotBlank(linkedBy, "Linked by", 200), LinkedUtc = Guard.Utc(nowUtc, nameof(nowUtc)) };
+    }
+}

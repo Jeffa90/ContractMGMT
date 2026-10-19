@@ -242,6 +242,9 @@ public static class DocumentsModule
         services.AddScoped<IDocumentQuery, DocumentQuery>();
         services.AddScoped<IDocumentClassification, DocumentClassificationService>();
         services.TryAddSingleton<IMalwareScanner, DisabledMalwareScanner>();
+        services.TryAddSingleton(new ScannerProviderOptions());
+        services.TryAddSingleton<ScannerTestStore>();
+        services.AddScoped<IScannerReadiness, ScannerReadinessService>();
         return services;
     }
 }

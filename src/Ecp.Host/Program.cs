@@ -31,6 +31,12 @@ var builder = WebApplication.CreateBuilder(args);
 var secrets = new EnvironmentAndFileSecretProvider();
 var resolved = HostConfiguration.Resolve(builder.Configuration, secrets, builder.Environment.ContentRootPath);
 var production = resolved.Host.Mode == EcpMode.Production;
+var network = Ecp.Host.Network.NetworkOptions.From(builder.Configuration, production);
+var secureCookies = network.RequireHttps;   // Production, or an explicit Ecp:Network:RequireHttps: cookies are Secure and plain HTTP is refused with an explanation (G-33)
+builder.Services.AddSingleton(network);
+builder.Services.AddSingleton<Ecp.Host.Network.NetworkObservations>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.Network.NetworkReadinessCheck>();
+if (network.ForwardedHeadersEnabled) builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(network.Apply);
 Directory.CreateDirectory(resolved.Host.DataDirectory);
 
 var localisation = new LocalisationOptions();
@@ -58,6 +64,8 @@ builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.PackReadines
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.CapabilityReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.RegionalReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.DocumentScanReadinessCheck>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.GovernanceReadinessCheck>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Operations.EmailReadinessCheck>();
 builder.Services.AddHostedService<BackgroundJobService>();
 builder.Services.AddSingleton<DemoSeeder>();
 builder.Services.AddSingleton<ISetupProtector, DataProtectionSetupProtector>();
@@ -84,7 +92,7 @@ builder.Services.AddAuthentication(EcpSchemes.Session).AddCookie(EcpSchemes.Sess
     o.Cookie.Name = "ecp.session";
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Lax;
-    o.Cookie.SecurePolicy = production ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+    o.Cookie.SecurePolicy = secureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
     o.ExpireTimeSpan = TimeSpan.FromHours(8);
     o.SlidingExpiration = true;
     o.LoginPath = "/SignIn";
@@ -112,7 +120,7 @@ builder.Services.AddAntiforgery(o =>
     o.Cookie.Name = "ecp.csrf";
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Strict;
-    o.Cookie.SecurePolicy = production ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+    o.Cookie.SecurePolicy = secureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
     o.HeaderName = "X-CSRF-TOKEN";
 });
 builder.Services.AddRazorPages().AddViewLocalization();
@@ -198,6 +206,7 @@ catch (Exception ex) when (ex is not OperationCanceledException)
 }
 
 app.UseMiddleware<CorrelationMiddleware>();
+if (network.ForwardedHeadersEnabled) app.UseForwardedHeaders();   // before anything reads the scheme; only the named proxies are trusted
 // Error pages: status-code re-execution wraps the exception handler, so a handled exception with no body becomes an HTML error page for browsers.
 app.UseWhen(c => !c.Request.Path.StartsWithSegments("/api") && !c.Request.Path.StartsWithSegments("/health"),
     b => b.UseStatusCodePagesWithReExecute("/Error", "?code={0}"));
@@ -205,8 +214,9 @@ app.UseWhen(c => !c.Request.Path.StartsWithSegments("/api") && !c.Request.Path.S
 app.UseWhen(c => c.Request.Path.StartsWithSegments("/api") || c.Request.Path.StartsWithSegments("/health"), b => b.UseStatusCodePages());
 app.UseExceptionHandler();
 app.UseMiddleware<SecurityHeadersMiddleware>();
-if (production) app.UseHsts();
+if (secureCookies) app.UseHsts();
 app.UseStaticFiles();
+app.UseMiddleware<Ecp.Host.Network.NetworkGuardMiddleware>();
 app.UseMiddleware<SetupGateMiddleware>();
 app.UseRequestLocalization(o =>
 {

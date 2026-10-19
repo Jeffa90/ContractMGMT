@@ -274,3 +274,25 @@ Source: owner instruction for the Implementation Readiness Gap Closure slice; ar
 | D13.6 | **The application never holds a private signing key.** Pack signing is the Pack Publisher's task outside the application; the System Administrator registers public keys only. |
 | D13.7 | **The malware gate fails closed.** Only a connected scanner's Clean result releases a file. No real scanner is claimed (Future / Not Verified). Administration reuses `notifications.administer`, scoped to the administrator's organisations (assumption, reversible). |
 | D13.8 | **"No-code" is claimed only for what `docs/NO_CODE_REHEARSAL.md` proves** (20 steps over real HTTP, on SQLite and on real SQL Server) and is not claimed for installation, identity, secrets, mail, backups, pack signing or a real scanner, which are technical or external tasks. |
+
+## D14 Company Rehearsal Enablement (owner instruction 2026-10-19)
+
+Source: owner instruction for the Company Rehearsal Enablement slice; architecture in `decisions/ADR-0038-company-rehearsal-enablement.md`; evidence in `docs/IMPLEMENTATION_REHEARSAL.md`.
+
+| ID | Decision |
+|---|---|
+| D14.1 | Demo/Test remains the supported mode for the first supervised company rehearsal. |
+| D14.2 | Test mode can enforce Production-equivalent second-person configuration governance through an explicit, fail-safe setting. |
+| D14.3 | Demo mode may keep simplified governance where already supported. |
+| D14.4 | Production continues to enforce second-person governance; no setting lowers it. |
+| D14.5 | Production remains blocked without a connected, healthy malware scanner. |
+| D14.6 | A Test-mode masked-data rehearsal may use the labelled mock scanner only when explicitly enabled and accepted on the record. |
+| D14.7 | Email readiness verifies actual provider connectivity and test-message delivery. |
+| D14.8 | A configured but unreachable email provider is never reported Healthy. |
+| D14.9 | The setup wizard presents plain-language failures for TLS and proxy misconfiguration. |
+| D14.10 | Pack signing remains a technical Pack Publisher function. |
+| D14.11 | The signing experience does not require a source-code checkout. |
+| D14.12 | Data masking is the customer's responsibility; the implementation process includes a masking declaration and approval checkpoint. |
+| D14.13 | An upgrade pre-flight is successful only when Ready, or Ready with warnings that are explicitly accepted. |
+| D14.14 | Blocked and Not Verified are never counted as successful rehearsal evidence. |
+| D14.15 | The platform does not declare Production readiness during this slice. |

@@ -42,6 +42,6 @@
     }
     else if (c.Usage.Count > 0)
     {
-        <p class="hint">@L["Set-up cannot be reset because the organisation already holds"] @string.Join(", ", c.Usage.Select(u => u.Count + " " + u.What)).</p>
+        <p class="hint">@L["Set-up cannot be reset because the organisation already holds"] @string.Join(", ", c.Usage.Select(u => u.Count + " " + Terms.Expand(u.What))).</p>
     }
 }

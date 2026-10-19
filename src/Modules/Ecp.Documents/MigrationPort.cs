@@ -21,6 +21,10 @@ public interface IMalwareScanner
     bool IsConnected => true;
     /// <summary>True for the scanner that stands in for a provider in Demonstration and tests. It proves the hook, not protection.</summary>
     bool IsDemonstrationOnly => false;
+    /// <summary>The adapter's key, as named in <c>Documents:Scanner:Provider</c>. Defaults to the display name.</summary>
+    string ProviderKey => Name;
+    /// <summary>Whether the provider is reachable now. An adapter that has a health endpoint should call it; the default says "reachable" for any connected scanner and proves nothing more.</summary>
+    Task<ScannerHealth> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(IsConnected ? new ScannerHealth(true, "Connected.") : new ScannerHealth(false, "No scanner is connected."));
     Task<ScanVerdict> ScanAsync(Stream content, CancellationToken ct = default);
 }
 

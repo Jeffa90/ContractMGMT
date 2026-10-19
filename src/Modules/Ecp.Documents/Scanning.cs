@@ -121,6 +121,14 @@ internal sealed class DocumentScanning(
             audit.Record(new AuditEntry(status switch { ScanStatus.Infected => "document.quarantined", ScanStatus.Error => "document.scan.failed", _ => "document.scan.completed" }, nameof(DocumentVersion), current.Id.ToString(),
                 OrganisationId: document.OrganisationId, Classification: document.Classification, NewValuesJson: JsonSerializer.Serialize(new { outcome = status.ToString(), provider = scanner.Name, trigger, document = document.Id })));
             settled = status;
+            if (status == ScanStatus.Error)
+            {
+                // The scanner could not give a verdict. When the bounded retries are used up the file stays held and a person has to act, so that is its own event (and notification).
+                var failures = await db.ScanAttempts.AsNoTracking().CountAsync(a => a.VersionId == current.Id && a.Outcome == ScanStatus.Error, c);
+                if (failures >= options.Value.MaxScanAttempts)
+                    audit.Record(new AuditEntry("document.scan.retry_exhausted", nameof(DocumentVersion), current.Id.ToString(), OrganisationId: document.OrganisationId, Classification: document.Classification,
+                        NewValuesJson: JsonSerializer.Serialize(new { provider = scanner.Name, attempts = failures, document = document.Id })));
+            }
         }, ct);
         return settled;
     }

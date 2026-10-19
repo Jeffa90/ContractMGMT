@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Ecp.Configuration;
 using Ecp.Configuration.Forms;
 using Ecp.Lifecycle.Definitions;
+using Ecp.Recovery;
 using Ecp.Tenancy;
 using Ecp.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,8 +13,14 @@ using Xunit;
 
 namespace Ecp.Api.Tests;
 
-/// <summary>One line of the evidence pack: a step of the journey, who did it in which role, through which screen, and what came of it.</summary>
-public sealed record RehearsalStep(int Number, string Title, string Persona, string Role, bool TechnicalRole, string Via, string Outcome, bool Passed);
+/// <summary>
+/// One line of the evidence pack: a step of the journey, who did it in which role, through which screen, what the operation itself reported (<see cref="Operational"/>, kept exactly as reported) and what that counts as
+/// (<see cref="Verdict"/>). A step that merely ran without an operational result is Passed; a step whose operation was Blocked or Failed is Failed; one that could not be checked is Not Verified (ADR-0038).
+/// </summary>
+public sealed record RehearsalStep(int Number, string Title, string Persona, string Role, bool TechnicalRole, string Via, string Outcome, string Operational, EvidenceVerdict Verdict)
+{
+    public bool Passed => Verdict == EvidenceVerdict.Passed;
+}
 
 /// <summary>
 /// The no-code implementation rehearsal (docs/NO_CODE_REHEARSAL.md). A synthetic company is set up from nothing and brought to a working, loaded register by the people who would do it, using only the application's pages:
@@ -25,12 +32,26 @@ public sealed class RehearsalLedger
     private readonly List<RehearsalStep> _steps = [];
     public IReadOnlyList<RehearsalStep> Steps => _steps;
 
+    public int Count(EvidenceVerdict verdict) => _steps.Count(s => s.Verdict == verdict);
+
+    /// <summary>A step with no operational result of its own: it passes if it ran, and throws (recording a failure) if it did not.</summary>
     public async Task Step(int number, string title, string persona, string role, string via, Func<Task<string>> body, bool technical = false)
     {
-        try { var outcome = await body(); _steps.Add(new RehearsalStep(number, title, persona, role, technical, via, outcome, true)); }
+        try { var outcome = await body(); _steps.Add(new RehearsalStep(number, title, persona, role, technical, via, outcome, "Completed", EvidenceVerdict.Passed)); }
         catch (Exception ex)
         {
-            _steps.Add(new RehearsalStep(number, title, persona, role, technical, via, ex.GetType().Name + ": " + ex.Message.Split('\n')[0], false));
+            _steps.Add(new RehearsalStep(number, title, persona, role, technical, via, ex.GetType().Name + ": " + ex.Message.Split('\n')[0], "Failed", EvidenceVerdict.Failed));
+            throw;
+        }
+    }
+
+    /// <summary>A step whose operation reports an outcome. The outcome is judged by <see cref="EvidenceSemantics"/> and recorded as reported: Blocked is Failed, Not Verified stays Not Verified, and neither is ever shown as Passed.</summary>
+    public async Task JudgedStep(int number, string title, string persona, string role, string via, Func<Task<(string Outcome, EvidenceJudgement Judgement)>> body, bool technical = false)
+    {
+        try { var (outcome, judgement) = await body(); _steps.Add(new RehearsalStep(number, title, persona, role, technical, via, outcome, judgement.Operational, judgement.Verdict)); }
+        catch (Exception ex)
+        {
+            _steps.Add(new RehearsalStep(number, title, persona, role, technical, via, ex.GetType().Name + ": " + ex.Message.Split('\n')[0], "Failed", EvidenceVerdict.Failed));
             throw;
         }
     }
@@ -39,10 +60,12 @@ public sealed class RehearsalLedger
     {
         var sb = new StringBuilder();
         sb.AppendLine("# No-code implementation rehearsal: evidence").AppendLine();
-        sb.AppendLine($"- Provider: {provider} ({verification})").AppendLine($"- Steps: {_steps.Count} ({_steps.Count(s => s.Passed)} passed, {_steps.Count(s => !s.Passed)} failed)");
-        sb.AppendLine($"- Steps needing a technical role: {_steps.Count(s => s.TechnicalRole)}; business-role steps: {_steps.Count(s => !s.TechnicalRole)}").AppendLine();
-        sb.AppendLine("| # | Step | Who | Role | Technical role | Screen | Result |").AppendLine("|---|------|-----|------|----------------|--------|--------|");
-        foreach (var s in _steps) sb.AppendLine($"| {s.Number} | {s.Title} | {s.Persona} | {s.Role} | {(s.TechnicalRole ? "yes" : "no")} | {s.Via} | {(s.Passed ? "Passed" : "Failed")}: {s.Outcome} |");
+        sb.AppendLine($"- Provider: {provider} ({verification})");
+        sb.AppendLine($"- Steps: {_steps.Count} ({Count(EvidenceVerdict.Passed)} Passed, {Count(EvidenceVerdict.Failed)} Failed, {Count(EvidenceVerdict.NotVerified)} Not Verified, {Count(EvidenceVerdict.Warning)} Warning (not accepted))");
+        sb.AppendLine($"- Steps needing a technical role: {_steps.Count(s => s.TechnicalRole)}; business-role steps: {_steps.Count(s => !s.TechnicalRole)}");
+        sb.AppendLine("- Blocked and Failed are Failed. Not Verified is Not Verified. Ready with warnings is Passed only when every warning was explicitly accepted. The operational outcome is shown exactly as the operation reported it.").AppendLine();
+        sb.AppendLine("| # | Step | Who | Role | Technical role | Screen | Operational outcome | Verdict | Result |").AppendLine("|---|------|-----|------|----------------|--------|---------------------|---------|--------|");
+        foreach (var s in _steps) sb.AppendLine($"| {s.Number} | {s.Title} | {s.Persona} | {s.Role} | {(s.TechnicalRole ? "yes" : "no")} | {s.Via} | {s.Operational} | {EvidenceSemantics.Label(s.Verdict)} | {s.Outcome} |");
         return sb.ToString();
     }
 }

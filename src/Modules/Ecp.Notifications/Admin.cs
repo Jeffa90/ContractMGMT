@@ -1,3 +1,4 @@
+using Ecp.Operations;
 using Ecp.Audit;
 using Ecp.Identity;
 using Ecp.Lifecycle;
@@ -12,7 +13,7 @@ namespace Ecp.Notifications;
 
 internal sealed class NotificationAdmin(
     NotificationsDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, IAccessService access, IAccessDirectory directory, ILifecycleOutbox outbox, IOptions<NotificationsOptions> options,
-    IEmailDeliveryProviderFactory providers) : INotificationAdmin
+    IEmailDeliveryProviderFactory providers, IEmailConfigurationService email) : INotificationAdmin
 {
     /// <summary>The organisations the caller administers notifications for (null: all in the tenant). A caller with no such grant gets a 403.</summary>
     private async Task<IReadOnlyList<Guid>?> ScopeAsync(CancellationToken ct)
@@ -34,10 +35,11 @@ internal sealed class NotificationAdmin(
         var tracking = db.Tracking.AsNoTracking().AsQueryable();
         if (orgs is not null) tracking = tracking.Where(t => orgs.Contains(t.OrganisationId));
         var waiting = (await outbox.PendingAsync(500, ct)).Count;
+        var effectiveProvider = (await email.EffectiveAsync(ct)).ProviderKey;
         return new NotificationSummary(
             await deliveries.CountAsync(d => d.Status == DeliveryStatus.Pending, ct), await deliveries.CountAsync(d => d.Status == DeliveryStatus.Failed, ct), await deliveries.CountAsync(d => d.Status == DeliveryStatus.DeadLetter, ct),
             await deliveries.CountAsync(d => d.Status == DeliveryStatus.Sent && d.SentUtc >= since, ct), await tracking.CountAsync(t => t.AcknowledgedUtc == null || t.AcknowledgedUtc < t.LastReminderSentUtc, ct), waiting,
-            options.Value.EmailProvider, providers.IsSimulated(options.Value.EmailProvider));
+            effectiveProvider, providers.IsSimulated(effectiveProvider));
     }
 
     public async Task<PagedResult<DeliveryRow>> DeliveriesAsync(string? status, int page = 1, int pageSize = 25, CancellationToken ct = default)

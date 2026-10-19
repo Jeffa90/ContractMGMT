@@ -304,6 +304,8 @@ public static class PackCli
         if (outPrivate is null || outPublic is null) return 2;
         if ((File.Exists(outPrivate) || File.Exists(outPublic)) && !flags.Contains("--force")) { error.WriteLine("A key file already exists; refusing to overwrite it (use --force to replace)."); return 1; }
         var (privatePem, spki) = PackKeys.Generate();
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outPrivate))!);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outPublic))!);
         File.WriteAllText(outPrivate, privatePem);
         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(outPrivate, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         File.WriteAllText(outPublic, PackKeys.ToPublicPem(spki));

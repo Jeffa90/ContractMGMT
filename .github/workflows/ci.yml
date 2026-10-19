@@ -40,6 +40,17 @@ jobs:
         run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Solution packs (build, reproducibility, sign and verify with an ephemeral key, no embedded packs, no committed private key)
         run: tools/check-packs.sh
+      - name: Pack Publisher tool (pack the .NET tool, install that artefact alone, build/validate/report/sign/verify/inspect with it; no source checkout is used by the tool)
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/pack-tool && mkdir -p artifacts/pack-tool
+          dotnet pack src/Ecp.PackTool/Ecp.PackTool.csproj -c Release --no-restore -o artifacts/pack-tool
+          ECP_PACK_TOOL_PACKAGE_DIR="$PWD/artifacts/pack-tool" dotnet test tests/Ecp.Integration.Tests/Ecp.Integration.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~PackToolArtefact"
+          (cd artifacts/pack-tool && sha256sum *.nupkg | tee SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ecp-pack-tool
+          path: artifacts/pack-tool
       - name: Repository consistency checks (links, CSV/JSON, references, manifest, Mermaid structure)
         run: python3 -I tools/check-repo.py .
       - name: Tooling script tests

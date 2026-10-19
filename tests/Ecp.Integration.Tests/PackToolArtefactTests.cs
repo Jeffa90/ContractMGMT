@@ -98,16 +98,16 @@ public sealed class PackToolArtefactTests : IDisposable
 
         // Keys are made by the publisher and referenced by the tool.
         var keygen = Ecp("keygen", "--out-private", "keys/publisher.key", "--out-public", "keys/publisher.pub.pem");
-        Assert.Equal(0, keygen.Exit);
+        Assert.True(keygen.Exit == 0, keygen.Out + keygen.Err);
         var privatePem = File.ReadAllText(Path.Combine(work, "keys", "publisher.key"));
         var privateBody = string.Concat(privatePem.Split('\n').Where(l => !l.StartsWith("-----"))).Trim();
         Assert.Equal(1, Ecp("keygen", "--out-private", "keys/publisher.key", "--out-public", "keys/publisher.pub.pem").Exit);   // never overwrites a key
 
         // Signing from a file reference, then from an environment variable.
         var signedByFile = Exec(tool, ["sign", "--package", "out/a.ecpkg", "--out", "out/signed-file.ecpkg", "--key-id", "publisher-2026", "--key-ref", "file:keys/publisher.key"], work);
-        Assert.Equal(0, signedByFile.Exit);
+        Assert.True(signedByFile.Exit == 0, signedByFile.Out + signedByFile.Err);
         var signedByEnv = Exec(tool, ["sign", "--package", "out/a.ecpkg", "--out", "out/signed-env.ecpkg", "--key-id", "publisher-2026", "--key-ref", "env:ECP_E2E_PACK_KEY"], work, new() { ["ECP_E2E_PACK_KEY"] = privatePem });
-        Assert.Equal(0, signedByEnv.Exit);
+        Assert.True(signedByEnv.Exit == 0, signedByEnv.Out + signedByEnv.Err);
 
         var verify = Ecp("verify", "--package", "out/signed-file.ecpkg", "--public-key", "keys/publisher.pub.pem", "--key-id", "publisher-2026", "--production");
         Assert.Equal(0, verify.Exit);

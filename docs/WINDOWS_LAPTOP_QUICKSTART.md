@@ -82,7 +82,7 @@ In your browser go to **<http://localhost:5080/Setup>**, paste the setup code, a
 | 5 | Solution pack | *Blank (no business defaults)* |
 | 6 | Identity provider | Type: *Demonstration sign-in*. Provider key: `demo`. Name shown on the sign-in page: `Demonstration sign-in`. Leave the rest empty |
 | 7 | Initial administrator | Full name: `Jeff`. Email: `jeff@northwind.example.test` (any valid-looking address). Leave **Also make this person an installation administrator** ticked |
-| 8 | Organisation | Name: `Northwind Traders`. Country: *Australia (AU)*. Locale: `en-AU`. Time zone: `Australia/Sydney`. Currency: `AUD`. Reference prefix: `NWT`. Leave the tax identifier as *(none for now)*. (Use your own country, locale, zone and currency if different) |
+| 8 | Organisation | Name: `Northwind Traders`. Country: *Australia (AU)*. Locale: `en-AU`. Time zone: Australia/Sydney. Currency: `AUD`. Reference prefix: `NWT`. Leave the tax identifier as *(none for now)*. (Use your own country, locale, zone and currency if different) |
 | 9 | Branding | Product name: `Northwind Contract Register`. Keep the colour. Footer empty |
 | 10 | Classification levels | Keep what is filled in |
 | 11 | Email notifications | Provider: *Development capture (simulated; delivers nothing)*. From address: `northwind@northwind.example.test`. Send a test message to: `jeff@northwind.example.test`. You should see that the simulated provider accepted the test and that email is **Not Verified**: that is correct for a laptop |

@@ -62,7 +62,7 @@ ecp-pack report --package out/my-pack-1.0.0.signed.ecpkg --public-key publisher.
 | 0 | Success |
 | 1 | The package or request is not acceptable (validation failed, verification failed, unsigned package refused for Production, a key file would be overwritten) |
 | 2 | Usage error (missing or unknown option); the message says which |
-| 3 | The key reference could not be used (not set, not found, not a usable ES256 key); the message never includes the key |
+| 3 | A file or key could not be read or written (a missing package, an unwritable folder) or the key reference could not be used (not set, not found, not a usable ES256 key); the message never includes the key |
 
 ### What is verified
 

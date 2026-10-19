@@ -72,3 +72,19 @@ Not covered here and therefore Not Verified: IIS and Azure deployment models, ex
 - [ ] The deferred gaps in `docs/IMPLEMENTATION_READINESS.md` section 2.3 have been read and accepted or scheduled
 
 Not covered here and therefore Not Verified: identity provider and secrets handling in a customer environment, a real restore inside the rehearsal, a real scanner.
+
+## Company rehearsal enablement (ADR-0038; `docs/IMPLEMENTATION_REHEARSAL.md` section 9)
+
+Unticked until a person has seen the evidence. The platform never declares Production readiness.
+
+- [ ] **Governance mode** shows `Production` on the setup report, `/Admin/Health` (R-GOV-01) and the operations dashboard
+- [ ] **Email**: `/Admin/Operations/Email` shows Healthy after a test message to a real mailbox, from a real provider, with secret references only; R-EML-01 is Healthy; the test is recent. **Not Verified in this product against a real mail service**
+- [ ] **Scanner**: `/Admin/Operations/Scanner` shows Healthy after the self-test of a real, connected scanner; R-DOC-01 is Healthy. **Blocked: no real scanner adapter exists**
+- [ ] **Network**: the site is reached over HTTPS through the real proxy; R-NET-01 is Healthy; no `ECP-NET-001` or `ECP-NET-002` has been seen. **Not Verified against a real proxy product**
+- [ ] **Packs**: signed by the Pack Publisher with the standalone `ecp-pack` tool, the public key registered by the Tenant Administrator; the private key is held outside the application
+- [ ] **Masked data** (Test rehearsals only): every masked batch had a current, approved declaration and (for the demonstration scanner) a recorded acceptance; no Production batch carries a masked-data classification
+- [ ] **Accepted warnings** are listed, each with a reason, an owner and an expiry, and none has lapsed unnoticed
+- [ ] The **implementation evidence pack** (`/Admin/Operations/EvidencePack`) was downloaded, filed, and its sign-off lines completed by named people outside the platform
+- [ ] A Production-mode rehearsal in a non-production environment, with the customer's identity provider and mail relay, has been taken through setup and a day of use
+
+Verdict at the time of writing (`docs/IMPLEMENTATION_REHEARSAL.md` section 9.3): Production-mode setup and Production use with confidential contracts are **Blocked**.

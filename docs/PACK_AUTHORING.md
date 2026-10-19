@@ -57,7 +57,7 @@ Run the installed tool (`ecp-pack <command> ...`; installation is in `docs/PACK_
 | `compare --a <file> --b <file>` | Reproducibility check: equal when everything except the signature is identical |
 | `keygen --out-private <file> --out-public <file>` | Make a **new** key pair for testing; keep the private key out of source control |
 
-Exit codes: 0 success, 1 the package or request is not acceptable, 2 usage error, 3 the key reference could not be used. Output never contains key material.
+Exit codes: 0 success, 1 the package or request is not acceptable, 2 usage error, 3 a file or key could not be read or written, or the key reference could not be used. Output never contains key material.
 
 ## 3. Building and checking the shipped packs
 

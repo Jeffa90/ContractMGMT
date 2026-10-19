@@ -86,12 +86,12 @@ None. Every gap in Appendix D was reproduced in the code except where the table 
 | Rollback governance for every kind | Implemented: permission, recent sign-in, reason, second person where required, new release, immutable history, audit | `ConfigurationRollbackKindsScenarios` (every kind of the second business's configuration) |
 | Organisation set-up checklist | Implemented, read from what is published and drafted | `OrganisationCreationScenarios` |
 | Eight click-by-click guides | Written (section 5) | Not Verified by an unaided non-developer |
-| 20-step no-code rehearsal | **Passed over real HTTP on the lightweight provider and on real SQL Server** | `docs/NO_CODE_REHEARSAL.md` |
+| 23-step no-code rehearsal (was 20 steps) | **Passed over real HTTP on the lightweight provider and on real SQL Server** | `docs/NO_CODE_REHEARSAL.md` |
 
 ## 4. What still stands between this product and a company-implementation rehearsal
 
-1. **G-12 (High):** e-mail delivery is set by the System Administrator through environment settings; the wizard page does not change it and the readiness check does not prove mail works.
-2. **G-25 (High):** no real scanner; attachments cannot be released in Production.
+1. **G-12 (closed as readiness, section 8):** email is configured once on `/Admin/Operations/Email` and the setup email stage, and readiness is proved by a test message; live delivery to a customer's mail service is still Not Verified.
+2. **G-25 (boundary closed, section 8):** no real scanner exists; attachments cannot be released in Production.
 3. **Identity provider and secrets** (G-09, G-10, G-14, G-16): technical tasks that the System Administrator performs from the installation guide.
 4. **Backups** are proved by the SQL Server recovery tests; the rehearsal opens the page but does not repeat a restore.
 5. **R-DOC-01 in Production (found while writing the guides; read from the code, not run in Production mode).** With no real scanner connected, the platform check is Unhealthy; `/health/ready` should then answer 503, and the setup wizard treats an Unhealthy platform check as blocking, so "Finish setup" would be refused in Production. This is the intended fail-closed result, and it is the same blocker as G-25.
@@ -125,19 +125,20 @@ Each was read from the code; none was run in a browser. They are limits or contr
 - **Review buttons.** The on-screen labels are "Approve and publish", "Send back for changes", "Reject" and "Withdraw my submission".
 - **Behaviours worth knowing.** Only people who have signed in once are offered as an initial administrator; after a step-up redirect the Create form comes back empty; Add / Move / Remove in the form editors change the screen only until Save draft; choosing a pack in the onboarding wizard does not assign it (G-08); the Organisation Administrator has no menu entry for the set-up checklist, so the Tenant Administrator passes on the link; the onboarding wizard is not among the 20 rehearsal steps.
 
-## 8. Findings from the greenfield rehearsal (G-31 to G-37)
+## 8. Findings from the greenfield rehearsal (G-31 to G-37), and their closure
 
-Found while writing `docs/IMPLEMENTATION_REHEARSAL.md` on 2026-10-18, most of them by driving a Production-mode host over HTTP. None is fixed; each is Deferred. The rehearsal document has the evidence.
+Found while writing `docs/IMPLEMENTATION_REHEARSAL.md` on 2026-10-18, most of them by driving a Production-mode host over HTTP. They were closed by the Company Rehearsal Enablement slice on 2026-10-19 (ADR-0038); the rehearsal document, section 9, has the evidence.
 
-| ID | Finding | Severity | Workaround |
-|---|---|---|---|
-| **G-31** | The second-person rule is on only in Production and has no setting, so a Demo or Test rehearsal cannot exercise it | High for rehearsals | Follow a written two-person procedure in Test; rely on the automated rehearsal for the rule itself |
-| **G-32** | Terminology tokens such as the one for the solution pack and for notifications are shown raw in the setup wizard's browser title and its "Complete first" text | Low | None needed; cosmetic |
-| **G-33** | `/Setup` in Production behind a proxy that does not forward the scheme returns a bare 500; the cause is only in the log | Medium | Forward `X-Forwarded-Proto`; read the log |
-| **G-34** | Signing a pack needs a repository checkout and the .NET SDK; the pack tool is not in the image or a release artefact | Medium | The Pack Publisher keeps a build host |
-| **G-35** | No aid for masking data and no way to tell masked from real | Medium | The customer's data-protection owner masks and certifies before the first load |
-| **G-36** | Playbook Appendices B and E and section 1.1 still carry statements the readiness slice made untrue; the setup and onboarding guides disagree on who sets classification levels | Low | Read the banner: the guides are authoritative |
-| **G-37** | Rehearsal step 19 asserts only that a pre-flight verdict word appears and records "Blocked" as a pass | Low | The N-1 to N rehearsal in CI is the proof of a Ready pre-flight |
+| ID | Finding | Severity | Status | How it was closed |
+|---|---|---|---|---|
+| **G-31** | The second-person rule was on only in Production and had no setting, so a Demo or Test rehearsal could not exercise it | High for rehearsals | **Fixed** | `Ecp:Governance:SecondPerson` (`Default` or `Enforced`). Production always enforces; Test can enforce the Production rule; Demo ignores the setting. The effective mode is shown on the setup report, `/Admin/Health` (check R-GOV-01) and the operations dashboard, and is recorded on configuration audit events and releases |
+| **G-32** | Terminology tokens were shown raw in the setup wizard | Low | **Fixed** | Titles and messages expanded at their origin; a response guard replaces a leftover token with a neutral marker and logs a stable code; a render sweep over three packs asserts none reaches a reader |
+| **G-33** | `/Setup` in Production behind a proxy that does not forward the scheme returned a bare 500 | Medium | **Fixed** (a real reverse proxy product is **Not Verified**) | Plain-language page with `ECP-NET-001` or `ECP-NET-002`, readiness check R-NET-01, a setup check, `docs/REVERSE_PROXY.md` |
+| **G-34** | Signing a pack needed a repository checkout and the .NET SDK | Medium | **Fixed** locally; the CI step is Scaffolded until it has run on a runner | `ecp-pack` .NET tool package with key references, deterministic builds, a sanitised report and exit codes; `PackToolArtefactTests` installs that artefact alone |
+| **G-35** | No aid for masking data and no way to tell masked from real | Medium | **Fixed as a checkpoint, not a detector** | Masked-data declaration (owner, source, method, fields, approval, expiry, permitted users) gates commit of a batch marked Masked Company Data in Test. The platform does not mask, detect or de-identify and never states the data is safe |
+| **G-36** | Guides disagreed with the application and with each other | Low | **Fixed** | All implementation guides reconciled; `tools/check-docs.py` (in CI) fails when a guide names a page or permission that does not exist, repeats a retired statement or tells a business role to run a command |
+| **G-37** | A Blocked pre-flight was recorded as a pass | Low | **Fixed** | One evidence-semantics rule (Ready = Passed; Ready with warnings = Passed only when accepted on the record; Blocked/Failed = Failed; Not Verified stays Not Verified); the rehearsal has 23 steps and judges steps 21 to 23 by it |
+| **G-12** | Email setup did not equal live delivery | High | **Fixed as readiness; live delivery Not Verified** | One installation email configuration shared by setup and Administration; readiness is a connectivity probe plus a synthetic test message; unreachable is never Healthy; results go stale. SMTP verified only against a loopback test relay; Graph is a scaffold |
+| **G-25** | No real scanner | High | **Boundary Implemented; real scanner still absent (Production Blocked)** | Provider configuration, provider-neutral self-test, Scanner page, labelled mock only in Demo/Test, acceptance on the record for masked-data rehearsals, alerts. No real scanner is claimed |
 
-Section 4 (what stands between this product and a company-implementation rehearsal) is unchanged by these findings; item 5 there (R-DOC-01 in Production) was observed on a live Production-mode host in the greenfield rehearsal: `/health/ready` answers 503 while the same database in Test mode answers 200 with every check Healthy.
-
+**What still stands between this product and Production** (unchanged by this slice): a real scanner adapter (R-DOC-01 stays Unhealthy in Production without one), a Production-mode rehearsal in a non-production environment with the customer's identity provider and mail relay, signed packs with a custodied key, a least-privilege database login, and one unaided run by a trained non-developer. Production approval is external governance and is not declared.

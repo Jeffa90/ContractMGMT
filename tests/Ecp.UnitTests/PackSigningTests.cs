@@ -274,7 +274,7 @@ public sealed class PackSigningTests
             Assert.Equal(0, code);
             Assert.Equal(2, Cli("sign", "--package", unsigned, "--out", "x", "--key-id", "k").Code);                      // neither --key-file nor --key-env
             Assert.Equal(2, Cli("nonsense").Code);
-            Assert.Equal(1, Cli("validate", "--package", Path.Combine(dir, "missing.ecpkg")).Code);
+            Assert.Equal(3, Cli("validate", "--package", Path.Combine(dir, "missing.ecpkg")).Code);              // a file that cannot be read is the environment's fault, not an unacceptable package
             Assert.NotEmpty(spki);
         }
         finally { Directory.Delete(dir, true); }

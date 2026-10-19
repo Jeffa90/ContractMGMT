@@ -20,7 +20,7 @@ Forwarded headers change what the application believes about a request, so they 
 |---|---|
 | `Ecp:Network:ForwardedHeaders:Enabled` | `true` turns forwarded-header handling on. |
 | `Ecp:Network:ForwardedHeaders:KnownProxies` | Comma-separated addresses of the proxies to trust, for example `10.0.0.5`. |
-| `Ecp:Network:ForwardedHeaders:KnownNetworks` | Comma-separated networks in CIDR form, for example `10.0.0.0/24`. |
+| `Ecp:Network:ForwardedHeaders:KnownNetworks` | Comma-separated networks in CIDR form, for example network 10.0.0.0 with a 24-bit prefix. |
 | `Ecp:Network:ForwardedHeaders:ForwardLimit` | How many proxies deep to read (default 1). |
 | `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` | The framework's container shortcut. It trusts **any** sender, so only use it where the container is reachable from the proxy alone (the supplied Docker images set it, and the published port is bound to 127.0.0.1). Prefer the settings above for anything wider. |
 

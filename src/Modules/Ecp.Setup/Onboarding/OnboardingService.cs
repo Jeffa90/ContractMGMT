@@ -179,14 +179,14 @@ internal sealed class OnboardingService(IConfigurationService configuration, IAc
     public async Task<ReleaseDto> PublishAsync(Guid organisationId, string note, CancellationToken ct = default)
     {
         var state = await GetAsync(organisationId, ct);
-        await readiness.RequireReadyAsync(organisationId, state, ct);   // never "ready to publish" while a Required item of the selected pack is open
+        if (state.IsPublishable) await readiness.RequireReadyAsync(organisationId, state, ct);   // an unvalidated draft is refused by the configuration service with its own reason; a valid one is never published while a Required item of the selected pack is open
         return await configuration.PublishAsync(state.DraftId, note, ct);
     }
 
     public async Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default)
     {
         var state = await GetAsync(organisationId, ct);
-        await readiness.RequireReadyAsync(organisationId, state, ct);
+        if (state.IsPublishable) await readiness.RequireReadyAsync(organisationId, state, ct);
         return await configuration.SubmitOrPublishAsync(state.DraftId, note, ct);
     }
 

@@ -185,7 +185,7 @@ public sealed class SetupHostTests
         // the initial administrator is also Organisation Administrator of the first organisation, so onboarding can begin straight away
         Assert.Contains("Organisation onboarding", home);
         var onboarding = await admin.GetStringAsync("/Onboarding");
-        Assert.Contains("Checklist", onboarding); Assert.Contains("Host Setup Organisation", onboarding);
+        Assert.Contains("Set-up checklist", onboarding); Assert.Contains("Host Setup Organisation", onboarding);
     }
 
     [Fact]

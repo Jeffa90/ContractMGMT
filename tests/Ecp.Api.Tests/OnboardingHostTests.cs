@@ -77,6 +77,11 @@ public sealed class OnboardingHostTests
         Assert.Equal(HttpStatusCode.OK, bad.StatusCode);
         Assert.Contains("Nothing was saved", badBody); Assert.Contains("Line 2", badBody); Assert.Contains("Galactic", badBody);
 
+        // This test is about the wizard's mechanics, so it works from the Blank configuration, whose only Required items are the platform's own. (What a stricter pack requires, and that
+        // publishing is refused while it is open, is proved in ReadinessScenarios and in the Set-up checklist tests.)
+        var choosePack = await DemoApp.PostFormAsync(admin, $"/Onboarding/Step/pack?org={orgId}", new Dictionary<string, string> { ["Org"] = orgId.ToString(), ["PackId"] = "blank" }, $"/Onboarding/Step/pack?org={orgId}");
+        Assert.Equal(HttpStatusCode.Redirect, choosePack.StatusCode);
+
         // save two lists
         foreach (var (step, csv) in new[]
         {
@@ -106,7 +111,7 @@ public sealed class OnboardingHostTests
         Assert.Contains("Category", validated);
 
         var publish = await DemoApp.PostFormAsync(admin, $"/Onboarding/Review?org={orgId}", new Dictionary<string, string> { ["Org"] = orgId.ToString(), ["Note"] = "First release" }, $"/Onboarding/Review?handler=Publish&org={orgId}");
-        Assert.Equal(HttpStatusCode.Redirect, publish.StatusCode);
+        Assert.True(publish.StatusCode == HttpStatusCode.Redirect, System.Text.RegularExpressions.Regex.Match(await publish.Content.ReadAsStringAsync(), "Not ready to publish[^<]*").Value);
         Assert.Contains("Release 1 was published", await admin.GetStringAsync($"/Onboarding/Review?org={orgId}"));
 
         // the release is in effect

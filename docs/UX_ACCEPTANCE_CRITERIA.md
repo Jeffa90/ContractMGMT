@@ -1,6 +1,6 @@
 # UX acceptance criteria: guided administration
 
-Status: **Proposed.** These are the criteria the slices in `docs/UX_REDESIGN.md` section 18 must meet before they are called done. Nothing here is implemented. Production approval is external governance and nothing here declares it.
+Status: **Approved by the owner (2026-10-29).** These are the criteria the slices in `docs/UX_REDESIGN.md` section 18 must meet before they are called done. How far each is met, with the evidence and the honest gaps, is in `docs/UX_IMPLEMENTATION_STATUS.md`. Production approval is external governance and nothing here declares it.
 
 How to read: each criterion has an ID, a statement written as *Given / When / Then* where useful, and **Verify**, the kind of evidence that counts. "Over HTTP" means a test that signs in through the real sign-in page and drives the real pages (the style of `NoCodeRehearsalTests`), on SQLite and on real SQL Server. "Role matrix" means the check is repeated for every role in `requirements/02-reference/role-permission-matrix.csv`. A criterion is **Passed**, **Failed**, or **Not Verified**; a slice does not close with an unexplained Not Verified.
 
@@ -41,7 +41,7 @@ Test users: the target person is a Procurement Excellence Manager or Contract Ad
 | NAV-007 | The former "Access to this tenant" is named **Support & emergency access log**, sits under Security & Audit, and its page states in one sentence that it lists installation administrators' time-limited access to this tenant | Over HTTP: page text |
 | NAV-008 | Labels follow terminology: with the JBS pack, "Counterparties" and "Contracts" show the pack's words; no raw `[[...]]` token is visible | Rendered-page sweep over Blank, JBS Procurement and Construction Subcontracts |
 | NAV-009 | Breadcrumbs appear on every Administration page, name the group and the page, and the current page is not a link | Accessibility test |
-| NAV-010 | At 320 CSS pixels the navigation collapses behind a Menu button; no horizontal page scroll | Responsive test at 320 and 40rem |
+| NAV-010 | At 320 CSS pixels the navigation wraps onto lines (it is a short row of links, so no Menu button is needed); no horizontal page scroll | Responsive test at 320 and 40rem |
 
 ## C. Home page (HOME)
 

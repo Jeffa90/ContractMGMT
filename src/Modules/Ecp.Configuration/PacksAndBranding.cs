@@ -14,8 +14,19 @@ public sealed record PackClassification(IReadOnlyList<string> Levels, string Def
 public sealed record PackDefaults(string? Culture, string? TimeZoneId, string? CurrencyCode, string? ReferencePrefix, PackClassification Classification,
     IReadOnlyList<PackContractType> ContractTypes, IReadOnlyList<PackCategory> Categories);
 
+/// <summary>
+/// The closed vocabulary a pack may use to say what its business needs set up (<c>onboardingRequirements</c> in its solution-pack document): the item keys of the set-up checklist and the three levels. It is
+/// data only; the platform's own universal items cannot be relaxed by a pack.
+/// </summary>
+public static class OnboardingRequirementVocabulary
+{
+    public static readonly IReadOnlyList<string> Keys = ["organisation", "solutionPack", "regional", "structure", "categories", "contractTypes", "people", "owners", "approvers", "workflow", "notifications", "review", "publish"];
+    public static readonly IReadOnlyList<string> Universal = ["organisation", "review", "publish"];
+    public static readonly IReadOnlyList<string> Levels = ["Required", "Recommended", "Optional"];
+}
+
 public sealed record SolutionPackInfo(string PackId, string Name, string Version, string Description, bool Synthetic, string Publisher,
-    IReadOnlyList<string> Features, string OwnershipModel, string ApprovalModel, PackDefaults Defaults);
+    IReadOnlyList<string> Features, string OwnershipModel, string ApprovalModel, PackDefaults Defaults, IReadOnlyDictionary<string, string>? OnboardingRequirements = null);
 
 /// <summary>
 /// The packs a first-run setup can offer: the shipped, read-only packages that are usable in this environment (compatible, and trusted or explicitly allowed as unsigned synthetic packs in Demo and Test).

@@ -156,6 +156,16 @@ internal sealed class PackValidationService
         if (problem is not null) yield return new PackIssue(PackCodes.ContentInvalid, PackSeverity.Error, problem, "content/solution-pack.json", "Correct the SolutionPack document in the pack source.");
         else if (classification!.Levels.Count == 0 || !classification.Levels.Contains(classification.DefaultLevel))
             yield return new PackIssue(PackCodes.ContentInvalid, PackSeverity.Error, "The pack's default classification level is not one of its levels.", "content/solution-pack.json", "Correct the classification defaults.");
+        if (problem is null && info?.OnboardingRequirements is { } requirements)
+            foreach (var (key, level) in requirements)
+            {
+                if (!OnboardingRequirementVocabulary.Keys.Contains(key, StringComparer.Ordinal))
+                    yield return new PackIssue(PackCodes.ContentInvalid, PackSeverity.Error, $"onboardingRequirements: '{key}' is not a set-up checklist item.", "content/solution-pack.json", "Use only: " + string.Join(", ", OnboardingRequirementVocabulary.Keys) + ".");
+                else if (!OnboardingRequirementVocabulary.Levels.Contains(level, StringComparer.Ordinal))
+                    yield return new PackIssue(PackCodes.ContentInvalid, PackSeverity.Error, $"onboardingRequirements: '{level}' is not a level for '{key}'.", "content/solution-pack.json", "Use Required, Recommended or Optional.");
+                else if (OnboardingRequirementVocabulary.Universal.Contains(key, StringComparer.Ordinal) && level != "Required")
+                    yield return new PackIssue(PackCodes.ContentInvalid, PackSeverity.Error, $"onboardingRequirements: '{key}' is a platform safety item and is always Required.", "content/solution-pack.json", "Remove it from onboardingRequirements.");
+            }
     }
 
     private static ClassificationScale? ScaleOf(OpenedPackage opened)

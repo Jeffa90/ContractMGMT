@@ -45,7 +45,7 @@
         <div class="access-banner preview-banner" role="alert">
             <strong>@L["TEST MODE"] — @L["Previewing as"] @PreviewCtx.TargetName</strong>
             <span>@L["Read-only"] · @L["ends in {0} min", Math.Max(0, (int)Math.Ceiling((PreviewCtx.ExpiresUtc - DateTime.UtcNow).TotalMinutes))]</span>
-            <form method="post" action="/Account/ExitPreview"><button type="submit">@L["Exit user preview"]</button></form>
+            <form method="post" asp-page="/Account/ExitPreview"><button type="submit">@L["Exit user preview"]</button></form>
         </div>
     }
     @if (HostOptions.Mode != EcpMode.Production)

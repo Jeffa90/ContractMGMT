@@ -11,6 +11,7 @@ public sealed class IndexModel(IOnboardingService onboarding, IOrganisationStruc
 {
     public OnboardingState? State { get; private set; }
     public IReadOnlyList<ChecklistItem> Checklist { get; private set; } = [];
+    public ReadinessReport? Readiness { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         => await GuardedAsync(async () =>
@@ -18,6 +19,7 @@ public sealed class IndexModel(IOnboardingService onboarding, IOrganisationStruc
             if (!await SelectOrganisationAsync(ct)) return NotFound();
             State = await Onboarding.GetAsync(OrganisationId, ct);
             Checklist = Build(State);
+            Readiness = await Onboarding.ReadinessAsync(OrganisationId, ct);
             return Page();
         });
 

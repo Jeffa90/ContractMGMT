@@ -337,3 +337,15 @@ Assets: the governance setting, email configuration and test results, scanner co
 | T-CRE-08 | **Proxy header spoofing to fake HTTPS** | Forwarded headers honoured only from configured proxies; an untrusted sender yields `ECP-NET-002`, never a pass; the container shortcut trusts any sender and is documented as acceptable only where only the proxy can reach the container | Real proxy products not exercised (Not Verified) |
 | T-CRE-09 | **Information leak in diagnostics** (stack traces, header values, token diagnostics) | Safe page shows a code, a sentence, an action and a correlation id only; leftover terminology tokens are replaced with a neutral marker | |
 | T-CRE-10 | **Evidence pack leaks contract content, or injects spreadsheet formulas** | Counts, codes, hashes and correlation ids only; formula-safe CSV; secret scan in tests | |
+
+## Guided administration: preview, synthetic people and Test-mode access (ADR-0039)
+
+| Threat | Control | Status |
+|---|---|---|
+| Preview used to read more than the previewer may see | Containment: every active grant of the target must be one the previewer could give (delegation policy); re-checked on every request; installation-scope people are never previewable | Implemented, tested (SQLite and SQL Server) |
+| Preview used to act as another person | Read-only at the request layer and the database layer; only audit and the preview's own record are writable; no credential or identity is touched | Implemented, tested |
+| Forged or stale `ecp:preview` claim | The claim names a database row; the row, the mode, the previewer's right to manage people and the target's status are re-checked per request; Production ignores and ends it | Implemented; Production HTTP forgery test **Not Verified** (service-level Production tests pass) |
+| Preview or Test-mode access present in Production | Refused in the services, not only hidden; the same applies to demonstration sign-in for new people | Implemented, tested against a Production-mode installation |
+| Self-grant through the Test-mode shortcut | Only Demo/Test, only an administrator of the organisation, recent sign-in, bounded set of profiles, never System or Tenant Administrator, audited, removable; self-approval prevention unchanged | Implemented, tested |
+| Identity group mapped to a privileged role | Closed safe role catalogue at the store and the screen; `rolemappings.manage`; delegation policy; no high classification ceiling | Implemented, tested |
+| Onboarding published while the organisation is not ready | Service-level publish gate on the pack's Required items | Implemented, tested |

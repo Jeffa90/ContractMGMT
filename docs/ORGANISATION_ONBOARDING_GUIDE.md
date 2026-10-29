@@ -184,6 +184,11 @@ Shown as **Start this set-up again** only when the organisation holds no real wo
 
 Success flash: "Set-up reset: N drafts discarded and M structure items ended." Then re-enter structure in Part F, step 2. **Evidence:** the flash text, the audit event (organisation.setup.reset), and the reason.
 
+### The set-up checklist (UX-5)
+
+The first thing on the Onboarding page (`/Onboarding`) is the **Set-up checklist**: thirteen items in the order to do them, each **Required**, **Recommended** or **Optional**, and each **Complete**, **Needs attention**, **To do** or **Not used here**. Nothing is ticked by hand; each item reads the facts that make it true (for example "every category has a primary owner who holds the owner role"). What counts as Required comes from the starting configuration (solution pack) you chose: a pack can say, for each item, what its business needs. The platform insists only on its own safety items (the organisation exists, the draft is reviewed, it is published). While a Required item is open the page says "Not ready to publish yet", names the items, and the Publish button on the review page is off; publishing is refused by the service as well. The draft's own categories and owners count, because publishing creates them.
+
+
 ## Part E. Prepare the drafts from the pack
 
 **Navigation.** Menu entry **Packs**, page **/Admin/Packs/Assign**.

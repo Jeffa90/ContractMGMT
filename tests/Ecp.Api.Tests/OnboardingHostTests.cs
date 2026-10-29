@@ -67,7 +67,7 @@ public sealed class OnboardingHostTests
         using var admin = await app.SignInAsync("orgadmin@a.example.test");
 
         var home = await admin.GetStringAsync($"/Onboarding?org={orgId}");
-        Assert.Contains("Checklist", home); Assert.Contains("Nothing has been published yet", home);
+        Assert.Contains("Set-up checklist", home); Assert.Contains("Nothing has been published yet", home);
         Assert.Contains("Onboarding", await admin.GetStringAsync("/")); // navigation entry
 
         // a bad import is rejected as a whole, with line numbers, and keeps what the person typed

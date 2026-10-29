@@ -336,6 +336,24 @@ public sealed class RoleBoundaryTests
     }
 
     [Fact]
+    public void Full_test_mode_access_does_not_let_a_person_approve_their_own_submission_whatever_else_they_hold()
+    {
+        // The shape "Give me full Test-mode access" creates: administration, contract administration, ownership, review and approval in a test approver group.
+        var s = World.Subject(
+            World.Assign(RoleCodes.OrganisationAdministrator, Org1()),
+            World.Assign(RoleCodes.ProcurementAdministrator, Org1("Confidential")),
+            World.Assign(RoleCodes.CategoryOwner, Org1("Confidential")),
+            World.Assign(RoleCodes.Legal, Org1("Confidential")),
+            World.Assign(RoleCodes.Approver, Org1("Confidential"), approverGroup: "TEST-APPROVERS"));
+        var pending = World.Contract() with { PendingApprovalGroupKeys = new HashSet<string> { "TEST-APPROVERS" } };
+        Assert.True(World.Decide(s, "approvals.action", pending).Allowed);                                // someone else's submission: allowed, as for any approver
+        var own = pending with { SubmittedByUserId = World.UserA };
+        var d = World.Decide(s, "approvals.action", own);
+        Assert.False(d.Allowed);                                                                            // their own: refused, whatever else they hold
+        Assert.Equal(8, d.Layer);
+    }
+
+    [Fact]
     public void Auditor_reads_and_exports_evidence_but_cannot_operate()
     {
         var s = World.Subject(World.Assign(RoleCodes.Auditor, Org1()));

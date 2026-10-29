@@ -86,7 +86,7 @@ else if (Model.CanCreate || Model.CanReadContracts)
         <h2 id="setup-h">@L["Setup & administration"]</h2>
         <p class="hint">@L["Set up people, categories and approvals, and check the installation."]</p>
         <p><a class="button secondary" href="/Admin">@L["Open Administration"]</a>
-            @if (Model.CanManageUsers) { <a class="button secondary" href="/Admin/Users">@L["Add or change people"]</a> }
+            @if (Model.CanManageUsers) { <a class="button secondary" href="/Admin/People">@L["Add or change people"]</a> }
             <a class="button secondary" href="/Access">@L["My access"]</a></p>
     </section>
 }

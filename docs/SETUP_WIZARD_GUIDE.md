@@ -257,6 +257,11 @@ What Save does: creates the user (invited until their first verified sign-in; ac
 
 ---
 
+### Stage 7, continued: what will this person do? (UX-4)
+
+The initial administrator stage also asks what this person will do in the organisation besides administering it: create and manage contracts, own every category, review, approve, read only. In Demo and Test "create and manage" and "own every category" are ticked for you; in Production nothing is, and you can leave everything unticked (the person then administers only, and someone else must be given the work on contracts). The choices are applied when the organisation is created, through the same trusted path as the administrator roles, and recorded in the set-up report. If there are no categories yet, owning them is asked for again by the set-up checklist once they exist.
+
+
 ## Stage 8: Organisation
 
 | | |

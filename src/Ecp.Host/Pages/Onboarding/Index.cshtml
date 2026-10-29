@@ -13,7 +13,35 @@
     </form>
 }
 <p>@L["[[organisation]]"]: <strong>@Model.OrganisationName</strong>. @(Model.State!.CurrentRelease is { } r ? $"Current release: {r}." : "Nothing has been published yet.")</p>
-<h2>@L["Checklist"]</h2>
+@if (Model.Readiness is { } ready)
+{
+    <section class="card" aria-labelledby="ready-h">
+        <h2 id="ready-h">@L["Set-up checklist"]</h2>
+        <p class="lede">@Terms.Expand("What the [[organisation|lower]] needs before it is ready to use, in the order to do it. What is Required depends on the starting configuration you chose; each item turns Complete by itself when it is true.")</p>
+        @if (ready.CanPublish)
+        {
+            <p class="flash" role="status">@L["Every required item is complete. You can review the draft and publish."]</p>
+        }
+        else
+        {
+            <p class="flash warn" role="status"><strong>@L["Not ready to publish yet."]</strong> @ready.BlockingItems.Count @(ready.BlockingItems.Count == 1 ? L["required item is"].Value : L["required items are"].Value) @L["still open:"] @string.Join("; ", ready.BlockingItems.Select(i => Terms.Expand(i.Title)))</p>
+        }
+        <ol class="steps">
+        @foreach (var item in ready.Items)
+        {
+            <li>
+                <span class="badge @(item.State == Ecp.Setup.Onboarding.ReadinessState.Complete ? "ok" : item.State == Ecp.Setup.Onboarding.ReadinessState.NeedsAttention ? "bad" : "")">@(item.State switch { Ecp.Setup.Onboarding.ReadinessState.Complete => L["Complete"].Value, Ecp.Setup.Onboarding.ReadinessState.NeedsAttention => L["Needs attention"].Value, Ecp.Setup.Onboarding.ReadinessState.NotApplicable => L["Not used here"].Value, _ => L["To do"].Value })</span>
+                <span class="badge @(item.Level == Ecp.Setup.Onboarding.ReadinessLevel.Required ? "warn" : "")">@(item.Level switch { Ecp.Setup.Onboarding.ReadinessLevel.Required => L["Required"].Value, Ecp.Setup.Onboarding.ReadinessLevel.Recommended => L["Recommended"].Value, _ => L["Optional"].Value })</span>
+                <a href="@item.FixHref@(item.FixHref.StartsWith("/Onboarding") ? "?org=" + Model.OrganisationId : "")">@Terms.Expand(item.Title)</a>
+                <span class="hint">@Terms.Expand(item.Detail)</span>
+            </li>
+        }
+        </ol>
+        @if (ready.PackKey is not null) { <p class="hint">@Terms.Expand($"Required, Recommended and Optional come from the starting configuration “{ready.PackKey}”.") @(ready.PackDefinesRequirements ? "" : L["It does not set its own, so only the platform's safety items are Required."].Value)</p> }
+    </section>
+}
+<h2>@L["Draft sections"]</h2>
+<p class="hint">@L["These are the bulk-entry sections of the draft that publishing applies (CSV, advanced). Most people use the checklist above and the screens it links to."]</p>
 <ol class="steps">
 @foreach (var item in Model.Checklist)
 {

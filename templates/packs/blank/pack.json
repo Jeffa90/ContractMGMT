@@ -24,5 +24,16 @@
     },
     "contractTypes": [],
     "categories": []
+  },
+  "onboardingRequirements": {
+    "regional": "Optional",
+    "structure": "Optional",
+    "categories": "Optional",
+    "contractTypes": "Optional",
+    "people": "Recommended",
+    "owners": "Optional",
+    "approvers": "Optional",
+    "workflow": "Optional",
+    "notifications": "Optional"
   }
 }

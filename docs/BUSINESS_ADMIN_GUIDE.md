@@ -104,6 +104,20 @@ The People table lists **Name, Email, Status, Current roles**; the name opens th
 **Common errors.** "Your role does not allow you to grant roles."; "The role or scope is above what the caller may grant."; a blank reason.
 **Evidence.** The Role assignments table (role, scope, ceiling, effective dates, granted by) and the audit entry.
 
+## 2A. People & Access (the guided way; UX-3, UX-6, UX-7)
+
+Most administrators never need section 2. **Administration, People & Access, People** (`/Admin/People`) lists everyone you may manage with the kind of access each has.
+
+* **Add a person** (`/Admin/People/Access`): name and email, what they will do (Contract Manager, Contract Administrator, Reviewer, Approval Authority, Read Only, Organisation Administrator, Business Configuration Administrator, Auditor; you see only what you may give), where they can work, which categories they own, the highest classification they may see, and for an approval authority the approver group. The last step says in plain English what the person will be able to do and not do, and what saving will add. Saving needs a recent sign-in. Adding the person and giving the access is one step: if the access is refused, the person is not created.
+* **Change access** on a person adds to what they have; **End this access** on the person's page ends exactly what a guided save created. Access given any other way is left alone.
+* **Allow demonstration sign-in** (Demo and Test only; absent in Production) creates a synthetic test person with no password who can be chosen on the demonstration sign-in page.
+* **Preview as this user** (Demo and Test only) lets you see the application as that person sees it, using their real access. It is read-only, lasts 30 minutes, shows a banner "TEST MODE: Previewing as ..." with **Exit user preview**, and is recorded. You can preview only a person whose access you could give yourself.
+* **My access** (`/Access`) tells any signed-in person what they can do, where and why, and what they cannot do and what kind of access would give it.
+* **Set up my access** (`/Access/Setup`), for an administrator who cannot yet create anything: in Demo and Test, **Give me full Test-mode access** says exactly what it grants, then applies it (and can be removed). In Production nobody can give themselves access; ask another administrator.
+* **Categories and owners** (`/Admin/Categories`): a primary and a backup owner per category, chosen from everyone you manage; **assign all** shows a preview first; tick several rows to set them together. A person without the owner role is given it in the same save.
+* **Identity group mappings** (`/Admin/People/Mappings`, Advanced, tenant administrators) give access automatically to a group from your single sign-on. They are limited to reading, reviewing, auditing, owning and administering contracts and can never carry administrator or approval access.
+
+
 ## 3. Approver groups
 
 **Navigation.** Menu entry **Approver groups**, page **/Admin/ApproverGroups**; one group at **/Admin/ApproverGroups/Details?key=**.

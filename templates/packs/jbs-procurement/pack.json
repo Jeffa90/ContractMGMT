@@ -73,5 +73,16 @@
         "name": "Logistics"
       }
     ]
+  },
+  "onboardingRequirements": {
+    "regional": "Recommended",
+    "structure": "Recommended",
+    "categories": "Required",
+    "contractTypes": "Recommended",
+    "people": "Required",
+    "owners": "Required",
+    "approvers": "Required",
+    "workflow": "Required",
+    "notifications": "Recommended"
   }
 }

@@ -24,6 +24,7 @@ public static class SetupModule
         services.AddScoped<OnboardingApplier>();
         services.AddScoped<IConfigurationKind, OrganisationOnboardingKind>();
         services.AddScoped<IOnboardingService, OnboardingService>();
+        services.AddScoped<IOnboardingReadiness, OnboardingReadiness>();
         services.AddScoped<Organisations.IOrganisationCreation, Organisations.OrganisationCreation>();
         foreach (var stage in Stages.SetupStages.All()) services.AddSingleton(typeof(ISetupStage), stage);
         foreach (var check in Stages.SetupChecks.All()) services.AddSingleton(typeof(ISetupCheck), check);

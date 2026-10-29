@@ -55,6 +55,7 @@ public static class NavigationCatalogue
             new("people", "/Admin/People", "People", "Add people, say what each will do, and see what that lets them do.", ["users.manage"], null, "/Admin/People"),
             new("users", "/Admin/Users", "Users and roles (advanced)", "Exact role grants, scopes and classification ceilings.", ["users.manage"], null, "/Admin/Users"),
             new("simulation", "/Admin/Simulation", "Access simulator (advanced)", "Test what a person could do before giving access.", ["users.manage"]),
+            new("mappings", "/Admin/People/Mappings", "Identity group mappings (advanced)", "Give access automatically to a group from your single sign-on.", ["rolemappings.manage"]),
         ]),
         new("organisation", "Organisation", "Your [[organisation|lower]], its structure and regional settings.",
         [

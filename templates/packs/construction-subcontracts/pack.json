@@ -81,5 +81,15 @@
         "name": "Finishes"
       }
     ]
+  },
+  "onboardingRequirements": {
+    "structure": "Recommended",
+    "categories": "Recommended",
+    "contractTypes": "Required",
+    "people": "Required",
+    "owners": "Recommended",
+    "approvers": "Optional",
+    "workflow": "Required",
+    "notifications": "Optional"
   }
 }

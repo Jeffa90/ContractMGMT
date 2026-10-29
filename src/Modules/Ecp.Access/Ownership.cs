@@ -26,7 +26,7 @@ public sealed record OwnershipOutcome(int Assigned, int Replaced, int Skipped, b
 public sealed record OwnershipPlan(int Categories, int AlreadyOwned, int WillReplace, bool WillAddRole, string PersonName);
 
 /// <summary>
-/// Category ownership in a form (docs/UX_REDESIGN.md section 9): a primary and a backup owner per category, in plain choices, from everyone the administrator may manage. Choosing someone who lacks the role
+/// Ownership of categories in a form (docs/UX_REDESIGN.md section 9): a primary and a backup owner per category, in plain choices, from everyone the administrator may manage. Choosing someone who lacks the role
 /// that lets owners act gives them it in the same save. Every step is the real secured service, so the delegation and permission rules apply; a refusal rolls the whole save back.
 /// </summary>
 public interface ICategoryOwnership

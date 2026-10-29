@@ -1,6 +1,6 @@
 # UX redesign: guided administration and task-oriented navigation
 
-Status: **Proposed design. Nothing in this document is implemented.** Branch ux/guided-administration, opened from claude/stoic-volta-dvszm5 at commit `5cdf9f7`. No application code, permission code, role code or schema has been changed. Production approval is external governance and nothing here declares it.
+Status: **Approved by the owner (2026-10-29) and implemented in slices UX-1 to UX-7 on branch ux/guided-administration, opened from claude/stoic-volta-dvszm5 at commit `5cdf9f7`.** What was built, what differs from this design and what is still open is recorded in `docs/UX_IMPLEMENTATION_STATUS.md`; decisions are in `decisions/ADR-0039-guided-administration-access-profiles.md`. No permission code or role code changed. Production approval is external governance and nothing here declares it.
 
 Evidence base: the first manual localhost usability test (owner finding, 2026-10-29, twelve observations, plus one additional finding on testing as another user, section 7A) and a read of the code on this branch. Where this document says "the code does X", the file is named so it can be checked. Where something could not be confirmed it is labelled **Not Verified** or listed as a gap in section 16. Acceptance criteria are in `docs/UX_ACCEPTANCE_CRITERIA.md`.
 
@@ -779,7 +779,7 @@ None changes the security model. "Blocks" says which part of the UX cannot ship 
 
 | ID | Gap | Why it matters | Blocks |
 |---|---|---|---|
-| **UXG-01** | No profile concept; `GrantAsync` makes one assignment per call; no shared transaction between grants and ownership | "Save access" must apply several operations safely | People wizard, bootstrap |
+| **UXG-01** | No profile concept; `GrantAsync` makes one assignment per call; no shared transaction between grants and ownership. **Resolved:** `IUnitOfWork` gives one transaction across module contexts and buffers audit events, so a profile application is atomic (all or nothing); no partial state needs reporting | "Save access" must apply several operations safely | People wizard, bootstrap |
 | **UXG-02** | No effective-access service: nothing lists a person's permissions with sources; the simulator covers eight permissions on a synthetic record; `GrantsAsync` works only for the current user | Section 11 | Effective Access, review step |
 | **UXG-03** | No path lets a person grant themselves access; the delegated path refuses (`self_grant`) and the trusted path is not exposed. A Demo/Test-only application service is needed, with `access.test_bootstrap`, source `TestBootstrap`, recent sign-in and mode gating | Section 7 | Test bootstrap |
 | **UXG-04** | Secured owner API cannot set effective dates or reuse "primary vs backup" from the UI; assigning ownership does not check the `CategoryOwner` role; no "categories owned by person X" query; no one-primary rule | Sections 9 and 11 | Ownership editor |

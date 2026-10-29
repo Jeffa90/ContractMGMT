@@ -23,6 +23,7 @@ public static class AccessModule
         services.AddScoped<IPreviewService, PreviewService>();
         services.AddScoped<IAdministratorBootstrap, AdministratorBootstrap>();
         services.AddScoped<ICategoryOwnership, CategoryOwnershipService>();
+        services.AddScoped<IGroupMappingAdministration, GroupMappingAdministration>();
         return services;
     }
 }

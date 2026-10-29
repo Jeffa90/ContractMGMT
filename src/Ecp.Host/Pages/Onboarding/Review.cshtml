@@ -70,9 +70,16 @@
     <form method="post" asp-page-handler="Publish">
         <input type="hidden" name="Org" value="@Model.OrganisationId" />
         <div class="field"><label for="note">@L["Note for the release history"]</label><input id="note" name="Note" type="text" maxlength="500" /></div>
-        @if (s.IsPublishable) { var pb = new Ecp.Host.Pages.PublishButtonsModel(s.DraftId, Model.Governance, "Publish", L["Publish"].Value); <partial name="_PublishButtons" model="pb" /> }
+        @if (Model.Readiness is { CanPublish: false } notReady)
+        {
+            <div class="error-summary" role="alert"><h3>@L["Not ready to publish"]</h3>
+                <p>@L["These required items are still open. Fix them, then come back."]</p>
+                <ul>@foreach (var i in notReady.BlockingItems) { <li><a href="@i.FixHref@(i.FixHref.StartsWith("/Onboarding") ? "?org=" + Model.OrganisationId : "")">@Terms.Expand(i.Title)</a>: @Terms.Expand(i.Detail)</li> }</ul></div>
+            <button type="submit" disabled>@L["Publish"]</button>
+        }
+        else if (s.IsPublishable) { var pb = new Ecp.Host.Pages.PublishButtonsModel(s.DraftId, Model.Governance, "Publish", L["Publish"].Value); <partial name="_PublishButtons" model="pb" /> }
         else { <button type="submit" disabled>@L["Publish"]</button> }
-        @if (!s.IsPublishable) { <p class="hint">@L["Publishing needs a draft that validated without errors and has not been changed since."]</p> }
+        @if (!s.IsPublishable && Model.Readiness is not { CanPublish: false }) { <p class="hint">@L["Publishing needs a draft that validated without errors and has not been changed since."]</p> }
     </form>
     <form method="post" asp-page-handler="Discard"><input type="hidden" name="Org" value="@Model.OrganisationId" /><button type="submit" class="secondary">@L["Discard this draft"]</button></form>
 </section>

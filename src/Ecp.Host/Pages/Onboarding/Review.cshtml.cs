@@ -12,6 +12,7 @@ public sealed class ReviewModel(IOnboardingService onboarding, IOrganisationStru
     public IReadOnlyList<PlanLine> Plan { get; private set; } = [];
     public OnboardingPreview? Preview { get; private set; }
     public GovernanceInfo? Governance { get; private set; }
+    public ReadinessReport? Readiness { get; private set; }
     public IReadOnlyList<OnboardingRelease> Releases { get; private set; } = [];
     public Ecp.SharedKernel.Localisation.RegionalSettings Regional { get; private set; } = Ecp.SharedKernel.Localisation.RegionalSettings.Unset;
 
@@ -27,6 +28,7 @@ public sealed class ReviewModel(IOnboardingService onboarding, IOrganisationStru
         Preview = await Onboarding.PreviewAsync(OrganisationId, ct);
         Releases = await Onboarding.ReleasesAsync(OrganisationId, ct);
         Governance = await Onboarding.GovernanceAsync(OrganisationId, ct);
+        Readiness = await Onboarding.ReadinessAsync(OrganisationId, ct);
         Regional = await HttpContext.RequestServices.GetRequiredService<IRegionalSettingsResolver>().GetAsync(OrganisationId, ct);
         return true;
     }

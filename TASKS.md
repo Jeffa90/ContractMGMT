@@ -10,7 +10,22 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-19, end of the Company Rehearsal Enablement slice)
+## Current state (2026-10-29, guided administration on branch ux/guided-administration; not merged)
+
+**Guided administration (slices UX-1 to UX-7; `decisions/ADR-0039-guided-administration-access-profiles.md`; design `docs/UX_REDESIGN.md`; criteria `docs/UX_ACCEPTANCE_CRITERIA.md`; what is built, deviations and open gaps `docs/UX_IMPLEMENTATION_STATUS.md`).** Branched from the known-good functional baseline (`5cdf9f7`), which is unchanged. Owner decisions applied: access profiles are a presentation layer over real grants; the selected pack defines Required/Recommended/Optional; sensitive access changes need a recent sign-in; group mappings stay Advanced and safe; Test/Demo-only tools are refused in Production at the service.
+
+* **UX-1 navigation, Home, Administration (Implemented, Verified).** Short everyday navigation, one Administration menu and landing page, Home with + New contract, My Actions, Reports hub, My access.
+* **UX-2 `Ecp.Access` module (Implemented, Verified on SQLite and SQL Server).** Eight access profiles; 94 permissions mapped to 36 plain-English abilities (build fails if one is missing); atomic apply with dry-run preview; effective access from the evaluator; provenance table that explains and never decides.
+* **UX-3 People & Access (Implemented, Verified).** People list, Add a person / Change access wizard, person page, Allow demonstration sign-in (Demo/Test only), Preview as this user (Demo/Test only; read-only; banner; audited; containment; re-validated per request).
+* **UX-4 first administrator (Implemented, Verified).** Set-up asks what the administrator will do; Give me full Test-mode access (Demo/Test only, bounded, audited, removable, never System/Tenant Administrator).
+* **UX-5 onboarding checklist (Implemented, Verified).** Thirteen business-outcome items computed from facts; pack-defined Required/Recommended/Optional (`onboardingRequirements` in the solution-pack document); publish refused in the service and the screen while a Required item is open.
+* **UX-6 category ownership (Implemented, Verified).** Primary and backup owner per category, assign-all with preview, bulk, search, needs-an-owner filter, owner role added in the same save.
+* **UX-7 identity group mappings (Implemented, Verified).** Secured guided Advanced screen; safe role catalogue enforced at the store.
+* **Two new tables** (`ProfileApplication`, `PreviewSession`) with row-level security; one migration (`AddAccessTables`); the 1.1.0 upgrade manifest was regenerated (7 new migrations) and verifies. A defect found by running on SQL Server: the module needed a design-time factory so migrations are generated for SQL Server, not SQLite.
+* **Not done / Not Verified:** moderated usability test (USE-001..006), keyboard, zoom and screen-reader walkthroughs (ACC-002/004/005), ownership effective dates, people search and paging, Add a test colleague, configurable profile definitions (S8), Documents hub, Recent contracts. See `docs/UX_IMPLEMENTATION_STATUS.md` section 6.
+* **Production approval is external governance; nothing here declares it.** The functional baseline's verdicts are unchanged: Production-mode setup Blocked; Demo/Test Supported with conditions.
+
+## Previous state (2026-10-19, end of the Company Rehearsal Enablement slice)
 
 **Company Rehearsal Enablement (this pass; `decisions/ADR-0038-company-rehearsal-enablement.md`, owner decisions D14.1 to D14.15, `docs/IMPLEMENTATION_REHEARSAL.md` section 9).** Objective: a trained implementation team can deploy a non-production company environment, complete Setup, configure realistic governance, validate email and identity readiness and run the documented rehearsal without misleading passes or raw technical errors.
 

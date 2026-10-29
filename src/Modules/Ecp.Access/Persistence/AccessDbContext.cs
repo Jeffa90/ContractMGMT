@@ -1,6 +1,7 @@
 using Ecp.Access.Domain;
 using Ecp.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
 
 namespace Ecp.Access.Persistence;
 
@@ -43,5 +44,14 @@ public sealed class AccessDbContext(DbContextOptions<AccessDbContext> options, D
             e.HasIndex(x => new { x.TenantId, x.PreviewerUserId, x.StartedUtc });
             e.HasIndex(x => new { x.TenantId, x.TargetUserId, x.StartedUtc });
         });
+    }
+}
+
+public sealed class AccessDbContextFactory : IDesignTimeDbContextFactory<AccessDbContext>
+{
+    public AccessDbContext CreateDbContext(string[] args)
+    {
+        var (options, services) = DesignTime.Create<AccessDbContext>(AccessModule.Schema);
+        return new AccessDbContext(options, services);
     }
 }

@@ -482,10 +482,24 @@ internal sealed class RoleAssignmentService(
     }
 }
 
+/// <summary>
+/// The roles an identity-group mapping may ever carry. A mapping gives access automatically to whoever the identity provider says is in a group, so it is kept to the roles that read, review, audit or own
+/// work. It never carries an administrator role (organisation, business-configuration or tenant) or an approval role (those need an approver group and a named person), whoever asks and however they ask.
+/// </summary>
+public static class GroupMappingPolicy
+{
+    public static readonly IReadOnlySet<string> SafeRoles = new HashSet<string>
+    {
+        RoleCodes.Viewer, RoleCodes.CategoryOwner, RoleCodes.Legal, RoleCodes.Auditor, RoleCodes.ProcurementAdministrator, RoleCodes.DivisionSiteAdministrator
+    };
+}
+
 internal sealed class GroupMappingService(IdentityDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IClassificationScaleProvider scales) : IGroupMappingService
 {
     public async Task<Guid> AddAsync(string providerKey, string groupKey, string roleCode, ViewerKind? viewerKind, ScopeSet scope, string? approverGroupKey, CancellationToken ct = default)
     {
+        if (!GroupMappingPolicy.SafeRoles.Contains(roleCode))
+            throw new DomainException("mapping_role_not_allowed", "An identity group cannot be given that kind of access. Administrator and approval access is given to named people, not to a group.");
         var mapping = GroupRoleMapping.Create(tenant.RequireTenantId(), providerKey, groupKey, roleCode, viewerKind, scope, approverGroupKey, await scales.GetAsync(ct), clock.UtcNow);
         return await uow.ExecuteAsync(async c =>
         {

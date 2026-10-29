@@ -6,6 +6,13 @@
 <p class="lede">@L["Add people, say what each will do, and see exactly what that lets them do. You never need to know role names or codes."]</p>
 <p><a class="button" href="/Admin/People/Access">@L["Add a person"]</a>
    <a href="/Admin/Users">@L["Advanced: users and roles"]</a></p>
+<details><summary>@L["Advanced"]</summary>
+    <ul>
+        <li><a href="/Admin/Users">@L["Users and roles: exact role grants, scopes, classification ceilings and dates"]</a></li>
+        <li><a href="/Admin/People/Mappings">@L["Identity group mappings: give access automatically to a group from your single sign-on"]</a></li>
+        <li><a href="/Admin/Simulation">@L["Access simulator: try what a person could do before giving access"]</a></li>
+    </ul>
+</details>
 @if (Model.Rows.Count == 0)
 {
     <p class="flash warn" role="status">@L["There is nobody here yet. Add the first person."]</p>

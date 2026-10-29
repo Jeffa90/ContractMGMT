@@ -349,6 +349,18 @@ internal static class SetupScenarios
         else Assert.Equal(new[] { RoleCodes.OrganisationAdministrator, RoleCodes.TenantAdministrator }.OrderBy(x => x), held);   // "administer only" grants nothing else
     }
 
+    /// <summary>UX-4: in Demo and Test the operational choices are ticked for the administrator; in Production nothing is ticked for them.</summary>
+    public static async Task Operational_choices_are_ticked_in_test_and_never_in_production(TestApp app, bool ticked)
+    {
+        var svc = app.Services.GetRequiredService<ISetupService>();
+        var stage = (await svc.DescribeAsync("admin"))!;
+        string? Value(string name) => stage.Fields.Single(f => f.Name == name).Value;
+        Assert.Equal(ticked ? "true" : null, Value("doManage"));
+        Assert.Equal(ticked ? "true" : null, Value("doOwn"));
+        Assert.Null(Value("doReview")); Assert.Null(Value("doApprove")); Assert.Null(Value("doRead"));            // never ticked for anyone
+        Assert.Equal(["doManage", "doOwn", "doReview", "doApprove", "doRead"], stage.Fields.Where(f => f.Name.StartsWith("do", StringComparison.Ordinal)).Select(f => f.Name));
+    }
+
     public static async Task Production_refuses_demonstration_features_and_unsafe_configuration(TestApp app)
     {
         // The test application is composed in Production setup mode over a database that is not reached through a secret reference.

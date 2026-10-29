@@ -69,13 +69,15 @@ public interface IOnboardingService
     Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default);
     Task<RollbackOutcome> RequestRollbackAsync(Guid organisationId, int toRelease, string reason, CancellationToken ct = default);
     Task<GovernanceInfo?> GovernanceAsync(Guid organisationId, CancellationToken ct = default);
+    /// <summary>The business-outcome checklist for the organisation: Required, Recommended and Optional items by the selected pack, with their state computed from facts.</summary>
+    Task<ReadinessReport> ReadinessAsync(Guid organisationId, CancellationToken ct = default);
     Task<IReadOnlyList<OnboardingRelease>> ReleasesAsync(Guid organisationId, CancellationToken ct = default);
     Task DiscardDraftAsync(Guid organisationId, CancellationToken ct = default);
     string Export(OnboardingDocument document, string step);
 }
 
 internal sealed class OnboardingService(IConfigurationService configuration, IAccessService access, ITenantContext tenant, OnboardingFactsLoader facts, IClassificationScaleProvider scales,
-    IPackLoader packs) : IOnboardingService
+    IPackLoader packs, IOnboardingReadiness readiness) : IOnboardingService
 {
     private const string Kind = OrganisationOnboardingKind.KindName;
 
@@ -177,12 +179,14 @@ internal sealed class OnboardingService(IConfigurationService configuration, IAc
     public async Task<ReleaseDto> PublishAsync(Guid organisationId, string note, CancellationToken ct = default)
     {
         var state = await GetAsync(organisationId, ct);
+        await readiness.RequireReadyAsync(organisationId, state, ct);   // never "ready to publish" while a Required item of the selected pack is open
         return await configuration.PublishAsync(state.DraftId, note, ct);
     }
 
     public async Task<PublishOutcome> SubmitOrPublishAsync(Guid organisationId, string note, CancellationToken ct = default)
     {
         var state = await GetAsync(organisationId, ct);
+        await readiness.RequireReadyAsync(organisationId, state, ct);
         return await configuration.SubmitOrPublishAsync(state.DraftId, note, ct);
     }
 
@@ -191,6 +195,9 @@ internal sealed class OnboardingService(IConfigurationService configuration, IAc
         await RequireAsync(organisationId, ct);
         return await configuration.RequestRollbackAsync(Kind, organisationId, toRelease, reason, ct);
     }
+
+    public async Task<ReadinessReport> ReadinessAsync(Guid organisationId, CancellationToken ct = default)
+        => await readiness.GetAsync(organisationId, await GetAsync(organisationId, ct), ct);
 
     public async Task<GovernanceInfo?> GovernanceAsync(Guid organisationId, CancellationToken ct = default)
     {

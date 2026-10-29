@@ -5,6 +5,7 @@ using Ecp.Identity;
 using Ecp.Identity.Access;
 using Ecp.Identity.Domain;
 using Ecp.Identity.Providers;
+using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.Tests.Common;
 using Microsoft.EntityFrameworkCore;
@@ -144,6 +145,25 @@ internal static class AccessProfileScenarios
         var approve = report.Abilities.Single(a => a.Key == "approve-contracts");
         Assert.True(approve.Can);
         Assert.False(string.IsNullOrEmpty(approve.Conditions));                                    // "only while a request for their group is waiting"
+    }
+
+    public static async Task Deleting_every_provenance_row_changes_nobodys_permissions(AccessWorld w)
+    {
+        var person = await NewPersonAsync(w, "Pia Provenance");
+        await AdminAsync(w, "orgAdmin", s => s.Get<IAccessProfileService>().ApplyAsync(new AccessChange(person, w.Org1, [AccessProfiles.ContractManager, AccessProfiles.ReadOnly], Ownership: OwnershipChoice.All)));
+        var before = await AdminAsync(w, "orgAdmin", s => s.Get<IEffectiveAccess>().ForUserAsync(person));
+        Assert.NotEmpty(before.Profiles);
+        await using (var scope = w.AsScopeless())
+        {
+            var db = scope.Get<Ecp.Access.Persistence.AccessDbContext>();
+            db.ProfileApplications.RemoveRange(db.ProfileApplications);
+            await scope.Get<IUnitOfWork>().ExecuteAsync(async c => { await db.SaveChangesAsync(c); });
+        }
+        var after = await AdminAsync(w, "orgAdmin", s => s.Get<IEffectiveAccess>().ForUserAsync(person));
+        Assert.Empty(after.Profiles);                                                             // the explanation is gone ...
+        Assert.Equal(before.Abilities.Where(a => a.Can).Select(a => a.Key), after.Abilities.Where(a => a.Can).Select(a => a.Key));   // ... the permissions are not
+        Assert.Equal(before.Owns.Select(o => o.CategoryId), after.Owns.Select(o => o.CategoryId));
+        Assert.Equal(before.Grants.Count(g => g.Active), after.Grants.Count(g => g.Active));
     }
 
     public static async Task Ending_an_application_ends_only_what_it_created(AccessWorld w)
@@ -321,6 +341,75 @@ internal static class AccessProfileScenarios
         Assert.Empty(await AuditAsync(w, "access.test_bootstrap"));
         // The delegated route still refuses a person giving themselves access, in Production as anywhere.
         await Assert.ThrowsAsync<DomainException>(() => AsPersonAsync(w, admin, s => s.Get<IAccessProfileService>().ApplyAsync(new AccessChange(admin, w.Org1, [AccessProfiles.ContractManager]))));
+    }
+
+    // ---- Identity group mappings (Advanced) ------------------------------------------------------------------------------------------------------------------
+
+    private static async Task RegisterProviderAsync(AccessWorld w)
+    {
+        await using var s = w.AsScopeless();
+        var issues = await s.Get<IProviderRegistry>().SaveAsync(new IdentityProviderSettings("corp-sso", IdentityProviderKind.Oidc, "Company sign-in", "https://idp.example.test", "client", "env:ECP_TEST_NOT_SET", null));
+        Assert.DoesNotContain(issues, i => i.Blocking);
+    }
+
+    public static async Task Mappings_need_the_right_to_manage_them_a_recent_sign_in_and_a_closed_safe_catalogue(AccessWorld w)
+    {
+        await RegisterProviderAsync(w);
+        var request = new MappingRequest("corp-sso", "Finance-Readers", RoleCodes.Viewer, w.Org1);
+        // An organisation administrator can give roles to people but does not hold the right to manage mappings; nor does anyone else but the tenant administrator.
+        foreach (var who in new[] { "orgAdmin", "viewerAll", "procAdmin" })
+        {
+            await Assert.ThrowsAsync<ForbiddenException>(() => AdminAsync(w, who, s => s.Get<IGroupMappingAdministration>().ListAsync()));
+            await Assert.ThrowsAsync<ForbiddenException>(() => AdminAsync(w, who, s => s.Get<IGroupMappingAdministration>().AddAsync(request)));
+        }
+        await Assert.ThrowsAsync<ReauthenticationRequiredException>(() => w.AsAsync("tenantAdmin", s => s.Get<IGroupMappingAdministration>().AddAsync(request)));
+        var preview = await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().PreviewAsync(request));
+        Assert.True(preview.CanSave, string.Join("; ", preview.Problems));
+        Assert.Contains("Finance-Readers", preview.Sentence);                                    // in words, naming the provider and the group
+        Assert.Contains("Company sign-in", preview.Sentence);
+        var id = await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().AddAsync(request));
+        var rows = await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().ListAsync());
+        var row = Assert.Single(rows);
+        Assert.Equal(id, row.Id);
+        Assert.True(row.Active);
+        Assert.DoesNotContain(RoleCodes.Viewer, row.Access);                                      // the access is described, not coded
+        await AdminAsync(w, "tenantAdmin", async s => { await s.Get<IGroupMappingAdministration>().EndAsync(id, "No longer needed"); return true; });
+        Assert.False(Assert.Single(await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().ListAsync())).Active);
+
+        // The closed catalogue: no administrator or approval access through a group, however the call is made.
+        foreach (var role in new[] { RoleCodes.OrganisationAdministrator, RoleCodes.BusinessConfigurationAdministrator, RoleCodes.Approver, RoleCodes.BackupApprover, RoleCodes.TenantAdministrator, RoleCodes.SystemAdministrator })
+        {
+            var refusal = await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().PreviewAsync(request with { RoleCode = role }));
+            Assert.False(refusal.CanSave, role);
+            await using var scope = w.AsScopeless();
+            var low = await Assert.ThrowsAsync<DomainException>(() => scope.Get<IGroupMappingService>().AddAsync("corp-sso", "Admins", role, null, ScopeSet.ForOrganisations([w.Org1], "Internal"), role is RoleCodes.Approver or RoleCodes.BackupApprover ? "G1" : null));
+            Assert.Contains(low.Code, new[] { "mapping_role_not_allowed", "mapping_not_allowed" });   // refused at the store too, not only by the screen
+        }
+        Assert.All(GroupMappingPolicy.SafeRoles, r => Assert.True(Ecp.Setup.Onboarding.OnboardingRoles.MappableByOnboarding.Contains(r)));   // one catalogue, not two
+        Assert.Equal(GroupMappingPolicy.SafeRoles.Count, Ecp.Setup.Onboarding.OnboardingRoles.MappableByOnboarding.Count);
+    }
+
+    public static async Task A_mapping_is_narrow_by_construction_no_high_ceiling_no_unchosen_places_and_viewer_kind_follows_the_places(AccessWorld w)
+    {
+        await RegisterProviderAsync(w);
+        var good = new MappingRequest("corp-sso", "Packaging-Readers", RoleCodes.Viewer, w.Org1, ScopeChoice.Categories, [w.CatPackaging], "Internal");
+        Assert.True((await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().PreviewAsync(good))).CanSave);
+        // A high classification level is for named people.
+        Assert.False((await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().PreviewAsync(good with { Ceiling = "Restricted" }))).CanSave);
+        // Selected places must be chosen; roles that cannot be narrowed are not narrowed.
+        Assert.False((await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().PreviewAsync(good with { ScopeIds = [] }))).CanSave);
+        Assert.False((await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().PreviewAsync(new MappingRequest("corp-sso", "Reviewers", RoleCodes.Legal, w.Org1, ScopeChoice.Categories, [w.CatPackaging])))).CanSave);
+        // An unknown provider and a blank group are refused in words.
+        var bad = await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().PreviewAsync(new MappingRequest("nope", " ", RoleCodes.Viewer, w.Org1)));
+        Assert.False(bad.CanSave); Assert.True(bad.Problems.Count >= 2);
+        // Saved: the viewer kind comes from the places chosen, never from the administrator.
+        await AdminAsync(w, "tenantAdmin", s => s.Get<IGroupMappingAdministration>().AddAsync(good));
+        await using var scope = w.AsScopeless();
+        var stored = Assert.Single(await scope.Get<IGroupMappingService>().ListAsync());
+        Assert.Equal(ViewerKind.Category, stored.ViewerKind);
+        Assert.Equal([w.CatPackaging], stored.Scope.CategoryIds);
+        Assert.Equal("Internal", stored.Scope.ClassificationCeiling);
+        Assert.Equal(2, (await AuditAsync(w, "rolemapping.created")).Count + 1);                // exactly one, from the audited store
     }
 
     /// <summary>Run against an installation whose mode is Production.</summary>

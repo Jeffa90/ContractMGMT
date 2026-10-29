@@ -1,0 +1,82 @@
+@page "/Admin/People/Mappings"
+@model Ecp.Host.Pages.Admin.People.MappingsModel
+@using Ecp.Access
+@{ ViewData["Title"] = L["Identity group mappings"].Value; }
+<h1>@L["Identity group mappings"] <span class="badge">@L["Advanced"]</span></h1>
+<p class="lede">@L["Group mappings give people access automatically when they sign in through your company's single sign-on, based on the groups they belong to there. You do not need them to set up an individual person. Use them when you run production with a corporate identity provider and want group membership to drive access."]</p>
+<p class="hint">@L["A mapping can only give access to read, review, audit, own work or administer work on [[contract|plural|lower]], never to administer the system or to approve. Those are given to named people."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+<section class="card" aria-labelledby="list-h">
+    <h2 id="list-h">@L["Existing mappings"]</h2>
+    @if (Model.Rows.Count == 0) { <p class="hint">@L["There are none."]</p> }
+    @foreach (var m in Model.Rows)
+    {
+        <form method="post" asp-page-handler="End">
+            <input type="hidden" name="id" value="@m.Id" />
+            <p>@Terms.Expand(m.Sentence) @if (!m.Active) { <span class="badge">@L["Ended"]</span> }</p>
+            <details><summary>@L["Details"]</summary><p class="hint">@L["Provider"]: <code>@m.ProviderKey</code> · @L["Group"]: <code>@m.Group</code></p></details>
+            @if (m.Active)
+            {
+                <div class="field"><label for="end-@m.Id">@L["Reason for ending"]</label><input id="end-@m.Id" name="reason" type="text" maxlength="1000" required aria-required="true" /></div>
+                <button type="submit" class="secondary">@L["End this mapping"]</button>
+            }
+        </form>
+    }
+</section>
+
+<section class="card" aria-labelledby="add-h">
+    <h2 id="add-h">@L["Add a mapping"]</h2>
+    @if (Model.Providers.Count == 0)
+    {
+        <p class="flash warn" role="status">@L["No sign-in provider is configured and enabled, so there is nothing to map yet."]</p>
+    }
+    else
+    {
+    <form method="post" asp-page-handler="Preview">
+        <div class="field"><label for="ProviderKey">@L["Sign-in provider"]</label>
+            <select id="ProviderKey" name="ProviderKey" required aria-required="true">@foreach (var p in Model.Providers) { <option value="@p.Key" selected="@(Model.ProviderKey == p.Key)">@p.DisplayName</option> }</select></div>
+        <div class="field"><label for="GroupName">@L["Group name"]</label><input id="GroupName" name="GroupName" type="text" maxlength="500" value="@Model.GroupName" required aria-required="true" aria-describedby="g-hint" />
+            <p id="g-hint" class="hint">@L["Exactly as your identity provider sends it, including capital letters. For example: Finance-Readers."]</p></div>
+        <div class="field"><label for="RoleCode">@L["What they can do"]</label>
+            <select id="RoleCode" name="RoleCode" required aria-required="true">@foreach (var r in Model.Roles) { <option value="@r.RoleCode" selected="@(Model.RoleCode == r.RoleCode)">@Terms.Expand(r.Label)</option> }</select>
+            <p class="hint">@foreach (var r in Model.Roles) { <span>@Terms.Expand(r.Label): @Terms.Expand(r.Description) </span> }</p></div>
+        @if (Model.Organisations.Count > 1)
+        {
+            <div class="field"><label for="OrganisationId">@Terms.Expand("[[organisation]]")</label>
+                <select id="OrganisationId" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(Model.OrganisationId == o.Id)">@o.Name</option> }</select></div>
+        }
+        else { <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /> }
+        <fieldset><legend>@L["Where"]</legend>
+            <div class="field check"><input id="sc-w" type="radio" name="Scope" value="@nameof(ScopeChoice.WholeOrganisation)" checked="@(Model.Scope == nameof(ScopeChoice.WholeOrganisation))" /><label for="sc-w">@Terms.Expand("The whole [[organisation|lower]]")</label></div>
+            <div class="field check"><input id="sc-d" type="radio" name="Scope" value="@nameof(ScopeChoice.Divisions)" checked="@(Model.Scope == nameof(ScopeChoice.Divisions))" /><label for="sc-d">@Terms.Expand("Selected [[division|plural|lower]]")</label></div>
+            <div class="field check"><input id="sc-b" type="radio" name="Scope" value="@nameof(ScopeChoice.BusinessUnits)" checked="@(Model.Scope == nameof(ScopeChoice.BusinessUnits))" /><label for="sc-b">@Terms.Expand("Selected [[business.unit|plural|lower]]")</label></div>
+            <div class="field check"><input id="sc-s" type="radio" name="Scope" value="@nameof(ScopeChoice.Sites)" checked="@(Model.Scope == nameof(ScopeChoice.Sites))" /><label for="sc-s">@Terms.Expand("Selected [[site|plural|lower]]")</label></div>
+            <div class="field check"><input id="sc-c" type="radio" name="Scope" value="@nameof(ScopeChoice.Categories)" checked="@(Model.Scope == nameof(ScopeChoice.Categories))" /><label for="sc-c">@Terms.Expand("Selected [[category|plural|lower]]")</label></div>
+        </fieldset>
+        @if (Model.Places.Count > 0)
+        {
+            <fieldset><legend>@L["Tick the places (only if you chose selected places)"]</legend>
+                @foreach (var p in Model.Places) { <div class="field check"><input id="pl-@p.Id" type="checkbox" name="ScopeIds" value="@p.Id" checked="@Model.ScopeIds.Contains(p.Id)" /><label for="pl-@p.Id">@p.Name</label></div> }
+            </fieldset>
+        }
+        <div class="field"><label for="Ceiling">@L["Highest classification they may see"]</label>
+            <select id="Ceiling" name="Ceiling">@foreach (var l in Model.Levels) { <option value="@l" selected="@(string.Equals(Model.Ceiling ?? Model.DefaultLevel, l, StringComparison.OrdinalIgnoreCase))">@L["Up to {0}", l]</option> }</select></div>
+        <button type="submit">@L["Check this mapping"]</button>
+    </form>
+    }
+    @if (Model.Preview is { } preview)
+    {
+        @if (preview.CanSave)
+        {
+            <div class="card"><h3>@L["Check before you save"]</h3><p>@Terms.Expand(preview.Sentence)</p>
+                <form method="post" asp-page-handler="Save">
+                    <input type="hidden" name="ProviderKey" value="@Model.ProviderKey" /><input type="hidden" name="GroupName" value="@Model.GroupName" /><input type="hidden" name="RoleCode" value="@Model.RoleCode" />
+                    <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="Scope" value="@Model.Scope" /><input type="hidden" name="Ceiling" value="@Model.Ceiling" />
+                    @foreach (var id in Model.ScopeIds) { <input type="hidden" name="ScopeIds" value="@id" /> }
+                    <button type="submit">@L["Save mapping"]</button> <span class="hint">@L["You may be asked to sign in again first."]</span></form></div>
+        }
+        else { <div class="error-summary" role="alert"><h3>@L["This mapping cannot be saved yet"]</h3><ul>@foreach (var p in preview.Problems) { <li>@Terms.Expand(p)</li> }</ul></div> }
+    }
+</section>
+<p><a href="/Admin/People">@L["Back to People & Access"]</a></p>

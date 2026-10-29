@@ -8,7 +8,7 @@
     "1.0.0"
   ],
   "sourceLedgerSha256": "dc6242cab14aa459f345e553cdd3a7d90e249fba69552e6ef552750c3c5aa64f",
-  "targetLedgerSha256": "a99190dee88e5e064c5db8474930d1a8930c9aef4d631d35fffc68f9da703b5f",
+  "targetLedgerSha256": "eba6927da5bce6cd99ec00bf8ceb95f7fe3424847064c181bfe17faa7ea0c9bc",
   "moduleOrder": [
     "Audit",
     "Tenancy",
@@ -805,28 +805,11 @@
       "module": "Access",
       "tier": 8,
       "schema": "access",
-      "schemaVersion": "20261029091900_AddPreviewSession",
+      "schemaVersion": "20261029100354_AddAccessTables",
       "migrations": [
         {
-          "id": "20261029084421_AddProfileApplication",
-          "checksum": "4731615b31632c7ccea849c546e7be18938b7c73f5eac9708a38bd5e3d34bc96",
-          "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
-          ],
-          "objects": [
-            "create index access.ProfileApplication.IX_ProfileApplication_TenantId_OrganisationId_ProfileKey",
-            "create index access.ProfileApplication.IX_ProfileApplication_TenantId_UserId",
-            "create table access.ProfileApplication",
-            "ensure schema access",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_ProfileApplication] ADD FILTER PREDIC\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
-          ],
-          "operations": 6
-        },
-        {
-          "id": "20261029091900_AddPreviewSession",
-          "checksum": "840df6e6f863836e3628aaea84ac0e46ceb6b9e195945b08da7d39e5ef8855a4",
+          "id": "20261029100354_AddAccessTables",
+          "checksum": "867395d50c7300a5425ffbdc7f7220144ec8455cc9e56b51890bcdc7115681d4",
           "categories": [
             "IndexOrConstraint",
             "RowLevelSecurity"
@@ -834,11 +817,16 @@
           "objects": [
             "create index access.PreviewSession.IX_PreviewSession_TenantId_PreviewerUserId_StartedUtc",
             "create index access.PreviewSession.IX_PreviewSession_TenantId_TargetUserId_StartedUtc",
+            "create index access.ProfileApplication.IX_ProfileApplication_TenantId_OrganisationId_ProfileKey",
+            "create index access.ProfileApplication.IX_ProfileApplication_TenantId_UserId",
             "create table access.PreviewSession",
+            "create table access.ProfileApplication",
+            "ensure schema access",
             "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_PreviewSession] ADD FILTER PREDICATE \u2026",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_ProfileApplication] ADD FILTER PREDIC\u2026",
             "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
           ],
-          "operations": 5
+          "operations": 10
         }
       ]
     },
@@ -1074,27 +1062,8 @@
     },
     {
       "module": "Access",
-      "id": "20261029084421_AddProfileApplication",
-      "checksum": "4731615b31632c7ccea849c546e7be18938b7c73f5eac9708a38bd5e3d34bc96",
-      "categories": [
-        "IndexOrConstraint",
-        "RowLevelSecurity"
-      ],
-      "objects": [
-        "create index access.ProfileApplication.IX_ProfileApplication_TenantId_OrganisationId_ProfileKey",
-        "create index access.ProfileApplication.IX_ProfileApplication_TenantId_UserId",
-        "create table access.ProfileApplication",
-        "ensure schema access",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_ProfileApplication] ADD FILTER PREDIC\u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
-      ],
-      "reviewRequired": false,
-      "reviewed": true
-    },
-    {
-      "module": "Access",
-      "id": "20261029091900_AddPreviewSession",
-      "checksum": "840df6e6f863836e3628aaea84ac0e46ceb6b9e195945b08da7d39e5ef8855a4",
+      "id": "20261029100354_AddAccessTables",
+      "checksum": "867395d50c7300a5425ffbdc7f7220144ec8455cc9e56b51890bcdc7115681d4",
       "categories": [
         "IndexOrConstraint",
         "RowLevelSecurity"
@@ -1102,8 +1071,13 @@
       "objects": [
         "create index access.PreviewSession.IX_PreviewSession_TenantId_PreviewerUserId_StartedUtc",
         "create index access.PreviewSession.IX_PreviewSession_TenantId_TargetUserId_StartedUtc",
+        "create index access.ProfileApplication.IX_ProfileApplication_TenantId_OrganisationId_ProfileKey",
+        "create index access.ProfileApplication.IX_ProfileApplication_TenantId_UserId",
         "create table access.PreviewSession",
+        "create table access.ProfileApplication",
+        "ensure schema access",
         "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_PreviewSession] ADD FILTER PREDICATE \u2026",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_ProfileApplication] ADD FILTER PREDIC\u2026",
         "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
       ],
       "reviewRequired": false,
@@ -1230,5 +1204,5 @@
     ],
     "dataLossStatement": "Rolling back discards everything created after the pre-upgrade backup, including anything done after the upgrade finished. It cannot be recovered from the backup."
   },
-  "manifestSha256": "40a1ce6fef9a8b224fc42e805858d1e300ecc8f3b79a6318b7a9c25335952d40"
+  "manifestSha256": "6af6095c4de167ea1f5f1c1fa735daa87508a3310ea21ac0f6cfedce6134abfc"
 }

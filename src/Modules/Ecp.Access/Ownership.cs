@@ -36,14 +36,14 @@ public interface ICategoryOwnership
     Task<OwnershipPlan> PlanAsync(Guid organisationId, IReadOnlyList<Guid> categoryIds, Guid userId, bool primary, CancellationToken ct = default);
     /// <summary>Makes the person the primary or backup owner of each category (and gives them the owner role first if they lack it). A new primary replaces the current one, who is ended with a reason.</summary>
     Task<OwnershipOutcome> SetOwnerAsync(Guid organisationId, IReadOnlyList<Guid> categoryIds, Guid userId, bool primary, string? reason, CancellationToken ct = default);
-    /// <summary>Every top-level active category of the organisation (owning one covers its sub-categories), for one person.</summary>
+    /// <summary>Makes the person the owner of every current <b>and future</b> category of the organisation, as a standing policy (ADR-0040), not a copy of today's list. Existing ownership of others is left alone.</summary>
     Task<OwnershipOutcome> AssignAllAsync(Guid organisationId, Guid userId, bool primary, string? reason, CancellationToken ct = default);
     Task EndAsync(Guid assignmentId, string reason, CancellationToken ct = default);
 }
 
 internal sealed class CategoryOwnershipService(
     ISecuredCategoryService categories, IPeopleDirectory people, IRoleAssignmentService roles, IAccessProfileService profiles, IUnitOfWork uow,
-    IUserService users, IClock clock, ReauthenticationContext reauth) : ICategoryOwnership
+    IUserService users, IClock clock, ReauthenticationContext reauth, ICategoryOwnershipPolicy policy) : ICategoryOwnership
 {
     private static readonly TimeSpan StepUpWindow = TimeSpan.FromMinutes(10);
 
@@ -157,10 +157,24 @@ internal sealed class CategoryOwnershipService(
 
     public async Task<OwnershipOutcome> AssignAllAsync(Guid organisationId, Guid userId, bool primary, string? reason, CancellationToken ct = default)
     {
-        var all = (await categories.ListAsync(ct)).Where(c => c.IsActive && c.OrganisationId == organisationId).ToList();
-        var top = all.Where(c => c.ParentCategoryId is null || all.All(p => p.Id != c.ParentCategoryId)).Select(c => c.Id).ToList();
-        if (top.Count == 0) throw new DomainException("no_categories", "There are no [[category|plural|lower]] yet.");
-        return await SetOwnerAsync(organisationId, top, userId, primary, reason, ct);
+        var person = await users.GetAsync(userId, ct) ?? throw new ResourceNotFoundException();
+        await people.GetManageableUserAsync(userId, ct);   // not found unless the administrator may manage this person
+        reauth.Require(clock.UtcNow, StepUpWindow);
+        var held = HoldsOwnerRole(await roles.ListForUserAsync(userId, includeEnded: false, ct), organisationId, clock.UtcNow);
+        return await uow.ExecuteAsync(async c =>
+        {
+            var notes = new List<string>(); var roleAdded = false;
+            if (!held)
+            {
+                // The role that lets an owner act is given in the same save, so ownership never lands on a person who cannot use it.
+                await profiles.ApplyAsync(new AccessChange(userId, organisationId, [AccessProfiles.ContractManager], Reason: reason ?? "Given when made an owner"), c);
+                roleAdded = true;
+                notes.Add($"{person.DisplayName} was also given the {AccessProfiles.Find(AccessProfiles.ContractManager)!.Label} profile so they can act as an owner.");
+            }
+            var outcome = await policy.SetAsync(organisationId, userId, primary, reason, c);
+            notes.Add($"{person.DisplayName} now owns every current and future [[category|lower]] in this [[organisation|lower]]. A new one is theirs automatically.");
+            return new OwnershipOutcome(outcome.Assigned, 0, outcome.AlreadyOwned, roleAdded, notes);
+        }, ct);
     }
 
     public async Task EndAsync(Guid assignmentId, string reason, CancellationToken ct = default)

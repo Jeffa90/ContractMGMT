@@ -57,6 +57,8 @@ public interface IAccessDirectory
 {
     /// <summary>The access facts of any user of the current tenant (as the evaluator would see them), or null if the user does not exist or is disabled.</summary>
     Task<AccessSubject?> LoadSubjectAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>The same, for a person who has not signed in yet (Invited), so a report can say what they will be able to do once active. Never used to decide a real request: the evaluator still refuses a subject that is not Active.</summary>
+    Task<AccessSubject?> LoadSubjectIncludingInvitedAsync(Guid userId, CancellationToken ct = default);
     /// <summary>People currently holding an Approver or Backup Approver assignment for the approver group.</summary>
     Task<IReadOnlyList<ApproverInfo>> ApproversAsync(string approverGroupKey, CancellationToken ct = default);
     /// <summary>People who hold (or, for a future date, will hold) an Approver or Backup Approver assignment for the group at the given instant, so a rule can be tried on a date other than today.</summary>
@@ -679,6 +681,14 @@ internal sealed class AccessDirectory(IdentityDbContext db, IClock clock) : IAcc
     {
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null || user.Status != UserStatus.Active) return null;
+        var rows = await db.RoleAssignments.AsNoTracking().Where(a => a.UserId == userId).ToListAsync(ct);
+        return new AccessSubject(user.Id, user.TenantId, user.Status, rows.Select(AccessService.ToView).ToList());
+    }
+
+    public async Task<AccessSubject?> LoadSubjectIncludingInvitedAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null || user.Status == UserStatus.Disabled) return null;
         var rows = await db.RoleAssignments.AsNoTracking().Where(a => a.UserId == userId).ToListAsync(ct);
         return new AccessSubject(user.Id, user.TenantId, user.Status, rows.Select(AccessService.ToView).ToList());
     }

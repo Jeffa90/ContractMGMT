@@ -1,0 +1,42 @@
+@model Ecp.Access.AccessReview
+@* The plain-English Review Access panel shared by the set-up step and the People and Access wizard. Role and permission codes appear only inside the collapsed Advanced details. *@
+<section class="card access-review" aria-labelledby="ar-h">
+    <h2 id="ar-h">@L["Review access"]</h2>
+    <p><strong>@Model.PersonName</strong> @L["in"] <strong>@Model.Organisation</strong></p>
+
+    <h3>@L["This person will be able to:"]</h3>
+    @if (Model.WillBeAbleTo.Count == 0) { <p class="hint">@L["They will not be able to do anything yet."]</p> }
+    else
+    {
+        <ul class="ability-list">@foreach (var l in Model.WillBeAbleTo) { <li><span aria-hidden="true">✓</span><span class="visually-hidden">@L["can"]</span> @Terms.Expand(l.Text)@if (l.Where is { Length: > 0 }) { <span class="hint"> · @Terms.Expand(l.Where)</span> }</li> }</ul>
+    }
+    @if (Model.AlsoIncluded.Count > 0)
+    {
+        <details><summary>@L["Also included"]</summary>
+            <ul class="ability-list">@foreach (var l in Model.AlsoIncluded) { <li><span aria-hidden="true">✓</span><span class="visually-hidden">@L["can"]</span> @Terms.Expand(l.Text)@if (l.Where is { Length: > 0 }) { <span class="hint"> · @Terms.Expand(l.Where)</span> }</li> }</ul></details>
+    }
+
+    <h3>@L["This person will not be able to:"]</h3>
+    <ul class="ability-list">@foreach (var l in Model.WillNotBeAbleTo) { <li><span aria-hidden="true">✗</span><span class="visually-hidden">@L["cannot"]</span> @Terms.Expand(l.Text)</li> }</ul>
+
+    <h3>@L["Summary"]</h3>
+    <dl class="facts">
+        @foreach (var f in Model.Facts) { <dt>@Terms.Expand(f.Label)</dt><dd>@Terms.Expand(f.Value)</dd> }
+        <dt>@L["Approval memberships"]</dt>
+        <dd>@if (Model.ApproverGroupKeys.Count == 0) { @L["None"] } else { @string.Join(", ", Model.ApproverGroupKeys.Select(k => Terms.GroupLabel(k))) }</dd>
+    </dl>
+
+    @foreach (var n in Model.Notes) { <p class="flash warn" role="status">@Terms.Expand(n)</p> }
+
+    @if (Model.WillDo.Count > 0)
+    {
+        <details><summary>@L["Exactly what saving will do"]</summary><ul>@foreach (var st in Model.WillDo) { <li>@Terms.Expand(st)</li> }</ul></details>
+    }
+    @if (Model.AdvancedGrants.Count > 0)
+    {
+        <details open><summary>@L["Advanced details"]</summary>
+            <table><caption class="visually-hidden">@L["The role grants this person will hold"]</caption>
+                <thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["Code"]</th><th scope="col">@L["Where"]</th><th scope="col">@L["Up to"]</th><th scope="col">@L["Source"]</th></tr></thead>
+                <tbody>@foreach (var g in Model.AdvancedGrants) { <tr><th scope="row">@Terms.Expand(g.RoleLabel)</th><td><code>@g.RoleCode</code></td><td>@Terms.Expand(g.Where)</td><td>@g.Ceiling</td><td>@Terms.Expand(g.Source)</td></tr> }</tbody></table></details>
+    }
+</section>

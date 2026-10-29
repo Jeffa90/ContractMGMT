@@ -8,6 +8,7 @@ using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Ecp.Contracts;
 
@@ -131,6 +132,15 @@ public interface IContractLifecycleService
 }
 
 /// <summary>Trusted category operations used by publication of onboarding configuration and Demo seeding (no per-user authorisation).</summary>
+/// <summary>
+/// Told, inside the same unit of work, when a category comes into being or is brought back into use, by any route (the Categories screen, set-up and onboarding, a data migration). It lets a standing
+/// ownership policy recognise a new category in the same transaction as the category itself. An observer adds no authorisation rule: it may only do what the trusted ownership service already does.
+/// </summary>
+public interface ICategoryLifecycleObserver
+{
+    Task OnCategoryActivatedAsync(Guid categoryId, Guid organisationId, CancellationToken ct = default);
+}
+
 public interface ICategoryAdministration
 {
     Task<Guid> UpsertCategoryAsync(Guid organisationId, string code, string name, string? parentCode, CancellationToken ct = default);
@@ -630,7 +640,7 @@ internal sealed class SecuredCategoryService(
 }
 
 internal sealed class CategoryAdministration(
-    ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IOrganisationStructureService structure) : ICategoryAdministration
+    ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, IOrganisationStructureService structure, IServiceProvider services) : ICategoryAdministration
 {
     public async Task<Guid> UpsertCategoryAsync(Guid organisationId, string code, string name, string? parentCode, CancellationToken ct = default)
     {
@@ -648,6 +658,7 @@ internal sealed class CategoryAdministration(
         {
             var existing = await db.Categories.FirstOrDefaultAsync(x => x.OrganisationId == organisationId && x.Code == normalised, c);
             Category category;
+            var cameIntoUse = existing is null || !existing.IsActive;
             if (existing is null)
             {
                 category = Category.Create(tenantId, organisationId, normalised, name, parentId);
@@ -657,6 +668,7 @@ internal sealed class CategoryAdministration(
             await db.SaveChangesAsync(c);
             audit.Record(new AuditEntry(existing is null ? "category.created" : "category.updated", nameof(Category), category.Id.ToString(), OrganisationId: organisationId,
                 NewValuesJson: System.Text.Json.JsonSerializer.Serialize(new { category.Code, category.Name })));
+            if (cameIntoUse) foreach (var observer in services.GetServices<ICategoryLifecycleObserver>()) await observer.OnCategoryActivatedAsync(category.Id, organisationId, c);
             return category.Id;
         }, ct);
     }

@@ -7,6 +7,7 @@ using Ecp.Persistence;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Ecp.Contracts;
@@ -96,7 +97,7 @@ internal sealed class MigrationIdentifierChecker(Ecp.SharedKernel.Localisation.I
 internal sealed class ContractMigrationPort(
     ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, IActorContext actor, IClock clock, ITenantContext tenant, ReferenceAllocator allocator,
     ITenantDirectory tenants, IOptions<ContractsOptions> options, IEnumerable<IContractCreationPolicy> policies, IContractCustomFieldWriter customFields, ICustomFieldCatalogue fieldCatalogue,
-    ISupplierIdentifierWriter identifiers, Ecp.Configuration.IRegionalSettingsResolver regional) : IContractMigrationPort
+    ISupplierIdentifierWriter identifiers, Ecp.Configuration.IRegionalSettingsResolver regional, IServiceProvider services) : IContractMigrationPort
 {
     // The same source the contract pages use: the lifecycle definition in force for the organisation. Only a host with no lifecycle module falls back to the configured code.
     public async Task<string> InitialStatusAsync(Guid organisationId, CancellationToken ct = default)
@@ -181,6 +182,7 @@ internal sealed class ContractMigrationPort(
             catch (DbUpdateException ex) when (DbExceptions.IsUniqueViolation(ex)) { throw new DomainException("category_code_in_use", "That [[category|lower]] code is already in use."); }
             audit.Record(new AuditEntry("migration.category.created", nameof(Category), category.Id.ToString(), OrganisationId: organisationId, MigrationBatchId: batchId,
                 NewValuesJson: AuditJson.Of(new { category.Code, category.Name, sourceSystem, sourceRecordId })));
+            foreach (var observer in services.GetServices<ICategoryLifecycleObserver>()) await observer.OnCategoryActivatedAsync(category.Id, organisationId, c);
         }, ct);
         return category.Id;
     }

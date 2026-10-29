@@ -5,6 +5,7 @@
 @if (Model.Blocked) { <partial name="_OnboardingBlocked" /> return; }
 <p><a href="/Onboarding?org=@Model.OrganisationId">&larr; @L["Checklist"]</a></p>
 <h1>@L["Review, simulate and publish"]</h1>
+@if (Model.Ready is { } ready) { <partial name="_ReadyToUse" model="ready" /> }
 <p>@L["[[organisation]]"]: <strong>@Model.OrganisationName</strong>. @(s.CurrentRelease is { } r ? $"Current release: {r}." : "Nothing has been published yet.")</p>
 @if (!ViewData.ModelState.IsValid)
 {

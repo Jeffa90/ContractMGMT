@@ -1,0 +1,13 @@
+@model Ecp.Host.Pages.Onboarding.ReadyToUse
+@* The organisation's completion panel: plain words, four next steps, no technical concepts. *@
+<section class="card ready" aria-labelledby="rtu-h">
+    <h2 id="rtu-h">@Model.OrganisationName @L["is ready to use"]</h2>
+    <p class="lede">@Terms.Expand("The set-up is finished and in effect. Here is what most people do next.")</p>
+    <p class="actions">
+        @if (Model.CanCreateContract) { <a class="button" href="/Contracts/Create">@Terms.Expand("Create first [[contract|lower]]")</a> }
+        else { <span class="hint">@Terms.Expand("Creating a [[contract|lower]] needs access to work on them. Add yourself or someone else below.")</span> }
+        <a class="button secondary" href="/Admin/People/Access">@L["Add another person"]</a>
+        <a class="button secondary" href="/Onboarding?org=@Model.OrganisationId">@Terms.Expand("Review [[organisation|lower]] setup")</a>
+        <a class="button secondary" href="/">@L["Go to Home"]</a>
+    </p>
+</section>

@@ -65,7 +65,7 @@ internal static class AuditJson
     public static string Of(object value) => JsonSerializer.Serialize(value);
 }
 
-internal sealed class CategoryService(ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, ITenantDirectory tenants) : ICategoryService
+internal sealed class CategoryService(ContractsDbContext db, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, ITenantDirectory tenants, IServiceProvider services) : ICategoryService
 {
     public async Task<Guid> CreateAsync(CreateCategoryRequest r, CancellationToken ct = default)
     {
@@ -79,6 +79,7 @@ internal sealed class CategoryService(ContractsDbContext db, IUnitOfWork uow, IA
             await Save(db, c);
             audit.Record(new AuditEntry("category.created", nameof(Category), category.Id.ToString(), OrganisationId: category.OrganisationId,
                 NewValuesJson: AuditJson.Of(new { category.Code, category.Name })));
+            foreach (var observer in services.GetServices<ICategoryLifecycleObserver>()) await observer.OnCategoryActivatedAsync(category.Id, category.OrganisationId, c);
             return category.Id;
         }, ct);
     }

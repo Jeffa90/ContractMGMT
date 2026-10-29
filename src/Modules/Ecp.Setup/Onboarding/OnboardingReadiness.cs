@@ -52,7 +52,7 @@ public static class ReadinessCatalogue
         (ContractTypes, "[[contract.type|plural|sentence]]", "The kinds of [[contract|lower]] the [[organisation|lower]] makes.", "/Onboarding/Step/types"),
         (People, "People & Access", "Someone is able to create and manage [[contract|plural|lower]].", "/Admin/People"),
         (Owners, "[[contract.owner|plural|sentence]]", "Every [[category|lower]] has a primary owner who can act as one.", "/Admin/Categories"),
-        (Approvers, "Approval Authorities", "Approver groups have people in them.", "/Admin/ApproverGroups"),
+        (Approvers, "Approval authorities", "Someone is chosen to approve.", "/Admin/ApprovalAuthorities"),
         (Workflow, "Workflow and approvals", "The workflow and the approval rules have been reviewed.", "/Admin/Configuration"),
         (Notifications, "Notifications", "What people are told, and when, has been reviewed.", "/Admin/Notifications"),
         (Review, "Review set-up", "The draft is checked and its effect previewed.", "/Onboarding/Review"),
@@ -67,7 +67,7 @@ public static class ReadinessCatalogue
 
 internal sealed class OnboardingReadiness(
     IOrganisationStructureService organisations, ICategoryAdministration categories, IRoleAssignmentService roles, IUserService users, IApproverGroupService groups, IConfigurationReleases releases,
-    ICapabilityResolver capabilities, ISolutionPackCatalogue catalogue, IClock clock) : IOnboardingReadiness
+    ICapabilityResolver capabilities, ISolutionPackCatalogue catalogue, IClock clock, IOrganisationPackContent packContent) : IOnboardingReadiness
 {
     private const string LifecycleKind = "WorkflowContractLifecycle";
 
@@ -117,6 +117,13 @@ internal sealed class OnboardingReadiness(
         var regional = await releases.LatestAsync("RegionalProfile", organisationId, ct);
         var lifecycle = await releases.LatestAsync(LifecycleKind, organisationId, ct);
         var matrix = await releases.LatestAsync("ApprovalMatrix", organisationId, ct);
+        // Nothing published yet is not "not reviewed" when the selected pack supplies a complete standard workflow: that is the safe default the organisation starts from.
+        string? packWorkflow = null;
+        if (lifecycle is null && packKey is not null)
+        {
+            try { var d = await packContent.GetStartingDocumentAsync(organisationId, packKey, LifecycleKind, ct); packWorkflow = $"{d.PackKey} {d.Version}"; }
+            catch (DomainException) { /* no usable pack document, or a draft is waiting: the checklist says the workflow still needs review */ }
+        }
         var notifications = await releases.LatestAsync("NotificationPolicy", organisationId, ct);
         var structureCount = structure.LegalEntities.Count + structure.Divisions.Count + structure.BusinessUnits.Count + structure.Sites.Count + doc.Structure.Count;
 
@@ -138,8 +145,9 @@ internal sealed class OnboardingReadiness(
                 : (ReadinessState.Complete, "Every category has a primary owner."),
             ReadinessCatalogue.Approvers => !approvalsOn ? (ReadinessState.NotApplicable, "This organisation does not use the approval step.")
                 : groupsWithPeople == 0 ? (ReadinessState.NotStarted, "No approver group has anyone in it yet.") : (ReadinessState.Complete, $"{groupsWithPeople} {Plural(groupsWithPeople, "group", "groups")} with people"),
-            ReadinessCatalogue.Workflow => lifecycle is null ? (ReadinessState.NotStarted, "The workflow has not been reviewed yet.")
-                : approvalsOn && matrix is null ? (ReadinessState.NotStarted, "The approval rules have not been reviewed yet.") : (ReadinessState.Complete, $"Workflow release {lifecycle.Number}"),
+            ReadinessCatalogue.Workflow => lifecycle is null
+                    ? (packWorkflow is not null ? (ReadinessState.Complete, $"The standard workflow of {packWorkflow} applies") : (ReadinessState.NotStarted, "The workflow has not been reviewed yet."))
+                : approvalsOn && NamesMatrix(lifecycle.ContentJson) && matrix is null ? (ReadinessState.NotStarted, "The workflow names approval rules that have not been reviewed yet.") : (ReadinessState.Complete, $"Workflow release {lifecycle.Number}"),
             ReadinessCatalogue.Notifications => notifications is null ? (ReadinessState.NotStarted, "Not reviewed yet.") : (ReadinessState.Complete, $"Release {notifications.Number}"),
             ReadinessCatalogue.Review => errors > 0 ? (ReadinessState.NeedsAttention, $"{errors} problem(s) to fix.") : state.IsPublishable ? (ReadinessState.Complete, "Checked and previewed.") : (ReadinessState.NotStarted, "Check the draft on the review page."),
             ReadinessCatalogue.Publish => state.CurrentRelease is null ? (ReadinessState.NotStarted, "Nothing published yet.") : (ReadinessState.Complete, $"Release {state.CurrentRelease}"),
@@ -156,6 +164,27 @@ internal sealed class OnboardingReadiness(
             items.Add(new ReadinessItem(key, items.Count + 1, title, purpose, level, st, detail, href));
         }
         return new ReadinessReport(organisationId, packKey, requirements is { Count: > 0 }, items);
+    }
+
+    /// <summary>Whether the workflow's approval step names an approval matrix. Without one the single approver group decides, so no matrix has to be written.</summary>
+    private static bool NamesMatrix(string workflowJson)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(workflowJson);
+            bool Find(System.Text.Json.JsonElement e)
+            {
+                if (e.ValueKind != System.Text.Json.JsonValueKind.Object) return false;
+                foreach (var p in e.EnumerateObject())
+                {
+                    if (string.Equals(p.Name, "matrix", StringComparison.OrdinalIgnoreCase) && p.Value.ValueKind == System.Text.Json.JsonValueKind.String && !string.IsNullOrWhiteSpace(p.Value.GetString())) return true;
+                    if (Find(p.Value)) return true;
+                }
+                return false;
+            }
+            return Find(doc.RootElement);
+        }
+        catch (System.Text.Json.JsonException) { return false; }
     }
 
     private static bool IsUniversal(string key) => OnboardingRequirementVocabulary.Universal.Contains(key, StringComparer.Ordinal);

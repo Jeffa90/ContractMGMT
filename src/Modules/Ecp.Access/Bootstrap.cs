@@ -9,6 +9,7 @@ using Ecp.Identity.Access;
 using Ecp.Identity.Domain;
 using Ecp.Persistence;
 using Ecp.SharedKernel;
+using Ecp.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ecp.Access;
@@ -38,6 +39,9 @@ public interface IAdministratorBootstrap
     /// <summary>Trusted, for set-up (no signed-in person): grants the chosen profiles to the named administrator in the organisation.</summary>
     Task<BootstrapResult> ApplyAtSetupAsync(Guid userId, Guid organisationId, BootstrapChoices choices, string byLabel, CancellationToken ct = default);
 
+    /// <summary>Trusted, for set-up: what the same choices would give, by a dry run of the real services that is rolled back, in plain English. Nothing is kept.</summary>
+    Task<AccessReview> PreviewAtSetupAsync(Guid userId, Guid organisationId, BootstrapChoices choices, CancellationToken ct = default);
+
     Task<TestAccessPlan> PlanTestAccessAsync(Guid organisationId, CancellationToken ct = default);
 
     /// <summary>Demo and Test only: the signed-in administrator gives themselves full Test-mode access in the organisation. Needs a recent sign-in.</summary>
@@ -50,7 +54,7 @@ public interface IAdministratorBootstrap
 internal sealed class AdministratorBootstrap(
     IRoleAssignmentService roles, ICategoryAdministration categoryAdmin, IUserService users, IAccessService access, IAccessDirectory directory, IApproverGroupService groups,
     ICapabilityResolver capabilities, IEffectiveAccess effective, IUnitOfWork uow, IAuditWriter audit, ITenantContext tenant, IClock clock, ActorContext actor, ReauthenticationContext reauth,
-    IdentityOptions identity, AccessDbContext db) : IAdministratorBootstrap
+    IdentityOptions identity, AccessDbContext db, IOwnershipPolicyEngine ownershipPolicy, ITrustedEffectiveAccess trustedEffective, IOrganisationStructureService structure, IApprovalAuthorities authorities) : IAdministratorBootstrap
 {
     public const string TestApproverGroup = "TEST-APPROVERS";
     public const string SetupApproverGroup = "INITIAL-APPROVERS";
@@ -68,8 +72,41 @@ internal sealed class AdministratorBootstrap(
         if (choices.Review) keys.Add(AccessProfiles.Reviewer);
         if (choices.Approve) keys.Add(AccessProfiles.ApprovalAuthority);
         if (choices.ReadOnly) keys.Add(AccessProfiles.ReadOnly);
-        var group = choices.Approve ? choices.ApproverGroupKey ?? SetupApproverGroup : null;
+        var group = choices.Approve ? choices.ApproverGroupKey ?? await authorities.PackAuthorityKeyAsync(organisationId, ct) ?? SetupApproverGroup : null;
         return await uow.ExecuteAsync(c => ApplyTrustedAsync(userId, organisationId, keys, choices.OwnAllCategories ? OwnershipChoice.All : OwnershipChoice.None, null, group, AssignmentSource.Setup, "Setup", byLabel, "Chosen during set-up", c), ct);
+    }
+
+    private static List<string> KeysOf(BootstrapChoices choices)
+    {
+        var keys = new List<string>();
+        if (choices.ManageContracts) keys.Add(AccessProfiles.ContractManager);
+        if (choices.Review) keys.Add(AccessProfiles.Reviewer);
+        if (choices.Approve) keys.Add(AccessProfiles.ApprovalAuthority);
+        if (choices.ReadOnly) keys.Add(AccessProfiles.ReadOnly);
+        return keys;
+    }
+
+    public async Task<AccessReview> PreviewAtSetupAsync(Guid userId, Guid organisationId, BootstrapChoices choices, CancellationToken ct = default)
+    {
+        var person = await users.GetAsync(userId, ct) ?? throw new ResourceNotFoundException();
+        var org = await structure.GetOrganisationAsync(organisationId, ct) ?? throw new ResourceNotFoundException();
+        var scale = await access.ClassificationScaleAsync(ct);
+        var keys = KeysOf(choices);
+        var group = choices.Approve ? choices.ApproverGroupKey ?? await authorities.PackAuthorityKeyAsync(organisationId, ct) ?? SetupApproverGroup : null;
+        EffectiveAccessReport? after = null;
+        try
+        {
+            await uow.ExecuteAsync<bool>(async c =>
+            {
+                if (choices.Any) await ApplyTrustedAsync(userId, organisationId, keys, choices.OwnAllCategories ? OwnershipChoice.All : OwnershipChoice.None, null, group, AssignmentSource.Setup, "Setup", "setup", "Review", c);
+                after = await trustedEffective.ForUserTrustedAsync(userId, c);
+                throw new RolledBackForPreview();
+            }, ct);
+        }
+        catch (RolledBackForPreview) { }
+        var steps = keys.Select(k => new PlannedStep("grant", $"Give {AccessProfiles.Find(k)!.Label}.")).ToList();
+        if (choices.Any && choices.OwnAllCategories) steps.Add(new PlannedStep("ownership-policy", "Make them the owner of every current and future [[category|lower]], so a [[category|lower]] added later is theirs automatically."));
+        return AccessReviewBuilder.Build(new ReviewInput(person.DisplayName, org.Name, keys, choices.Any && choices.OwnAllCategories ? OwnershipChoice.All : OwnershipChoice.None, null, group is null ? null : [group]), after!, scale, steps);
     }
 
     // -- Test-mode access -----------------------------------------------------------------------------------------------------------------------------------
@@ -104,7 +141,7 @@ internal sealed class AdministratorBootstrap(
         var (keys, skipped) = await TestProfilesAsync(organisationId, ct);
         var held = await db.ProfileApplications.AsNoTracking().AnyAsync(a => a.UserId == me && a.OrganisationId == organisationId && a.Origin == "TestBootstrap" && a.EndedUtc == null, ct);
         var will = keys.Select(k => AccessProfiles.Find(k)!).Select(p => $"{p.Label}: {p.Summary}").ToList();
-        if (keys.Contains(AccessProfiles.ContractAdministrator)) will.Add("Ownership of every [[category|lower]] that exists now, as primary or backup owner.");
+        if (keys.Contains(AccessProfiles.ContractAdministrator)) will.Add("Ownership of every current and future [[category|lower]] in the [[organisation|lower]].");
         var notGranted = new List<string> { "System Administrator or Tenant Administrator (never granted by this).", "The ability to approve or publish your own work: separation of duties still applies. Add a second test person to rehearse approvals." };
         notGranted.AddRange(skipped);
         EffectiveAccessReport? after = null;
@@ -159,6 +196,7 @@ internal sealed class AdministratorBootstrap(
             {
                 foreach (var g in row.GrantIds) { await roles.RevokeTrustedAsync(g, AssignmentSource.TestBootstrap, why, c); ended++; }
                 foreach (var o in row.OwnershipIds) { try { await categoryAdmin.EndOwnerTrustedAsync(o, why, c); } catch (DomainException) { /* already ended */ } }
+                await ownershipPolicy.EndForApplicationAsync(row.Id, why, "the person themselves", c);
                 row.End("the person themselves", clock.UtcNow);
             }
             await db.SaveChangesAsync(c);
@@ -177,8 +215,6 @@ internal sealed class AdministratorBootstrap(
         var scale = await access.ClassificationScaleAsync(ct);
         var existing = await roles.ListForUserAsync(userId, includeEnded: false, ct);
         var notes = new List<string>(); var grants = 0; var ownerships = 0;
-        var categories = (await categoryAdmin.ListAllAsync(ct)).Where(c => c.IsActive && c.OrganisationId == organisationId).ToList();
-        var topLevel = categories.Where(c => c.ParentCategoryId is null || categories.All(p => p.Id != c.ParentCategoryId)).ToList();
         var me = access.CurrentUserId;
         foreach (var key in profileKeys)
         {
@@ -194,22 +230,21 @@ internal sealed class AdministratorBootstrap(
                 grantIds.Add(await roles.GrantTrustedAsync(request, source, byLabel, null, ct));
                 grants++;
             }
+            Guid? policyId = null;
             if (profile.OwnsCategories && ownership == OwnershipChoice.All)
             {
-                if (topLevel.Count == 0) notes.Add($"There are no categories yet, so {profile.Label} owns nothing until you give it ownership. The set-up checklist lists it as work to do.");
-                foreach (var cat in topLevel.Where(c => c.Owners.All(o => o.UserId != userId || o.EffectiveToUtc is not null)))
-                {
-                    var primary = !cat.Owners.Any(o => o.IsPrimary && (o.EffectiveToUtc is null || o.EffectiveToUtc > clock.UtcNow));
-                    ownershipIds.Add(await categoryAdmin.AssignOwnerTrustedAsync(cat.Id, userId, primary, clock.UtcNow, null, byLabel, reason, ct));
-                    ownerships++;
-                }
+                // Standing policy: today's categories now, every later category in the same transaction as the category.
+                var outcome = await ownershipPolicy.SetAsync(new PolicyRequest(organisationId, userId, Primary: true, origin, null, byLabel, me, reason), trusted: true, ct);
+                policyId = outcome.PolicyId; ownerships += outcome.Assigned;
             }
-            if (grantIds.Count > 0 || ownershipIds.Count > 0 || (profile.OwnsCategories && ownership == OwnershipChoice.All && topLevel.Count == 0))
+            if (grantIds.Count > 0 || policyId is not null)
             {
-                var summary = $"{profile.Label}: {string.Join(", ", profile.RoleCodes.Select(RoleLabels.Label))}" + (ownershipIds.Count > 0 ? $"; owns {ownershipIds.Count} categor{(ownershipIds.Count == 1 ? "y" : "ies")}" : profile.OwnsCategories && topLevel.Count == 0 ? "; ownership waits for categories" : "");
-                db.ProfileApplications.Add(ProfileApplication.Record(tenantId, organisationId, userId, key, AccessProfile.Version, origin, byLabel, me, clock.UtcNow, grantIds, ownershipIds,
-                    summary.Length > 300 ? summary[..300] : summary, reason, actor.CorrelationId));
+                var summary = $"{profile.Label}: {string.Join(", ", profile.RoleCodes.Select(RoleLabels.Label))}" + (policyId is not null ? "; owns every current and future category" : "");
+                var application = ProfileApplication.Record(tenantId, organisationId, userId, key, AccessProfile.Version, origin, byLabel, me, clock.UtcNow, grantIds, [],
+                    summary.Length > 300 ? summary[..300] : summary, reason, actor.CorrelationId);
+                db.ProfileApplications.Add(application);
                 await db.SaveChangesAsync(ct);
+                if (policyId is { } pid) await ownershipPolicy.LinkAsync(pid, application.Id, ct);
             }
         }
         audit.Record(new AuditEntry(origin == "Setup" ? "access.bootstrap.setup" : "access.bootstrap.applied", "User", userId.ToString(), OrganisationId: organisationId, Reason: reason,

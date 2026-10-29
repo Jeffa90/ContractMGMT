@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Onboarding;
 
+/// <summary>What the "ready to use" panel needs: the organisation and whether the signed-in person can start a first record.</summary>
+public sealed record ReadyToUse(Guid OrganisationId, string OrganisationName, bool CanCreateContract);
+
 /// <summary>Shared behaviour of the onboarding pages: the caller needs onboarding.run, and one organisation is selected (query string, defaulting to the first the caller can see).</summary>
 [Authorize(Policy = "perm:onboarding.run")]
 public abstract class OnboardingPageModel(IOnboardingService onboarding, IOrganisationStructureService organisations) : EcpPageModel

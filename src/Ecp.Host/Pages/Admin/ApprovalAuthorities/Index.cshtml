@@ -1,0 +1,108 @@
+@page "/Admin/ApprovalAuthorities"
+@model Ecp.Host.Pages.Admin.ApprovalAuthorities.IndexModel
+@{ ViewData["Title"] = L["Approval authorities"].Value; }
+<h1>@L["Approval authorities"]</h1>
+<p class="lede">@Terms.Expand("Choose who can approve, and who stands in for them. Pick people by name. You never need to know a group key.")</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="card inline-form" aria-label="@L["Choose the organisation"]">
+        <div class="field"><label for="OrganisationId">@Terms.Expand("[[organisation]]")</label>
+            <select id="OrganisationId" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(Model.OrganisationId == o.Id)">@o.Name</option> }</select></div>
+        <div class="actions"><button type="submit" class="secondary">@L["Show"]</button></div>
+    </form>
+}
+
+@if (Model.View is not { } view) { <p class="flash warn" role="status">@L["There is no organisation here you can manage."]</p> }
+else
+{
+    var hidden = new List<string>();
+    <p class="hint">@Terms.Expand("For") <strong>@view.OrganisationName</strong>.</p>
+    @if (view.Authorities.Count == 0 && !Model.Creating)
+    {
+        <p class="flash warn" role="status">@Terms.Expand("Nothing in this [[organisation|lower]]'s workflow asks for an approver yet. You can still set up an approval authority by name.")</p>
+    }
+    @foreach (var a in view.Authorities)
+    {
+        var editing = Model.Editing == a.Key;
+        <section class="card" aria-labelledby="au-@a.Key">
+            <h2 id="au-@a.Key">@a.DisplayName</h2>
+            <p class="hint">@Terms.Expand(a.UsedFor)@if (a.FromPack) { <span> · @L["Provided by the starting configuration"]</span> }</p>
+            @if (!a.Registered) { <p class="flash warn" role="status">@L["Nobody has been chosen yet."]</p> }
+            <h3>@L["Members"]</h3>
+            @if (a.Members.Count == 0) { <p class="hint">@L["Nobody yet."]</p> } else { <ul>@foreach (var m in a.Members) { <li>@m.Name</li> }</ul> }
+            <h3>@L["Backups"]</h3>
+            @if (a.Backups.Count == 0) { <p class="hint">@L["Nobody yet."]</p> } else { <ul>@foreach (var m in a.Backups) { <li>@m.Name</li> }</ul> }
+            @if (Model.ShowKeys) { <p class="hint">@L["Machine key"]: <code>@a.Key</code></p> }
+            @if (!editing) { <p><a class="button" href="/Admin/ApprovalAuthorities?organisationId=@view.OrganisationId&amp;edit=@Uri.EscapeDataString(a.Key)">@L["Choose people"]</a></p> }
+            else
+            {
+                <form method="post">
+                    <input type="hidden" name="OrganisationId" value="@view.OrganisationId" /><input type="hidden" name="Key" value="@a.Key" />
+                    <fieldset><legend>@L["Members (can approve)"]</legend>
+                        @foreach (var p in view.People) { <div class="field check"><input id="m-@p.UserId" type="checkbox" name="MemberIds" value="@p.UserId" checked="@Model.MemberIds.Contains(p.UserId)" /><label for="m-@p.UserId">@p.Name</label></div> }
+                    </fieldset>
+                    <fieldset><legend>@L["Backups (stand in when members are away)"]</legend>
+                        @foreach (var p in view.People) { <div class="field check"><input id="b-@p.UserId" type="checkbox" name="BackupIds" value="@p.UserId" checked="@Model.BackupIds.Contains(p.UserId)" /><label for="b-@p.UserId">@p.Name</label></div> }
+                    </fieldset>
+                    @if (Model.Plan is { } plan)
+                    {
+                        @if (!plan.CanApply) { <div class="error-summary" role="alert"><h3>@L["This cannot be saved yet"]</h3><ul>@foreach (var p in plan.Problems) { <li>@Terms.Expand(p)</li> }</ul></div> }
+                        else
+                        {
+                            <h3>@L["This will"]</h3>
+                            <ul>@foreach (var st in plan.Steps) { <li>@Terms.Expand(st)</li> }</ul>
+                            <div class="field"><label for="Reason">@L["Reason (kept in the audit trail)"]</label><input id="Reason" name="Reason" type="text" maxlength="500" value="@Model.Reason" /></div>
+                            <div class="field check"><input id="Confirm" type="checkbox" name="Confirm" value="true" required aria-required="true" /><label for="Confirm">@L["I have read this and I want to make these changes."]</label></div>
+                            <button type="submit" asp-page-handler="Save">@L["Save"]</button>
+                        }
+                    }
+                    <button type="submit" class="secondary" asp-page-handler="Review">@L["Review the change"]</button>
+                    <a href="/Admin/ApprovalAuthorities?organisationId=@view.OrganisationId">@L["Cancel"]</a>
+                </form>
+            }
+        </section>
+    }
+
+    @if (Model.Creating)
+    {
+        <section class="card" aria-labelledby="new-h">
+            <h2 id="new-h">@L["Set up another approval authority"]</h2>
+            <form method="post">
+                <input type="hidden" name="OrganisationId" value="@view.OrganisationId" />
+                <div class="field"><label for="DisplayName">@L["Name"]</label><input id="DisplayName" name="DisplayName" type="text" maxlength="200" value="@Model.DisplayName" required aria-required="true" /></div>
+                <fieldset><legend>@L["Members (can approve)"]</legend>
+                    @foreach (var p in view.People) { <div class="field check"><input id="nm-@p.UserId" type="checkbox" name="MemberIds" value="@p.UserId" checked="@Model.MemberIds.Contains(p.UserId)" /><label for="nm-@p.UserId">@p.Name</label></div> }
+                </fieldset>
+                <fieldset><legend>@L["Backups (stand in when members are away)"]</legend>
+                    @foreach (var p in view.People) { <div class="field check"><input id="nb-@p.UserId" type="checkbox" name="BackupIds" value="@p.UserId" checked="@Model.BackupIds.Contains(p.UserId)" /><label for="nb-@p.UserId">@p.Name</label></div> }
+                </fieldset>
+                @if (Model.Plan is { } plan2)
+                {
+                    @if (!plan2.CanApply) { <div class="error-summary" role="alert"><h3>@L["This cannot be saved yet"]</h3><ul>@foreach (var p in plan2.Problems) { <li>@Terms.Expand(p)</li> }</ul></div> }
+                    else
+                    {
+                        <h3>@L["This will"]</h3>
+                        <ul>@foreach (var st in plan2.Steps) { <li>@Terms.Expand(st)</li> }</ul>
+                        <div class="field check"><input id="NewConfirm" type="checkbox" name="Confirm" value="true" required aria-required="true" /><label for="NewConfirm">@L["I have read this and I want to make these changes."]</label></div>
+                        <button type="submit" asp-page-handler="Save">@L["Save"]</button>
+                    }
+                }
+                <button type="submit" class="secondary" asp-page-handler="Review">@L["Review the change"]</button>
+                <a href="/Admin/ApprovalAuthorities?organisationId=@view.OrganisationId">@L["Cancel"]</a>
+            </form>
+        </section>
+    }
+    else
+    {
+        <p><a href="/Admin/ApprovalAuthorities?organisationId=@view.OrganisationId&amp;create=true">@L["Set up another approval authority"]</a></p>
+    }
+    <details><summary>@L["Advanced"]</summary>
+        <ul>
+            <li><a href="/Admin/ApprovalAuthorities?organisationId=@view.OrganisationId&amp;advanced=true">@L["Show the machine keys"]</a></li>
+            <li><a href="/Admin/ApproverGroups">@L["Approver groups: register a group by key, set delegation, retire a group"]</a></li>
+            <li><a href="/Admin/Approvals">@Terms.Expand("[[approval]] matrices: rules by value, category and classification")</a></li>
+        </ul>
+    </details>
+}

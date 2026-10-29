@@ -60,6 +60,163 @@ internal static class AccessProfileScenarios
         Assert.Single(await AuditAsync(w, "access.profile.applied"), e => e.EntityId == person.ToString());
     }
 
+
+    // -- UX-9: durable all-category ownership, the review, and approval authorities by name ------------------------------------------------------------------
+
+    private static async Task<HashSet<Guid>> OwnedByAsync(AccessWorld w, Guid person)
+    {
+        await using var scope = w.AsScopeless();
+        return (await scope.Get<ICategoryAdministration>().ListAllAsync()).Where(c => c.Owners.Any(o => o.UserId == person && o.EffectiveToUtc is null)).Select(c => c.Id).ToHashSet();
+    }
+
+    public static async Task Owning_all_categories_means_current_and_future_ones_and_ending_it_leaves_other_ownership_alone(AccessWorld w)
+    {
+        var maya = await NewPersonAsync(w, "Maya AllOwner");
+        var erin = await NewPersonAsync(w, "Erin Explicit");
+        // Erin was given Energy explicitly, before and independently of any policy.
+        await AdminAsync(w, "orgAdmin", s => s.Get<IAccessProfileService>().ApplyAsync(new AccessChange(erin, w.Org1, [AccessProfiles.ContractManager], Ownership: OwnershipChoice.Selected, OwnedCategoryIds: [w.CatEnergy])));
+
+        var result = await AdminAsync(w, "orgAdmin", s => s.Get<IAccessProfileService>().ApplyAsync(new AccessChange(maya, w.Org1, [AccessProfiles.ContractManager], Ownership: OwnershipChoice.All)));
+        Assert.True(result.OwnershipsCreated >= 1);
+        var before = await OwnedByAsync(w, maya);
+        Assert.Contains(w.CatPackaging, before); Assert.Contains(w.CatEnergy, before);          // the categories that exist (Flexible is covered through its parent)
+
+        var policies = await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().ForPersonAsync(maya));
+        var policy = Assert.Single(policies);
+        Assert.Equal(w.Org1, policy.OrganisationId);
+        Assert.True(policy.Open);
+
+        // A category created afterwards, by the Categories screen's service, is recognised in the same transaction.
+        var created = await AdminAsync(w, "orgAdmin", s => s.Get<ISecuredCategoryService>().CreateAsync(new CreateCategoryRequest(w.Org1, "LOGISTICS", "Logistics")));
+        Assert.Contains(created, await OwnedByAsync(w, maya));
+        // ... and by the trusted route set-up, onboarding and imports use.
+        var upserted = await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryAdministration>().UpsertCategoryAsync(w.Org1, "SERVICES", "Services", null));
+        Assert.Contains(upserted, await OwnedByAsync(w, maya));
+        // A different organisation's category is not theirs: the policy is for one organisation.
+        var elsewhere = await AdminAsync(w, "tenantAdmin", s => s.Get<ICategoryAdministration>().UpsertCategoryAsync(w.Org2, "LEGAL-SERVICES", "Legal services", null));
+        Assert.DoesNotContain(elsewhere, await OwnedByAsync(w, maya));
+        // Category authorisation itself is unchanged: she can create in the new category and the report explains why.
+        var report = await AdminAsync(w, "orgAdmin", s => s.Get<IEffectiveAccess>().ForUserAsync(maya));
+        Assert.Single(report.Standing);
+        var edit = report.Abilities.Single(a => a.Key == "edit-contracts");
+        Assert.True(edit.Can);
+        Assert.Contains("every current and future", edit.Where);
+        Assert.Contains("standing instruction", string.Join(" ", edit.Because));
+        Assert.NotEmpty(await AuditAsync(w, "access.ownership_policy.set"));
+        Assert.Contains(await AuditAsync(w, "access.ownership_policy.applied"), e => e.EntityId == created.ToString());
+
+        // Ending the profile ends the policy and only the ownership it created. Erin keeps hers.
+        var app = (await AdminAsync(w, "orgAdmin", s => s.Get<IAccessProfileService>().ApplicationsOfAsync(maya, false))).Single();
+        await AdminAsync(w, "orgAdmin", async s => { await s.Get<IAccessProfileService>().EndApplicationAsync(app.Id, "No longer needed"); return true; });
+        Assert.Empty(await OwnedByAsync(w, maya));
+        Assert.Empty(await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().ForPersonAsync(maya)));
+        Assert.Contains(w.CatEnergy, await OwnedByAsync(w, erin));
+        Assert.NotEmpty(await AuditAsync(w, "access.ownership_policy.ended"));
+        var later = await AdminAsync(w, "orgAdmin", s => s.Get<ISecuredCategoryService>().CreateAsync(new CreateCategoryRequest(w.Org1, "FLEET", "Fleet")));
+        Assert.DoesNotContain(later, await OwnedByAsync(w, maya));                                  // nothing is recognised any more
+    }
+
+    public static async Task A_standing_ownership_policy_leaves_existing_ownership_untouched_and_is_not_visible_to_another_tenant(AccessWorld w, AccessWorld other)
+    {
+        var sam = await NewPersonAsync(w, "Sam ExistingOwner");
+        var tara = await NewPersonAsync(w, "Tara AllOwner");
+        await AdminAsync(w, "orgAdmin", s => s.Get<IAccessProfileService>().ApplyAsync(new AccessChange(sam, w.Org1, [AccessProfiles.ContractManager], Ownership: OwnershipChoice.Selected, OwnedCategoryIds: [w.CatPackaging])));
+        await AdminAsync(w, "orgAdmin", s => s.Get<IAccessProfileService>().ApplyAsync(new AccessChange(tara, w.Org1, [AccessProfiles.ContractManager], Ownership: OwnershipChoice.All)));
+        await using (var scope = w.AsScopeless())
+        {
+            var packaging = (await scope.Get<ICategoryAdministration>().ListAllAsync()).Single(c => c.Id == w.CatPackaging);
+            var primary = Assert.Single(packaging.Owners, o => o.IsPrimary);
+            Assert.NotEqual(tara, primary.UserId);                                               // an existing primary is not displaced by a policy
+            Assert.Contains(packaging.Owners, o => o.UserId == sam);                             // explicit ownership is left exactly as it was
+            Assert.Contains(packaging.Owners, o => o.UserId == tara && !o.IsPrimary);            // the policy owner stands beside them
+        }
+        // Another tenant sees none of it and cannot end it.
+        Assert.Empty(await AdminAsync(other, "tenantAdmin", s => s.Get<ICategoryOwnershipPolicy>().ListAsync()));
+        var policy = (await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().ListAsync())).Single(p => p.UserId == tara);
+        await Assert.ThrowsAnyAsync<Exception>(() => AdminAsync(other, "tenantAdmin", async s => { await s.Get<ICategoryOwnershipPolicy>().EndAsync(policy.Id, "not mine"); return true; }));
+        Assert.Contains(await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().ListAsync()), p => p.UserId == tara && p.Open);
+    }
+
+    public static async Task The_policy_needs_the_right_to_assign_ownership_and_a_recent_sign_in(AccessWorld w)
+    {
+        var person = await NewPersonAsync(w, "Pia Policy");
+        await AdminAsync(w, "orgAdmin", s => s.Get<IAccessProfileService>().ApplyAsync(new AccessChange(person, w.Org1, [AccessProfiles.ContractManager])));
+        // A tenant administrator alone cannot assign ownership (existing rule), so cannot set a policy either.
+        await Assert.ThrowsAnyAsync<Exception>(() => AdminAsync(w, "tenantAdmin", s => s.Get<ICategoryOwnershipPolicy>().SetAsync(w.Org1, person, true, "try")));
+        // Without a recent sign-in nothing is set.
+        await Assert.ThrowsAsync<ReauthenticationRequiredException>(() => w.AsAsync("orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().SetAsync(w.Org1, person, true, "stale")));
+        Assert.Empty(await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().ForPersonAsync(person)));
+        var outcome = await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().SetAsync(w.Org1, person, true, "Owns everything"));
+        Assert.True(outcome.Created);
+        var again = await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().SetAsync(w.Org1, person, true, "Again"));
+        Assert.False(again.Created);                                                                 // idempotent: one standing policy per person and organisation
+        Assert.Single(await AdminAsync(w, "orgAdmin", s => s.Get<ICategoryOwnershipPolicy>().ForPersonAsync(person)));
+    }
+
+    public static async Task The_review_says_in_plain_English_what_saving_would_give_and_shows_codes_only_in_advanced_details(AccessWorld w)
+    {
+        var person = await NewPersonAsync(w, "Rhea Review");
+        var change = new AccessChange(person, w.Org1, [AccessProfiles.ContractManager], Ownership: OwnershipChoice.All, Ceiling: "Internal");
+        var plan = await AdminAsync(w, "orgAdmin", s => s.Get<IAccessProfileService>().PreviewAsync(change));
+        Assert.True(plan.CanApply, string.Join("; ", plan.Problems));
+        await using var scope = w.AsScopeless();
+        var scale = await scope.Get<IAccessService>().ClassificationScaleAsync();
+        var input = new ReviewInput("Rhea Review", "World One", change.ProfileKeys, change.Ownership, change.Ceiling);
+        var review = AccessReviewBuilder.Build(input, plan.After!, scale, plan.Steps);
+        Assert.Contains(review.WillBeAbleTo, l => l.Text.StartsWith("Create", StringComparison.Ordinal));
+        Assert.Contains(review.WillBeAbleTo, l => l.Text.StartsWith("Edit", StringComparison.Ordinal));
+        Assert.Contains(review.WillBeAbleTo, l => l.Text.StartsWith("Upload", StringComparison.Ordinal));
+        Assert.Contains(review.WillNotBeAbleTo, l => l.Text.Contains("formal review", StringComparison.Ordinal));
+        Assert.Contains(review.WillNotBeAbleTo, l => l.Text.Contains("own submissions", StringComparison.Ordinal));
+        Assert.Contains(review.WillNotBeAbleTo, l => l.Text.StartsWith("Administer", StringComparison.Ordinal));
+        Assert.Contains(review.WillNotBeAbleTo, l => l.Text.Contains("above Internal", StringComparison.Ordinal) || l.Text.Contains("above", StringComparison.Ordinal));
+        Assert.Contains(review.Facts, f => f.Label.Contains("ownership", StringComparison.OrdinalIgnoreCase) && f.Value.Contains("current and future", StringComparison.Ordinal));
+        Assert.Contains(review.Facts, f => f.Label.Contains("ceiling", StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(review.AdvancedGrants);                                                          // no codes unless asked
+        Assert.DoesNotContain(RoleCodes.CategoryOwner, string.Join(" ", review.WillBeAbleTo.Select(l => l.Text + l.Where).Concat(review.WillNotBeAbleTo.Select(l => l.Text))));
+        var advanced = AccessReviewBuilder.Build(input, plan.After!, scale, plan.Steps, includeAdvanced: true);
+        Assert.Contains(advanced.AdvancedGrants, g => g.RoleCode.Contains(RoleCodes.CategoryOwner, StringComparison.Ordinal));
+        // The review is a dry run: nothing was kept.
+        Assert.Empty(await OwnedByAsync(w, person));
+    }
+
+    public static async Task Approval_authorities_are_set_up_by_name_and_membership_changes_go_through_the_approver_group_rules(AccessWorld w)
+    {
+        var pat = await NewPersonAsync(w, "Pat Approver");
+        var bo = await NewPersonAsync(w, "Bo Backup");
+        var plan = await AdminAsync(w, "orgAdmin", s => s.Get<IApprovalAuthorities>().PreviewAsync(new AuthorityChange(w.Org1, null, "Registration Approvers", [pat], [bo])));
+        Assert.True(plan.CanApply, string.Join("; ", plan.Problems));
+        Assert.True(plan.IsNew);
+        Assert.Matches("^[A-Z0-9-]+$", plan.Key);                                                   // a key was made for them
+        var view0 = await AdminAsync(w, "orgAdmin", s => s.Get<IApprovalAuthorities>().ViewAsync(w.Org1));
+        Assert.DoesNotContain(view0.Authorities, a => a.Key == plan.Key);                           // a preview registers nothing
+
+        var saved = await AdminAsync(w, "orgAdmin", s => s.Get<IApprovalAuthorities>().SaveAsync(new AuthorityChange(w.Org1, null, "Registration Approvers", [pat], [bo])));
+        var view = await AdminAsync(w, "orgAdmin", s => s.Get<IApprovalAuthorities>().ViewAsync(w.Org1));
+        var authority = view.Authorities.Single(a => a.Key == saved.Key);
+        Assert.Equal("Registration Approvers", authority.DisplayName);
+        Assert.Equal(["Pat Approver"], authority.Members.Select(m => m.Name));
+        Assert.Equal(["Bo Backup"], authority.Backups.Select(m => m.Name));
+        Assert.True(authority.Registered);
+        await using (var scope = w.AsScopeless())
+        {
+            var held = await scope.Get<IRoleAssignmentService>().ListForUserAsync(pat);
+            Assert.Contains(held, a => a.RoleCode == RoleCodes.Approver && a.ApproverGroupKey == saved.Key);      // the ordinary role, carrying the generated key
+        }
+        // Changing the people: Pat is replaced by Bo as a member.
+        await AdminAsync(w, "orgAdmin", s => s.Get<IApprovalAuthorities>().SaveAsync(new AuthorityChange(w.Org1, saved.Key, null, [bo], [])));
+        var after = (await AdminAsync(w, "orgAdmin", s => s.Get<IApprovalAuthorities>().ViewAsync(w.Org1))).Authorities.Single(a => a.Key == saved.Key);
+        Assert.Equal(["Bo Backup"], after.Members.Select(m => m.Name));
+        Assert.Empty(after.Backups);
+        // A second authority with the same name gets its own key.
+        var twin = await AdminAsync(w, "orgAdmin", s => s.Get<IApprovalAuthorities>().SaveAsync(new AuthorityChange(w.Org1, null, "Registration Approvers", [pat], [])));
+        Assert.NotEqual(saved.Key, twin.Key);
+        // It needs a recent sign-in, and a person cannot be both a member and a backup.
+        await Assert.ThrowsAsync<ReauthenticationRequiredException>(() => w.AsAsync("orgAdmin", s => s.Get<IApprovalAuthorities>().SaveAsync(new AuthorityChange(w.Org1, saved.Key, null, [pat], []))));
+        await Assert.ThrowsAnyAsync<DomainException>(() => AdminAsync(w, "orgAdmin", s => s.Get<IApprovalAuthorities>().SaveAsync(new AuthorityChange(w.Org1, saved.Key, null, [pat], [pat]))));
+        Assert.NotEmpty(await AuditAsync(w, "access.approval_authority.saved"));
+    }
+
     public static async Task A_manager_who_owns_nothing_is_told_why_they_cannot_create_yet(AccessWorld w)
     {
         var person = await NewPersonAsync(w, "Nina NoOwnership");

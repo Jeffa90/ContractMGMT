@@ -29,6 +29,7 @@ else if (st.LastMessage is not null && st.Status != StageStatus.NotStarted)
 }
 else
 {
+    @if (st.Review is { } review) { <partial name="_AccessReview" model="review" /> }
     <form method="post">
         <partial name="_StageForm" model="st" />
         @if (Model.Checks.Count > 0)

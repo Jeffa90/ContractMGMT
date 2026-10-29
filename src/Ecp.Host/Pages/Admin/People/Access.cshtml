@@ -120,11 +120,11 @@
             <h2 id="s4-h">@Terms.Expand("Which [[category|plural|lower]] will they own?")</h2>
             <p class="hint">@Terms.Expand("Owning a [[category|lower]] is what lets a person create and edit [[contract|plural|lower]] in it, and it also covers its sub-[[category|plural|lower]]. Without ownership they can read but not create or edit.")</p>
             <fieldset><legend class="visually-hidden">@L["Ownership"]</legend>
-                <div class="field check"><input id="ow-a" type="radio" name="Input.Ownership" value="@nameof(OwnershipChoice.All)" checked="@(Model.Input.Ownership == nameof(OwnershipChoice.All))" /><label for="ow-a">@Terms.Expand("All [[category|plural|lower]]")</label></div>
+                <div class="field check"><input id="ow-a" type="radio" name="Input.Ownership" value="@nameof(OwnershipChoice.All)" checked="@(Model.Input.Ownership == nameof(OwnershipChoice.All))" /><label for="ow-a">@Terms.Expand("All current and future [[category|plural|lower]] in this [[organisation|lower]]")</label><p class="hint">@Terms.Expand("A [[category|lower]] added later is theirs automatically. Ownership someone else was given is left as it is.")</p></div>
                 <div class="field check"><input id="ow-s" type="radio" name="Input.Ownership" value="@nameof(OwnershipChoice.Selected)" checked="@(Model.Input.Ownership == nameof(OwnershipChoice.Selected))" /><label for="ow-s">@Terms.Expand("Selected [[category|plural|lower]] (tick below)")</label></div>
                 <div class="field check"><input id="ow-n" type="radio" name="Input.Ownership" value="@nameof(OwnershipChoice.None)" checked="@(Model.Input.Ownership == nameof(OwnershipChoice.None))" /><label for="ow-n">@L["None for now"]</label></div>
             </fieldset>
-            @if (Model.Categories.Count == 0) { <p class="hint">@Terms.Expand("There are no [[category|plural|lower]] yet. Choose All and the ownership is recorded when they exist, or create them first under Administration.")</p> }
+            @if (Model.Categories.Count == 0) { <p class="hint">@Terms.Expand("There are no [[category|plural|lower]] yet. Choose All current and future and every [[category|lower]] added later is theirs automatically.")</p> }
             else
             {
                 <fieldset><legend>@Terms.Expand("[[category|plural]]")</legend>
@@ -158,14 +158,14 @@
             <h2 id="s6-h">@L["Which approver group?"]</h2>
             @if (Model.ApproverGroups.Count == 0)
             {
-                <p class="flash warn" role="status">@L["There are no approver groups yet."] <a href="/Admin/ApproverGroups">@L["Create one first"]</a>, @L["then come back."]</p>
+                <p class="flash warn" role="status">@L["There are no approver groups yet."] <a href="/Admin/ApprovalAuthorities">@L["Set up approval authorities"]</a>, @L["then come back."]</p>
             }
             else
             {
                 <div class="field"><label for="Input_ApproverGroup">@L["Approver group"]</label>
                     <select id="Input_ApproverGroup" name="Input.ApproverGroup" required aria-required="true">
                         <option value="">@L["Choose…"]</option>
-                        @foreach (var g in Model.ApproverGroups) { <option value="@g.Key" selected="@(Model.Input.ApproverGroup == g.Key)">@Terms.GroupLabel(g.Key) (@g.Approvers + @g.Backups)</option> }
+                        @foreach (var g in Model.ApproverGroups) { <option value="@g.Key" selected="@(Model.Input.ApproverGroup == g.Key)">@g.DisplayName (@g.Members.Count @L["members"], @g.Backups.Count @L["backups"])</option> }
                     </select>
                     <p class="hint">@L["They can approve only while a request for this group is waiting."]</p></div>
             }
@@ -184,18 +184,13 @@
                 }
                 else
                 {
-                    @if (plan.After is { } after)
+                    @if (Model.Review is { } review)
                     {
-                        <p><strong>@after.DisplayName</strong> @L["will be able to:"]</p>
-                        <ul class="ability-list">@foreach (var a in after.CanDo) { <li><span aria-hidden="true">✓</span><span class="visually-hidden">@L["can"]</span> @Terms.Expand(a.Label)@if (a.Where.Length > 0) { <span class="hint"> · @Terms.Expand(a.Where)</span> }@if (a.Conditions is { Length: > 0 }) { <div class="hint">@Terms.Expand(a.Conditions)</div> }</li> }</ul>
-                        @if (!after.HasAnyAccess) { <p class="hint">@L["They will not be able to do anything yet."]</p> }
-                        <details><summary>@L["What they will not be able to do"]</summary>
-                            <ul class="ability-list">@foreach (var a in after.CannotDo) { <li><span aria-hidden="true">✗</span><span class="visually-hidden">@L["cannot"]</span> @Terms.Expand(a.Label)</li> }</ul></details>
-                        <p>@L["Highest classification they may see"]: <strong>@after.HighestClassification</strong></p>
-                        @foreach (var a in after.Attention.Where(x => x.Code is "role-without-ownership")) { <p class="flash warn" role="status">@Terms.Expand(a.Message)</p> }
+                        <partial name="_AccessReview" model="review" />
+                        @foreach (var a in plan.After!.Attention.Where(x => x.Code is "role-without-ownership")) { <p class="flash warn" role="status">@Terms.Expand(a.Message)</p> }
+                        @if (!Model.Input.Advanced) { <p><button type="submit" class="secondary" asp-page-handler="Next" name="Input.Advanced" value="true">@L["Show advanced details"]</button></p> }
                     }
-                    <h3>@L["This will"]</h3>
-                    <ul>@foreach (var st in plan.Steps) { <li>@Terms.Expand(st.Text)</li> }</ul>
+                    <div class="field check"><input id="Input_Confirm" type="checkbox" name="Input.Confirm" value="true" required aria-required="true" checked="@Model.Input.Confirm" /><label for="Input_Confirm">@L["I have read this and I want to give this access."]</label></div>
                 }
                 <div class="field"><label for="Input_Reason">@L["Reason (kept in the audit trail)"]</label><input id="Input_Reason" name="Input.Reason" type="text" maxlength="1000" value="@Model.Input.Reason" /></div>
             }

@@ -23,7 +23,7 @@ internal sealed class RolledBackForPreview : Exception;
 internal sealed class AccessProfileService(
     IAccessService access, IPeopleDirectory people, IRoleAssignmentService roles, ISecuredCategoryService categories, IUserService users, IUnitOfWork uow, IAuditWriter audit,
     ITenantContext tenant, IClock clock, ActorContext actor, ReauthenticationContext reauth, AccessDbContext db, IEffectiveAccess effective, ICapabilityResolver capabilities,
-    ICategoryAdministration categoryAdmin) : IAccessProfileService
+    ICategoryAdministration categoryAdmin, IOwnershipPolicyEngine ownershipPolicy) : IAccessProfileService
 {
     private static readonly TimeSpan StepUpWindow = TimeSpan.FromMinutes(10);
 
@@ -126,15 +126,22 @@ internal sealed class AccessProfileService(
                 steps.Add(new PlannedStep("grant", $"Give {RoleName(role)} ({Where(request.Scope)}, up to {ceiling}) as part of the {profile.Label} profile."));
             }
 
-            if (profile.OwnsCategories && change.Ownership != OwnershipChoice.None)
+            Guid? policyId = null;
+            if (profile.OwnsCategories && change.Ownership == OwnershipChoice.All)
+            {
+                // "All current and future": a standing policy, not a copy of today's list. Today's categories are covered now; every category created later is covered in the same transaction as the category.
+                var outcome = await ownershipPolicy.SetAsync(new PolicyRequest(change.OrganisationId, change.UserId, Primary: true, "Guided", null, byLabel, me, change.Reason ?? $"Access profile: {profile.Label}"), trusted: false, ct);
+                policyId = outcome.PolicyId; ownershipsCreated += outcome.Assigned;
+                steps.Add(new PlannedStep("ownership-policy", $"Make {person.DisplayName} the owner of every current and future [[category|lower]] in this [[organisation|lower]]. Any [[category|lower]] added later is recognised automatically."));
+                steps.AddRange(outcome.Steps.Select(t => new PlannedStep("ownership", t.Replace("Make them", $"Make {person.DisplayName}"))));
+                if (outcome.AlreadyOwned > 0) steps.Add(new PlannedStep("keep", $"{person.DisplayName} already owns {outcome.AlreadyOwned} [[category|plural|lower]]; that ownership is left as it is."));
+            }
+            else if (profile.OwnsCategories && change.Ownership == OwnershipChoice.Selected)
             {
                 // The list is read trusted so the choice is not limited by what the administrator can see; every ownership is still given through the secured service, which checks the caller's own authority.
                 var all = (await categoryAdmin.ListAllAsync(ct)).Where(c => c.IsActive && c.OrganisationId == change.OrganisationId).ToList();
-                var targets = change.Ownership == OwnershipChoice.All
-                    ? all.Where(c => c.ParentCategoryId is null || all.All(p => p.Id != c.ParentCategoryId)).ToList()   // owning a category covers its sub-categories
-                    : all.Where(c => change.OwnedCategories.Contains(c.Id)).ToList();
-                if (change.Ownership == OwnershipChoice.Selected && targets.Count == 0) throw new DomainException("ownership_required", "Choose at least one category to own, or choose none.");
-                if (targets.Count == 0) { ownershipPending = true; notes.Add("There are no categories yet. Ownership is not recorded until categories exist."); }
+                var targets = all.Where(c => change.OwnedCategories.Contains(c.Id)).ToList();
+                if (targets.Count == 0) throw new DomainException("ownership_required", "Choose at least one category to own, or choose none.");
                 foreach (var cat in targets)
                 {
                     if (cat.Owners.Any(o => o.UserId == change.UserId)) { steps.Add(new PlannedStep("keep", $"{person.DisplayName} already owns {cat.Name}.")); continue; }
@@ -145,14 +152,15 @@ internal sealed class AccessProfileService(
                 }
             }
 
-            if (grantIds.Count > 0 || ownershipIds.Count > 0)
+            if (grantIds.Count > 0 || ownershipIds.Count > 0 || policyId is not null)
             {
-                var summary = $"{profile.Label}: {string.Join(", ", profile.RoleCodes.Select(RoleName))}{(ownershipIds.Count > 0 ? $"; owns {ownershipIds.Count} categor{(ownershipIds.Count == 1 ? "y" : "ies")}" : "")}";
+                var summary = $"{profile.Label}: {string.Join(", ", profile.RoleCodes.Select(RoleName))}{(policyId is not null ? "; owns every current and future category" : ownershipIds.Count > 0 ? $"; owns {ownershipIds.Count} categor{(ownershipIds.Count == 1 ? "y" : "ies")}" : "")}";
                 var row = ProfileApplication.Record(tenantId, change.OrganisationId, change.UserId, profile.Key, AccessProfile.Version, "Guided", byLabel, me, clock.UtcNow, grantIds, ownershipIds,
                     summary.Length > 300 ? summary[..300] : summary, change.Reason, actor.CorrelationId);
                 db.ProfileApplications.Add(row);
                 await db.SaveChangesAsync(ct);
                 applications.Add(row.Id);
+                if (policyId is { } pid) await ownershipPolicy.LinkAsync(pid, row.Id, ct);
                 audit.Record(new AuditEntry("access.profile.applied", "User", change.UserId.ToString(), OrganisationId: change.OrganisationId, Reason: change.Reason,
                     NewValuesJson: JsonSerializer.Serialize(new { profile = profile.Key, version = AccessProfile.Version, grants = grantIds, ownerships = ownershipIds, ceiling })));
             }
@@ -227,6 +235,7 @@ internal sealed class AccessProfileService(
             foreach (var g in row.GrantIds) { try { await roles.RevokeAsync(g, reason, c); } catch (DomainException ex) when (ex.Code is "already_ended" or "not_active") { /* already ended by hand */ } }
             foreach (var o in row.OwnershipIds) { try { await categories.EndOwnershipAsync(o, reason, c); } catch (DomainException) { /* already ended by hand */ } }
             var by = access.CurrentUserId is { } me ? (await users.GetAsync(me, c))?.DisplayName ?? "an administrator" : "an administrator";
+            await ownershipPolicy.EndForApplicationAsync(row.Id, reason, by, c);   // the standing policy goes, and only the ownership it created
             row.End(by, clock.UtcNow);
             await db.SaveChangesAsync(c);
             audit.Record(new AuditEntry("access.profile.ended", "User", row.UserId.ToString(), OrganisationId: row.OrganisationId, Reason: reason,

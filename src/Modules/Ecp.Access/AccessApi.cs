@@ -15,6 +15,9 @@ public sealed record OwnedCategory(Guid CategoryId, string Name, Guid Organisati
 
 public sealed record GrantView(Guid AssignmentId, string RoleLabel, string RoleCode, string Where, string HighestClassification, string Source, string? ProfileLabel, DateTime EffectiveFromUtc, DateTime? EffectiveToUtc, bool Active, bool Future, bool Ended, string? ApproverGroupKey);
 
+/// <summary>"Owns every current and future category in this organisation": the standing instruction behind an all-category ownership choice.</summary>
+public sealed record StandingOwnership(Guid OrganisationId, string OrganisationName, bool Primary, string GivenBy, DateTime GivenUtc, string? ProfileLabel);
+
 public sealed record ProfileBadge(string Key, string Label, Guid ApplicationId, DateTime AppliedUtc, string AppliedBy, Guid OrganisationId);
 
 /// <summary>
@@ -23,11 +26,12 @@ public sealed record ProfileBadge(string Key, string Label, Guid ApplicationId, 
 /// </summary>
 public sealed record EffectiveAccessReport(
     Guid UserId, string DisplayName, string Email, UserStatusView Status, IReadOnlyList<ProfileBadge> Profiles, string HighestClassification,
-    IReadOnlyList<AbilityStatus> Abilities, IReadOnlyList<OwnedCategory> Owns, IReadOnlyList<GrantView> Grants, IReadOnlyList<AttentionItem> Attention, IReadOnlyList<string> ApproverGroups)
+    IReadOnlyList<AbilityStatus> Abilities, IReadOnlyList<OwnedCategory> Owns, IReadOnlyList<GrantView> Grants, IReadOnlyList<AttentionItem> Attention, IReadOnlyList<string> ApproverGroups, IReadOnlyList<StandingOwnership>? StandingOwnerships = null)
 {
     public IEnumerable<AbilityStatus> CanDo => Abilities.Where(a => a.Can);
     public IEnumerable<AbilityStatus> CannotDo => Abilities.Where(a => !a.Can);
     public bool HasAnyAccess => Abilities.Any(a => a.Can);
+    public IReadOnlyList<StandingOwnership> Standing => StandingOwnerships ?? [];
 }
 
 public enum UserStatusView { Invited, Active, Disabled }

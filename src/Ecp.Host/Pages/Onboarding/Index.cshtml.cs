@@ -7,11 +7,12 @@ namespace Ecp.Host.Pages.Onboarding;
 
 public sealed record ChecklistItem(string Id, string Title, string Status, string Detail);
 
-public sealed class IndexModel(IOnboardingService onboarding, IOrganisationStructureService organisations) : OnboardingPageModel(onboarding, organisations)
+public sealed class IndexModel(IOnboardingService onboarding, IOrganisationStructureService organisations, Ecp.Identity.IAccessService access) : OnboardingPageModel(onboarding, organisations)
 {
     public OnboardingState? State { get; private set; }
     public IReadOnlyList<ChecklistItem> Checklist { get; private set; } = [];
     public ReadinessReport? Readiness { get; private set; }
+    public ReadyToUse? Ready { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         => await GuardedAsync(async () =>
@@ -20,6 +21,7 @@ public sealed class IndexModel(IOnboardingService onboarding, IOrganisationStruc
             State = await Onboarding.GetAsync(OrganisationId, ct);
             Checklist = Build(State);
             Readiness = await Onboarding.ReadinessAsync(OrganisationId, ct);
+            if (Readiness.CanPublish && State.CurrentRelease is not null) Ready = new ReadyToUse(OrganisationId, OrganisationName, await access.HoldsAnywhereAsync("contracts.create", ct));
             return Page();
         });
 

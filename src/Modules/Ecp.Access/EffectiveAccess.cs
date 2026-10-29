@@ -73,10 +73,21 @@ internal sealed class ScopeNames
     }
 }
 
+/// <summary>Trusted read of the effective-access report, for the dry runs behind a review at set-up. Internal to the module; never offered to a page.</summary>
+internal interface ITrustedEffectiveAccess { Task<EffectiveAccessReport> ForUserTrustedAsync(Guid userId, CancellationToken ct = default); }
+
 internal sealed class EffectiveAccessService(
     IAccessService access, IAccessDirectory directory, IPeopleDirectory people, IRoleAssignmentService roles, IUserService users, ICategoryAdministration categoryAdmin,
-    IOrganisationStructureService structure, IClock clock, AccessDbContext db) : IEffectiveAccess
+    IOrganisationStructureService structure, IClock clock, AccessDbContext db) : IEffectiveAccess, ITrustedEffectiveAccess
 {
+    /// <summary>Set-up and the dry run behind a review: the same report, for a person the caller does not yet administer (there is no signed-in caller at set-up). Not reachable from request input.</summary>
+    public async Task<EffectiveAccessReport> ForUserTrustedAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await users.GetAsync(userId, ct) ?? throw new ResourceNotFoundException();
+        var assignments = await roles.ListForUserAsync(userId, includeEnded: true, ct);
+        return await BuildAsync(userId, user.DisplayName, user.Email, user.Status, assignments, ct);
+    }
+
     public async Task<EffectiveAccessReport> ForUserAsync(Guid userId, CancellationToken ct = default)
     {
         var person = await people.GetManageableUserAsync(userId, ct);   // not found unless the caller may administer this person
@@ -104,6 +115,9 @@ internal sealed class EffectiveAccessService(
             .Select(c => new OwnedCategory(c.Id, c.Name, c.OrganisationId, c.Owners.Any(o => o.UserId == userId && o.IsPrimary))).OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
 
         var applications = await db.ProfileApplications.AsNoTracking().Where(a => a.UserId == userId).OrderBy(a => a.AppliedUtc).ToListAsync(ct);
+        var policies = await db.CategoryOwnershipPolicies.AsNoTracking().Where(p => p.UserId == userId && p.EndedUtc == null).OrderBy(p => p.CreatedUtc).ToListAsync(ct);
+        var standing = policies.Select(p => new StandingOwnership(p.OrganisationId, names.Organisations.GetValueOrDefault(p.OrganisationId, "an organisation"), p.Primary, p.CreatedByLabel, p.CreatedUtc,
+            applications.FirstOrDefault(a => a.Id == p.ApplicationId) is { } app ? Label(app.ProfileKey) : null)).ToList();
         var profileOfGrant = new Dictionary<Guid, AppliedProfile>();
         foreach (var a in applications.Where(a => a.IsOpen)) foreach (var g in a.GrantIds) profileOfGrant[g] = new AppliedProfile(a.ProfileKey, a.AppliedByLabel, a.AppliedUtc, a.Origin);
 
@@ -111,7 +125,7 @@ internal sealed class EffectiveAccessService(
             SourceText(a.Source, profileOfGrant.GetValueOrDefault(a.Id)), profileOfGrant.TryGetValue(a.Id, out var p) ? Label(p.Key) : null, a.EffectiveFromUtc, a.EffectiveToUtc,
             a.IsActive, a.EffectiveFromUtc > now, a.EffectiveToUtc is { } to && to <= now, a.ApproverGroupKey)).ToList();
 
-        var subject = status == UserStatus.Disabled ? null : await directory.LoadSubjectAsync(userId, ct);
+        var subject = status == UserStatus.Disabled ? null : await directory.LoadSubjectIncludingInvitedAsync(userId, ct);
         // An invited person has no sign-in yet. The report shows what they will be able to do once active, so the evaluator is asked as if the account were active.
         var evaluated = subject is null ? null : subject with { Status = UserStatus.Active, PermissionAllowlist = null };
         var evaluator = AccessEvaluator.Default;
@@ -123,14 +137,14 @@ internal sealed class EffectiveAccessService(
         {
             var perms = AbilityCatalogue.PermissionsOf(ability.Key).ToList();
             var grants = perms.SelectMany(pm => grantsBy.GetValueOrDefault(pm) ?? []).GroupBy(g => (g.AssignmentId, g.Relationship)).Select(g => g.First()).ToList();
-            abilities.Add(AbilityOf(ability, grants, owns, categories, names, profileOfGrant, assignments, evaluator.Matrix, perms));
+            abilities.Add(AbilityOf(ability, grants, owns, categories, names, profileOfGrant, assignments, evaluator.Matrix, perms, standing));
         }
 
         var highest = assignments.Where(a => a.IsActive).Select(a => a.Scope.ClassificationCeiling).OrderByDescending(scale.Rank).FirstOrDefault() ?? "None";
         var badges = applications.Where(a => a.IsOpen).Select(a => new ProfileBadge(a.ProfileKey, Label(a.ProfileKey), a.Id, a.AppliedUtc, a.AppliedByLabel, a.OrganisationId)).ToList();
         var attention = AttentionOf(status, assignments, owns, categories);
         var groups = assignments.Where(a => a.IsActive && !string.IsNullOrEmpty(a.ApproverGroupKey)).Select(a => a.ApproverGroupKey!).Distinct().OrderBy(x => x).ToList();
-        return new EffectiveAccessReport(userId, name, email, View(status), badges, highest, abilities, owns, grantViews, attention, groups);
+        return new EffectiveAccessReport(userId, name, email, View(status), badges, highest, abilities, owns, grantViews, attention, groups, standing);
     }
 
     private sealed record AppliedProfile(string Key, string By, DateTime AppliedUtc, string Origin);
@@ -153,7 +167,7 @@ internal sealed class EffectiveAccessService(
         };
 
     private static AbilityStatus AbilityOf(Ability ability, List<AccessGrant> grants, List<OwnedCategory> owns, IReadOnlyList<CategoryItem> categories, ScopeNames names,
-        Dictionary<Guid, AppliedProfile> profileOfGrant, IReadOnlyList<AssignmentDto> assignments, PermissionMatrix matrix, List<string> perms)
+        Dictionary<Guid, AppliedProfile> profileOfGrant, IReadOnlyList<AssignmentDto> assignments, PermissionMatrix matrix, List<string> perms, IReadOnlyList<StandingOwnership> standing)
     {
         if (grants.Count == 0)
         {
@@ -176,12 +190,15 @@ internal sealed class EffectiveAccessService(
         if (unconditional.Count > 0) { can = true; where.AddRange(unconditional.Select(names.WhereOfGrant).Distinct()); because.Add(Because(unconditional)); }
         if (owner.Count > 0)
         {
-            var ownedInScope = owns.Where(o => owner.Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(o.OrganisationId))).ToList();
-            if (ownedInScope.Count > 0)
+            bool InGrantScope(Guid org) => owner.Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(org));
+            var standingInScope = standing.Where(x => InGrantScope(x.OrganisationId)).ToList();
+            var ownedInScope = owns.Where(o => InGrantScope(o.OrganisationId) && standingInScope.All(x => x.OrganisationId != o.OrganisationId)).ToList();
+            if (ownedInScope.Count > 0 || standingInScope.Count > 0)
             {
                 can = true;
-                where.Add("in the [[category|plural|lower]] they own: " + string.Join(", ", ownedInScope.Select(o => o.Name)));
-                because.Add(Because(owner) + "; owns the [[category|lower]]");
+                foreach (var x in standingInScope) where.Add($"in every current and future [[category|lower]] of {x.OrganisationName}");
+                if (ownedInScope.Count > 0) where.Add("in the [[category|plural|lower]] they own: " + string.Join(", ", ownedInScope.Select(o => o.Name)));
+                because.Add(Because(owner) + (standingInScope.Count > 0 ? "; owns every current and future [[category|lower]] there (a standing instruction, so a new one is theirs automatically)" : "; owns the [[category|lower]]"));
             }
             else conditions.Add("Their role allows this, but they do not own a [[category|lower]] yet. Owning a [[category|lower]] is what lets them do it.");
         }

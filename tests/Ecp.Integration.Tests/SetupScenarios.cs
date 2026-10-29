@@ -31,6 +31,7 @@ internal static class SetupScenarios
         "branding" => new() { ["productName"] = "Setup Test Platform", ["accentColour"] = "#1f3a8a", ["footerText"] = "Synthetic installation" },
         "classification" => new() { ["levels"] = "Public\nInternal\nConfidential\nRestricted", ["defaultLevel"] = "Internal" },
         "notifications" => new() { ["provider"] = "Mock", ["from"] = "platform@setup.example.invalid", ["testRecipient"] = AdminEmail },
+        "access" => new() { ["confirm"] = "true" },
         _ => []
     };
 
@@ -48,7 +49,7 @@ internal static class SetupScenarios
         foreach (var s in stages) await MustAsync(svc, s);
     }
 
-    public static readonly string[] BeforeReadiness = ["mode", "database", "storage", "tenant", "pack", "identity", "admin", "organisation", "branding", "classification", "notifications"];
+    public static readonly string[] BeforeReadiness = ["mode", "database", "storage", "tenant", "pack", "identity", "admin", "organisation", "branding", "classification", "notifications", "access"];
 
     public static async Task AcknowledgeAndRunReadinessAsync(ISetupService svc)
     {
@@ -137,7 +138,7 @@ internal static class SetupScenarios
         Assert.All(new[] { "mode", "database", "storage", "tenant", "pack" }, id => Assert.Equal(StageStatus.Complete, after.Stages.Single(s => s.Id == id).Status));
 
         // continuing on the restarted instance finishes the installation, and still only one tenant exists
-        await WalkAsync(restarted, "identity", "admin", "organisation", "branding", "classification", "notifications");
+        await WalkAsync(restarted, "identity", "admin", "organisation", "branding", "classification", "notifications", "access");
         Assert.True((await restarted.SkipAsync("demo", Actor)).Succeeded);
         await AcknowledgeAndRunReadinessAsync(restarted);
         await MustAsync(restarted, "complete");
@@ -167,7 +168,7 @@ internal static class SetupScenarios
         var svc = app.Services.GetRequiredService<ISetupService>();
         await WalkAsync(svc, BeforeReadiness);
         // run each configuring stage a second time with the same input: success, and nothing is duplicated
-        foreach (var stage in new[] { "mode", "database", "storage", "tenant", "pack", "identity", "admin", "organisation", "branding", "classification", "notifications" })
+        foreach (var stage in new[] { "mode", "database", "storage", "tenant", "pack", "identity", "admin", "organisation", "branding", "classification", "notifications", "access" })
         {
             var again = await RunAsync(svc, stage);
             Assert.True(again.Succeeded, $"{stage} again: {again.Message}");
@@ -315,7 +316,7 @@ internal static class SetupScenarios
         var svc = app.Services.GetRequiredService<ISetupService>();
         await WalkAsync(svc, "mode", "database", "storage", "tenant", "pack");
         Assert.False((await RunAsync(svc, "readiness")).Succeeded);                                   // dependencies unmet
-        await WalkAsync(svc, "identity", "admin", "organisation", "branding", "classification", "notifications");
+        await WalkAsync(svc, "identity", "admin", "organisation", "branding", "classification", "notifications", "access");
         var blockedByWarnings = await RunAsync(svc, "readiness");
         Assert.False(blockedByWarnings.Succeeded);
         Assert.Contains("Acknowledge", blockedByWarnings.Message);
@@ -334,7 +335,7 @@ internal static class SetupScenarios
         var admin = Inputs("admin");
         if (choose) { admin["doManage"] = "true"; admin["doOwn"] = "true"; admin["doRead"] = "true"; }
         await MustAsync(svc, "admin", admin);
-        await WalkAsync(svc, "organisation");
+        await WalkAsync(svc, "organisation", "branding", "classification", "notifications", "access");
         await using var rootScope = app.Services.CreateAsyncScope();
         var tenant = (await rootScope.ServiceProvider.GetRequiredService<ITenantDirectory>().ListAsync()).Single();
         await using var scope = app.ScopeFor(tenant.Id);
@@ -347,6 +348,39 @@ internal static class SetupScenarios
             Assert.DoesNotContain(RoleCodes.Legal, held); Assert.DoesNotContain(RoleCodes.Approver, held);          // not chosen, not granted
         }
         else Assert.Equal(new[] { RoleCodes.OrganisationAdministrator, RoleCodes.TenantAdministrator }.OrderBy(x => x), held);   // "administer only" grants nothing else
+    }
+
+    /// <summary>UX-9: nothing is given until the administrator has read the review and confirmed; the review is plain English, a dry run that keeps nothing, and carries no role code.</summary>
+    public static async Task Access_is_given_only_after_the_administrator_confirms_the_review(TestApp app)
+    {
+        var svc = app.Services.GetRequiredService<ISetupService>();
+        await WalkAsync(svc, "mode", "database", "storage", "tenant", "pack", "identity");
+        var admin = Inputs("admin"); admin["doManage"] = "true"; admin["doOwn"] = "true";
+        await MustAsync(svc, "admin", admin);
+        await WalkAsync(svc, "organisation", "branding", "classification", "notifications");
+        await using var rootScope = app.Services.CreateAsyncScope();
+        var tenant = (await rootScope.ServiceProvider.GetRequiredService<ITenantDirectory>().ListAsync()).Single();
+        await using var scope = app.ScopeFor(tenant.Id);
+        var user = (await scope.Get<IUserService>().FindByEmailAsync(AdminEmail))!;
+        async Task<List<string>> HeldAsync() => (await scope.Get<IRoleAssignmentService>().ListForUserAsync(user.Id)).Select(a => a.RoleCode).OrderBy(x => x).ToList();
+        Assert.DoesNotContain(RoleCodes.CategoryOwner, await HeldAsync());                          // choosing is not giving
+
+        var review = (await svc.DescribeAsync("access"))!.Review;
+        Assert.NotNull(review);
+        Assert.True(review!.WillBeAbleTo.Count > 0, "WILL: " + string.Join(" | ", review.WillBeAbleTo.Select(l => l.Text)) + " WONT: " + string.Join(" | ", review.WillNotBeAbleTo.Select(l => l.Text)) + " FACTS: " + string.Join(" | ", review.Facts.Select(f => f.Label + "=" + f.Value)));
+        Assert.Contains(review.WillBeAbleTo, l => l.Text.StartsWith("Create", StringComparison.Ordinal));
+        Assert.Contains(review.WillBeAbleTo, l => l.Text.StartsWith("Administer", StringComparison.Ordinal));
+        Assert.Contains(review.WillNotBeAbleTo, l => l.Text.Contains("own submissions", StringComparison.Ordinal));
+        Assert.Contains(review.Facts, f => f.Label.Contains("ownership", StringComparison.OrdinalIgnoreCase) && f.Value.Contains("future", StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(review.AdvancedGrants);                                                         // no role code unless Advanced details is asked for
+        Assert.DoesNotContain(RoleCodes.CategoryOwner, await HeldAsync());                          // the review is a dry run: nothing kept
+
+        var unconfirmed = await RunAsync(svc, "access", new Dictionary<string, string>());
+        Assert.False(unconfirmed.Succeeded);
+        Assert.DoesNotContain(RoleCodes.CategoryOwner, await HeldAsync());
+
+        await MustAsync(svc, "access");
+        Assert.Contains(RoleCodes.CategoryOwner, await HeldAsync());
     }
 
     /// <summary>UX-4: in Demo and Test the operational choices are ticked for the administrator; in Production nothing is ticked for them.</summary>

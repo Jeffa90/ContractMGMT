@@ -12,6 +12,7 @@
         <button type="submit" class="secondary">@L["Switch [[organisation|lower]]"]</button>
     </form>
 }
+@if (Model.Ready is { } readyToUse) { <partial name="_ReadyToUse" model="readyToUse" /> }
 <p>@L["[[organisation]]"]: <strong>@Model.OrganisationName</strong>. @(Model.State!.CurrentRelease is { } r ? $"Current release: {r}." : "Nothing has been published yet.")</p>
 @if (Model.Readiness is { } ready)
 {

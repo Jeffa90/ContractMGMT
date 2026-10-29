@@ -63,7 +63,7 @@ public sealed record StageField(string Name, string Label, FieldKind Kind, bool 
 
 /// <summary>What the wizard shows for a stage: fields with their current values, notes and the stage status.</summary>
 public sealed record StageDescriptor(string Id, string Title, string Summary, StageStatus Status, IReadOnlyList<StageField> Fields, IReadOnlyList<string> Notes,
-    string ActionLabel, string? LastMessage, bool Available, string? UnavailableReason);
+    string ActionLabel, string? LastMessage, bool Available, string? UnavailableReason, Ecp.Access.AccessReview? Review = null);
 
 public sealed record StageResult(bool Succeeded, string Message, IReadOnlyList<string> Details)
 {

@@ -75,7 +75,8 @@ public static class NavigationCatalogue
         [
             new("workflow", "/Admin/Configuration", "Workflow configuration", "States, steps and buttons.", ["config.draft", "config.history.read"]),
             new("matrices", "/Admin/Approvals", "[[approval]] matrices", "Who approves what.", ["approvals.matrix.read", "approvals.simulate", "approvals.delegate"], CapabilityKeys.RegisterAuthorisation),
-            new("approvergroups", "/Admin/ApproverGroups", "Approver groups", "People who can approve together.", ["users.manage"]),
+            new("authorities", "/Admin/ApprovalAuthorities", "Approval authorities", "Choose who approves, and who stands in, by name.", ["users.manage"], CapabilityKeys.RegisterAuthorisation, "/Admin/ApprovalAuthorities"),
+            new("approvergroups", "/Admin/ApproverGroups", "Approver groups (advanced)", "Register a group by its key, set delegation, retire a group.", ["users.manage"]),
             new("reviews", "/Admin/Reviews", "Configuration reviews", "Changes waiting for a second person.",
                 ["config.draft", "config.publish", "terminology.draft", "terminology.publish", "capabilities.draft", "capabilities.publish"]),
         ]),

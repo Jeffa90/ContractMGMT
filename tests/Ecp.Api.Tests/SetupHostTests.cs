@@ -47,6 +47,7 @@ public sealed class SetupHostTests
         ["branding"] = new() { ["productName"] = "Host Setup Platform", ["accentColour"] = "#14532d", ["footerText"] = "Synthetic installation" },
         ["classification"] = new() { ["levels"] = "Public\nInternal\nConfidential\nRestricted", ["defaultLevel"] = "Internal" },
         ["notifications"] = new() { ["provider"] = "Mock", ["from"] = "platform@setup.example.invalid", ["testRecipient"] = AdminEmail },
+        ["access"] = new() { ["confirm"] = "true" },
     };
 
     private static async Task PostStepAsync(HttpClient client, string id, Dictionary<string, string>? fields = null)
@@ -88,7 +89,7 @@ public sealed class SetupHostTests
         return Uri.TryCreate(l, UriKind.Absolute, out var u) ? u.AbsolutePath : l.Split('?')[0];
     }
 
-    private static readonly string[] ToReadiness = ["mode", "database", "storage", "tenant", "pack", "identity", "admin", "organisation", "branding", "classification", "notifications"];
+    private static readonly string[] ToReadiness = ["mode", "database", "storage", "tenant", "pack", "identity", "admin", "organisation", "branding", "classification", "notifications", "access"];
 
     [Fact]
     public async Task An_incomplete_installation_sends_browsers_to_setup_and_closes_the_api_but_keeps_health_open()
@@ -277,7 +278,7 @@ public sealed class SetupHostTests
         Assert.Equal(HttpStatusCode.Redirect, (await next.GetAsync("/")).StatusCode);              // still gated after the restart
         // the session cookie from before the restart is not accepted by a client that never had one; a fresh token reopens setup
         Assert.Equal(HttpStatusCode.Redirect, (await OpenSessionAsync(next, await NewTokenAsync(second))).StatusCode);
-        await WalkAsync(next, ["tenant", "identity", "admin", "organisation", "branding", "classification", "notifications"]);   // repeating finished steps is harmless
+        await WalkAsync(next, ["tenant", "identity", "admin", "organisation", "branding", "classification", "notifications", "access"]);   // repeating finished steps is harmless
         await FinishAsync(next);
         Assert.True(await svc.IsCompleteAsync());
         await using var scope = second.Factory.Services.CreateAsyncScope();

@@ -85,6 +85,8 @@ public interface ISetupStage
     IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered);
     IReadOnlyList<string> Notes(SetupDocument doc, SetupEnvironment env);
     Task<StageResult> ExecuteAsync(StageContext context);
+    /// <summary>What the person is about to confirm, said in plain English before the step does anything (null for steps with nothing to review).</summary>
+    Task<Ecp.Access.AccessReview?> ReviewAsync(StageContext context) => Task.FromResult<Ecp.Access.AccessReview?>(null);
 }
 
 public abstract class SetupStageBase : ISetupStage
@@ -99,6 +101,7 @@ public abstract class SetupStageBase : ISetupStage
     public virtual bool AppliesTo(SetupEnvironment env) => true;
     public virtual IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered) => [];
     public virtual IReadOnlyList<string> Notes(SetupDocument doc, SetupEnvironment env) => [];
+    public virtual Task<Ecp.Access.AccessReview?> ReviewAsync(StageContext context) => Task.FromResult<Ecp.Access.AccessReview?>(null);
     public abstract Task<StageResult> ExecuteAsync(StageContext context);
 }
 

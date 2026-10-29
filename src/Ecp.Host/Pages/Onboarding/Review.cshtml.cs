@@ -6,13 +6,14 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Onboarding;
 
-public sealed class ReviewModel(IOnboardingService onboarding, IOrganisationStructureService organisations) : OnboardingPageModel(onboarding, organisations)
+public sealed class ReviewModel(IOnboardingService onboarding, IOrganisationStructureService organisations, Ecp.Identity.IAccessService access) : OnboardingPageModel(onboarding, organisations)
 {
     public OnboardingState? State { get; private set; }
     public IReadOnlyList<PlanLine> Plan { get; private set; } = [];
     public OnboardingPreview? Preview { get; private set; }
     public GovernanceInfo? Governance { get; private set; }
     public ReadinessReport? Readiness { get; private set; }
+    public ReadyToUse? Ready { get; private set; }
     public IReadOnlyList<OnboardingRelease> Releases { get; private set; } = [];
     public Ecp.SharedKernel.Localisation.RegionalSettings Regional { get; private set; } = Ecp.SharedKernel.Localisation.RegionalSettings.Unset;
 
@@ -29,6 +30,7 @@ public sealed class ReviewModel(IOnboardingService onboarding, IOrganisationStru
         Releases = await Onboarding.ReleasesAsync(OrganisationId, ct);
         Governance = await Onboarding.GovernanceAsync(OrganisationId, ct);
         Readiness = await Onboarding.ReadinessAsync(OrganisationId, ct);
+        if (Readiness.CanPublish && State.CurrentRelease is not null) Ready = new ReadyToUse(OrganisationId, OrganisationName, await access.HoldsAnywhereAsync("contracts.create", ct));
         Regional = await HttpContext.RequestServices.GetRequiredService<IRegionalSettingsResolver>().GetAsync(OrganisationId, ct);
         return true;
     }

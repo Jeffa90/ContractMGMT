@@ -9,6 +9,11 @@ public sealed class AccessProfileScenarioTests_Sqlite(SqliteWorldFixture fx) : I
 {
     private async Task RunFreshAsync(Func<AccessWorld, Task> scenario) => await scenario(await fx.FreshAsync());
 
+    [Fact] public Task Owning_all_categories_means_current_and_future_ones() => RunFreshAsync(AccessProfileScenarios.Owning_all_categories_means_current_and_future_ones_and_ending_it_leaves_other_ownership_alone);
+    [Fact] public async Task A_standing_policy_leaves_existing_ownership_untouched_and_is_tenant_isolated() => await AccessProfileScenarios.A_standing_ownership_policy_leaves_existing_ownership_untouched_and_is_not_visible_to_another_tenant(await fx.FreshAsync(), fx.Other);
+    [Fact] public Task The_policy_needs_authority_and_a_recent_sign_in() => RunFreshAsync(AccessProfileScenarios.The_policy_needs_the_right_to_assign_ownership_and_a_recent_sign_in);
+    [Fact] public Task The_review_is_plain_English_with_codes_only_in_advanced_details() => RunFreshAsync(AccessProfileScenarios.The_review_says_in_plain_English_what_saving_would_give_and_shows_codes_only_in_advanced_details);
+    [Fact] public Task Approval_authorities_are_set_up_by_name() => RunFreshAsync(AccessProfileScenarios.Approval_authorities_are_set_up_by_name_and_membership_changes_go_through_the_approver_group_rules);
     [Fact] public Task A_contract_manager_profile_becomes_an_ordinary_role_grant_and_category_ownership() => RunFreshAsync(AccessProfileScenarios.A_contract_manager_profile_becomes_an_ordinary_role_grant_and_category_ownership);
     [Fact] public Task A_manager_who_owns_nothing_is_told_why_they_cannot_create_yet() => RunFreshAsync(AccessProfileScenarios.A_manager_who_owns_nothing_is_told_why_they_cannot_create_yet);
     [Fact] public Task A_failure_part_way_through_leaves_nothing_behind() => RunFreshAsync(AccessProfileScenarios.A_failure_part_way_through_leaves_nothing_behind);
@@ -44,6 +49,11 @@ public sealed class AccessProfileScenarioTests_SqlServer(SqlServerWorldFixture f
 {
     private async Task RunFreshAsync(Func<AccessWorld, Task> scenario) => await scenario(await fx.FreshAsync());
 
+    [SqlServerFact] public Task Owning_all_categories_means_current_and_future_ones() => RunFreshAsync(AccessProfileScenarios.Owning_all_categories_means_current_and_future_ones_and_ending_it_leaves_other_ownership_alone);
+    [SqlServerFact] public async Task A_standing_policy_leaves_existing_ownership_untouched_and_is_tenant_isolated() => await AccessProfileScenarios.A_standing_ownership_policy_leaves_existing_ownership_untouched_and_is_not_visible_to_another_tenant(await fx.FreshAsync(), fx.Other);
+    [SqlServerFact] public Task The_policy_needs_authority_and_a_recent_sign_in() => RunFreshAsync(AccessProfileScenarios.The_policy_needs_the_right_to_assign_ownership_and_a_recent_sign_in);
+    [SqlServerFact] public Task The_review_is_plain_English_with_codes_only_in_advanced_details() => RunFreshAsync(AccessProfileScenarios.The_review_says_in_plain_English_what_saving_would_give_and_shows_codes_only_in_advanced_details);
+    [SqlServerFact] public Task Approval_authorities_are_set_up_by_name() => RunFreshAsync(AccessProfileScenarios.Approval_authorities_are_set_up_by_name_and_membership_changes_go_through_the_approver_group_rules);
     [SqlServerFact] public Task A_contract_manager_profile_becomes_an_ordinary_role_grant_and_category_ownership() => RunFreshAsync(AccessProfileScenarios.A_contract_manager_profile_becomes_an_ordinary_role_grant_and_category_ownership);
     [SqlServerFact] public Task A_manager_who_owns_nothing_is_told_why_they_cannot_create_yet() => RunFreshAsync(AccessProfileScenarios.A_manager_who_owns_nothing_is_told_why_they_cannot_create_yet);
     [SqlServerFact] public Task A_failure_part_way_through_leaves_nothing_behind() => RunFreshAsync(AccessProfileScenarios.A_failure_part_way_through_leaves_nothing_behind);

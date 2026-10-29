@@ -26,6 +26,10 @@ public sealed class WizardInput
     public List<Guid> OwnedIds { get; set; } = [];
     public string? ApproverGroup { get; set; }
     public string? Reason { get; set; }
+    /// <summary>The administrator has read the review and confirms the access is to be given.</summary>
+    public bool Confirm { get; set; }
+    /// <summary>Show role details on the review (Advanced).</summary>
+    public bool Advanced { get; set; }
 }
 
 public sealed record Choice(Guid Id, string Name);
@@ -37,7 +41,7 @@ public sealed record Choice(Guid Id, string Name);
 [Authorize(Policy = "perm:users.manage")]
 public sealed class AccessModel(
     IPersonAccessService people, IAccessProfileService profiles, IEffectiveAccess effective, IOrganisationStructureService organisations, ICategoryAdministration categories,
-    IApproverGroupService groups, IAccessService access, DemoIdentityService demo) : EcpPageModel
+    IApprovalAuthorities authorities, IAccessService access, DemoIdentityService demo) : EcpPageModel
 {
     [BindProperty(SupportsGet = true)] public WizardInput Input { get; set; } = new();
     [BindProperty(SupportsGet = true)] public int Step { get; set; } = 1;
@@ -53,8 +57,9 @@ public sealed class AccessModel(
     public IReadOnlyList<Choice> Categories { get; private set; } = [];
     public IReadOnlyList<string> Levels { get; private set; } = [];
     public int HighLevelRank { get; private set; }
-    public IReadOnlyList<ApproverGroupSummary> ApproverGroups { get; private set; } = [];
+    public IReadOnlyList<ApprovalAuthority> ApproverGroups { get; private set; } = [];
     public AccessPlan? Plan { get; private set; }
+    public AccessReview? Review { get; private set; }
     public EffectiveAccessReport? Current { get; private set; }
     public bool DemoAvailable => people.DemonstrationSignInAllowed && demo.IsEnabled;
     public string DefaultCeiling { get; private set; } = "";
@@ -107,6 +112,12 @@ public sealed class AccessModel(
 
     public async Task<IActionResult> OnPostSaveAsync(CancellationToken ct)
     {
+        if (!Input.Confirm)
+        {
+            // Nothing is given until the administrator has read the review and said so.
+            ModelState.AddModelError("Input.Confirm", "Read the review and tick the box to confirm before access is given.");
+            return await RunAsync(async () => { await LoadAsync(ct); Step = Last; await BuildReviewAsync(ct); return Page(); }, reload: async () => { await LoadAsync(ct); Step = Last; await BuildReviewAsync(ct); });
+        }
         // Changing roles, scope, ceiling, ownership or approver membership needs a recent sign-in. The answers travel in the address so the review comes back after signing in again.
         var authorisation = HttpContext.RequestServices.GetRequiredService<IAuthorizationService>();
         if (!(await authorisation.AuthorizeAsync(User, Policies.RecentAuthentication)).Succeeded)
@@ -191,6 +202,14 @@ public sealed class AccessModel(
         Plan = EditMode
             ? await profiles.PreviewAsync(Change(Input.UserId!.Value), ct)
             : await people.PreviewNewAsync(new NewPerson(Input.DisplayName ?? "", Input.Email ?? "", Input.AllowDemo), Change(Guid.Empty), ct);
+        if (Plan is { CanApply: true, After: { } after })
+        {
+            _ = Enum.TryParse<OwnershipChoice>(Input.Ownership, out var ownership);
+            var scale = await access.ClassificationScaleAsync(ct);
+            var org = Organisations.FirstOrDefault(o => o.Id == Input.OrganisationId)?.Name ?? "";
+            Review = AccessReviewBuilder.Build(new ReviewInput(after.DisplayName, org, Input.Profiles, NeedsOwnership ? ownership : OwnershipChoice.None, Input.Ceiling,
+                NeedsApproverGroup && !string.IsNullOrWhiteSpace(Input.ApproverGroup) ? [Input.ApproverGroup] : null), after, scale, Plan.Steps, Input.Advanced);
+        }
     }
 
     private async Task LoadAsync(CancellationToken ct)
@@ -215,7 +234,7 @@ public sealed class AccessModel(
             BusinessUnits = structure.BusinessUnits.Where(b => b.IsActive).Select(b => new Choice(b.Id, b.Name)).ToList();
             Sites = structure.Sites.Where(s => s.IsActive).Select(s => new Choice(s.Id, s.Name)).ToList();
             Categories = (await categories.ListAllAsync(ct)).Where(c => c.OrganisationId == o && c.IsActive).OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).Select(c => new Choice(c.Id, c.Name)).ToList();
-            ApproverGroups = (await groups.ListAsync(ct)).Where(g => g.IsActive && (g.OrganisationId is null || g.OrganisationId == o)).ToList();
+            ApproverGroups = (await authorities.ViewAsync(o, ct)).Authorities;
             var top = Chosen.Select(p => AccessProfiles.DefaultCeiling(p, scale)).OrderByDescending(scale.Rank).FirstOrDefault();
             DefaultCeiling = top ?? scale.DefaultLevel;
         }

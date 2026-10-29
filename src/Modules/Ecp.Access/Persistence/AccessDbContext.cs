@@ -10,6 +10,7 @@ public sealed class AccessDbContext(DbContextOptions<AccessDbContext> options, D
 {
     public DbSet<ProfileApplication> ProfileApplications => Set<ProfileApplication>();
     public DbSet<PreviewSession> PreviewSessions => Set<PreviewSession>();
+    public DbSet<CategoryOwnershipPolicy> CategoryOwnershipPolicies => Set<CategoryOwnershipPolicy>();
     protected override string SchemaName => AccessModule.Schema;
 
     protected override void ConfigureModule(ModelBuilder mb)
@@ -31,6 +32,20 @@ public sealed class AccessDbContext(DbContextOptions<AccessDbContext> options, D
             e.Ignore(x => x.GrantIds); e.Ignore(x => x.OwnershipIds); e.Ignore(x => x.IsOpen);
             e.HasIndex(x => new { x.TenantId, x.UserId });
             e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.ProfileKey });
+        });
+        mb.Entity<CategoryOwnershipPolicy>(e =>
+        {
+            e.ToTable("CategoryOwnershipPolicy");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Origin).HasMaxLength(20).IsRequired();
+            e.Property(x => x.CreatedByLabel).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.AssignmentIdsJson).IsRequired();
+            e.Property(x => x.EndedBy).HasMaxLength(200);
+            e.Property(x => x.EndReason).HasMaxLength(500);
+            e.Ignore(x => x.AssignmentIds); e.Ignore(x => x.IsOpen);
+            e.HasIndex(x => new { x.TenantId, x.OrganisationId, x.UserId });
         });
         mb.Entity<PreviewSession>(e =>
         {

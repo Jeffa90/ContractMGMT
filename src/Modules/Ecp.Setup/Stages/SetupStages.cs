@@ -20,7 +20,7 @@ public static class SetupStages
     public static IReadOnlyList<Type> All() =>
     [
         typeof(ModeStage), typeof(DatabaseStage), typeof(StorageStage), typeof(TenantStage), typeof(PackStage), typeof(IdentityStage), typeof(AdminStage),
-        typeof(OrganisationStage), typeof(BrandingStage), typeof(ClassificationStage), typeof(NotificationsStage), typeof(DemoDataStage), typeof(ReadinessStage), typeof(CompleteStage)
+        typeof(OrganisationStage), typeof(BrandingStage), typeof(ClassificationStage), typeof(NotificationsStage), typeof(AccessStage), typeof(DemoDataStage), typeof(ReadinessStage), typeof(CompleteStage)
     ];
 }
 
@@ -328,8 +328,8 @@ internal sealed class AdminStage : SetupStageBase
             new("doManage", "Create and manage [[contract|plural|lower]]", FieldKind.Checkbox, false,
                 "What will this person do in the [[organisation|lower]]? Administering is always included. Tick what else, so they can work on [[contract|plural|lower]] as soon as they sign in. In production nothing is ticked for you: choose deliberately, or leave all unticked and give someone else this work.",
                 Value: env.HostMode == EcpMode.Production ? null : "true"),
-            new("doOwn", "Own every [[category|lower]] (needs the choice above)", FieldKind.Checkbox, false,
-                "Owning a [[category|lower]] is what lets a person create and edit [[contract|plural|lower]] in it. If there are no [[category|plural|lower]] yet, the checklist asks for the ownership as soon as they exist.",
+            new("doOwn", "Own all current and future [[category|plural|lower]] (needs the choice above)", FieldKind.Checkbox, false,
+                "Owning a [[category|lower]] is what lets a person create and edit [[contract|plural|lower]] in it. This covers every [[category|lower]] that exists and every one added later, so it works from the first day.",
                 Value: env.HostMode == EcpMode.Production ? null : "true"),
             new("doReview", "Review [[contract|plural|lower]] ([[legal.review|lower]])", FieldKind.Checkbox, false, "Only where the [[organisation|lower]] uses this step."),
             new("doApprove", "Approve [[contract|plural|lower]]", FieldKind.Checkbox, false, "Only where the [[organisation|lower]] uses this step. An approver group is created for them."),
@@ -344,7 +344,7 @@ internal sealed class AdminStage : SetupStageBase
     {
         var name = c.Required("displayName", "Full name");
         var email = c.Required("email", "Email address");
-        if (c.Flag("doOwn") && !c.Flag("doManage")) throw new DomainException("doOwn", "Owning every [[category|lower]] needs “Create and manage [[contract|plural|lower]]” as well.");
+        if (c.Flag("doOwn") && !c.Flag("doManage")) throw new DomainException("doOwn", "Owning all current and future [[category|plural|lower]] needs “Create and manage [[contract|plural|lower]]” as well.");
         if (!System.Net.Mail.MailAddress.TryCreate(email, out _)) throw new DomainException("email", "Enter a valid email address.");
         using var tenantScope = c.UseTenant();
         var users = c.Get<IUserService>();
@@ -477,22 +477,12 @@ internal sealed class OrganisationStage : SetupStageBase
                     Reason: "Initial administrator of the first [[organisation|lower]], named during setup"), AssignmentSource.Setup, "setup:" + c.Actor.Label, null, c.Ct);
             }
         }
-        // What the initial administrator will do beyond administering, as chosen at the administrator stage. The grants use the same trusted path as the administrator roles above.
-        var operational = "";
-        if (Guid.TryParse(c.Doc.Get("admin", "userId"), out var operatorId))
-        {
-            var chosen2 = new BootstrapChoices(c.Doc.Get("admin", "in.doManage") == "true", c.Doc.Get("admin", "in.doOwn") == "true", c.Doc.Get("admin", "in.doReview") == "true",
-                c.Doc.Get("admin", "in.doApprove") == "true", c.Doc.Get("admin", "in.doRead") == "true");
-            var applied = await c.Get<IAdministratorBootstrap>().ApplyAtSetupAsync(operatorId, c.Doc.OrganisationId!.Value, chosen2, "setup:" + c.Actor.Label, c.Ct);
-            c.Record.Data["operational"] = chosen2.Any ? $"{applied.GrantsCreated} grant(s), {applied.OwnershipsCreated} ownership(s)" : "administer only";
-            operational = chosen2.Any ? $" The initial administrator can also work on [[contract|plural|lower]] ({applied.GrantsCreated} access grant(s) added)." : " The initial administrator administers only; someone else must be given the work on [[contract|plural|lower]].";
-        }
         var latest = await configuration.LatestReleaseAsync("SolutionPack", Guid.Empty, c.Ct);
         if (latest is null || !latest.ContentJson.Contains($"\"{packId}\"", StringComparison.Ordinal))
             await c.Get<IConfigurationBootstrap>().DraftValidatePublishAsync("SolutionPack", Guid.Empty, JsonSerializer.Serialize(new { packId }), "setup:" + c.Actor.Label, "Selected during setup", c.Ct);
         foreach (var (k, v) in new Dictionary<string, string> { ["organisationName"] = name, ["culture"] = culture, ["timeZone"] = zone, ["currency"] = currency, ["referencePrefix"] = prefix, ["country"] = country ?? "", ["identifierProfile"] = identifierKey ?? "" })
             c.Remember(k, v);
-        return StageResult.Ok($"[[organisation]] '{name}' is ready." + operational);
+        return StageResult.Ok($"[[organisation]] '{name}' is ready.");
     }
 }
 
@@ -634,6 +624,41 @@ internal sealed class NotificationsStage : SetupStageBase
     }
 }
 
+internal sealed class AccessStage : SetupStageBase
+{
+    public override string Id => "access";
+    public override string Title => "Administrator access";
+    public override string Summary => "Check what the initial administrator will be able to do in the [[organisation|lower]], then confirm. Nothing is given until you do.";
+    public override string ActionLabel => "Confirm and give this access";
+    public override IReadOnlyList<string> DependsOn => ["organisation", "classification"];
+
+    public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)
+        => [new("confirm", "I have read this and I want to give this access.", FieldKind.Checkbox, true)];
+
+    private static BootstrapChoices ChoicesOf(SetupDocument doc)
+        => new(doc.Get("admin", "in.doManage") == "true", doc.Get("admin", "in.doOwn") == "true", doc.Get("admin", "in.doReview") == "true", doc.Get("admin", "in.doApprove") == "true", doc.Get("admin", "in.doRead") == "true");
+
+    public override async Task<AccessReview?> ReviewAsync(StageContext c)
+    {
+        if (!Guid.TryParse(c.Doc.Get("admin", "userId"), out var userId) || c.Doc.OrganisationId is not { } organisationId) return null;
+        using var tenantScope = c.UseTenant();
+        return await c.Get<IAdministratorBootstrap>().PreviewAtSetupAsync(userId, organisationId, ChoicesOf(c.Doc), c.Ct);
+    }
+
+    public override async Task<StageResult> ExecuteAsync(StageContext c)
+    {
+        if (!c.Flag("confirm")) throw new DomainException("confirm", "Read what this gives the initial administrator and tick the box to confirm before access is given.");
+        if (!Guid.TryParse(c.Doc.Get("admin", "userId"), out var operatorId) || c.Doc.OrganisationId is not { } organisationId) throw new DomainException("admin", "Name the initial administrator first.");
+        using var tenantScope = c.UseTenant();
+        var choices = ChoicesOf(c.Doc);
+        var applied = await c.Get<IAdministratorBootstrap>().ApplyAtSetupAsync(operatorId, organisationId, choices, "setup:" + c.Actor.Label, c.Ct);
+        c.Record.Data["operational"] = choices.Any ? $"{applied.GrantsCreated} grant(s), {applied.OwnershipsCreated} ownership(s)" : "administer only";
+        return StageResult.Ok(choices.Any
+            ? $"The initial administrator can now work on [[contract|plural|lower]] ({applied.GrantsCreated} access grant(s) added)."
+            : "The initial administrator administers only; someone else must be given the work on [[contract|plural|lower]].", [.. applied.Notes]);
+    }
+}
+
 internal sealed class DemoDataStage : SetupStageBase
 {
     public override string Id => "demo";
@@ -663,7 +688,7 @@ internal sealed class ReadinessStage : SetupStageBase
     public override string Title => "Readiness review";
     public override string Summary => "Run the readiness checks. Blocking failures must be fixed; warnings need a recorded reason to continue.";
     public override string ActionLabel => "Run checks";
-    public override IReadOnlyList<string> DependsOn => ["storage", "organisation", "branding", "classification", "notifications"];
+    public override IReadOnlyList<string> DependsOn => ["storage", "organisation", "branding", "classification", "notifications", "access"];
     public override bool Amendable => true;
 
     public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)

@@ -53,7 +53,7 @@ internal sealed class SetupService(ISetupStore store, SetupEnvironment env, IEnu
     private DateTime _lockedUntil;
 
     /// <summary>Stage display order. Dependencies are enforced separately; this is the order the wizard presents.</summary>
-    private static readonly string[] Order_ = ["mode", "database", "storage", "tenant", "pack", "identity", "admin", "organisation", "branding", "classification", "notifications", "demo", "readiness", "complete"];
+    private static readonly string[] Order_ = ["mode", "database", "storage", "tenant", "pack", "identity", "admin", "organisation", "branding", "classification", "notifications", "access", "demo", "readiness", "complete"];
 
     private static IReadOnlyList<ISetupStage> Order(IEnumerable<ISetupStage> stages)
         => [.. stages.OrderBy(s => { var i = Array.IndexOf(Order_, s.Id); return i < 0 ? int.MaxValue : i; })];
@@ -194,7 +194,17 @@ internal sealed class SetupService(ISetupStore store, SetupEnvironment env, IEnu
         string? Remembered(string name) => record.Data.TryGetValue("in." + name, out var v) ? v : null;
         var fields = stage.Fields(doc, env, Remembered).Select(f => f with { Value = Remembered(f.Name) ?? f.Value }).ToList();
         var available = IsAvailable(stage, doc, amending, out var reason);
-        return new StageDescriptor(stage.Id, stage.Title, stage.Summary, doc.StatusOf(stageId), fields, stage.Notes(doc, env), stage.ActionLabel, record.Note, available, reason);
+        Ecp.Access.AccessReview? review = null;
+        if (available && doc.TenantId is not null)
+        {
+            // A step that asks for confirmation shows what it will do first. The review is a dry run in its own scope and changes nothing.
+            await using var scope = scopes.CreateAsyncScope();
+            var actorContext = scope.ServiceProvider.GetRequiredService<ActorContext>();
+            actorContext.Type = ActorType.System; actorContext.ActorId = "setup:review"; actorContext.Source = "Setup";
+            try { review = await stage.ReviewAsync(new StageContext(doc, record, new Dictionary<string, string>(), new SetupActor("review"), env, scope.ServiceProvider, ct)); }
+            catch (Exception ex) when (ex is DomainException or ForbiddenException or ResourceNotFoundException) { logger.LogInformation("Setup review for {Stage} could not be prepared: {Reason}", stageId, ex.Message); }
+        }
+        return new StageDescriptor(stage.Id, stage.Title, stage.Summary, doc.StatusOf(stageId), fields, stage.Notes(doc, env), stage.ActionLabel, record.Note, available, reason, review);
     }
 
     public async Task<StageResult> ExecuteAsync(string stageId, IReadOnlyDictionary<string, string> values, SetupActor actor, bool amending = false, CancellationToken ct = default)

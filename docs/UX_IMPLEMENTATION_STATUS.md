@@ -58,12 +58,44 @@ Evidence names are test classes under `tests/`. "Journey" is `GuidedAdministrati
 | **DOC** | DOC-001 guides updated; DOC-004 labels in this document | DOC-002 permission counts, DOC-003 configurable profile definitions (profiles are compiled into the product; the configuration kind is a later slice S8, not built) |
 | **USE** | none | USE-001..006 are moderated or reading-level measurements: **Not Verified**. The automated journey proves the steps work; it does not prove a first-time administrator finds them in a minute |
 
-## 5. Manual acceptance journey
+## 5. Manual acceptance scenario (owner's final review)
 
-`GuidedAdministrationJourneyTests.A_first_administrator_gets_to_work_adds_a_colleague_and_checks_what_the_colleague_sees_without_any_code` drives the scenario the owner described over HTTP on the Demo/Test host, signing in through the real sign-in page: Home says "Set up my access" with no **+ New contract** → **Give me full Test-mode access** (what it grants and does not, first) → My access shows "Create contracts" and Home shows **+ New contract** → Add a person (name, email, Allow demonstration sign-in) → Contract Manager → ownership of one category chosen by name from a list → review in plain English → save → **Preview as this user** (banner, the person's navigation and records, administrator's authority absent, a write refused) → **Exit user preview** → the person signs in through demonstration sign-in and sees the same. Every page of the journey is checked for role codes, viewer kinds and permission names. It **passed**. A person doing the same in a browser is **Not Verified**.
+Two automated journeys drive the scenario over HTTP on the Test/Demo host, through the real sign-in page, with an antiforgery token on every post, and check every page for role codes, permission names, viewer kinds and group keys (none appears):
+
+* `GuidedAdministrationJourneyTests` (seeded Demo): Set up my access, **Give me full Test-mode access**, Add a person, Preview, Exit, sign in as the person. **Passed.**
+* `ManualAcceptanceScenarioTests.A_fresh_Test_mode_organisation_an_initial_administrator_and_a_synthetic_Jeffrey_end_to_end` (a **fresh, uninstalled** Test-mode installation set up through the real 14-stage wizard; the administrator ticks "Administer the organisation", "Create and manage contracts" and "Own all categories"). **Passed**, with the three named gaps below recorded by the test itself (the test fails if the gap list changes, so this page cannot drift from the product).
+
+| Step | Result | Evidence |
+|---|---|---|
+| A. Fresh Test-mode organisation | **Done** | the set-up wizard in the test |
+| B. Initial administrator chooses Administer, Create/manage contracts, Own all categories | **Done** | set-up admin stage |
+| C. Review page explains in plain English what access results | **Partial (gap 1)**: the set-up stage applies the choice and **My access** is the plain-English review after the fact; the set-up stage has no separate review page before saving | `/Access` contains "Create contracts" |
+| D. Save access | **Done** (saved by set-up) | |
+| E. Home shows + New contract, My Contracts, My Actions, Reviews Due, Expiring Soon | **Done once a category exists and is owned** (gap 2); My Actions is in the navigation, the other four are on Home | Home assertions |
+| F. Create a second synthetic person, "Jeffrey" | **Done** | Add a person wizard |
+| G. Contract Manager, selected organisation, selected categories, Internal ceiling, Allow demonstration sign-in | **Done** | wizard steps 2 to 5 |
+| H. Save | **Done** | |
+| I. Jeffrey appears on the Demonstration sign-in page | **Done** | `/SignIn` |
+| J. Preview as Jeffrey | **Done** | person page |
+| K. Operational navigation only; only authorised records; Administration hidden; banner; writes refused | **Done**, with a note: a Category Owner **reads every contract in the organisation** within the ceiling (confirmed decision), so Jeffrey sees a contract in a category he does not own, read-only, and cannot edit it | banner, no Administration menu, People forbidden, edit refused, supplier create refused |
+| L. Exit preview | **Done** (the banner's own button) | |
+| M. Sign out and sign in normally as Jeffrey | **Done** | |
+| N. Jeffrey creates a contract in an authorised category | **Done** | redirect to the new contract |
+| O. Jeffrey cannot create or edit outside the scope | **Done** | create in the other category refused; edit page not available |
+
+**UX gaps found by running the scenario (reported, not worked around through an Advanced page):**
+
+1. **No review page at set-up.** The first administrator's choices are saved by the set-up stage; the plain-English description of the resulting access is on **My access**, afterwards.
+2. **"Own all categories" at set-up does not carry to categories added later.** A new organisation has no categories; the choice is kept, but until the administrator adds categories and makes themself the owner in the guided ownership editor, Home offers no **+ New contract** (it says why).
+3. **Approver groups.** Approval authorities need an approver group, and the page that creates the first one asks for a **Group key**; no guided path creates it. Separately, publishing the set-up is refused (correctly, by the readiness gate) until the pack's required "Workflow and approvals" item is done, and the reference pack ships **no approval rules**; the only way to author them is the approval-matrix form editor. So a fresh JBS organisation cannot reach "Ready" without a specialist step. The scenario, Home work cards, supplier and contract creation do not depend on publishing the set-up.
+
+Two things the run exposed and that were fixed on this branch: the **Plan table on the onboarding review page printed raw terminology tokens** (now expanded); and the scenario's own set-up had to include the reference pack's **Legal Privileged** classification level, otherwise the pack's notification policy cannot be installed and Home shows no work cards (the set-up classification stage, as shipped, lets an administrator remove a level the pack's policy names; the error surfaces on Home as no cards rather than on the stage; recorded here as an observation, not changed).
+
+A person doing the same in a browser is **Not Verified**.
 
 ## 6. Known gaps (first things to do next)
 
+0. The three scenario gaps in section 5: a review page at set-up, ownership of categories added later, a guided first approver group and a guided path to the pack's approval rules.
 1. Moderated usability test of the journey with real administrators (USE-001..006), and keyboard and screen-reader walkthroughs (ACC-002, 004, 005).
 2. Ownership effective dates (OWN-006), End asks for a reason (OWN-009), mapping change-as-one-action (MAP-007), naming the group on mapped grants (MAP-006).
 3. People search and paging; "why am I asked this" disclosures; Preview on the list and old Users page; the sign-in page hint; **Add a test colleague**.

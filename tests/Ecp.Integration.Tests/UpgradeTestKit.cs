@@ -29,7 +29,10 @@ internal sealed class N1Installation : IAsyncDisposable
         var app = await TestApp.CreateSqlServerAsync(migrate: true, configure: RecoveryTestKit.Configure(layout, services => { LifecycleScenarios.Scanner(services); more?.Invoke(services); }));
         var data = await SyntheticInstallation.BuildAsync(app);
         var baseline = UpgradeCatalogue.Embedded().Baseline(SourceVersion) ?? throw new InvalidOperationException("The frozen baseline for " + SourceVersion + " is missing.");
-        await app.Services.GetRequiredService<MigrationRunner>().RunToAsync(baseline.Modules.ToDictionary(m => m.Module, m => (string?)m.SchemaVersion));
+        var targets = baseline.Modules.ToDictionary(m => m.Module, m => (string?)m.SchemaVersion);
+        // A module that did not exist in the baseline (for example Access, added in 1.1.0) has no schema at all on a genuine N-1 installation: revert it to nothing.
+        foreach (var module in app.Services.GetServices<ModuleDescriptor>()) targets.TryAdd(module.Name, "0");
+        await app.Services.GetRequiredService<MigrationRunner>().RunToAsync(targets);
         return new N1Installation { App = app, Layout = layout, Data = data };
     }
 

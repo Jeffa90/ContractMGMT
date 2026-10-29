@@ -1,0 +1,26 @@
+@page "/Reports"
+@model Ecp.Host.Pages.Reports.IndexModel
+@{ ViewData["Title"] = L["Reports"].Value; }
+<h1>@L["Reports"]</h1>
+<p class="lede">@L["The lists, counts and exports available to you. They show only what you could open yourself."]</p>
+<div class="grid">
+    @if (Model.CanReadContracts)
+    {
+        <section class="card" aria-labelledby="r-dash"><h2 id="r-dash">@L["Dashboards"]</h2>
+            <p class="hint">@L["Counts and lists of the [[agreement|plural|lower]] that need attention: expiring, reviews due, awaiting action."]</p>
+            <p><a class="button secondary" href="/Dashboards">@L["Open dashboards"]</a></p></section>
+        <section class="card" aria-labelledby="r-reg"><h2 id="r-reg">@L["The [[contract.register]]"]</h2>
+            <p class="hint">@L["Search, filter and sort; save your own lists; export the list you are looking at to CSV or a spreadsheet."]</p>
+            <p><a class="button secondary" href="/Contracts">@L["Open the [[contract.register|lower]]"]</a></p></section>
+        <section class="card" aria-labelledby="r-cat"><h2 id="r-cat">@L["[[category|plural]] and owners"]</h2>
+            <p class="hint">@L["See which [[category|plural|lower]] exist and who owns each."]</p>
+            <p><a class="button secondary" href="/Admin/Categories">@L["Open [[category|plural|lower]]"]</a></p></section>
+    }
+    @if (Model.CanReadAudit)
+    {
+        <section class="card" aria-labelledby="r-aud"><h2 id="r-aud">@L["Audit"]</h2>
+            <p class="hint">@L["Who did what, and when. Exports are available from the audit page."]</p>
+            <p><a class="button secondary" href="/Admin/Audit">@L["Open audit events"]</a></p></section>
+    }
+</div>
+<p class="hint">@L["This is not a reporting tool. More reports are not available in this version."]</p>

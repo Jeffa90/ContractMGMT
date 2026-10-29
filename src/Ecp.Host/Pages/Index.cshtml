@@ -4,43 +4,88 @@
 <h1>@L["Home"]</h1>
 <p class="lede">@L["Your view of the [[contract.register|lower]] is limited to the [[organisation|plural|lower]], [[category|plural|lower]], [[business.unit|plural|lower]], [[site|plural|lower]] and classifications assigned to you."]</p>
 
-@if (Model.Roles.Count > 0)
-{
-    <section aria-labelledby="roles-h" class="card">
-        <h2 id="roles-h">@L["Your access"]</h2>
-        <div class="table-wrap">
-            <table>
-                <caption class="visually-hidden">@L["Your current role assignments"]</caption>
-                <thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["Scope"]</th><th scope="col">@L["Classification ceiling"]</th></tr></thead>
-                <tbody>
-                @foreach (var r in Model.Roles)
-                {
-                    <tr><td>@Terms.Role(r.Role)</td><td>@r.Scope</td><td>@r.Ceiling</td></tr>
-                }
-                </tbody>
-            </table>
-        </div>
-    </section>
-}
-else
+@if (!Model.HasAnyRole)
 {
     <p class="flash warn" role="status">@L["You have no active role assignment, so no records are visible. Ask an administrator for access."]</p>
 }
 
-@if (Model.CanReadContracts)
+@if (Model.CanCreate)
 {
-    <section aria-labelledby="counts-h">
-        <h2 id="counts-h">@L["[[contract|plural]] you can see"]</h2>
-        @if (Model.StatusCounts.Count == 0) { <p>@L["No [[contract|plural|lower]] are visible to you."]</p> }
-        else
-        {
-            <div class="grid">
-                @foreach (var (status, count) in Model.StatusCounts)
-                {
-                    <div class="card"><span class="stat">@count</span><a href="/Contracts?status=@Uri.EscapeDataString(status)">@status</a></div>
-                }
-            </div>
-        }
-        <p><a class="button" href="/Contracts">@L["Open the [[contract.register|lower]]"]</a></p>
+    <div class="home-actions"><a class="button primary-action" href="/Contracts/Create">+ @L["New [[contract|lower]]"]</a>
+        <a class="button secondary" href="/Contracts">@L["Open the [[contract.register|lower]]"]</a></div>
+}
+else if (Model.HasAnyRole && Model.Blocked != CreateBlock.None)
+{
+    <section class="card" aria-labelledby="cannot-h">
+        <h2 id="cannot-h">@L["You can't create [[contract|plural|lower]] yet"]</h2>
+        <p>
+            @switch (Model.Blocked)
+            {
+                case CreateBlock.NeedsOwnership:
+                    @L["You hold a role that lets you create [[contract|plural|lower]], but you do not own any [[category|lower]] yet. Owning a [[category|lower]] is what lets you create and edit [[contract|plural|lower]] in it."]
+                    break;
+                case CreateBlock.NoCategories:
+                    @L["There are no [[category|plural|lower]] yet. Someone needs to add them before a [[contract|lower]] can be created."]
+                    break;
+                case CreateBlock.NoRole:
+                    @L["Your current access lets you read [[contract|plural|lower]] but not create them."]
+                    break;
+                default:
+                    @L["Your current access does not include [[contract|plural|lower]]."]
+                    break;
+            }
+        </p>
+        <p>
+            @if (Model.CanManageUsers)
+            {
+                <a class="button secondary" href="/Access">@L["See what my access allows"]</a>
+                <span class="hint">@L["Nobody can give themselves access. Another administrator can give you the access you need."]</span>
+            }
+            else
+            {
+                <a class="button secondary" href="/Access">@L["See what my access allows"]</a>
+                <span class="hint">@L["Ask an administrator to give you the access you need."]</span>
+            }
+        </p>
+    </section>
+}
+
+@if (Model.Cards.Count > 0)
+{
+    <div class="grid">
+    @foreach (var c in Model.Cards)
+    {
+        <section class="card" aria-labelledby="card-@c.Key">
+            <h2 id="card-@c.Key">@c.Title <span class="badge @(c.Count > 0 && c.Key == "awaiting-my-action" ? "warn" : "")">@c.Count</span></h2>
+            <p class="hint">@c.Description</p>
+            <partial name="_DashboardRows" model="c.Rows" />
+            @if (c.Count > c.Rows.Count) { <p><a href="/Dashboards?card=@c.Key">@L["Show all"] (@c.Count)</a></p> }
+        </section>
+    }
+    </div>
+}
+else if (Model.CanCreate || Model.CanReadContracts)
+{
+    <p class="hint">@L["Nothing needs your attention right now."]</p>
+}
+
+<section class="card" aria-labelledby="notif-h">
+    <h2 id="notif-h">@L["[[notification|plural]]"] @if (Model.Unread > 0) { <span class="badge warn">@Model.Unread</span> }</h2>
+    @if (Model.Notifications.Count == 0) { <p class="hint">@L["No new [[notification|plural|lower]]."]</p> }
+    else
+    {
+        <ul class="plain">@foreach (var n in Model.Notifications) { <li>@if (!string.IsNullOrEmpty(n.LinkPath)) { <a href="@n.LinkPath">@n.Title</a> } else { @n.Title }</li> }</ul>
+        <p><a href="/Notifications">@L["Open all [[notification|plural|lower]]"]</a></p>
+    }
+</section>
+
+@if (Model.IsAdministrator)
+{
+    <section class="card setup" aria-labelledby="setup-h">
+        <h2 id="setup-h">@L["Setup & administration"]</h2>
+        <p class="hint">@L["Set up people, categories and approvals, and check the installation."]</p>
+        <p><a class="button secondary" href="/Admin">@L["Open Administration"]</a>
+            @if (Model.CanManageUsers) { <a class="button secondary" href="/Admin/Users">@L["Add or change people"]</a> }
+            <a class="button secondary" href="/Access">@L["My access"]</a></p>
     </section>
 }

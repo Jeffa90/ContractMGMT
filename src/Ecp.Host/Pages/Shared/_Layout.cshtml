@@ -5,7 +5,7 @@
 @inject EcpHostOptions HostOptions
 @inject Ecp.Host.Setup.BrandingAccessor Brand
 @inject Ecp.Identity.ElevationContext Elevation
-@inject Ecp.Notifications.INotificationInbox Inbox
+@inject Ecp.Host.Navigation.NavigationService Navigation
 @inject Ecp.Operations.IMaintenanceService Maintenance
 @{
     var branding = await Brand.GetAsync();
@@ -13,45 +13,18 @@
     var title = ViewData["Title"] as string ?? productName;
     var path = Context.Request.Path.Value ?? "/";
     var signedIn = User.Identity?.IsAuthenticated == true;
-    async Task<bool> Can(params string[] permissions) { foreach (var p in permissions) if (await Access.HoldsAnywhereAsync(p)) return true; return false; }
     var maintenanceOn = false;
     try { maintenanceOn = (await Maintenance.GetAsync()).Enabled; } catch (Exception) { /* the flag cannot be read; readiness reports it */ }
-    var items = new List<(string Href, string Text, string Match)>();
-    if (signedIn)
+    Ecp.Host.Navigation.NavigationModel? nav = null;
+    if (signedIn) nav = await Navigation.GetAsync(Context.RequestAborted);
+    bool Current(string match) => match == "/" ? path == "/" : path.StartsWith(match, StringComparison.OrdinalIgnoreCase);
+    // Breadcrumb for administration pages: Administration > group > page, from the same catalogue that builds the menu.
+    (Ecp.Host.Navigation.AdminSection Section, Ecp.Host.Navigation.NavItem Item)? crumb = null;
+    if (nav is not null && path.Length > 1)
     {
-        items.Add(("/", L["Home"].Value, "/"));
-        items.Add(("/Dashboards", L["Dashboards"].Value, "/Dashboards"));
-        if (await Can("contracts.read")) items.Add(("/Contracts", L["[[contract|plural]]"].Value, "/Contracts"));
-        if (Terms.UsesAnywhere(CapabilityKeys.LegalReview) && await Can("legal.review", "legal.respond", "contracts.submit_legal")) items.Add(("/Legal", L["[[legal.review|sentence]]"].Value, "/Legal"));
-        if (Terms.UsesAnywhere(CapabilityKeys.RegisterAuthorisation) && await Can("approvals.action", "contracts.submit_approval")) items.Add(("/Approvals", L["[[approval|plural]]"].Value, "/Approvals"));
-        if (Terms.UsesAnywhere(CapabilityKeys.Variations) && await Can("variations.create")) items.Add(("/Variations", L["[[variation|plural]]"].Value, "/Variations"));
-        if (Terms.UsesAnywhere(CapabilityKeys.Renewals) && await Can("renewals.create")) items.Add(("/Renewals", L["[[renewal|plural]]"].Value, "/Renewals"));
-        var unread = 0;
-        try { unread = await Inbox.UnreadCountAsync(); } catch (Exception) { /* a session without a person (an installation administrator) has no inbox */ }
-        items.Add(("/Notifications", unread > 0 ? L["[[notification|plural]]"].Value + " (" + unread + ")" : L["[[notification|plural]]"].Value, "/Notifications"));
-        if (await Can("suppliers.read")) items.Add(("/Suppliers", L["[[supplier|plural]]"].Value, "/Suppliers"));
-        if (await Can("categories.manage", "contracts.read")) items.Add(("/Admin/Categories", L["[[category|plural]]"].Value, "/Admin/Categories"));
-        if (await Can("users.manage")) items.Add(("/Admin/Users", L["Users and roles"].Value, "/Admin/Users"));
-        if (await Can("organisations.manage")) items.Add(("/Admin/Organisations", L["Organisations"].Value, "/Admin/Organisations"));
-        if (await Can("users.manage")) items.Add(("/Admin/ApproverGroups", L["Approver groups"].Value, "/Admin/ApproverGroups"));
-        if (await Can("audit.read", "audit.read_admin")) items.Add(("/Admin/Audit", L["Audit events"].Value, "/Admin/Audit"));
-        if (await Can("onboarding.run")) items.Add(("/Onboarding", L["[[organisation]] onboarding"].Value, "/Onboarding"));
-        if (await Can("migration.stage")) items.Add(("/Migration", L["Data migration"].Value, "/Migration"));
-        if (await Can("support.elevate")) items.Add(("/Admin/Support", L["Support access"].Value, "/Admin/Support"));
-        if (await Can("audit.read_admin")) items.Add(("/Admin/Elevations", L["Access to this tenant"].Value, "/Admin/Elevations"));
-        if (await Can("notifications.administer")) items.Add(("/Admin/Notifications", L["[[notification]] delivery"].Value, "/Admin/Notifications"));
-        if (Terms.UsesAnywhere(CapabilityKeys.RegisterAuthorisation) && await Can("approvals.matrix.read", "approvals.simulate", "approvals.delegate")) items.Add(("/Admin/Approvals", L["[[approval]] matrices"].Value, "/Admin/Approvals"));
-        if (await Can("config.draft", "config.publish", "terminology.draft", "terminology.publish", "capabilities.draft", "capabilities.publish")) items.Add(("/Admin/Reviews", L["Configuration reviews"].Value, "/Admin/Reviews"));
-        if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Configuration", L["Workflow configuration"].Value, "/Admin/Configuration"));
-        if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Studio", L["Configuration Studio"].Value, "/Admin/Studio"));
-        if (await Can("ops.manage")) items.Add(("/Admin/Health", L["Health and readiness"].Value, "/Admin/Health"));
-        if (await Can("operations.read")) items.Add(("/Admin/Operations", L["Operations"].Value, "/Admin/Operations"));
-        if (await Can("notifications.administer")) items.Add(("/Admin/Documents/Scanning", L["Document scanning"].Value, "/Admin/Documents/Scanning"));
-        if (await Can("capabilities.read", "capabilities.draft")) items.Add(("/Admin/Capabilities", L["Capabilities"].Value, "/Admin/Capabilities"));
-        if (await Can("terminology.read", "terminology.draft")) items.Add(("/Admin/Terminology", L["Terminology"].Value, "/Admin/Terminology"));
-        if (await Can("config.draft", "config.history.read")) items.Add(("/Admin/Regional", L["Regional settings"].Value, "/Admin/Regional"));
-        if (await Can("packs.read")) items.Add(("/Admin/Packs", L["[[solution.pack|plural|sentence]]"].Value, "/Admin/Packs"));
-        if (await Can("setup.run")) items.Add(("/Admin/Setup", L["Installation setup"].Value, "/Admin/Setup"));
+        foreach (var section in nav.Administration)
+            foreach (var item in section.Items)
+                if (Current(item.Match) && (crumb is null || item.Match.Length > crumb.Value.Item.Match.Length)) crumb = (section, item);
     }
 }
 <!DOCTYPE html>
@@ -84,24 +57,57 @@
     }
     <header class="site-header">
         <a class="brand" href="/">@productName</a>
-        @if (signedIn)
+        @if (nav is not null)
         {
             <nav aria-label="@L["Main"]">
-                <ul>
-                    @foreach (var item in items)
+                <ul class="primary">
+                    @foreach (var item in nav.Primary)
                     {
-                        var current = item.Match == "/" ? path == "/" : path.StartsWith(item.Match, StringComparison.OrdinalIgnoreCase);
-                        <li><a href="@item.Href" aria-current="@(current ? "page" : null)">@item.Text</a></li>
+                        <li><a href="@item.Href" aria-current="@(Current(item.Match) ? "page" : null)">@L[item.Text]</a></li>
+                    }
+                    @if (nav.HasAdministration)
+                    {
+                        <li class="admin-menu">
+                            <details id="admin-menu" @(crumb is not null ? "data-here" : "")>
+                                <summary>@L["Administration"]</summary>
+                                <div class="admin-panel">
+                                    <p><a href="/Admin">@L["All administration"]</a></p>
+                                    @foreach (var grp in nav.Administration)
+                                    {
+                                        <section aria-labelledby="menu-@grp.Key">
+                                            <h2 id="menu-@grp.Key" class="menu-heading">@L[grp.Title]</h2>
+                                            <ul>
+                                                @foreach (var item in grp.Items)
+                                                {
+                                                    <li><a href="@item.Href" aria-current="@(crumb is { } c && c.Item.Key == item.Key ? "page" : null)">@L[item.Text]</a></li>
+                                                }
+                                            </ul>
+                                        </section>
+                                    }
+                                </div>
+                            </details>
+                        </li>
                     }
                 </ul>
             </nav>
             <div class="who">
+                <a class="bell" href="/Notifications">@L["[[notification|plural]]"]@if (nav.Unread > 0) { <span class="badge warn"><span class="visually-hidden">@L["unread:"] </span>@nav.Unread</span> }</a>
                 <span>@L["Signed in as"] <strong>@User.Identity!.Name</strong></span>
                 <form method="post" asp-page="/SignOut"><button class="secondary" type="submit">@L["Sign out"]</button></form>
             </div>
         }
     </header>
     <main id="main" tabindex="-1">
+        @if (crumb is { } here)
+        {
+            <nav class="breadcrumb" aria-label="@L["Breadcrumb"]">
+                <ol>
+                    <li><a href="/Admin">@L["Administration"]</a></li>
+                    <li>@L[here.Section.Title]</li>
+                    <li><span aria-current="page">@L[here.Item.Text]</span></li>
+                </ol>
+            </nav>
+        }
         @if (TempData["Flash"] is string flash)
         {
             <div class="flash" role="status">@flash</div>
@@ -109,5 +115,6 @@
         @RenderBody()
     </main>
     <footer class="site-footer">@productName@(string.IsNullOrWhiteSpace(branding.FooterText) ? "" : " · " + branding.FooterText) &middot; @L["Production approval is external governance; this build does not declare it."]</footer>
+    <script src="~/js/nav.js" asp-append-version="true" defer></script>
 </body>
 </html>

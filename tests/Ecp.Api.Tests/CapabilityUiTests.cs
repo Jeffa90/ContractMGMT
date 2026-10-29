@@ -145,21 +145,21 @@ public sealed class CapabilityUiTests
         using var owner = await app.SignInAsync(ownerEmail, followRedirects: true);
 
         // The Blank pack leaves Legal Review and Renewals off, so the facilities organisation's navigation has neither, and keeps the capabilities that are on.
-        var before = await BodyAsync(owner, "/");
+        var before = await BodyAsync(owner, "/Actions");
         Assert.DoesNotContain("href=\"/Legal\"", before);
         Assert.DoesNotContain("href=\"/Renewals\"", before);
         Assert.Contains("href=\"/Variations\"", before);
 
         // The reference organisation keeps everything.
         using var refOwner = await app.SignInAsync(CatOwner, followRedirects: true);
-        var reference = await BodyAsync(refOwner, "/");
+        var reference = await BodyAsync(refOwner, "/Actions");
         Assert.Contains("href=\"/Legal\"", reference);
         Assert.Contains("href=\"/Renewals\"", reference);
 
         // Saving does not publish; validating and previewing show the effect; publishing makes it so.
         var form = Form(blankOrg, (CapabilityKeys.LegalReview, "on"), (CapabilityKeys.Renewals, "on"));
         Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(admin, Edit(blankOrg), form, Post("Save", blankOrg))).StatusCode);
-        Assert.DoesNotContain("href=\"/Legal\"", await BodyAsync(owner, "/"));
+        Assert.DoesNotContain("href=\"/Legal\"", await BodyAsync(owner, "/Actions"));
         var preview = await BodyAsync(admin, $"/Admin/Capabilities/Preview?organisationId={blankOrg}");
         Assert.Contains("is available again", preview);
         Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(admin, Edit(blankOrg), form, Post("Validate", blankOrg))).StatusCode);
@@ -167,14 +167,14 @@ public sealed class CapabilityUiTests
         Assert.Equal(HttpStatusCode.Redirect, publish.StatusCode);
         Assert.StartsWith("/Admin/Capabilities", publish.Headers.Location!.OriginalString);
 
-        var after = await BodyAsync(owner, "/");
+        var after = await BodyAsync(owner, "/Actions");
         Assert.Contains("href=\"/Legal\"", after);
         Assert.Contains("href=\"/Renewals\"", after);
 
         // Switching them off again (an explicit choice) hides them again; History and Audit record all of it.
         var off = Form(blankOrg, (CapabilityKeys.LegalReview, "off"), (CapabilityKeys.Renewals, "off"));
         Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(admin, Edit(blankOrg), off, Post("Publish", blankOrg))).StatusCode);
-        var hidden = await BodyAsync(owner, "/");
+        var hidden = await BodyAsync(owner, "/Actions");
         Assert.DoesNotContain("href=\"/Legal\"", hidden);
         Assert.DoesNotContain("href=\"/Renewals\"", hidden);
         var history = await BodyAsync(admin, $"/Admin/Capabilities/History?organisationId={blankOrg}");
@@ -187,7 +187,7 @@ public sealed class CapabilityUiTests
         var rollback = await DemoApp.PostFormAsync(admin, $"/Admin/Capabilities/History?organisationId={blankOrg}", new Dictionary<string, string> { ["OrganisationId"] = blankOrg.ToString(), ["ToRelease"] = "1", ["Reason"] = "We do review" },
             $"/Admin/Capabilities/History?handler=Rollback&organisationId={blankOrg}");
         Assert.Equal(HttpStatusCode.Redirect, rollback.StatusCode);
-        Assert.Contains("href=\"/Legal\"", await BodyAsync(owner, "/"));
+        Assert.Contains("href=\"/Legal\"", await BodyAsync(owner, "/Actions"));
 
         // The organisation administrator's own access is unchanged by any of it; the owner still cannot open the capability pages.
         Assert.Equal(HttpStatusCode.Forbidden, (await owner.GetAsync("/Admin/Capabilities")).StatusCode);
@@ -218,7 +218,7 @@ public sealed class CapabilityUiTests
         Assert.Contains("uses", await usesResponse.Content.ReadAsStringAsync());
 
         // Nothing was published: the navigation is as it was.
-        Assert.Contains("href=\"/Variations\"", await BodyAsync(owner, "/"));
+        Assert.Contains("href=\"/Variations\"", await BodyAsync(owner, "/Actions"));
         Assert.Contains("published no choice of its own", await BodyAsync(admin, $"/Admin/Capabilities?organisationId={blankOrg}"));
     }
 

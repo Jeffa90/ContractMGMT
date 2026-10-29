@@ -11,6 +11,8 @@ namespace Ecp.Api.Tests;
 /// G-25 over real HTTP: the Scanner page tells the truth about the scanner. A connected scanner is Not Verified until its self-test has passed with the current configuration; a scanner that says Clean to the standard test file
 /// fails the test; the demonstration scanner is a prominent warning in Test and can be accepted only there, by the technical role; Demo has nothing to accept. No real scanner is used: the providers here are test doubles.
 /// </summary>
+[Collection("Api")]
+[Trait("Category", "Api")]
 public sealed class ScannerPageTests
 {
     private const string SysAdmin = "sysadmin@installation.example.test";

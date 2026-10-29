@@ -37,7 +37,7 @@ public sealed class UiAccessTests
     {
         using var app = DemoApp.Start();
         using var client = await app.SignInAsync("viewer.category@a.example.test");
-        var home = await BodyAsync(client, "/");
+        var home = await BodyAsync(client, "/Access");
         Assert.Contains("Viewer (Category)", home);
         var register = await BodyAsync(client, "/Contracts");
         Assert.Contains("Synthetic Packaging Supply Agreement", register);

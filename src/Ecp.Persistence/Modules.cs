@@ -112,7 +112,8 @@ public sealed class MigrationRunner(IServiceProvider root, IEnumerable<ModuleDes
         await using (var cmd = conn.Connection.CreateCommand())
         {
             cmd.CommandText = script;
-            await cmd.ExecuteNonQueryAsync(ct);
+            try { await cmd.ExecuteNonQueryAsync(ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { throw new InvalidOperationException($"The SQLite schema for module {module.Name} could not be created: {ex.Message}", ex); }
         }
         await using var mark = conn.Connection.CreateCommand();
         mark.CommandText = $"INSERT INTO {SqliteMarkerTable}(name) VALUES (@n)";

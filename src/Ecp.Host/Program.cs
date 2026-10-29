@@ -48,6 +48,7 @@ builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
 builder.Services.AddScoped<Ecp.Host.Pages.PageFormat>();
 builder.Services.AddScoped<Ecp.Configuration.Forms.IFormLookupProvider, Ecp.Host.Pages.Admin.Forms.FormLookups>();
 builder.Services.AddScoped<Ecp.Host.Terminology.TermContext>();
+builder.Services.AddScoped<Ecp.Host.Navigation.NavigationService>();
 builder.Services.AddScoped<Microsoft.Extensions.Localization.IStringLocalizer<SharedResource>, Ecp.Host.Terminology.TermLocalizer>();
 
 builder.Services.AddSingleton<ISecretProvider>(secrets);

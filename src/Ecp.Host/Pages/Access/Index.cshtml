@@ -1,0 +1,28 @@
+@page "/Access"
+@model Ecp.Host.Pages.Access.IndexModel
+@{ ViewData["Title"] = L["My access"].Value; }
+<h1>@L["My access"]</h1>
+<p class="lede">@L["What you are allowed to do is decided by the roles you hold, where they apply, and the highest classification you may see."]</p>
+@if (Model.Roles.Count > 0)
+{
+    <section aria-labelledby="roles-h" class="card">
+        <h2 id="roles-h">@L["Your access"]</h2>
+        <div class="table-wrap">
+            <table>
+                <caption class="visually-hidden">@L["Your current role assignments"]</caption>
+                <thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["Scope"]</th><th scope="col">@L["Classification ceiling"]</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.Roles)
+                {
+                    <tr><td>@Terms.Role(r.Role)</td><td>@r.Scope</td><td>@r.Ceiling</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+else
+{
+    <p class="flash warn" role="status">@L["You have no active role assignment, so no records are visible. Ask an administrator for access."]</p>
+}
+<p><a href="/">@L["Back to Home"]</a></p>

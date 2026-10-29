@@ -166,7 +166,7 @@ public sealed class OidcSignInTests
 
         var register = await browser.GetAsync("/Contracts");
         Assert.Equal(HttpStatusCode.OK, register.StatusCode);                  // Legal (from the group mapping) reads contracts
-        var home = await browser.GetStringAsync("/");
+        var home = await browser.GetStringAsync("/Access");
         Assert.Contains("Olive Oidc", home);
         Assert.Contains("Legal", home);
     }

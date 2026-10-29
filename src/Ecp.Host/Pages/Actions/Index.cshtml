@@ -1,0 +1,31 @@
+@page "/Actions"
+@model Ecp.Host.Pages.Actions.IndexModel
+@{ ViewData["Title"] = L["My Actions"].Value; }
+<h1>@L["My Actions"]</h1>
+<p class="lede">@L["Everything waiting on you, in one place."]</p>
+<section class="card" aria-labelledby="await-h">
+    <h2 id="await-h">@L["Awaiting my action"] @if (Model.AwaitingMe is { } a) { <span class="badge @(a.Count > 0 ? "warn" : "")">@a.Count</span> }</h2>
+    @if (Model.AwaitingMe is { } card && card.Rows.Count > 0)
+    {
+        <partial name="_DashboardRows" model="card.Rows" />
+        @if (card.Count > card.Rows.Count) { <p><a href="/Dashboards?card=@card.Key">@L["Show all"] (@card.Count)</a></p> }
+    }
+    else
+    {
+        <p class="hint">@L["Nothing is waiting on you. New work appears here and in your notifications."]</p>
+    }
+</section>
+@if (Model.Queues.Count > 0)
+{
+    <h2>@L["Your queues"]</h2>
+    <div class="grid">
+    @foreach (var q in Model.Queues)
+    {
+        <section class="card" aria-labelledby="queue-@q.Key">
+            <h3 id="queue-@q.Key">@q.Title @if (q.Count is { } n) { <span class="badge @(n > 0 ? "warn" : "")">@n</span> }</h3>
+            <p class="hint">@q.Description</p>
+            <p><a class="button secondary" href="@q.Href">@L["Open"] @q.Title.ToLowerInvariant()</a></p>
+        </section>
+    }
+    </div>
+}

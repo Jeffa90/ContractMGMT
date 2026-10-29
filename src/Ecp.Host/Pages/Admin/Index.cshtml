@@ -1,0 +1,33 @@
+@page "/Admin"
+@model Ecp.Host.Pages.Admin.IndexModel
+@{ ViewData["Title"] = L["Administration"].Value; }
+<h1>@L["Administration"]</h1>
+<p class="lede">@L["Everything you can set up and manage, grouped by what it is for. Everyday work is on the other pages in the main menu."]</p>
+<form method="get" class="search-row" role="search">
+    <div class="field"><label for="q">@L["Find a page"]</label><input id="q" name="q" type="search" value="@Model.Q" autocomplete="off" /></div>
+    <button type="submit">@L["Search"]</button>
+    @if (!string.IsNullOrWhiteSpace(Model.Q)) { <a class="button secondary" href="/Admin">@L["Clear"]</a> }
+</form>
+@if (Model.Cards.Count == 0)
+{
+    <p class="flash warn" role="status">@L["No administration page matches that. Clear the search to see everything you can use."]</p>
+}
+<div class="admin-grid">
+@foreach (var card in Model.Cards)
+{
+    <section class="card" aria-labelledby="admin-@card.Key">
+        <h2 id="admin-@card.Key">@card.Title</h2>
+        <p class="hint">@card.Description</p>
+        <ul class="plain">
+            @foreach (var link in card.Links)
+            {
+                <li><a href="@link.Href">@link.Title</a>@if (!string.IsNullOrEmpty(link.Description)) { <span class="hint"> &mdash; @link.Description</span> }</li>
+            }
+        </ul>
+    </section>
+}
+</div>
+@if (Model.Queues.Any(q => q.Key == "reviews"))
+{
+    <p class="hint">@L["Changes waiting for you to review are in"] <a href="/Actions">@L["My Actions"]</a>.</p>
+}

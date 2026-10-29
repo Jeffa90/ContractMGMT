@@ -278,13 +278,13 @@ public sealed class TerminologyUiTests
         var (tenant, blankOrg) = await TenantAsync(app, "Demo Facilities Organisation");
         using var proc = await app.SignInAsync(ProcAdmin, followRedirects: true);
         using var owner = await app.SignInAsync(CatOwner, followRedirects: true);
-        Assert.Contains("Procurement Administrator", await BodyAsync(proc, "/"));
-        Assert.Contains("Category Owner", await BodyAsync(owner, "/"));
+        Assert.Contains("Procurement Administrator", await BodyAsync(proc, "/Access"));
+        Assert.Contains("Category Owner", await BodyAsync(owner, "/Access"));
 
         // In a neutral organisation the same stable roles read as Contract Administrator and Contract Owner.
         var adminEmail = await UserInAsync(app, tenant, blankOrg, RoleCodes.ProcurementAdministrator, null, "Confidential");
         using var neutral = await app.SignInAsync(adminEmail, followRedirects: true);
-        var home = await BodyAsync(neutral, "/");
+        var home = await BodyAsync(neutral, "/Access");
         Assert.True(home.Contains("Contract Administrator"), Regex.Match(home, "Your access.{0,600}", RegexOptions.Singleline).Value);
         Assert.DoesNotContain("Procurement Administrator", home);
         // The label differs; the authority does not: this person reaches the same pages the procurement administrator does.
@@ -321,7 +321,7 @@ public sealed class TerminologyUiTests
         var home = await BodyAsync(client, "/");
         Assert.Contains(">Agreements<", home);                                                         // navigation: contracts are agreements here
         Assert.Contains(">Counterparties<", home);
-        Assert.Contains(">Portfolios<", home);
+        Assert.Contains("Portfolios", await BodyAsync(client, "/Reports"));                          // the Reports hub names them
         Assert.Contains("Agreement Hub", home);                                                        // the application name from the pack
         Assert.Contains("agreement ledger", home);
         Assert.DoesNotMatch(">Contracts<|>Suppliers<|>Categories<", home);

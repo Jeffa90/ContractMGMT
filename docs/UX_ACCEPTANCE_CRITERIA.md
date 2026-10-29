@@ -24,6 +24,7 @@ Test users: the target person is a Procurement Excellence Manager or Contract Ad
 | 10. "Access to this tenant" misleading | NAV-007 |
 | 11. "How do I set myself up to create a contract?" | HOME-003, BOOT-001, EFF-006, E2E-001 |
 | 12. Not task-oriented or self-explanatory | the usability criteria in section P, E2E-001 to E2E-004 |
+| Additional: an invited Test person can't be tried out without an identity provider | PRV-001 to PRV-018, DSI-001 to DSI-009, E2E-007, E2E-008 |
 
 ---
 
@@ -112,6 +113,43 @@ Test users: the target person is a Procurement Excellence Manager or Contract Ad
 | BOOT-007 | The action writes `access.test_bootstrap` plus the ordinary `role.granted` / `category.ownership_assigned` events with source `TestBootstrap`; the audit chain still verifies | Audit assertions; `verify-audit` |
 | BOOT-008 | **Remove Test-mode access** ends exactly the grants the action created and nothing else | Over HTTP |
 | BOOT-009 | The confirmation page says that one person still cannot approve their own submission and offers **Add a test colleague**; the colleague can approve and the original person cannot | Over HTTP: separation of duties holds |
+
+## G2. Preview as this user (PRV): Demo and Test only
+
+| ID | Criterion | Verify |
+|---|---|---|
+| PRV-001 | A person holding `users.manage` over the target's organisation sees **Preview as this user** on the People list, the person's page and the Effective Access page (and on the existing Users details page before the new People screens ship) | Over HTTP, role matrix |
+| PRV-002 | In Production the control is absent, the service refuses a start request, and a forged preview claim in a session is ignored and ended on the next request | Over HTTP and unit, Production configuration |
+| PRV-003 | **Given** a started preview, **then** every page, including error pages, shows a permanent banner "TEST MODE — Previewing as <display name>", the words "Read-only", the time remaining, and an **Exit user preview** button that is the first focusable control after the skip link | Over HTTP; accessibility test |
+| PRV-004 | Exit returns the person to their own session and to the person's page; the preview record is closed; the banner is gone | Over HTTP |
+| PRV-005 | In preview the navigation, Home cards, buttons and page access equal those of the target: the set of pages that return success for the preview session equals the set for a real session of the target, for every role in the matrix | Differential test: preview versus real demonstration sign-in |
+| PRV-006 | Preview uses the target's roles, scopes, category ownership, classification ceiling, approver groups and capability restrictions: a record above the target's ceiling is not found; a contract in a category the target does not own offers no edit; a capability switched off for the target's organisation hides its pages | Over HTTP with prepared data |
+| PRV-007 | Every preview start, end and refused write is audited (`preview.started`, `preview.ended`, `preview.write_refused`) with previewer, target, tenant, expiry and correlation id; denials during preview carry the previewer as actor with type Preview; the audit chain verifies | Audit assertions; `verify-audit` |
+| PRV-008 | Preview never modifies the target: the user row, external-identity link, status (an Invited person stays Invited), credentials, sign-in history and tokens are byte-for-byte unchanged | Database snapshot before and after |
+| PRV-009 | Preview is read-only: a POST, PUT, PATCH or DELETE (except Exit and sign-out) is refused with a friendly page, writes nothing, and is recorded; the unit of work rejects any non-audit write in a preview scope | Over HTTP; unit test of the write guard |
+| PRV-010 | GET handlers that write (mark as read, last viewed, counters) make no change during preview | Over HTTP, inventory test of every GET page for the preview session, then a database diff |
+| PRV-011 | **Isolation:** a previewer cannot start a preview of a person in another tenant (not found), of a person outside their organisations, or of a Disabled person; a preview shows nothing from another tenant or organisation | Isolation suite extended |
+| PRV-012 | **Containment:** a previewer cannot preview a person who holds any grant the previewer could not give (a System Administrator, a higher ceiling, privileged access when the previewer is not a Tenant Administrator, a wider scope); the refusal is explained in words | Role matrix, over HTTP |
+| PRV-013 | A person cannot preview themselves, cannot start a second preview inside one, and cannot preview during support or emergency elevation | Over HTTP |
+| PRV-014 | Starting a preview requires a recent sign-in; without it the person signs in again and returns | Over HTTP |
+| PRV-015 | A preview ends automatically at its limit, on sign-out, on a mode change, and when the previewer or the target is disabled or the previewer loses `users.manage`; the next request returns to the administrator's own session | Over HTTP with FakeClock |
+| PRV-016 | A preview of an Invited person works and does not activate them | Over HTTP |
+| PRV-017 | The banner and the refusal page remain usable at 200% zoom and 320 CSS pixels, and the banner is not hidden by the target's branding or capability settings | Responsive and accessibility tests |
+| PRV-018 | Preview cannot be used to satisfy a separation-of-duties or second-person rule: a submission made by the target cannot be approved or published through a preview | Over HTTP |
+
+## G3. Demonstration sign-in for synthetic people (DSI): Demo and Test only
+
+| ID | Criterion | Verify |
+|---|---|---|
+| DSI-001 | **Allow demonstration sign-in** appears in the Add person wizard and invite form only when the mode is Demo or Test **and** demonstration sign-in is enabled on the installation; otherwise it is hidden with a one-line reason | Over HTTP in Demo, Test, Test with demonstration sign-in off, and Production |
+| DSI-002 | **Given** the option ticked, **then** the person is created Active, linked to the demonstration provider, flagged Synthetic, and appears on the Demonstration sign-in page with their roles | Over HTTP |
+| DSI-003 | A synthetic person can sign in through the demonstration page and sees the access the wizard granted (their navigation and Effective Access agree) | Over HTTP end to end |
+| DSI-004 | Without the option the person is Invited, does not appear on the sign-in page, and the sign-in page's empty-state sentence explains how to try them (preview or the option) | Over HTTP |
+| DSI-005 | Production: no checkbox, the service refuses, and invitation is unchanged (`InviteAsync`, invite-only, linked at the first verified provider sign-in) | Over HTTP and unit, Production configuration; existing invitation tests pass unchanged |
+| DSI-006 | The audit trail records the creation (`user.created` with the persona source) and each grant (`role.granted`); no new secret or credential is created | Audit assertions |
+| DSI-007 | A Synthetic badge is visible in People and on the person's page; it never appears in Production | Over HTTP |
+| DSI-008 | Several synthetic people with different profiles can be created in sequence and each signs in without any provider configuration | Over HTTP |
+| DSI-009 | Switching an already-Invited person to demonstration sign-in (if offered) is confirmed first, and a later real first sign-in through a configured provider is tested for the outcome; until tested the control is not offered | Over HTTP; **Not Verified** until performed |
 
 ## H. Organisation onboarding (ONB)
 
@@ -221,6 +259,8 @@ Test users: the target person is a Procurement Excellence Manager or Contract Ad
 | **E2E-004** | Add a Reviewer, an Approval Authority and a Read Only person; each signs in | Each sees exactly the navigation and pages their profile allows, and the Effective Access page agrees with what they can open |
 | **E2E-005** | An existing installation upgraded from the previous release | All prior grants, owners, mappings and releases unchanged; old URLs resolve; People & Access shows prior grants as "Other access" |
 | **E2E-006** | Identity group mapping in a Production-like configuration with the demonstration provider standing in for SSO | A mapped group grants the described access at sign-in and removes it when membership ends; no individual setup was needed |
+| **E2E-007** | Fresh Test installation; the administrator invites a colleague, gives them the Reviewer profile and chooses **Preview as this user** | The banner "TEST MODE — Previewing as <name>" shows on every page; the colleague's navigation appears; a write attempt is refused with an explanation; **Exit user preview** returns to the administrator; the audit shows start, refusal and end; the colleague is still Invited |
+| **E2E-008** | Same installation; the administrator creates a synthetic Approval Authority with **Allow demonstration sign-in**, then a Contract Manager the same way | Both appear on the Demonstration sign-in page; the Contract Manager submits a contract; the Approval Authority signs in and approves it; the Contract Manager cannot approve their own submission; no identity provider was configured |
 
 ---
 

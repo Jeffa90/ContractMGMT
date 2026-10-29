@@ -2,7 +2,7 @@
 
 Status: **Proposed design. Nothing in this document is implemented.** Branch ux/guided-administration, opened from claude/stoic-volta-dvszm5 at commit `5cdf9f7`. No application code, permission code, role code or schema has been changed. Production approval is external governance and nothing here declares it.
 
-Evidence base: the first manual localhost usability test (owner finding, 2026-10-29, twelve observations) and a read of the code on this branch. Where this document says "the code does X", the file is named so it can be checked. Where something could not be confirmed it is labelled **Not Verified** or listed as a gap in section 16. Acceptance criteria are in `docs/UX_ACCEPTANCE_CRITERIA.md`.
+Evidence base: the first manual localhost usability test (owner finding, 2026-10-29, twelve observations, plus one additional finding on testing as another user, section 7A) and a read of the code on this branch. Where this document says "the code does X", the file is named so it can be checked. Where something could not be confirmed it is labelled **Not Verified** or listed as a gap in section 16. Acceptance criteria are in `docs/UX_ACCEPTANCE_CRITERIA.md`.
 
 Labels used: **Reused** (exists, used as is), **Wrapped** (exists, new UI calls it), **New (UI)** (new pages or components over existing services), **New (backend)** (a genuine service gap, additive only), **Moved** (same page, new place), **Future**.
 
@@ -15,7 +15,8 @@ Labels used: **Reused** (exists, used as is), **Wrapped** (exists, new UI calls 
 3. **People & Access replaces four screens as the normal path** (Users and roles, Category owners, Viewer scopes, Identity group mappings). Those screens remain, under **Advanced**.
 4. **A first administrator ends setup able to do the job.** Setup asks what the administrator will do and grants the matching existing roles; in Demo and Test a single audited action gives a one-person trial full access; Production requires explicit selection.
 5. **Onboarding stops saying "Ready to publish" while required access is missing.** Readiness is computed from facts (who holds which role, which categories have owners), and the solution pack decides which items are required.
-6. **Most of this is a UX layer.** Seven narrow, additive backend items are genuinely needed (section 16). One is a security defect to fix before any new screen exposes it (identity group mappings are not authorised in the service).
+6. **An administrator can test what a person will experience without an identity provider (Demo and Test only):** a read-only, audited **Preview as this user**, and an **Allow demonstration sign-in** option for synthetic test people (sections 7A and 7B). Production invitation is unchanged.
+7. **Most of this is a UX layer.** Eleven narrow, additive backend items are genuinely needed (section 16). One is a security defect to fix before any new screen exposes it (identity group mappings are not authorised in the service).
 
 ---
 
@@ -50,6 +51,7 @@ Labels used: **Reused** (exists, used as is), **Wrapped** (exists, new UI calls 
 | F-6 | The set-up checklist always has 12 fixed items; the pack changes the state of the "Pack" item only. It does not read role holders, owners or viewers | `OrganisationCreation.cs:302-370` |
 | F-7 | Some counts in the documents differ from the matrix (82 or 87 permissions quoted, 94 in the file) | `requirements/02-reference/permission-catalogue.csv` |
 | F-8 | `_OnboardingBlocked.cshtml` says Business Configuration Administrators also hold onboarding rights; the matrix lists Tenant and Organisation Administrator only. **Not Verified** which is right | `src/Ecp.Host/Pages/Onboarding/_OnboardingBlocked.cshtml`; matrix line 51 |
+| F-10 | **An invited person cannot be tried out.** The demonstration sign-in page lists only users whose status is Active (`DemoIdentityService.ListAsync`), and a person stays Invited until a first verified sign-in. A Test administrator who invites a colleague and grants a role therefore cannot sign in as them, or see what they would see, without configuring a real identity provider. Observed in the second manual test | `src/Ecp.Host/Security/DemoIdentity.cs:ListAsync` |
 | F-9 | Cosmetic: a naive plural on the onboarding checklist ("3 categorys") | `Onboarding/Index.cshtml.cs:27-28` |
 
 ### 1.3 Top ten usability problems (ranked by harm to the target user)
@@ -64,6 +66,8 @@ Labels used: **Reused** (exists, used as is), **Wrapped** (exists, new UI calls 
 8. Home shows the role table, not the work; the useful cards are on another page.
 9. "Access to this tenant" is a misleading name for a support-access log.
 10. No screen answers "what can this person actually do, and why?".
+
+Additional (second test): an administrator has no way to experience a new person's access in Test without configuring an identity provider (F-10); this is addressed in sections 7A and 7B.
 
 ---
 
@@ -280,9 +284,10 @@ Route: `Administration > People & Access > People > Add person` (and **Change ac
 |---|---|
 | Name | Required, 200 characters (existing limit) |
 | Email | Required, 254 characters. If the person already exists the wizard says "Jeff Judd already has an account. Change their access instead?" and continues in edit mode |
-| Identity status | Read-only text: "Invited. They become active at their first sign-in" or "Active" (Demo and Test demonstration sign-in: "Active now") |
+| Identity status | Read-only text: "Invited. They become active at their first sign-in" or "Active" |
+| **Allow demonstration sign-in** (Demo and Test only; hidden in Production) | Unticked by default. Ticked: the person is created as a **synthetic test person**, active at once, and appears on the Demonstration sign-in page (section 7B). Hidden, with a one-line reason, when demonstration sign-in is switched off on this installation |
 
-Calls `IUserAdministration.InviteAsync` only on Save, not at this step.
+Calls `IUserAdministration.InviteAsync` only on Save, not at this step. With **Allow demonstration sign-in** ticked the Demo/Test application service in section 7B is used instead; Production always uses `InviteAsync`.
 
 ### Step 2: What will this person do?
 
@@ -388,6 +393,106 @@ A button on the person's own page and on the Home "Set up my access" card.
 ### 7.4 Production: guided explicit selection
 
 In Production the administrator uses the People wizard (section 6) for others and, for themselves, asks another administrator, or uses the setup-time step above. The Home card explains: "Someone else must give you the Contract Manager profile. Administrators can't give themselves access." and names the people who can.
+
+---
+
+## 7A. Test and Demo user preview ("Preview as this user")
+
+### 7A.1 Why
+
+In Test a person who is merely **Invited** cannot sign in with the demonstration identity (it lists Active people only, F-10), so an administrator cannot see the result of the access they just gave. Real identity-provider configuration is the wrong price for a trial. Preview lets an authorised administrator **see the application as that person would**, using that person's real effective access, without touching the person's identity.
+
+### 7A.2 What the administrator does
+
+1. From **People**, the person's page, or their Effective Access page, choose **Preview as this user**. (Before the new People screens exist, the same action is on the existing `/Admin/Users/Details` page.)
+2. A short confirmation explains: "You will see the application as Jeff Judd sees it. Preview is read-only. Nothing you do changes Jeff's account." Sign in again if the recent-sign-in window has passed.
+3. The application opens at Home **as that person**: their navigation, their cards, their buttons. A **permanent banner** runs across the top of every page, including error pages:
+
+```
+TEST MODE — Previewing as Jeff Judd      Read-only · ends in 28 min        [ Exit user preview ]
+```
+
+4. **Exit user preview** (a button, keyboard reachable, always the first control after the skip link) returns to the administrator's own session and to the person's page.
+
+### 7A.3 Who may preview whom (all rules enforced in the service, not the UI)
+
+| # | Rule | Reason |
+|---|---|---|
+| 1 | The host mode is **Demo or Test** (`HostModeAccessor`). In Production the service refuses, the middleware ignores the claim, and no control is rendered | Requirement 7; defence in depth |
+| 2 | The previewer holds `users.manage` over an organisation of the target, as `IPeopleDirectory.GetManageableUserAsync` already tests | No new permission code; same population that manages the person |
+| 3 | The previewer has signed in recently | Step-up, as for other sensitive actions |
+| 4 | The target is in the **same tenant** and is Active or Invited (not Disabled), is not the previewer, and holds no installation-scope role (System Administrator is never previewable) | Requirement 8; a preview cannot cross a tenant |
+| 5 | **Containment: every active grant of the target could have been granted by the previewer** under the existing delegation policy (role grantable, scope contained in the previewer's scope, ceiling below the high threshold unless the previewer is a Tenant Administrator, privileged access only for a Tenant Administrator) | "You can preview only what you could give." A preview must not let someone see more than they could grant, so it cannot be used to read records above the previewer's own authority |
+| 6 | No preview during support or emergency elevation, and no preview inside a preview | Keeps the two mechanisms separate and the actor unambiguous |
+
+A refusal is explained in words, for example: "Priya has access you aren't allowed to give (Legal Privileged records). Ask a Tenant Administrator to preview her."
+
+### 7A.4 How it works (a pattern the platform already has)
+
+Support and emergency access already put a claim in the signed session and **re-validate it against the database on every request** (`EcpClaims.ElevationId`, `SessionMiddleware`). Preview follows that pattern:
+
+* A small record, **PreviewSession** (an additive table: id, tenant, previewer, target, started, expires, ended, ended-reason, count of refused writes, correlation id), is created at start.
+* The session carries `ecp:preview = <id>`. On every request the middleware checks that the mode is not Production, the record is open and not expired, the previewer is still active and still holds `users.manage`, and the target is not Disabled. Any failure ends the preview and returns the person to their own session.
+* While valid: `CurrentUser` is the **target**, so the access evaluator, capability restrictions, notifications, dashboards and navigation are exactly what the target would get, with no special-casing and no new evaluator rule. `ActorContext` records `Type = Preview` and `ActorId = <previewer>` (a new string value of `ActorType`, additive: the audit column is a string, and the hash chain is unaffected).
+* The tenant is the previewer's tenant, unchanged, so all existing tenant filters and row-level security still apply.
+* The target's **identity and credentials are never read or written**: no sign-in is recorded, no external-identity link, no status change, no token. An Invited person stays Invited.
+
+### 7A.5 Read-only
+
+Preview shows the experience; it does not act. Three layers enforce it:
+
+1. **Request layer:** any request other than GET/HEAD, except Exit preview and sign-out, is refused with a friendly page ("Preview is read-only. To act as Jeff, use demonstration sign-in") and recorded.
+2. **Unit-of-work layer (defence in depth):** in a preview scope the unit of work may write **audit rows only**; any other change throws. This also covers handlers that write on a read (for example "mark as read" or "last viewed").
+3. **Review of reads with side effects:** the implementation must inventory GET handlers that write (gap UXG-20) and make them side-effect-free in preview.
+
+Because it is read-only, preview cannot be used to satisfy a second-person rule or to approve or publish one's own work; separation of duties is unaffected. Acting as another person is **not** offered (Q-10); for that, section 7B gives a synthetic person who signs in normally.
+
+### 7A.6 Audit (every session)
+
+| Event | When | Recorded |
+|---|---|---|
+| `preview.started` | Start | previewer, target, tenant, organisations, expiry, correlation id |
+| `preview.write_refused` | Each refused write | method and route pattern only (no body, no values), preview id |
+| `preview.ended` | Exit, expiry, sign-out, mode change, or either person becoming disabled | duration, end reason, count of refused writes |
+
+All three are new audit actions, added to the frozen list. Authorisation denials during preview carry `ActorType = Preview` with the previewer's id, so the audit browser can show "Admin Name (previewing Jeff Judd)". The Security & Audit page gains a "Previews" filter. The target is not notified; their own sign-in history is untouched.
+
+### 7A.7 Limits to state on the screen
+
+* The preview shows the target's own notifications and saved views, read-only and without marking anything read. This is acceptable only because Demo and Test hold synthetic data.
+* Preview is not an authorisation test of the platform's secrets or identity provider; real sign-in through a provider stays **Not Verified** until performed.
+* Maximum 30 minutes by default (configurable up to 60); "Extend" requires a fresh sign-in.
+
+---
+
+## 7B. Demonstration sign-in for synthetic test people
+
+### 7B.1 The option
+
+In Demo and Test, the Add person wizard (step 1) and the existing invite form offer **Allow demonstration sign-in**. When ticked:
+
+* The person is created as a **synthetic test person**: active immediately, linked to the demonstration provider, listed on the Demonstration sign-in page with their roles, and carrying a visible **Synthetic** badge in People and in the banner of environment pages.
+* The wizard then grants access exactly as for any person (profiles, scopes, ownership, ceiling).
+* The confirmation says: "Jeff Test can now be chosen on the sign-in page under Demonstration sign-in. Use **Preview as this user** to look without signing out."
+
+This lets a test administrator create several personas (a Reviewer, an Approval Authority, a Read Only user) and switch between them without any Entra ID or other provider.
+
+### 7B.2 Rules
+
+| Rule | Detail |
+|---|---|
+| Availability | Only when the host mode is Demo or Test **and** demonstration sign-in is enabled on this installation (`DemoIdentityService.IsEnabled`). Otherwise the checkbox is hidden and the page says why, and offers Preview |
+| Service | A Demo/Test application service calling the existing trusted creation (`IUserService.CreateActiveTrustedAsync(displayName, email, "demo", DemoIdentityService.Issuer, ...)`) with a source naming the test persona. It refuses in Production at the service |
+| Permission | `users.manage` over the organisation, as for any invitation |
+| Existing invited person | A person already **Invited** can be switched on with a confirmation ("Jeff will no longer wait for a first sign-in through your identity provider"). Its interaction with a later real first sign-in is **Not Verified** and must be tested before this ships (UXG-18). Until then the control is offered at creation only |
+| Audit | The existing `user.created` event with the persona source; the grants the existing `role.granted` events |
+| Sign-in list hint | The Demonstration sign-in page gains an empty-state sentence: "Missing someone? People who are only invited don't appear here. Ask an administrator to allow demonstration sign-in for them, or to preview as them" |
+
+### 7B.3 Production is unchanged
+
+Production invitation remains `IUserAdministration.InviteAsync`: invite-only, linked at the first verified sign-in through the configured identity provider. The checkbox, the service path and the Preview controls do not exist in Production, and requests to them are refused.
+
+---
 
 ---
 
@@ -660,7 +765,9 @@ Targets: WCAG 2.2 AA, plus the project's accessibility and localisation requirem
 | `IOnboardingService`, applier, validator, review page | Onboarding drafts, validation, publish and rollback |
 | `IConfigurationReleases` and the configuration lifecycle | Draft, validate, preview, publish, history, rollback, audit for any new configuration kind |
 | `HostModeAccessor`, `EcpMode` | Demo/Test/Production gating of the bootstrap |
-| `ReauthenticationContext` | Step-up for access changes |
+| `ReauthenticationContext` | Step-up for access changes and for starting a preview |
+| `SessionMiddleware`, `EcpClaims.ElevationId` pattern, `ActorContext` | The preview claim, per-request re-validation and actor recording |
+| `IUserService.CreateActiveTrustedAsync`, `DemoIdentityService` | Synthetic test people who can sign in with the demonstration identity |
 | Terminology and `TermSet.IsRoleOffered` | Labels; hiding roles a capability does not use |
 | `tools/check-docs.py`, rendered-page sweep, `Accessibility` test helper | Guide and page guards |
 
@@ -687,6 +794,10 @@ None changes the security model. "Blocks" says which part of the UX cannot ship 
 | **UXG-13** | No in-place edit of a role assignment or a mapping (revoke and re-grant) | Edit flows produce two audit events | Cosmetic; explained on screen |
 | **UXG-14** | No plain-English ability catalogue for the 94 permissions | Sections 6 and 11 | Review step, Effective Access |
 | **UXG-15** | Documents quote 82 or 87 permissions; the matrix has 94 | Truthfulness | Documentation fix |
+| **UXG-17** | No preview mechanism: no preview session record, claim, per-request validation, read-only enforcement or unit-of-work write guard; `ActorType` has no `Preview`; three new audit actions | Section 7A | Preview |
+| **UXG-18** | No Demo/Test application service that creates a synthetic person who can use the demonstration sign-in (the trusted creation exists but is used only by setup and the seeder); behaviour of switching an already-Invited person to demonstration sign-in, and its interaction with a later real first sign-in, is **Not Verified** | Section 7B | Demonstration sign-in option |
+| **UXG-19** | The containment rule for preview ("every grant could have been granted by the previewer") has no reusable service; the delegation checks exist inside the grant path only | Section 7A.3 rule 5 | Preview eligibility |
+| **UXG-20** | GET handlers that write (mark as read, last viewed, usage counters) are not inventoried; the unit of work has no read-only scope | Section 7A.5 | Preview read-only guarantee |
 | **UXG-16** | **Not Verified:** who holds onboarding rights (`_OnboardingBlocked.cshtml` vs matrix) | Section 8 | Documentation or text fix |
 
 ---
@@ -704,6 +815,10 @@ None changes the security model. "Blocks" says which part of the UX cannot ship 
 | Q-7 | Should "own all categories" mean all **current** categories, or a standing rule that covers future ones? | Current categories plus a Needs-attention reminder; a standing rule would be a new ownership concept and is Future |
 | Q-8 | Is the one-person Test bootstrap allowed in **Demo** as well as Test? | Yes (both are non-production); Production never |
 | Q-9 | Navigation label for `/Admin/Elevations` | "Support & emergency access log" |
+| Q-10 | Should preview ever allow **acting** as the person (writes attributed to the administrator "as" the person)? | No. It would let one human satisfy both sides of a separation-of-duties rule, which defeats the governance being rehearsed. Use synthetic people with demonstration sign-in to act |
+| Q-11 | Should **Allow demonstration sign-in** be ticked by default in Test? | Unticked in Test, ticked in Demo; remember the last choice per administrator |
+| Q-12 | Use `users.manage` for preview, or add a dedicated permission? | `users.manage` plus the containment rule; a new permission code would touch the frozen catalogue for no gain |
+| Q-13 | Preview time limit | 30 minutes, configurable up to 60 |
 
 ---
 
@@ -715,8 +830,8 @@ Each slice is a vertical, tested increment on this branch, behind a configuratio
 |---|---|---|---|
 | **S1 Navigation and Home** | Primary navigation, Administration disclosure menu and landing page, bell, renamed support-access log, Home cards from `IDashboardService`, Setup & administration card (using the existing checklist), "Set up my access" explanation (text only) | UXG-11 (or the interim rule), small layout and CSS work | 8, 9, 10 |
 | **S2 Access foundation** | Compiled default profile catalogue; ability catalogue (UXG-14); effective-access report (UXG-02); application service (UXG-01); profile-application table (5.6) | The additive table and manifest regeneration | 7, 11 (backend) |
-| **S3 Bootstrap** | Setup step "What will you do?"; Test/Demo "Give me full access" (UXG-03); Add a test colleague; audit; Production guard | S2 | 2, 3, 11 |
-| **S4 People & Access** | People list, Add/Edit wizard, Effective Access page, My access; Advanced grants moved | S2, step-up | 7, 11, 12 |
+| **S3 Bootstrap and test personas** | Setup step "What will you do?"; Test/Demo "Give me full access" (UXG-03); Add a test colleague; **Allow demonstration sign-in** for new synthetic people (UXG-18); **Preview as this user** (UXG-17, 19, 20) on the existing Users page first; audit; Production guards | S2 | 2, 3, 11, and the additional finding |
+| **S4 People & Access** | People list, Add/Edit wizard, Effective Access page, My access; Advanced grants moved; Preview and demonstration sign-in re-homed into People | S2, step-up | 7, 11, 12 |
 | **S5 Category ownership** | Ownership editor, primary/backup, dates, bulk, "assign all"; prerequisite-role prompt | UXG-04 | 5 |
 | **S6 Onboarding readiness** | Readiness service, states, pack-defined requirements, Publish blocked while Required items open, structure editor (UXG-08) | UXG-06, UXG-08 | 4 |
 | **S7 Identity group mappings** | Authorise the service (UXG-05) with tests first; guided Advanced screen | UXG-05 | 6 |
@@ -740,6 +855,10 @@ Every slice finishes with: Release build with warnings as errors, unit/architect
 | Required-item rules differ by pack and cause confusion | Admin cannot publish and does not know why | Publish disabled with a list of exactly which items; pack requirements shown in the checklist |
 | Scope creep into reporting, document search or a new role system | Delay | Section 4.4 and 16 label them; out of scope for this branch |
 | New table requires a manifest regeneration and upgrade rehearsal | Release process | One migration only, covered by the existing N-1 to N rehearsal |
+| Preview is used to read more than the previewer may see | Privilege leak | Containment rule (7A.3 rule 5), tenant and organisation scope unchanged, Demo/Test only; tests for each role and for a target with higher authority |
+| Preview leaks into Production by configuration | Impersonation in Production | Mode checked in the service **and** in the middleware on every request; tests in Production configuration |
+| A GET handler writes during preview | The target's data changes | Request-layer refusal, unit-of-work write guard, inventory of GET side effects (UXG-20) |
+| Preview mistaken for signing in as the person | Wrong expectation about what the person can do | Permanent banner, read-only message, link to demonstration sign-in |
 | One-person trials still cannot approve their own submissions | "It still doesn't work" feedback | State it on the confirmation page; offer the test colleague |
 | Navigation change surprises existing users and guides | Support load | Routes unchanged; banners; switch per slice; guides updated with each slice |
 | Rework of 31 nav items touches every page's chrome | Regressions | Navigation built from one declarative list in one place; rendered-page tests assert every old URL still resolves for the role that had it |
@@ -757,7 +876,8 @@ Home                                   Contracts ─ Create / Details / Edit / L
 Administration (/Admin)
  ├ People & Access ─ People ─ Add person (7 steps) ─ Person ─ Effective access ─ Change access
  │                   Access profiles (read-only list; editor in S8)       Approval authorities ─ Approver groups
- │                   Advanced ─ Role grants · Identity group mappings · Access simulator
+ │                   Person ─ Preview as this user (Demo/Test, read-only) · Allow demonstration sign-in (Demo/Test)
+                   Advanced ─ Role grants · Identity group mappings · Access simulator
  ├ Organisation ─ Organisations · Set-up checklist (13 items) · Structure · Regional settings · Branding
  ├ Contracts & Metadata ─ Categories & owners · Contract types · Terminology · Capabilities · Studio · Data migration
  ├ Workflows & Approvals ─ Workflow · Approval matrix · Approver groups · Configuration reviews

@@ -124,6 +124,19 @@ public interface IConfigurationService
     Task DiscardDraftAsync(Guid draftId, CancellationToken ct = default);
 }
 
+/// <summary>
+/// A release that exists only in memory. The first time an organisation needs a reference document (a workflow, a notification policy) the platform installs it; a read-only preview must not
+/// write, so it uses the same document, unsaved. The identifier comes from the content, so repeated reads share one parsed copy.
+/// </summary>
+public static class UnsavedRelease
+{
+    public static ReleaseDto Of(string kind, Guid organisationId, string contentJson, string note)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(kind + "|" + organisationId + "|" + contentJson));
+        return new ReleaseDto(new Guid(hash.AsSpan(0, 16)), organisationId, kind, 0, contentJson, Convert.ToHexString(hash), null, note, "preview", DateTime.UnixEpoch, GovernanceMode: "unsaved");
+    }
+}
+
 /// <summary>Trusted lifecycle for installation, setup and tests: the same validation and versioning, with no signed-in user.</summary>
 public interface IConfigurationBootstrap
 {

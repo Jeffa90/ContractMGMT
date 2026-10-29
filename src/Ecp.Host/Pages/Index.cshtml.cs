@@ -55,7 +55,7 @@ public sealed class IndexModel(IAccessService access, IDashboardService dashboar
     }
 
     /// <summary>
-    /// A person can start a contract only where the role they hold lets them. A Procurement Administrator may in any category; a Category Owner only in a category they currently own
+    /// A person can start a contract only where the role they hold lets them. A person who administers contracts may do so in any category; a person who owns categories only in a category they currently own
     /// (the access service reports that as a relationship, not a permission). The page asks, so the button appears only when starting one can work.
     /// </summary>
     private async Task<(bool Can, CreateBlock Why)> CanCreateAsync(Guid me, CancellationToken ct)

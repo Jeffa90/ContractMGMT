@@ -555,7 +555,7 @@ internal sealed class ProviderRegistry(IdentityDbContext db, IUnitOfWork uow, IA
 
 internal sealed class AccessService(
     IdentityDbContext db, IUnitOfWork uow, IAuditWriter audit, IClock clock, CurrentUser currentUser, IClassificationScaleProvider scales, AccessEvaluator evaluator,
-    ElevationContext elevation) : IAccessService
+    ElevationContext elevation, PreviewContext preview) : IAccessService
 {
     private AccessSubject? _subject;
     private bool _loaded;
@@ -579,7 +579,9 @@ internal sealed class AccessService(
         if (user is not null)
         {
             var rows = await db.RoleAssignments.AsNoTracking().Where(a => a.UserId == id).ToListAsync(ct);
-            _subject = new AccessSubject(user.Id, user.TenantId, user.Status, rows.Select(ToView).ToList());
+            // While an administrator previews an invited person, the person is shown as they will be once active: their real grants are evaluated, and nothing about the account changes.
+            var status = preview.Active && preview.TargetUserId == id && user.Status == UserStatus.Invited ? UserStatus.Active : user.Status;
+            _subject = new AccessSubject(user.Id, user.TenantId, status, rows.Select(ToView).ToList());
         }
         _loaded = true;
         return _subject;

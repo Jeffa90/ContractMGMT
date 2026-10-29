@@ -342,3 +342,10 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - Company rehearsal enablement (ADR-0038): `decisions/ADR-0038-company-rehearsal-enablement.md`, `docs/REVERSE_PROXY.md`, `docs/WINDOWS_LAPTOP_QUICKSTART.md`, `docs/UX_REDESIGN.md`, `docs/UX_ACCEPTANCE_CRITERIA.md`, `docs/doc-consistency.json`, `src/Ecp.PackTool/README.md`, `tools/check-docs.py`, `tools/tests/test_check_docs.py`
 - `docs/INSTALLATION_GUIDE.md`, `docs/SETUP_WIZARD_GUIDE.md`, `docs/ORGANISATION_ONBOARDING_GUIDE.md`, `docs/BUSINESS_ADMIN_GUIDE.md`, `docs/PACK_IMPLEMENTATION_GUIDE.md`, `docs/MIGRATION_EXECUTION_GUIDE.md`, `docs/UAT_AND_CUTOVER_GUIDE.md`, `docs/OPERATIONS_QUICK_GUIDE.md`, `docs/DOCUMENT_SCANNING.md`
 - `src/Modules/Ecp.Approvals/Definitions/MatrixFormSchema.cs`, `src/Modules/Ecp.Lifecycle/ApproverGroupUsage.cs`, `src/Modules/Ecp.Lifecycle/Definitions/WorkflowFormInsights.cs`, `src/Modules/Ecp.Lifecycle/Definitions/WorkflowFormSchema.cs`, `src/Modules/Ecp.Notifications/Policy/NotificationPolicyFormInsight.cs`, `src/Modules/Ecp.Notifications/Policy/NotificationPolicyFormSchema.cs`
+
+## Guided administration (UX redesign slices, branch ux/guided-administration)
+
+- `decisions/ADR-0039-guided-administration-access-profiles.md`
+- `src/Modules/Ecp.Access/` (new module, tier 8: access profiles, effective access, People & Access services, administrator bootstrap, category ownership, Test/Demo preview and synthetic test people; with `packages.lock.json`, `abilities.csv` and its EF migrations)
+- `src/Ecp.Host/Navigation/`, `src/Ecp.Host/Pages/Admin/People/`, `src/Ecp.Host/Pages/Access/`, `src/Ecp.Host/Pages/Account/ExitPreview.cshtml`
+- `tests/Ecp.Api.Tests/NavigationAndHomeTests.cs`, `tests/Ecp.Api.Tests/MyAccessUiTests.cs`, `tests/Ecp.Api.Tests/PeopleAccessUiTests.cs`, `tests/Ecp.Api.Tests/BootstrapAndOwnershipUiTests.cs`, `tests/Ecp.Integration.Tests/AccessProfileScenarios.cs`, `tests/Ecp.Integration.Tests/AccessProfileScenarioTests.cs`

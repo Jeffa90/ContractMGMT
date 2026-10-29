@@ -17,6 +17,7 @@ public static class PersistenceServiceCollectionExtensions
         services.TryAddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
         services.TryAddScoped<ActorContext>();
         services.TryAddScoped<ReauthenticationContext>();
+        services.TryAddScoped<PreviewContext>();
         services.TryAddScoped<IActorContext>(sp => sp.GetRequiredService<ActorContext>());
         services.TryAddScoped<IScopedConnection, ScopedConnection>();
         services.TryAddScoped<DbContextServices>();

@@ -17,6 +17,8 @@ public static class EcpClaims
     /// <summary>The support or emergency elevation this session is working under, and the tenant it targets. Re-validated against the database on every request.</summary>
     public const string ElevationId = "ecp:elev";
     public const string ElevationTenantId = "ecp:elev_tid";
+    /// <summary>The Test/Demo preview this session is showing. Names a database row that is re-validated on every request; the claim alone grants nothing.</summary>
+    public const string PreviewId = "ecp:preview";
 }
 
 public static class EcpSchemes
@@ -76,6 +78,21 @@ public sealed class SessionIssuer(IClock clock)
         await context.SignInAsync(EcpSchemes.Session, new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = false, AllowRefresh = true });
     }
 
+    public async Task BeginPreviewAsync(HttpContext context, Guid previewId)
+    {
+        var identity = new ClaimsIdentity(context.User.Claims.Where(c => c.Type != EcpClaims.PreviewId), EcpSchemes.Session, ClaimTypes.Name, ClaimTypes.Role);
+        identity.AddClaim(new Claim(EcpClaims.PreviewId, previewId.ToString()));
+        await context.SignInAsync(EcpSchemes.Session, new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = false, AllowRefresh = true });
+    }
+
+    public async Task EndPreviewAsync(HttpContext context)
+    {
+        var identity = new ClaimsIdentity(context.User.Claims.Where(c => c.Type != EcpClaims.PreviewId), EcpSchemes.Session, ClaimTypes.Name, ClaimTypes.Role);
+        await context.SignInAsync(EcpSchemes.Session, new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = false, AllowRefresh = true });
+    }
+
+    public static Guid? IdentifyPreview(ClaimsPrincipal user) => Guid.TryParse(user.FindFirstValue(EcpClaims.PreviewId), out var p) ? p : null;
+
     public static (Guid ElevationId, Guid TenantId)? IdentifyElevation(ClaimsPrincipal user)
         => Guid.TryParse(user.FindFirstValue(EcpClaims.ElevationId), out var e) && Guid.TryParse(user.FindFirstValue(EcpClaims.ElevationTenantId), out var t) ? (e, t) : null;
 
@@ -93,7 +110,7 @@ public sealed class SessionIssuer(IClock clock)
 public sealed class SessionMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, TenantContext tenant, CurrentUser current, ActorContext actor, IUserService users, ITenantDirectory directory,
-        ReauthenticationContext reauth, ElevationContext elevationContext, IElevationService elevations, SessionIssuer sessions)
+        ReauthenticationContext reauth, ElevationContext elevationContext, IElevationService elevations, SessionIssuer sessions, Ecp.Access.IPreviewService previews, PreviewContext previewContext)
     {
         if (context.User.Identity?.IsAuthenticated == true && SessionIssuer.Identify(context.User) is { } who)
         {
@@ -125,6 +142,28 @@ public sealed class SessionMiddleware(RequestDelegate next)
                             }
                             await sessions.EndElevationAsync(context); // expired, ended or revoked: the session returns to the person's own tenant
                         }
+                        // Test/Demo preview: the session names a preview row that is checked again, in full, on every request. While it holds, the request runs as the previewed person's own access and cannot change anything.
+                        if (SessionIssuer.IdentifyPreview(context.User) is { } previewId)
+                        {
+                            var preview = who.TenantId == SystemTenant.Id || !previews.Available ? null : await previews.ResolveAsync(previewId, who.UserId, context.RequestAborted);
+                            if (preview is not null)
+                            {
+                                previewContext.Activate(preview.PreviewId, preview.PreviewerUserId, preview.TargetUserId, preview.TargetName, preview.ExpiresUtc);
+                                current.Set(preview.TargetUserId);
+                                actor.Type = ActorType.Preview; actor.ActorId = who.UserId.ToString();
+                                if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method) && !HttpMethods.IsOptions(context.Request.Method) && !PreviewAllowed(context.Request.Path))
+                                {
+                                    await previews.RecordRefusedWriteAsync(preview.PreviewId, context.Request.Method, context.Request.Path.Value ?? "/", context.RequestAborted);
+                                    await RefuseWriteAsync(context, preview.TargetName);
+                                    return;
+                                }
+                                await next(context);
+                                return;
+                            }
+                            // Over, expired, or no longer allowed (mode, authority, disabled): the session goes back to the person's own access.
+                            try { await previews.EndAsync(previewId, "Ended: no longer valid", context.RequestAborted); } catch (DomainException) { /* already ended */ }
+                            await sessions.EndPreviewAsync(context);
+                        }
                         current.Set(who.UserId);
                         actor.Type = ActorType.User; actor.ActorId = who.UserId.ToString();
                         await next(context);
@@ -138,5 +177,24 @@ public sealed class SessionMiddleware(RequestDelegate next)
             return;
         }
         await next(context);
+    }
+
+    /// <summary>The only requests a preview lets through besides reading: leaving the preview and signing out.</summary>
+    private static bool PreviewAllowed(PathString path) => path.StartsWithSegments("/Account/ExitPreview") || path.StartsWithSegments("/SignOut");
+
+    private static async Task RefuseWriteAsync(HttpContext context, string targetName)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.ContentType = "application/problem+json";
+            await context.Response.WriteAsync("{\"title\":\"Preview is read-only\",\"status\":403,\"detail\":\"Nothing was changed. Exit the preview to act.\"}");
+            return;
+        }
+        context.Response.ContentType = "text/html; charset=utf-8";
+        var name = System.Net.WebUtility.HtmlEncode(targetName);
+        await context.Response.WriteAsync("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Preview is read-only</title><link rel=\"stylesheet\" href=\"/css/site.css\"></head><body><main id=\"main\" class=\"card\">"
+            + "<h1>Preview is read-only</h1><p>Nothing was changed. You are previewing " + name + ", and a preview only shows what they can see. To act as " + name + ", use demonstration sign-in.</p>"
+            + "<p><a href=\"/\">Back to the preview</a>. Use <strong>Exit user preview</strong> in the banner when you are finished.</p></main></body></html>");
     }
 }

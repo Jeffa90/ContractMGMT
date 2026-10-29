@@ -1,3 +1,4 @@
+using Ecp.Access;
 using Ecp.Contracts;
 using Ecp.Identity;
 using Ecp.SharedKernel;
@@ -7,19 +8,29 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Admin;
 
-public sealed record CategoryRow(CategoryItem Category, string Indent);
-
-[Authorize(Policy = "perm:contracts.read")]
-public sealed class CategoriesModel(ISecuredCategoryService categories, IOrganisationStructureService organisations, IPeopleDirectory people,
-    IAccessService access) : EcpPageModel
+/// <summary>
+/// Categories and owners (docs/UX_REDESIGN.md section 9): one row per category with a primary and a backup owner chosen from everyone the administrator may manage, assign-all, bulk selection, search and
+/// a "needs an owner" filter. No CSV is needed (it stays under Bulk import). Choosing someone who lacks the owner role gives it to them in the same save. The services decide every permission.
+/// </summary>
+[Authorize(Policy = "perm:contracts.read|categories.manage|categories.assign")]
+public sealed class CategoriesModel(ISecuredCategoryService categories, ICategoryOwnership ownership, IOrganisationStructureService organisations, IAccessService access) : EcpPageModel
 {
-    public IReadOnlyList<CategoryRow> Rows { get; private set; } = [];
+    [BindProperty(SupportsGet = true)] public string? Q { get; set; }
+    [BindProperty(SupportsGet = true)] public bool Needs { get; set; }
+    [BindProperty] public Guid OrganisationId { get; set; }
+    [BindProperty] public Guid UserId { get; set; }
+    [BindProperty] public string Role { get; set; } = "primary";
+    [BindProperty] public List<Guid> CategoryIds { get; set; } = [];
+    [BindProperty] public string? Reason { get; set; }
+
+    public OwnershipBoard Board { get; private set; } = new([], 0, 0);
     public IReadOnlyList<OrganisationSummary> ManageOrganisations { get; private set; } = [];
     public bool CanManage { get; private set; }
     public bool CanAssign { get; private set; }
+    public OwnershipPlan? Plan { get; private set; }
+    public string? PlanAction { get; private set; }
     private Dictionary<Guid, string> _orgs = [];
-    private IReadOnlyDictionary<Guid, string> _users = new Dictionary<Guid, string>();
-    private readonly Dictionary<Guid, IReadOnlyList<PersonItem>> _candidates = [];
+    private readonly Dictionary<Guid, IReadOnlyList<OwnerChoice>> _people = [];
 
     public async Task<IActionResult> OnGetAsync(CancellationToken ct) { await LoadAsync(ct); return Page(); }
 
@@ -31,18 +42,37 @@ public sealed class CategoriesModel(ISecuredCategoryService categories, IOrganis
         return RedirectToPage();
     }, reload: () => LoadAsync(CancellationToken.None));
 
-    public Task<IActionResult> OnPostAssignAsync(Guid categoryId, Guid userId, CancellationToken ct) => RunAsync(async () =>
+    /// <summary>Shows what a change would do before it is made: how many categories, who is replaced, whether the person gains the owner role.</summary>
+    public Task<IActionResult> OnPostPlanAsync(CancellationToken ct) => RunAsync(async () =>
     {
-        await categories.AssignOwnerAsync(categoryId, userId, false, null, ct);
-        Flash("Owner assigned.");
-        return RedirectToPage();
-    });
+        await LoadAsync(ct);
+        Plan = await ownership.PlanAsync(OrganisationId, CategoryIds, UserId, Role == "primary", ct);
+        PlanAction = "SetOwner";
+        return Page();
+    }, reload: () => LoadAsync(ct));
+
+    public Task<IActionResult> OnPostPlanAllAsync(CancellationToken ct) => RunAsync(async () =>
+    {
+        await LoadAsync(ct);
+        var all = Board.Rows.Where(r => r.IsActive && r.OrganisationId == OrganisationId && (r.ParentId is null || Board.Rows.All(p => p.CategoryId != r.ParentId))).Select(r => r.CategoryId).ToList();
+        CategoryIds = all;
+        Plan = await ownership.PlanAsync(OrganisationId, all, UserId, Role == "primary", ct);
+        PlanAction = "SetOwner";
+        return Page();
+    }, reload: () => LoadAsync(ct));
+
+    public Task<IActionResult> OnPostSetOwnerAsync(CancellationToken ct) => StepUpRunAsync(async () =>
+    {
+        var outcome = await ownership.SetOwnerAsync(OrganisationId, CategoryIds, UserId, Role == "primary", Reason, ct);
+        Flash($"{outcome.Assigned} owner assignment(s) made" + (outcome.Replaced > 0 ? $", {outcome.Replaced} previous primary owner(s) replaced" : "") + (outcome.Skipped > 0 ? $", {outcome.Skipped} already as chosen" : "") + ". " + string.Join(" ", outcome.Notes));
+        return RedirectToPage(new { Q, Needs });
+    }, reload: () => LoadAsync(CancellationToken.None));
 
     public Task<IActionResult> OnPostEndAsync(Guid assignmentId, string? reason, CancellationToken ct) => RunAsync(async () =>
     {
-        await categories.EndOwnershipAsync(assignmentId, string.IsNullOrWhiteSpace(reason) ? "Ownership ended" : reason, ct);
-        Flash("Ownership ended.");
-        return RedirectToPage();
+        await ownership.EndAsync(assignmentId, string.IsNullOrWhiteSpace(reason) ? "Ownership ended" : reason, ct);
+        Flash("Ownership ended. That person can no longer edit in it.");
+        return RedirectToPage(new { Q, Needs });
     });
 
     public Task<IActionResult> OnPostDeactivateAsync(Guid categoryId, CancellationToken ct) => RunAsync(async () =>
@@ -54,33 +84,21 @@ public sealed class CategoriesModel(ISecuredCategoryService categories, IOrganis
 
     private async Task LoadAsync(CancellationToken ct)
     {
-        var all = await categories.ListAsync(ct);
+        Board = await ownership.BoardAsync(Q, Needs, ct);
         _orgs = (await organisations.ListOrganisationsAsync(ct)).ToDictionary(o => o.Id, o => o.Name);
         CanManage = await access.HoldsAnywhereAsync("categories.manage", ct);
         CanAssign = await access.HoldsAnywhereAsync("categories.assign", ct);
         var manageGrants = await access.GrantsAsync("categories.manage", ct);
         ManageOrganisations = _orgs.Where(o => manageGrants.Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(o.Key))).Select(o => new OrganisationSummary(o.Key, o.Value, "", "", "", "", null)).ToList();
-
-        var rows = new List<CategoryRow>();
-        void Add(CategoryItem c, int depth)
-        {
-            rows.Add(new CategoryRow(c, string.Concat(Enumerable.Repeat("- ", depth))));
-            foreach (var child in all.Where(x => x.ParentCategoryId == c.Id)) Add(child, depth + 1);
-        }
-        foreach (var root in all.Where(c => c.ParentCategoryId is null || all.All(p => p.Id != c.ParentCategoryId))) Add(root, 0);
-        Rows = rows;
-        _users = await people.DisplayNamesAsync(rows.SelectMany(r => r.Category.Owners.Select(o => o.UserId)), ct);
         if (CanAssign)
-            foreach (var orgId in rows.Select(r => r.Category.OrganisationId).Distinct())
+            foreach (var orgId in Board.Rows.Select(r => r.OrganisationId).Distinct())
             {
-                try { _candidates[orgId] = await people.OwnerCandidatesAsync(orgId, ct); }
-                catch (ForbiddenException) { _candidates[orgId] = []; } // an organisation outside the caller's assignment scope
+                try { _people[orgId] = await ownership.PeopleAsync(orgId, ct); }
+                catch (ForbiddenException) { _people[orgId] = []; }   // an organisation outside what the caller manages
             }
     }
 
     public string OrganisationName(Guid id) => _orgs.TryGetValue(id, out var n) ? n : "";
-    public string UserName(Guid id) => _users.TryGetValue(id, out var n) ? n : "Unknown user";
-
-    /// <summary>People who can own categories in an organisation: those holding an active CategoryOwner assignment that covers it.</summary>
-    public IEnumerable<PersonItem> OwnerCandidates(Guid organisationId) => _candidates.TryGetValue(organisationId, out var list) ? list : [];
+    public IReadOnlyList<OwnerChoice> People(Guid organisationId) => _people.TryGetValue(organisationId, out var list) ? list : [];
+    public IEnumerable<Guid> OrganisationsShown => Board.Rows.Select(r => r.OrganisationId).Distinct();
 }

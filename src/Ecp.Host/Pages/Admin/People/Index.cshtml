@@ -1,0 +1,43 @@
+@page "/Admin/People"
+@model Ecp.Host.Pages.Admin.People.IndexModel
+@using Ecp.Access
+@{ ViewData["Title"] = L["People & Access"].Value; }
+<h1>@L["People & Access"]</h1>
+<p class="lede">@L["Add people, say what each will do, and see exactly what that lets them do. You never need to know role names or codes."]</p>
+<p><a class="button" href="/Admin/People/Access">@L["Add a person"]</a>
+   <a href="/Admin/Users">@L["Advanced: users and roles"]</a></p>
+@if (Model.Rows.Count == 0)
+{
+    <p class="flash warn" role="status">@L["There is nobody here yet. Add the first person."]</p>
+}
+else
+{
+<div class="table-wrap">
+<table>
+    <caption class="visually-hidden">@L["People you can manage"]</caption>
+    <thead><tr><th scope="col">@L["Name"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Kind of access"]</th><th scope="col">@Terms.Expand("[[category|plural]] owned")</th><th scope="col">@L["Actions"]</th></tr></thead>
+    <tbody>
+    @foreach (var p in Model.Rows)
+    {
+        <tr>
+            <th scope="row"><a href="/Admin/People/Person/@p.Id">@p.DisplayName</a>
+                @if (p.IsTestPerson) { <span class="badge" title="@L["A synthetic test person who can sign in through demonstration sign-in"]">@L["Test person"]</span> }
+                <div class="hint">@p.Email</div></th>
+            <td>@(p.Status switch { UserStatusView.Active => L["Active"].Value, UserStatusView.Disabled => L["Disabled"].Value, _ => L["Invited"].Value })</td>
+            <td>
+                @if (p.Profiles.Count > 0) { @foreach (var b in p.Profiles) { <span class="badge">@Terms.Expand(b.Label)</span> } }
+                else if (p.Roles.Length > 0) { <span>@Terms.Expand(p.Roles)</span> }
+                else { <span class="hint">@L["No access yet"]</span> }
+            </td>
+            <td>@p.OwnedCategories</td>
+            <td><a href="/Admin/People/Access?Input.UserId=@p.Id&amp;Step=1">@L["Change access"]</a></td>
+        </tr>
+    }
+    </tbody>
+</table>
+</div>
+}
+@if (Model.DemonstrationSignIn)
+{
+    <p class="hint">@L["Test and demonstration installations only: tick “Allow demonstration sign-in” when adding a person to create a synthetic test person you can sign in as or preview, with no password or identity provider."]</p>
+}

@@ -38,6 +38,7 @@ else if (Model.HasAnyRole && Model.Blocked != CreateBlock.None)
         <p>
             @if (Model.CanManageUsers)
             {
+                <a class="button" href="/Access/Setup">@L["Set up my access"]</a>
                 <a class="button secondary" href="/Access">@L["See what my access allows"]</a>
                 <span class="hint">@L["Nobody can give themselves access. Another administrator can give you the access you need."]</span>
             }

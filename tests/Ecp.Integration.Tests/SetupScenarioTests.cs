@@ -29,6 +29,8 @@ public sealed class SetupScenarioTests_Sqlite
     [Fact] public Task Report_is_sanitised() => RunAsync(SetupScenarios.The_report_contains_no_secrets_tokens_references_or_personal_addresses);
     [Fact] public Task Readiness_gates_completion() => RunAsync(SetupScenarios.Readiness_blocks_completion_until_blocking_checks_pass_and_warnings_are_acknowledged);
     [Fact] public Task Production_refuses_demonstration_features() => RunAsync(SetupScenarios.Production_refuses_demonstration_features_and_unsafe_configuration, EcpMode.Production);
+    [Fact] public Task Administrator_gets_the_chosen_operational_profiles() => RunAsync(app => SetupScenarios.The_initial_administrator_gets_exactly_the_operational_profiles_they_chose(app, choose: true));
+    [Fact] public Task Administer_only_grants_nothing_else() => RunAsync(app => SetupScenarios.The_initial_administrator_gets_exactly_the_operational_profiles_they_chose(app, choose: false));
 }
 
 [Trait("Category", "SqlServer")]
@@ -53,6 +55,8 @@ public sealed class SetupScenarioTests_SqlServer
     [SqlServerFact] public Task Report_is_sanitised() => RunAsync(SetupScenarios.The_report_contains_no_secrets_tokens_references_or_personal_addresses);
     [SqlServerFact] public Task Readiness_gates_completion() => RunAsync(SetupScenarios.Readiness_blocks_completion_until_blocking_checks_pass_and_warnings_are_acknowledged);
     [SqlServerFact] public Task Production_refuses_demonstration_features() => RunAsync(SetupScenarios.Production_refuses_demonstration_features_and_unsafe_configuration, EcpMode.Production);
+    [SqlServerFact] public Task Administrator_gets_the_chosen_operational_profiles() => RunAsync(app => SetupScenarios.The_initial_administrator_gets_exactly_the_operational_profiles_they_chose(app, choose: true));
+    [SqlServerFact] public Task Administer_only_grants_nothing_else() => RunAsync(app => SetupScenarios.The_initial_administrator_gets_exactly_the_operational_profiles_they_chose(app, choose: false));
 }
 
 [Trait("Category", "Integration")]

@@ -393,6 +393,19 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
+      "ecp.access": {
+        "type": "Project",
+        "dependencies": {
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Contracts": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )"
+        }
+      },
       "ecp.approvals": {
         "type": "Project",
         "dependencies": {
@@ -465,6 +478,7 @@
       "ecp.host": {
         "type": "Project",
         "dependencies": {
+          "Ecp.Access": "[1.1.0, )",
           "Ecp.Approvals": "[1.1.0, )",
           "Ecp.Audit": "[1.1.0, )",
           "Ecp.Configuration": "[1.1.0, )",
@@ -579,6 +593,7 @@
       "ecp.setup": {
         "type": "Project",
         "dependencies": {
+          "Ecp.Access": "[1.1.0, )",
           "Ecp.Audit": "[1.1.0, )",
           "Ecp.Configuration": "[1.1.0, )",
           "Ecp.Contracts": "[1.1.0, )",
@@ -604,6 +619,7 @@
       "ecp.tests.common": {
         "type": "Project",
         "dependencies": {
+          "Ecp.Access": "[1.1.0, )",
           "Ecp.Approvals": "[1.1.0, )",
           "Ecp.Audit": "[1.1.0, )",
           "Ecp.Configuration": "[1.1.0, )",

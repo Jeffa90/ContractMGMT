@@ -60,11 +60,12 @@ public class CapabilityGuardTests
     [Fact]
     public void Top_level_navigation_for_each_optional_area_consults_the_capability_resolver()
     {
-        var layout = Read("src", "Ecp.Host", "Pages", "Shared", "_Layout.cshtml");
+        // Every navigation entry lives in one catalogue (docs/UX_REDESIGN.md section 3); the layout only renders what the builder returns.
+        var layout = Read("src", "Ecp.Host", "Navigation", "Navigation.cs");
         var lines = layout.Split('\n');
         foreach (var (path, key) in new[] { ("\"/Legal\"", "CapabilityKeys.LegalReview"), ("\"/Approvals\"", "CapabilityKeys.RegisterAuthorisation"), ("\"/Variations\"", "CapabilityKeys.Variations"), ("\"/Renewals\"", "CapabilityKeys.Renewals") })
         {
-            var line = lines.FirstOrDefault(l => l.Contains(path) && l.Contains("items.Add"));
+            var line = lines.FirstOrDefault(l => l.Contains(path) && l.TrimStart().StartsWith("new(", StringComparison.Ordinal));
             Assert.True(line is not null, $"No navigation entry for {path}.");
             Assert.True(line!.Contains(key), $"The navigation entry for {path} must be guarded by {key}.");
         }

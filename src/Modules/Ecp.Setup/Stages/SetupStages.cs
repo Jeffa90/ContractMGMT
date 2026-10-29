@@ -1,3 +1,4 @@
+using Ecp.Access;
 using System.Text.Json;
 using Ecp.Configuration;
 using Ecp.Documents.Storage;
@@ -324,6 +325,15 @@ internal sealed class AdminStage : SetupStageBase
             new("email", "Email address", FieldKind.Text, true, "Must match the address your identity provider asserts for this person. Accounts link by provider and subject, not by email alone."),
             new("installationAdmin", "Also make this person an installation administrator", FieldKind.Checkbox, false,
                 "Only installation administrators can reopen setup later (permission setup.run). Recommended.", Value: "true"),
+            new("doManage", "Create and manage [[contract|plural|lower]]", FieldKind.Checkbox, false,
+                "What will this person do in the [[organisation|lower]]? Administering is always included. Tick what else, so they can work on [[contract|plural|lower]] as soon as they sign in. In production nothing is ticked for you: choose deliberately, or leave all unticked and give someone else this work.",
+                Value: env.HostMode == EcpMode.Production ? null : "true"),
+            new("doOwn", "Own every [[category|lower]] (needs the choice above)", FieldKind.Checkbox, false,
+                "Owning a [[category|lower]] is what lets a person create and edit [[contract|plural|lower]] in it. If there are no [[category|plural|lower]] yet, the checklist asks for the ownership as soon as they exist.",
+                Value: env.HostMode == EcpMode.Production ? null : "true"),
+            new("doReview", "Review [[contract|plural|lower]] ([[legal.review|lower]])", FieldKind.Checkbox, false, "Only where the [[organisation|lower]] uses this step."),
+            new("doApprove", "Approve [[contract|plural|lower]]", FieldKind.Checkbox, false, "Only where the [[organisation|lower]] uses this step. An approver group is created for them."),
+            new("doRead", "Read only", FieldKind.Checkbox, false, "See [[contract|plural|lower]] and [[supplier|plural|lower]], but change nothing."),
         ];
 
     public override IReadOnlyList<string> Notes(SetupDocument doc, SetupEnvironment env)
@@ -334,6 +344,7 @@ internal sealed class AdminStage : SetupStageBase
     {
         var name = c.Required("displayName", "Full name");
         var email = c.Required("email", "Email address");
+        if (c.Flag("doOwn") && !c.Flag("doManage")) throw new DomainException("doOwn", "Owning every [[category|lower]] needs “Create and manage [[contract|plural|lower]]” as well.");
         if (!System.Net.Mail.MailAddress.TryCreate(email, out _)) throw new DomainException("email", "Enter a valid email address.");
         using var tenantScope = c.UseTenant();
         var users = c.Get<IUserService>();
@@ -366,6 +377,7 @@ internal sealed class AdminStage : SetupStageBase
             c.Record.Data["installationAdmin"] = "true";
         }
         c.Remember("installationAdmin", c.Flag("installationAdmin") ? "true" : "false");
+        foreach (var choice in new[] { "doManage", "doOwn", "doReview", "doApprove", "doRead" }) c.Remember(choice, c.Flag(choice) ? "true" : "false");
         var names = (c.Record.Data.GetValueOrDefault("names") ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries).ToList();
         if (!names.Contains(name)) names.Add(name);
         c.Record.Data["names"] = string.Join('|', names);
@@ -465,12 +477,22 @@ internal sealed class OrganisationStage : SetupStageBase
                     Reason: "Initial administrator of the first [[organisation|lower]], named during setup"), AssignmentSource.Setup, "setup:" + c.Actor.Label, null, c.Ct);
             }
         }
+        // What the initial administrator will do beyond administering, as chosen at the administrator stage. The grants use the same trusted path as the administrator roles above.
+        var operational = "";
+        if (Guid.TryParse(c.Doc.Get("admin", "userId"), out var operatorId))
+        {
+            var chosen2 = new BootstrapChoices(c.Doc.Get("admin", "in.doManage") == "true", c.Doc.Get("admin", "in.doOwn") == "true", c.Doc.Get("admin", "in.doReview") == "true",
+                c.Doc.Get("admin", "in.doApprove") == "true", c.Doc.Get("admin", "in.doRead") == "true");
+            var applied = await c.Get<IAdministratorBootstrap>().ApplyAtSetupAsync(operatorId, c.Doc.OrganisationId!.Value, chosen2, "setup:" + c.Actor.Label, c.Ct);
+            c.Record.Data["operational"] = chosen2.Any ? $"{applied.GrantsCreated} grant(s), {applied.OwnershipsCreated} ownership(s)" : "administer only";
+            operational = chosen2.Any ? $" The initial administrator can also work on [[contract|plural|lower]] ({applied.GrantsCreated} access grant(s) added)." : " The initial administrator administers only; someone else must be given the work on [[contract|plural|lower]].";
+        }
         var latest = await configuration.LatestReleaseAsync("SolutionPack", Guid.Empty, c.Ct);
         if (latest is null || !latest.ContentJson.Contains($"\"{packId}\"", StringComparison.Ordinal))
             await c.Get<IConfigurationBootstrap>().DraftValidatePublishAsync("SolutionPack", Guid.Empty, JsonSerializer.Serialize(new { packId }), "setup:" + c.Actor.Label, "Selected during setup", c.Ct);
         foreach (var (k, v) in new Dictionary<string, string> { ["organisationName"] = name, ["culture"] = culture, ["timeZone"] = zone, ["currency"] = currency, ["referencePrefix"] = prefix, ["country"] = country ?? "", ["identifierProfile"] = identifierKey ?? "" })
             c.Remember(k, v);
-        return StageResult.Ok($"[[organisation]] '{name}' is ready.");
+        return StageResult.Ok($"[[organisation]] '{name}' is ready." + operational);
     }
 }
 

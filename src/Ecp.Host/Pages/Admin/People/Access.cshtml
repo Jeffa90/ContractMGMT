@@ -1,0 +1,213 @@
+@page "/Admin/People/Access"
+@model Ecp.Host.Pages.Admin.People.AccessModel
+@using Ecp.Access
+@{
+    ViewData["Title"] = (Model.EditMode ? L["Change access"].Value : L["Add a person"].Value);
+    var s = Model.Step;
+    var plan = Model.Plan;
+    void Hid(string name, object? value) { if (value is not null && value.ToString() is { Length: > 0 } text) { <input type="hidden" name="@name" value="@text" /> } }
+    void HidList(string name, IEnumerable<object> values) { foreach (var v in values) { <input type="hidden" name="@name" value="@v" /> } }
+    var visibleSteps = Enumerable.Range(1, Ecp.Host.Pages.Admin.People.AccessModel.Last).Where(Model.Applies).ToList();
+}
+<h1>@(Model.EditMode ? L["Change access"].Value + (Model.PersonName is null ? "" : ": " + Model.PersonName) : L["Add a person"].Value)</h1>
+<ol class="wizard-steps" aria-label="@L["Progress"]">
+    @foreach (var n in visibleSteps)
+    {
+        <li aria-current="@(n == s ? "step" : null)">@(visibleSteps.IndexOf(n) + 1). @Terms.Expand(Ecp.Host.Pages.Admin.People.AccessModel.StepNames[n - 1])</li>
+    }
+</ol>
+<p class="hint">@L["Step {0} of {1}", visibleSteps.IndexOf(s) + 1, visibleSteps.Count]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+
+@if (Model.EditMode && Model.Current is { } cur && s < 7)
+{
+    <section class="card" aria-labelledby="has-h">
+        <h2 id="has-h">@L["What they can do today"]</h2>
+        @if (cur.Profiles.Count > 0) { <p>@foreach (var b in cur.Profiles) { <span class="badge">@Terms.Expand(b.Label)</span> }</p> }
+        @if (cur.HasAnyAccess) { <ul>@foreach (var a in cur.CanDo.Take(8)) { <li>@Terms.Expand(a.Label)@if (a.Where.Length > 0) { <span class="hint"> · @Terms.Expand(a.Where)</span> }</li> } @if (cur.CanDo.Count() > 8) { <li class="hint">@L["and {0} more", cur.CanDo.Count() - 8]</li> }</ul> }
+        else { <p class="hint">@L["Nothing yet."]</p> }
+        <p class="hint">@L["Choosing access below adds to this. To remove access, open the person and end the access you want to remove."]</p>
+    </section>
+}
+
+<form method="post">
+    @* Everything from other steps travels along unseen; the service checks all of it again at the end. *@
+    @if (s != 1) { Hid("Input.UserId", Model.Input.UserId); Hid("Input.DisplayName", Model.Input.DisplayName); Hid("Input.Email", Model.Input.Email); if (Model.Input.AllowDemo) { Hid("Input.AllowDemo", "true"); } Hid("Input.OrganisationId", Model.Input.OrganisationId); }
+    else { Hid("Input.UserId", Model.Input.UserId); }
+    @if (s != 2) { HidList("Input.Profiles", Model.Input.Profiles); }
+    @if (s != 3) { Hid("Input.Scope", Model.Input.Scope); HidList("Input.ScopeIds", Model.Input.ScopeIds.Cast<object>()); }
+    @if (s != 4) { Hid("Input.Ownership", Model.Input.Ownership); HidList("Input.OwnedIds", Model.Input.OwnedIds.Cast<object>()); }
+    @if (s != 5) { Hid("Input.Ceiling", Model.Input.Ceiling); if (Model.Input.Privileged) { Hid("Input.Privileged", "true"); } }
+    @if (s != 6) { Hid("Input.ApproverGroup", Model.Input.ApproverGroup); }
+    @if (s != 7) { Hid("Input.Reason", Model.Input.Reason); }
+    <input type="hidden" name="Step" value="@s" />
+
+    @if (s == 1)
+    {
+        <section class="card" aria-labelledby="s1-h">
+            <h2 id="s1-h">@L["Who is this?"]</h2>
+            @if (Model.EditMode) { <p><strong>@Model.PersonName</strong></p> }
+            else
+            {
+                <div class="field"><label for="Input_DisplayName">@L["Name"]</label><input id="Input_DisplayName" name="Input.DisplayName" type="text" maxlength="200" value="@Model.Input.DisplayName" required aria-required="true" /></div>
+                <div class="field"><label for="Input_Email">@L["Email address"]</label><input id="Input_Email" name="Input.Email" type="email" maxlength="254" value="@Model.Input.Email" required aria-required="true" aria-describedby="email-hint" />
+                    <p id="email-hint" class="hint">@L["They sign in with this address. In production they are invited and become active the first time your identity provider confirms it."]</p></div>
+                @if (Model.DemoAvailable)
+                {
+                    <div class="field check"><input id="Input_AllowDemo" name="Input.AllowDemo" type="checkbox" value="true" checked="@Model.Input.AllowDemo" aria-describedby="demo-hint" />
+                        <label for="Input_AllowDemo">@L["Allow demonstration sign-in"] <span class="badge warn">@L["Test only"]</span></label>
+                        <p id="demo-hint" class="hint">@L["Creates a synthetic test person with no password who can be chosen on the demonstration sign-in page. It does not change what they may do. Not available in production, where people are invited through your identity provider."]</p></div>
+                }
+            }
+            @if (Model.Organisations.Count > 1)
+            {
+                <div class="field"><label for="Input_OrganisationId">@Terms.Expand("Which [[organisation|lower]] will they work in?")</label>
+                    <select id="Input_OrganisationId" name="Input.OrganisationId" required aria-required="true">
+                        <option value="">@L["Choose…"]</option>
+                        @foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(Model.Input.OrganisationId == o.Id)">@o.Name</option> }
+                    </select></div>
+            }
+            else if (Model.Organisations.Count == 1) { <p>@Terms.Expand("[[organisation]]"): <strong>@Model.Organisations[0].Name</strong></p><input type="hidden" name="Input.OrganisationId" value="@Model.Organisations[0].Id" /> }
+        </section>
+    }
+    else if (s == 2)
+    {
+        <section class="card" aria-labelledby="s2-h">
+            <h2 id="s2-h">@L["What will this person do?"]</h2>
+            <p class="hint">@L["Tick everything that applies. You can only see choices you are allowed to give."]</p>
+            @foreach (var o in Model.Options)
+            {
+                <div class="field check">
+                    <input id="p-@o.Key" name="Input.Profiles" type="checkbox" value="@o.Key" checked="@Model.Input.Profiles.Contains(o.Key)" disabled="@(!o.Offered)" aria-describedby="p-@o.Key-d" />
+                    <label for="p-@o.Key">@Terms.Expand(o.Label)</label>
+                    <p id="p-@o.Key-d" class="hint">@Terms.Expand(o.Summary)@if (!o.Offered) { <text> <strong>@o.WhyNot</strong></text> }</p>
+                </div>
+            }
+            @if (!Model.EditMode) { <p class="hint">@L["Choose nothing to add the person now and give access later."]</p> }
+        </section>
+    }
+    else if (s == 3)
+    {
+        <section class="card" aria-labelledby="s3-h">
+            <h2 id="s3-h">@L["Where can they work?"]</h2>
+            <fieldset><legend class="visually-hidden">@L["Where they can work"]</legend>
+                <div class="field check"><input id="sc-w" type="radio" name="Input.Scope" value="@nameof(ScopeChoice.WholeOrganisation)" checked="@(Model.Input.Scope == nameof(ScopeChoice.WholeOrganisation))" /><label for="sc-w">@Terms.Expand("The whole [[organisation|lower]]")</label></div>
+                @if (Model.Divisions.Count > 0) { <div class="field check"><input id="sc-d" type="radio" name="Input.Scope" value="@nameof(ScopeChoice.Divisions)" checked="@(Model.Input.Scope == nameof(ScopeChoice.Divisions))" /><label for="sc-d">@Terms.Expand("Selected [[division|plural|lower]]")</label></div> }
+                @if (Model.BusinessUnits.Count > 0) { <div class="field check"><input id="sc-b" type="radio" name="Input.Scope" value="@nameof(ScopeChoice.BusinessUnits)" checked="@(Model.Input.Scope == nameof(ScopeChoice.BusinessUnits))" /><label for="sc-b">@Terms.Expand("Selected [[business.unit|plural|lower]]")</label></div> }
+                @if (Model.Sites.Count > 0) { <div class="field check"><input id="sc-s" type="radio" name="Input.Scope" value="@nameof(ScopeChoice.Sites)" checked="@(Model.Input.Scope == nameof(ScopeChoice.Sites))" /><label for="sc-s">@Terms.Expand("Selected [[site|plural|lower]]")</label></div> }
+                @if (Model.Categories.Count > 0) { <div class="field check"><input id="sc-c" type="radio" name="Input.Scope" value="@nameof(ScopeChoice.Categories)" checked="@(Model.Input.Scope == nameof(ScopeChoice.Categories))" /><label for="sc-c">@Terms.Expand("Selected [[category|plural|lower]]")</label></div> }
+            </fieldset>
+            @if (Model.Divisions.Count + Model.BusinessUnits.Count + Model.Sites.Count + Model.Categories.Count == 0)
+            {
+                <p class="hint">@Terms.Expand("This [[organisation|lower]] has no structure or [[category|plural|lower]] yet, so access applies to the whole [[organisation|lower]].")</p>
+            }
+            else
+            {
+                <p class="hint">@L["If you choose selected places, tick them below. Otherwise leave these alone."]</p>
+                @foreach (var (title, items) in new[] { (Terms.Expand("[[division|plural]]"), Model.Divisions), (Terms.Expand("[[business.unit|plural|sentence]]"), Model.BusinessUnits), (Terms.Expand("[[site|plural]]"), Model.Sites), (Terms.Expand("[[category|plural]]"), Model.Categories) })
+                {
+                    if (items.Count == 0) { continue; }
+                    <fieldset><legend>@title</legend>
+                        @foreach (var item in items) { <div class="field check"><input id="sid-@item.Id" type="checkbox" name="Input.ScopeIds" value="@item.Id" checked="@Model.Input.ScopeIds.Contains(item.Id)" /><label for="sid-@item.Id">@item.Name</label></div> }
+                    </fieldset>
+                }
+            }
+        </section>
+    }
+    else if (s == 4)
+    {
+        <section class="card" aria-labelledby="s4-h">
+            <h2 id="s4-h">@Terms.Expand("Which [[category|plural|lower]] will they own?")</h2>
+            <p class="hint">@Terms.Expand("Owning a [[category|lower]] is what lets a person create and edit [[contract|plural|lower]] in it, and it also covers its sub-[[category|plural|lower]]. Without ownership they can read but not create or edit.")</p>
+            <fieldset><legend class="visually-hidden">@L["Ownership"]</legend>
+                <div class="field check"><input id="ow-a" type="radio" name="Input.Ownership" value="@nameof(OwnershipChoice.All)" checked="@(Model.Input.Ownership == nameof(OwnershipChoice.All))" /><label for="ow-a">@Terms.Expand("All [[category|plural|lower]]")</label></div>
+                <div class="field check"><input id="ow-s" type="radio" name="Input.Ownership" value="@nameof(OwnershipChoice.Selected)" checked="@(Model.Input.Ownership == nameof(OwnershipChoice.Selected))" /><label for="ow-s">@Terms.Expand("Selected [[category|plural|lower]] (tick below)")</label></div>
+                <div class="field check"><input id="ow-n" type="radio" name="Input.Ownership" value="@nameof(OwnershipChoice.None)" checked="@(Model.Input.Ownership == nameof(OwnershipChoice.None))" /><label for="ow-n">@L["None for now"]</label></div>
+            </fieldset>
+            @if (Model.Categories.Count == 0) { <p class="hint">@Terms.Expand("There are no [[category|plural|lower]] yet. Choose All and the ownership is recorded when they exist, or create them first under Administration.")</p> }
+            else
+            {
+                <fieldset><legend>@Terms.Expand("[[category|plural]]")</legend>
+                    @foreach (var c in Model.Categories) { <div class="field check"><input id="oid-@c.Id" type="checkbox" name="Input.OwnedIds" value="@c.Id" checked="@Model.Input.OwnedIds.Contains(c.Id)" /><label for="oid-@c.Id">@c.Name</label></div> }
+                </fieldset>
+            }
+        </section>
+    }
+    else if (s == 5)
+    {
+        <section class="card" aria-labelledby="s5-h">
+            <h2 id="s5-h">@L["How sensitive may the information be?"]</h2>
+            <p class="hint">@L["The highest classification this person may see. They never see anything above it."]</p>
+            <div class="field"><label for="Input_Ceiling">@L["Highest level"]</label>
+                <select id="Input_Ceiling" name="Input.Ceiling">
+                    @for (var i = 0; i < Model.Levels.Count; i++)
+                    {
+                        var lvl = Model.Levels[i];
+                        <option value="@lvl" selected="@(string.Equals(Model.Input.Ceiling ?? Model.DefaultCeiling, lvl, StringComparison.OrdinalIgnoreCase))">@L["Up to {0}", lvl]@(i >= Model.HighLevelRank ? " (" + L["high: needs a senior administrator"].Value + ")" : "")</option>
+                    }
+                </select></div>
+            @if (Model.Chosen.Any(p => p.Key == AccessProfiles.Reviewer))
+            {
+                <div class="field check"><input id="Input_Privileged" name="Input.Privileged" type="checkbox" value="true" checked="@Model.Input.Privileged" /><label for="Input_Privileged">@L["Needs privileged records (such as legally privileged material)"]</label></div>
+            }
+        </section>
+    }
+    else if (s == 6)
+    {
+        <section class="card" aria-labelledby="s6-h">
+            <h2 id="s6-h">@L["Which approver group?"]</h2>
+            @if (Model.ApproverGroups.Count == 0)
+            {
+                <p class="flash warn" role="status">@L["There are no approver groups yet."] <a href="/Admin/ApproverGroups">@L["Create one first"]</a>, @L["then come back."]</p>
+            }
+            else
+            {
+                <div class="field"><label for="Input_ApproverGroup">@L["Approver group"]</label>
+                    <select id="Input_ApproverGroup" name="Input.ApproverGroup" required aria-required="true">
+                        <option value="">@L["Choose…"]</option>
+                        @foreach (var g in Model.ApproverGroups) { <option value="@g.Key" selected="@(Model.Input.ApproverGroup == g.Key)">@Terms.GroupLabel(g.Key) (@g.Approvers + @g.Backups)</option> }
+                    </select>
+                    <p class="hint">@L["They can approve only while a request for this group is waiting."]</p></div>
+            }
+        </section>
+    }
+    else
+    {
+        <section class="card" aria-labelledby="s7-h">
+            <h2 id="s7-h">@L["Check before you save"]</h2>
+            @if (plan is null) { <p class="flash warn" role="status">@L["Nothing to review."]</p> }
+            else
+            {
+                @if (!plan.CanApply)
+                {
+                    <div class="error-summary" role="alert"><h3>@L["This cannot be saved yet"]</h3><ul>@foreach (var p in plan.Problems) { <li>@Terms.Expand(p)</li> }</ul></div>
+                }
+                else
+                {
+                    @if (plan.After is { } after)
+                    {
+                        <p><strong>@after.DisplayName</strong> @L["will be able to:"]</p>
+                        <ul class="ability-list">@foreach (var a in after.CanDo) { <li><span aria-hidden="true">✓</span><span class="visually-hidden">@L["can"]</span> @Terms.Expand(a.Label)@if (a.Where.Length > 0) { <span class="hint"> · @Terms.Expand(a.Where)</span> }@if (a.Conditions is { Length: > 0 }) { <div class="hint">@Terms.Expand(a.Conditions)</div> }</li> }</ul>
+                        @if (!after.HasAnyAccess) { <p class="hint">@L["They will not be able to do anything yet."]</p> }
+                        <details><summary>@L["What they will not be able to do"]</summary>
+                            <ul class="ability-list">@foreach (var a in after.CannotDo) { <li><span aria-hidden="true">✗</span><span class="visually-hidden">@L["cannot"]</span> @Terms.Expand(a.Label)</li> }</ul></details>
+                        <p>@L["Highest classification they may see"]: <strong>@after.HighestClassification</strong></p>
+                        @foreach (var a in after.Attention.Where(x => x.Code is "role-without-ownership")) { <p class="flash warn" role="status">@Terms.Expand(a.Message)</p> }
+                    }
+                    <h3>@L["This will"]</h3>
+                    <ul>@foreach (var st in plan.Steps) { <li>@Terms.Expand(st.Text)</li> }</ul>
+                }
+                <div class="field"><label for="Input_Reason">@L["Reason (kept in the audit trail)"]</label><input id="Input_Reason" name="Input.Reason" type="text" maxlength="1000" value="@Model.Input.Reason" /></div>
+            }
+        </section>
+    }
+
+    <p class="actions">
+        @if (s > 1) { <button type="submit" class="secondary" asp-page-handler="Back" formnovalidate>@L["Back"]</button> }
+        @if (s < 7) { <button type="submit" asp-page-handler="Next">@L["Next"]</button> }
+        else if (plan is { CanApply: true }) { <button type="submit" asp-page-handler="Save">@L["Save access"]</button> }
+        else { <button type="submit" class="secondary" asp-page-handler="Next" formnovalidate disabled>@L["Save access"]</button> }
+        <a href="/Admin/People">@L["Cancel"]</a>
+    </p>
+    @if (s == 7) { <p class="hint">@L["You may be asked to sign in again before saving. Your choices are kept."]</p> }
+</form>

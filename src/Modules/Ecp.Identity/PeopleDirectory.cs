@@ -27,6 +27,9 @@ public interface IPeopleDirectory
 
     /// <summary>Names (no email) of the active people who hold any active role covering the organisation, for choosing a person in a form. Needs the caller to hold an active role; at most 500.</summary>
     Task<IReadOnlyList<PersonName>> ColleaguesAsync(Guid organisationId, CancellationToken ct = default);
+
+    /// <summary>Among the people the caller may administer, those who sign in through the named provider (for example the demonstration provider, to mark synthetic test people).</summary>
+    Task<IReadOnlySet<Guid>> LinkedToProviderAsync(string providerKey, CancellationToken ct = default);
 }
 
 public sealed record PersonName(Guid Id, string DisplayName);
@@ -98,6 +101,13 @@ internal sealed class PeopleDirectory(IdentityDbContext db, IAccessService acces
         if (subject is null || !subject.Assignments.Any(a => a.IsActiveAt(now))) return [];
         var ids = (await db.RoleAssignments.AsNoTracking().ToListAsync(ct)).Where(a => a.IsActiveAt(now) && (a.ScopeLevel == ScopeLevel.Tenant || a.OrganisationIds.Contains(organisationId))).Select(a => a.UserId).Distinct().ToList();
         return await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id) && u.Status == UserStatus.Active).OrderBy(u => u.DisplayName).Take(500).Select(u => new PersonName(u.Id, u.DisplayName)).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlySet<Guid>> LinkedToProviderAsync(string providerKey, CancellationToken ct = default)
+    {
+        var manageable = (await ManageableUsersAsync(ct)).Select(p => p.Id).ToHashSet();
+        var linked = await db.ExternalIdentities.AsNoTracking().Where(x => x.ProviderKey == providerKey).Select(x => x.UserId).ToListAsync(ct);
+        return linked.Where(manageable.Contains).ToHashSet();
     }
 
     private static PersonItem ToItem(UserProfile u, List<RoleAssignment> assignments, DateTime now)

@@ -6,8 +6,9 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Ecp.Persistence;
 
 /// <summary>Services every module context needs. Registered per scope.</summary>
-public sealed class DbContextServices(ITenantContext tenant, IScopedConnection connection, IClock clock)
+public sealed class DbContextServices(ITenantContext tenant, IScopedConnection connection, IClock clock, PreviewContext preview)
 {
+    public PreviewContext Preview { get; } = preview;
     public ITenantContext Tenant { get; } = tenant;
     public IScopedConnection Connection { get; } = connection;
     public IClock Clock { get; } = clock;
@@ -105,8 +106,12 @@ public abstract class TenantDbContext : DbContext
         if (tx is not null) await Database.UseTransactionAsync(tx, ct);
     }
 
+    /// <summary>Whether this context may be written while previewing another person. Only the audit trail is: the preview must be recorded, and everything else is refused.</summary>
+    protected virtual bool PermitsWritesInPreview => false;
+
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
+        if (_services.Preview.WritesRefused && !PermitsWritesInPreview && ChangeTracker.HasChanges()) throw new PreviewReadOnlyException();
         PrepareForSave();
         await EnlistAsync(cancellationToken);
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);

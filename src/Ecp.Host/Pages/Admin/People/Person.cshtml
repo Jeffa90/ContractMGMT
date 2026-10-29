@@ -1,0 +1,88 @@
+@page "/Admin/People/Person/{id:guid}"
+@model Ecp.Host.Pages.Admin.People.PersonModel
+@using Ecp.Access
+@{
+    var r = Model.Report;
+    ViewData["Title"] = r.DisplayName;
+}
+<h1>@r.DisplayName</h1>
+<p><span class="badge">@r.Email</span> <span class="badge @(r.Status == UserStatusView.Disabled ? "bad" : "ok")">@(r.Status switch { UserStatusView.Active => L["Active"].Value, UserStatusView.Disabled => L["Disabled"].Value, _ => L["Invited"].Value })</span></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@foreach (var a in r.Attention) { <p class="flash warn" role="status">@Terms.Expand(a.Message)</p> }
+<p class="actions">
+    <a class="button" href="/Admin/People/Access?Input.UserId=@r.UserId&amp;Step=1">@L["Change access"]</a>
+    <a href="/Admin/Users/Details/@r.UserId">@L["Advanced: exact grants"]</a>
+    <a href="/Admin/People">@L["Back to people"]</a>
+</p>
+
+<section class="card" aria-labelledby="can-h">
+    <h2 id="can-h">@L["What they can do"]</h2>
+    @if (r.Profiles.Count > 0) { <p>@L["Kind of access"]: @foreach (var b in r.Profiles) { <span class="badge">@Terms.Expand(b.Label)</span> }</p> }
+    <p>@L["Highest classification they may see"]: <strong>@r.HighestClassification</strong></p>
+    @if (r.Owns.Count > 0) { <p>@Terms.Expand("[[category|plural]] they own"): @string.Join(", ", r.Owns.Select(o => o.Name))</p> }
+    @if (!r.HasAnyAccess) { <p class="hint">@L["They cannot do anything yet."]</p> }
+    @foreach (var grp in r.CanDo.GroupBy(a => a.Group))
+    {
+        <h3>@Terms.Expand(grp.Key)</h3>
+        <ul class="ability-list">
+        @foreach (var a in grp)
+        {
+            <li><span aria-hidden="true">✓</span><span class="visually-hidden">@L["can"]</span> @Terms.Expand(a.Label)
+                @if (a.Where.Length > 0) { <span class="hint"> · @Terms.Expand(a.Where)</span> }
+                @if (a.Conditions is { Length: > 0 }) { <div class="hint">@Terms.Expand(a.Conditions)</div> }
+                <details><summary>@L["Why"]</summary><ul>@foreach (var b in a.Because) { <li>@Terms.Expand(b)</li> }</ul></details></li>
+        }
+        </ul>
+    }
+    <details><summary>@L["What they cannot do, and what would give it"]</summary>
+        <ul class="ability-list">@foreach (var a in r.CannotDo) { <li><span aria-hidden="true">✗</span><span class="visually-hidden">@L["cannot"]</span> @Terms.Expand(a.Label)@if (a.GrantedBy.Count > 0) { <span class="hint"> · @L["Given by"]: @string.Join(", ", a.GrantedBy.Select(Terms.Expand))</span> }</li> }</ul></details>
+</section>
+
+@if (Model.PreviewOffered)
+{
+    <section class="card" aria-labelledby="prev-h">
+        <h2 id="prev-h">@L["Preview as this user"] <span class="badge warn">@L["Test only"]</span></h2>
+        <p>@L["See the application exactly as {0} sees it, using their real access. It is read-only: nothing you do there changes anything, and their account and sign-in are not touched. Every preview is recorded.", r.DisplayName]</p>
+        @if (Model.Eligibility.Allowed)
+        {
+            <form method="post" asp-page-handler="Preview" asp-route-id="@r.UserId">
+                <div class="field"><label for="preview-reason">@L["Why are you previewing?"]</label><input id="preview-reason" name="reason" type="text" required aria-required="true" maxlength="1000" /></div>
+                <button type="submit">@L["Preview as {0}", r.DisplayName]</button>
+                <p class="hint">@L["Lasts {0} minutes. You may be asked to sign in again first.", Model.PreviewMinutes]</p>
+            </form>
+        }
+        else { <p class="flash warn" role="status">@Model.Eligibility.Why</p> }
+    </section>
+}
+
+<section class="card" aria-labelledby="given-h">
+    <h2 id="given-h">@L["Access given through the guided screens"]</h2>
+    @if (Model.Applications.Count == 0) { <p class="hint">@L["None. Any access this person has was given directly; see the details below."]</p> }
+    @foreach (var app in Model.Applications)
+    {
+        <form method="post" asp-page-handler="End" asp-route-id="@r.UserId">
+            <input type="hidden" name="applicationId" value="@app.Id" />
+            <p><strong>@Terms.Expand(app.ProfileLabel)</strong> <span class="hint">· @app.AppliedBy · @app.AppliedUtc.ToString("yyyy-MM-dd")</span></p>
+            <p class="hint">@Terms.Expand(app.Summary)</p>
+            <div class="field"><label for="end-@app.Id">@L["Reason for ending this access"]</label><input id="end-@app.Id" name="reason" type="text" required aria-required="true" maxlength="1000" /></div>
+            <button type="submit" class="secondary">@L["End this access"]</button>
+        </form>
+    }
+</section>
+
+<section class="card" aria-labelledby="det-h">
+    <h2 id="det-h">@L["Details"]</h2>
+    <details><summary>@L["Every role they hold, where it applies, and where it came from"]</summary>
+        <div class="table-wrap"><table>
+            <caption class="visually-hidden">@L["Role assignments"]</caption>
+            <thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["Where"]</th><th scope="col">@L["Classification ceiling"]</th><th scope="col">@L["Came from"]</th><th scope="col">@L["Status"]</th></tr></thead>
+            <tbody>
+            @foreach (var g in r.Grants)
+            {
+                <tr><td>@Terms.Role(g.RoleCode)</td><td>@Terms.Expand(g.Where)</td><td>@g.HighestClassification</td><td>@Terms.Expand(g.Source)</td>
+                    <td>@(g.Active ? L["Active"].Value : g.Future ? L["Starts later"].Value : L["Ended"].Value)</td></tr>
+            }
+            @if (r.Grants.Count == 0) { <tr><td colspan="5">@L["No role assignments."]</td></tr> }
+            </tbody></table></div>
+    </details>
+</section>

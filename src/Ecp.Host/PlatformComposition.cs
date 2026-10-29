@@ -10,6 +10,7 @@ using Ecp.Notifications;
 using Ecp.Operations;
 using Ecp.Persistence;
 using Ecp.Recovery;
+using Ecp.Access;
 using Ecp.Setup;
 using Ecp.SharedKernel;
 using Ecp.SharedKernel.Secrets;
@@ -75,6 +76,7 @@ public static class PlatformComposition
         services.AddSingleton(new HostModeAccessor(resolved.Host.Mode));
         services.AddSingleton(new EmailEnvironmentDefaults(startingNotifications.EmailProvider, startingNotifications.Smtp));
         services.AddSingleton(new EmailReadinessOptions { MaxAge = TimeSpan.FromHours(Math.Clamp(configuration.GetValue("Ecp:Email:ReadinessMaxAgeHours", 168), 1, 24 * 90)) });
+        services.AddAccessModule();
         services.AddOperationsModule(paths.DataDirectory);
         services.AddSetupModule(new SetupEnvironment(resolved.Host.Mode, paths.DataDirectory,
             DemoIdentityEnabled: resolved.Host.Mode != EcpMode.Production && resolved.Host.DemoTenantResolution, DemoSeedEnabled: resolved.Host.DemoSeed,

@@ -1,0 +1,64 @@
+@page "/Access/Setup"
+@model Ecp.Host.Pages.Access.SetupModel
+@{ ViewData["Title"] = L["Set up my access"].Value; }
+<h1>@L["Set up my access"]</h1>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Mine is { } mine)
+{
+    <section class="card" aria-labelledby="now-h">
+        <h2 id="now-h">@L["What you can do today"]</h2>
+        @if (mine.HasAnyAccess) { <ul>@foreach (var a in mine.CanDo.Take(10)) { <li>@Terms.Expand(a.Label)@if (a.Where.Length > 0) { <span class="hint"> · @Terms.Expand(a.Where)</span> }</li> }</ul> }
+        else { <p class="hint">@L["Nothing yet."]</p> }
+        @foreach (var a in mine.Attention.Where(x => x.Code is "role-without-ownership")) { <p class="flash warn" role="status">@Terms.Expand(a.Message)</p> }
+        <p><a href="/Access">@L["See everything my access allows"]</a></p>
+    </section>
+}
+@if (!Model.TestMode)
+{
+    <section class="card" aria-labelledby="prod-h">
+        <h2 id="prod-h">@L["Nobody can give themselves access"]</h2>
+        <p>@Terms.Expand("To work on [[contract|plural|lower]] yourself, ask another administrator to give you the right kind of access under People & Access: for example the [[contract]] Manager profile. They choose it for you in a few clicks, and it is recorded.")</p>
+        <p>@L["This is deliberate. It keeps the person who gives access separate from the person who receives it."]</p>
+        <p><a href="/Admin/People">@L["Open People & Access"]</a></p>
+    </section>
+}
+else
+{
+    <section class="card" aria-labelledby="test-h">
+        <h2 id="test-h">@L["Give me full Test-mode access"] <span class="badge warn">@L["TEST ONLY"]</span></h2>
+        <p>@L["For trying the product on synthetic data. It is not available in production. It uses ordinary access and ownership, is recorded, and can be removed again."]</p>
+        @if (Model.Organisations.Count > 1)
+        {
+            <form method="get"><div class="field"><label for="OrganisationId">@Terms.Expand("[[organisation]]")</label>
+                <select id="OrganisationId" name="OrganisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(Model.OrganisationId == o.Id)">@o.Name</option> }</select></div>
+                <button type="submit" class="secondary">@L["Show what this would give"]</button></form>
+        }
+        @if (Model.Plan is { } plan)
+        {
+            if (!plan.Available) { <p class="flash warn" role="status">@plan.WhyNot</p> }
+            else
+            {
+                <h3>@L["This will give you"]</h3>
+                <ul>@foreach (var w in plan.WillGrant) { <li>@Terms.Expand(w)</li> }</ul>
+                <h3>@L["This will not give you"]</h3>
+                <ul>@foreach (var n in plan.NotGranted) { <li>@Terms.Expand(n)</li> }</ul>
+                @if (plan.After is { } after) { <p>@L["After this you will be able to:"] @string.Join(", ", after.CanDo.Take(12).Select(a => Terms.Expand(a.Label)))@(after.CanDo.Count() > 12 ? "…" : "")</p> }
+                <form method="post" asp-page-handler="Give">
+                    <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+                    <div class="field"><label for="Reason">@L["Reason (kept in the audit trail)"]</label><input id="Reason" name="Reason" type="text" maxlength="500" value="Trying the product in Test mode" required aria-required="true" /></div>
+                    @if (plan.AlreadyHeld) { <p class="hint">@L["You already have Test-mode access here; applying again adds only what is missing."]</p> }
+                    <button type="submit">@L["Give me full Test-mode access"]</button>
+                </form>
+                @if (plan.AlreadyHeld)
+                {
+                    <form method="post" asp-page-handler="End">
+                        <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" />
+                        <div class="field"><label for="EndReason">@L["Reason for removing it"]</label><input id="EndReason" name="Reason" type="text" maxlength="500" required aria-required="true" /></div>
+                        <button type="submit" class="secondary">@L["Remove Test-mode access"]</button>
+                    </form>
+                }
+                <p class="hint">@L["You still cannot approve or publish your own work: that separation always applies. To rehearse an approval, add a second test person under People & Access with “Allow demonstration sign-in” and the Approval Authority profile."]</p>
+            }
+        }
+    </section>
+}

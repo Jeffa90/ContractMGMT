@@ -17,6 +17,6 @@ public static class DesignTime
             .UseSqlServer(connection.Connection, o => o.MigrationsHistoryTable("__EFMigrationsHistory", schema))
             .ReplaceService<IModelCacheKeyFactory, ProviderAwareModelCacheKeyFactory>()
             .Options;
-        return (options, new DbContextServices(tenant, connection, new SystemClock()));
+        return (options, new DbContextServices(tenant, connection, new SystemClock(), new Ecp.SharedKernel.PreviewContext()));
     }
 }

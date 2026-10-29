@@ -326,6 +326,29 @@ internal static class SetupScenarios
         await MustAsync(svc, "complete");
     }
 
+    /// <summary>UX-4: the administrator names what they will do in the organisation, and set-up issues exactly those profiles through the trusted path.</summary>
+    public static async Task The_initial_administrator_gets_exactly_the_operational_profiles_they_chose(TestApp app, bool choose)
+    {
+        var svc = app.Services.GetRequiredService<ISetupService>();
+        await WalkAsync(svc, "mode", "database", "storage", "tenant", "pack", "identity");
+        var admin = Inputs("admin");
+        if (choose) { admin["doManage"] = "true"; admin["doOwn"] = "true"; admin["doRead"] = "true"; }
+        await MustAsync(svc, "admin", admin);
+        await WalkAsync(svc, "organisation");
+        await using var rootScope = app.Services.CreateAsyncScope();
+        var tenant = (await rootScope.ServiceProvider.GetRequiredService<ITenantDirectory>().ListAsync()).Single();
+        await using var scope = app.ScopeFor(tenant.Id);
+        var user = (await scope.Get<IUserService>().FindByEmailAsync(AdminEmail))!;
+        var held = (await scope.Get<IRoleAssignmentService>().ListForUserAsync(user.Id)).Select(a => a.RoleCode).OrderBy(x => x).ToList();
+        if (choose)
+        {
+            Assert.Contains(RoleCodes.CategoryOwner, held); Assert.Contains(RoleCodes.Viewer, held);
+            Assert.Contains(RoleCodes.OrganisationAdministrator, held); Assert.Contains(RoleCodes.TenantAdministrator, held);
+            Assert.DoesNotContain(RoleCodes.Legal, held); Assert.DoesNotContain(RoleCodes.Approver, held);          // not chosen, not granted
+        }
+        else Assert.Equal(new[] { RoleCodes.OrganisationAdministrator, RoleCodes.TenantAdministrator }.OrderBy(x => x), held);   // "administer only" grants nothing else
+    }
+
     public static async Task Production_refuses_demonstration_features_and_unsafe_configuration(TestApp app)
     {
         // The test application is composed in Production setup mode over a database that is not reached through a secret reference.

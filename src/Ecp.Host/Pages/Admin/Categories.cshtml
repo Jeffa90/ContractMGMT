@@ -1,60 +1,114 @@
 @page "/Admin/Categories"
 @model Ecp.Host.Pages.Admin.CategoriesModel
-@{ ViewData["Title"] = L["[[category|plural]]"].Value; }
-<h1>@L["[[category|plural]]"]</h1>
-<p class="lede">@L["[[category]] ownership decides who can edit [[contract|plural|lower]]. Owners edit only the [[category|plural|lower]] they currently own; ending an ownership removes edit rights immediately."]</p>
+@{ ViewData["Title"] = L["[[category|plural]] and owners"].Value; }
+<h1>@L["[[category|plural]] and owners"]</h1>
+<p class="lede">@L["Each [[category|lower]] has a primary owner and, if you wish, a backup. Owning a [[category|lower]] is what lets a person create and edit [[contract|plural|lower]] in it, and it also covers its sub-[[category|plural|lower]]. Ending an ownership removes edit rights straight away."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 
+<form method="get" class="filter-row" role="search">
+    <div class="field"><label for="Q">@L["Search"]</label><input id="Q" name="Q" type="search" value="@Model.Q" maxlength="100" /></div>
+    <div class="field check"><input id="Needs" name="Needs" type="checkbox" value="true" checked="@Model.Needs" /><label for="Needs">@L["Only those that need an owner"]</label></div>
+    <button type="submit" class="secondary">@L["Show"]</button>
+</form>
+<p>
+    @if (Model.Board.NeedsOwner > 0) { <span class="badge warn">@Terms.Expand($"{Model.Board.NeedsOwner} [[category|lower]] need{(Model.Board.NeedsOwner == 1 ? "s" : "")} a primary owner")</span> }
+    else if (Model.Board.Rows.Count > 0) { <span class="badge ok">@L["Every [[category|lower]] has a primary owner"]</span> }
+    @if (Model.Board.NeedsAttention > 0) { <span class="badge warn">@Model.Board.NeedsAttention @L["need attention"]</span> }
+    <a href="/Onboarding">@L["Bulk import from a CSV file (advanced)"]</a>
+</p>
+
+@if (Model.Plan is { } plan)
+{
+    <section class="card" aria-labelledby="plan-h">
+        <h2 id="plan-h">@L["Check before you save"]</h2>
+        <p>@Terms.Expand($"{plan.PersonName} will become the {(Model.Role == "primary" ? "primary" : "backup")} owner of {plan.Categories} [[category|lower]]" + (plan.Categories == 1 ? "" : "s") + ".")</p>
+        <ul>
+            @if (plan.AlreadyOwned > 0) { <li>@plan.AlreadyOwned @L["already as chosen, so nothing changes there."]</li> }
+            @if (plan.WillReplace > 0) { <li>@plan.WillReplace @L["current primary owner(s) will be replaced and told why in the record."]</li> }
+            @if (plan.WillAddRole) { <li>@Terms.Expand($"{plan.PersonName} does not yet hold the role that lets owners act, so they will also be given the [[contract]] Manager profile.")</li> }
+        </ul>
+        <form method="post" asp-page-handler="SetOwner">
+            <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="UserId" value="@Model.UserId" /><input type="hidden" name="Role" value="@Model.Role" />
+            @foreach (var id in Model.CategoryIds) { <input type="hidden" name="CategoryIds" value="@id" /> }
+            <div class="field"><label for="Reason">@L["Reason (kept in the audit trail)"]</label><input id="Reason" name="Reason" type="text" maxlength="1000" /></div>
+            <button type="submit">@L["Save ownership"]</button> <a href="/Admin/Categories">@L["Cancel"]</a>
+            <p class="hint">@L["You may be asked to sign in again before saving."]</p>
+        </form>
+    </section>
+}
+
 <div class="table-wrap">
+<form id="bulk" method="post" asp-page-handler="Plan"></form>
 <table>
-    <caption>@L["[[category]] tree"]</caption>
-    <thead><tr><th scope="col">@L["[[category]]"]</th><th scope="col">@L["[[organisation]]"]</th><th scope="col">@L["Current owners"]</th><th scope="col">@L["Status"]</th>@if (Model.CanAssign || Model.CanManage) { <th scope="col">@L["Actions"]</th> }</tr></thead>
+    <caption class="visually-hidden">@L["[[category]] tree"]</caption>
+    <thead><tr>@if (Model.CanAssign) { <th scope="col"><span class="visually-hidden">@L["Select"]</span></th> }<th scope="col">@L["[[category]]"]</th><th scope="col">@L["Primary owner"]</th><th scope="col">@L["Backup owner"]</th><th scope="col">@L["Status"]</th>@if (Model.CanManage) { <th scope="col">@L["Actions"]</th> }</tr></thead>
     <tbody>
-    @foreach (var row in Model.Rows)
+    @foreach (var row in Model.Board.Rows)
     {
         <tr>
-            <th scope="row">@row.Indent@row.Category.Name <span class="hint">(@row.Category.Code)</span></th>
-            <td>@Model.OrganisationName(row.Category.OrganisationId)</td>
+            @if (Model.CanAssign) { <td>@if (row.IsActive) { <input form="bulk" type="checkbox" name="CategoryIds" value="@row.CategoryId" id="sel-@row.CategoryId" aria-label="@L["Select"] @row.Name" /> }</td> }
+            <th scope="row">@(string.Concat(Enumerable.Repeat("— ", row.Depth)))@row.Name <span class="hint">(@row.Code@(Model.OrganisationsShown.Count() > 1 ? ", " + Model.OrganisationName(row.OrganisationId) : ""))</span></th>
             <td>
-                @foreach (var o in row.Category.Owners)
+                @foreach (var o in row.Primaries)
                 {
-                    <div>@Model.UserName(o.UserId) @if (o.IsPrimary) { <span class="badge">@L["primary"]</span> }
+                    <div>@o.Name
                     @if (Model.CanAssign)
                     {
-                        <form method="post" asp-page-handler="End" class="inline"><input type="hidden" name="assignmentId" value="@o.AssignmentId" /><input type="hidden" name="reason" value="Ownership ended from the category list" />
-                            <button class="secondary" type="submit" aria-label="@L["End ownership for"] @Model.UserName(o.UserId) @L["of"] @row.Category.Name">@L["End"]</button></form>
+                        <form method="post" asp-page-handler="End" class="inline"><input type="hidden" name="assignmentId" value="@o.AssignmentId" /><input type="hidden" name="reason" value="Ownership ended from the ownership screen" />
+                            <button class="secondary" type="submit" aria-label="@L["End ownership for"] @o.Name @L["of"] @row.Name">@L["End"]</button></form>
                     }</div>
                 }
-                @if (row.Category.Owners.Count == 0) { <span class="hint">@L["No current owner"]</span> }
+                @if (row.Primaries.Count == 0 && row.IsActive)
+                {
+                    @if (row.ParentId is not null && Model.Board.Rows.FirstOrDefault(p => p.CategoryId == row.ParentId) is { Primaries.Count: > 0 } parent) { <span class="hint">@Terms.Expand("Covered by the owner of ")@row.ParentName</span> }
+                    else { <span class="badge warn">@L["Needs an owner"]</span> }
+                }
             </td>
-            <td>@(row.Category.IsActive ? L["Active"] : L["Inactive"])</td>
-            @if (Model.CanAssign || Model.CanManage)
+            <td>
+                @foreach (var o in row.Backups)
+                {
+                    <div>@o.Name
+                    @if (Model.CanAssign)
+                    {
+                        <form method="post" asp-page-handler="End" class="inline"><input type="hidden" name="assignmentId" value="@o.AssignmentId" /><input type="hidden" name="reason" value="Ownership ended from the ownership screen" />
+                            <button class="secondary" type="submit" aria-label="@L["End ownership for"] @o.Name @L["of"] @row.Name">@L["End"]</button></form>
+                    }</div>
+                }
+                @if (row.Backups.Count == 0) { <span class="hint">—</span> }
+            </td>
+            <td>@if (!row.IsActive) { <span class="badge">@L["Inactive"]</span> } else if (row.Attention.Count > 0) { <span class="badge warn">@L["Needs attention"]</span> @foreach (var a in row.Attention) { <div class="hint">@Terms.Expand(a)</div> } } else if (row.Primaries.Count > 0) { <span class="badge ok">@L["Complete"]</span> }</td>
+            @if (Model.CanManage)
             {
-                <td>
-                    @if (Model.CanAssign && row.Category.IsActive)
-                    {
-                        <form method="post" asp-page-handler="Assign">
-                            <input type="hidden" name="categoryId" value="@row.Category.Id" />
-                            <label for="owner-@row.Category.Id" class="visually-hidden">@L["Owner for"] @row.Category.Name</label>
-                            <select id="owner-@row.Category.Id" name="userId" required aria-required="true">
-                                <option value="">@L["Choose an owner"]</option>
-                                @foreach (var u in Model.OwnerCandidates(row.Category.OrganisationId)) { <option value="@u.Id">@u.DisplayName</option> }
-                            </select>
-                            <button type="submit">@L["Assign owner"]</button>
-                        </form>
-                    }
-                    @if (Model.CanManage && row.Category.IsActive)
-                    {
-                        <form method="post" asp-page-handler="Deactivate"><input type="hidden" name="categoryId" value="@row.Category.Id" /><button class="secondary" type="submit" aria-label="@L["Deactivate"] @row.Category.Name">@L["Deactivate"]</button></form>
-                    }
-                </td>
+                <td>@if (row.IsActive) { <form method="post" asp-page-handler="Deactivate"><input type="hidden" name="categoryId" value="@row.CategoryId" /><button class="secondary" type="submit" aria-label="@L["Deactivate"] @row.Name">@L["Deactivate"]</button></form> }</td>
             }
         </tr>
     }
-    @if (Model.Rows.Count == 0) { <tr><td colspan="5">@L["No [[category|plural|lower]] are visible to you."]</td></tr> }
+    @if (Model.Board.Rows.Count == 0) { <tr><td colspan="6">@L["No [[category|plural|lower]] are visible to you."]</td></tr> }
     </tbody>
 </table>
 </div>
+
+@if (Model.CanAssign && Model.Board.Rows.Count > 0)
+{
+    @foreach (var orgId in Model.OrganisationsShown)
+    {
+        <section class="card" aria-labelledby="assign-@orgId">
+            <h2 id="assign-@orgId">@L["Choose owners"]@(Model.OrganisationsShown.Count() > 1 ? " · " + Model.OrganisationName(orgId) : "")</h2>
+            <p class="hint">@L["Tick the [[category|plural|lower]] above (or leave all unticked to use “assign all”), then choose the person and whether they are the primary or a backup owner."]</p>
+            <div class="field"><label for="user-@orgId">@L["Person"]</label>
+                <select id="user-@orgId" name="UserId" form="bulk" required aria-required="true">
+                    <option value="">@L["Choose a person"]</option>
+                    @foreach (var p in Model.People(orgId)) { <option value="@p.UserId">@p.DisplayName@(p.HoldsRole ? "" : " (" + L["will be given the owner role"].Value + ")")</option> }
+                </select></div>
+            <fieldset><legend>@L["As"]</legend>
+                <div class="field check"><input id="role-p-@orgId" type="radio" name="Role" value="primary" form="bulk" checked /><label for="role-p-@orgId">@L["Primary owner"]</label></div>
+                <div class="field check"><input id="role-b-@orgId" type="radio" name="Role" value="backup" form="bulk" /><label for="role-b-@orgId">@L["Backup owner"]</label></div></fieldset>
+            <input type="hidden" name="OrganisationId" value="@orgId" form="bulk" />
+            <button type="submit" form="bulk">@L["Review the ticked [[category|plural|lower]]"]</button>
+            <button type="submit" form="bulk" formaction="?handler=PlanAll" class="secondary">@Terms.Expand("Assign all [[category|plural|lower]] to this person")</button>
+        </section>
+    }
+}
 
 @if (Model.CanManage)
 {
@@ -65,7 +119,7 @@
         <div class="field"><label for="Code">@L["Code"]</label><input id="Code" name="Code" type="text" required aria-required="true" maxlength="100" /></div>
         <div class="field"><label for="Name">@L["Name"]</label><input id="Name" name="Name" type="text" required aria-required="true" maxlength="200" /></div>
         <div class="field"><label for="ParentCategoryId">@L["Parent [[category|lower]]"]</label>
-            <select id="ParentCategoryId" name="ParentCategoryId"><option value="">@L["None (top level)"]</option>@foreach (var r in Model.Rows.Where(r => r.Category.IsActive)) { <option value="@r.Category.Id">@r.Category.Name (@Model.OrganisationName(r.Category.OrganisationId))</option> }</select></div>
+            <select id="ParentCategoryId" name="ParentCategoryId"><option value="">@L["None (top level)"]</option>@foreach (var r in Model.Board.Rows.Where(r => r.IsActive)) { <option value="@r.CategoryId">@r.Name (@Model.OrganisationName(r.OrganisationId))</option> }</select></div>
         <button type="submit">@L["Add [[category|lower]]"]</button>
     </form>
 }

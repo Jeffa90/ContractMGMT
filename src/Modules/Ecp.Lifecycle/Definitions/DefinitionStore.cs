@@ -107,6 +107,10 @@ internal sealed class WorkflowDefinitionStore(IConfigurationReleases releases, I
                     $"Installed the {document.PackKey} {document.Version} reference definition (package {document.PackageSha256[..12]})", ct);
                 await packContent.RecordStartAsync(organisationId, document, ct);
             }
+            catch (PreviewReadOnlyException)
+            {
+                latest = UnsavedRelease.Of(kind, organisationId, document.Json, "Reference definition (preview: not installed)");   // a read-only preview uses it without installing it
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Another request may have installed it first (the release number is unique); use theirs. Anything else is a real failure.

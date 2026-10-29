@@ -53,6 +53,10 @@ internal sealed class NotificationPolicyStore(IConfigurationReleases releases, I
                     $"Installed the {document.PackKey} {document.Version} reference notification policy (package {document.PackageSha256[..12]})", ct);
                 await packContent.RecordStartAsync(organisationId, document, ct);
             }
+            catch (PreviewReadOnlyException)
+            {
+                latest = UnsavedRelease.Of(NotificationPolicyKinds.Policy, organisationId, document.Json, "Reference policy (preview: not installed)");   // a read-only preview uses it without installing it
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 latest = await releases.LatestAsync(NotificationPolicyKinds.Policy, organisationId, ct);

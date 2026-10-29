@@ -9,6 +9,7 @@ using Ecp.Lifecycle;
 using Ecp.Notifications;
 using Ecp.Operations;
 using Ecp.Persistence;
+using Ecp.Access;
 using Ecp.Setup;
 using Ecp.SharedKernel;
 using Ecp.Tenancy;
@@ -177,6 +178,7 @@ public sealed class TestApp : IAsyncDisposable
         // The test worlds create organisations without a solution pack and exercise the reference (JBS) lifecycle and notification policy, so the installation default names that pack here and only here.
         services.AddLifecycleModule(o => { o.Mode = setupMode; o.DefaultPackId = TestPacks.Reference; });
         services.AddNotificationsModule(o => { o.Mode = setupMode; o.DefaultPackId = TestPacks.Reference; });
+        services.AddAccessModule();
         services.AddOperationsModule(root);
         services.AddSetupModule(new SetupEnvironment(setupMode, root, DemoIdentityEnabled: false, DemoSeedEnabled: false, ConnectionFromSecretReference: false,
             provider.ToString(), "test", AllowRemoteSetup: false));

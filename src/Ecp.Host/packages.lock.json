@@ -415,6 +415,18 @@
         "resolved": "9.0.11",
         "contentHash": "s8yUYuYYu+PAwvBdhLG1KyrGrk9gkYeuPxfAsXsTqqWyepwSyEw8hAaflW4nO98NG52YpYI1am2+9o+79h2RtQ=="
       },
+      "ecp.access": {
+        "type": "Project",
+        "dependencies": {
+          "Ecp.Audit": "[1.1.0, )",
+          "Ecp.Configuration": "[1.1.0, )",
+          "Ecp.Contracts": "[1.1.0, )",
+          "Ecp.Identity": "[1.1.0, )",
+          "Ecp.Persistence": "[1.1.0, )",
+          "Ecp.SharedKernel": "[1.1.0, )",
+          "Ecp.Tenancy": "[1.1.0, )"
+        }
+      },
       "ecp.approvals": {
         "type": "Project",
         "dependencies": {
@@ -571,6 +583,7 @@
       "ecp.setup": {
         "type": "Project",
         "dependencies": {
+          "Ecp.Access": "[1.1.0, )",
           "Ecp.Audit": "[1.1.0, )",
           "Ecp.Configuration": "[1.1.0, )",
           "Ecp.Contracts": "[1.1.0, )",

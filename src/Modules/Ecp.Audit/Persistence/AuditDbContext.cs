@@ -9,6 +9,7 @@ public sealed class AuditDbContext(DbContextOptions<AuditDbContext> options, DbC
 {
     public DbSet<AuditEvent> Events => Set<AuditEvent>();
     protected override string SchemaName => AuditModule.Schema;
+    protected override bool PermitsWritesInPreview => true;   // a preview is recorded, and what it was refused is recorded; nothing else may be written
 
     protected override void ConfigureModule(ModelBuilder mb)
     {

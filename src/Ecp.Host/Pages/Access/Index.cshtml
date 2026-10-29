@@ -1,28 +1,94 @@
 @page "/Access"
 @model Ecp.Host.Pages.Access.IndexModel
-@{ ViewData["Title"] = L["My access"].Value; }
+@{
+    ViewData["Title"] = L["My access"].Value;
+    var r = Model.Report;
+}
 <h1>@L["My access"]</h1>
-<p class="lede">@L["What you are allowed to do is decided by the roles you hold, where they apply, and the highest classification you may see."]</p>
-@if (Model.Roles.Count > 0)
+<p class="lede">@L["What you can do depends on the access you have been given, where it applies, and the highest classification you may see."]</p>
+
+@if (!r.HasAnyAccess)
 {
-    <section aria-labelledby="roles-h" class="card">
-        <h2 id="roles-h">@L["Your access"]</h2>
-        <div class="table-wrap">
-            <table>
-                <caption class="visually-hidden">@L["Your current role assignments"]</caption>
-                <thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["Scope"]</th><th scope="col">@L["Classification ceiling"]</th></tr></thead>
-                <tbody>
-                @foreach (var r in Model.Roles)
-                {
-                    <tr><td>@Terms.Role(r.Role)</td><td>@r.Scope</td><td>@r.Ceiling</td></tr>
-                }
-                </tbody>
-            </table>
-        </div>
-    </section>
+    <p class="flash warn" role="status">@L["You have no active access, so no records are visible. Ask an administrator for access."]</p>
 }
 else
 {
-    <p class="flash warn" role="status">@L["You have no active role assignment, so no records are visible. Ask an administrator for access."]</p>
+    <section aria-labelledby="who-h" class="card">
+        <h2 id="who-h">@L["You"]</h2>
+        <p>@r.DisplayName<span class="hint"> · @r.Email</span></p>
+        @if (r.Profiles.Count > 0)
+        {
+            <p>@L["Kind of access"]: @foreach (var p in r.Profiles) { <span class="badge">@Terms.Expand(p.Label)</span> }</p>
+        }
+        <p>@L["Highest classification you may see"]: <strong>@r.HighestClassification</strong></p>
+        @if (r.Owns.Count > 0)
+        {
+            <p>@Terms.Expand("You own these [[category|plural|lower]]"): @string.Join(", ", r.Owns.Select(o => o.Name))</p>
+        }
+        @foreach (var a in r.Attention.Where(a => a.Code is "role-without-ownership" or "owner-without-role"))
+        {
+            <p class="flash warn" role="status">@Terms.Expand(a.Message)</p>
+        }
+    </section>
+
+    @foreach (var grp in r.CanDo.GroupBy(a => a.Group))
+    {
+        <section aria-labelledby="g-@(Math.Abs(grp.Key.GetHashCode()))" class="card">
+            <h2 id="g-@(Math.Abs(grp.Key.GetHashCode()))">@Terms.Expand(grp.Key)</h2>
+            <ul class="ability-list">
+            @foreach (var a in grp)
+            {
+                <li>
+                    <strong><span aria-hidden="true">✓</span><span class="visually-hidden">@L["You can"]</span> @Terms.Expand(a.Label)</strong>
+                    @if (a.Where.Length > 0) { <div class="hint">@Terms.Expand(a.Where)</div> }
+                    @if (a.Conditions is { Length: > 0 }) { <div class="hint">@Terms.Expand(a.Conditions)</div> }
+                    <details><summary>@L["Why"]</summary><ul>@foreach (var b in a.Because) { <li>@Terms.Expand(b)</li> }</ul></details>
+                </li>
+            }
+            </ul>
+        </section>
+    }
+}
+
+<section aria-labelledby="cannot-h" class="card">
+    <h2 id="cannot-h">@L["What you cannot do"]</h2>
+    <details>
+        <summary>@L["Show what you cannot do, and what would give it"]</summary>
+        <ul class="ability-list">
+        @foreach (var a in r.CannotDo)
+        {
+            <li>
+                <span aria-hidden="true">✗</span><span class="visually-hidden">@L["You cannot"]</span> @Terms.Expand(a.Label)
+                @if (a.GrantedBy.Count > 0) { <span class="hint"> · @L["Given by"]: @string.Join(", ", a.GrantedBy.Select(Terms.Expand))</span> }
+                @if (a.Conditions is { Length: > 0 }) { <div class="hint">@Terms.Expand(a.Conditions)</div> }
+            </li>
+        }
+        </ul>
+    </details>
+</section>
+
+@if (r.Grants.Count > 0)
+{
+    <section aria-labelledby="roles-h" class="card">
+        <h2 id="roles-h">@L["Details"]</h2>
+        <details>
+            <summary>@L["Roles, where they apply, and where each came from"]</summary>
+            <div class="table-wrap">
+                <table>
+                    <caption class="visually-hidden">@L["Your role assignments"]</caption>
+                    <thead><tr><th scope="col">@L["Role"]</th><th scope="col">@L["Where"]</th><th scope="col">@L["Classification ceiling"]</th><th scope="col">@L["Came from"]</th><th scope="col">@L["Status"]</th></tr></thead>
+                    <tbody>
+                    @foreach (var g in r.Grants)
+                    {
+                        <tr>
+                            <td>@Terms.Role(g.RoleCode)</td><td>@Terms.Expand(g.Where)</td><td>@g.HighestClassification</td><td>@Terms.Expand(g.Source)</td>
+                            <td>@(g.Active ? L["Active"].Value : g.Future ? L["Starts later"].Value : L["Ended"].Value)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </section>
 }
 <p><a href="/">@L["Back to Home"]</a></p>

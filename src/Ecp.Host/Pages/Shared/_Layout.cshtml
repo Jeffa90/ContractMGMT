@@ -5,6 +5,7 @@
 @inject EcpHostOptions HostOptions
 @inject Ecp.Host.Setup.BrandingAccessor Brand
 @inject Ecp.Identity.ElevationContext Elevation
+@inject Ecp.SharedKernel.PreviewContext PreviewCtx
 @inject Ecp.Host.Navigation.NavigationService Navigation
 @inject Ecp.Operations.IMaintenanceService Maintenance
 @{
@@ -39,6 +40,14 @@
 </head>
 <body>
     <a class="skip-link" href="#main">@L["Skip to main content"]</a>
+    @if (PreviewCtx.Active)
+    {
+        <div class="access-banner preview-banner" role="alert">
+            <strong>@L["TEST MODE"] — @L["Previewing as"] @PreviewCtx.TargetName</strong>
+            <span>@L["Read-only"] · @L["ends in {0} min", Math.Max(0, (int)Math.Ceiling((PreviewCtx.ExpiresUtc - DateTime.UtcNow).TotalMinutes))]</span>
+            <form method="post" action="/Account/ExitPreview"><button type="submit">@L["Exit user preview"]</button></form>
+        </div>
+    }
     @if (HostOptions.Mode != EcpMode.Production)
     {
         <div class="env-banner" role="status">@L["Demonstration environment"] (@HostOptions.Mode): @L["synthetic data only, not for production use."]</div>

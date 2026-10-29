@@ -134,6 +134,7 @@ internal sealed class AccessWorld
     }
 
     public DateTime Now => _app.Clock.UtcNow;
+    public void Advance(TimeSpan by) => _app.Clock.Advance(by);
 
     /// <summary>A scope in this tenant with no signed-in user (trusted setup-style operations and verification reads).</summary>
     public TenantScope AsScopeless() => _app.ScopeFor(TenantId);

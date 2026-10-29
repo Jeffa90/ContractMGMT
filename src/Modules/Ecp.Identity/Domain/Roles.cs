@@ -37,4 +37,4 @@ public enum ScopeLevel { Installation, Tenant, Organisation }
 
 public enum UserStatus { Invited, Active, Disabled }
 
-public enum AssignmentSource { Manual, GroupMapping, Onboarding, Setup, Demo }
+public enum AssignmentSource { Manual, GroupMapping, Onboarding, Setup, Demo, TestBootstrap }

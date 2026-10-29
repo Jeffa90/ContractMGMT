@@ -41,7 +41,7 @@
     <div class="table-wrap"><table>
         <caption class="visually-hidden">@L["Plan"]</caption>
         <thead><tr><th scope="col">@L["Section"]</th><th scope="col">@L["To create"]</th><th scope="col">@L["Already present"]</th><th scope="col">@L["Dropped from the previous release"]</th></tr></thead>
-        <tbody>@foreach (var p in Model.Plan) { <tr><th scope="row">@p.Section</th><td>@p.ToCreate</td><td>@p.AlreadyPresent</td><td>@p.ToEnd</td></tr> }</tbody>
+        <tbody>@foreach (var p in Model.Plan) { <tr><th scope="row">@L[p.Section]</th><td>@p.ToCreate</td><td>@p.AlreadyPresent</td><td>@p.ToEnd</td></tr> }</tbody>
     </table></div>
     <p class="hint">@L["Nothing is deleted. Items dropped from the previous release are ended only if onboarding created them."]</p>
 </section>

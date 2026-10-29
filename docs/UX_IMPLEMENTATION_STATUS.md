@@ -1,6 +1,6 @@
 # Guided administration: implementation status
 
-Status: **Implemented in slices UX-1 to UX-7; verification and usability testing described below.** Branch ux/guided-administration (from claude/stoic-volta-dvszm5 at commit 5cdf9f7; that branch is unchanged). Design: `docs/UX_REDESIGN.md`. Criteria: `docs/UX_ACCEPTANCE_CRITERIA.md`. Decisions: `decisions/ADR-0039-guided-administration-access-profiles.md`. Production approval is external governance and nothing here declares it.
+Status: **Implemented in slices UX-1 to UX-7 and verified (final acceptance review 2026-10-29, section 5A); three UX gaps found by the owner's manual scenario and a moderated usability test remain open (sections 5 and 6).** Branch ux/guided-administration (from claude/stoic-volta-dvszm5 at commit 5cdf9f7; that branch is unchanged). Design: `docs/UX_REDESIGN.md`. Criteria: `docs/UX_ACCEPTANCE_CRITERIA.md`. Decisions: `decisions/ADR-0039-guided-administration-access-profiles.md`. Production approval is external governance and nothing here declares it.
 
 Labels: **Implemented** (built and covered by a named automated test), **Partial** (built, with the stated gap), **Not built**, **Not Verified** (needs a person, a browser or an environment this work did not have). "SQLite" tests are provider-independent behaviour, not SQL Server proof; "SQL Server" means the same scenario ran on a real SQL Server 2022 container.
 
@@ -93,6 +93,45 @@ Two things the run exposed and that were fixed on this branch: the **Plan table 
 
 A person doing the same in a browser is **Not Verified**.
 
+## 5A. Final acceptance review: the 32 items
+
+"Test" names a class or method under `tests/`. Items are **Implemented** (built and covered by a named automated test) unless stated. Where coverage is narrower than the item, it says so.
+
+| # | Item | Result | Evidence and note |
+|---|---|---|---|
+| 1 | Simplified operational navigation | Implemented | `NavigationAndHomeTests` (short menu for every role; no Administration for everyday roles; every old entry still has a place) |
+| 2 | Administration landing page | Implemented | `NavigationAndHomeTests.The_Administration_landing_page_lists_only_what_the_person_may_use_and_can_be_searched` |
+| 3 | Task-oriented Home | Implemented | `NavigationAndHomeTests` (work cards, set-up card for administrators only); manual scenario step E. On a new organisation the work cards appear only after the pack's reference notification policy can be installed (needs the pack's classification levels) |
+| 4 | Prominent **+ New contract** for authorised users | Implemented | `Home_offers_New_contract_only_to_a_person_who_can_start_one_and_otherwise_says_why`; both journeys |
+| 5 | Access Profile catalogue | Implemented | eight profiles, compiled in (configurable definitions are slice S8, not built); `AccessProfile*` scenarios, `AccessProfileScopeTests` |
+| 6 | Effective Access report | Implemented | `Effective_access_agrees_with_the_evaluator_for_every_person_and_permission` (SQLite and SQL Server); abilities catalogue test |
+| 7 | My Access page | Implemented | `MyAccessUiTests` |
+| 8 | People & Access list | Implemented | `PeopleAccessUiTests`; search and paging **Not built** |
+| 9 | Add Person wizard | Implemented | `PeopleAccessUiTests`, `GuidedAdministrationJourneyTests`, manual scenario (two people) |
+| 10 | Edit Access wizard | Implemented | `BootstrapAndOwnershipUiTests` (edit-mode review), `GuidedAdministrationAccessibilityTests`, service tests for the atomic apply and recent sign-in |
+| 11 | Organisation, category, site and business-unit scope selection | Implemented; **coverage partial** | organisation and category end to end (manual scenario, journey); division, business-unit and site choices become the right scope sets and viewer kinds in `AccessProfileScopeTests` (unit level, added in this review); an HTTP test that selects a site or business unit in the wizard page is **Not built** |
+| 12 | Classification in plain language | Implemented | the wizard asks for "up to" the organisation's own level names; both journeys use Internal |
+| 13 | Category ownership in the same journey | Implemented | wizard step 4; `Category_owners_are_chosen_in_a_form_from_everyone_and_the_owner_role_is_given_in_the_same_save`; manual scenario |
+| 14 | Approver membership in the same journey | Implemented | wizard step 6; `An_approval_authority_needs_an_approver_group...`; manual scenario (Approval Authority). The approver group must exist first (gap 3) |
+| 15 | Advanced grants separated | Implemented | "Users and roles (advanced)" and Advanced links; `Every_pre_redesign_navigation_entry_still_has_a_place` |
+| 16 | Guided initial-administrator access setup | Implemented | `SetupScenarios`, `BootstrapAndOwnershipUiTests`, manual scenario; gaps 1 and 2 |
+| 17 | Demo/Test-only "Give me full Test-mode access" | Implemented | `Full_test_mode_access_*`, `Test_mode_access_does_not_exist_in_production` (refused at the service) |
+| 18 | Demo/Test-only "Allow demonstration sign-in" | Implemented | `A_test_person_signs_in_through_the_demonstration_provider...`, `Demonstration_sign_in_and_synthetic_people_are_refused_in_production_at_the_service`, manual scenario (listed on the sign-in page, signs in) |
+| 19 | Demo/Test-only "Preview as this user" | Implemented | `Preview_*` scenarios, `PeopleAccessUiTests`, `Preview_does_not_exist_in_production` |
+| 20 | Preview is read-only | Implemented | `A_preview_cannot_write_anything_but_its_own_record_and_the_audit_trail`; request layer and database layer; manual scenario (a supplier create is refused) |
+| 21 | Preview uses the target's real effective access | Implemented | `A_preview_runs_with_the_previewed_persons_real_access_not_the_administrators`; manual scenario (the previewed person sees the contract of a category they do not own read-only and cannot edit it, per the read-all rule) |
+| 22 | Preview cannot inherit administrator authority | Implemented | same; manual scenario (no Administration menu, People forbidden) |
+| 23 | Preview cannot cross tenant or organisation | Implemented | `A_preview_cannot_cross_tenants`; `You_may_preview_only_what_you_could_give...` (the previewer must be able to give everything the target holds, including the organisation scope) |
+| 24 | Persistent TEST MODE banner | Implemented | `PeopleAccessUiTests`, journey, manual scenario; not on the one refusal page (recorded deviation 5) |
+| 25 | Clear Exit Preview | Implemented | the banner form carries its own antiforgery token; used exactly so by both journeys |
+| 26 | Onboarding checklist, Required/Recommended/Optional | Implemented | `ReadinessScenarios` (SQLite and SQL Server), `OnboardingHostTests`, `MappingsAndChecklistUiTests` |
+| 27 | Never "Ready" while Required operational access is incomplete | Implemented | `ReadinessScenarios`; manual scenario (publish refused with "Not ready to publish") |
+| 28 | Category ownership as form/table, not CSV | Implemented | `BootstrapAndOwnershipUiTests`; manual scenario |
+| 29 | Identity Group Mappings under Advanced | Implemented | `MappingsAndChecklistUiTests`, `Mappings_*` scenarios |
+| 30 | CSV and bulk retained only as Advanced/Bulk | **Partial** | the onboarding draft's CSV sections remain, labelled "Draft sections" with an explanation rather than "Bulk import (Advanced)" (ONB-009); migration/bulk tools are unchanged under Operations |
+| 31 | The existing evaluator remains the sole authority | Implemented | `AccessEvaluator.cs` and `PermissionMatrix.cs` have **no diff** from the baseline; the parity test above; a person holding every Test-mode role still cannot approve their own submission |
+| 32 | Stable role and permission identifiers unchanged | Implemented | no diff in the role/permission reference CSVs or `RoleCodes`; the only change in `Roles.cs` is a new `AssignmentSource` value, `TestBootstrap` |
+
 ## 6. Known gaps (first things to do next)
 
 0. The three scenario gaps in section 5: a review page at set-up, ownership of categories added later, a guided first approver group and a guided path to the pack's approval rules.
@@ -102,3 +141,18 @@ A person doing the same in a browser is **Not Verified**.
 4. An inventory sweep of every GET page under Preview (PRV-010) and a per-permission differential for effective access (EFF-002).
 5. Configurable access-profile definitions with draft, publish and rollback (slice S8); today they are compiled in.
 6. Documents hub, "Recent contracts", reports (UXG-09 and later).
+
+## 7. Verification of this state
+
+| Check | Where | Result |
+|---|---|---|
+| Locked restore; Release build with warnings as errors | local workspace and CI | 0 warnings, 0 errors; CI run 82 (commit 7bf540c) succeeded |
+| Unit tests | local | **979 passed** (the 967 of the full run plus the 12 scope tests added in this review, run separately) |
+| Architecture tests | local | **113 passed** |
+| API tests (including both journeys, the accessibility checks and the manual acceptance scenario) | local | **242 passed** |
+| Integration suite including every real SQL Server 2022 wrapper and the upgrade tests | local, `ECP_TEST_SQL` set | **715 passed, 0 failed, 0 skipped**. Local total **2,049 passed, 0 failed, 0 skipped** |
+| N-1 to N upgrade rehearsal on SQL Server; SQL Server tests; performance baseline | CI run 82 | succeeded |
+| Container image build and smoke | CI run 82 | succeeded |
+| Repository checks, documentation consistency, solution packs, pack tool, tooling tests, supply chain | local and CI | pass; two licence items remain pending owner review (unchanged) |
+
+Not Verified: a person completing the scenario in a browser; moderated usability (USE-001..006); keyboard, zoom and screen-reader walkthroughs (ACC-002/004/005); IIS and Azure (unchanged from the baseline). Production approval is external governance and is not declared.

@@ -1,6 +1,6 @@
 # UX acceptance criteria: guided administration
 
-Status: **Approved by the owner (2026-10-29).** These are the criteria the slices in `docs/UX_REDESIGN.md` section 18 must meet before they are called done. How far each is met, with the evidence and the honest gaps, is in `docs/UX_IMPLEMENTATION_STATUS.md`. Production approval is external governance and nothing here declares it.
+Status: **Approved by the owner (2026-10-29).** These are the criteria the slices in `docs/UX_REDESIGN.md` section 18 must meet before they are called done. How far each is met, with the evidence and the honest gaps, is in `docs/UX_IMPLEMENTATION_STATUS.md` (section 4 per criterion, section 5A for the final 32-item review, section 5 for the manual scenario). Production approval is external governance and nothing here declares it.
 
 How to read: each criterion has an ID, a statement written as *Given / When / Then* where useful, and **Verify**, the kind of evidence that counts. "Over HTTP" means a test that signs in through the real sign-in page and drives the real pages (the style of `NoCodeRehearsalTests`), on SQLite and on real SQL Server. "Role matrix" means the check is repeated for every role in `requirements/02-reference/role-permission-matrix.csv`. A criterion is **Passed**, **Failed**, or **Not Verified**; a slice does not close with an unexplained Not Verified.
 

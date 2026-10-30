@@ -158,7 +158,11 @@ A person doing the same in a browser is **Not Verified**.
 7. Fields (UX-10): per-surface Create/Edit/Details switches (an engine change); a new field is not a register column until a shared view lists it (the Studio's Views page), only an export can include it on request; shared choice lists are still edited on the older Lists page; the older Studio field pages remain as the advanced editor.
 8. Observations from the fresh journey, not changed: the set-up classification stage lets an administrator remove a level the pack's notification policy names ("Legal Privileged"), which then shows as an empty Home instead of a message on that stage; the data-migration route of the ownership policy has no dedicated test (the Categories screen and the trusted upsert do); the Approval authorities page carries the machine key in its edit link and a hidden field (never in the visible text); approval-rule authoring remains the form editor for a workflow that names a matrix.
 
-## 7. Verification of this state
+## 7A. Verification after UX-10 (guided Fields)
+
+Local, 2026-10-30: locked restore and Release build with warnings as errors (0 warnings, 0 errors); unit **979**, architecture **113**, API **262** (including `GuidedFieldsSqlServerTests` on a real SQL Server 2022 container), integration **731** (every real-SQL-Server wrapper and the upgrade tests): **2,085 passed, 0 failed, 0 skipped**. `tools/check-repo.py`, `tools/check-docs.py`, `tools/check-packs.sh` and the tooling tests pass. No migration was added, so the 1.1.0 upgrade manifest is unchanged. The full run caught one defect in the new pages (a stage-name helper used a regex lookbehind, unsupported by the non-backtracking engine, which made the Edit page fail) and two architecture-rule breaches (a fixed date format and a workflow-state literal in a comment); all fixed and re-run. CI for the final commit is recorded in `deploy/STATUS.md`.
+
+## 7. Verification of the UX-9 state
 
 After UX-9 (commit 6daa265 and the documentation commit that follows it):
 

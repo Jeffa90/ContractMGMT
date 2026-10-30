@@ -119,7 +119,16 @@ public static class FieldGuide
     }
 
     /// <summary>A workflow state code read as words, splitting at each capital letter. Only the label changes; the stored value stays the state's own code.</summary>
-    public static string StageName(string code) => System.Text.RegularExpressions.Regex.Replace(code, "(?<=[a-z])(?=[A-Z])", " ", System.Text.RegularExpressions.RegexOptions.NonBacktracking);
+    public static string StageName(string code)
+    {
+        var sb = new StringBuilder(code.Length + 4);
+        for (var i = 0; i < code.Length; i++)
+        {
+            if (i > 0 && char.IsUpper(code[i]) && char.IsLower(code[i - 1])) sb.Append(' ');
+            sb.Append(code[i]);
+        }
+        return sb.ToString();
+    }
 
     public static string Sentence(IEnumerable<string> parts)
     {

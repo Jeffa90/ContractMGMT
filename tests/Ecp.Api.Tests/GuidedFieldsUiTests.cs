@@ -448,6 +448,12 @@ public sealed class GuidedFieldsUiTests
         Assert.Matches("^[a-z][a-z0-9_]{1,62}$", FieldGuide.KeyFromName(new string('x', 200), []));
     }
 
+    [Theory]
+    [InlineData("AwaitingApproval", "Awaiting Approval")]
+    [InlineData("Draft", "Draft")]
+    [InlineData("InLegalReview", "In Legal Review")]
+    public void A_stage_code_is_shown_as_words(string code, string words) => Assert.Equal(words, FieldGuide.StageName(code));
+
     [Fact]
     public void A_choice_code_reads_naturally_and_is_unique()
     {

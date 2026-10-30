@@ -21,19 +21,58 @@
 {
     <section class="card" aria-labelledby="plan-h">
         <h2 id="plan-h">@L["Check before you save"]</h2>
-        <p>@Terms.Expand($"{plan.PersonName} will become the {(Model.Role == "primary" ? "primary" : "backup")} owner of {plan.Categories} [[category|lower]]" + (plan.Categories == 1 ? "" : "s") + ".")</p>
+        @if (Model.PlanAll)
+        {
+            <p>@Terms.Expand($"{plan.PersonName} will own every current and future [[category|lower]] in this [[organisation|lower]], as {(Model.Role == "primary" ? "primary" : "backup")} owner.")</p>
+            <ul>
+                <li>@Terms.Expand("A [[category|lower]] added later is theirs automatically, in the same moment it is created.")</li>
+                @if (plan.Categories > 0) { <li>@plan.Categories @Terms.Expand("[[category|plural|lower]] exist now and are covered now.")</li> }
+                @if (plan.AlreadyOwned > 0) { <li>@plan.AlreadyOwned @L["already owned by them, so nothing changes there."]</li> }
+                <li>@L["Ownership someone else was given is left exactly as it is. Where another primary owner exists they become a backup beside them."]</li>
+                @if (plan.WillAddRole) { <li>@Terms.Expand($"{plan.PersonName} does not yet hold the role that lets owners act, so they will also be given the [[contract]] Manager profile.")</li> }
+            </ul>
+            <form method="post" asp-page-handler="OwnAll">
+                <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="UserId" value="@Model.UserId" /><input type="hidden" name="Role" value="@Model.Role" />
+                <div class="field"><label for="Reason">@L["Reason (kept in the audit trail)"]</label><input id="Reason" name="Reason" type="text" maxlength="1000" /></div>
+                <button type="submit">@L["Save ownership"]</button> <a href="/Admin/Categories">@L["Cancel"]</a>
+                <p class="hint">@L["You may be asked to sign in again before saving."]</p>
+            </form>
+        }
+        else
+        {
+            <p>@Terms.Expand($"{plan.PersonName} will become the {(Model.Role == "primary" ? "primary" : "backup")} owner of {plan.Categories} [[category|lower]]" + (plan.Categories == 1 ? "" : "s") + ".")</p>
+            <ul>
+                @if (plan.AlreadyOwned > 0) { <li>@plan.AlreadyOwned @L["already as chosen, so nothing changes there."]</li> }
+                @if (plan.WillReplace > 0) { <li>@plan.WillReplace @L["current primary owner(s) will be replaced and told why in the record."]</li> }
+                @if (plan.WillAddRole) { <li>@Terms.Expand($"{plan.PersonName} does not yet hold the role that lets owners act, so they will also be given the [[contract]] Manager profile.")</li> }
+            </ul>
+            <form method="post" asp-page-handler="SetOwner">
+                <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="UserId" value="@Model.UserId" /><input type="hidden" name="Role" value="@Model.Role" />
+                @foreach (var id in Model.CategoryIds) { <input type="hidden" name="CategoryIds" value="@id" /> }
+                <div class="field"><label for="Reason">@L["Reason (kept in the audit trail)"]</label><input id="Reason" name="Reason" type="text" maxlength="1000" /></div>
+                <button type="submit">@L["Save ownership"]</button> <a href="/Admin/Categories">@L["Cancel"]</a>
+                <p class="hint">@L["You may be asked to sign in again before saving."]</p>
+            </form>
+        }
+    </section>
+}
+
+@if (Model.Standing.Count > 0)
+{
+    <section class="card" aria-labelledby="standing-h">
+        <h2 id="standing-h">@Terms.Expand("Owns every current and future [[category|lower]]")</h2>
+        <p class="hint">@Terms.Expand("These people own each [[category|lower]] in the [[organisation|lower]], including any added later. Ending it ends only the ownership it created; ownership given any other way stays.")</p>
         <ul>
-            @if (plan.AlreadyOwned > 0) { <li>@plan.AlreadyOwned @L["already as chosen, so nothing changes there."]</li> }
-            @if (plan.WillReplace > 0) { <li>@plan.WillReplace @L["current primary owner(s) will be replaced and told why in the record."]</li> }
-            @if (plan.WillAddRole) { <li>@Terms.Expand($"{plan.PersonName} does not yet hold the role that lets owners act, so they will also be given the [[contract]] Manager profile.")</li> }
+            @foreach (var p in Model.Standing)
+            {
+                <li>@p.PersonName · @p.OrganisationName · @L["since"] @p.CreatedUtc.ToString("yyyy-MM-dd") · @p.CategoriesCovered @L["covered now"]
+                    @if (Model.CanAssign)
+                    {
+                        <form method="post" asp-page-handler="EndStanding" class="inline"><input type="hidden" name="policyId" value="@p.Id" /><input type="hidden" name="reason" value="Standing ownership ended from the ownership screen" />
+                            <button class="secondary" type="submit" aria-label="@L["End standing ownership for"] @p.PersonName">@L["End"]</button></form>
+                    }</li>
+            }
         </ul>
-        <form method="post" asp-page-handler="SetOwner">
-            <input type="hidden" name="OrganisationId" value="@Model.OrganisationId" /><input type="hidden" name="UserId" value="@Model.UserId" /><input type="hidden" name="Role" value="@Model.Role" />
-            @foreach (var id in Model.CategoryIds) { <input type="hidden" name="CategoryIds" value="@id" /> }
-            <div class="field"><label for="Reason">@L["Reason (kept in the audit trail)"]</label><input id="Reason" name="Reason" type="text" maxlength="1000" /></div>
-            <button type="submit">@L["Save ownership"]</button> <a href="/Admin/Categories">@L["Cancel"]</a>
-            <p class="hint">@L["You may be asked to sign in again before saving."]</p>
-        </form>
     </section>
 }
 
@@ -105,7 +144,7 @@
                 <div class="field check"><input id="role-b-@orgId" type="radio" name="Role" value="backup" form="bulk" /><label for="role-b-@orgId">@L["Backup owner"]</label></div></fieldset>
             <input type="hidden" name="OrganisationId" value="@orgId" form="bulk" />
             <button type="submit" form="bulk">@L["Review the ticked [[category|plural|lower]]"]</button>
-            <button type="submit" form="bulk" formaction="?handler=PlanAll" class="secondary">@Terms.Expand("Assign all [[category|plural|lower]] to this person")</button>
+            <button type="submit" form="bulk" formaction="?handler=PlanAll" class="secondary">@Terms.Expand("Own all current and future [[category|plural|lower]]")</button>
         </section>
     }
 }

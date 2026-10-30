@@ -66,6 +66,15 @@ public sealed class PeopleAccessUiTests
         Assert.Contains("will be able to", review);
         Assert.Contains("Save access", review);
         Assert.DoesNotContain("This cannot be saved yet", review);
+        // The review says what the person will and will not be able to do, in words, with the ownership as a standing choice; no role code unless Advanced details is asked for.
+        Assert.Contains("This person will be able to", review);
+        Assert.Contains("This person will not be able to", review);
+        Assert.Contains("Approve or sign off their own submissions", review);
+        Assert.Contains("Every current and future", review);
+        Assert.DoesNotContain("CategoryOwner", review);
+        var advanced = await StepAsync(admin, "Next", new Dictionary<string, string>(carried) { ["Step"] = "7" }, ("Input.Profiles", "contract-manager"), ("Input.Scope", "WholeOrganisation"), ("Input.Ownership", "All"), ("Input.Ceiling", "Internal"), ("Input.Advanced", "true"));
+        Assert.Contains("Advanced details", advanced);
+        Assert.Contains("CategoryOwner", advanced);
 
         // Nothing exists until Save.
         var (tenant, _) = await app.FindUserAsync(OrgAdmin);

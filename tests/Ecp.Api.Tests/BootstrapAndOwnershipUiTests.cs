@@ -120,4 +120,44 @@ public sealed class BootstrapAndOwnershipUiTests
         var refused = await DemoApp.PostFormAsync(admin, "/Admin/Categories", backup, "/Admin/Categories?handler=SetOwner");
         Assert.Contains("already the primary owner", await refused.Content.ReadAsStringAsync());
     }
+
+    [Fact]
+    public async Task Owning_all_current_and_future_categories_is_reviewed_saved_recognises_a_new_category_and_can_be_ended_without_touching_other_ownership()
+    {
+        using var app = DemoApp.Start();
+        using var admin = await app.SignInAsync(OrgAdmin, followRedirects: false);
+        var (tenant, _) = await app.FindUserAsync(OrgAdmin);
+        var email = $"allowner.{Guid.NewGuid():N}"[..20] + "@a.example.test";
+        var person = await app.WithTenantAsync(tenant, sp => sp.GetRequiredService<IUserService>().InviteAsync("Alma AllOwner", email));
+        var page = await BodyAsync(admin, "/Admin/Categories");
+        Assert.Contains("Own all current and future", page);
+        var org = Regex.Match(page, "name=\"OrganisationId\" value=\"([0-9a-f-]{36})\" form=\"bulk\"").Groups[1].Value;
+        var fields = new List<KeyValuePair<string, string>> { new("OrganisationId", org), new("UserId", person.ToString()), new("Role", "primary") };
+
+        var plan = await (await DemoApp.PostFormAsync(admin, "/Admin/Categories", fields, "/Admin/Categories?handler=PlanAll")).Content.ReadAsStringAsync();
+        Assert.Contains("every current and future", plan);
+        Assert.Contains("A category added later is theirs automatically", plan);
+        Assert.Contains("Ownership someone else was given is left exactly as it is", plan);
+        Assert.DoesNotContain("CategoryOwner", plan);
+
+        Assert.Equal(HttpStatusCode.Redirect, (await DemoApp.PostFormAsync(admin, "/Admin/Categories", fields, "/Admin/Categories?handler=OwnAll")).StatusCode);
+        var after = await BodyAsync(admin, "/Admin/Categories");
+        Assert.Contains("Alma AllOwner", Regex.Match(after, "<section[^>]*aria-labelledby=\"standing-h\".*?</section>", RegexOptions.Singleline).Value);
+
+        // A category created afterwards, through the same Categories screen, is Alma's with no further step.
+        var create = await DemoApp.PostFormAsync(admin, "/Admin/Categories", new Dictionary<string, string> { ["OrganisationId"] = org, ["Code"] = "NEWLY-ADDED", ["Name"] = "Newly Added", ["ParentCategoryId"] = "" }, "/Admin/Categories?handler=Create");
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var owners = await app.WithTenantAsync(tenant, async sp => (await sp.GetRequiredService<Ecp.Contracts.ICategoryAdministration>().ListAllAsync()).Single(c => c.Code == "NEWLY-ADDED").Owners);
+        Assert.Contains(owners, o => o.UserId == person);
+
+        // Ending it ends the ownership it created and leaves everyone else's alone.
+        var others = await app.WithTenantAsync(tenant, async sp => (await sp.GetRequiredService<Ecp.Contracts.ICategoryAdministration>().ListAllAsync()).SelectMany(c => c.Owners.Where(o => o.UserId != person).Select(o => o.AssignmentId)).ToHashSet());
+        var policyId = Regex.Match(after, "name=\"policyId\" value=\"([0-9a-f-]{36})\"").Groups[1].Value;
+        Assert.NotEmpty(policyId);
+        var end = await DemoApp.PostFormAsync(admin, "/Admin/Categories", new Dictionary<string, string> { ["policyId"] = policyId, ["reason"] = "No longer needed" }, "/Admin/Categories?handler=EndStanding");
+        Assert.Equal(HttpStatusCode.Redirect, end.StatusCode);
+        var afterEnd = await app.WithTenantAsync(tenant, async sp => (await sp.GetRequiredService<Ecp.Contracts.ICategoryAdministration>().ListAllAsync()).ToList());
+        Assert.DoesNotContain(afterEnd.SelectMany(c => c.Owners), o => o.UserId == person);
+        Assert.Subset(afterEnd.SelectMany(c => c.Owners.Select(o => o.AssignmentId)).ToHashSet(), others);   // nobody else lost ownership
+    }
 }

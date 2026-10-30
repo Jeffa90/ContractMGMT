@@ -13,7 +13,7 @@ namespace Ecp.Host.Pages.Admin;
 /// a "needs an owner" filter. No CSV is needed (it stays under Bulk import). Choosing someone who lacks the owner role gives it to them in the same save. The services decide every permission.
 /// </summary>
 [Authorize(Policy = "perm:contracts.read|categories.manage|categories.assign")]
-public sealed class CategoriesModel(ISecuredCategoryService categories, ICategoryOwnership ownership, IOrganisationStructureService organisations, IAccessService access) : EcpPageModel
+public sealed class CategoriesModel(ISecuredCategoryService categories, ICategoryOwnership ownership, ICategoryOwnershipPolicy policies, IOrganisationStructureService organisations, IAccessService access) : EcpPageModel
 {
     [BindProperty(SupportsGet = true)] public string? Q { get; set; }
     [BindProperty(SupportsGet = true)] public bool Needs { get; set; }
@@ -28,6 +28,9 @@ public sealed class CategoriesModel(ISecuredCategoryService categories, ICategor
     public bool CanManage { get; private set; }
     public bool CanAssign { get; private set; }
     public OwnershipPlan? Plan { get; private set; }
+    /// <summary>The plan is for "every current and future category" rather than for the ticked ones.</summary>
+    public bool PlanAll { get; private set; }
+    public IReadOnlyList<OwnershipPolicyInfo> Standing { get; private set; } = [];
     public string? PlanAction { get; private set; }
     private Dictionary<Guid, string> _orgs = [];
     private readonly Dictionary<Guid, IReadOnlyList<OwnerChoice>> _people = [];
@@ -56,10 +59,25 @@ public sealed class CategoriesModel(ISecuredCategoryService categories, ICategor
         await LoadAsync(ct);
         var all = Board.Rows.Where(r => r.IsActive && r.OrganisationId == OrganisationId && (r.ParentId is null || Board.Rows.All(p => p.CategoryId != r.ParentId))).Select(r => r.CategoryId).ToList();
         CategoryIds = all;
-        Plan = await ownership.PlanAsync(OrganisationId, all, UserId, Role == "primary", ct);
-        PlanAction = "SetOwner";
+        // "Own all" is a standing instruction: today's categories are covered now and every one added later is covered as it is created. With none yet there is still something to confirm.
+        Plan = all.Count == 0 ? new OwnershipPlan(0, 0, 0, false, (await ownership.PeopleAsync(OrganisationId, ct)).FirstOrDefault(p => p.UserId == UserId)?.DisplayName ?? "That person") : await ownership.PlanAsync(OrganisationId, all, UserId, Role == "primary", ct);
+        PlanAll = true;
         return Page();
     }, reload: () => LoadAsync(ct));
+
+    public Task<IActionResult> OnPostOwnAllAsync(CancellationToken ct) => StepUpRunAsync(async () =>
+    {
+        var outcome = await ownership.AssignAllAsync(OrganisationId, UserId, Role == "primary", Reason, ct);
+        Flash(string.Join(" ", outcome.Notes));
+        return RedirectToPage(new { Q, Needs });
+    }, reload: () => LoadAsync(CancellationToken.None));
+
+    public Task<IActionResult> OnPostEndStandingAsync(Guid policyId, string? reason, CancellationToken ct) => StepUpRunAsync(async () =>
+    {
+        await policies.EndAsync(policyId, string.IsNullOrWhiteSpace(reason) ? "Standing ownership ended from the ownership screen" : reason, ct);
+        Flash("Standing ownership ended. The ownership it created is ended; ownership given any other way is untouched, and a [[category|lower]] added from now on is not recognised.");
+        return RedirectToPage(new { Q, Needs });
+    }, reload: () => LoadAsync(CancellationToken.None));
 
     public Task<IActionResult> OnPostSetOwnerAsync(CancellationToken ct) => StepUpRunAsync(async () =>
     {
@@ -90,6 +108,8 @@ public sealed class CategoriesModel(ISecuredCategoryService categories, ICategor
         CanAssign = await access.HoldsAnywhereAsync("categories.assign", ct);
         var manageGrants = await access.GrantsAsync("categories.manage", ct);
         ManageOrganisations = _orgs.Where(o => manageGrants.Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(o.Key))).Select(o => new OrganisationSummary(o.Key, o.Value, "", "", "", "", null)).ToList();
+        try { Standing = await policies.ListAsync(null, false, ct); }
+        catch (ForbiddenException) { Standing = []; }   // seeing standing instructions needs permission to manage people
         if (CanAssign)
             foreach (var orgId in Board.Rows.Select(r => r.OrganisationId).Distinct())
             {

@@ -11,6 +11,7 @@ public sealed class ReadinessScenarioTests_Sqlite
 
     [Fact] public Task What_is_Required_comes_from_the_pack() => RunAsync(ReadinessScenarios.What_is_Required_comes_from_the_selected_pack_and_the_platform_insists_only_on_its_universal_items);
     [Fact] public Task Publishing_is_refused_while_a_Required_item_is_open() => RunAsync(ReadinessScenarios.Publishing_is_refused_in_words_while_a_Required_item_of_the_pack_is_open_and_allowed_once_it_is_done);
+    [Fact] public Task The_packs_standard_workflow_is_a_safe_default() => RunAsync(ReadinessScenarios.The_pack_s_standard_workflow_is_a_safe_default_and_approval_rules_are_not_demanded_when_the_workflow_names_none);
     [Fact] public Task An_owner_without_the_role_needs_attention() => RunAsync(ReadinessScenarios.An_owner_without_the_role_that_lets_owners_act_needs_attention_not_a_green_tick);
     [Fact] public Task The_checklist_is_authorised() => RunAsync(ReadinessScenarios.The_checklist_is_authorised_like_the_rest_of_onboarding);
     [Fact] public void The_vocabulary_matches_the_checklist_and_the_shipped_packs() => ReadinessVocabularyTests.The_checklist_and_the_pack_vocabulary_name_the_same_items_and_the_shipped_packs_use_them_correctly();
@@ -23,6 +24,7 @@ public sealed class ReadinessScenarioTests_SqlServer
 
     [SqlServerFact] public Task What_is_Required_comes_from_the_pack() => RunAsync(ReadinessScenarios.What_is_Required_comes_from_the_selected_pack_and_the_platform_insists_only_on_its_universal_items);
     [SqlServerFact] public Task Publishing_is_refused_while_a_Required_item_is_open() => RunAsync(ReadinessScenarios.Publishing_is_refused_in_words_while_a_Required_item_of_the_pack_is_open_and_allowed_once_it_is_done);
+    [SqlServerFact] public Task The_packs_standard_workflow_is_a_safe_default() => RunAsync(ReadinessScenarios.The_pack_s_standard_workflow_is_a_safe_default_and_approval_rules_are_not_demanded_when_the_workflow_names_none);
     [SqlServerFact] public Task An_owner_without_the_role_needs_attention() => RunAsync(ReadinessScenarios.An_owner_without_the_role_that_lets_owners_act_needs_attention_not_a_green_tick);
     [SqlServerFact] public Task The_checklist_is_authorised() => RunAsync(ReadinessScenarios.The_checklist_is_authorised_like_the_rest_of_onboarding);
 }

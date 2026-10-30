@@ -62,6 +62,19 @@ internal static class ReadinessScenarios
         Assert.Equal(ReadinessState.NotStarted, afterCategories.Items.Single(i => i.Key == ReadinessCatalogue.Owners).State);
     }
 
+    /// <summary>UX-9: nothing published yet is not "not reviewed" when the pack ships a complete standard workflow, and approval rules are asked for only when the workflow names a matrix.</summary>
+    public static async Task The_pack_s_standard_workflow_is_a_safe_default_and_approval_rules_are_not_demanded_when_the_workflow_names_none(TestApp app)
+    {
+        var (w, s, svc) = await StartAsync(app);
+        await using var _ = s;
+        await svc.SelectPackAsync(w.OrganisationId, TestPacks.Reference, loadDefaults: false);
+        var workflow = (await svc.ReadinessAsync(w.OrganisationId)).Items.Single(i => i.Key == ReadinessCatalogue.Workflow);
+        Assert.Equal(ReadinessState.Complete, workflow.State);
+        Assert.Contains("standard workflow", workflow.Detail);
+        Assert.DoesNotContain("approval rules", workflow.Detail);                                // the reference workflow names an approver group, not a matrix
+        Assert.Equal("/Admin/ApprovalAuthorities", (await svc.ReadinessAsync(w.OrganisationId)).Items.Single(i => i.Key == ReadinessCatalogue.Approvers).FixHref);
+    }
+
     public static async Task An_owner_without_the_role_that_lets_owners_act_needs_attention_not_a_green_tick(TestApp app)
     {
         var (w, s, svc) = await StartAsync(app);

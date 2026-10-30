@@ -1,6 +1,6 @@
 # Guided administration: implementation status
 
-Status: **Implemented in slices UX-1 to UX-7 and verified (final acceptance review 2026-10-29, section 5A); three UX gaps found by the owner's manual scenario and a moderated usability test remain open (sections 5 and 6).** Branch ux/guided-administration (from claude/stoic-volta-dvszm5 at commit 5cdf9f7; that branch is unchanged). Design: `docs/UX_REDESIGN.md`. Criteria: `docs/UX_ACCEPTANCE_CRITERIA.md`. Decisions: `decisions/ADR-0039-guided-administration-access-profiles.md`. Production approval is external governance and nothing here declares it.
+Status: **Implemented in slices UX-1 to UX-9 and verified (final acceptance review 2026-10-29, section 5A; the three gaps it found were closed by UX-9 on 2026-10-30, section 5).** A moderated usability test and the items in section 6 remain open. Branch ux/guided-administration (from claude/stoic-volta-dvszm5 at commit 5cdf9f7; that branch is unchanged). Design: `docs/UX_REDESIGN.md`. Criteria: `docs/UX_ACCEPTANCE_CRITERIA.md`. Decisions: `decisions/ADR-0039-guided-administration-access-profiles.md`. Production approval is external governance and nothing here declares it.
 
 Labels: **Implemented** (built and covered by a named automated test), **Partial** (built, with the stated gap), **Not built**, **Not Verified** (needs a person, a browser or an environment this work did not have). "SQLite" tests are provider-independent behaviour, not SQL Server proof; "SQL Server" means the same scenario ran on a real SQL Server 2022 container.
 
@@ -30,9 +30,11 @@ Labels: **Implemented** (built and covered by a named automated test), **Partial
 ## 3. Deviations from the design, recorded
 
 1. **New audit actions** were added (`access.profile.applied`, `access.profile.ended`, `access.test_person.created`, `access.test_bootstrap`, `access.test_bootstrap.ended`, `access.bootstrap.setup`, `access.bootstrap.applied`, and the three `preview` actions) beyond the two the design listed; PPL-007's "no new ones" and SEC-001 are therefore met only for existing actions. The existing `role.granted` and `category.ownership_assigned` events are still written for every grant.
-2. **Two new tables**, not one (SEC-009's "single new table").
+2. **Three new tables**, not one (SEC-009's "single new table"): `ProfileApplication`, `PreviewSession` and, from UX-9, `CategoryOwnershipPolicy` (the standing "own all current and future categories" instruction; ADR-0040).
 3. **Pack requirements** live in the existing solution-pack document (`onboardingRequirements`), not a new pack kind; this avoids changing the pack format. A pack can raise or relax anything except the platform's three universal items.
 4. **A tenant administrator alone cannot assign category ownership** (existing rule); the Test-mode shortcut and the ownership editor are used by an organisation administrator, and the screens say so in words instead of failing silently.
+6. **Set-up has 15 stages**: UX-9 adds "Administrator access" (review and confirm) after notifications, so choosing access is no longer giving it. The first-administrator grants moved there from the organisation stage.
+7. **Standing ownership supersedes Q-7** ("current categories only"): the owner decided on 2026-10-30 that "own all categories" means current and future (ADR-0040). Category authorisation is unchanged; a policy keeps ordinary assignments in step.
 5. The Preview refusal page has no banner (it is not rendered through the layout); it names the previewed person and links back.
 
 ## 4. Criteria status
@@ -46,7 +48,7 @@ Evidence names are test classes under `tests/`. "Journey" is `GuidedAdministrati
 | **PRF** | PRF-001..005, 007, 008 (`AccessProfile*` scenarios, SQLite and SQL Server) | PRF-006 capability hiding: Reviewer and Approval Authority are marked unavailable when the step is off; admin-role non-hiding **Implemented**; PRF-009 "Other access" label: grants without provenance show their source text, not the literal words |
 | **PPL** | PPL-003, 005, 008, 012 (wizard, Journey); PPL-011 Advanced links | PPL-001 search and paging **Not built**; PPL-002 "why am I asked this" disclosures **Not built** (hints are shown); PPL-004 Back preserves answers (hidden fields; not asserted by a test); PPL-006 sign-in return is built (answers travel in the address) but only the service rule is tested; PPL-009/010 unchanged existing behaviour |
 | **EFF** | EFF-001..003, 005..008 (My access, person page, parity and catalogue tests) | EFF-002 is proved at ability level (nothing shown that the evaluator denies and the reverse for every world user); a per-permission differential is **Not built**; EFF-004 ended/future grants appear in the details table with their status, not a separate "Past and future access" list |
-| **BOOT** | BOOT-001..003, 005..008 (set-up scenarios, `BootstrapAndOwnershipUiTests`, SQLite and SQL Server) | BOOT-004: the intent is kept as a note and the checklist's owners item reads "Waiting for categories" (**Partial**); BOOT-009: the page explains the separation-of-duties limit and the evaluator test proves it; an **Add a test colleague** button is **Not built** (use Add a person with demonstration sign-in and the Approval Authority profile) |
+| **BOOT** | BOOT-001..003, 005..008 (set-up scenarios, `BootstrapAndOwnershipUiTests`, SQLite and SQL Server) | BOOT-004: **Implemented** by UX-9 as a standing policy (a category created later is owned automatically); BOOT-009: the page explains the separation-of-duties limit and the evaluator test proves it; an **Add a test colleague** button is **Not built** (use Add a person with demonstration sign-in and the Approval Authority profile) |
 | **PRV** | PRV-002 (service), 003..009, 011..016, 018 in effect (`AccessProfile*` preview scenarios, `PeopleAccessUiTests`) | PRV-001 the control is on the person page only (not the list or the old Users page); PRV-003 banner is on every layout page, not the refusal page; PRV-010 the one GET that wrote (lazy installation of a reference notification policy or workflow) is handled; a full inventory sweep of every GET page is **Not Verified**; PRV-015 each end condition is checked on every request, expiry and disabling are tested, sign-out/mode change are not tested separately; PRV-017 **Not Verified** |
 | **DSI** | DSI-001..003, 005, 006, 008 | DSI-004 the sign-in page empty-state sentence **Not built**; DSI-007 the Test person badge is in the People list only; DSI-009 switching an Invited person **Not built** (offered at creation only) |
 | **ONB** | ONB-001..008 (`ReadinessScenarios`, `OnboardingHostTests`, SQLite and SQL Server) | ONB-009 the CSV sections are labelled "Draft sections" with an explanation, not "Bulk import (Advanced)"; ONB-010 plurals handled in the new text only |
@@ -58,38 +60,30 @@ Evidence names are test classes under `tests/`. "Journey" is `GuidedAdministrati
 | **DOC** | DOC-001 guides updated; DOC-004 labels in this document | DOC-002 permission counts, DOC-003 configurable profile definitions (profiles are compiled into the product; the configuration kind is a later slice S8, not built) |
 | **USE** | none | USE-001..006 are moderated or reading-level measurements: **Not Verified**. The automated journey proves the steps work; it does not prove a first-time administrator finds them in a minute |
 
-## 5. Manual acceptance scenario (owner's final review)
+## 5. Manual acceptance scenario (owner's final review; re-run after UX-9)
 
-Two automated journeys drive the scenario over HTTP on the Test/Demo host, through the real sign-in page, with an antiforgery token on every post, and check every page for role codes, permission names, viewer kinds and group keys (none appears):
+Two automated journeys drive the scenario over HTTP on the Test/Demo host, through the real sign-in page, with an antiforgery token on every post, and check every page for role codes, permission codes, viewer kinds and group keys (none is shown):
 
-* `GuidedAdministrationJourneyTests` (seeded Demo): Set up my access, **Give me full Test-mode access**, Add a person, Preview, Exit, sign in as the person. **Passed.**
-* `ManualAcceptanceScenarioTests.A_fresh_Test_mode_organisation_an_initial_administrator_and_a_synthetic_Jeffrey_end_to_end` (a **fresh, uninstalled** Test-mode installation set up through the real 14-stage wizard; the administrator ticks "Administer the organisation", "Create and manage contracts" and "Own all categories"). **Passed**, with the three named gaps below recorded by the test itself (the test fails if the gap list changes, so this page cannot drift from the product).
+* `GuidedAdministrationJourneyTests` (seeded Demo): Set up my access, Give me full Test-mode access, Add a person (now with the review and its confirmation), Preview, Exit, sign in as the person. **Passed.**
+* `ManualAcceptanceScenarioTests.A_fresh_Test_mode_organisation_an_initial_administrator_and_a_synthetic_Jeffrey_end_to_end`: a **fresh, uninstalled** Test-mode installation of the JBS reference pack (tenant "JBS TEST"), set up through the real 15-stage wizard. **Passed with no recorded gap.** The three gaps found in the first run (section 6 of the earlier revision) are closed by UX-9 (ADR-0040).
 
 | Step | Result | Evidence |
 |---|---|---|
-| A. Fresh Test-mode organisation | **Done** | the set-up wizard in the test |
-| B. Initial administrator chooses Administer, Create/manage contracts, Own all categories | **Done** | set-up admin stage |
-| C. Review page explains in plain English what access results | **Partial (gap 1)**: the set-up stage applies the choice and **My access** is the plain-English review after the fact; the set-up stage has no separate review page before saving | `/Access` contains "Create contracts" |
-| D. Save access | **Done** (saved by set-up) | |
-| E. Home shows + New contract, My Contracts, My Actions, Reviews Due, Expiring Soon | **Done once a category exists and is owned** (gap 2); My Actions is in the navigation, the other four are on Home | Home assertions |
-| F. Create a second synthetic person, "Jeffrey" | **Done** | Add a person wizard |
-| G. Contract Manager, selected organisation, selected categories, Internal ceiling, Allow demonstration sign-in | **Done** | wizard steps 2 to 5 |
-| H. Save | **Done** | |
-| I. Jeffrey appears on the Demonstration sign-in page | **Done** | `/SignIn` |
-| J. Preview as Jeffrey | **Done** | person page |
-| K. Operational navigation only; only authorised records; Administration hidden; banner; writes refused | **Done**, with a note: a Category Owner **reads every contract in the organisation** within the ceiling (confirmed decision), so Jeffrey sees a contract in a category he does not own, read-only, and cannot edit it | banner, no Administration menu, People forbidden, edit refused, supplier create refused |
-| L. Exit preview | **Done** (the banner's own button) | |
-| M. Sign out and sign in normally as Jeffrey | **Done** | |
-| N. Jeffrey creates a contract in an authorised category | **Done** | redirect to the new contract |
-| O. Jeffrey cannot create or edit outside the scope | **Done** | create in the other category refused; edit page not available |
+| Create organisation | **Done** | set-up wizard |
+| Configure initial administrator: Administer, Create and manage, **Own all current and future categories** | **Done** | administrator stage; nothing is applied yet |
+| Review effective access | **Done**: the "Administrator access" step shows *This person will be able to* / *will not be able to* / summary, in words, with no role or permission code, and no Advanced details at set-up | page text asserted |
+| Confirm | **Done**; without the tick the step is refused and nothing is given | asserted |
+| Reach Home; **+ New contract** exists | **Done**, even though no category exists yet (the administrator will own the first one the moment it is created); My Actions, My Contracts, Reviews Due, Expiring Soon are there | Home assertions |
+| Create a new category after set-up; the administrator owns it automatically | **Done**: no ownership step; the administrator then creates a contract in it | ownership read from the category list; contract created |
+| Add Jeffrey through People & Access, Contract Manager, selected-category ownership (Packaging), Internal ceiling, demonstration sign-in | **Done**, with the review and the confirmation; an unconfirmed save is refused and creates nobody | wizard steps; review page text |
+| Jeffrey on the Demonstration sign-in page | **Done** | `/SignIn` |
+| Preview Jeffrey; operational navigation only; banner; writes refused; Administration hidden | **Done** (a Category Owner reads every contract in the organisation within the ceiling, a confirmed decision, so Jeffrey sees the other category's contract read-only and cannot edit it) | banner, no Administration, People and Approval authorities forbidden, edit refused, a write refused |
+| Exit preview; sign out; sign in normally as Jeffrey | **Done** | banner button with its own token |
+| Jeffrey creates a contract in an authorised category; edit refused outside it | **Done** | redirect to the new contract; create in the other category refused; edit page unavailable |
+| Configure an Approval Authority using names only | **Done**: the authority the workflow names is listed as "Group Head of Procurement"; Pat Approver is chosen as a member and Jeffrey as a backup; reviewed in words; refused until confirmed; saved. Pat's approval right is then proved with the evaluator | page text; no key in the page text |
+| Onboarding completion | **Done**: validating and publishing the set-up shows **JBS TEST is ready to use** with *Create first contract*, *Add another person*, *Review organisation setup*, *Go to Home* | page text |
 
-**UX gaps found by running the scenario (reported, not worked around through an Advanced page):**
-
-1. **No review page at set-up.** The first administrator's choices are saved by the set-up stage; the plain-English description of the resulting access is on **My access**, afterwards.
-2. **"Own all categories" at set-up does not carry to categories added later.** A new organisation has no categories; the choice is kept, but until the administrator adds categories and makes themself the owner in the guided ownership editor, Home offers no **+ New contract** (it says why).
-3. **Approver groups.** Approval authorities need an approver group, and the page that creates the first one asks for a **Group key**; no guided path creates it. Separately, publishing the set-up is refused (correctly, by the readiness gate) until the pack's required "Workflow and approvals" item is done, and the reference pack ships **no approval rules**; the only way to author them is the approval-matrix form editor. So a fresh JBS organisation cannot reach "Ready" without a specialist step. The scenario, Home work cards, supplier and contract creation do not depend on publishing the set-up.
-
-Two things the run exposed and that were fixed on this branch: the **Plan table on the onboarding review page printed raw terminology tokens** (now expanded); and the scenario's own set-up had to include the reference pack's **Legal Privileged** classification level, otherwise the pack's notification policy cannot be installed and Home shows no work cards (the set-up classification stage, as shipped, lets an administrator remove a level the pack's policy names; the error surfaces on Home as no cards rather than on the stage; recorded here as an observation, not changed).
+Two defects were found and fixed by running this journey, both in code that had shipped: **the supplier form bound the whole posted form as identifier types** when the organisation had none set up (every submission was refused with "ABN: That identifier type is not set up"), and **the effective-access report of a person who had not signed in yet was empty** because the loader returned no subject for an invited person. A third item was a wording defect: the onboarding review's Plan table printed raw terminology tokens.
 
 A person doing the same in a browser is **Not Verified**.
 
@@ -111,10 +105,10 @@ A person doing the same in a browser is **Not Verified**.
 | 10 | Edit Access wizard | Implemented | `BootstrapAndOwnershipUiTests` (edit-mode review), `GuidedAdministrationAccessibilityTests`, service tests for the atomic apply and recent sign-in |
 | 11 | Organisation, category, site and business-unit scope selection | Implemented; **coverage partial** | organisation and category end to end (manual scenario, journey); division, business-unit and site choices become the right scope sets and viewer kinds in `AccessProfileScopeTests` (unit level, added in this review); an HTTP test that selects a site or business unit in the wizard page is **Not built** |
 | 12 | Classification in plain language | Implemented | the wizard asks for "up to" the organisation's own level names; both journeys use Internal |
-| 13 | Category ownership in the same journey | Implemented | wizard step 4; `Category_owners_are_chosen_in_a_form_from_everyone_and_the_owner_role_is_given_in_the_same_save`; manual scenario |
-| 14 | Approver membership in the same journey | Implemented | wizard step 6; `An_approval_authority_needs_an_approver_group...`; manual scenario (Approval Authority). The approver group must exist first (gap 3) |
+| 13 | Category ownership in the same journey | Implemented | wizard step 4 (All current and future, Selected, None); `Category_owners_are_chosen_in_a_form...`; `Owning_all_categories_means_current_and_future_ones...` (SQLite and SQL Server); `Owning_all_current_and_future_categories_is_reviewed_saved...`; manual scenario |
+| 14 | Approver membership in the same journey | Implemented | wizard step 6 (authorities offered by name); `Approval_authorities_are_set_up_by_name...`; `ApprovalAuthoritiesUiTests`; manual scenario (an authority chosen by names only, no key) |
 | 15 | Advanced grants separated | Implemented | "Users and roles (advanced)" and Advanced links; `Every_pre_redesign_navigation_entry_still_has_a_place` |
-| 16 | Guided initial-administrator access setup | Implemented | `SetupScenarios`, `BootstrapAndOwnershipUiTests`, manual scenario; gaps 1 and 2 |
+| 16 | Guided initial-administrator access setup | Implemented | `SetupScenarios` (review, confirmation, nothing given before it), `BootstrapAndOwnershipUiTests`, manual scenario |
 | 17 | Demo/Test-only "Give me full Test-mode access" | Implemented | `Full_test_mode_access_*`, `Test_mode_access_does_not_exist_in_production` (refused at the service) |
 | 18 | Demo/Test-only "Allow demonstration sign-in" | Implemented | `A_test_person_signs_in_through_the_demonstration_provider...`, `Demonstration_sign_in_and_synthetic_people_are_refused_in_production_at_the_service`, manual scenario (listed on the sign-in page, signs in) |
 | 19 | Demo/Test-only "Preview as this user" | Implemented | `Preview_*` scenarios, `PeopleAccessUiTests`, `Preview_does_not_exist_in_production` |
@@ -134,25 +128,32 @@ A person doing the same in a browser is **Not Verified**.
 
 ## 6. Known gaps (first things to do next)
 
-0. The three scenario gaps in section 5: a review page at set-up, ownership of categories added later, a guided first approver group and a guided path to the pack's approval rules.
 1. Moderated usability test of the journey with real administrators (USE-001..006), and keyboard and screen-reader walkthroughs (ACC-002, 004, 005).
 2. Ownership effective dates (OWN-006), End asks for a reason (OWN-009), mapping change-as-one-action (MAP-007), naming the group on mapped grants (MAP-006).
 3. People search and paging; "why am I asked this" disclosures; Preview on the list and old Users page; the sign-in page hint; **Add a test colleague**.
 4. An inventory sweep of every GET page under Preview (PRV-010) and a per-permission differential for effective access (EFF-002).
 5. Configurable access-profile definitions with draft, publish and rollback (slice S8); today they are compiled in.
 6. Documents hub, "Recent contracts", reports (UXG-09 and later).
+7. Observations from the fresh journey, not changed: the set-up classification stage lets an administrator remove a level the pack's notification policy names ("Legal Privileged"), which then shows as an empty Home instead of a message on that stage; the data-migration route of the ownership policy has no dedicated test (the Categories screen and the trusted upsert do); the Approval authorities page carries the machine key in its edit link and a hidden field (never in the visible text); approval-rule authoring remains the form editor for a workflow that names a matrix.
 
 ## 7. Verification of this state
 
+After UX-9 (commit 6daa265 and the documentation commit that follows it):
+
 | Check | Where | Result |
 |---|---|---|
-| Locked restore; Release build with warnings as errors | local workspace and CI | 0 warnings, 0 errors; CI run 82 (commit 7bf540c) succeeded |
-| Unit tests | local | **979 passed** (the 967 of the full run plus the 12 scope tests added in this review, run separately) |
+| Locked restore; Release build with warnings as errors | local workspace and CI | 0 warnings, 0 errors; CI run 86 (commit 6daa265) |
+| Unit tests | local | **979 passed** |
 | Architecture tests | local | **113 passed** |
-| API tests (including both journeys, the accessibility checks and the manual acceptance scenario) | local | **242 passed** |
-| Integration suite including every real SQL Server 2022 wrapper and the upgrade tests | local, `ECP_TEST_SQL` set | **715 passed, 0 failed, 0 skipped**. Local total **2,049 passed, 0 failed, 0 skipped** |
-| N-1 to N upgrade rehearsal on SQL Server; SQL Server tests; performance baseline | CI run 82 | succeeded |
-| Container image build and smoke | CI run 82 | succeeded |
+| API tests (both journeys, the fresh manual acceptance journey, accessibility checks, approval authorities, ownership editor) | local | **247 passed** |
+| Integration suite including every real SQL Server 2022 wrapper and the upgrade tests | local, `ECP_TEST_SQL` set | **731 passed, 0 failed, 0 skipped** |
+| **Local total** | | **2,070 passed, 0 failed, 0 skipped** |
+| N-1 to N upgrade rehearsal on SQL Server; SQL Server tests; performance baseline | CI run 86 | recorded in `deploy/STATUS.md` |
+| Container image build and smoke | CI run 86 | recorded in `deploy/STATUS.md` |
 | Repository checks, documentation consistency, solution packs, pack tool, tooling tests, supply chain | local and CI | pass; two licence items remain pending owner review (unchanged) |
+
+One local API run failed 57 tests with HTTP 500 and the cause was the workspace, not the product: the file-watcher instance limit (128) of a restarted container was exhausted. With the limit raised (as before) the same API suite passed 247 of 247. CI is unaffected.
+
+The earlier verification of the UX-8 state (commit a3f65e5; 979 unit, 113 architecture, 242 API, 715 integration; CI run 84 all green) stands as history.
 
 Not Verified: a person completing the scenario in a browser; moderated usability (USE-001..006); keyboard, zoom and screen-reader walkthroughs (ACC-002/004/005); IIS and Azure (unchanged from the baseline). Production approval is external governance and is not declared.

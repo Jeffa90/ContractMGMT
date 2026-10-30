@@ -351,3 +351,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `tests/Ecp.Api.Tests/NavigationAndHomeTests.cs`, `tests/Ecp.Api.Tests/MyAccessUiTests.cs`, `tests/Ecp.Api.Tests/PeopleAccessUiTests.cs`, `tests/Ecp.Api.Tests/BootstrapAndOwnershipUiTests.cs`, `tests/Ecp.Integration.Tests/AccessProfileScenarios.cs`, `tests/Ecp.Integration.Tests/AccessProfileScenarioTests.cs`
 - `docs/UX_IMPLEMENTATION_STATUS.md`, `src/Modules/Ecp.Setup/Onboarding/OnboardingReadiness.cs`, `src/Ecp.Host/Pages/Admin/People/`, `tests/Ecp.Integration.Tests/ReadinessScenarios.cs`, `tests/Ecp.Integration.Tests/ReadinessScenarioTests.cs`, `tests/Ecp.Api.Tests/GuidedAdministrationJourneyTests.cs`, `tests/Ecp.Api.Tests/GuidedAdministrationAccessibilityTests.cs`, `tests/Ecp.Api.Tests/MappingsAndChecklistUiTests.cs`
 - `tests/Ecp.Api.Tests/ManualAcceptanceScenarioTests.cs`, `tests/Ecp.UnitTests/AccessProfileScopeTests.cs`
+- `decisions/ADR-0040-standing-category-ownership-review-and-approval-authorities.md`
+- `src/Modules/Ecp.Access/AccessReview.cs`, `src/Modules/Ecp.Access/Authorities.cs`, `src/Modules/Ecp.Access/OwnershipPolicy.cs`, `src/Modules/Ecp.Access/Domain/CategoryOwnershipPolicy.cs`, `src/Modules/Ecp.Access/Persistence/Migrations/` (`AddCategoryOwnershipPolicy`)
+- `src/Ecp.Host/Pages/Admin/ApprovalAuthorities/`, `src/Ecp.Host/Pages/Shared/_AccessReview.cshtml`, `src/Ecp.Host/Pages/Shared/_ReadyToUse.cshtml`
+- `tests/Ecp.Api.Tests/ApprovalAuthoritiesUiTests.cs`

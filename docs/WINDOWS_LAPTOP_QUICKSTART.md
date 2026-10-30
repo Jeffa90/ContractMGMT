@@ -71,7 +71,7 @@ Wait for `Now listening on: http://localhost:5080`. **Leave this window open**; 
 
 In your browser go to **<http://localhost:5080/Setup>**, paste the setup code, and click **Open setup**. Work down the list. Each step has one button (**Save and continue** unless it says otherwise).
 
-## 6. Create Northwind Traders (the 14 steps)
+## 6. Create Northwind Traders (the 15 steps)
 
 | # | Step | What to do |
 |---|---|---|
@@ -86,9 +86,10 @@ In your browser go to **<http://localhost:5080/Setup>**, paste the setup code, a
 | 9 | Branding | Product name: `Northwind Contract Register`. Keep the colour. Footer empty |
 | 10 | Classification levels | Keep what is filled in |
 | 11 | Email notifications | Provider: *Development capture (simulated; delivers nothing)*. From address: `northwind@northwind.example.test`. Send a test message to: `jeff@northwind.example.test`. You should see that the simulated provider accepted the test and that email is **Not Verified**: that is correct for a laptop |
-| 12 | Demonstration data | Click **Skip this step** |
-| 13 | Readiness review | Click **Run checks**. Two warnings appear (the database and platform checks, because no malware scanner exists; and email, because it is simulated). Type a short reason in each box, for example *Laptop trial* and *Laptop trial, email simulated*, then click **Run checks** again. It should say all blocking checks passed and the warnings were acknowledged |
-| 14 | Finish setup | Click **Finish setup** |
+| 12 | Administrator access | Read what Jeff will and will not be able to do (the ticks you chose at step 7 decide it). Tick **I have read this and I want to give this access.** and click **Confirm and give this access** |
+| 13 | Demonstration data | Click **Skip this step** |
+| 14 | Readiness review | Click **Run checks**. Two warnings appear (the database and platform checks, because no malware scanner exists; and email, because it is simulated). Type a short reason in each box, for example *Laptop trial* and *Laptop trial, email simulated*, then click **Run checks** again. It should say all blocking checks passed and the warnings were acknowledged |
+| 15 | Finish setup | Click **Finish setup** |
 
 You land on the sign-in page with "Setup is complete."
 

@@ -4,7 +4,7 @@ Status of this document: describes what is **implemented** in this build (2026-1
 
 | Capability | Label |
 |---|---|
-| First-run wizard (14 steps), resumable, idempotent | Implemented |
+| First-run wizard (15 steps), resumable, idempotent | Implemented |
 | Setup token, single session, loopback-only by default, closed after completion | Implemented |
 | Re-authenticated reopening of selected steps by an installation administrator | Implemented (Demo identity confirmation verified; live OpenID Connect `prompt=login` re-authentication verified only against the in-process mock identity provider) |
 | Readiness checks and sanitised report | Implemented (11 setup checks plus the platform's own checks; the full R-* catalogue is **not** built) |
@@ -87,7 +87,7 @@ Contains: generated time (UTC), mode, deployment, version, step statuses, every 
 | ASM-20 | The setup token is issued by a command run on the server and printed to that terminal, not printed to the console log at start-up (`SETUP_AND_READINESS_SPEC.md` section 1 says "console/log"). Not logging a bearer credential is the safer reading; reversible |
 | ASM-21 | The initial administrator is also made Organisation Administrator of the first organisation. A Tenant Administrator could grant themselves that role (delegation allows it) and could otherwise not run onboarding; granting it in setup only removes a step. Reversible |
 | ASM-22 | Installation (System) administrators sign in through the same provider registered in the installation scope. A person who is both has two independent accounts (one per scope), consistent with "a person in two tenants has two users". The sign-in page lists both providers for the single-tenant case |
-| ASM-23 | Stage numbering differs from the specification's S1 to S18: 14 stages are implemented; supplier and taxonomy CSV import beyond onboarding (S13), deployment-specific stages and the full R-* catalogue are not |
+| ASM-23 | Stage numbering differs from the specification's S1 to S18: 15 stages are implemented; supplier and taxonomy CSV import beyond onboarding (S13), deployment-specific stages and the full R-* catalogue are not |
 | ASM-24 | Onboarding group mappings cannot grant administrator or approver roles (approvers need an approver group, which onboarding does not model) |
 | Open | Q-06 (final classification level names): the placeholder scale is editable in setup |
 | Not built | Adopting an existing populated installation that has no setup record; file upload and XLSX for onboarding import; supplier CSV import; role templates and delegated-administrator creation inside the wizard; stage S13/S14 dry-run import for suppliers; automated accessibility tests of the wizard (A11Y-009 **Not Verified**; markup follows the accessibility rules but was only reviewed by hand) |

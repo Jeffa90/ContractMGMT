@@ -562,7 +562,7 @@ The onboarding configuration kind, its draft/validate/publish/rollback/second-pe
 Route: `Administration > Contracts & Metadata > Categories & owners`.
 
 ```
-Categories and owners                         [ Assign all to one owner ▾ ]  [ Bulk import (CSV) ]
+Categories and owners                         [ Own all current and future ▾ ]  [ Bulk import (CSV) ]
 Search [____]   Show: ( ) All  ( ) Needs an owner
 
 Category       Primary owner       Backup owner        Effective        Status
@@ -576,7 +576,7 @@ Packaging      [Select ▾]          [Select ▾]                           ⚠ 
 | Form, not CSV | One row per category from `ISecuredCategoryService.ListAsync`; two drop-downs per row |
 | People list | **All** people the administrator may manage, not only those who already hold `CategoryOwner`. Choosing someone who lacks the role shows an inline note, "Jeff doesn't have the Contract Manager profile yet; saving will add it", and the save issues both (UXG-01/UXG-04). Today the list offers only existing `CategoryOwner` holders, which is why it appears empty |
 | Primary vs backup | Primary uses `isPrimary=true`; backup is a non-primary owner. The page today always passes `false`, so this needs the owner API to accept it from the UI (it already takes the argument) |
-| Assign all to one owner | One action, with a preview "Jeff will own 14 categories" |
+| Own all current and future | One action, with a preview "Jeff will own every current and future category" |
 | Bulk select | Check rows, then "Set primary owner" or "Set backup owner" |
 | Effective dates | An optional "from / until" per assignment (for example a holiday cover). The secured API has no dates; the trusted one has (**UXG-04**); the secured API gets optional dates |
 | Search and filter | Text filter and "Needs an owner" filter (a client-side filter over the loaded list) |
@@ -812,7 +812,7 @@ None changes the security model. "Blocks" says which part of the UX cannot ship 
 | Q-4 | Add a recent-sign-in requirement to People & Access saves? | Yes, in the UI layer (UXG-07 optional later) |
 | Q-5 | Who defines Required onboarding items: platform default, pack, or tenant? | Pack, with the platform default as the fallback |
 | Q-6 | Which roles may identity group mappings carry in the guided form? | The six onboarding allows; widen deliberately |
-| Q-7 | Should "own all categories" mean all **current** categories, or a standing rule that covers future ones? | Current categories plus a Needs-attention reminder; a standing rule would be a new ownership concept and is Future |
+| Q-7 | Should "own all categories" mean all **current** categories, or a standing rule that covers future ones? | **Superseded by the owner (2026-10-30): current and future.** A small additive policy record keeps ordinary ownership assignments in step (ADR-0040); category authorisation is unchanged |
 | Q-8 | Is the one-person Test bootstrap allowed in **Demo** as well as Test? | Yes (both are non-production); Production never |
 | Q-9 | Navigation label for `/Admin/Elevations` | "Support & emergency access log" |
 | Q-10 | Should preview ever allow **acting** as the person (writes attributed to the administrator "as" the person)? | No. It would let one human satisfy both sides of a separation-of-duties rule, which defeats the governance being rehearsed. Use synthetic people with demonstration sign-in to act |

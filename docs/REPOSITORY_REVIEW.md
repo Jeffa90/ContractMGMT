@@ -152,7 +152,7 @@ Severity: **H** blocks correct implementation, **M** causes rework if guessed wr
 | ASM-20 | The setup token is issued by `Ecp.Host setup-token` and printed to that terminal only; it is not printed to the console log at start-up (spec section 1 says "console/log"). A bearer credential is not logged | Low | Open; documented in `docs/SETUP_AND_ONBOARDING.md` section 7 |
 | ASM-21 | The initial administrator is also made Organisation Administrator of the first organisation during setup, because a Tenant Administrator's `config.*` rights cover tenant-level definitions only (matrix `S` with `TenantLevelDefinition`) and onboarding is organisation-level | Low | Open |
 | ASM-22 | Installation (System) administrators live in the installation scope and sign in through the same identity provider registered there; a person who is both has two independent accounts | Low | Open |
-| ASM-23 | 14 setup stages are implemented, not the specification's S1 to S18; supplier import and the full R-* readiness catalogue are later work | Low | Open |
+| ASM-23 | 15 setup stages are implemented, not the specification's S1 to S18; supplier import and the full R-* readiness catalogue are later work | Low | Open |
 | ASM-24 | Onboarding cannot map administrator or approver roles through identity groups; those are assigned in user administration under delegation rules | Low | Open |
 
 ---

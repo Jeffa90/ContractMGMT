@@ -383,6 +383,26 @@ internal static class SetupScenarios
         Assert.Contains(RoleCodes.CategoryOwner, await HeldAsync());
     }
 
+    /// <summary>UX-9: an administrator who chooses to approve at set-up is put in the authority the starting configuration's workflow names, not in an invented group.</summary>
+    public static async Task Approving_at_setup_uses_the_authority_the_workflow_of_the_pack_names(TestApp app)
+    {
+        var svc = app.Services.GetRequiredService<ISetupService>();
+        await WalkAsync(svc, "mode", "database", "storage", "tenant", "pack", "identity");
+        var admin = Inputs("admin"); admin["doApprove"] = "true";
+        await MustAsync(svc, "admin", admin);
+        await WalkAsync(svc, "organisation", "branding", "classification", "notifications");
+        var review = (await svc.DescribeAsync("access"))!.Review!;
+        Assert.Contains(review.ApproverGroupKeys, k => k == "Approvers");                              // the Blank pack's workflow names "Approvers"
+        await MustAsync(svc, "access");
+        await using var rootScope = app.Services.CreateAsyncScope();
+        var tenant = (await rootScope.ServiceProvider.GetRequiredService<ITenantDirectory>().ListAsync()).Single();
+        await using var scope = app.ScopeFor(tenant.Id);
+        var user = (await scope.Get<IUserService>().FindByEmailAsync(AdminEmail))!;
+        var held = await scope.Get<IRoleAssignmentService>().ListForUserAsync(user.Id);
+        Assert.Contains(held, a => a.RoleCode == RoleCodes.Approver && a.ApproverGroupKey == "Approvers");
+        Assert.DoesNotContain(held, a => a.ApproverGroupKey == "INITIAL-APPROVERS");
+    }
+
     /// <summary>UX-4: in Demo and Test the operational choices are ticked for the administrator; in Production nothing is ticked for them.</summary>
     public static async Task Operational_choices_are_ticked_in_test_and_never_in_production(TestApp app, bool ticked)
     {

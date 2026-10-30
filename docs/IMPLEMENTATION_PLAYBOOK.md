@@ -322,7 +322,7 @@ The proxy must end TLS and forward the original scheme and client address. In th
 
 ## 6. Setup wizard: every page and field
 
-**What it is.** The one-time wizard for a fresh installation. It runs at `/Setup`, in 14 stages, in a fixed order. Each stage saves when you press its button and can be repeated safely (running the same input again changes nothing). The wizard survives a restart or a closed browser.
+**What it is.** The one-time wizard for a fresh installation. It runs at `/Setup`, in 15 stages, in a fixed order. Each stage saves when you press its button and can be repeated safely (running the same input again changes nothing). The wizard survives a restart or a closed browser.
 
 **Who.** A System Administrator opens it (needs a command line on the server); a Business Administrator enters the business fields with them. Rating for opening the wizard: **C**. Rating for the business fields: **B**.
 

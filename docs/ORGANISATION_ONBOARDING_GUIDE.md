@@ -188,6 +188,10 @@ Success flash: "Set-up reset: N drafts discarded and M structure items ended." T
 
 The first thing on the Onboarding page (`/Onboarding`) is the **Set-up checklist**: thirteen items in the order to do them, each **Required**, **Recommended** or **Optional**, and each **Complete**, **Needs attention**, **To do** or **Not used here**. Nothing is ticked by hand; each item reads the facts that make it true (for example "every category has a primary owner who holds the owner role"). What counts as Required comes from the starting configuration (solution pack) you chose: a pack can say, for each item, what its business needs. The platform insists only on its own safety items (the organisation exists, the draft is reviewed, it is published). While a Required item is open the page says "Not ready to publish yet", names the items, and the Publish button on the review page is off; publishing is refused by the service as well. The draft's own categories and owners count, because publishing creates them.
 
+Two things changed in the checklist with the guided approval and ownership work. **Approval authorities** (the *Approvers* item) now links to `/Admin/ApprovalAuthorities`, where you choose the people by name. **Workflow and approvals** no longer asks you to write approval rules unless your workflow names an approval matrix: without one, the single approver group your pack's workflow names decides, and the pack's standard workflow counts as in place until you change it.
+
+**Ready to use.** When every Required item is done and the set-up is published, the Onboarding page and the Review page lead with **<Organisation> is ready to use** and four actions: **Create first contract**, **Add another person**, **Review organisation setup** and **Go to Home**. No technical setting is shown there.
+
 
 ## Part E. Prepare the drafts from the pack
 

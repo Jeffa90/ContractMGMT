@@ -53,9 +53,12 @@ public static class AccessReviewBuilder
 
         // Separation of duties applies to everyone, whatever they are given.
         wont.Add(new ReviewLine("Approve or sign off their own submissions (a second person is always needed)", null));
-        var ceiling = after.HighestClassification;
+        // The ceiling that matters is the one the chosen access carries (the administrator roles sit at their own, higher level and do not read records).
+        var worksOnRecords = input.ProfileKeys.Count > 0;
+        var ceiling = !string.IsNullOrWhiteSpace(input.Ceiling) ? scale.Canonical(input.Ceiling) ?? input.Ceiling
+            : input.ProfileKeys.Select(AccessProfiles.Find).OfType<AccessProfile>().Select(p => AccessProfiles.DefaultCeiling(p, scale)).OrderByDescending(scale.Rank).FirstOrDefault() ?? after.HighestClassification;
         var above = scale.Levels.Where(l => scale.Rank(l) > scale.Rank(ceiling)).ToList();
-        if (above.Count > 0 && after.HasAnyAccess) wont.Add(new ReviewLine($"Open records classified above {ceiling} ({string.Join(", ", above)})", null));
+        if (above.Count > 0 && worksOnRecords) wont.Add(new ReviewLine($"Open records classified above {ceiling} ({string.Join(", ", above)})", null));
 
         var shown = new HashSet<string>(Headline.Concat(AdministrationAbilities).Append("run-installation"));
         foreach (var a in after.CanDo.Where(a => !shown.Contains(a.Key))) also.Add(new ReviewLine(WillText(a), a.Where.Length > 0 ? a.Where : null));
@@ -73,7 +76,7 @@ public static class AccessReviewBuilder
             new("[[organisation]]", input.OrganisationName),
             new("Access profile", profiles.Count == 0 ? "None chosen" : string.Join(", ", profiles)),
             new("[[contract]] ownership", ownership),
-            new("Classification ceiling", after.HasAnyAccess ? $"Up to {ceiling}" : "Not applicable"),
+            new("Classification ceiling", worksOnRecords ? $"Up to {ceiling}" : "Not applicable"),
             new("Administration access", administers.Count > 0 ? "Administers the [[organisation|lower]]" : "None"),
         };
         var notes = after.Attention.Select(x => x.Message).ToList();

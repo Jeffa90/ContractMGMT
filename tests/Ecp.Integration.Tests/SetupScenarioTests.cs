@@ -29,6 +29,7 @@ public sealed class SetupScenarioTests_Sqlite
     [Fact] public Task Report_is_sanitised() => RunAsync(SetupScenarios.The_report_contains_no_secrets_tokens_references_or_personal_addresses);
     [Fact] public Task Readiness_gates_completion() => RunAsync(SetupScenarios.Readiness_blocks_completion_until_blocking_checks_pass_and_warnings_are_acknowledged);
     [Fact] public Task Production_refuses_demonstration_features() => RunAsync(SetupScenarios.Production_refuses_demonstration_features_and_unsafe_configuration, EcpMode.Production);
+    [Fact] public Task Approving_at_setup_uses_the_pack_authority() => RunAsync(SetupScenarios.Approving_at_setup_uses_the_authority_the_workflow_of_the_pack_names);
     [Fact] public Task Access_is_given_only_after_confirming_the_review() => RunAsync(SetupScenarios.Access_is_given_only_after_the_administrator_confirms_the_review);
     [Fact] public Task Administrator_gets_the_chosen_operational_profiles() => RunAsync(app => SetupScenarios.The_initial_administrator_gets_exactly_the_operational_profiles_they_chose(app, choose: true));
     [Fact] public Task Operational_choices_are_ticked_in_test() => RunAsync(app => SetupScenarios.Operational_choices_are_ticked_in_test_and_never_in_production(app, ticked: true));
@@ -58,6 +59,7 @@ public sealed class SetupScenarioTests_SqlServer
     [SqlServerFact] public Task Report_is_sanitised() => RunAsync(SetupScenarios.The_report_contains_no_secrets_tokens_references_or_personal_addresses);
     [SqlServerFact] public Task Readiness_gates_completion() => RunAsync(SetupScenarios.Readiness_blocks_completion_until_blocking_checks_pass_and_warnings_are_acknowledged);
     [SqlServerFact] public Task Production_refuses_demonstration_features() => RunAsync(SetupScenarios.Production_refuses_demonstration_features_and_unsafe_configuration, EcpMode.Production);
+    [SqlServerFact] public Task Approving_at_setup_uses_the_pack_authority() => RunAsync(SetupScenarios.Approving_at_setup_uses_the_authority_the_workflow_of_the_pack_names);
     [SqlServerFact] public Task Access_is_given_only_after_confirming_the_review() => RunAsync(SetupScenarios.Access_is_given_only_after_the_administrator_confirms_the_review);
     [SqlServerFact] public Task Administrator_gets_the_chosen_operational_profiles() => RunAsync(app => SetupScenarios.The_initial_administrator_gets_exactly_the_operational_profiles_they_chose(app, choose: true));
     [SqlServerFact] public Task Operational_choices_are_ticked_in_test() => RunAsync(app => SetupScenarios.Operational_choices_are_ticked_in_test_and_never_in_production(app, ticked: true));

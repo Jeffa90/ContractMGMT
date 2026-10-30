@@ -15,7 +15,7 @@ public sealed record OwnedCategory(Guid CategoryId, string Name, Guid Organisati
 
 public sealed record GrantView(Guid AssignmentId, string RoleLabel, string RoleCode, string Where, string HighestClassification, string Source, string? ProfileLabel, DateTime EffectiveFromUtc, DateTime? EffectiveToUtc, bool Active, bool Future, bool Ended, string? ApproverGroupKey);
 
-/// <summary>"Owns every current and future category in this organisation": the standing instruction behind an all-category ownership choice.</summary>
+/// <summary>"Owns every current and future category in this organisation": the standing instruction behind the choice to own all categories.</summary>
 public sealed record StandingOwnership(Guid OrganisationId, string OrganisationName, bool Primary, string GivenBy, DateTime GivenUtc, string? ProfileLabel);
 
 public sealed record ProfileBadge(string Key, string Label, Guid ApplicationId, DateTime AppliedUtc, string AppliedBy, Guid OrganisationId);

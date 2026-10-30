@@ -173,7 +173,7 @@ Test users: the target person is a Procurement Excellence Manager or Contract Ad
 | OWN-001 | The editor lists every category with a primary-owner and backup-owner drop-down; no CSV is needed to assign an owner | Over HTTP |
 | OWN-002 | The people list includes everyone the administrator may manage, not only existing Category Owners; choosing someone without the role states that the role will be added and does so on save | Over HTTP; audit shows both grants |
 | OWN-003 | Primary and backup are distinguishable and stored (`IsPrimary`); a backup cannot equal the primary | Over HTTP |
-| OWN-004 | **Assign all to one owner** shows a preview and applies to all active categories | Over HTTP |
+| OWN-004 | **Own all current and future categories** shows a preview and applies to every active category now and to each category created later, in the same transaction as the category, without touching ownership others were given | Over HTTP |
 | OWN-005 | Bulk selection sets primary or backup for the selected rows and announces the count | Over HTTP; accessibility test |
 | OWN-006 | Optional effective dates are accepted and enforced; an ownership not yet effective does not confer rights | Over HTTP with FakeClock |
 | OWN-007 | Filter "Needs an owner" shows exactly the categories without a current primary owner; sub-categories show "inherits" | Over HTTP |

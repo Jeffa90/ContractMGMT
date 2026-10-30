@@ -259,7 +259,7 @@ What Save does: creates the user (invited until their first verified sign-in; ac
 
 ### Stage 7, continued: what will this person do? (UX-4)
 
-The initial administrator stage also asks what this person will do in the organisation besides administering it: create and manage contracts, own every category, review, approve, read only. In Demo and Test "create and manage" and "own every category" are ticked for you; in Production nothing is, and you can leave everything unticked (the person then administers only, and someone else must be given the work on contracts). The choices are applied when the organisation is created, through the same trusted path as the administrator roles, and recorded in the set-up report. If there are no categories yet, owning them is asked for again by the set-up checklist once they exist.
+The initial administrator stage also asks what this person will do in the organisation besides administering it: create and manage contracts, own all current and future categories, review, approve, read only. In Demo and Test "create and manage" and "own all current and future" are ticked for you; in Production nothing is, and you can leave everything unticked (the person then administers only, and someone else must be given the work on contracts). **Choosing is not giving:** nothing is applied until you have read the review at Stage 11A and confirmed it. "Own all current and future categories" is a standing instruction, not a copy of today's list: a category added later is theirs automatically, in the moment it is created.
 
 
 ## Stage 8: Organisation
@@ -366,6 +366,23 @@ Success: "N classification levels published." (or "unchanged"). **Amendable late
 A passing result is tied to the settings (a changed setting makes it **stale**) and expires (168 hours by default, `Ecp:Email:ReadinessMaxAgeHours`), after which email reads as not ready until it is tested again. Check R-NOT-01 in stage 13 reads this result: in **Production, Finish setup cannot complete without a passing test**; outside Production a missing, simulated, stale or failed test is a warning that must be acknowledged. SMTP is Implemented and **Not Verified** against a customer's mail service; Graph is Scaffolded and is not connected. **Amendable later.**
 
 ---
+
+## Stage 11A: Administrator access (review and confirm)
+
+| | |
+|---|---|
+| Navigation | "Administrator access"; **/Setup/Step/access** |
+| Who | Business Administrator |
+| Purpose | Read, in plain English, what the initial administrator will be able to do, and give that access |
+| Comes after | Classification levels (the classification ceiling uses your level names) |
+
+The page shows a **Review access** panel built by a dry run of the real access rules that is rolled back, so it says exactly what confirming will do:
+
+* **This person will be able to:** each thing with where it applies (for example create contracts, view contracts, edit contracts in the categories they own, upload documents, create variations, administer the organisation).
+* **This person will not be able to:** for example perform formal review, approve or sign off their own submissions (a second person is always needed), open records above their classification ceiling.
+* **Summary:** the organisation, the access profile, contract ownership ("Every current and future category in <organisation>"), the classification ceiling, approval memberships and administration access.
+
+No role or permission code appears on this page. Tick **I have read this and I want to give this access.** and press **Confirm and give this access**. Without the tick nothing is given and the step reports that it was not completed. The grants are the same ordinary role grants and ownership the platform uses everywhere; they are recorded in the audit trail with the reason "Chosen during set-up".
 
 ## Stage 12: Demonstration data (Demo and Test only)
 

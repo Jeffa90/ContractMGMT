@@ -38,7 +38,7 @@ public static class ConfigurationKindLabels
         "Capabilities" => $"/Admin/Capabilities/Edit?organisationId={organisationId}",
         "RegionalProfile" => $"/Admin/Regional?organisationId={organisationId}",
         "OrganisationOnboarding" => $"/Onboarding?org={organisationId}",
-        "CustomField" => "/Admin/Studio/Fields",
+        "CustomField" => "/Admin/Fields",
         "ContractListView" => "/Admin/Studio/Views",
         "WorkflowContractLifecycle" or "WorkflowVariation" or "ApprovalMatrix" or "NotificationPolicy" => $"/Admin/Forms/Edit?kind={kind}&organisationId={organisationId}",
         _ => null,

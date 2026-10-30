@@ -146,6 +146,8 @@
             <div class="field"><label for="ExportFormat">@L["Format"]</label><select id="ExportFormat" name="ExportFormat"><option value="csv">CSV</option><option value="xlsx">Excel (XLSX)</option></select></div>
             <div class="field"><label for="ExportStyle">@L["Values"]</label><select id="ExportStyle" name="ExportStyle" aria-describedby="ExportStyle-hint"><option value="business">@L["For reading: my organisation's date, time and number formats, with currency codes"]</option><option value="machine">@L["For another system: ISO dates, UTC times and plain numbers"]</option></select>
                 <span id="ExportStyle-hint" class="hint">@L["Choose the second only when a program will read the file; it does not depend on any locale."]</span></div>
+            <div class="field"><label><input type="checkbox" name="ExportAdditional" value="true" /> @L["Include the additional fields (those marked for exports that you are allowed to see)"]</label><input type="hidden" name="ExportAdditional" value="false" />
+                @if (Model.Organisations.Count > 1) { <span class="hint">@L["Choose one [[organisation|lower]] above first, so its additional fields are known."]</span> }</div>
             <div class="field"><label><input type="checkbox" name="ExportLarge" value="true" /> @L["This is a large export"]</label><input type="hidden" name="ExportLarge" value="false" /></div>
             <div class="field"><label for="ExportReason">@L["Reason (required for a large export)"]</label><input id="ExportReason" name="ExportReason" type="text" maxlength="500" /></div>
             <button type="submit" class="secondary">@L["Export"]</button>

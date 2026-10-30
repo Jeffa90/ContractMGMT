@@ -1,0 +1,14 @@
+@page "/Admin/Fields/Preview"
+@model Ecp.Host.Pages.Admin.Fields.PreviewModel
+@{ ViewData["Title"] = L["Preview"].Value + (Model.Field is null ? "" : ": " + Model.Field.Label); }
+<h1>@L["Preview"]@(Model.Field is null ? "" : ": " + Model.Field.Label)</h1>
+<p><a href="/Admin/Fields?organisationId=@Model.OrganisationId">&larr; @L["Back to Fields"]</a></p>
+@if (Model.Field is not null && Model.Preview is { } preview)
+{
+    <p><span class="badge">@FieldGuide.Label(Model.Field.Type)</span> <span class="badge @(Model.StatusText == "Published" ? "ok" : "warn")">@L[Model.StatusText]</span></p>
+    <partial name="_FieldPreview" model="preview" />
+    @if (Model.CanEdit)
+    {
+        <div class="actions"><a class="button" href="/Admin/Fields/Edit?organisationId=@Model.OrganisationId&key=@Uri.EscapeDataString(Model.Field.Key)">@L["Edit this field"]</a></div>
+    }
+}

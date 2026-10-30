@@ -29,7 +29,7 @@ public sealed class LocaleProbeUiTests
 
     private static readonly string[] AdminPages =
     [
-        "/Admin/Categories", "/Admin/Users", "/Admin/Notifications", "/Admin/Terminology", "/Admin/Terminology/Edit", "/Admin/Capabilities", "/Admin/Packs", "/Admin/Approvals", "/Admin/Studio",
+        "/Admin/Categories", "/Admin/Users", "/Admin/Notifications", "/Admin/Terminology", "/Admin/Terminology/Edit", "/Admin/Capabilities", "/Admin/Packs", "/Admin/Approvals", "/Admin/Studio", "/Admin/Fields", "/Admin/Fields/Edit", "/Admin/Fields/History",
         "/Admin/Audit", "/Admin/Health", "/Admin/Configuration"
     ];
 

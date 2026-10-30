@@ -260,6 +260,18 @@ internal sealed class ContractCustomFieldService(
         return Calculator.Evaluate(d, Number, Date, Text, culture);
     }
 
+    /// <summary>
+    /// What a person may enter on a new record: a field held at a classification level the person cannot read in this organisation is neither offered nor accepted, exactly as it is neither shown, edited nor searched once
+    /// the record exists (a creator would otherwise write a value they can never read back). A creator who holds no read right at all is not narrowed here.
+    /// </summary>
+    private async Task<Func<FieldDefinition, bool>> CreateGateAsync(Guid organisationId, CancellationToken ct)
+    {
+        var grants = (await access.GrantsAsync("contracts.read", ct)).Where(g => g.OrganisationIds is null || g.OrganisationIds.Contains(organisationId)).ToList();
+        if (grants.Count == 0) return _ => true;
+        var readable = grants.SelectMany(g => g.AllowedClassifications).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return d => readable.Contains(d.Classification);
+    }
+
     public async Task<CustomFieldForm> ForNewAsync(Guid organisationId, string? contractType, CustomFieldInput? submitted = null, IReadOnlyDictionary<string, string>? errors = null, CancellationToken ct = default)
     {
         var grants = await access.GrantsAsync("contracts.create", ct);
@@ -267,11 +279,12 @@ internal sealed class ContractCustomFieldService(
         var set = await catalogue.PublishedAsync(organisationId, ct);
         var roles = await RolesAsync(organisationId, ct);
         var (culture, zone, today) = await LocaleAsync(organisationId, ct);
+        var mayEnter = await CreateGateAsync(organisationId, ct);
         var entries = new List<CustomFieldEntry>();
         foreach (var d in set.Fields)
         {
             var fc = new FieldContext(roles, "", contractType, today, false);
-            if (!FieldRules.IsCurrent(d, today) || !FieldRules.AppliesToType(d, contractType) || d.IsCalculated) continue;
+            if (!FieldRules.IsCurrent(d, today) || !FieldRules.AppliesToType(d, contractType) || d.IsCalculated || !mayEnter(d)) continue;
             if (d.VisibleToRoles.Count > 0 && !d.VisibleToRoles.Any(roles.Contains)) continue;
             var editable = FieldRules.Editable(d with { VisibleInStates = [], EditableInStates = [] }, fc);
             if (!editable) continue;      // a field the creator cannot fill in has no place on the Create page; it can be filled in later by whoever may
@@ -363,7 +376,8 @@ internal sealed class ContractCustomFieldService(
         var set = await catalogue.PublishedAsync(organisationId, ct);
         var roles = await RolesAsync(organisationId, ct);
         var (_, _, today) = await LocaleAsync(organisationId, ct);
-        var plan = await PlanAsync(set, [], input, d => FieldRules.Editable(d with { VisibleInStates = [], EditableInStates = [] }, new FieldContext(roles, initialStatus, contractType, today, false)), enforceRequired: true, applyDefaults: true, ct);
+        var mayEnter = await CreateGateAsync(organisationId, ct);
+        var plan = await PlanAsync(set, [], input, d => mayEnter(d) && FieldRules.Editable(d with { VisibleInStates = [], EditableInStates = [] }, new FieldContext(roles, initialStatus, contractType, today, false)), enforceRequired: true, applyDefaults: true, ct);
         if (plan.Errors.Count > 0) throw new CustomFieldValidationException(plan.Errors);
     }
 

@@ -339,8 +339,32 @@ The two share one form. A Variation is a controlled change to an effective contr
 
 ---
 
+## 8A. Fields: add an extra detail to every contract (UX-10)
+
+Use this when the business needs to record something the contract does not already hold, such as an insurance expiry date, whether a supplier is critical, or the agreed payment terms. You need no key, no code, no JSON, no SQL and no database change, and you do not need to know how configuration is released.
+
+**Where:** Administration, Contracts & Metadata, **Fields**. The page lists every field with **Field**, **Type**, **Section**, **Used on**, **Required** and **Status**, and has **+ Add field**, a **Search** box, and on each row **Edit**, **Preview**, **Retire** (or **Reinstate**) and **Version history**. The up and down arrows put a field in order within its section.
+
+**Add a field:** choose **+ Add field**. The page has seven parts, in this order.
+
+1. **Basic information.** The field name (what people see), a description for administrators, and help text shown under the field on the form.
+2. **Field type.** Pick one: Text, Long text, Number, Decimal, Money, Percentage, Date, Date/time, Yes/No, Single choice, Multiple choice, Person, Lookup, Email, URL, File reference or Calculated. The settings below the picker change to match the type (a date offers an earliest and latest date; a choice offers a list of options; a number offers a lowest and highest value). Nothing that does not apply to the type is shown. A published field's type cannot change; retire it and add a new one.
+3. **Choices** (single and multiple choice). Type each option as people should read it. **+ Add option** adds a row; the arrows put options in order; **Offered** switches an option off so it is no longer offered while records that already hold it keep it; **Remove** is offered only for an option that has never been published.
+4. **Placement.** The section it appears under (or **A new section...**), and where in that section (at the end, at the start, or after another field). The page lists where people will see it: New contract, Edit contract and Contract details. Every field is on all three; who may see or change it is set under Advanced rules.
+5. **Rules.** Standard: **Required**, **Searchable**, **Filterable**, **Sortable**, **Reportable**. A box appears only where it makes sense for the type (a date is filtered, not text-searched). **Advanced rules** is collapsed: who can see it, who can change it, the stages it is shown or editable in, the contract types it applies to, its classification, the dates it is offered, use in approval rules, and its technical name (made for you from the field name).
+6. **Preview.** Press **Preview** at any time to see the field drawn the way New contract and Contract details will draw it. Nothing is saved.
+7. **Review and publish.** The page says in plain English what publishing will do, for example: "Insurance Expiry will appear under Risk & Compliance on New Contract, Edit Contract and Contract details. It will be optional, filterable, sortable and included in exports and reports." **Save draft** keeps the field; the panel under the review then offers **Publish**, or **Submit for publication** where your organisation needs a second person to publish. A second person sees **Review and publish**.
+
+**Several changes together:** each field you save waits in "Changes waiting to be published" on the Fields page. Publishing puts everything listed there in force together. **Discard unpublished changes** puts the fields back as they were.
+
+**Use the new field:** once published it is on New contract and Edit contract for people who may fill it in, on Contract details for people who may see it, and in the register's **Filters** list (choose the organisation first if you can reach several). To put its values in an export, tick **Include the additional fields** on the export form. A field marked **Required** is asked for on new contracts and the next time an existing contract is edited; nothing is changed in bulk.
+
+**Retire a field:** **Retire** on the row. The page says how many records hold a value, and that those values are kept and still shown on those records. The field stops being offered on New and Edit. A field is never deleted. **Reinstate** brings it back. Retiring, like adding, waits in the changes panel until it is published.
+
+**Version history:** every publication is a version. The page for a field lists the versions that touched it ("Added Insurance Expiry", "Retired Critical Supplier"), and the page for all fields can restore an earlier version, which is published again as a new version; it is refused if it would remove a field or option that records now use.
+
 ## 8. Other configuration pages not detailed here
-The **Configuration Studio** (menu entry **Configuration Studio**, page **/Admin/Studio**) manages additional contract fields, choice lists and saved views, with the same draft, check, submit, review and rollback path. The old raw document page **/Admin/Configuration** is a **read-only diagnostic in Production** (editable only in Demonstration and Test) and still hosts the release history and **Publish again** rollback for the four form kinds. Pack handling is on **/Admin/Packs** (the business administrator uploads, reads the checks, installs and assigns; signing and key registration are technical tasks: **[Technical task: Pack Publisher]**, **[Technical task: System Administrator]**).
+**Fields** (menu: Administration, Contracts & Metadata, **Fields**, page **/Admin/Fields**) is where the extra details recorded on every contract are added and changed. See section 8A. The **Configuration Studio (advanced)** (page **/Admin/Studio**) still manages the sections and shared lists that fields use, and shared list views, and carries the older single-page field editor, with the same draft, check, submit, review and rollback path. The old raw document page **/Admin/Configuration** is a **read-only diagnostic in Production** (editable only in Demonstration and Test) and still hosts the release history and **Publish again** rollback for the four form kinds. Pack handling is on **/Admin/Packs** (the business administrator uploads, reads the checks, installs and assigns; signing and key registration are technical tasks: **[Technical task: Pack Publisher]**, **[Technical task: System Administrator]**).
 
 ## 9. The review inbox
 

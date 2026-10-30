@@ -1,0 +1,31 @@
+@model Ecp.Host.Pages.Admin.Fields.FieldPreviewModel
+@using Ecp.Metadata
+@{ var d = Model.Definition; }
+<section class="card" aria-labelledby="preview-h">
+    <h2 id="preview-h">@L["Preview"]</h2>
+    <p class="hint">@L["This is the field as people will see it. Nothing here is saved."]</p>
+    <h3>@Terms.Expand("New [[contract]]")</h3>
+    @if (d.IsCalculated || d.IsRetired)
+    {
+        <p class="hint">@(d.IsRetired ? L["A retired field is not offered on the form."] : L["A calculated field is worked out, never typed in, so it is not on the form."])</p>
+    }
+    else
+    {
+        <partial name="~/Pages/Shared/_CustomFieldInputs.cshtml" model="Model.AsForm(true)" />
+    }
+    <h3>@Terms.Expand("[[contract]] details")</h3>
+    <partial name="~/Pages/Shared/_CustomFieldValues.cshtml" model="Model.AsForm(false)" />
+    <h3>@L["Register and export"]</h3>
+    <ul class="plain">
+        <li>@(d.Searchable ? L["Found by the register's search box."] : L["Not found by the search box."])</li>
+        <li>@(d.Filterable ? L["Can be used as a filter."] : L["Cannot be used as a filter."])</li>
+        <li>@(d.Sortable ? L["Can be sorted on."] : L["Cannot be sorted on."])</li>
+        <li>@(d.Reportable ? L["Included in exports."] : L["Not included in exports."])</li>
+    </ul>
+</section>
+<section class="card" aria-labelledby="review-h">
+    <h2 id="review-h">@L["Review"]</h2>
+    <ul>
+        @foreach (var line in Model.Review) { <li>@Terms.Expand(line)</li> }
+    </ul>
+</section>

@@ -1,6 +1,6 @@
 # Guided administration: implementation status
 
-Status: **Implemented in slices UX-1 to UX-9 and verified (final acceptance review 2026-10-29, section 5A; the three gaps it found were closed by UX-9 on 2026-10-30, section 5).** A moderated usability test and the items in section 6 remain open. Branch ux/guided-administration (from claude/stoic-volta-dvszm5 at commit 5cdf9f7; that branch is unchanged). Design: `docs/UX_REDESIGN.md`. Criteria: `docs/UX_ACCEPTANCE_CRITERIA.md`. Decisions: `decisions/ADR-0039-guided-administration-access-profiles.md`. Production approval is external governance and nothing here declares it.
+Status: **Implemented in slices UX-1 to UX-10 and verified (final acceptance review 2026-10-29, section 5A; the three gaps it found were closed by UX-9 on 2026-10-30, section 5).** UX-10 (guided Fields, section 5B) followed on 2026-10-30. A moderated usability test and the items in section 6 remain open. Branch ux/guided-administration (from claude/stoic-volta-dvszm5 at commit 5cdf9f7; that branch is unchanged). Design: `docs/UX_REDESIGN.md`. Criteria: `docs/UX_ACCEPTANCE_CRITERIA.md`. Decisions: `decisions/ADR-0039-guided-administration-access-profiles.md`. Production approval is external governance and nothing here declares it.
 
 Labels: **Implemented** (built and covered by a named automated test), **Partial** (built, with the stated gap), **Not built**, **Not Verified** (needs a person, a browser or an environment this work did not have). "SQLite" tests are provider-independent behaviour, not SQL Server proof; "SQL Server" means the same scenario ran on a real SQL Server 2022 container.
 
@@ -15,6 +15,8 @@ Labels: **Implemented** (built and covered by a named automated test), **Partial
 | UX-5 Onboarding | **Set-up checklist** (13 business-outcome items, Required/Recommended/Optional, computed from facts) above the existing draft sections; Publish blocked, with links, while a Required item is open | `IOnboardingReadiness`; packs may carry `onboardingRequirements` (data) in their solution-pack document, validated against a closed vocabulary; the platform insists only on organisation, review and publish |
 | UX-6 Category ownership | **Categories and owners**: primary and backup per category, assign-all with a preview, bulk selection, search, "needs an owner" filter, owner role added in the same save | `ICategoryOwnership` |
 | UX-7 Advanced | **Identity group mappings** (Advanced): in words, previewed in a sentence, closed safe role catalogue | `IGroupMappingAdministration` (requires `rolemappings.manage`, delegation policy, recent sign-in, no high ceiling, org-filtered); `GroupMappingPolicy.SafeRoles` enforced at the store as well |
+
+| UX-10 Fields | **Fields** landing (Field, Type, Section, Used on, Required, Status; **+ Add field**, search, Edit, Preview, Retire/Reinstate, Version history); a guided **Add/Edit field** page (basic information, type picker, only that type's settings, choice editor, placement, standard and Advanced rules, preview, plain-English review, Save draft, Publish or Submit for publication); Retire and Version history pages; export option **Include the additional fields** | None to the field engine (ADR-0041). One contracts-module defect fixed: Create now applies the classification gate that Details, Edit, Save and the register already applied |
 
 ## 2. Security behaviour preserved
 
@@ -126,6 +128,25 @@ A person doing the same in a browser is **Not Verified**.
 | 31 | The existing evaluator remains the sole authority | Implemented | `AccessEvaluator.cs` and `PermissionMatrix.cs` have **no diff** from the baseline; the parity test above; a person holding every Test-mode role still cannot approve their own submission |
 | 32 | Stable role and permission identifiers unchanged | Implemented | no diff in the role/permission reference CSVs or `RoleCodes`; the only change in `Roles.cs` is a new `AssignmentSource` value, `TestBootstrap` |
 
+## 5B. Guided Fields (UX-10): the finding, the scenario and the result
+
+**Finding.** Adding a custom field was hard enough that the administrator could not tell whether it worked. Causes, each fixed in the pages (the engine was sound): a field key to invent; choices typed as `CODE | Label | inactive`; a "Start a draft" step; every setting of every type on one page; separate validate and publish pages; no view of the field as the form would draw it; no statement of what publishing would do for this person; no way to see which fields were waiting.
+
+**Scenario (Create without code).** Insurance Expiry (Date), Critical Supplier (Yes/No) and Payment Terms (Single choice: 30, 45, 60, 90 days), added on the Fields pages, published, then: all three on Create contract; values save; values on Contract details; values edited by an authorised person; an effective record still locked (its page shows the fields, offers no edit, and a posted edit is refused); each field filtered through the register's filter form and the filter tells two contracts apart; an authorised export contains the three columns and values; a field for category owners only does not appear to a viewer (details, the register's filter list, search, filter) nor in the export of a person who may export (a viewer may not export at all), and a field held above the category owner's classification ceiling does not appear to that owner on details, edit or create, and a value cannot be written for it on Create; retiring Critical Supplier keeps its values on the records, in the database and in exports; an earlier version restored; another organisation's administrator cannot reach the fields; the typed columns checked directly in SQL Server; no migration applied. `GuidedFieldsUiTests` (SQLite) and `GuidedFieldsSqlServerTests` (real SQL Server) run the same scenario. A second test shows the second-person path (the author is offered "Submit for publication", a reviewer publishes), and one runs the structural accessibility checks over every new page.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Fields landing with Field, Type, Section, Used on, Required, Status, + Add field, Search, Edit, Preview, Retire, Version history | Implemented | `GuidedFieldsUiTests` |
+| Guided Add/Edit: basic information, type, only that type's settings, choice editor, placement, standard and collapsed Advanced rules, preview, plain-English review | Implemented | same; the settings that do not belong to a type are absent from its page |
+| Save draft, Submit for publication, Publish according to governance | Implemented | same, including the second-person test |
+| No JSON, SQL, field key, migration, code or release knowledge needed | Implemented | page text scanned for those words; applied-migration count unchanged |
+| Preview "exactly as it will appear" | Implemented | the preview renders the same partials as Create and Details |
+| Create, Edit and Details as three independent switches | **Not built (by design)** | the engine has none; "Used on" shows what the rules do. ADR-0041 asks the owner whether to add them |
+| New field as a column of a shared view from the Fields pages | **Not built** | views are their own configuration; the export form's **Include the additional fields** covers exports |
+| Real-browser walkthrough, screen reader | **Not Verified** | structural checks only |
+
+**Backend defect, reported separately from the usability failures.** One, in the contracts module (not the field engine): `ForNewAsync` and `ValidateForNewAsync` skipped the classification gate. A creator whose classification ceiling was below a field's level was offered the field and could write a value that they could never read back (Details, Edit, Save and the register already gated it). Fixed; covered by the scenario above on SQLite and SQL Server. No defect was found in the metadata engine, the value storage, the validator, publication, rollback or retirement.
+
 ## 6. Known gaps (first things to do next)
 
 1. Moderated usability test of the journey with real administrators (USE-001..006), and keyboard and screen-reader walkthroughs (ACC-002, 004, 005).
@@ -134,7 +155,8 @@ A person doing the same in a browser is **Not Verified**.
 4. An inventory sweep of every GET page under Preview (PRV-010) and a per-permission differential for effective access (EFF-002).
 5. Configurable access-profile definitions with draft, publish and rollback (slice S8); today they are compiled in.
 6. Documents hub, "Recent contracts", reports (UXG-09 and later).
-7. Observations from the fresh journey, not changed: the set-up classification stage lets an administrator remove a level the pack's notification policy names ("Legal Privileged"), which then shows as an empty Home instead of a message on that stage; the data-migration route of the ownership policy has no dedicated test (the Categories screen and the trusted upsert do); the Approval authorities page carries the machine key in its edit link and a hidden field (never in the visible text); approval-rule authoring remains the form editor for a workflow that names a matrix.
+7. Fields (UX-10): per-surface Create/Edit/Details switches (an engine change); a new field is not a register column until a shared view lists it (the Studio's Views page), only an export can include it on request; shared choice lists are still edited on the older Lists page; the older Studio field pages remain as the advanced editor.
+8. Observations from the fresh journey, not changed: the set-up classification stage lets an administrator remove a level the pack's notification policy names ("Legal Privileged"), which then shows as an empty Home instead of a message on that stage; the data-migration route of the ownership policy has no dedicated test (the Categories screen and the trusted upsert do); the Approval authorities page carries the machine key in its edit link and a hidden field (never in the visible text); approval-rule authoring remains the form editor for a workflow that names a matrix.
 
 ## 7. Verification of this state
 

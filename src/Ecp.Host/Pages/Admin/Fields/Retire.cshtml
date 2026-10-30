@@ -1,0 +1,33 @@
+@page "/Admin/Fields/Retire"
+@model Ecp.Host.Pages.Admin.Fields.RetireModel
+@{ var retired = Model.Field?.IsRetired ?? false; ViewData["Title"] = (retired ? L["Reinstate field"] : L["Retire field"]).Value; }
+<h1>@(retired ? L["Reinstate field"] : L["Retire field"])@(Model.Field is null ? "" : ": " + Model.Field.Label)</h1>
+<p><a href="/Admin/Fields?organisationId=@Model.OrganisationId">&larr; @L["Back to Fields"]</a></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Field is { } f)
+{
+    var uses = Model.State.Usage.Of(f.Key);
+    <section class="card">
+        @if (retired)
+        {
+            <p>@L["Reinstating puts this field back on the New and Edit forms. Values already entered were never removed."]</p>
+        }
+        else
+        {
+            <ul>
+                <li>@L["The field stops being offered on New and Edit forms."]</li>
+                <li>@(uses > 0 ? $"{uses} " + L["record(s) already hold a value for it. Those values are kept and still shown on the records that have them."].Value : L["No record holds a value for it yet. Any value entered later would be kept in the same way."].Value)</li>
+                <li>@L["Exports and the register still include the values already entered."]</li>
+                <li>@L["A field is retired, never deleted, so its history can always be shown. You can reinstate it later."]</li>
+            </ul>
+        }
+        <form method="post">
+            <input type="hidden" name="organisationId" value="@Model.OrganisationId" /><input type="hidden" name="key" value="@f.Key" />
+            <div class="actions">
+                <button type="submit">@(retired ? L["Reinstate this field"] : L["Retire this field"])</button>
+                <a class="button secondary" href="/Admin/Fields?organisationId=@Model.OrganisationId">@L["Cancel"]</a>
+            </div>
+        </form>
+        <p class="hint">@L["The change waits in your unpublished changes until you publish."]</p>
+    </section>
+}

@@ -38,6 +38,8 @@ public sealed class IndexModel(IContractViews views, IContractRegister register,
     [BindProperty] public string? ExportStyle { get; set; }
     [BindProperty] public string? ExportReason { get; set; }
     [BindProperty] public bool ExportLarge { get; set; }
+    /// <summary>Adds every additional field the person can see that is marked as reportable to the export's columns, whichever columns the view itself shows.</summary>
+    [BindProperty] public bool ExportAdditional { get; set; }
 
     public IReadOnlyDictionary<string, string> StatusLabels { get; private set; } = new Dictionary<string, string>();
     public IReadOnlyList<ViewSummary> Views { get; private set; } = [];
@@ -88,7 +90,13 @@ public sealed class IndexModel(IContractViews views, IContractRegister register,
         var prepared = await views.PrepareAsync(View, Org, 1, Q, ParseFilters(), SortOverride(), ct);
         var summary = string.Join("; ", new[] { string.IsNullOrWhiteSpace(Q) ? null : $"text '{Q.Trim()}'" }.Concat((ParseFilters() ?? []).Select(f => $"{f.Field} {f.Op} {string.Join(",", f.Values)}")).Where(x => x is not null));
         var format = string.Equals(ExportFormat, "xlsx", StringComparison.OrdinalIgnoreCase) ? Ecp.Contracts.Register.ExportFormat.Xlsx : Ecp.Contracts.Register.ExportFormat.Csv;
-        var result = await exports.ExportAsync(new ExportRequest(prepared.Query, format, null, false, ExportLarge, ExportReason, summary.Length == 0 ? null : summary, prepared.View.Definition.Name,
+        IReadOnlyList<string>? columns = null;
+        if (ExportAdditional)
+        {
+            var shown = (prepared.Query.Columns ?? prepared.View.Definition.Columns).ToList();
+            columns = shown.Concat(Catalogue.Fields.Where(f => f.IsCustom && f.Displayable && f.Reportable).Select(f => f.Key)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        var result = await exports.ExportAsync(new ExportRequest(prepared.Query, format, columns, false, ExportLarge, ExportReason, summary.Length == 0 ? null : summary, prepared.View.Definition.Name,
             string.Equals(ExportStyle, "machine", StringComparison.OrdinalIgnoreCase) ? Ecp.Contracts.Register.ExportStyle.Machine : Ecp.Contracts.Register.ExportStyle.Business), ct);
         Response.Headers.CacheControl = "no-store";
         return File(result.Content, result.ContentType, result.FileName);

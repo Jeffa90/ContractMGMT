@@ -18,7 +18,8 @@
         <p>@Model.FieldCount @L["published field(s)"]@(Model.FieldRelease is { } r ? $", release {r}" : "") @if (Model.FieldDraft) { <span class="badge warn">@L["Draft open"]</span> }</p>
         <p>@L["Fields, sections and choice lists. Choose who sees and changes each field, whether it can be searched, filtered, sorted, exported or used in [[approval|plural|lower]]."]</p>
         <div class="actions">
-            @if (Model.CanDraft) { <a class="button" href="/Admin/Studio/Fields?organisationId=@org">@L["Manage fields"]</a> <a class="button secondary" href="/Admin/Studio/Lists?organisationId=@org">@L["Sections and lists"]</a> }
+            <a class="button" href="/Admin/Fields?organisationId=@org">@L["Manage fields"]</a>
+            @if (Model.CanDraft) { <a class="button secondary" href="/Admin/Studio/Lists?organisationId=@org">@L["Sections and lists"]</a> <a class="button secondary" href="/Admin/Studio/Fields?organisationId=@org">@L["Advanced field editor"]</a> }
             <a class="button secondary" href="/Admin/Studio/History?organisationId=@org">@L["Versions and rollback"]</a>
         </div>
     </section>

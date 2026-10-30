@@ -1,0 +1,289 @@
+@page "/Admin/Fields/Edit"
+@model Ecp.Host.Pages.Admin.Fields.EditModel
+@using Ecp.Metadata
+@{
+    var f = Model.Form;
+    var title = Model.IsNew ? L["Add field"].Value : L["Edit field"].Value;
+    ViewData["Title"] = title;
+    var t = f.Type;
+    var sections = Model.State.Working.OrderedSections.Where(s => s.Key != "general").ToList();
+    var siblings = Model.State.Working.Fields.Where(x => x.Section == f.Section && !string.Equals(x.Key, Model.Key, StringComparison.OrdinalIgnoreCase)).OrderBy(x => x.Order).ThenBy(x => x.Label, StringComparer.Ordinal).ToList();
+}
+<h1>@title@(Model.IsNew || string.IsNullOrWhiteSpace(f.Name) ? "" : ": " + f.Name)</h1>
+<p><a href="/Admin/Fields?organisationId=@Model.OrganisationId">&larr; @L["Back to Fields"]</a></p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (!Model.IsNew && Model.Published) { <p class="hint">@L["This field is published. Its type cannot change while records may hold values; to use a different type, retire it and add a new field. Options can be added or switched off, never removed."]</p> }
+
+<form method="post">
+    <input type="hidden" name="PreviousType" value="@f.Type" />
+    @* Pressing Enter in a text box submits the first button in the form; this makes that the save button, not a type or option button. *@
+    <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">@L["Save draft"]</button>
+
+    <fieldset class="card">
+        <legend>1. @L["Basic information"]</legend>
+        <div class="field"><label for="Form.Name">@L["Field name"]</label>
+            <input id="Form.Name" name="Form.Name" type="text" maxlength="100" required value="@f.Name" aria-describedby="name-hint" />
+            <p id="name-hint" class="hint">@L["What people see beside the field, for example \"Insurance Expiry\"."]</p></div>
+        <div class="field"><label for="Form.Description">@L["Description (for administrators)"]</label>
+            <input id="Form.Description" name="Form.Description" type="text" maxlength="300" value="@f.Description" /></div>
+        <div class="field"><label for="Form.HelpText">@L["Help text"]</label>
+            <input id="Form.HelpText" name="Form.HelpText" type="text" maxlength="300" value="@f.HelpText" aria-describedby="help-hint" />
+            <p id="help-hint" class="hint">@L["Shown under the field on the form to explain what to enter."]</p></div>
+    </fieldset>
+
+    <fieldset class="card">
+        <legend>2. @L["Field type"]</legend>
+        @if (Model.Published && !Model.IsNew)
+        {
+            <input type="hidden" name="Form.Type" value="@t" />
+            <p><strong>@FieldGuide.Label(t)</strong> &mdash; @Terms.Expand(FieldGuide.Of(t).Description)</p>
+        }
+        else
+        {
+            <input type="hidden" name="Form.Type" value="@t" />
+            <p class="hint" id="type-hint">@L["Choose what kind of information this field holds. The settings below change to match."]</p>
+            <div class="type-grid" role="group" aria-labelledby="type-hint">
+                @foreach (var g in FieldGuide.Types)
+                {
+                    <button type="submit" asp-page-handler="Refresh" formnovalidate name="NewType" value="@g.Code" aria-pressed="@(g.Code == t ? "true" : "false")">
+                        <span class="type-name">@g.Label</span><span class="hint">@Terms.Expand(g.Description)</span></button>
+                }
+            </div>
+        }
+
+        <h3>@L["Settings for"] @FieldGuide.Label(t)</h3>
+        @if (FieldGuide.NeedsNoMoreSettings(t)) { <p class="hint">@L["This type needs no further settings."]</p> }
+
+        @if (FieldGuide.HasLength(t))
+        {
+            <div class="field"><label for="Form.MinLength">@L["Shortest allowed (characters)"]</label><input id="Form.MinLength" name="Form.MinLength" type="text" inputmode="numeric" value="@f.MinLength" /></div>
+            <div class="field"><label for="Form.MaxLength">@L["Longest allowed (characters)"]</label><input id="Form.MaxLength" name="Form.MaxLength" type="text" inputmode="numeric" value="@f.MaxLength" /></div>
+        }
+        @if (FieldGuide.HasRange(t))
+        {
+            <div class="field"><label for="Form.Min">@L["Lowest allowed"]</label><input id="Form.Min" name="Form.Min" type="text" inputmode="decimal" value="@f.Min" /></div>
+            <div class="field"><label for="Form.Max">@L["Highest allowed"]</label><input id="Form.Max" name="Form.Max" type="text" inputmode="decimal" value="@f.Max" /></div>
+        }
+        @if (FieldGuide.HasDecimals(t))
+        {
+            <div class="field"><label for="Form.Decimals">@L["Decimal places"]</label><input id="Form.Decimals" name="Form.Decimals" type="text" inputmode="numeric" value="@f.Decimals" /></div>
+        }
+        @if (FieldGuide.HasCurrency(t))
+        {
+            <div class="field"><label for="Form.Currency">@L["Currency code (leave blank to use the [[contract|lower]]'s currency)"]</label><input id="Form.Currency" name="Form.Currency" type="text" maxlength="3" value="@f.Currency" /></div>
+        }
+        @if (FieldGuide.HasDateRange(t))
+        {
+            <div class="field"><label for="Form.MinDate">@L["Earliest date allowed"]</label><input id="Form.MinDate" name="Form.MinDate" type="date" value="@f.MinDate" /></div>
+            <div class="field"><label for="Form.MaxDate">@L["Latest date allowed"]</label><input id="Form.MaxDate" name="Form.MaxDate" type="date" value="@f.MaxDate" /></div>
+        }
+        @if (FieldGuide.HasItemCount(t))
+        {
+            <div class="field"><label for="Form.MinItems">@L["Fewest options a person must pick"]</label><input id="Form.MinItems" name="Form.MinItems" type="text" inputmode="numeric" value="@f.MinItems" /></div>
+            <div class="field"><label for="Form.MaxItems">@L["Most options a person may pick"]</label><input id="Form.MaxItems" name="Form.MaxItems" type="text" inputmode="numeric" value="@f.MaxItems" /></div>
+        }
+        @if (FieldGuide.HasList(t))
+        {
+            <div class="field"><label for="Form.Lookup">@L["Shared list to pick from"]</label>
+                <select id="Form.Lookup" name="Form.Lookup"><option value="">@L["Choose a list"]</option>@foreach (var l in Model.State.Working.Lookups) { <option value="@l.Name" selected="@(l.Name == f.Lookup)">@l.Label</option> }</select>
+                <p class="hint">@L["Shared lists are kept under"] <a href="/Admin/Studio/Lists?organisationId=@Model.OrganisationId">@L["Sections and shared lists"]</a>.</p></div>
+        }
+        @if (FieldGuide.HasPrefill(t))
+        {
+            <div class="field"><label for="Form.DefaultValue">@L["Pre-filled value (optional)"]</label>
+                <input id="Form.DefaultValue" name="Form.DefaultValue" type="@(t == FieldTypes.Date ? "date" : "text")" value="@f.DefaultValue" /></div>
+        }
+        @if (FieldGuide.HasYesNoPrefill(t))
+        {
+            <div class="field"><label for="Form.DefaultValue">@L["Starts as"]</label>
+                <select id="Form.DefaultValue" name="Form.DefaultValue"><option value="">@L["Not set"]</option><option value="true" selected="@(f.DefaultValue == "true")">@L["Yes"]</option><option value="false" selected="@(f.DefaultValue == "false")">@L["No"]</option></select></div>
+        }
+        @if (FieldGuide.HasCalculation(t))
+        {
+            <p class="hint">@L["A calculated field is shown, never typed in. It is worked out from other fields using one of these operations."]</p>
+            <div class="field"><label for="Form.CalcKind">@L["What to work out"]</label>
+                <select id="Form.CalcKind" name="Form.CalcKind">
+                    <option value="">@L["Choose"]</option>
+                    <option value="@CalculationKinds.DaysBetween" selected="@(f.CalcKind == CalculationKinds.DaysBetween)">@L["Days between two dates (first to second)"]</option>
+                    <option value="@CalculationKinds.Sum" selected="@(f.CalcKind == CalculationKinds.Sum)">@L["Add numbers together"]</option>
+                    <option value="@CalculationKinds.Difference" selected="@(f.CalcKind == CalculationKinds.Difference)">@L["Subtract the second number from the first"]</option>
+                    <option value="@CalculationKinds.Product" selected="@(f.CalcKind == CalculationKinds.Product)">@L["Multiply numbers"]</option>
+                    <option value="@CalculationKinds.Ratio" selected="@(f.CalcKind == CalculationKinds.Ratio)">@L["Divide the first number by the second"]</option>
+                    <option value="@CalculationKinds.Template" selected="@(f.CalcKind == CalculationKinds.Template)">@L["Show text that includes other fields' values"]</option>
+                </select></div>
+            @if (f.CalcKind == CalculationKinds.Template)
+            {
+                <div class="field"><label for="Form.CalcTemplate">@L["Text to show"]</label><input id="Form.CalcTemplate" name="Form.CalcTemplate" type="text" maxlength="300" value="@f.CalcTemplate" aria-describedby="tpl-hint" />
+                    <p id="tpl-hint" class="hint">@L["Put a field's name in { } where its value should appear, for example: Expires on {Insurance Expiry}."]</p></div>
+            }
+            else if (!string.IsNullOrEmpty(f.CalcKind))
+            {
+                <div class="field"><label for="Form.CalcFirst">@L["First field"]</label>
+                    <select id="Form.CalcFirst" name="Form.CalcFirst"><option value="">@L["Choose a field"]</option>@foreach (var o in Model.Operands) { <option value="@o.Key" selected="@(o.Key == f.CalcFirst)">@o.Label</option> }</select></div>
+                <div class="field"><label for="Form.CalcSecond">@L["Second field"]</label>
+                    <select id="Form.CalcSecond" name="Form.CalcSecond"><option value="">@L["Choose a field"]</option>@foreach (var o in Model.Operands) { <option value="@o.Key" selected="@(o.Key == f.CalcSecond)">@o.Label</option> }</select></div>
+                @if (f.CalcKind is CalculationKinds.Sum or CalculationKinds.Product)
+                {
+                    <fieldset><legend>@L["More fields (optional)"]</legend>
+                        @foreach (var o in Model.Operands) { <label><input type="checkbox" name="Form.CalcMore" value="@o.Key" checked="@f.CalcMore.Contains(o.Key)" /> @o.Label</label> }
+                    </fieldset>
+                }
+            }
+            @if (!string.IsNullOrEmpty(f.CalcKind) && f.CalcKind is not (CalculationKinds.DaysBetween or CalculationKinds.Template))
+            {
+                <div class="field"><label for="Form.CalcDecimals">@L["Decimal places of the result"]</label><input id="Form.CalcDecimals" name="Form.CalcDecimals" type="text" inputmode="numeric" value="@f.CalcDecimals" /></div>
+            }
+            @if (string.IsNullOrEmpty(f.CalcKind)) { <p class="hint">@L["Choose what to work out, then press Preview to see the fields to use."]</p> <button type="submit" asp-page-handler="Refresh" formnovalidate class="secondary">@L["Show the fields to use"]</button> }
+            else { <button type="submit" asp-page-handler="Refresh" formnovalidate class="secondary">@L["Update the fields to choose from"]</button> }
+        }
+    </fieldset>
+
+    @if (FieldGuide.HasOptions(t))
+    {
+        <fieldset class="card">
+            <legend>3. @L["Choices"]</legend>
+            <p class="hint" id="opt-hint">@L["Write each option as people should read it. Use the arrows to put them in order. An option you switch off is no longer offered, but records that already hold it keep it."]</p>
+            <ul class="option-list" aria-describedby="opt-hint">
+                @for (var i = 0; i < f.Options.Count; i++)
+                {
+                    var o = f.Options[i]; var published = Model.IsPublishedOption(o);
+                    <li>
+                        <input type="hidden" name="Form.Options[@i].Code" value="@o.Code" />
+                        <label class="visually-hidden" for="Form.Options[@i].Label">@L["Option"] @(i + 1)</label>
+                        <input id="Form.Options[@i].Label" name="Form.Options[@i].Label" type="text" maxlength="100" value="@o.Label" />
+                        <label><input type="checkbox" name="Form.Options[@i].Active" value="true" checked="@o.Active" /> @L["Offered"]</label><input type="hidden" name="Form.Options[@i].Active" value="false" />
+                        <button type="submit" class="secondary" asp-page-handler="Option" formnovalidate name="OptionAction" value="up:@i" disabled="@(i == 0)" aria-label="@L["Move up"]: @o.Label">&uarr;</button>
+                        <button type="submit" class="secondary" asp-page-handler="Option" formnovalidate name="OptionAction" value="down:@i" disabled="@(i == f.Options.Count - 1)" aria-label="@L["Move down"]: @o.Label">&darr;</button>
+                        @if (!published) { <button type="submit" class="secondary" asp-page-handler="Option" formnovalidate name="OptionAction" value="remove:@i" aria-label="@L["Remove"]: @o.Label">@L["Remove"]</button> }
+                        else { <span class="hint">@L["Already in use: switch off instead of removing"]</span> }
+                    </li>
+                }
+            </ul>
+            <button type="submit" class="secondary" asp-page-handler="Option" formnovalidate name="OptionAction" value="add">+ @L["Add option"]</button>
+            @if (t == FieldTypes.SingleChoice)
+            {
+                <div class="field"><label for="Form.DefaultValue">@L["Pre-selected option (optional)"]</label>
+                    <select id="Form.DefaultValue" name="Form.DefaultValue"><option value="">@L["None"]</option>@foreach (var o in f.Options.Where(o => !string.IsNullOrWhiteSpace(o.Label))) { <option value="@o.Label" selected="@(string.Equals(o.Label, f.DefaultValue, StringComparison.OrdinalIgnoreCase))">@o.Label</option> }</select></div>
+            }
+        </fieldset>
+    }
+
+    <fieldset class="card">
+        <legend>4. @L["Placement"]</legend>
+        <div class="field"><label for="Form.Section">@L["Form section"]</label>
+            <select id="Form.Section" name="Form.Section">
+                <option value="general" selected="@(f.Section == "general")">@Model.SectionLabel(Model.State.Working, "general")</option>
+                @foreach (var s in sections) { <option value="@s.Key" selected="@(s.Key == f.Section)">@s.Label</option> }
+                <option value="@EditModel.NewSection" selected="@(f.Section == EditModel.NewSection)">@L["A new section..."]</option>
+            </select></div>
+        <div class="field"><label for="Form.NewSectionName">@L["Name of the new section (only if you chose \"A new section\")"]</label><input id="Form.NewSectionName" name="Form.NewSectionName" type="text" maxlength="100" value="@f.NewSectionName" /></div>
+        <div class="field"><label for="Form.Position">@L["Display order"]</label>
+            <select id="Form.Position" name="Form.Position">
+                @if (!Model.IsNew) { <option value="keep" selected="@(f.Position == "keep")">@L["Keep its current place"]</option> }
+                <option value="end" selected="@(f.Position == "end")">@L["At the end of the section"]</option>
+                <option value="start" selected="@(f.Position == "start")">@L["At the start of the section"]</option>
+                @foreach (var s in siblings) { <option value="after:@s.Key" selected="@(f.Position == "after" && string.Equals(f.AfterKey, s.Key, StringComparison.OrdinalIgnoreCase))">@L["After"] @s.Label</option> }
+            </select>
+            <p class="hint">@L["Choosing a different section above and pressing Preview updates the \"After\" choices."]</p></div>
+        <p><strong>@L["Where people will see it"]</strong></p>
+        <ul class="plain">
+            @if (t == FieldTypes.Calculated) { <li>@Terms.Expand("[[contract]] details") <span class="hint">(@L["worked out; never typed in"])</span></li> }
+            else
+            {
+                <li>@Terms.Expand("New [[contract]]")</li><li>@Terms.Expand("Edit [[contract]]")</li><li>@Terms.Expand("[[contract]] details")</li>
+            }
+            <li>@L["Register search and filters: as set under Rules below"]</li><li>@L["Exports and reports: as set under Rules below"]</li>
+        </ul>
+        <p class="hint">@L["Every field appears on the New and Edit forms and on the details page. Who sees or changes it, and in which stages, is set under Advanced rules."]</p>
+    </fieldset>
+
+    <fieldset class="card">
+        <legend>5. @L["Rules"]</legend>
+        @if (FieldGuide.CanRequire(t))
+        {
+            <div class="field"><label><input type="checkbox" name="Form.Required" value="true" checked="@f.Required" /> @L["Required"]</label><input type="hidden" name="Form.Required" value="false" />
+                <p class="hint">@L["Required fields are asked for on new [[contract|plural|lower]] and the next time an existing one is edited. Nothing is changed in bulk."]</p></div>
+        }
+        @if (FieldGuide.CanSearch(t)) { <div class="field"><label><input type="checkbox" name="Form.Searchable" value="true" checked="@f.Searchable" /> @L["Searchable: found by the register's search box"]</label><input type="hidden" name="Form.Searchable" value="false" /></div> }
+        @if (FieldGuide.CanFilter(t)) { <div class="field"><label><input type="checkbox" name="Form.Filterable" value="true" checked="@f.Filterable" /> @L["Filterable: can be used as a filter in the register"]</label><input type="hidden" name="Form.Filterable" value="false" /></div> }
+        @if (FieldGuide.CanSort(t)) { <div class="field"><label><input type="checkbox" name="Form.Sortable" value="true" checked="@f.Sortable" /> @L["Sortable: the register can be sorted by it"]</label><input type="hidden" name="Form.Sortable" value="false" /></div> }
+        <div class="field"><label><input type="checkbox" name="Form.Reportable" value="true" checked="@f.Reportable" /> @L["Reportable: included in exports and reports"]</label><input type="hidden" name="Form.Reportable" value="false" /></div>
+        @if (!FieldGuide.CanSearch(t) || !FieldGuide.CanFilter(t) || !FieldGuide.CanSort(t))
+        {
+            <p class="hint">@L["Some choices are not offered for this type because they would not make sense, for example a date is filtered rather than text-searched."]</p>
+        }
+
+        <details class="advanced"@(Model.Published && (f.VisibleToRoles.Count + f.EditableByRoles.Count + f.VisibleInStates.Count + f.EditableInStates.Count + f.ContractTypes.Count > 0) ? " open" : "")>
+            <summary>@L["Advanced rules"]</summary>
+            <fieldset><legend>@L["Who can see it (none ticked: everyone who can see the [[contract|lower]])"]</legend>
+                @foreach (var r in Model.Roles) { <label><input type="checkbox" name="Form.VisibleToRoles" value="@r" checked="@f.VisibleToRoles.Contains(r)" /> @Terms.Role(r)</label> }</fieldset>
+            @if (t != FieldTypes.Calculated)
+            {
+                <fieldset><legend>@L["Who can change it (none ticked: anyone who can edit the [[contract|lower]])"]</legend>
+                    @foreach (var r in Model.Roles) { <label><input type="checkbox" name="Form.EditableByRoles" value="@r" checked="@f.EditableByRoles.Contains(r)" /> @Terms.Role(r)</label> }</fieldset>
+            }
+            @if (Model.KnownStates is { } states)
+            {
+                <fieldset><legend>@L["Shown only in these stages (none ticked: all)"]</legend>@foreach (var s in states.Order()) { <label><input type="checkbox" name="Form.VisibleInStates" value="@s" checked="@f.VisibleInStates.Contains(s)" /> @FieldGuide.StageName(s)</label> }</fieldset>
+                @if (t != FieldTypes.Calculated) { <fieldset><legend>@L["Can be changed only in these stages (none ticked: all)"]</legend>@foreach (var s in states.Order()) { <label><input type="checkbox" name="Form.EditableInStates" value="@s" checked="@f.EditableInStates.Contains(s)" /> @FieldGuide.StageName(s)</label> }</fieldset> }
+            }
+            else
+            {
+                <div class="field"><label for="Form.VisibleInStates">@L["Shown only in these stages (separate with commas; blank: all)"]</label><input id="Form.VisibleInStates" name="Form.VisibleInStates" type="text" value="@string.Join(", ", f.VisibleInStates)" /></div>
+                @if (t != FieldTypes.Calculated) { <div class="field"><label for="Form.EditableInStates">@L["Can be changed only in these stages (separate with commas; blank: all)"]</label><input id="Form.EditableInStates" name="Form.EditableInStates" type="text" value="@string.Join(", ", f.EditableInStates)" /></div> }
+            }
+            @if (Model.ContractTypeChoices.Count > 0)
+            {
+                <fieldset><legend>@Terms.Expand("Applies only to these [[contract.type|plural|lower]] (none ticked: all)")</legend>
+                    @foreach (var c in Model.ContractTypeChoices) { <label><input type="checkbox" name="Form.ContractTypes" value="@c.Code" checked="@f.ContractTypes.Contains(c.Code)" /> @c.Label</label> }</fieldset>
+            }
+            else
+            {
+                <div class="field"><label for="Form.ContractTypes">@Terms.Expand("Applies only to these [[contract.type|plural|lower]] (separate with commas; blank: all)")</label><input id="Form.ContractTypes" name="Form.ContractTypes" type="text" value="@string.Join(", ", f.ContractTypes)" /></div>
+            }
+            <div class="field"><label for="Form.Classification">@L["Classification of the values"]</label>
+                <select id="Form.Classification" name="Form.Classification">@foreach (var l in Model.Levels) { <option value="@l" selected="@(l == f.Classification)">@l</option> }</select>
+                <p class="hint">@L["A value is held at the more sensitive of this level and the [[contract|lower]]'s own. Nobody without access at that level sees it, not in the register, an export or an [[approval|lower]]."]</p></div>
+            <div class="field"><label for="Form.EffectiveFrom">@L["Offered from"]</label><input id="Form.EffectiveFrom" name="Form.EffectiveFrom" type="date" value="@f.EffectiveFrom" /></div>
+            <div class="field"><label for="Form.EffectiveTo">@L["Offered until"]</label><input id="Form.EffectiveTo" name="Form.EffectiveTo" type="date" value="@f.EffectiveTo" /></div>
+            <div class="field"><label for="Form.Placeholder">@L["Hint shown inside the empty box"]</label><input id="Form.Placeholder" name="Form.Placeholder" type="text" maxlength="100" value="@f.Placeholder" /></div>
+            @if (FieldGuide.HasPattern(t))
+            {
+                <div class="field"><label for="Form.Pattern">@L["Only accept text in this format (a pattern; leave blank for anything)"]</label><input id="Form.Pattern" name="Form.Pattern" type="text" maxlength="200" value="@f.Pattern" /></div>
+                <div class="field"><label for="Form.PatternMessage">@L["What to say when the text does not match"]</label><input id="Form.PatternMessage" name="Form.PatternMessage" type="text" maxlength="200" value="@f.PatternMessage" /></div>
+            }
+            @if (FieldGuide.CanUseInApprovals(t))
+            {
+                <div class="field"><label><input type="checkbox" name="Form.UsableInApprovals" value="true" checked="@f.UsableInApprovals" /> @L["Can be used in [[approval|lower]] rules"]</label><input type="hidden" name="Form.UsableInApprovals" value="false" /></div>
+            }
+            @if (Model.IsNew)
+            {
+                <div class="field"><label for="Form.CustomKey">@L["Technical name (optional)"]</label><input id="Form.CustomKey" name="Form.CustomKey" type="text" maxlength="63" value="@f.CustomKey" aria-describedby="key-hint" />
+                    <p id="key-hint" class="hint">@L["Leave blank: one is made from the field name. It identifies the field in exports and cannot change once published."]</p></div>
+            }
+            else
+            {
+                <p class="hint">@L["Technical name"]: <code>@Model.Key</code> (@L["fixed once published"])</p>
+            }
+        </details>
+    </fieldset>
+
+    <div class="actions">
+        <button type="submit" asp-page-handler="Preview" class="secondary" formnovalidate>@L["Preview"]</button>
+        <button type="submit">@L["Save draft"]</button>
+        <a class="button secondary" href="/Admin/Fields?organisationId=@Model.OrganisationId">@L["Cancel"]</a>
+    </div>
+</form>
+
+@if (Model.Preview is { } preview)
+{
+    <partial name="_FieldPreview" model="preview" />
+    @if (!Model.IsNew && Model.PendingFields.Any(p => string.Equals(p.Key, Model.Key, StringComparison.OrdinalIgnoreCase)))
+    {
+        <partial name="_PublishPanel" model="Model" />
+    }
+    else if (Model.IsNew || !Model.State.HasDraft)
+    {
+        <p class="hint">@(Model.IsNew ? L["Press \"Save draft\" to keep this field, then publish it from here."] : L["Make a change and press \"Save draft\" to publish it."])</p>
+    }
+}

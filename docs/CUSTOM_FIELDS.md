@@ -60,10 +60,18 @@ Server-side only, and always after the contract's own access rules.
 
 A field can feed an approval matrix only when an administrator marks it usable in approvals (multiple-choice, long text, web address, file reference and calculated fields cannot). A matrix explanation shows the values it judged, so this is a deliberate choice.
 
+## Administering fields (UX-10)
+
+Business administrators manage fields on the guided **Fields** pages (`/Admin/Fields`): a landing page (Field, Type, Section, Used on, Required, Status), a guided Add/Edit page, Preview, Retire and Version history. They call the same `ICustomFieldStudio` as the older Studio pages, so nothing in this document about definitions, values, rules, drafts, publication or rollback changed; ADR-0041 records the design. The field key and each choice's stored code are generated (from the name and the label) and shown only under Advanced rules. See `docs/BUSINESS_ADMIN_GUIDE.md` section 8A for the steps.
+
+What "Used on" means: the engine has no separate switches for New, Edit and Details. A current field that is not calculated is on New and Edit for people the roles allow; a visible field is on Details; stages, roles and classification narrow that. The pages show that and do not pretend to offer independent switches.
+
+A new field is not a column of any view automatically. The register's export form has **Include the additional fields**, which adds every reportable field the person may see to that export; a shared view lists fixed columns and is edited in the Studio.
+
 ## Limits and known gaps
 
 * Person and file-reference fields cannot be loaded by a migration (refused with MIG-E025). A person field offers the colleagues in the contract's organisation.
 * An emergency unlock changes core fields only; additional fields change by Variation.
-* The Studio edits definitions in a form; it is not a graphical form designer (no drag and drop, no conditional required rules, one section order per organisation).
+* The Fields pages and the Studio edit definitions in forms; neither is a graphical form designer (no drag and drop, no conditional required rules, one section order per organisation). There are no independent Create, Edit and Details switches per field (an engine change; recorded in ADR-0041). Choice lists shared between fields are still edited on the older Lists page.
 * Search over a multiple-choice field matches any of its values; ordering by one uses the first.
 * SQL Server behaviour (indexes, row-level security, concurrency) is covered by tests tagged `SqlServer`; see TESTING.md for what has and has not been verified.

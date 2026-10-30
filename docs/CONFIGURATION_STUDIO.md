@@ -1,6 +1,6 @@
 # Configuration Studio (STU-01, initial form-based release)
 
-Status: **Implemented** as forms. There is **no** graphical or drag-and-drop designer in this release. Pages live under `/Admin/Studio`. Each page needs the configuration rights named below; every edit is a draft until validated and published.
+Status: **Implemented** as forms. Fields are now managed on the guided **Fields** pages (`/Admin/Fields`, docs/BUSINESS_ADMIN_GUIDE.md section 8A); this Studio keeps sections, shared lists and shared views, and its field pages are the advanced editor. There is **no** graphical or drag-and-drop designer in this release. Pages live under `/Admin/Studio`. Each page needs the configuration rights named below; every edit is a draft until validated and published.
 
 ## Rights
 

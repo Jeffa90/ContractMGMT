@@ -355,3 +355,9 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Modules/Ecp.Access/AccessReview.cs`, `src/Modules/Ecp.Access/Authorities.cs`, `src/Modules/Ecp.Access/OwnershipPolicy.cs`, `src/Modules/Ecp.Access/Domain/CategoryOwnershipPolicy.cs`, `src/Modules/Ecp.Access/Persistence/Migrations/` (`AddCategoryOwnershipPolicy`)
 - `src/Ecp.Host/Pages/Admin/ApprovalAuthorities/`, `src/Ecp.Host/Pages/Shared/_AccessReview.cshtml`, `src/Ecp.Host/Pages/Shared/_ReadyToUse.cshtml`
 - `tests/Ecp.Api.Tests/ApprovalAuthoritiesUiTests.cs`
+
+## Guided field administration (UX-10, branch ux/guided-administration)
+
+- `decisions/ADR-0041-guided-field-administration.md`
+- `src/Ecp.Host/Pages/Admin/Fields/` (Fields landing, Add/Edit Field, Preview, Retire, Version history; `FieldGuide.cs`, `FieldForm.cs`, `FieldsPage.cs`, `FieldPreviewModel.cs`, `_FieldPreview.cshtml`, `_PublishPanel.cshtml`)
+- `tests/Ecp.Api.Tests/GuidedFieldsUiTests.cs`

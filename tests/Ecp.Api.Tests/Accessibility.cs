@@ -25,7 +25,9 @@ internal static class Accessibility
             var attrs = control.Groups[2].Value;
             if (Regex.IsMatch(attrs, "type=\"(hidden|submit|button)\"")) continue;
             var id = Regex.Match(attrs, "\\bid=\"([^\"]+)\"");
-            var labelled = Regex.IsMatch(attrs, "aria-label=\"[^\"]+\"") || (id.Success && Regex.IsMatch(html, "<label[^>]*for=\"" + Regex.Escape(id.Groups[1].Value) + "\""));
+            var before = html[..control.Index];
+            var wrapped = before.LastIndexOf("<label", StringComparison.Ordinal) > before.LastIndexOf("</label>", StringComparison.Ordinal);       // <label><input> text</label> names the control too
+            var labelled = wrapped || Regex.IsMatch(attrs, "aria-label=\"[^\"]+\"") || (id.Success && Regex.IsMatch(html, "<label[^>]*for=\"" + Regex.Escape(id.Groups[1].Value) + "\""));
             Assert.True(labelled, $"{page}: unlabelled control {control.Value}");
         }
         foreach (Match button in Regex.Matches(html, "<button\\b[^>]*>(.*?)</button>", RegexOptions.Singleline))

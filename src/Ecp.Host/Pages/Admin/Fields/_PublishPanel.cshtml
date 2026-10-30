@@ -1,0 +1,74 @@
+@model Ecp.Host.Pages.Admin.Fields.FieldsPage
+@using Ecp.Configuration
+@using Ecp.Configuration.Domain
+@using Ecp.Metadata
+@* The one place changes to fields are put in force. The buttons say what will really happen to this person: publish, submit for a second person, or go and review someone else's submission. The services decide; this only tells the truth about it. *@
+@{
+    var g = Model.Governance;
+    var pending = Model.PendingFields;
+    var checks = Model.Checks();
+    var errors = checks.Where(c => c.IsError).ToList();
+    var second = g?.SecondPersonRequired ?? false;
+}
+@if (Model.State.HasDraft && Model.CanEdit)
+{
+    <section class="card setup" aria-labelledby="pub-h" id="publish">
+        <h2 id="pub-h">@L["Changes waiting to be published"]</h2>
+        @if (pending.Count == 0) { <p>@L["A draft is open, but no field differs from what is in force."]</p> }
+        else
+        {
+            <ul>
+                @foreach (var f in pending) { <li><strong>@f.Label</strong> <span class="badge warn">@FieldGuide.StatusOf(f, Model.State.Published.Find(f.Key)).Text</span></li> }
+            </ul>
+            <p class="hint">@L["Nothing here is on the forms yet. Publishing puts all of these in force together."]</p>
+        }
+        @if (checks.Count > 0)
+        {
+            <h3>@L["Checks"]</h3>
+            <ul>
+                @foreach (var c in checks) { <li><span class="badge @(c.IsError ? "bad" : "warn")">@(c.IsError ? L["Fix this"] : L["Note"])</span> @Terms.Expand(c.Text)</li> }
+            </ul>
+        }
+        @if (Model.State.Impact.Count > 0)
+        {
+            <ul class="plain">
+                @foreach (var i in Model.State.Impact.Where(i => i.Level != ImpactLevel.Info)) { <li><span class="badge @(i.Level == ImpactLevel.Blocking ? "bad" : "warn")">@(i.Level == ImpactLevel.Blocking ? L["Blocks publishing"] : L["Check"])</span> @Terms.Expand(i.Message)</li> }
+            </ul>
+        }
+        @if (second)
+        {
+            <p class="hint">@L["Your organisation needs a second person to publish. You submit these changes; someone else reviews and publishes them."]</p>
+        }
+        else if (!Model.MayPublish)
+        {
+            <p class="hint">@L["You can save drafts. Someone with permission to publish has to put them in force."]</p>
+        }
+        @if (g is { State: ReviewState.Rejected or ReviewState.ReturnedForRework })
+        {
+            <p class="error-summary" role="status">@L["A reviewer sent this back. Change it and submit it again. Their comment is on the review page."] <a href="/Admin/Reviews/Details?id=@Model.State.Draft!.Id">@L["Read the comment"]</a></p>
+        }
+        @if (errors.Count > 0) { <p class="hint" role="status">@L["Fix what is marked above before publishing."]</p> }
+        <form method="post" action="/Admin/Fields?handler=Publish">
+            <input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+            @if (second && g is { CanDecide: true })
+            {
+                <p><a class="button" href="/Admin/Reviews/Details?id=@Model.State.Draft!.Id">@L["Review and publish"]</a></p>
+            }
+            else if (second && g is { State: ReviewState.Submitted })
+            {
+                <p class="hint" role="status">@L["Waiting for review. A second person publishes it."] <a href="/Admin/Reviews/Details?id=@Model.State.Draft!.Id">@L["See the submission"]</a></p>
+            }
+            else if (second || Model.MayPublish)
+            {
+                <div class="field"><label for="Note">@L["Note for the version history (optional)"]</label><input id="Note" name="Note" type="text" maxlength="500" /></div>
+                <div class="actions">
+                    <button type="submit" disabled="@(errors.Count > 0)">@(second ? L["Submit for publication"] : L["Publish"])</button>
+                </div>
+            }
+        </form>
+        <form method="post" action="/Admin/Fields?handler=Discard" class="inline">
+            <input type="hidden" name="organisationId" value="@Model.OrganisationId" />
+            <button type="submit" class="secondary">@L["Discard unpublished changes"]</button>
+        </form>
+    </section>
+}

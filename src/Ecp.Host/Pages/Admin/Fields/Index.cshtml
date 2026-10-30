@@ -1,0 +1,74 @@
+@page "/Admin/Fields"
+@model Ecp.Host.Pages.Admin.Fields.IndexModel
+@using Ecp.Metadata
+@{ ViewData["Title"] = L["Fields"].Value; }
+<h1>@L["Fields"]</h1>
+<p class="lede">@L["The extra details your organisation records on every [[contract|lower]], such as an insurance expiry date or a payment term. Add a field here and it appears on the forms, in search and in exports, with no code and no change to the database."]</p>
+<partial name="_Errors" model="ViewData.ModelState" />
+@if (Model.Organisations.Count > 1)
+{
+    <form method="get" class="card">
+        <div class="field"><label for="organisationId">@L["[[organisation]]"]</label>
+            <select id="organisationId" name="organisationId">@foreach (var o in Model.Organisations) { <option value="@o.Id" selected="@(o.Id == Model.OrganisationId)">@o.Name</option> }</select></div>
+        <button type="submit">@L["Choose"]</button>
+    </form>
+}
+@if (Model.OrganisationId is { } org && Model.State is not null)
+{
+    <partial name="_PublishPanel" model="Model" />
+    <div class="actions">
+        @if (Model.CanEdit) { <a class="button" href="/Admin/Fields/Edit?organisationId=@org">+ @L["Add field"]</a> }
+        <form method="get" class="inline" role="search">
+            <input type="hidden" name="organisationId" value="@org" />
+            <label for="q" class="visually-hidden">@L["Search fields"]</label>
+            <input id="q" name="q" type="search" value="@Model.Q" placeholder="@L["Search fields"]" />
+            <button type="submit" class="secondary">@L["Search"]</button>
+            @if (!string.IsNullOrWhiteSpace(Model.Q)) { <a href="/Admin/Fields?organisationId=@org">@L["Clear search"]</a> }
+        </form>
+    </div>
+
+    <div class="table-wrap">
+    <table>
+        <caption class="visually-hidden">@L["Fields"]</caption>
+        <thead><tr><th scope="col">@L["Field"]</th><th scope="col">@L["Type"]</th><th scope="col">@L["Section"]</th><th scope="col">@L["Used on"]</th><th scope="col">@L["Required"]</th><th scope="col">@L["Status"]</th><th scope="col">@L["Actions"]</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Found)
+        {
+            var f = r.Field; var q = Uri.EscapeDataString(f.Key);
+            <tr>
+                <th scope="row">@f.Label</th>
+                <td>@r.TypeLabel</td>
+                <td>@r.SectionLabel</td>
+                <td>@Terms.Expand(string.Join(" · ", r.UsedOn))</td>
+                <td>@(f.Required ? L["Yes"] : L["No"])</td>
+                <td><span class="badge @(r.StatusKey == "published" ? "ok" : r.StatusKey == "retired" ? "" : "warn")">@L[r.StatusText]</span>@if (r.RecordsWithValues > 0) { <span class="hint"> @r.RecordsWithValues @L["with a value"]</span> }</td>
+                <td>
+                    @if (Model.CanEdit) { <a href="/Admin/Fields/Edit?organisationId=@org&key=@q">@L["Edit"]</a> }
+                    <a href="/Admin/Fields/Preview?organisationId=@org&key=@q">@L["Preview"]</a>
+                    @if (Model.CanEdit)
+                    {
+                        <a href="/Admin/Fields/Retire?organisationId=@org&key=@q">@(f.IsRetired ? L["Reinstate"] : L["Retire"])</a>
+                    }
+                    <a href="/Admin/Fields/History?organisationId=@org&key=@q">@L["Version history"]</a>
+                    @if (Model.CanEdit && string.IsNullOrWhiteSpace(Model.Q))
+                    {
+                        <form method="post" asp-page-handler="Move" class="inline"><input type="hidden" name="organisationId" value="@org" /><input type="hidden" name="key" value="@f.Key" />
+                            <button type="submit" class="secondary" name="direction" value="-1" aria-label="@L["Move up"]: @f.Label">&uarr;</button>
+                            <button type="submit" class="secondary" name="direction" value="1" aria-label="@L["Move down"]: @f.Label">&darr;</button></form>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Found.Count == 0)
+        {
+            <tr><td colspan="7">@(string.IsNullOrWhiteSpace(Model.Q) ? L["No fields yet. Choose \"+ Add field\" to create the first one."] : L["No field matches that search."])</td></tr>
+        }
+        </tbody>
+    </table>
+    </div>
+    <p>
+        <a href="/Admin/Fields/History?organisationId=@org">@L["Version history and restore"]</a> ·
+        <a href="/Admin/Studio/Lists?organisationId=@org">@L["Sections and shared lists"]</a> ·
+        <a href="/Admin/Audit?entityType=CustomField">@L["Audit history of field changes"]</a>
+    </p>
+}

@@ -5,6 +5,7 @@
 @{ ViewData["Title"] = L["Additional [[contract|lower]] fields"].Value; }
 <h1>@L["Additional [[contract|lower]] fields"]</h1>
 <p><a href="/Admin/Studio?organisationId=@Model.OrganisationId">@L["Configuration Studio"]</a></p>
+<p class="hint">@L["This is the advanced editor. Most people should use the guided"] <a href="/Admin/Fields?organisationId=@Model.OrganisationId">@L["Fields page"]</a>, @L["which asks for no technical names."]</p>
 <partial name="_Errors" model="ViewData.ModelState" />
 @if (Model.Organisations.Count > 1)
 {

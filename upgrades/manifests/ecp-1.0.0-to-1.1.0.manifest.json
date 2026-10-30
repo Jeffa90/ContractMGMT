@@ -8,7 +8,7 @@
     "1.0.0"
   ],
   "sourceLedgerSha256": "dc6242cab14aa459f345e553cdd3a7d90e249fba69552e6ef552750c3c5aa64f",
-  "targetLedgerSha256": "eba6927da5bce6cd99ec00bf8ceb95f7fe3424847064c181bfe17faa7ea0c9bc",
+  "targetLedgerSha256": "c50d479a934070e3d0c8b2e0b6d8c41bfcc208ea164284d28dc0de4f0ca5a723",
   "moduleOrder": [
     "Audit",
     "Tenancy",
@@ -805,7 +805,7 @@
       "module": "Access",
       "tier": 8,
       "schema": "access",
-      "schemaVersion": "20261029100354_AddAccessTables",
+      "schemaVersion": "20261029234110_AddCategoryOwnershipPolicy",
       "migrations": [
         {
           "id": "20261029100354_AddAccessTables",
@@ -827,6 +827,21 @@
             "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
           ],
           "operations": 10
+        },
+        {
+          "id": "20261029234110_AddCategoryOwnershipPolicy",
+          "checksum": "f2531c5c66f3499401c9cf6e784b5db521e0cefe64c0298a930ff58ca9286c5e",
+          "categories": [
+            "IndexOrConstraint",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "create index access.CategoryOwnershipPolicy.IX_CategoryOwnershipPolicy_TenantId_OrganisationId_UserId",
+            "create table access.CategoryOwnershipPolicy",
+            "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_CategoryOwnershipPolicy] ADD FILTER P\u2026",
+            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
+          ],
+          "operations": 4
         }
       ]
     },
@@ -1084,6 +1099,23 @@
       "reviewed": true
     },
     {
+      "module": "Access",
+      "id": "20261029234110_AddCategoryOwnershipPolicy",
+      "checksum": "f2531c5c66f3499401c9cf6e784b5db521e0cefe64c0298a930ff58ca9286c5e",
+      "categories": [
+        "IndexOrConstraint",
+        "RowLevelSecurity"
+      ],
+      "objects": [
+        "create index access.CategoryOwnershipPolicy.IX_CategoryOwnershipPolicy_TenantId_OrganisationId_UserId",
+        "create table access.CategoryOwnershipPolicy",
+        "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_CategoryOwnershipPolicy] ADD FILTER P\u2026",
+        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
+      ],
+      "reviewRequired": false,
+      "reviewed": true
+    },
+    {
       "module": "Operations",
       "id": "20261018003226_AddMigrationRecords",
       "checksum": "20276a7b97c1094f06867474fac4bfdb86c9890c33554575da6203a1f913f651",
@@ -1204,5 +1236,5 @@
     ],
     "dataLossStatement": "Rolling back discards everything created after the pre-upgrade backup, including anything done after the upgrade finished. It cannot be recovered from the backup."
   },
-  "manifestSha256": "6af6095c4de167ea1f5f1c1fa735daa87508a3310ea21ac0f6cfedce6134abfc"
+  "manifestSha256": "04a6a5470ece06a44c7d2adf0e4b18b25b5a436f798c21ebe3b0b5f92ee94902"
 }

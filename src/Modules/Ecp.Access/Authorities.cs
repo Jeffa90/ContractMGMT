@@ -13,7 +13,7 @@ namespace Ecp.Access;
 public sealed record AuthorityMember(Guid UserId, Guid AssignmentId, string Name);
 
 /// <summary>An approval authority as an administrator sees it: a name, what it approves, and who is in it. The stable machine key is for Advanced use only.</summary>
-public sealed record ApprovalAuthority(string Key, string DisplayName, string UsedFor, bool Registered, bool FromPack, IReadOnlyList<AuthorityMember> Members, IReadOnlyList<AuthorityMember> Backups);
+public sealed record ApprovalAuthority(string Key, string DisplayName, string UsedFor, bool Registered, bool NamedByWorkflow, IReadOnlyList<AuthorityMember> Members, IReadOnlyList<AuthorityMember> Backups);
 
 public sealed record AuthorityPerson(Guid UserId, string Name);
 
@@ -114,10 +114,10 @@ internal sealed class ApprovalAuthorityService(
                     (m.IsBackup ? backups : members).Add(new AuthorityMember(m.UserId, m.AssignmentId, m.DisplayName));
             }
             var name = terms.HasGroupName(key) ? terms.Group(key) : !string.IsNullOrWhiteSpace(reg?.Description) ? reg!.Description : key;
-            result.Add(new ApprovalAuthority(key, name, info.UsedFor ?? "Approving work sent to this group", reg?.Registered ?? false, info.UsedFor is not null && info.Item3, members, backups));
+            result.Add(new ApprovalAuthority(key, name, info.UsedFor ?? "Approving work sent to this group", reg?.Registered ?? false, info.UsedFor is not null, members, backups));
         }
         var choices = (await people.ManageableUsersAsync(ct)).Where(p => p.Status != UserStatus.Disabled).OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase).Select(p => new AuthorityPerson(p.Id, p.DisplayName)).ToList();
-        return new AuthoritiesView(organisationId, org.Name, result.OrderByDescending(a => a.FromPack).ThenBy(a => a.DisplayName, StringComparer.OrdinalIgnoreCase).ToList(), choices);
+        return new AuthoritiesView(organisationId, org.Name, result.OrderByDescending(a => a.NamedByWorkflow).ThenBy(a => a.DisplayName, StringComparer.OrdinalIgnoreCase).ToList(), choices);
     }
 
     private static string KeyFrom(string displayName, IReadOnlyCollection<string> taken)

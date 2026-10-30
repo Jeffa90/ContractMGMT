@@ -68,7 +68,7 @@ public sealed class GuidedAdministrationJourneyTests
         Assert.Contains("Check before you save", review);
         Assert.Contains("Journey Jo", review);
         var saved = await DemoApp.PostFormAsync(admin, "/Admin/People/Access", new Dictionary<string, string>(carried)
-            { ["Step"] = "7", ["Input.Profiles"] = "contract-manager", ["Input.Scope"] = "WholeOrganisation", ["Input.Ownership"] = "Selected", ["Input.OwnedIds"] = packaging, ["Input.Ceiling"] = "Internal" }, "/Admin/People/Access?handler=Save");
+            { ["Step"] = "7", ["Input.Profiles"] = "contract-manager", ["Input.Scope"] = "WholeOrganisation", ["Input.Ownership"] = "Selected", ["Input.OwnedIds"] = packaging, ["Input.Ceiling"] = "Internal", ["Input.Confirm"] = "true" }, "/Admin/People/Access?handler=Save");
         Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
         var personUrl = saved.Headers.Location!.ToString();
         var person = await PageAsync(admin, personUrl);

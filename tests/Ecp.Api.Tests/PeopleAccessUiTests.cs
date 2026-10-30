@@ -71,9 +71,18 @@ public sealed class PeopleAccessUiTests
         var (tenant, _) = await app.FindUserAsync(OrgAdmin);
         Assert.False(await app.WithTenantAsync(tenant, async sp => await sp.GetRequiredService<Ecp.Identity.IUserService>().FindByEmailAsync(email) is not null));
 
+        // The review has to be confirmed: without the tick nothing is created.
+        var unconfirmed = await DemoApp.PostFormAsync(admin, "/Admin/People/Access", new Dictionary<string, string>(carried)
+        {
+            ["Step"] = "7", ["Input.Profiles"] = "contract-manager", ["Input.Scope"] = "WholeOrganisation", ["Input.Ownership"] = "All", ["Input.Ceiling"] = "Internal"
+        }, "/Admin/People/Access?handler=Save");
+        Assert.Equal(HttpStatusCode.OK, unconfirmed.StatusCode);
+        Assert.Contains("tick the box to confirm", await unconfirmed.Content.ReadAsStringAsync());
+        Assert.False(await app.WithTenantAsync(tenant, async sp => await sp.GetRequiredService<Ecp.Identity.IUserService>().FindByEmailAsync(email) is not null));
+
         var save = await DemoApp.PostFormAsync(admin, "/Admin/People/Access", new Dictionary<string, string>(carried)
         {
-            ["Step"] = "7", ["Input.Profiles"] = "contract-manager", ["Input.Scope"] = "WholeOrganisation", ["Input.Ownership"] = "All", ["Input.Ceiling"] = "Internal", ["Input.Reason"] = "Joins the team"
+            ["Step"] = "7", ["Input.Profiles"] = "contract-manager", ["Input.Scope"] = "WholeOrganisation", ["Input.Ownership"] = "All", ["Input.Ceiling"] = "Internal", ["Input.Reason"] = "Joins the team", ["Input.Confirm"] = "true"
         }, "/Admin/People/Access?handler=Save");
         Assert.Equal(HttpStatusCode.Redirect, save.StatusCode);
         var person = await BodyAsync(admin, save.Headers.Location!.ToString());

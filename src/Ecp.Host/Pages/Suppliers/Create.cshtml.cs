@@ -31,7 +31,10 @@ public sealed class CreateModel(ISecuredSupplierService suppliers, ISupplierIden
         return await RunAsync(async () =>
         {
             if (OrganisationId is null || string.IsNullOrWhiteSpace(Name)) { ModelState.AddModelError(nameof(Name), "Enter the [[supplier|lower]] name."); return Page(); }
-            var values = Identifier.Where(kv => !string.IsNullOrWhiteSpace(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value);
+            // Only the fields named Identifier[type]. A dictionary property binds the whole form when no such field exists (an organisation with no identifier type set up), which would read the name and the
+            // antiforgery token as identifier types and refuse every submission.
+            var values = Request.Form.Keys.Where(k => k.StartsWith("Identifier[", StringComparison.Ordinal) && k.EndsWith(']')).ToDictionary(k => k["Identifier[".Length..^1], k => Request.Form[k].ToString().Trim())
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value);
             var address = new SupplierAddress(Address.GetValueOrDefault("line1"), Address.GetValueOrDefault("line2"), Address.GetValueOrDefault("locality"), Address.GetValueOrDefault("region"),
                 Address.GetValueOrDefault("postal"), Address.GetValueOrDefault("country"));
             var id = await suppliers.CreateAsync(new CreateSupplierRequest(OrganisationId.Value, Name, null, string.IsNullOrWhiteSpace(VendorNumber) ? null : VendorNumber, null, values, Address: address), ct);

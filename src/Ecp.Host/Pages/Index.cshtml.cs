@@ -12,7 +12,7 @@ namespace Ecp.Host.Pages;
 public enum CreateBlock { None, NoContractAccess, NeedsOwnership, NoCategories, NoRole }
 
 /// <summary>Home: the person's work first (start a contract, what is waiting, what is due), and a separate, quieter card for administrators. Nothing here decides access; it only reads what the services return.</summary>
-public sealed class IndexModel(IAccessService access, IDashboardService dashboards, INotificationInbox inbox, ISecuredCategoryService categories, NavigationService navigation) : EcpPageModel
+public sealed class IndexModel(IAccessService access, IDashboardService dashboards, INotificationInbox inbox, ISecuredCategoryService categories, NavigationService navigation, Ecp.Access.ICategoryOwnershipPolicy ownershipPolicy) : EcpPageModel
 {
     /// <summary>The cards shown on Home, in order. Each exists only when the capability behind it is on and the person may see it.</summary>
     public static readonly string[] HomeCards = [DashboardKeys.AwaitingMyAction, DashboardKeys.MyContracts, DashboardKeys.ReviewsDue, DashboardKeys.ExpiringSoon];
@@ -64,7 +64,12 @@ public sealed class IndexModel(IAccessService access, IDashboardService dashboar
         if (grants.Count == 0) return (false, CanReadContracts ? CreateBlock.NoRole : CreateBlock.NoContractAccess);
         if (grants.Any(g => g.Relationship == GrantRelationship.None)) return (true, CreateBlock.None);
         var all = await categories.ListAsync(ct);
-        if (all.Count(c => c.IsActive) == 0) return (false, CreateBlock.NoCategories);
+        if (all.Count(c => c.IsActive) == 0)
+        {
+            // A person who owns every current and future category will own the first one the moment it exists, so the way to start is open to them; the page says what is missing.
+            var standing = await ownershipPolicy.ForPersonAsync(me, ct);
+            return standing.Count > 0 ? (true, CreateBlock.None) : (false, CreateBlock.NoCategories);
+        }
         var owned = all.Any(c => c.IsActive && c.Owners.Any(o => o.UserId == me));
         return owned ? (true, CreateBlock.None) : (false, CreateBlock.NeedsOwnership);
     }

@@ -41,6 +41,11 @@ else
                 <option value="">@L["Choose [[category|lower|a]]"]</option>
                 @foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }
             </select>
+            @if (Model.Categories.Count == 0)
+            {
+                <p class="flash warn" role="status">@Terms.Expand("There are no [[category|plural|lower]] yet, so there is nowhere to file a [[contract|lower]]. Add the first one under Administration, [[category|plural]] and owners; if you own every current and future [[category|lower]] it is yours as soon as it exists.")
+                    <a href="/Admin/Categories">@Terms.Expand("Add a [[category|lower]]")</a></p>
+            }
         </div>
         <div class="field">
             <label for="Classification">@L["[[field.classification|sentence]]"]</label>

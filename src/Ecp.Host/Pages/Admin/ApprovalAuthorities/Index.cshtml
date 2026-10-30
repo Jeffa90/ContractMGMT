@@ -28,7 +28,7 @@ else
         var editing = Model.Editing == a.Key;
         <section class="card" aria-labelledby="au-@a.Key">
             <h2 id="au-@a.Key">@a.DisplayName</h2>
-            <p class="hint">@Terms.Expand(a.UsedFor)@if (a.FromPack) { <span> · @L["Provided by the starting configuration"]</span> }</p>
+            <p class="hint">@Terms.Expand(a.UsedFor)@if (a.NamedByWorkflow) { <span> · @L["Set up by the starting configuration; you only choose the people"]</span> }</p>
             @if (!a.Registered) { <p class="flash warn" role="status">@L["Nobody has been chosen yet."]</p> }
             <h3>@L["Members"]</h3>
             @if (a.Members.Count == 0) { <p class="hint">@L["Nobody yet."]</p> } else { <ul>@foreach (var m in a.Members) { <li>@m.Name</li> }</ul> }

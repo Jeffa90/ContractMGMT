@@ -361,3 +361,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `decisions/ADR-0041-guided-field-administration.md`
 - `src/Ecp.Host/Pages/Admin/Fields/` (Fields landing, Add/Edit Field, Preview, Retire, Version history; `FieldGuide.cs`, `FieldForm.cs`, `FieldsPage.cs`, `FieldPreviewModel.cs`, `_FieldPreview.cshtml`, `_PublishPanel.cshtml`)
 - `tests/Ecp.Api.Tests/GuidedFieldsUiTests.cs`
+
+## JBS standards review (documentation only, branch ux/guided-administration)
+
+- `docs/JBS_STANDARDS_COMPLIANCE.md`, `docs/JBS_DEPLOYMENT_GAP_PLAN.md`

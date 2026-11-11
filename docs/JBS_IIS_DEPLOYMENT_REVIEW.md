@@ -82,13 +82,13 @@ configured with `Ecp:Recovery:Mode=External`:
 
 - `upgrade-apply` takes `--external-recovery-point "<UTC time and reference>"` instead of a backup ID,
   and records it in the evidence and upgrade history;
-- a new pre-flight check reads `msdb.dbo.backupset` (read-only) and blocks the upgrade unless the
-  database has a recent full backup and, in full recovery, a recent log backup (thresholds set in
-  config, agreed with the DBA, e.g. full in the last 26 h and log in the last 30 min);
+- the pre-flight backup checks are skipped. **This matches JBS AI Initiatives** (decided 2026-11-11):
+  the pipeline trusts that the DBA's normal backups exist and does not check them. A later option is
+  a read-only check of `msdb.dbo.backupset` that blocks the upgrade if the last backup is too old;
 - `backup`, `restore` and `upgrade-rollback-evidence` refuse to run and point to the DBA process;
 - failure messages say "ask the DBA to restore to <recovery point>" instead of naming an app backup.
 
-Effort: M, mostly in `Ecp.Recovery` (preflight, upgrade service, CLI) plus tests.
+Effort: S to M, mostly in `Ecp.Recovery` (preflight, upgrade service, CLI) plus tests.
 
 ### Proposed flow (in `iis-deploy.yml`, before files are swapped)
 
@@ -103,7 +103,7 @@ package in a staging folder and the site's settings plus the migration identity:
 3. Take the site offline (`app_offline.htm`), and record the recovery point (UTC now). Keep the
    previous release folder for rollback.
 4. New build: `upgrade-plan` (read the confirmation phrase), then `upgrade-preflight --apply-phase --json`,
-   which includes the DBA-backup recency check. **Blocked → fail.** Warnings are accepted only if their
+   **Blocked → fail.** Warnings are accepted only if their
    codes are in the per-environment variable `ECP_UPGRADE_ACCEPT` (empty by default, so a new warning
    stops the deploy for a person to decide).
 5. `upgrade-apply --external-recovery-point "<time> deploy <sha>" --reason "Deploy <sha>" --confirm "<phrase>" --expect-sha256 <manifest hash>`.
@@ -119,14 +119,14 @@ Production environment's required reviewers approve, which counts as the change 
 
 | Item | Where |
 |---|---|
-| Migration identity connection string (schema owner: `db_ddladmin` plus rights to create functions and **security policies** for row-level security, or `db_owner` if the DBA prefers), plus `SELECT` on `msdb.dbo.backupset` | GitHub environment **secret** `ECP_MIGRATION_SQL`, passed to the CLI as `Database__ConnectionStringRef=env:ECP_MIGRATION_SQL` for the upgrade steps only |
+| Migration identity connection string (schema owner: `db_ddladmin` plus rights to create functions and **security policies** for row-level security, or `db_owner` if the DBA prefers) | GitHub environment **secret** `ECP_MIGRATION_SQL`, passed to the CLI as `Database__ConnectionStringRef=env:ECP_MIGRATION_SQL` for the upgrade steps only |
 | `APPENV_Ecp__Recovery__Mode=External` | GitHub environment variable |
 | Runtime app pool login stays least-privilege (`db_datareader`, `db_datawriter`, `EXECUTE`) | DBA (DB-04) |
 | Infra backup of `EcpData` on the app server, in step with the DBA's database backups | Infra |
 | Reviews for migrations flagged "review required" | `upgrades/migration-reviews.json` in the repo, before merge |
 
 DBA questions this settles or raises: DB-06 (who runs migrations; proposed: the pipeline, under a
-separate identity, with approval for Production) and the backup-recency thresholds.
+separate identity, with approval for Production).
 
 ## 4. Revised P0 list for JBS IIS (QA then Production)
 
@@ -138,7 +138,7 @@ separate identity, with approval for Production) and the backup-recency threshol
 | 4 | G-4 request limits: `RequestSizeLimit` on document upload pages; `maxAllowedContentLength` stamped by the deploy at 2 GB, with app-level limits enforcing the real per-page sizes | S |
 | 5 | G-6 warm-up path set to `/health/live` (done in `scripts/ci/Set-IisAlwaysOn.ps1`); SPN `HTTP/<host>` for each app pool account | S |
 | 6 | P0-4 Serilog with a rolling file sink under the data root, redaction kept | M |
-| 7 | G-7 external recovery point mode, then G-1 automated database upgrade | M + M |
+| 7 | G-7 external recovery point mode, then G-1 automated database upgrade | S to M + M |
 | 8 | P0-5 first QA deploy as the verification run, recorded in `deploy/STATUS.md` | M |
 | 9 | P0-1 Windows sign-in through IIS, as in JBS AI Initiatives (section 1a) | M |
 

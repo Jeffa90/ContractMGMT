@@ -1,0 +1,162 @@
+# Reusable deploy of a dotnet-spa-build.yml artifact onto an on-prem IIS site, run on a
+# self-hosted Windows runner installed on the target web server (see docs/deployment.md).
+#
+# Per-environment settings live on the GitHub Environment, not in YAML:
+#   Variables:  IIS_SITE_PATH       (required) physical path of the IIS site
+#               SMOKE_TEST_URL      (optional) URL to GET after deploy
+#               IIS_SITE_NAME       (optional) site name; when set, the site and app pool are
+#                                   created on first deploy if missing (Initialize-IisSite.ps1)
+#               IIS_APP_POOL        (optional) app pool name, defaults to IIS_SITE_NAME
+#               IIS_BINDING         (needed to create the site) e.g. https:*:443:myapp.jbssa.com.au
+#               IIS_CERT_THUMBPRINT (https) certificate IT installed on the server - the usual
+#                                   option while JBS web certificates are issued by hand
+#               IIS_CERT_AUTO       (https, instead) "true" = request the certificate from an AD CS
+#                                   CA and renew it within 40 days of expiry (Set-IisCertificate.ps1);
+#                                   needs IIS_CERT_CA and IIS_CERT_TEMPLATE
+#               IIS_CERT_DNS_NAMES  (optional, with IIS_CERT_AUTO) extra certificate names, space-separated
+#               IIS_APP_POOL_USER   (optional) domain account (DOMAIN\user) for the app pool; default ApplicationPoolIdentity
+#   Secrets:    IIS_APP_POOL_PASSWORD (with IIS_APP_POOL_USER)
+#   Secrets / variables prefixed APPENV_ are stamped into web.config as environment
+#   variables with the prefix removed, e.g. secret APPENV_Anthropic__ApiKey -> Anthropic__ApiKey.
+#   (GitHub upper-cases secret names; .NET configuration keys are case-insensitive.)
+#
+# Approval gates (e.g. who signs off Production) are the Environment's "Required reviewers".
+#
+# Callers must pass `secrets: inherit` so the Environment's secrets are visible here.
+name: Deploy to IIS (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment name (QA, Production, ...). Also the default ASPNETCORE_ENVIRONMENT.
+        type: string
+        required: true
+      runner-label:
+        description: Label of the self-hosted runner on the target web server (e.g. iis-qa, iis-prod).
+        type: string
+        required: true
+      aspnetcore-environment:
+        description: ASPNETCORE_ENVIRONMENT value, if different from the environment name.
+        type: string
+        default: ""
+      sql-migrations:
+        description: |
+          One "ConnectionStringName=folder" per line, folders relative to the sql artifact.
+          Connection strings are read from the package's appsettings.{env}.json. Empty = no migrations.
+        type: string
+        default: ""
+      sql-exclude:
+        description: Space-separated SQL file names never to run (e.g. demo seed data).
+        type: string
+        default: ""
+      preserve-folders:
+        description: Space-separated folder names in the site that hold runtime data and must not be overwritten or deleted.
+        type: string
+        default: "logs"
+      tools-repository:
+        description: Repository holding scripts/ci (set this when the reusable workflows live in a shared repo).
+        type: string
+        default: ""
+      tools-ref:
+        description: Ref of tools-repository to use.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: [self-hosted, windows, "${{ inputs.runner-label }}"]
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.SMOKE_TEST_URL }}
+    concurrency:
+      group: deploy-${{ github.repository }}-${{ inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - name: Get deploy scripts
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.tools-repository || github.repository }}
+          ref: ${{ inputs.tools-ref || github.sha }}
+          sparse-checkout: scripts/ci
+          path: tools
+
+      - name: Download app
+        uses: actions/download-artifact@v8
+        with:
+          name: app
+          path: ${{ runner.temp }}/package/app
+
+      - name: Download sql
+        if: inputs.sql-migrations != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: sql
+          path: ${{ runner.temp }}/package/sql
+
+      - name: Deploy
+        shell: powershell
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+          ALL_VARS: ${{ toJSON(vars) }}
+          SITE_PATH: ${{ vars.IIS_SITE_PATH }}
+          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
+          ASPNET_ENV: ${{ inputs.aspnetcore-environment || inputs.environment }}
+          SQL_MIGRATIONS: ${{ inputs.sql-migrations }}
+          SQL_EXCLUDE: ${{ inputs.sql-exclude }}
+          PRESERVE_FOLDERS: ${{ inputs.preserve-folders }}
+          SITE_NAME: ${{ vars.IIS_SITE_NAME }}
+          APP_POOL: ${{ vars.IIS_APP_POOL }}
+          BINDING: ${{ vars.IIS_BINDING }}
+          # Not sensitive, so it belongs in Variables, but accept a secret too (an easy mix-up).
+          CERT_THUMBPRINT: ${{ vars.IIS_CERT_THUMBPRINT || secrets.IIS_CERT_THUMBPRINT }}
+          CERT_AUTO: ${{ vars.IIS_CERT_AUTO }}
+          CERT_CA: ${{ vars.IIS_CERT_CA }}
+          CERT_TEMPLATE: ${{ vars.IIS_CERT_TEMPLATE }}
+          CERT_DNS_NAMES: ${{ vars.IIS_CERT_DNS_NAMES }}
+          APP_POOL_USER: ${{ vars.IIS_APP_POOL_USER }}
+          APP_POOL_PASSWORD: ${{ secrets.IIS_APP_POOL_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (-not $env:SITE_PATH) { throw "Set the IIS_SITE_PATH variable on the '${{ inputs.environment }}' environment." }
+
+          # APPENV_-prefixed variables first, then secrets, so a secret wins over a variable of the same name.
+          $appEnv = @{}
+          foreach ($source in @($env:ALL_VARS, $env:ALL_SECRETS)) {
+            if (-not $source) { continue }
+            foreach ($p in ($source | ConvertFrom-Json).PSObject.Properties) {
+              if ($p.Name -like "APPENV_*") { $appEnv[$p.Name.Substring(7)] = [string]$p.Value }
+            }
+          }
+          Write-Host "Injecting $($appEnv.Count) app setting(s): $(($appEnv.Keys | Sort-Object) -join ', ')"
+
+          $split = { param($s) @($s -split '\s+' | Where-Object { $_ }) }
+          & "$env:GITHUB_WORKSPACE\tools\scripts\ci\Deploy-IisSite.ps1" `
+            -PackagePath "$env:RUNNER_TEMP\package\app" `
+            -SqlPackagePath "$env:RUNNER_TEMP\package\sql" `
+            -SitePath $env:SITE_PATH `
+            -Environment $env:ASPNET_ENV `
+            -EnvironmentVariables $appEnv `
+            -SqlMigrations $env:SQL_MIGRATIONS `
+            -SqlExclude (& $split $env:SQL_EXCLUDE) `
+            -PreserveFolders (& $split $env:PRESERVE_FOLDERS) `
+            -SmokeTestUrl $env:SMOKE_TEST_URL `
+            -SiteName $env:SITE_NAME `
+            -AppPoolName $env:APP_POOL `
+            -Binding $env:BINDING `
+            -CertificateThumbprint $env:CERT_THUMBPRINT `
+            -CertificateAuto:($env:CERT_AUTO -eq "true") `
+            -CertificateAuthority $env:CERT_CA `
+            -CertificateTemplate $env:CERT_TEMPLATE `
+            -CertificateDnsNames (& $split $env:CERT_DNS_NAMES) `
+            -AppPoolUser $env:APP_POOL_USER `
+            -AppPoolPassword $env:APP_POOL_PASSWORD
+
+      - name: Clean up package
+        if: always()
+        shell: powershell
+        run: Remove-Item "$env:RUNNER_TEMP\package" -Recurse -Force -ErrorAction SilentlyContinue

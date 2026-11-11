@@ -1,0 +1,48 @@
+# Enterprise Contract Platform: build once on Windows, deploy to QA (IIS), then promote the same
+# artifact to Production after approval (the Production environment's Required reviewers).
+# Pull-request / branch checks stay in ci.yml. Setup: docs/DEPLOYMENT.md.
+#
+# Database migrations are NOT run by this pipeline: the app runs them deliberately with
+# `dotnet Ecp.Host.dll migrate` under a migration identity (deploy/iis/README.md, gap plan P1-5).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "requirements/**"
+      - "prompts/**"
+      - "decisions/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/dotnet-spa-build.yml
+    with:
+      api-project: src/Ecp.Host/Ecp.Host.csproj
+      test-project: tests/Ecp.UnitTests/Ecp.UnitTests.csproj
+      dotnet-version: "10.0.x"
+      ui-path: ""
+
+  deploy-qa:
+    needs: build
+    uses: ./.github/workflows/iis-deploy.yml
+    with:
+      environment: QA
+      runner-label: iis-qa
+      preserve-folders: logs
+    secrets: inherit
+
+  deploy-prod:
+    needs: deploy-qa
+    uses: ./.github/workflows/iis-deploy.yml
+    with:
+      environment: Production
+      runner-label: iis-prod
+      preserve-folders: logs
+    secrets: inherit

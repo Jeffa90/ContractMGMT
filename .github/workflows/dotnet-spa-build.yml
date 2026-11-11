@@ -1,0 +1,123 @@
+# Reusable build for an ASP.NET Core API that serves a Node-built SPA from its wwwroot.
+# Restores (lock-file enforced), tests, builds the UI into the API's wwwroot, publishes,
+# and uploads:
+#   app - dotnet publish output, environment-neutral (ASPNETCORE_ENVIRONMENT and secrets
+#         are stamped into web.config at deploy time, so the same artifact goes QA -> Prod)
+#   sql - the SQL migration scripts (only when sql-path is set)
+#
+# Usage from another app's workflow:
+#   jobs:
+#     build:
+#       uses: ./.github/workflows/dotnet-spa-build.yml   # or <org>/<repo>/.github/workflows/dotnet-spa-build.yml@main
+#       with:
+#         api-project: api/MyApp.Api.csproj
+#         test-project: api.Tests/MyApp.Api.Tests.csproj
+name: Build .NET + SPA (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      api-project:
+        description: Path to the web API .csproj.
+        type: string
+        required: true
+      test-project:
+        description: Path to the test .csproj. Leave empty to skip tests.
+        type: string
+        default: ""
+      ui-path:
+        description: Folder containing the SPA's package.json. Leave empty if there is no UI.
+        type: string
+        default: ui
+      ui-dist:
+        description: UI build output folder, relative to ui-path.
+        type: string
+        default: dist
+      sql-path:
+        description: Folder of SQL migration scripts to ship with the build. Leave empty for none.
+        type: string
+        default: ""
+      dotnet-version:
+        type: string
+        default: "8.0.x"
+      node-version:
+        type: string
+        default: "22"
+    outputs:
+      has-sql:
+        description: Whether a sql artifact was uploaded.
+        value: ${{ inputs.sql-path != '' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - uses: actions/setup-node@v7
+        if: inputs.ui-path != ''
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.ui-path }}/package-lock.json
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          dotnet restore "${{ inputs.api-project }}" --locked-mode
+          if ("${{ inputs.test-project }}") { dotnet restore "${{ inputs.test-project }}" --locked-mode }
+
+      - name: Test
+        if: inputs.test-project != ''
+        run: dotnet test "${{ inputs.test-project }}" -c Release --no-restore --logger trx --results-directory TestResults
+
+      - name: Upload test results
+        if: always() && inputs.test-project != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: ignore
+
+      - name: Build UI
+        if: inputs.ui-path != ''
+        working-directory: ${{ inputs.ui-path }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy UI into wwwroot
+        if: inputs.ui-path != ''
+        shell: pwsh
+        run: |
+          $wwwroot = Join-Path (Split-Path -Parent "${{ inputs.api-project }}") "wwwroot"
+          if (Test-Path $wwwroot) { Remove-Item $wwwroot -Recurse -Force }
+          New-Item -ItemType Directory -Path $wwwroot | Out-Null
+          Copy-Item -Path "${{ inputs.ui-path }}/${{ inputs.ui-dist }}/*" -Destination $wwwroot -Recurse -Force
+
+      - name: Publish
+        run: dotnet publish "${{ inputs.api-project }}" -c Release --no-restore -o "${{ runner.temp }}/app"
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: app
+          path: ${{ runner.temp }}/app
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload sql artifact
+        if: inputs.sql-path != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: sql
+          path: ${{ inputs.sql-path }}
+          if-no-files-found: error
+          retention-days: 30

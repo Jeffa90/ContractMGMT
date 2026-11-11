@@ -23,7 +23,8 @@ public interface IReadinessCheck
 /// <summary>What the host was started with, reduced to facts the guard can judge (no secret values).</summary>
 public sealed record StartupFacts(
     EcpMode Mode, DatabaseProvider Provider, bool ConnectionFromSecretReference, bool InlineConnectionStringPresent,
-    bool DemoTenantResolutionEnabled, bool DemoSeedEnabled, string DataDirectory);
+    bool DemoTenantResolutionEnabled, bool DemoSeedEnabled, string DataDirectory,
+    string ApplicationDirectory = "", bool AutoMigrateEnabled = false);
 
 public sealed record GuardViolation(string CheckId, string Message);
 
@@ -49,15 +50,30 @@ public static class ProductionGuard
         if (f.DemoSeedEnabled)
             violations.Add(new("R-DEMO-01", "Demonstration data must not be present or seeded in Production."));
         if (string.IsNullOrWhiteSpace(f.DataDirectory) || IsEphemeral(f.DataDirectory))
-            violations.Add(new("R-ST-01", "Document storage must be a persistent directory, not a temporary location."));
+            violations.Add(new("R-ST-01", "Document storage must be a persistent directory outside the application folder; set Ecp:DataDirectory to an absolute path (for example a path on a data volume), not a temporary location."));
+        else if (IsInside(f.DataDirectory, f.ApplicationDirectory))
+            violations.Add(new("R-ST-02", "Document storage and the data-protection key ring must be outside the application folder, because a redeploy replaces that folder."));
+        if (f.AutoMigrateEnabled)
+            violations.Add(new("R-MIG-01", "Automatic database migration at start-up is refused in Production. Apply schema changes as a deliberate, audited release step (see docs/UPGRADE_RUNBOOK.md)."));
         return violations;
+    }
+
+    private static bool IsInside(string path, string parent)
+    {
+        if (string.IsNullOrWhiteSpace(parent)) return false;
+        var compare = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var child = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)) + Path.DirectorySeparatorChar;
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parent)) + Path.DirectorySeparatorChar;
+        return child.StartsWith(root, compare);
     }
 
     private static bool IsEphemeral(string path)
     {
         var full = Path.GetFullPath(path);
         var temp = Path.GetFullPath(Path.GetTempPath());
-        return full.StartsWith(temp, StringComparison.Ordinal) || full.StartsWith("/tmp/", StringComparison.Ordinal);
+        // Windows paths are case-insensitive; Unix paths are not.
+        var compare = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return full.StartsWith(temp, compare) || full.StartsWith("/tmp/", StringComparison.Ordinal);
     }
 }
 

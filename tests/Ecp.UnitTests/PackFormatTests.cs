@@ -143,7 +143,25 @@ public sealed class PackFormatTests
 
     [Fact]
     public void A_symbolic_link_is_refused()
-        => AssertRefused(Read(Zip(("content/link.json", [1], e => e.ExternalAttributes = unchecked((int)0xA1FF0000)))), PackCodes.UnsafeFeature);
+    {
+        // The Unix mode bits count only when the archive says it was made on a Unix host. The zip library writes its own host marker (a different one on Windows), so the
+        // marker is set explicitly, exactly as the encrypted-entry test sets its header bit: the test must not depend on the machine it runs on.
+        var zip = Zip(("content/link.json", [1], e => e.ExternalAttributes = unchecked((int)0xA1FF0000)));
+        MarkMadeOnUnix(zip);
+        AssertRefused(Read(zip), PackCodes.UnsafeFeature);
+    }
+
+    [Fact]
+    public void A_reparse_point_made_on_a_windows_host_is_refused()
+    {
+        var zip = Zip(("content/link.json", [1], e => e.ExternalAttributes = 0x400));      // FILE_ATTRIBUTE_REPARSE_POINT
+        zip[CentralDirectoryOffset(zip) + 5] = 0;                                         // host marker 0: DOS/FAT, as a Windows tool writes it
+        AssertRefused(Read(zip), PackCodes.UnsafeFeature);
+    }
+
+    private static int CentralDirectoryOffset(byte[] zip) => (int)BitConverter.ToUInt32(zip, zip.Length - 22 + 16);
+
+    private static void MarkMadeOnUnix(byte[] zip) => zip[CentralDirectoryOffset(zip) + 5] = 3;   // the high byte of "version made by" is the host: 3 is Unix
 
     [Fact]
     public void An_encrypted_entry_is_refused()

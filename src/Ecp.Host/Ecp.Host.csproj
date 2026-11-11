@@ -27,6 +27,12 @@
     <ProjectReference Include="../Ecp.PackTool/Ecp.PackTool.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Local-run values only (Demo mode, SQLite, auto-migrate). They are never published, so a deployed host starts from the Production-safe appsettings.json. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <Content Remove="data/**" />
+    <None Remove="data/**" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />

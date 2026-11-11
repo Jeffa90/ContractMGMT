@@ -301,6 +301,85 @@ public class HostConfigurationTests
         Assert.Contains("[R-SEC-02]", ex.Message);
     }
 
+    private static string RepositoryFile(string relative)
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+            if (File.Exists(Path.Combine(dir.FullName, relative))) return Path.Combine(dir.FullName, relative);
+        throw new FileNotFoundException(relative);
+    }
+
+    [Fact]
+    public void The_shipped_base_settings_file_is_safe_for_Production_and_never_falls_back_to_Demo()
+    {
+        // Only the file that is published, with no environment, no secret and no override: the host must refuse, and must name what is missing.
+        var shipped = new ConfigurationBuilder().AddJsonFile(RepositoryFile("src/Ecp.Host/appsettings.json")).Build();
+        Assert.Equal("Production", shipped["Ecp:Mode"]);
+        Assert.Equal("SqlServer", shipped["Database:Provider"]);
+        Assert.False(shipped.GetValue("Ecp:DemoSeed", true));
+        Assert.False(shipped.GetValue("Ecp:DemoTenantResolution", true));
+        Assert.False(shipped.GetValue("Database:AutoMigrate", true));
+        var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(shipped, Secrets, "/app"));
+        Assert.Contains("[R-SEC-02]", ex.Message);
+        Assert.Contains("[R-ST-01]", ex.Message);
+        Assert.DoesNotContain("[R-DB-01]", ex.Message); // the provider is already SQL Server
+    }
+
+    [Fact]
+    public void A_host_with_no_settings_at_all_resolves_as_Production_not_Demo()
+    {
+        var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()), Secrets, "/app"));
+        Assert.Contains("[R-SEC-02]", ex.Message);
+        Assert.Contains("[R-ST-01]", ex.Message);
+        Assert.True(new EcpHostOptions().Mode == EcpMode.Production);
+    }
+
+    [Fact]
+    public void The_Development_settings_file_is_not_published()
+    {
+        var csproj = File.ReadAllText(RepositoryFile("src/Ecp.Host/Ecp.Host.csproj"));
+        Assert.Contains("appsettings.Development.json", csproj);
+        Assert.Contains("CopyToPublishDirectory=\"Never\"", csproj);
+        var shipped = File.ReadAllText(RepositoryFile("src/Ecp.Host/appsettings.json"));
+        Assert.DoesNotContain("Sqlite", shipped);
+        Assert.DoesNotContain("ecp-demo", shipped);
+    }
+
+    [Theory]
+    [InlineData("true", "/var/lib/ecp", "R-MIG-01")]
+    [InlineData("false", "/app/data", "R-ST-02")]
+    [InlineData("false", "/app", "R-ST-02")]
+    public void Production_refuses_automatic_migration_and_storage_inside_the_application_folder(string autoMigrate, string dataDirectory, string expected)
+    {
+        var name = "ECP_CFG_" + Guid.NewGuid().ToString("N");
+        Environment.SetEnvironmentVariable(name, "Server=db.example;Database=ecp;User Id=app;Password=not-a-real-secret");
+        try
+        {
+            var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()
+            {
+                ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = dataDirectory, ["Database:Provider"] = "SqlServer", ["Database:ConnectionStringRef"] = "env:" + name,
+                ["Database:AutoMigrate"] = autoMigrate,
+            }), Secrets, "/app"));
+            Assert.Contains($"[{expected}]", ex.Message);
+        }
+        finally { Environment.SetEnvironmentVariable(name, null); }
+    }
+
+    [Fact]
+    public void Production_refuses_the_lightweight_provider_even_when_a_connection_secret_is_supplied()
+    {
+        var name = "ECP_CFG_" + Guid.NewGuid().ToString("N");
+        Environment.SetEnvironmentVariable(name, "Data Source=/var/lib/ecp/x.db");
+        try
+        {
+            var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()
+            {
+                ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "Sqlite", ["Database:ConnectionStringRef"] = "env:" + name,
+            }), Secrets, "/app"));
+            Assert.Contains("[R-DB-01]", ex.Message);
+        }
+        finally { Environment.SetEnvironmentVariable(name, null); }
+    }
+
     [Fact]
     public void Startup_refusal_messages_never_contain_secret_values()
     {

@@ -14,11 +14,11 @@ public sealed class StartupRefusedException(IReadOnlyList<GuardViolation> violat
 
 public sealed record EcpHostOptions
 {
-    public EcpMode Mode { get; init; } = EcpMode.Demo;
+    public EcpMode Mode { get; init; } = EcpMode.Production;
     public bool DemoTenantResolution { get; init; }
     public bool DemoSeed { get; init; }
     public string DemoTenantName { get; init; } = "Demo Tenant A";
-    public string DataDirectory { get; init; } = "data";
+    public string DataDirectory { get; init; } = "";
 }
 
 public sealed record ResolvedConfiguration(EcpHostOptions Host, DatabaseOptions Database, StartupFacts Facts);
@@ -37,7 +37,8 @@ public static class HostConfiguration
             DemoTenantResolution = config.GetValue("Ecp:DemoTenantResolution", false),
             DemoSeed = config.GetValue("Ecp:DemoSeed", false),
             DemoTenantName = config["Ecp:DemoTenantName"] ?? "Demo Tenant A",
-            DataDirectory = config["Ecp:DataDirectory"] ?? "data"
+            // A blank value means "not configured": Production refuses it (R-ST-01); Demo and Test fall back to a folder beside the application.
+            DataDirectory = config["Ecp:DataDirectory"] ?? ""
         };
         var provider = Enum.TryParse<DatabaseProvider>(config["Database:Provider"], true, out var p) ? p : DatabaseProvider.SqlServer;
         var inline = config["Database:ConnectionString"];
@@ -54,7 +55,9 @@ public static class HostConfiguration
             connection = inline;
         }
 
-        var dataDirectory = Path.IsPathRooted(host.DataDirectory) ? host.DataDirectory : Path.Combine(contentRoot, host.DataDirectory);
+        var dataDirectory = string.IsNullOrWhiteSpace(host.DataDirectory)
+            ? (host.Mode == EcpMode.Production ? "" : Path.Combine(contentRoot, "data"))
+            : Path.IsPathRooted(host.DataDirectory) ? host.DataDirectory : Path.Combine(contentRoot, host.DataDirectory);
         if (provider == DatabaseProvider.Sqlite && connection.Contains("Data Source=", StringComparison.OrdinalIgnoreCase) && !connection.Contains(":memory:", StringComparison.OrdinalIgnoreCase)
             && !connection.Contains("Mode=Memory", StringComparison.OrdinalIgnoreCase))
         {
@@ -70,7 +73,7 @@ public static class HostConfiguration
 
         var database = new DatabaseOptions { Provider = provider, ConnectionString = connection, AutoMigrate = config.GetValue("Database:AutoMigrate", false) };
         var facts = new StartupFacts(host.Mode, provider, fromSecret, InlineConnectionStringPresent: !string.IsNullOrWhiteSpace(inline) && !fromSecret,
-            host.DemoTenantResolution, host.DemoSeed, dataDirectory);
+            host.DemoTenantResolution, host.DemoSeed, dataDirectory, ApplicationDirectory: contentRoot, AutoMigrateEnabled: database.AutoMigrate);
         var violations = ProductionGuard.Evaluate(facts);
         if (violations.Count > 0) throw new StartupRefusedException(violations);
         if (string.IsNullOrWhiteSpace(connection)) throw new InvalidOperationException("No database connection is configured.");

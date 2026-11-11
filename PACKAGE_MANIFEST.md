@@ -369,3 +369,10 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 ## JBS IIS integration plan (documentation only)
 
 - `docs/JBS_IIS_INTEGRATION_PLAN.md`
+
+## JBS IIS deployment (branch jbs/iis-integration; from pull request 1 and the IIS integration work)
+
+- `.github/workflows/deploy.yml`, `.github/workflows/dotnet-spa-build.yml`, `.github/workflows/iis-deploy.yml`, `.gitattributes`
+- `scripts/ci/Deploy-IisSite.ps1`, `scripts/ci/Initialize-IisSite.ps1`, `scripts/ci/Invoke-SqlMigrations.ps1`, `scripts/ci/Set-IisAlwaysOn.ps1`, `scripts/ci/Set-IisCertificate.ps1`, `scripts/ci/Set-WebConfigEnvironment.ps1`
+- `scripts/setup/setup-github-environments.sh`
+- `docs/DEPLOYMENT.md`, `docs/JBS_IIS_DEPLOYMENT_REVIEW.md`, `docs/JBS_IIS_INTEGRATION_PLAN.md`, `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`

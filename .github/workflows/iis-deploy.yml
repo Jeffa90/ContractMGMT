@@ -7,9 +7,9 @@
 #               IIS_SITE_NAME       (optional) site name; when set, the site and app pool are
 #                                   created on first deploy if missing (Initialize-IisSite.ps1)
 #               IIS_APP_POOL        (optional) app pool name, defaults to IIS_SITE_NAME
-#               IIS_BINDING         (needed to create the site) e.g. https:*:443:myapp.jbssa.com.au
+#               IIS_BINDING         (needed to create the site) e.g. https:*:443:myapp.example.org
 #               IIS_CERT_THUMBPRINT (https) certificate IT installed on the server - the usual
-#                                   option while JBS web certificates are issued by hand
+#                                   option while the organisation's web certificates are issued by hand
 #               IIS_CERT_AUTO       (https, instead) "true" = request the certificate from an AD CS
 #                                   CA and renew it within 40 days of expiry (Set-IisCertificate.ps1);
 #                                   needs IIS_CERT_CA and IIS_CERT_TEMPLATE

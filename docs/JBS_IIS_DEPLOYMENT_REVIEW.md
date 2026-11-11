@@ -50,11 +50,11 @@ Confirmed by reading the code and running the tools, 2026-11-11:
 |---|---|---|
 | CSRF on every state-changing endpoint, global | Compliant | Only Razor Page handlers change state; antiforgery on by default, `SameSite=Strict`; no `DisableAntiforgery`; the only opt-out is the Error page |
 | Authenticate by default | Partly | Fallback policy at `Program.cs:115`. **11 of 13** anonymous opt-outs have no "who calls it and why" comment, including the state-changing Setup pages (gap plan P2-7) |
-| Scope parameters validated server-side | Compliant (sampled) | Tenant only from the session claim; organisation IDs from forms are checked in module services. To confirm: `OnboardingReadiness.GetAsync` and `Admin/Simulation` rely on callers for the scope check |
+| Scope parameters validated server-side | Compliant (sampled) | Tenant only from the session claim; organisation IDs from forms are checked in module services. To confirm: `OnboardingReadiness.GetAsync` and the access simulator page (src/Ecp.Host/Pages/Admin/Simulation.cshtml) rely on callers for the scope check |
 | Parameterised SQL | Compliant | Values always parameterised. Identifiers interpolated only from constants/EF metadata; `DBCC CHECKDB (N'{name}')` (`Recovery/Validation.cs:603`) is the one validated non-constant value (already a P2-6 deviation) |
 | Serilog, enrichers, sinks | **Non-compliant** | No Serilog. Under IIS in-process with `stdoutLogEnabled=false`, only Warning+ reaches the Event Log; Information is lost (P0-4) |
 | Log the exception object | Partly | 3 places log `ex.Message`/type name instead: `Setup/SetupService.cs:205`, `Host/Security/Oidc.cs:138`, `Program.cs:203-206` |
-| Config layering, safe defaults, discoverable keys | **Non-compliant** | Unsafe base file (G-2); no `appsettings.Production.json`; no user secrets (P1-3) |
+| Config layering, safe defaults, discoverable keys | **Non-compliant** | Unsafe base file (G-2); no an appsettings.Production file; no user secrets (P1-3) |
 | csproj: SDK-style, lock files, warnings as errors | Compliant | `Directory.Build.props`; 26 lock files; locked-mode restore passes on Windows |
 | csproj metadata | Non-compliant | No `Company`/`Copyright`/`NeutralLanguage` (P1-4) |
 | SCA | Compliant | `dotnet list package --vulnerable --include-transitive`: no vulnerable packages in any project |
@@ -92,7 +92,7 @@ Effort: S to M, mostly in `Ecp.Recovery` (preflight, upgrade service, CLI) plus 
 
 ### Proposed flow (in `iis-deploy.yml`, before files are swapped)
 
-New script `scripts/ci/Invoke-EcpDatabaseUpgrade.ps1`, run on the self-hosted runner with the **new**
+New script a new Invoke-EcpDatabaseUpgrade script (to be written), run on the self-hosted runner with the **new**
 package in a staging folder and the site's settings plus the migration identity:
 
 1. `upgrade-manifest-verify`: fail if the manifest is invalid.
@@ -133,7 +133,7 @@ separate identity, with approval for Production).
 | Order | Item | Effort |
 |---|---|---|
 | 1 | G-5 fix the two Windows test failures | S |
-| 2 | G-2 safe base `appsettings.json` (Production defaults; demo values moved to `appsettings.Demo.json` / Development) | S |
+| 2 | G-2 safe base `appsettings.json` (Production defaults; demo values moved to a Demo settings file / Development) | S |
 | 3 | G-3 machine-level key protection (`ProtectKeysWithDpapi(protectToLocalMachine: true)`, or a certificate) and/or `loadUserProfile=true` in `Initialize-IisSite.ps1` | S |
 | 4 | G-4 request limits: `RequestSizeLimit` on document upload pages; `maxAllowedContentLength` stamped by the deploy at 2 GB, with app-level limits enforcing the real per-page sizes | S |
 | 5 | G-6 warm-up path set to `/health/live` (done in `scripts/ci/Set-IisAlwaysOn.ps1`); SPN `HTTP/<host>` for each app pool account | S |
@@ -159,7 +159,7 @@ identified. The question is what the app does with someone it has not seen befor
 
 **What the app does today (with OIDC):** sign-in succeeds only for an account an administrator has
 already **invited** (`IdentityApi.ResolveLoginAsync` refuses everyone else with "not_invited").
-Identity **group mappings** already exist (`Ecp.Access/Mappings.cs`, Admin > People > Mappings). They
+Identity **group mappings** already exist (src/Modules/Ecp.Access/Mappings.cs, Admin > People > Mappings). They
 give roles to people *who are already signed in* according to the groups the provider reports.
 They do not create accounts.
 

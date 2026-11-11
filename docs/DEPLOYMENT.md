@@ -35,7 +35,7 @@ Run once, as a repo admin: `PROD_REVIEWER=<github-user> bash scripts/setup/setup
 | `IIS_BINDING` | `https:*:443:contracts-qa.jbssa.com.au` | `https:*:443:contracts.jbssa.com.au` |
 | `IIS_APP_POOL_USER` | `AMH\svc_jbsai_qa` (shared with JBS AI; also runs migrations) | UPDATE ME |
 | `IIS_CERT_THUMBPRINT` | UPDATE ME | UPDATE ME |
-| `SMOKE_TEST_URL` | `.../health/live` | `.../health/live` |
+| `SMOKE_TEST_URL` | the /health/live address of the site | the /health/live address of the site |
 | Data root | `C:\EcpData\ContractPlatform` | `D:\EcpData\ContractPlatform` |
 
 App settings are `APPENV_*` **variables** mirroring `deploy/iis/web.config` (`Ecp__Mode=Production`,

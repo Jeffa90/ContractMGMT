@@ -24,7 +24,7 @@ public interface IReadinessCheck
 public sealed record StartupFacts(
     EcpMode Mode, DatabaseProvider Provider, bool ConnectionFromSecretReference, bool InlineConnectionStringPresent,
     bool DemoTenantResolutionEnabled, bool DemoSeedEnabled, string DataDirectory,
-    string ApplicationDirectory = "", bool AutoMigrateEnabled = false, bool InlineConnectionCredentialFree = false);
+    string ApplicationDirectory = "", bool AutoMigrateEnabled = false, bool InlineConnectionCredentialFree = false, string KeyDirectory = "");
 
 public sealed record GuardViolation(string CheckId, string Message);
 
@@ -53,8 +53,8 @@ public static class ProductionGuard
             violations.Add(new("R-DEMO-01", "Demonstration data must not be present or seeded in Production."));
         if (string.IsNullOrWhiteSpace(f.DataDirectory) || IsEphemeral(f.DataDirectory))
             violations.Add(new("R-ST-01", "Document storage must be a persistent directory outside the application folder; set Ecp:DataDirectory to an absolute path (for example a path on a data volume), not a temporary location."));
-        else if (IsInside(f.DataDirectory, f.ApplicationDirectory))
-            violations.Add(new("R-ST-02", "Document storage and the data-protection key ring must be outside the application folder, because a redeploy replaces that folder."));
+        else if (IsInside(f.DataDirectory, f.ApplicationDirectory) || (f.KeyDirectory.Length > 0 && (IsInside(f.KeyDirectory, f.ApplicationDirectory) || IsEphemeral(f.KeyDirectory))))
+            violations.Add(new("R-ST-02", "Document storage and the data-protection key ring must be outside the application folder and not temporary, because a redeploy replaces that folder and a temporary folder loses the keys."));
         if (f.AutoMigrateEnabled)
             violations.Add(new("R-MIG-01", "Automatic database migration at start-up is refused in Production. Apply schema changes as a deliberate, audited release step (see docs/UPGRADE_RUNBOOK.md)."));
         return violations;

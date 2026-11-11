@@ -379,3 +379,4 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Ecp.Host/appsettings.Development.json` (local-run values only; never published)
 - `src/Ecp.Host/web.config`, `src/Ecp.Host/UploadLimits.cs`, `tools/check-iis-publish.py`, `tools/tests/test_check_iis_publish.py`, `tests/Ecp.Api.Tests/IisPackagingTests.cs`
 - `src/Ecp.Persistence/ConnectionInspection.cs`, `src/Modules/Ecp.Operations/DatabaseAccessReadinessCheck.cs`, `tests/Ecp.UnitTests/ConnectionInspectionTests.cs`, `tests/Ecp.Integration.Tests/RuntimePrivilegeSqlServerTests.cs`
+- `src/Ecp.Host/DataProtectionSettings.cs`, `tests/Ecp.Api.Tests/DataProtectionTests.cs`

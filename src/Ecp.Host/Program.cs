@@ -75,9 +75,13 @@ builder.Services.AddSingleton<IDemoDataApplier, DemoDataApplier>();
 builder.Services.AddScoped<BrandingAccessor>();
 
 // Keys for cookies, antiforgery and temp data live in the data directory (persistent volume) so sessions survive restarts (R-SEC-04).
-var dataProtection = builder.Services.AddDataProtection().SetApplicationName("EnterpriseContractPlatform")
-    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(resolved.Host.DataDirectory, "keyring")));
-if (OperatingSystem.IsWindows()) dataProtection.ProtectKeysWithDpapi();
+// The directory, the protection and the diagnostics are described in docs/DEPLOYMENT.md ("Data protection"). A recycled pool, a redeploy and a restart all reuse the same ring.
+var dataProtectionSettings = DataProtectionSettings.From(builder.Configuration, resolved.Host.DataDirectory);
+Directory.CreateDirectory(dataProtectionSettings.KeyDirectory);
+dataProtectionSettings.Apply(builder.Services.AddDataProtection());
+builder.Services.AddSingleton(dataProtectionSettings);
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.DataProtectionReadinessCheck>();
 builder.Services.AddSingleton<Ecp.Operations.IKeyRingInspector, DataProtectionKeyRingInspector>();
 
 // Sessions: a signed cookie issued after a verified sign-in. Organisation identity providers register their own schemes at run time.

@@ -365,3 +365,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 ## JBS standards review (documentation only, branch ux/guided-administration)
 
 - `docs/JBS_STANDARDS_COMPLIANCE.md`, `docs/JBS_DEPLOYMENT_GAP_PLAN.md`
+
+## JBS IIS integration plan (documentation only)
+
+- `docs/JBS_IIS_INTEGRATION_PLAN.md`

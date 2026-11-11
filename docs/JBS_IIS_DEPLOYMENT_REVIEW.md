@@ -151,5 +151,40 @@ QA can be deployed and its hosting checked after items 1 to 8. Users can't sign 
 - **Backup recency (G-7):** the DBA's backup schedule for these databases, so the pre-flight thresholds match it,
   and confirmation that Infra's server backups will include `EcpData` on the app servers.
 - **Data root:** which drive for `EcpData` on `AUQLDDC01QA2WI` and `AUQLDDC01APP3WI`.
-- **Access model:** must every user be invited in the app (the current design), or should membership of an
-  AD group admit them? JBS AI Initiatives uses in-app membership plus a config fail-safe admin list.
+- **Access model:** for Jeff to decide. See section 6.
+
+## 6. Decision for Jeff: who can sign in with Windows sign-in?
+
+With IIS Windows Authentication, every JBS domain user who reaches the site arrives already
+identified. The question is what the app does with someone it has not seen before.
+
+**What the app does today (with OIDC):** sign-in succeeds only for an account an administrator has
+already **invited** (`IdentityApi.ResolveLoginAsync` refuses everyone else with "not_invited").
+Identity **group mappings** already exist (`Ecp.Access/Mappings.cs`, Admin > People > Mappings). They
+give roles to people *who are already signed in* according to the groups the provider reports.
+They do not create accounts.
+
+| | A. Invite only (current design) | B. AD group admits people (new) | C. Both |
+|---|---|---|---|
+| Who can sign in | Only people an admin has invited | Anyone in a named AD group, such as `AMH\ContractPlatform-Users`; the account is created at first sign-in | Invited people, plus members of the named group(s) |
+| Who grants access | App administrators, in the app | IT/AD group owners, through AD requests | Both |
+| Roles | Assigned in the app | From group mappings (e.g. `...-Legal` gives Legal reviewer); otherwise none until an admin adds them | Either |
+| Leavers | Admin disables them, or AD disables the login (they can't authenticate anyway) | Removed from the group, so no access at next sign-in | Both |
+| Like JBS AI Initiatives? | Close: it uses in-app membership plus a fail-safe admin list in config | No | Partly |
+| Build effort on top of Windows sign-in (P0-1) | None extra | S to M: create the account at first sign-in, but only for configured groups; pass Windows group SIDs into the existing mapping engine; audit it; tests | S to M (same as B) |
+| Main risk | Admin effort for a large user base | A wrongly broad group (e.g. `Domain Users`) admits everyone, so the setting must refuse very broad groups and be audited | Two places to check when someone asks "why can they get in?" |
+
+**Things to know whichever option is chosen:**
+- Windows identities are matched by **SID**, not by name, so a renamed account keeps its access.
+- Windows sign-in gives no verified email address, so invitations need to name the Windows account
+  (`AMH\user`) as well as, or instead of, the email. That is a small change either way.
+- Group membership comes from the user's Kerberos token, so a group change takes effect at the
+  user's next Windows logon, not instantly.
+- Under option B or C, the app must stay safe if the group setting is missing or empty: it should
+  then admit only invited people, which is the safe default under the JBS configuration standard.
+
+**Recommendation (Jeff's call):** start with **A**. It matches the current design and JBS AI Initiatives
+and needs no extra build. Add **C** later if inviting people becomes a burden, limited to named groups
+that IT owns.
+
+**Decision:** ______ (Jeff), date ______

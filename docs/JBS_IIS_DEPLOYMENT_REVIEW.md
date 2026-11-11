@@ -18,8 +18,15 @@ four existing items need re-ranking:
 | G-3 | **Data-protection keys under IIS**: `ProtectKeysWithDpapi()` (`Program.cs:78`) is per-user DPAPI; with no loaded profile, cookies/antiforgery keys can become unreadable after a recycle or identity change | P0 |
 | G-4 | **Document uploads capped at ~30 MB** by the in-process `MaxRequestBodySize` default (no `RequestSizeLimit` on document pages), and IIS `maxAllowedContentLength` (100 MB in the scaffold, ~28.6 MB in the SDK-generated `web.config`) blocks the 2 GB migration upload | P0 (was part of P0-2) |
 | G-5 | **Unit tests fail on Windows** (2 of 979): `MigrationAuditAndGuardTests.Several_problems_are_all_reported_together` (`/tmp/z` is not a full path on Windows) and `PackFormatTests.A_symbolic_link_is_refused` (`ZipArchive` on Windows writes a non-Unix "made by", so the symlink bit is ignored). Test-only defects, but they block a Windows build agent | P0 |
-| G-6 | **IIS authentication settings for the site**: until Windows sign-in exists, the site must have Anonymous **on** and Windows Authentication **off**, or the OIDC callback and health probes break | P0 (doc + script) |
-| G-7 | **Backup directory reachable by SQL Server and the app** on Windows (SMB share or same disk, NTFS ACLs). Needed by G-1 and by the app's own backup feature | P0 for G-1 |
+| G-6 | **IIS Windows Authentication, as in JBS AI Initiatives** (decided 2026-11-11, section 1a). The deploy scripts already set Windows Authentication on and Anonymous off. The app does not yet accept that identity, so until P0-1 is built nobody can sign in | P0 (with P0-1) |
+| G-7 | **Backup share reachable by SQL Server and the app.** The database servers are separate hosts, so this must be a UNC share: the SQL Server service account on the DB server needs write access, and the runner and app pool accounts on the app server need read access. Needed by G-1 and by the app's own backup feature | P0 for G-1 |
+
+## 1a. Decisions recorded 2026-11-11
+
+| Decision | Effect |
+|---|---|
+| **Sign-in is the same as JBS AI Initiatives**: IIS Windows Authentication (Kerberos/NTLM) on, Anonymous off site-wide; the app reads the Windows identity IIS forwards (`IISDefaults.AuthenticationScheme`) | Answers I-12 (Entra not used) and I-05 (Anonymous off; only the warm-up path `/health/live` is anonymous in IIS). P0-1 drops from **L to M**: no Negotiate package or Kerberos code is needed, because IIS does the handshake. The app must (a) authenticate `/SignIn` with the IIS scheme, (b) match the Windows user to an **invited** account by SID (with UPN or `DOMAIN\user` shown), (c) optionally map AD groups through the existing group-mapping engine, (d) issue the existing `ecp.session` cookie. The first administrator from the setup wizard must be linked to a Windows account. OIDC and Demo stay available for other installations (portability) |
+| **Servers** | QA: app `AUQLDDC01QA2WI`, database `AUQLDDC01QA2XI`. Production: app `AUQLDDC01APP3WI`, database `AUQLDDC01DBP3WI`. These are shared with JBS AI Initiatives; this app gets its own IIS site, app pool, host name and database |
 
 Re-ranking for the JBS IIS route:
 
@@ -115,18 +122,20 @@ backups: confirm both are wanted, and their retention).
 | 2 | G-2 safe base `appsettings.json` (Production defaults; demo values moved to `appsettings.Demo.json` / Development) | S |
 | 3 | G-3 machine-level key protection (`ProtectKeysWithDpapi(protectToLocalMachine: true)`, or a certificate) and/or `loadUserProfile=true` in `Initialize-IisSite.ps1` | S |
 | 4 | G-4 request limits: `RequestSizeLimit` on document upload pages; `maxAllowedContentLength` stamped by the deploy at 2 GB, with app-level limits enforcing the real per-page sizes | S |
-| 5 | G-6 site authentication settings in `Initialize-IisSite.ps1` | S |
+| 5 | G-6 warm-up path set to `/health/live` (done in `scripts/ci/Set-IisAlwaysOn.ps1`); SPN `HTTP/<host>` for each app pool account | S |
 | 6 | P0-4 Serilog with a rolling file sink under the data root, redaction kept | M |
 | 7 | G-1 + G-7 automated database upgrade | M |
 | 8 | P0-5 first QA deploy as the verification run, recorded in `deploy/STATUS.md` | M |
-| 9 | P0-1 Windows sign-in (or Entra OIDC if JBS accepts it: I-12) before users are invited | L (M with Entra) |
+| 9 | P0-1 Windows sign-in through IIS, as in JBS AI Initiatives (section 1a) | M |
 
-QA can be deployed and checked after items 1 to 8. Users can't sign in until item 9 is done,
-unless the OIDC route is approved and set up.
+QA can be deployed and its hosting checked after items 1 to 8. Users can't sign in until item 9 is done.
 
-## 5. Questions for JBS that block this list
+## 5. Questions still open
 
-- **I-12:** is Entra OIDC acceptable instead of Windows Negotiate? This decides the size of item 9.
-- **DB-04 / DB-06:** which accounts are allowed, and is pipeline-run migration with Production approval acceptable?
-- **Database server:** is the QA SQL Server on `AUQLDDC01QA2WI` or on another host? This decides the backup share (G-7).
-- **Data root:** which drive for `EcpData` on each server, and how much space backups need there.
+- **DB-04 / DB-06:** the DBA must create the database on `AUQLDDC01QA2XI` / `AUQLDDC01DBP3WI` and three
+  logins (runtime, migration, backup). Is a pipeline-run migration with Production approval acceptable?
+- **Backup share (G-7):** where it lives (a share on the DB server, readable from the app server, is
+  simplest) and how much space it needs. Also, does the DBA want the app's own backups alongside theirs (DB-07)?
+- **Data root:** which drive for `EcpData` on `AUQLDDC01QA2WI` and `AUQLDDC01APP3WI`.
+- **Access model:** must every user be invited in the app (the current design), or should membership of an
+  AD group admit them? JBS AI Initiatives uses in-app membership plus a config fail-safe admin list.

@@ -66,7 +66,7 @@ Set-WebConfiguration -PSPath "IIS:\" -Filter "/system.webServer/applicationIniti
 # where the Hangfire server starts and the recurring jobs get (re-)registered on every app start).
 # It has to be a path that allows anonymous access: the warm-up request carries no credentials, so
 # with anonymous auth off site-wide IIS answers "/" with a 401 before ANCM ever starts the app.
-$warmupPage = "/warmup"
+$warmupPage = "/health/live"   # Ecp has no /warmup; /health/live is AllowAnonymous and starts the app
 $existingPages = @(Get-WebConfiguration -PSPath "IIS:\" -Filter "/system.webServer/applicationInitialization/add" -Location $SiteName -ErrorAction SilentlyContinue |
     ForEach-Object { $_.initializationPage })
 foreach ($page in $existingPages | Where-Object { $_ -ne $warmupPage }) {

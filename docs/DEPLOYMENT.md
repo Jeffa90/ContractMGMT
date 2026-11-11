@@ -26,7 +26,8 @@ Run once, as a repo admin: `PROD_REVIEWER=<github-user> bash scripts/setup/setup
 
 | Setting | QA | Production |
 |---|---|---|
-| Server | `AUQLDDC01QA2WI` (shared with JBS AI Initiatives, separate site) | not yet chosen |
+| App server | `AUQLDDC01QA2WI` | `AUQLDDC01APP3WI` |
+| Database server | `AUQLDDC01QA2XI` | `AUQLDDC01DBP3WI` |
 | `IIS_SITE_NAME` / `IIS_APP_POOL` | `ContractPlatform` | `ContractPlatform` |
 | `IIS_SITE_PATH` | `C:\inetpub\ContractPlatform` | `C:\inetpub\ContractPlatform` |
 | `IIS_BINDING` | `https:*:443:contracts-qa.jbssa.com.au` | `https:*:443:contracts.jbssa.com.au` |
@@ -49,15 +50,21 @@ Secrets: `IIS_APP_POOL_PASSWORD` per environment.
    repo with label `iis-qa`, as a local admin. Restart its service after group changes.
 2. **Service account** `AMH\svc_contracts_qa`, added to `AMH\Allow Log On As A Batch Job`.
 3. **DNS + certificate** for `contracts-qa.jbssa.com.au` from IT; set `IIS_CERT_THUMBPRINT`.
-   `setspn -S HTTP/contracts-qa.jbssa.com.au AMH\svc_contracts_qa` once Windows sign-in exists (P0-1).
+   `setspn -S HTTP/contracts-qa.jbssa.com.au AMH\svc_contracts_qa` (Kerberos for Windows Authentication).
 4. **Folders:** `<data root>\Data` (modify for the pool account) and `<data root>\Secrets\sql-connection.txt`
    (read for the pool account only).
 5. **Database:** least-privilege runtime login for the pool account; separate migration identity; run
    `migrate`, then `setup-token` and the `/Setup` wizard from the server (`deploy/iis/README.md`).
 6. **App pool:** Always Running with preload and no idle time-out so background jobs keep running (P0-3).
 
+## Sign-in
+
+Same as JBS AI Initiatives: the deploy scripts turn IIS Windows Authentication on and Anonymous off;
+only `/health/live` (the warm-up path) is anonymous. The app does not yet accept the IIS Windows identity
+(see `docs/JBS_IIS_DEPLOYMENT_REVIEW.md`, P0-1).
+
 ## Known blockers from the gap plan
 
-- P0-1 Windows sign-in is not built, so users cannot sign in on JBS's network yet.
+- P0-1 the app does not yet accept the IIS Windows identity, so users cannot sign in yet.
 - P0-2 request limits in the published `web.config`, and P0-4 durable logging, are not done.
 Deploying to QA is useful to prove hosting (P0-5); it is not production approval.

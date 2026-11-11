@@ -34,7 +34,7 @@ appvars() {
   setvar "$env" APPENV_Database__AutoMigrate        "false"
 }
 
-# ---- QA: same server as JBS AI Initiatives (AUQLDDC01QA2WI), its own site/pool/host name ----
+# ---- QA: app AUQLDDC01QA2WI, database AUQLDDC01QA2XI (shared with JBS AI Initiatives); own site/pool/host ----
 create_env QA
 setvar QA IIS_SITE_NAME       "ContractPlatform"
 setvar QA IIS_APP_POOL        "ContractPlatform"
@@ -45,7 +45,7 @@ setvar QA IIS_APP_POOL_USER   'AMH\svc_contracts_qa'
 setvar QA SMOKE_TEST_URL      "https://contracts-qa.jbssa.com.au/health/live"
 appvars QA 'C:\EcpData\ContractPlatform'
 
-# ---- Production: server not yet chosen ----
+# ---- Production: app AUQLDDC01APP3WI, database AUQLDDC01DBP3WI ----
 create_env Production
 setvar Production IIS_SITE_NAME       "ContractPlatform"
 setvar Production IIS_APP_POOL        "ContractPlatform"

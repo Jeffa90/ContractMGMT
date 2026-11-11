@@ -146,10 +146,10 @@ QA can be deployed and its hosting checked after items 1 to 8. Users can't sign 
 
 ## 5. Questions still open
 
-- **DB-04 / DB-06:** the DBA must create the database on `AUQLDDC01QA2XI` / `AUQLDDC01DBP3WI` and three
+- **DB-04 / DB-06:** the DBA must create the database on `AUQLDDC01QA2XI` / `AUQLDDC01DBP3WI` and two
   logins (runtime and migration). Is a pipeline-run migration with Production approval acceptable?
-- **Backup recency (G-7):** the DBA's backup schedule for these databases, so the pre-flight thresholds match it,
-  and confirmation that Infra's server backups will include `EcpData` on the app servers.
+- **Backups:** confirm the new databases are in the DBA's normal backup schedule (point-in-time restore
+  wanted), and that Infra's server backups include `EcpData` on the app servers.
 - **Data root:** which drive for `EcpData` on `AUQLDDC01QA2WI` and `AUQLDDC01APP3WI`.
 - **Access model:** for Jeff to decide. See section 6.
 

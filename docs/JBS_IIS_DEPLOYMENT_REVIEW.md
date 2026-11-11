@@ -119,9 +119,9 @@ Production environment's required reviewers approve, which counts as the change 
 
 | Item | Where |
 |---|---|
-| Migration identity connection string (schema owner: `db_ddladmin` plus rights to create functions and **security policies** for row-level security, or `db_owner` if the DBA prefers) | GitHub environment **secret** `ECP_MIGRATION_SQL`, passed to the CLI as `Database__ConnectionStringRef=env:ECP_MIGRATION_SQL` for the upgrade steps only |
+| Migration identity: **QA uses the app pool account `AMH\svc_jbsai_qa`** (decided 2026-11-11). It needs schema-owner rights (`db_ddladmin` plus rights to create functions and **security policies** for row-level security, or `db_owner`) | The pipeline starts the CLI as that account with `Start-Process -Credential` using `IIS_APP_POOL_PASSWORD`, so Integrated Security connects as it. The runner's own account needs no SQL rights. Needs the Secondary Logon service on the app server |
 | `APPENV_Ecp__Recovery__Mode=External` | GitHub environment variable |
-| Runtime app pool login stays least-privilege (`db_datareader`, `db_datawriter`, `EXECUTE`) | DBA (DB-04) |
+| One account for running and migrating means the running app has schema-change rights. Accepted for QA; decide separately for Production (DB-04) | DBA |
 | Infra backup of `EcpData` on the app server, in step with the DBA's database backups | Infra |
 | Reviews for migrations flagged "review required" | `upgrades/migration-reviews.json` in the repo, before merge |
 
@@ -146,8 +146,7 @@ QA can be deployed and its hosting checked after items 1 to 8. Users can't sign 
 
 ## 5. Questions still open
 
-- **DB-04 / DB-06:** the DBA must create the database on `AUQLDDC01QA2XI` / `AUQLDDC01DBP3WI` and two
-  logins (runtime and migration). Is a pipeline-run migration with Production approval acceptable?
+- **DB-04 / DB-06:** the DBA must create the database on `AUQLDDC01QA2XI` / `AUQLDDC01DBP3WI` and grant `AMH\svc_jbsai_qa` (QA) the rights above; Production account to be decided. Is a pipeline-run migration with Production approval acceptable?
 - **Backups:** confirm the new databases are in the DBA's normal backup schedule (point-in-time restore
   wanted), and that Infra's server backups include `EcpData` on the app servers.
 - **Data root:** which drive for `EcpData` on `AUQLDDC01QA2WI` and `AUQLDDC01APP3WI`.

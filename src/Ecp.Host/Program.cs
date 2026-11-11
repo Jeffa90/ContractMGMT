@@ -125,6 +125,16 @@ builder.Services.AddAntiforgery(o =>
     o.HeaderName = "X-CSRF-TOKEN";
 });
 builder.Services.AddRazorPages().AddViewLocalization();
+// Request size and time policy (docs/DEPLOYMENT.md "Upload limits and timeouts"): a small default for every endpoint; only the upload endpoints raise it, each to its own limit.
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(o => o.Limits.MaxRequestBodySize = UploadLimits.DefaultRequestBytes);
+// Under IIS the same default is enforced by requestFiltering in web.config before the request reaches the application (IISServerOptions is a Windows-only type and is not used here).
+builder.Services.AddRequestTimeouts(o =>
+{
+    TimeSpan Seconds(string key, TimeSpan fallback) => builder.Configuration.GetValue<int?>($"Ecp:Http:{key}") is > 0 and var s ? TimeSpan.FromSeconds(s) : fallback;
+    o.DefaultPolicy = new Microsoft.AspNetCore.Http.Timeouts.RequestTimeoutPolicy { Timeout = Seconds("RequestTimeoutSeconds", UploadLimits.DefaultTimeout) };
+    o.AddPolicy(UploadLimits.UploadTimeoutPolicy, Seconds("UploadTimeoutSeconds", UploadLimits.UploadTimeout));
+    o.AddPolicy(UploadLimits.MigrationTimeoutPolicy, Seconds("MigrationTimeoutSeconds", UploadLimits.MigrationTimeout));
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ProblemExceptionHandler>();
 builder.Services.AddOpenApi();
@@ -230,6 +240,7 @@ app.UseRequestLocalization(o =>
 app.UseRateLimiter();
 app.UseMiddleware<MaintenanceMiddleware>();
 app.UseRouting();
+app.UseRequestTimeouts();
 app.UseAuthentication();
 app.UseMiddleware<SessionMiddleware>();
 app.UseAuthorization();

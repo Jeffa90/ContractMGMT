@@ -21,7 +21,7 @@ create_env() {
 setvar() { gh variable set "$2" --env "$1" -R "$REPO" --body "$3"; }
 
 
-# App settings (APPENV_ prefix is stripped and stamped into web.config). Mirrors deploy/iis/web.config.
+# App settings (APPENV_ prefix is stripped and stamped into web.config). Mirrors src/Ecp.Host/web.config.
 # The app refuses an inline connection string, so it reads it from the env var ECP_SQL_CONNECTION
 # (Database__ConnectionStringRef=env:...). With Integrated Security it holds no password, so it is a
 # variable, not a secret; it connects as the app pool account.

@@ -2,6 +2,9 @@
   <PropertyGroup>
     <RootNamespace>Ecp.Host</RootNamespace>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- IIS publish: the project web.config is kept and the SDK stamps processPath/arguments into it. The ASP.NET Core Module runs the app in-process (docs/DEPLOYMENT.md). -->
+    <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+    <AspNetCoreModuleName>AspNetCoreModuleV2</AspNetCoreModuleName>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Ecp.SharedKernel/Ecp.SharedKernel.csproj" />

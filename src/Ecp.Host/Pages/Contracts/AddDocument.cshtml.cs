@@ -1,11 +1,15 @@
 using Ecp.Contracts;
 using Ecp.Lifecycle;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Contracts;
 
 [Authorize(Policy = "perm:contracts.read")]
+[RequestSizeLimit(UploadLimits.DocumentRequestBytes)]
+[RequestFormLimits(MultipartBodyLengthLimit = UploadLimits.DocumentRequestBytes)]
+[RequestTimeout(UploadLimits.UploadTimeoutPolicy)]
 public sealed class AddDocumentModel(ISecuredContractService contracts, ISecuredContractDocuments documents, ILifecycleService lifecycle) : EcpPageModel
 {
     public ContractDetails Contract { get; private set; } = null!;

@@ -38,6 +38,12 @@ jobs:
       - name: Honest result summary (Passed / Failed / Skipped / NOT VERIFIED)
         if: always()
         run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: IIS publish output (web.config, safe Production defaults, no Development settings or local data; files only, NOT an IIS run)
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/iis-publish
+          dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release --no-restore --no-build -o artifacts/iis-publish
+          python3 -I tools/check-iis-publish.py artifacts/iis-publish
       - name: Solution packs (build, reproducibility, sign and verify with an ephemeral key, no embedded packs, no committed private key)
         run: tools/check-packs.sh
       - name: Pack Publisher tool (pack the .NET tool, install that artefact alone, build/validate/report/sign/verify/inspect with it; no source checkout is used by the tool)

@@ -38,7 +38,7 @@ Run once, as a repo admin: `PROD_REVIEWER=<github-user> bash scripts/setup/setup
 | `SMOKE_TEST_URL` | the /health/live address of the site | the /health/live address of the site |
 | Data root | `C:\EcpData\ContractPlatform` | `D:\EcpData\ContractPlatform` |
 
-App settings are `APPENV_*` **variables** mirroring `deploy/iis/web.config` (`Ecp__Mode=Production`,
+App settings are `APPENV_*` **variables** mirroring `src/Ecp.Host/web.config` (`Ecp__Mode=Production`,
 demo off, SQL Server, `Database__AutoMigrate=false`). The database connection uses Windows
 authentication (Integrated Security), so it holds no password. It is the variable
 `APPENV_ECP_SQL_CONNECTION`, and the app reads it through `Database__ConnectionStringRef=env:ECP_SQL_CONNECTION`

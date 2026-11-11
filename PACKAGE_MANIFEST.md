@@ -185,7 +185,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Modules/Ecp.Audit/`, `src/Modules/Ecp.Tenancy/`, `src/Modules/Ecp.Contracts/`, `src/Modules/Ecp.Documents/`, `src/Modules/Ecp.DataMigration/`, `src/Modules/Ecp.Operations/` (each with `packages.lock.json`; the bulk-migration module is `Ecp.DataMigration`, ADR-0015)
 - `tests/Ecp.Tests.Common/`, `tests/Ecp.UnitTests/`, `tests/Ecp.Integration.Tests/`, `tests/Ecp.Architecture.Tests/`, `tests/Ecp.Api.Tests/`
 - `tools/add-migration.sh`, `tools/check-repo.py`, `tools/compose-smoke.sh`, `tools/generate-migration-sample-attachments.py`, `tools/migration-demo.py`, `tools/dev-sandbox.sh`, `tools/docker-runtime-smoke.sh`, `tools/sqlserver-up.sh`, `tools/test-report.sh`
-- `deploy/README.md`, `deploy/STATUS.md`, `deploy/docker/` (Dockerfile, compose.yml, compose.production.yml, smoke.sh), `deploy/iis/` (web.config, README.md), `deploy/azure/` (main.bicep, README.md)
+- `deploy/README.md`, `deploy/STATUS.md`, `deploy/docker/` (Dockerfile, compose.yml, compose.production.yml, smoke.sh), `deploy/iis/` (README.md; the IIS web.config now lives in `src/Ecp.Host/web.config`), `deploy/azure/` (main.bicep, README.md)
 - `.github/workflows/ci.yml`
 - `docs/ENVIRONMENT.md`
 
@@ -377,3 +377,4 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `scripts/setup/setup-github-environments.sh`
 - `docs/DEPLOYMENT.md`, `docs/JBS_IIS_DEPLOYMENT_REVIEW.md`, `docs/JBS_IIS_INTEGRATION_PLAN.md`, `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`
 - `src/Ecp.Host/appsettings.Development.json` (local-run values only; never published)
+- `src/Ecp.Host/web.config`, `src/Ecp.Host/UploadLimits.cs`, `tools/check-iis-publish.py`, `tools/tests/test_check_iis_publish.py`, `tests/Ecp.Api.Tests/IisPackagingTests.cs`

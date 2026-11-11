@@ -1,11 +1,15 @@
 using Ecp.Lifecycle;
 using Ecp.Lifecycle.Domain;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Legal;
 
 [Authorize(Policy = "perm:contracts.read")]
+[RequestSizeLimit(UploadLimits.DocumentRequestBytes)]
+[RequestFormLimits(MultipartBodyLengthLimit = UploadLimits.DocumentRequestBytes)]
+[RequestTimeout(UploadLimits.UploadTimeoutPolicy)]
 public sealed class ReviewModel(ILegalReviewService legal) : EcpPageModel
 {
     public LegalReviewDetail Review { get; private set; } = null!;

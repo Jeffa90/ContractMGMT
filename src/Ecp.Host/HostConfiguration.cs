@@ -73,7 +73,8 @@ public static class HostConfiguration
 
         var database = new DatabaseOptions { Provider = provider, ConnectionString = connection, AutoMigrate = config.GetValue("Database:AutoMigrate", false) };
         var facts = new StartupFacts(host.Mode, provider, fromSecret, InlineConnectionStringPresent: !string.IsNullOrWhiteSpace(inline) && !fromSecret,
-            host.DemoTenantResolution, host.DemoSeed, dataDirectory, ApplicationDirectory: contentRoot, AutoMigrateEnabled: database.AutoMigrate);
+            host.DemoTenantResolution, host.DemoSeed, dataDirectory, ApplicationDirectory: contentRoot, AutoMigrateEnabled: database.AutoMigrate,
+            InlineConnectionCredentialFree: provider == DatabaseProvider.SqlServer && SqlConnectionInspector.Inspect(inline).CredentialFree);
         var violations = ProductionGuard.Evaluate(facts);
         if (violations.Count > 0) throw new StartupRefusedException(violations);
         if (string.IsNullOrWhiteSpace(connection)) throw new InvalidOperationException("No database connection is configured.");

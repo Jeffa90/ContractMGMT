@@ -365,6 +365,43 @@ public class HostConfigurationTests
     }
 
     [Fact]
+    public void Production_accepts_integrated_authentication_in_ordinary_configuration_without_a_secret_file()
+    {
+        var resolved = HostConfiguration.Resolve(Config(new()
+        {
+            ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "SqlServer",
+            ["Database:ConnectionString"] = "Server=db.example;Database=Ecp;Integrated Security=True;Encrypt=True",
+        }), Secrets, "/app");
+        Assert.Equal(DatabaseProvider.SqlServer, resolved.Database.Provider);
+        Assert.False(resolved.Facts.ConnectionFromSecretReference);
+        Assert.True(resolved.Facts.InlineConnectionCredentialFree);
+    }
+
+    [Theory]
+    [InlineData("Server=db.example;Database=Ecp;User Id=app;Password=SuperSecretValue123")]
+    [InlineData("Server=db.example;Database=Ecp;Integrated Security=True;User Id=app;Password=SuperSecretValue123")]
+    [InlineData("Server=db.example;Database=Ecp")]
+    public void Production_still_refuses_an_inline_string_that_holds_a_credential_or_names_no_method(string connection)
+    {
+        var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()
+        {
+            ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "SqlServer", ["Database:ConnectionString"] = connection,
+        }), Secrets, "/app"));
+        Assert.Contains("[R-SEC-02]", ex.Message);
+        Assert.DoesNotContain("SuperSecretValue123", ex.Message);
+    }
+
+    [Fact]
+    public void Production_refuses_the_lightweight_provider_even_with_an_integrated_looking_string()
+    {
+        var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()
+        {
+            ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "Sqlite", ["Database:ConnectionString"] = "Server=x;Database=y;Integrated Security=True",
+        }), Secrets, "/app"));
+        Assert.Contains("[R-DB-01]", ex.Message);
+    }
+
+    [Fact]
     public void Production_refuses_the_lightweight_provider_even_when_a_connection_secret_is_supplied()
     {
         var name = "ECP_CFG_" + Guid.NewGuid().ToString("N");

@@ -66,6 +66,7 @@ builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.CapabilityRe
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.RegionalReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.DocumentScanReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.GovernanceReadinessCheck>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Operations.DatabaseAccessReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Operations.EmailReadinessCheck>();
 builder.Services.AddHostedService<BackgroundJobService>();
 builder.Services.AddSingleton<DemoSeeder>();

@@ -28,3 +28,6 @@
 - Run restore/build/migrations/tests and fix failures before claiming completion.
 - Label functionality as implemented, mocked, disabled or future.
 - Record contradictions and reversible assumptions rather than silently guessing.
+
+## JBS IIS deployment
+- `deploy.yml` builds `src/Ecp.Host` and deploys to IIS via GitHub Actions; see `docs/DEPLOYMENT.md`. Keep `scripts/ci/*.ps1` ASCII-only.

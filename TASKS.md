@@ -10,7 +10,7 @@ Dependency-driven roadmap. Narrative, sequencing logic and milestone gates: `doc
 4. Update this file **before** starting a phase and after each increment. Record blockers and decisions here or in an ADR.
 5. Test IDs refer to `docs/TESTING.md`. Questions/assumptions (`Q-nn`, `ASM-nn`) refer to `docs/REPOSITORY_REVIEW.md`.
 
-## Current state (2026-10-29, guided administration on branch ux/guided-administration; not merged)
+## Current state (2026-10-29, guided administration developed on branch ux/guided-administration; main was fast-forwarded to it on 2026-11-11, so main now holds this state)
 
 **Guided administration (slices UX-1 to UX-7; `decisions/ADR-0039-guided-administration-access-profiles.md`; design `docs/UX_REDESIGN.md`; criteria `docs/UX_ACCEPTANCE_CRITERIA.md`; what is built, deviations and open gaps `docs/UX_IMPLEMENTATION_STATUS.md`).** Branched from the known-good functional baseline (`5cdf9f7`), which is unchanged. Owner decisions applied: access profiles are a presentation layer over real grants; the selected pack defines Required/Recommended/Optional; sensitive access changes need a recent sign-in; group mappings stay Advanced and safe; Test/Demo-only tools are refused in Production at the service.
 

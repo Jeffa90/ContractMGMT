@@ -1,6 +1,6 @@
 # Deployment to IIS with GitHub Actions (JBS reference)
 
-Status: **Implemented as files; Not Verified on IIS and not yet run.** The first QA deployment is the verification run. Docker and Azure models are unchanged (`deploy/docker`, `deploy/azure`). Nothing here is production approval. Open questions are in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
+Status: **Implemented as files; CI green (commit e0d2ac7) including a Windows build-and-test job; Not Verified on IIS and not yet run.** The first QA deployment is the verification run. Docker and Azure models are unchanged (`deploy/docker`, `deploy/azure`). Nothing here is production approval. Open questions are in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
 
 ## Workflows
 

@@ -21,6 +21,8 @@ This plan was written before any code changed. The slice on branch jbs/iis-integ
 
 Still open and not guessed: the P3 questions (Infrastructure and DBA answers) are listed at the end of `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
 
+CI: commit e0d2ac7 passed every job (Linux, Windows, SQL Server 2022, container); see `deploy/STATUS.md`. Nothing has run on IIS.
+
 ## 1. Ranking
 
 | Rank | Meaning |

@@ -22,6 +22,8 @@ The review below describes the code as it was reviewed. Since then branch jbs/ii
 
 Items that belong to JBS Infrastructure or the DBA remain **REQUIRES JBS INFRASTRUCTURE CONFIRMATION** and are listed in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
 
+CI: commit e0d2ac7 passed every job (Linux, Windows, SQL Server 2022, container); see `deploy/STATUS.md`. Nothing has run on IIS.
+
 ## 1. How to read this document
 
 **Method.** Each rule was compared with the real code, project files, configuration, authentication, persistence, logging, deployment files, tests and CI. Evidence names files so it can be checked. Nothing was run on Windows, IIS, Azure DevOps or a JBS SQL Server; those are labelled **NOT VERIFIED** rather than assumed.

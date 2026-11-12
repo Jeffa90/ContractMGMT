@@ -1,6 +1,6 @@
 # Windows Server / IIS deployment
 
-**Status: Implemented as files, Not Verified on IIS.** The build workspace is Linux. The package, its `web.config`, the sign-in flow and the pipeline have been built and tested without IIS; the first QA run on a real server is the verification. The full description is `docs/DEPLOYMENT.md`; status and open questions are in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
+**Status: Implemented as files, CI green on Linux, Windows and SQL Server (commit e0d2ac7), Not Verified on IIS.** The build workspace is Linux. The package, its `web.config`, the sign-in flow and the pipeline have been built and tested without IIS; the first QA run on a real server is the verification. The full description is `docs/DEPLOYMENT.md`; status and open questions are in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
 
 1. Install the .NET 10 Hosting Bundle and the IIS role with the ASP.NET Core Module V2 and Windows Authentication.
 2. The package comes from `dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release`. The project's `src/Ecp.Host/web.config` is published with it (in-process hosting, request limits per upload URL, no environment variables and no secrets). `tools/check-iis-publish.py <folder>` inspects the published files.

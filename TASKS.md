@@ -465,7 +465,7 @@ Gate: BRS-001 to BRS-004; UPG-001 to UPG-004; SEC-030, SEC-031; PER-001 to PER-0
 
 ## JBS IIS integration (branch jbs/iis-integration)
 
-Owner decisions of 2026-11-11 (invite-only Windows access; integration branch; pull request 1 integrated, not merged to main). Status and evidence: `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`. Everything is Implemented and tested here; nothing has run on IIS, so each IIS-facing item is **Not Verified** until the first QA deployment. Production approval is external governance and is not declared.
+Owner decisions of 2026-11-11 (invite-only Windows access; integration branch; pull request 1 integrated, not merged to main). Status and evidence: `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`. Everything is Implemented, tested here and in CI (commit e0d2ac7, run 109, all jobs green including Windows and SQL Server); nothing has run on IIS, so each IIS-facing item is **Not Verified** until the first QA deployment. Production approval is external governance and is not declared.
 
 - [x] JBS-0 Integration branch created; pull request 1 merged into it; vocabulary-guard, manifest and document-path defects fixed.
 - [x] JBS-A Windows-only test failures fixed (reparse-point refusal in pack archives; case-insensitive Windows temp-path guard) and a Windows CI job added.

@@ -132,14 +132,14 @@ internal static class ClassificationScenarios
             Assert.Contains(docs, d => d.DocumentId == ordinary);
             Assert.DoesNotContain(docs, d => d.DocumentId == secret);
             await Assert.ThrowsAsync<ResourceNotFoundException>(() => s.Get<ISecuredContractDocuments>().OpenAsync(secret));
-            Assert.NotNull(await s.Get<ISecuredContractDocuments>().OpenAsync(ordinary));
+            await using (var opened = (await s.Get<ISecuredContractDocuments>().OpenAsync(ordinary))!.Content) Assert.NotNull(opened);   // the file is released here: Windows cannot delete an open file
         });
         // Legal (Restricted ceiling) sees both.
         await w.AsAsync("legal", async s =>
         {
             var docs = await s.Get<ISecuredContractDocuments>().ListAsync(w.Contracts["C2"]);
             Assert.Contains(docs, d => d.DocumentId == secret);
-            Assert.NotNull(await s.Get<ISecuredContractDocuments>().OpenAsync(secret));
+            await using (var opened = (await s.Get<ISecuredContractDocuments>().OpenAsync(secret))!.Content) Assert.NotNull(opened);
         });
         // A document can never be classified below its contract.
         await w.AsAsync("ownerPackaging", async s =>

@@ -99,13 +99,16 @@ public sealed class UpgradeCatalogue
 
     public static UpgradeCatalogue FromAssembly(Assembly assembly)
     {
-        var names = assembly.GetManifestResourceNames().Where(n => n.StartsWith("upgrades/", StringComparison.Ordinal)).Order(StringComparer.Ordinal).ToList();
+        // The build names these resources from the file's folder. On Windows the folder separator is a backslash ("upgrades/manifests\x.json"), so names are compared with forward slashes
+        // and the stream is opened by its real name; otherwise a Windows build would find no manifest and could not be upgraded.
+        var names = assembly.GetManifestResourceNames().Where(n => n.StartsWith("upgrades/", StringComparison.Ordinal))
+            .Select(n => (Real: n, Logical: n.Replace('\\', '/'))).OrderBy(n => n.Logical, StringComparer.Ordinal).ToList();
         byte[] Read(string name) { using var s = assembly.GetManifestResourceStream(name)!; using var m = new MemoryStream(); s.CopyTo(m); return m.ToArray(); }
-        var baselines = names.Where(n => n.StartsWith("upgrades/baselines/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<ReleaseLedger>(Read(n))).ToList();
-        var manifests = names.Where(n => n.StartsWith("upgrades/manifests/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<UpgradeManifest>(Read(n))).ToList();
-        var notes = names.Where(n => n.StartsWith("upgrades/release-notes/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<ReleaseNotes>(Read(n))).ToList();
-        var review = names.FirstOrDefault(n => n == "upgrades/migration-reviews.json");
-        var register = review is null ? new MigrationReviewRegister(1, []) : UpgradeJson.Parse<MigrationReviewRegister>(Read(review));
+        var baselines = names.Where(n => n.Logical.StartsWith("upgrades/baselines/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<ReleaseLedger>(Read(n.Real))).ToList();
+        var manifests = names.Where(n => n.Logical.StartsWith("upgrades/manifests/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<UpgradeManifest>(Read(n.Real))).ToList();
+        var notes = names.Where(n => n.Logical.StartsWith("upgrades/release-notes/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<ReleaseNotes>(Read(n.Real))).ToList();
+        var review = names.FirstOrDefault(n => n.Logical == "upgrades/migration-reviews.json");
+        var register = review.Real is null ? new MigrationReviewRegister(1, []) : UpgradeJson.Parse<MigrationReviewRegister>(Read(review.Real));
         return new UpgradeCatalogue(baselines, manifests, register, notes);
     }
 

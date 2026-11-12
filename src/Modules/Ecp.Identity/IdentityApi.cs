@@ -745,6 +745,9 @@ public static class IdentityModule
         services.AddScoped<IAuditBrowser, AuditBrowser>();
         services.AddScoped<IPeopleDirectory, PeopleDirectory>();
         services.AddScoped<IUserAdministration, UserAdministration>();
+        services.AddScoped<Ecp.Identity.Windows.WindowsSignIn>();
+        services.AddScoped<Ecp.Identity.Windows.IWindowsSignIn>(sp => sp.GetRequiredService<Ecp.Identity.Windows.WindowsSignIn>());
+        services.AddScoped<Ecp.Identity.Windows.IWindowsAccounts>(sp => sp.GetRequiredService<Ecp.Identity.Windows.WindowsSignIn>());
         services.AddScoped<IApproverGroupService, ApproverGroupService>();
         services.AddScoped<IClassificationScaleProvider, DefaultClassificationScaleProvider>();
         return services;

@@ -150,8 +150,8 @@ Environment variable names use double underscores. Put them in the composition f
 
 | Setting | Required in Production | Purpose and example | Secret? |
 |---|---|---|---|
-| `Ecp__Mode` | Yes | Value Production. The shipped default file says Demo, so set it explicitly | No |
-| `Ecp__DemoSeed` | Yes | Value false. If true (the shipped default) the installation fills itself with fake data and **skips the setup wizard** in Demo and Test; in Production the start-up guard refuses it | No |
+| `Ecp__Mode` | Yes | Value Production. The published default file is Production-safe (it already says Production, SQL Server, no demonstration data, no automatic migration), but set it explicitly so the intent is on record | No |
+| `Ecp__DemoSeed` | Yes | Value false (also the published default). If true the installation fills itself with fake data and **skips the setup wizard** in Demo and Test; in Production the start-up guard refuses it | No |
 | `Ecp__DemoTenantResolution` | Yes | Value false (default is true) | No |
 | `Database__Provider` | Yes | Value SqlServer. Production refuses anything else | No |
 | `Database__ConnectionStringRef` | Yes | A reference to the secret file (example below). A pasted connection string is refused in Production | The file's content |

@@ -16,9 +16,11 @@
 #               IIS_CERT_DNS_NAMES  (optional, with IIS_CERT_AUTO) extra certificate names, space-separated
 #               IIS_APP_POOL_USER   (optional) domain account (DOMAIN\user) for the app pool; default ApplicationPoolIdentity
 #   Secrets:    IIS_APP_POOL_PASSWORD (with IIS_APP_POOL_USER)
-#   Secrets / variables prefixed APPENV_ are stamped into web.config as environment
-#   variables with the prefix removed, e.g. secret APPENV_Anthropic__ApiKey -> Anthropic__ApiKey.
-#   (GitHub upper-cases secret names; .NET configuration keys are case-insensitive.)
+#   Variables prefixed APPENV_ are stamped into web.config as environment variables with the prefix
+#   removed, e.g. APPENV_Ecp__Mode -> Ecp__Mode. Only VARIABLES are stamped: a secret would end up in
+#   web.config in clear text, so this pipeline never reads secrets for that purpose. (The application
+#   needs none: SQL Server uses integrated authentication, and any secret is a file or environment
+#   reference resolved on the server.)
 #
 # Approval gates (e.g. who signs off Production) are the Environment's "Required reviewers".
 #
@@ -101,7 +103,6 @@ jobs:
       - name: Deploy
         shell: powershell
         env:
-          ALL_SECRETS: ${{ toJSON(secrets) }}
           ALL_VARS: ${{ toJSON(vars) }}
           SITE_PATH: ${{ vars.IIS_SITE_PATH }}
           SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
@@ -124,15 +125,21 @@ jobs:
           $ErrorActionPreference = "Stop"
           if (-not $env:SITE_PATH) { throw "Set the IIS_SITE_PATH variable on the '${{ inputs.environment }}' environment." }
 
-          # APPENV_-prefixed variables first, then secrets, so a secret wins over a variable of the same name.
+          # APPENV_-prefixed VARIABLES only. Values are never printed, only the names.
           $appEnv = @{}
-          foreach ($source in @($env:ALL_VARS, $env:ALL_SECRETS)) {
-            if (-not $source) { continue }
-            foreach ($p in ($source | ConvertFrom-Json).PSObject.Properties) {
+          if ($env:ALL_VARS) {
+            foreach ($p in ($env:ALL_VARS | ConvertFrom-Json).PSObject.Properties) {
               if ($p.Name -like "APPENV_*") { $appEnv[$p.Name.Substring(7)] = [string]$p.Value }
             }
           }
           Write-Host "Injecting $($appEnv.Count) app setting(s): $(($appEnv.Keys | Sort-Object) -join ', ')"
+
+          # Fail safely before anything on the server is touched: a Production-mode installation needs these, and they are not guessed.
+          foreach ($required in @("Ecp__Mode", "Ecp__DataDirectory", "Database__ConnectionString")) {
+            if (-not $appEnv.ContainsKey($required) -or -not $appEnv[$required]) { throw "The '${{ inputs.environment }}' environment has no APPENV_$required variable. Set it (scripts/setup/setup-github-environments.sh lists every value)." }
+          }
+          if ($appEnv["Ecp__Mode"] -eq "Demo") { throw "Ecp__Mode is Demo. A deployed environment must not run in Demo mode." }
+          if ($appEnv.ContainsKey("Database__ConnectionString") -and $appEnv["Database__ConnectionString"] -match "(?i)(password|pwd)\s*=") { throw "Database__ConnectionString contains a password. Use Windows integrated authentication (no credential in the string)." }
 
           $split = { param($s) @($s -split '\s+' | Where-Object { $_ }) }
           & "$env:GITHUB_WORKSPACE\tools\scripts\ci\Deploy-IisSite.ps1" `
@@ -154,7 +161,8 @@ jobs:
             -CertificateTemplate $env:CERT_TEMPLATE `
             -CertificateDnsNames (& $split $env:CERT_DNS_NAMES) `
             -AppPoolUser $env:APP_POOL_USER `
-            -AppPoolPassword $env:APP_POOL_PASSWORD
+            -AppPoolPassword $env:APP_POOL_PASSWORD `
+            -DataPath $appEnv["Ecp__DataDirectory"]
 
       - name: Clean up package
         if: always()

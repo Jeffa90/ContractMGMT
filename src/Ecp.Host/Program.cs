@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +60,15 @@ builder.Configuration.GetSection("Identity:Demo").Bind(demoIdentity);
 builder.Services.AddSingleton(demoIdentity);
 
 var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+
+// Structured logging (docs/DEPLOYMENT.md, "Logging"): one place, a durable rolling file, shared context on every event, secrets redacted before anything is written.
+var loggingSettings = Ecp.Host.Logging.LoggingSettings.From(builder.Configuration, resolved.Host.DataDirectory);
+builder.Services.AddSingleton(loggingSettings);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.Logging.LoggingReadinessCheck>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.Logging.LogDestinationsReadinessCheck>();
+builder.Host.UseSerilog((context, services, logger) => Ecp.Host.Logging.LoggingConfiguration.Apply(logger, loggingSettings, hostVersion, resolved.Host.Mode.ToString(),
+    Ecp.Host.Logging.EcpLogEnricher.DatabaseIdentifier(resolved.Database.Provider, resolved.Database.ConnectionString), services.GetService<IHttpContextAccessor>(), secrets, () => DateTime.UtcNow), writeToProviders: true);
 builder.Services.AddEcpPlatformModules(builder.Configuration, resolved, PlatformComposition.PathsFor(resolved.Host.DataDirectory, builder.Configuration), hostVersion, builder.Environment.ContentRootPath, builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"));
 builder.Services.AddSingleton<Ecp.Recovery.IRestoreTargetFactory>(new RestoreTargetFactory(builder.Configuration, resolved, hostVersion, builder.Environment.ContentRootPath, builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot")));
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.PackReadinessCheck>();
@@ -232,6 +242,8 @@ app.UseExceptionHandler();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 if (secureCookies) app.UseHsts();
 app.UseStaticFiles();
+app.UseSerilogRequestLogging(o => o.GetLevel = (context, _, ex) =>
+    context.Request.Path.StartsWithSegments("/health") ? Serilog.Events.LogEventLevel.Verbose : ex is not null || context.Response.StatusCode >= 500 ? Serilog.Events.LogEventLevel.Error : Serilog.Events.LogEventLevel.Information);
 app.UseMiddleware<Ecp.Host.Network.NetworkGuardMiddleware>();
 app.UseMiddleware<SetupGateMiddleware>();
 app.UseRequestLocalization(o =>
@@ -246,6 +258,7 @@ app.UseRateLimiter();
 app.UseMiddleware<MaintenanceMiddleware>();
 app.UseRouting();
 app.UseRequestTimeouts();
+app.UseMiddleware<Ecp.Host.Security.WindowsIdentityCaptureMiddleware>();   // before UseAuthentication: a server-supplied Windows principal is not an application session
 app.UseAuthentication();
 app.UseMiddleware<SessionMiddleware>();
 app.UseAuthorization();

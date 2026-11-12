@@ -7,10 +7,17 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Setup;
 
-public sealed record TestSignInLink(string Scheme, string Key, string Name);
+/// <summary>A way to test sign-in. For an OpenID Connect provider <see cref="Scheme"/> names the scheme; for Windows sign-in it is <see cref="WindowsScheme"/> and the web server does the authenticating.</summary>
+public sealed record TestSignInLink(string Scheme, string Key, string Name)
+{
+    public const string WindowsScheme = "windows";
+    public string Href(string returnUrl) => Scheme == WindowsScheme
+        ? $"/Account/WindowsSignIn?testProvider={Uri.EscapeDataString(Key)}&returnUrl={Uri.EscapeDataString(returnUrl)}"
+        : $"/Account/Challenge?scheme={Uri.EscapeDataString(Scheme)}&testProvider={Uri.EscapeDataString(Key)}&returnUrl={Uri.EscapeDataString(returnUrl)}";
+}
 
 [AllowAnonymous]
-public sealed class StepModel(ISetupService setup, OidcSchemeManager oidc) : SetupPageModel(setup)
+public sealed class StepModel(ISetupService setup, OidcSchemeManager oidc, Ecp.Identity.Windows.IWindowsSignIn windows, Ecp.SharedKernel.TenantContext tenantContext) : SetupPageModel(setup)
 {
     public StageDescriptor? Stage { get; private set; }
     public StageResult? Result { get; private set; }
@@ -56,7 +63,12 @@ public sealed class StepModel(ISetupService setup, OidcSchemeManager oidc) : Set
         if (Stage is null) return false;
         var snapshot = await Setup.SnapshotAsync(false, ct);
         if (snapshot.TenantId is { } tenantId && id is "admin" or "readiness" or "identity")
-            TestLinks = [.. oidc.ForTenant(tenantId).Select(p => new TestSignInLink(p.Scheme, p.Settings.Key, p.Settings.DisplayName))];
+        {
+            var links = oidc.ForTenant(tenantId).Select(p => new TestSignInLink(p.Scheme, p.Settings.Key, p.Settings.DisplayName)).ToList();
+            using (tenantContext.Use(tenantId))
+                if (await windows.ProviderKeyAsync(ct) is { } windowsKey) links.Add(new TestSignInLink(TestSignInLink.WindowsScheme, windowsKey, "Windows"));
+            TestLinks = links;
+        }
         if (id == "readiness" || id == "complete") Checks = await Setup.RunChecksAsync(ct);
         return true;
     }

@@ -27,6 +27,12 @@ public sealed class EcpFactory : WebApplicationFactory<Program>
 
     private readonly Action<IServiceCollection>? _services;
 
+    static EcpFactory()
+    {
+        // Test hosts never need configuration files to reload; each reloading file watcher costs an inotify instance, and the per-user limit (128 by default, also on CI runners) is shared by every host a test run creates.
+        Environment.SetEnvironmentVariable("DOTNET_hostBuilder__reloadConfigOnChange", "false");
+    }
+
     public EcpFactory(Dictionary<string, string?> settings, Action<IServiceCollection>? services = null)
     {
         _services = services;
@@ -189,7 +195,7 @@ public class DemoHostTests
         string[] anonymousAllowlist =
         [
             "/health/live", "/health/startup", "/health/ready", "/api/v1/info", "/api/v1/openapi.json",
-            "/SignIn", "/SignOut", "/Error", "/Account/Challenge", "/css/branding.css",
+            "/SignIn", "/SignOut", "/Error", "/Account/Challenge", "/Account/WindowsSignIn", "/Account/AccessRefused", "/css/branding.css",
             // Setup pages are reachable only through the one-time token (and exist only until installation is complete); see SetupTests.
             "/Setup", "/Setup/Step/{id}", "/Setup/Report"
         ];
@@ -399,6 +405,36 @@ public class HostConfigurationTests
             ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "Sqlite", ["Database:ConnectionString"] = "Server=x;Database=y;Integrated Security=True",
         }), Secrets, "/app"));
         Assert.Contains("[R-DB-01]", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("External", false)]
+    [InlineData("application", false)]
+    [InlineData("Extrnal", true)]
+    [InlineData("DbaOwned", true)]
+    public void The_recovery_mode_must_be_one_of_the_two_known_values(string mode, bool refused)
+    {
+        var name = "ECP_REC_" + Guid.NewGuid().ToString("N");
+        Environment.SetEnvironmentVariable(name, "Server=db.example;Database=ecp;User Id=app;Password=not-a-real-secret");
+        try
+        {
+            Func<ResolvedConfiguration> resolve = () => HostConfiguration.Resolve(Config(new()
+            {
+                ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "SqlServer", ["Database:ConnectionStringRef"] = "env:" + name,
+                ["Ecp:Recovery:Mode"] = mode,
+            }), Secrets, "/app");
+            if (refused) Assert.Contains("[R-REC-01]", Assert.Throws<StartupRefusedException>(() => resolve()).Message);
+            else Assert.NotNull(resolve());
+        }
+        finally { Environment.SetEnvironmentVariable(name, null); }
+    }
+
+    [Fact]
+    public void The_command_line_offers_the_recovery_point_commands()
+    {
+        Assert.Contains("declare-recovery-point", OperationsCli.Commands);
+        Assert.Contains("list-recovery-points", OperationsCli.Commands);
+        Assert.Contains("Declared by DBA; not verified by this application", OperationsCli.Usage);
     }
 
     [Fact]

@@ -10,6 +10,10 @@ Files that exist only on the pull request branch are named in plain text, not as
 
 ---
 
+## Update: executed on branch jbs/iis-integration
+
+The owner approved invite-only Windows sign-in (decision 1), the integration branch (decision 2) and the merge of pull request 1 into it (decision 3), with the pull request's defects fixed first (decision 4). Items A to J of this plan were then implemented where no Infrastructure or DBA answer was needed. The outcome, evidence and the open questions are in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`. This plan is kept as written; where the implementation differs it is stated there, notably: no schema migration was needed for Windows sign-in (the existing external-identity table is reused), and the Windows CI job runs the non-SQL tests but is not an IIS run.
+
 ## 1. Current branch situation
 
 Checked against the live remote on 2026-11-11, not against older documentation.

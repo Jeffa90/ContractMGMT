@@ -23,7 +23,10 @@ public static class UpgradeEvidence
         quiescence = r.Quiescence,
         steps = r.Steps.Select(s => new { s.Module, s.From, s.To, s.Migrations, s.Milliseconds, s.Outcome, failure = Redaction.Clean(s.Failure) }),
         validation = r.Validation is null ? null : Validation(r.Validation),
-        rollback = new { method = "restore", backupId = r.BackupId, note = "Restore the verified pre-upgrade backup into a clean database and start the matching application version. Never run an older application against an upgraded database." },
+        rollback = ExternalRecoveryStatements.IsExternalId(r.BackupId)
+            ? (object)new { method = "restore-by-dba", recoveryPointId = r.BackupId, statement = ExternalRecoveryStatements.DeclaredNotVerified, verifiedByApplication = false,
+                note = "The database administrator restores the declared recovery point with their own tools and the matching application version is started. This application did not create or verify that recovery point and has not rehearsed restoring it. Never run an older application against an upgraded database." }
+            : new { method = "restore", backupId = r.BackupId, note = "Restore the verified pre-upgrade backup into a clean database and start the matching application version. Never run an older application against an upgraded database." },
         notice = Notice,
     };
 

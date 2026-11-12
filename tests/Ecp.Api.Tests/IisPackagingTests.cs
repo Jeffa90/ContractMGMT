@@ -116,7 +116,7 @@ public class IisPackagingTests
     public void Documents_up_to_the_configured_document_limit_fit_the_endpoint_limit()
     {
         var documents = new Ecp.Documents.DocumentsOptions();
-        Assert.True(UploadLimits.DocumentRequestBytes > documents.MaxFileBytes, "the request limit must leave room for the multipart envelope");
+        Assert.True(UploadLimits.DocumentRequestBytes > documents.MaxFileBytes, "the request limit must leave room for the multipart framing");
         Assert.True(UploadLimits.DocumentRequestBytes - documents.MaxFileBytes <= 2 * 1024 * 1024);
         Assert.True(UploadLimits.PackRequestBytes > 8 * 1024 * 1024);
     }

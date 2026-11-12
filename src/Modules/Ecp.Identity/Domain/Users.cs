@@ -73,4 +73,12 @@ public sealed class ExternalIdentity : ITenantOwned
     };
 
     public void Seen(DateTime nowUtc) => LastSeenUtc = Guard.Utc(nowUtc, nameof(nowUtc));
+
+    /// <summary>Replaces the subject of an invitation that named an account with the stable identifier seen at the first sign-in (Windows: account name to SID).</summary>
+    public void RebindSubject(string subject, DateTime nowUtc)
+    {
+        Subject = Guard.NotBlank(subject, "Subject", 450);
+        LinkedUtc = Guard.Utc(nowUtc, nameof(nowUtc));
+        LastSeenUtc = nowUtc;
+    }
 }

@@ -9,6 +9,19 @@
     <div class="error-summary" role="alert" tabindex="-1" id="signin-error"><h2>@L["Sign-in was not completed"]</h2><p>@Model.Message</p></div>
 }
 
+@if (Model.WindowsAvailable)
+{
+    <section aria-labelledby="win-h" class="card">
+        <h2 id="win-h">@L["Windows sign-in"]</h2>
+        <p class="lede">@L["Your Windows account identifies you. You must also have been invited and given access by an administrator."]</p>
+        <p><a class="button" href="/Account/WindowsSignIn?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">@L["Continue with your Windows account"]</a></p>
+        @if (Model.WindowsInstallationAvailable)
+        {
+            <p><a href="/Account/WindowsSignIn?scope=installation&amp;returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">@L["Sign in as an installation administrator"]</a></p>
+        }
+    </section>
+}
+
 @if (Model.Providers.Count > 0)
 {
     <section aria-labelledby="idp-h" class="card">
@@ -56,7 +69,7 @@
         }
     </section>
 }
-else if (Model.Providers.Count == 0)
+else if (Model.Providers.Count == 0 && !Model.WindowsAvailable)
 {
     <p class="card">@L["No sign-in provider is available. Contact your administrator."]</p>
 }

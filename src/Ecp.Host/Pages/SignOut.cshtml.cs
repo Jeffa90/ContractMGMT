@@ -14,6 +14,6 @@ public sealed class SignOutModel : EcpPageModel
     public async Task<IActionResult> OnPostAsync()
     {
         await HttpContext.SignOutAsync(EcpSchemes.Session);
-        return RedirectToPage("/SignIn");
+        return RedirectToPage("/SignIn", new { reason = "signed_out" });
     }
 }

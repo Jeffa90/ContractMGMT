@@ -103,6 +103,8 @@ param(
 
     [string]$AppPoolPassword,
 
+    [string]$DataPath,
+
     [int]$SmokeTestTimeoutSeconds = 120
 )
 
@@ -134,6 +136,10 @@ function Get-ConnectionString([string]$name) {
     }
     return $value
 }
+
+# One immutable build: the package must be exactly what the build recorded. (web.config is excluded because this script stamps it for the environment.)
+$manifestCheck = Join-Path $PSScriptRoot "Test-BuildManifest.ps1"
+if (Test-Path $manifestCheck) { & $manifestCheck -PackagePath $PackagePath }
 
 Write-Host "==> Configuring web.config for $Environment"
 & (Join-Path $PSScriptRoot "Set-WebConfigEnvironment.ps1") `
@@ -167,9 +173,12 @@ Set-Content -Path $appOffline -Value "<html><body><h2>Updating - back in a minut
 # Give the ASP.NET Core Module time to shut the process down and release file locks.
 Start-Sleep -Seconds 5
 
+$snapshotTaken = $false
+$keepOffline = $false
 try {
     Write-Host "==> Snapshotting current site to $backupPath"
     Invoke-Robocopy $SitePath $backupPath @("/XF", "app_offline.htm")
+    $snapshotTaken = $true
 
     Write-Host "==> Copying new version into $SitePath"
     Invoke-Robocopy $PackagePath $SitePath @("/XF", "app_offline.htm")
@@ -179,7 +188,7 @@ try {
             -SiteName $SiteName -AppPoolName $AppPoolName -SitePath $SitePath `
             -Binding $Binding `
             -AppPoolUser $AppPoolUser -AppPoolPassword $AppPoolPassword `
-            -WritableFolders $PreserveFolders
+            -WritableFolders $PreserveFolders -DataPath $DataPath
 
         # https sites: make sure the binding has a valid certificate (and renew it when it's close
         # to expiry). Runs every deploy; makes no changes when the certificate is fine.
@@ -194,9 +203,28 @@ try {
             & (Join-Path $PSScriptRoot "Set-IisCertificate.ps1") @certArgs | Out-Null
         }
     }
+} catch {
+    # Fail safely: a half-copied site must never be put back online. Restore the snapshot taken above; if that cannot be done, leave the site offline.
+    Write-Host "!! Deploy failed: $($_.Exception.Message)"
+    if ($snapshotTaken) {
+        try {
+            Write-Host "==> Restoring the previous version from $backupPath"
+            Invoke-Robocopy $backupPath $SitePath @("/XF", "app_offline.htm")
+            Write-Host "    previous version restored"
+        } catch {
+            $keepOffline = $true
+            Write-Host "!! Restoring the previous version failed: $($_.Exception.Message)"
+            Write-Host "!! The site is being left OFFLINE (app_offline.htm stays). Restore $backupPath to $SitePath by hand, then delete app_offline.htm."
+        }
+    }
+    throw
 } finally {
-    Write-Host "==> Bringing app back online"
-    Remove-Item $appOffline -Force -ErrorAction SilentlyContinue
+    if ($keepOffline) {
+        Write-Host "==> Leaving the site offline"
+    } else {
+        Write-Host "==> Bringing app back online"
+        Remove-Item $appOffline -Force -ErrorAction SilentlyContinue
+    }
 }
 
 if ($SmokeTestUrl) {
@@ -215,7 +243,7 @@ if ($SmokeTestUrl) {
     } while ((Get-Date) -lt $deadline)
 
     if ($null -eq $status -or $status -ge 500) {
-        throw "Smoke test failed (last status: $status). Check the site's logs folder; roll back with: robocopy `"$backupPath`" `"$SitePath`" /MIR /XD $($PreserveFolders -join ' ')"
+        throw "Smoke test failed (last status: $status). The new version is still in place. Check the application log in the data root (logs folder). Roll back the FILES with: robocopy `"$backupPath`" `"$SitePath`" /MIR /XD $($PreserveFolders -join ' '). Do not roll back the files if the database has already been upgraded: an older application must never run against a newer database; restore a database recovery point instead."
     }
     Write-Host "    HTTP $status - app is up."
 }

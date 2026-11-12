@@ -5,6 +5,10 @@ server), deployed by GitHub Actions. Docker and Azure are out of scope for JBS a
 Reviewed against the JBS .NET standards (`jbs-dev-standards` 1.3.0) and `docs/JBS_DEPLOYMENT_GAP_PLAN.md`.
 Nothing here declares production approval.
 
+## Update: Section 4 implemented on branch jbs/iis-integration
+
+The application changes in Section 4 were built on branch jbs/iis-integration. The mapping from this review to the work is in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md` (items A to J). Everything is **Implemented** and tested here and **Not Verified on IIS**; the first QA deployment is the proof. The pipeline calls for external recovery points (section 3) are built as `Ecp:Recovery:Mode=External`; the upgrade is still not run by the pipeline.
+
 ## 1. Verdict
 
 `JBS_DEPLOYMENT_GAP_PLAN.md` is accurate in what it lists, and the architecture can stay as it is.

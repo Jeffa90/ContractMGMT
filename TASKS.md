@@ -463,6 +463,25 @@ Gate: BRS-001 to BRS-004; UPG-001 to UPG-004; SEC-030, SEC-031; PER-001 to PER-0
 | [ ] | DOCS-DICT | Published data dictionary refreshed from the model | M9 gate | Dictionary matches schema (generated check) | n/a |
 | [ ] | REL-01 | Release-readiness review using all skills; smoke tests; assess demo, migration, no-code, Docker, IIS, Azure, handover, security and production readiness separately | all above | `prompts/90-RELEASE-READINESS.md`; `E2E-DOD-001` passes | n/a |
 
+## JBS IIS integration (branch jbs/iis-integration)
+
+Owner decisions of 2026-11-11 (invite-only Windows access; integration branch; pull request 1 integrated, not merged to main). Status and evidence: `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`. Everything is Implemented and tested here; nothing has run on IIS, so each IIS-facing item is **Not Verified** until the first QA deployment. Production approval is external governance and is not declared.
+
+- [x] JBS-0 Integration branch created; pull request 1 merged into it; vocabulary-guard, manifest and document-path defects fixed.
+- [x] JBS-A Windows-only test failures fixed (reparse-point refusal in pack archives; case-insensitive Windows temp-path guard) and a Windows CI job added.
+- [x] JBS-B Fail-safe Production defaults: Production-safe base settings, Demo values in the unpublished Development file, guards R-ST-01, R-ST-02, R-MIG-01, R-REC-01.
+- [x] JBS-C IIS packaging: published `web.config` (module V2, in-process), per-URL upload limits, request-timeout policy, `tools/check-iis-publish.py`.
+- [x] JBS-D Windows Authentication provider: identity only, invite-only (ADR-0042); friendly refusal page; audited refusals; Test/Demo identities unchanged outside Production.
+- [x] JBS-E First administrator linked to a Windows account at setup; "Test sign-in" for Windows.
+- [x] JBS-F Data protection: explicit key directory and protection, readiness R-SEC-04, documentation.
+- [x] JBS-G External DBA recovery points: `Ecp:Recovery:Mode=External`, `declare-recovery-point`, preflight NOT VERIFIED, evidence wording (ADR-0043).
+- [x] JBS-H Integrated SQL authentication without a secret file; readiness R-DB-02 (runtime login and privileges).
+- [x] JBS-I Serilog foundation: structured JSON, shared context, redaction, durable rolling file, readiness R-LOG-01/02. Application Insights and fatal-error email configurable, **Not Verified**.
+- [x] JBS-J Pipeline safety (CI gate, one verified build, rollback, no secrets in web.config), rewritten environment setup script (not executed), secrets scan.
+- [ ] JBS-K Run on IIS in QA (needs Infrastructure and DBA answers; the verification run). Not started.
+- [ ] JBS-L Active Directory group-driven onboarding (deferred by the owner).
+- [ ] JBS-M Application Insights sink (needs the decision and a package approval).
+
 ## Continuous tracks (every milestone)
 
 | ID | Task |

@@ -1,14 +1,15 @@
 # Windows Server / IIS deployment
 
-**Status: Scaffolded / Not Verified.** The build workspace is Linux; nothing here has been executed on Windows Server or IIS. Treat the steps as a checklist to be proven in a Windows test environment (task T1.12 verification).
+**Status: Implemented as files, Not Verified on IIS.** The build workspace is Linux. The package, its `web.config`, the sign-in flow and the pipeline have been built and tested without IIS; the first QA run on a real server is the verification. The full description is `docs/DEPLOYMENT.md`; status and open questions are in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
 
-1. Install the .NET 10 Hosting Bundle and enable the IIS role with the ASP.NET Core Module V2.
-2. `dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release -o publish`; copy to the site folder.
-3. Create an application pool: *No Managed Code*, a dedicated low-privilege identity (a group-managed service account is preferred). Grant it modify rights only on the data directory and read rights on the secret file.
-4. Store the SQL connection string in a file outside the web root (`D:\EcpSecrets\sql-connection.txt`, NTFS permissions limited to the pool identity). `web.config` carries only the *reference* (`file:`), never the value (SEC-030).
-5. Create the database login/role for runtime (least privilege; see `docs/ENVIRONMENT.md` and the migration role notes), then run the migration deliberately: `dotnet Ecp.Host.dll migrate` under a separate migration identity. Production never auto-migrates.
-6. Bind HTTPS with a certificate from your store; redirect HTTP; HSTS is applied by the application in Production.
-7. First-run setup: on the server run `dotnet Ecp.Host.dll setup-token` (with the same environment/secret references as the site) and open `http://localhost/Setup` **from the server** (the wizard answers `404` to anyone else); follow `docs/SETUP_AND_ONBOARDING.md`. Setup state is kept in the bootstrap folder of the data directory; the pool identity needs modify rights there.
-8. Verify `/health/live`, `/health/startup`, `/health/ready` (detail is hidden from anonymous callers in Production).
+1. Install the .NET 10 Hosting Bundle and the IIS role with the ASP.NET Core Module V2 and Windows Authentication.
+2. The package comes from `dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release`. The project's `src/Ecp.Host/web.config` is published with it (in-process hosting, request limits per upload URL, no environment variables and no secrets). `tools/check-iis-publish.py <folder>` inspects the published files.
+3. The site folder is replaced on every deploy. **Documents, the data-protection key ring and logs live in the data root outside the site** (`Ecp__DataDirectory`); the application refuses to start in Production if it is blank, temporary, or inside the application folder.
+4. Application pool: *No Managed Code*, a low-privilege account, **load user profile on** (the deploy script sets it). Grant the account Modify on the data root only.
+5. SQL Server: the connection string may hold no credential when it uses Windows integrated authentication (`Integrated Security=True`), so it can be ordinary configuration. A string with a user name or password must be a secret reference (`file:` or `env:`). The runtime account should only hold the `ecp_runtime` role; schema changes use a separate migration identity. Production never migrates automatically.
+6. Run the migration deliberately: `dotnet Ecp.Host.dll migrate` under the migration identity (a first install only; later releases use the upgrade commands in `docs/UPGRADE_RUNBOOK.md`).
+7. First-run setup: on the server run `dotnet Ecp.Host.dll setup-token` and open `http://localhost/Setup` from the server. Choose "Windows sign-in" for the identity provider and give the first administrator's `DOMAIN\name`. Use "Test sign-in" to prove it; the person must be invited, active and hold a role, so the setup wizard gives the administrator the administrator role.
+8. Verify `/health/live`, `/health/startup` and `/health/ready` (detail is hidden from anonymous callers in Production). `R-DB-02`, `R-SEC-04`, `R-LOG-01` and `R-BKP-01` say how the database sign-in, key ring, log and recovery are set up.
+9. Recovery is owned by the database administrators when `Ecp:Recovery:Mode` is `External`: they take and verify the recovery point; the platform records it (`declare-recovery-point`) and says "Declared by DBA; not verified by this application".
 
-The application refuses to start in Production with SQLite, inline connection strings, demo identity or demo seed (ProductionGuard R-* checks).
+The application refuses to start in Production with SQLite, inline connection strings that hold credentials, demonstration identity or seed data, automatic migration, or storage inside the application folder (ProductionGuard).

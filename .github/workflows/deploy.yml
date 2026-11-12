@@ -16,12 +16,43 @@ on:
       - "decisions/**"
       - "**/*.md"
   workflow_dispatch:
+    inputs:
+      promote-to-production:
+        description: Also promote to Production after QA succeeds (still needs the Production environment's required reviewer). Production is only ever deployed from main.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  # CI is not repeated here. The deployment waits for the existing CI workflow (ci.yml) to have finished GREEN on this exact commit, and does nothing otherwise.
+  verify-ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Require a green CI run on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 120); do
+            row="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$SHA" --limit 1 --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"' 2>/dev/null || true)"
+            case "$row" in
+              "completed success") echo "CI is green for $SHA."; exit 0 ;;
+              "completed "*) echo "::error::CI finished as '${row#completed }' for $SHA. Nothing is deployed."; exit 1 ;;
+              "") echo "No CI run found yet for $SHA (attempt $attempt)." ;;
+              *) echo "CI is $row for $SHA (attempt $attempt)." ;;
+            esac
+            sleep 30
+          done
+          echo "::error::CI did not finish green within 60 minutes for $SHA. Nothing is deployed."; exit 1
+
   build:
+    needs: verify-ci
     uses: ./.github/workflows/dotnet-spa-build.yml
     with:
       api-project: src/Ecp.Host/Ecp.Host.csproj
@@ -38,8 +69,10 @@ jobs:
       preserve-folders: logs
     secrets: inherit
 
+  # The same artifact, promoted. Production only from main, only when the push (or the manual run asked for it), and only after the Production environment's required reviewer approves.
   deploy-prod:
     needs: deploy-qa
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.promote-to-production)
     uses: ./.github/workflows/iis-deploy.yml
     with:
       environment: Production

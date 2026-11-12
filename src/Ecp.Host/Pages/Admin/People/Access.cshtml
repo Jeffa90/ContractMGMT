@@ -32,7 +32,7 @@
 
 <form method="post">
     @* Everything from other steps travels along unseen; the service checks all of it again at the end. *@
-    @if (s != 1) { Hid("Input.UserId", Model.Input.UserId); Hid("Input.DisplayName", Model.Input.DisplayName); Hid("Input.Email", Model.Input.Email); if (Model.Input.AllowDemo) { Hid("Input.AllowDemo", "true"); } Hid("Input.OrganisationId", Model.Input.OrganisationId); }
+    @if (s != 1) { Hid("Input.UserId", Model.Input.UserId); Hid("Input.DisplayName", Model.Input.DisplayName); Hid("Input.Email", Model.Input.Email); Hid("Input.WindowsAccount", Model.Input.WindowsAccount); if (Model.Input.AllowDemo) { Hid("Input.AllowDemo", "true"); } Hid("Input.OrganisationId", Model.Input.OrganisationId); }
     else { Hid("Input.UserId", Model.Input.UserId); }
     @if (s != 2) { HidList("Input.Profiles", Model.Input.Profiles); }
     @if (s != 3) { Hid("Input.Scope", Model.Input.Scope); HidList("Input.ScopeIds", Model.Input.ScopeIds.Cast<object>()); }
@@ -52,6 +52,11 @@
                 <div class="field"><label for="Input_DisplayName">@L["Name"]</label><input id="Input_DisplayName" name="Input.DisplayName" type="text" maxlength="200" value="@Model.Input.DisplayName" required aria-required="true" /></div>
                 <div class="field"><label for="Input_Email">@L["Email address"]</label><input id="Input_Email" name="Input.Email" type="email" maxlength="254" value="@Model.Input.Email" required aria-required="true" aria-describedby="email-hint" />
                     <p id="email-hint" class="hint">@L["They sign in with this address. In production they are invited and become active the first time your identity provider confirms it."]</p></div>
+                @if (Model.WindowsEnabled)
+                {
+                    <div class="field"><label for="Input_WindowsAccount">@L["Windows account"]</label><input id="Input_WindowsAccount" name="Input.WindowsAccount" type="text" maxlength="130" value="@Model.Input.WindowsAccount" placeholder="DOMAIN\username" autocomplete="off" aria-describedby="win-hint" />
+                        <p id="win-hint" class="hint">@L["Their Windows sign-in name, for example CONTOSO\\jsmith. The invitation is matched to this account the first time they sign in with Windows; their email address is not used for that. Signing in with Windows proves who they are; it gives no access by itself."]</p></div>
+                }
                 @if (Model.DemoAvailable)
                 {
                     <div class="field check"><input id="Input_AllowDemo" name="Input.AllowDemo" type="checkbox" value="true" checked="@Model.Input.AllowDemo" aria-describedby="demo-hint" />

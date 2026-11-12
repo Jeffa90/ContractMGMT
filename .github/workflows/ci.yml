@@ -59,6 +59,8 @@ jobs:
           path: artifacts/pack-tool
       - name: Repository consistency checks (links, CSV/JSON, references, manifest, Mermaid structure)
         run: python3 -I tools/check-repo.py .
+      - name: Secrets scan (private keys, token formats and secret-looking assignments in tracked files; a safety net, not a guarantee)
+        run: python3 -I tools/check-secrets.py .
       - name: Implementation documentation consistency (guides name only real pages and permissions; retired statements absent)
         run: python3 -I tools/check-docs.py .
       - name: Tooling script tests
@@ -77,6 +79,36 @@ jobs:
         if: always()
         with:
           name: test-results-non-sql
+          path: TestResults/*.trx
+
+  windows-build-and-test:
+    name: Windows - build, tests and IIS publish output (not an IIS run)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the S9 portability guard reads the git history against its baseline commit
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore (locked)
+        run: dotnet restore src/Ecp.sln --locked-mode
+      - name: Build (warnings are errors; NuGet audit is a gate)
+        run: dotnet build src/Ecp.sln -c Release --no-restore
+      - name: Test (everything that does not need SQL Server)
+        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category!=SqlServer" --logger "trx" --results-directory TestResults
+        env:
+          ECP_TEST_SQL: ""
+      - name: IIS publish output (files only; this runner has no IIS site for the application)
+        shell: pwsh
+        run: |
+          dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release --no-restore --no-build -o artifacts/iis-publish
+          python -I tools/check-iis-publish.py artifacts/iis-publish
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-windows
           path: TestResults/*.trx
 
   sqlserver-integration:

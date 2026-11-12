@@ -34,7 +34,7 @@ else
     <ul>
     @foreach (var l in Model.TestLinks)
     {
-        <li><a class="button secondary" href="/Account/Challenge?scheme=@Uri.EscapeDataString(l.Scheme)&amp;testProvider=@Uri.EscapeDataString(l.Key)&amp;returnUrl=@Uri.EscapeDataString("/Admin/Setup/Step/" + st.Id)">@L["Test sign-in with"] @l.Name</a></li>
+        <li><a class="button secondary" href="@l.Href("/Admin/Setup/Step/" + st.Id)">@L["Test sign-in with"] @l.Name</a></li>
     }
     </ul>
 }

@@ -58,7 +58,7 @@ public sealed class SetupGateMiddleware(RequestDelegate next, SetupEnvironment e
             return;
         }
         if (isSetup || path.StartsWithSegments("/health") || path.StartsWithSegments("/css") || path.StartsWithSegments("/js") || path == "/favicon.ico"
-            || path.StartsWithSegments("/api/v1/info") || path.StartsWithSegments("/Error") || path.StartsWithSegments("/Account/Challenge") || path.StartsWithSegments("/auth/callback"))
+            || path.StartsWithSegments("/api/v1/info") || path.StartsWithSegments("/Error") || path.StartsWithSegments("/Account/Challenge") || path.StartsWithSegments("/Account/WindowsSignIn") || path.StartsWithSegments("/Account/AccessRefused") || path.StartsWithSegments("/auth/callback"))
         { await next(context); return; }
         if (path.StartsWithSegments("/api"))
         {

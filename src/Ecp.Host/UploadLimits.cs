@@ -12,13 +12,13 @@ public static class UploadLimits
     /// <summary>Default maximum request body for every endpoint (forms, API calls). Far below the document limit on purpose.</summary>
     public const long DefaultRequestBytes = 10 * MiB;
 
-    /// <summary>Contract, variation, legal-review and executed-copy documents: the 100 MiB document limit plus 1 MiB for the multipart envelope.</summary>
+    /// <summary>Contract, variation, legal-review and executed-copy documents: the 100 MiB document limit plus 1 MiB for the multipart framing.</summary>
     public const long DocumentRequestBytes = 100 * MiB + 1 * MiB;
 
-    /// <summary>Solution-pack upload: packs are capped at 8 MiB; 1 MiB for the multipart envelope.</summary>
+    /// <summary>Solution-pack upload: packs are capped at 8 MiB; 1 MiB for the multipart framing.</summary>
     public const long PackRequestBytes = 9 * MiB;
 
-    /// <summary>Mapping-profile CSV files (field and lookup mappings): the page refuses anything over 5 MiB; 1 MiB for the multipart envelope. Served under the site default.</summary>
+    /// <summary>Mapping-profile CSV files (field and lookup mappings): the page refuses anything over 5 MiB; 1 MiB for the multipart framing. Served under the site default.</summary>
     public const long MappingFileRequestBytes = 6 * MiB;
 
     /// <summary>Bulk-migration archive upload. This is the only endpoint opened this far; it is limited to its own URL.</summary>

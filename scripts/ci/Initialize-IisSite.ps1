@@ -60,7 +60,9 @@ param(
 
     [string]$AppPoolPassword,
 
-    [string[]]$WritableFolders = @("logs")
+    [string[]]$WritableFolders = @("logs"),
+
+    [string]$DataPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -120,6 +122,11 @@ if (-not $poolExists) {
     }
 }
 
+# The data protection key ring is protected per user unless the app is told otherwise, and a user's keys need the account profile to be loaded.
+# Set on every run (new and existing pools): it is cheap and it is what keeps sign-in sessions valid after a pool recycle.
+Set-ItemProperty "IIS:\AppPools\$AppPoolName" -Name "processModel.loadUserProfile" -Value $true
+Write-Host "    app pool loads the user profile"
+
 # --- Folder permissions -------------------------------------------------------
 if (-not (Test-Path $SitePath)) { New-Item -ItemType Directory -Path $SitePath | Out-Null }
 $identity = if ($AppPoolUser) { $AppPoolUser } else { "IIS AppPool\$AppPoolName" }
@@ -132,6 +139,15 @@ foreach ($folder in $WritableFolders) {
     if ($LASTEXITCODE -ne 0) { throw "icacls failed granting Modify on $path to $identity." }
 }
 Write-Host "    granted $identity Read on the site and Modify on: $($WritableFolders -join ', ')"
+
+# The data root (documents, key ring, logs) lives OUTSIDE the site so a deploy never touches it. Only a grant is made here; nothing is removed, because other accounts
+# (for example the backup agent) may legitimately hold access that Infrastructure owns. Tightening it to the pool account alone is an Infrastructure decision.
+if ($DataPath) {
+    if (-not (Test-Path $DataPath)) { New-Item -ItemType Directory -Path $DataPath | Out-Null }
+    & icacls $DataPath /grant "$($identity):(OI)(CI)M" /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "icacls failed granting Modify on $DataPath to $identity." }
+    Write-Host "    granted $identity Modify on the data root $DataPath"
+}
 
 # --- Site ---------------------------------------------------------------------
 if (-not $siteExists) {

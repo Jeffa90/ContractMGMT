@@ -2,6 +2,25 @@
 
 Status: **Plan only. Nothing here is implemented.** Derived from `docs/JBS_STANDARDS_COMPLIANCE.md` (rule IDs `J-nn`, details `D-nn`, JBS questions `I-nn` and `DB-nn` refer to it). Branch ux/guided-administration, commit `9f5317e`, 2026-11-10. Production approval is external governance and nothing here declares it.
 
+## Update: state after the JBS IIS integration slice (branch jbs/iis-integration)
+
+This plan was written before any code changed. The slice on branch jbs/iis-integration has since built the items below; each is **Implemented** and tested here and **Not Verified on IIS** until the first QA run. Details and evidence: `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
+
+| Item | Was | Now |
+|---|---|---|
+| P0-1 Windows sign-in | Not built | Windows provider kind, **identity only and invite-only** (owner decision; ADR-0042); first administrator can sign in after Setup. Not Verified on IIS |
+| P0-2 IIS hosting hardening | `web.config` not published | `src/Ecp.Host/web.config` is published; per-URL upload limits; request-timeout policy; publish check in CI. Not Verified on IIS |
+| P0-3 Background jobs survive IIS | Script only | Unchanged script (Always Running, no idle time-out, warm-up) plus **load user profile**; Not Verified |
+| P0-4 Durable redacted log | None | Serilog, durable rolling file, redaction, shared context; readiness R-LOG-01 |
+| P0-5 Run on Windows and IIS | Not done | **Still not done for IIS.** A Windows CI job builds and runs every non-SQL test on Windows, and checks the publish output; that is not an IIS run |
+| P1-1 Serilog per Sections 1 and 5 | Not built | Foundation built. Application Insights and fatal-error email are **configurable and Not Verified** (no Application Insights sink in this build) |
+| P1-3 Configuration conventions | Demo defaults in the base file | Production-safe base file; Demo values only in `appsettings.Development.json`, never published |
+| P1-5 Scripted migrations for a DBA | Open | Unchanged: migrations are a deliberate step, not part of the pipeline (NEEDS DBA ANSWER on who runs them and when) |
+| P1-6 Integrated-authentication guard | Open | Done: a credential-free connection string may be ordinary configuration; anything with a credential must be a secret reference; R-DB-02 reports the runtime login and its privileges |
+| DB-06 / DB-07 backups | Open | `Ecp:Recovery:Mode=External`: DBA-owned recovery points are declared, audited and labelled "Declared by DBA; not verified by this application" (ADR-0043) |
+
+Still open and not guessed: the P3 questions (Infrastructure and DBA answers) are listed at the end of `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
+
 ## 1. Ranking
 
 | Rank | Meaning |

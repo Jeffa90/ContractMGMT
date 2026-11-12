@@ -6,7 +6,7 @@ namespace Ecp.Operations;
 /// <summary>
 /// R-DB-02: how the application signs in to SQL Server and what that login can do. It reads the login and its roles from the server rather than trusting
 /// the configuration, never prints a credential, and flags an over-privileged runtime account (sysadmin or db_owner) because the runtime should only hold
-/// the least-privilege runtime role; schema changes belong to a separate, deliberate migration identity (docs/DEPLOYMENT.md, JBS_IIS_INTEGRATION_PLAN section 11).
+/// the least-privilege runtime role; schema changes belong to a separate, deliberate migration identity (docs/DEPLOYMENT.md).
 /// It cannot judge whether the database administrator's grants are correct; that stays a database-administrator answer.
 /// </summary>
 public sealed class DatabaseAccessReadinessCheck(DatabaseOptions database, StartupFacts facts) : IReadinessCheck

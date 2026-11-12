@@ -4,6 +4,24 @@ Status: **Review only. No application code was changed.** Reviewed branch ux/gui
 
 Source of the standards: NEW-APP-STANDARDS-GUIDE.md ("Building a New Web App at JBS Australia"), read in full. This platform is a product with a JBS reference configuration, not a JBS-only application (CLAUDE.md, PORTABILITY_AND_NO_CODE.md); several findings turn on that.
 
+## Update: state after the JBS IIS integration slice (branch jbs/iis-integration)
+
+The review below describes the code as it was reviewed. Since then branch jbs/iis-integration changed the following (details and evidence in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`; none of it has run on IIS, so each moved item is at best **COMPLIANT** with the IIS part **NOT VERIFIED**):
+
+| Area | Reviewed as | Now |
+|---|---|---|
+| IIS hosting, ASP.NET Core Module V2 (`src/Ecp.Host/web.config`) | Scaffold only | Published with `dotnet publish`; in-process; checked in CI. NOT VERIFIED on IIS |
+| Windows Authentication | NON-COMPLIANT (not built) | COMPLIANT WITH DIFFERENT IMPLEMENTATION: IIS authenticates; the application authorises by invitation and its own roles (owner decision). NOT VERIFIED on IIS |
+| Configuration conventions, safe defaults | Demo values in the base settings file | Production-safe base file; Development file never published; Production refuses blank, temporary or in-application storage and automatic migration |
+| Secrets and connection strings | Production forced a secret file | Integrated authentication needs no secret; anything with a credential must be a secret reference |
+| Logging (Serilog, correlation, redaction, durable file) | NON-COMPLIANT | Foundation COMPLIANT; Application Insights and fatal-error email are configurable and NOT VERIFIED |
+| Data protection | Per-user DPAPI by default, undocumented | Explicit settings, readiness R-SEC-04, documented; NOT VERIFIED on Windows |
+| Request limits and timeouts | Defaults only; document uploads would have stopped at 30 MB | Explicit per-URL limits and timeout policy, tested for consistency |
+| Backups owned by the DBA | The application's backup feature was the only path | External recovery points, declared and audited; JUSTIFIED DEVIATION recorded in ADR-0043 pending DBA confirmation |
+| Pipeline | Pull request 1 as written | Waits for green CI on the commit, one verified build, rollback of a half-copied site, no secrets in `web.config`, rewritten environment setup script (not executed) |
+
+Items that belong to JBS Infrastructure or the DBA remain **REQUIRES JBS INFRASTRUCTURE CONFIRMATION** and are listed in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
+
 ## 1. How to read this document
 
 **Method.** Each rule was compared with the real code, project files, configuration, authentication, persistence, logging, deployment files, tests and CI. Evidence names files so it can be checked. Nothing was run on Windows, IIS, Azure DevOps or a JBS SQL Server; those are labelled **NOT VERIFIED** rather than assumed.

@@ -105,6 +105,17 @@ jobs:
       - name: Publish
         run: dotnet publish "${{ inputs.api-project }}" -c Release --no-restore -o "${{ runner.temp }}/app"
 
+      - name: Record the build manifest (commit, run and a SHA-256 for every published file)
+        shell: pwsh
+        run: |
+          $app = "${{ runner.temp }}/app"
+          $files = Get-ChildItem -Path $app -Recurse -File | Where-Object { $_.Name -ne "web.config" -and $_.Name -ne "build-manifest.json" } | Sort-Object FullName | ForEach-Object {
+            [ordered]@{ path = $_.FullName.Substring($app.Length + 1).Replace("\", "/"); sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+          }
+          [ordered]@{ commit = $env:GITHUB_SHA; runId = $env:GITHUB_RUN_ID; builtUtc = (Get-Date).ToUniversalTime().ToString("o"); files = @($files) } |
+            ConvertTo-Json -Depth 4 | Set-Content (Join-Path $app "build-manifest.json") -Encoding UTF8
+          Write-Host "Recorded $(@($files).Count) files for commit $env:GITHUB_SHA"
+
       - name: Upload app artifact
         uses: actions/upload-artifact@v7
         with:

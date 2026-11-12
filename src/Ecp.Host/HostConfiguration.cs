@@ -78,6 +78,9 @@ public static class HostConfiguration
         var protection = DataProtectionSettings.From(config, dataDirectory);
         facts = facts with { KeyDirectory = protection.KeyDirectory };
         var violations = ProductionGuard.Evaluate(facts).Concat(protection.Validate()).ToList();
+        var recoveryMode = config["Ecp:Recovery:Mode"];
+        if (!string.IsNullOrWhiteSpace(recoveryMode) && !Enum.TryParse<Ecp.Recovery.RecoveryMode>(recoveryMode, ignoreCase: true, out _))
+            violations.Add(new("R-REC-01", "Ecp:Recovery:Mode must be Application or External."));
         if (violations.Count > 0) throw new StartupRefusedException(violations);
         if (string.IsNullOrWhiteSpace(connection)) throw new InvalidOperationException("No database connection is configured.");
         return new ResolvedConfiguration(host with { DataDirectory = dataDirectory }, database, facts);

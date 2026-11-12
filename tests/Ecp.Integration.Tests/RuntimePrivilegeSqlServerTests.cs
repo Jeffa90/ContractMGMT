@@ -57,6 +57,7 @@ public sealed class RuntimePrivilegeSqlServerTests
         }
         finally
         {
+            SqlConnection.ClearAllPools();   // pooled connections of the test login would otherwise keep it "logged in" and block DROP LOGIN
             await using var c = new SqlConnection(admin); await c.OpenAsync();
             await using var cmd = c.CreateCommand(); cmd.CommandText = $"DROP LOGIN [{login}]"; await cmd.ExecuteNonQueryAsync();
         }

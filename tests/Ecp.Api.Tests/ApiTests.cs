@@ -31,6 +31,8 @@ public sealed class EcpFactory : WebApplicationFactory<Program>
     {
         // Test hosts never need configuration files to reload; each reloading file watcher costs an inotify instance, and the per-user limit (128 by default, also on CI runners) is shared by every host a test run creates.
         Environment.SetEnvironmentVariable("DOTNET_hostBuilder__reloadConfigOnChange", "false");
+        // The static-file version provider (asp-append-version) also watches wwwroot once per host; polling uses no inotify instance, so a long run of test hosts cannot exhaust the per-user limit.
+        Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "true");
     }
 
     public EcpFactory(Dictionary<string, string?> settings, Action<IServiceCollection>? services = null)

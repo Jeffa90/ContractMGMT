@@ -748,6 +748,26 @@ Local totals after UX-10: unit 979, architecture 113, API 262, integration 731 i
 
 Unit-level behaviour that changed outside the Fields pages: the Create path of the contracts module applies the classification gate (found by this scenario; the assertion that a creator below a field's level is neither offered it nor allowed to write it is in the same scenario). Not Verified: a person completing the journey in a browser; screen-reader and zoom walkthroughs.
 
+## 21. JBS IIS integration suites (branch jbs/iis-integration)
+
+Reported as Passed, Failed, Skipped and Not Verified separately. Nothing here ran on IIS.
+
+| Area | Where | What it proves |
+|---|---|---|
+| Fail-safe Production defaults | `HostConfigurationTests`, `ProductionRefusalTests` (API) | The published base settings are Production, SQL Server, no demo, no auto-migrate; a host with no settings is never Demo; R-ST-01, R-ST-02, R-MIG-01, R-REC-01 |
+| IIS packaging and upload limits | `IisPackagingTests` (API), `tools/tests/test_check_iis_publish.py`, CI step running `tools/check-iis-publish.py` on the published folder | `web.config` is the V2 module, in-process, no secrets; every upload page has its own limit and a matching IIS location; only the migration URL is opened to 2 GiB |
+| Windows sign-in (service) | `WindowsSignInTests` (integration; SQLite always, SQL Server variants in CI) | Invited allowed; uninvited, invited-without-access, disabled, recreated-account and wrong-domain refused; refusal audited; no role from authentication; tenant isolation; first administrator |
+| Windows sign-in (host) | `WindowsAuthenticationHostTests` (API) | A server-supplied Windows principal is never a session; friendly refusal page; audit; setup wizard end to end with a Windows administrator; sign-out does not loop. The server's authentication is simulated; **IIS Not Verified** |
+| Data protection | `DataProtectionTests` (API) | Keys survive a new process; unusable settings refused; readiness never prints key material. Windows DPAPI only runs on the Windows CI job |
+| Integrated SQL authentication | `ConnectionInspectionTests` (unit), `HostConfigurationTests`, `RuntimePrivilegeSqlServerTests` | Credential-free strings accepted, strings with credentials refused; the runtime login and its roles are read from the server. Integrated authentication itself **Not Verified** |
+| External recovery points | `ExternalRecoveryPointTests_Sqlite` and `_SqlServer` (integration) | Declared, audited, never "verified"; preflight NOT VERIFIED; rehearsal refused; readiness wording |
+| Logging | `LoggingTests` (API) | Redaction, shared context, durable shared file, rate-limited fatal email (fake sender), settings validation, request events in the running host. Application Insights and a real mail server **Not Verified** |
+| Pipeline and scripts | `tools/tests/test_setup_github_environments.py`, `tools/tests/test_check_secrets.py` | The setup script's safeguards are present and it never writes a placeholder (it is **not executed**); the secrets scan finds planted secrets and the repository is clean |
+
+Local totals on branch jbs/iis-integration (Linux, SQLite; real SQL Server not available in this workspace): unit 991, architecture 113, integration 375 passed and 6 skipped, API 310 passed and 9 skipped (**1,789 passed, 0 failed, 15 skipped**; every skip is a SQL Server variant that runs in the CI job `sqlserver-integration`). Tooling tests 38 passed. Repository, documentation and secrets checks pass. The Windows CI job (`windows-build-and-test`) and the SQL Server job are recorded in `deploy/STATUS.md` once they have run.
+
+Harness note: API test hosts now use polling file watchers and no configuration reload, because about 185 hosts in one run exhausted the per-user inotify limit (the new durable log made the exception visible).
+
 ## 16. Traceability to Master "Testing" and the Definition of Done
 
 | Master test family | IDs |

@@ -26,6 +26,10 @@ Implemented and Verified locally (SQLite and real SQL Server) and in CI run 82 (
 
 **UX-10 guided Fields (ADR-0041).** Implemented and Verified locally (SQLite and real SQL Server; 2,085 passed, 0 failed, 0 skipped): the Fields landing and guided Add/Edit field pages over the unchanged custom-field engine, with the acceptance scenario (Insurance Expiry, Critical Supplier, Payment Terms) proved over HTTP and in SQL Server. One backend defect (Create did not apply the classification gate) fixed in the contracts module; none in the field engine. **Not built:** independent Create/Edit/Details switches per field. **Not Verified:** a person using it in a browser; screen-reader and zoom walkthroughs.
 
+## JBS IIS integration (branch jbs/iis-integration; ADR-0042, ADR-0043)
+
+Implemented and tested locally; **nothing has run on IIS, and the CI run of this branch is recorded in `deploy/STATUS.md`**. Windows Authentication as identity only (invite-only, audited refusals, first administrator linked at setup), Production-safe defaults, IIS packaging with per-URL upload limits, data-protection settings and readiness, integrated SQL authentication, DBA-owned recovery points ("Declared by DBA; not verified by this application"), Serilog with redaction and a durable file, a pipeline that waits for green CI and deploys one verified build, a rewritten environment setup script (not executed), and a secrets scan. Local totals: 1,789 passed, 0 failed, 15 skipped (SQL Server variants that run in CI). What needs JBS Infrastructure or the DBA is listed in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`. Production approval is external governance and is not declared.
+
 ## 2. Completed modules
 
 All modules are .NET 10 projects in a modular monolith whose dependency tiers are enforced by architecture tests (`tests/Ecp.Architecture.Tests/ArchitectureTests.cs`). "Verified" columns refer to the slice tests, not to every line.

@@ -58,4 +58,4 @@ Not built, on purpose: Active Directory group-driven onboarding (deferred by the
 - No test ran on IIS. The ASP.NET Core Module, Windows Authentication, Kerberos, the application-pool identity, DPAPI machine scope and integrated SQL authentication are **Not Verified**.
 - `scripts/setup/setup-github-environments.sh` and the PowerShell deploy scripts were **not executed**. The setup script is checked statically (`tools/tests/test_setup_github_environments.py`), and the workflows parse as YAML.
 - Real SQL Server evidence comes from the CI job `sqlserver-integration` (SQL Server 2022 on Linux); it is not available in this workspace.
-- Results of the full CI run and the Windows job are recorded in `deploy/STATUS.md` after the run completes.
+- Local totals: unit 991, architecture 113, integration 375 passed (6 skipped), API 310 passed (9 skipped): 1,789 passed, 0 failed, 15 skipped. Results of the full CI run and the Windows job are recorded in `deploy/STATUS.md` after the run completes.

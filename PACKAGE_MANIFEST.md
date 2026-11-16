@@ -386,3 +386,4 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - Secrets scan and GitHub environment setup: `tools/check-secrets.py`, `tools/secrets-allowlist.json`, `tools/tests/test_check_secrets.py`, `scripts/setup/environments.example.env`
 - Pipeline safety: `scripts/ci/Test-BuildManifest.ps1`, `tools/tests/test_setup_github_environments.py`
 - `decisions/ADR-0042-windows-authentication-identity-only-invite-only.md`, `decisions/ADR-0043-recovery-points-owned-by-the-dba.md`
+- JBS QA deployment preparation: `docs/jbs/jbs-github-environments.env` (owner-confirmed, non-secret environment values), `tests/Ecp.Api.Tests/WarmupEndpointTests.cs`, `tests/Ecp.Integration.Tests/SqlPermissionProbeTests.cs`

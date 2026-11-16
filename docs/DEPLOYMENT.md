@@ -2,6 +2,32 @@
 
 Status: **Implemented as files; CI green (commit e0d2ac7) including a Windows build-and-test job; Not Verified on IIS and not yet run.** The first QA deployment is the verification run. Docker and Azure models are unchanged (`deploy/docker`, `deploy/azure`). Nothing here is production approval. Open questions are in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
 
+## JBS QA deployment configuration (owner-confirmed 2026-11-16)
+
+The values below were confirmed by the owner from Infrastructure and DBA answers. Non-secret values for the GitHub QA environment are in `docs/jbs/jbs-github-environments.env`. Nothing has been applied to GitHub and nothing has been deployed.
+
+| Item | QA | Production |
+|---|---|---|
+| URL | https://jbs-contracts-qa.jbssa.com.au | https://jbs-contracts.jbssa.com.au |
+| Application-pool and runtime SQL identity | `AMH\svc_jbsai_qa` | `AMH\svc_jbs_contracts` |
+| Kerberos SPN | HTTP/jbs-contracts-qa.jbssa.com.au on `AMH\svc_jbsai_qa` | HTTP/jbs-contracts.jbssa.com.au on `AMH\svc_jbs_contracts` |
+| Certificate thumbprint | 409A784432142E96CD8D5FDCBEEC7AC0870411A1 | REQUIRED BEFORE PRODUCTION |
+| Runner label | `iis-qa` | `iis-prod` (not set up) |
+| SQL Server | AUQLDDC01DEV5mi,1433, database JBSContracts (**DBA to confirm**), Windows integrated, `Encrypt=True;TrustServerCertificate=True` | REQUIRED BEFORE PRODUCTION |
+| Migration identity | the self-hosted runner's service account | the same pattern |
+
+**Folders (data root `C:\inetpub\JbsContracts\`).** `Ecp__DataDirectory` = `C:\inetpub\JbsContracts\Data` (documents are written to `Data\Documents`; Windows folder names are not case-sensitive), `Ecp__DataProtection__KeyDirectory` = `Data\Keys`, `Ecp__Packs__StorageDirectory` = `Data\SolutionPacks`, `Ecp__Logging__Directory` = `C:\inetpub\JbsContracts\logs`. The setup state, declared recovery points and the mock mail outbox are sub-folders of `Data` the application creates itself. `Data\Uploads` is not used by this application: uploaded documents and migration archives are stored in `Data\Documents`, uploaded packs in `Data\SolutionPacks`, so the folder may be created but stays empty.
+
+**The site folder (PROPOSED, confirm before QA).** The answers name the data root but not the site folder. The application refuses to start if its data, keys or logs are inside its own folder, because every deploy replaces that folder. The proposal is `C:\inetpub\JbsContracts\app` for the site (site and pool name `JbsContracts`), beside `logs` and `Data`. The deploy grants the pool Read on `app`, Modify on `logs` and `Data`, and restricts `Data\Keys` to the pool account and local Administrators (inherited entries removed on that folder only).
+
+**IIS.** Windows Authentication on and Anonymous off for the site; Anonymous on for `/warmup` only, the Application Initialization page. `/warmup` answers 200 with an empty body and nothing else; every ordinary path, `/health/*` included, needs Windows authentication at IIS. Always Running, preload, no idle time-out, load user profile. No proxy or load balancer, so no forwarded-header settings.
+
+**Logging.** Serilog rolling daily file `logs\log-.txt` (`Ecp__Logging__FileName=log-.txt`; the date is inserted, for example `log-20261116.txt`), 31 files kept, console also on. No Application Insights and no external telemetry: this build has no Application Insights sink, and the JBS values set no `ApplicationInsightsConnectionRef`, so readiness R-LOG-02 reports that no optional destination is configured.
+
+**Authentication.** IIS Windows Authentication, invite-only, no Windows-domain restriction in the application (the provider's domain list stays empty), no AD-group onboarding. Break-glass administrators stay configuration-controlled (the existing emergency-access mechanism; nothing new).
+
+**REQUIRED BEFORE QA** (not guessed; see `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`): the site folder and names above; the `IIS_APP_POOL_PASSWORD` secret for `AMH\svc_jbsai_qa` (needed only if the deploy creates the pool; it is set by hand with `gh secret set`); the DBA items (database, version, compatibility level, collation, row-level security and application-lock approval, the extra rights the probe shows the migration and runtime accounts need, backup and recovery policy, copy-only pre-deploy backup, RPO and RTO); SMTP port, authentication and TLS; how the first-run setup wizard is reached (it answers only on the server's loopback address, and the site binding is host-name specific).
+
 ## Workflows
 
 | Workflow | Trigger | Purpose |

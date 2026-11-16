@@ -13,3 +13,18 @@
 9. Recovery is owned by the database administrators when `Ecp:Recovery:Mode` is `External`: they take and verify the recovery point; the platform records it (`declare-recovery-point`) and says "Declared by DBA; not verified by this application".
 
 The application refuses to start in Production with SQLite, inline connection strings that hold credentials, demonstration identity or seed data, automatic migration, or storage inside the application folder (ProductionGuard).
+
+## JBS QA layout (owner-confirmed; site folder PROPOSED)
+
+```
+C:\inetpub\JbsContracts\
+  app\                 site folder, replaced on every deploy (PROPOSED name; pool reads it)
+  logs\                log-YYYYMMDD.txt, 31 kept (pool modifies)
+  Data\                Ecp__DataDirectory (pool modifies)
+    Documents\         contract documents and staged migration files
+    Keys\              data-protection key ring (pool and Administrators only)
+    SolutionPacks\     installed solution packs
+    Uploads\           created by IT; not used by this application
+```
+
+Values: `docs/jbs/jbs-github-environments.env`. Status and the items still required before QA: `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.

@@ -138,6 +138,21 @@ public class LoggingTests : IDisposable
     }
 
     [Fact]
+    public async Task The_log_file_name_and_retention_are_configurable_for_the_deployment()
+    {
+        var settings = LoggingSettings.From(Config(new() { ["Ecp:Logging:Directory"] = _dir, ["Ecp:Logging:FileName"] = "log-.txt", ["Ecp:Logging:RetainedFiles"] = "31", ["Ecp:Logging:Console"] = "false" }), _dir);
+        Assert.Equal(31, settings.RetainedFiles);
+        Assert.Empty(settings.Problems());
+        using (var log = LoggingConfiguration.Apply(new LoggerConfiguration(), settings, "1.0", "Production", "db", null, new EnvironmentAndFileSecretProvider(), () => DateTime.UtcNow).CreateLogger())
+            log.Information("named file");
+        await Task.Delay(50);
+        var file = Assert.Single(Directory.GetFiles(_dir, "log-*.txt"));
+        Assert.Matches(@"log-\d{8}\.txt$", file);
+        foreach (var bad in new[] { "..\\x.txt", "logs/log-.txt", "nolextension", "C:log.txt" })
+            Assert.Contains(LoggingSettings.From(Config(new() { ["Ecp:Logging:FileName"] = bad }), _dir).Problems(), p => p.Contains("FileName"));
+    }
+
+    [Fact]
     public void Settings_are_validated_and_secrets_must_be_references()
     {
         Assert.Empty(LoggingSettings.From(Config(new()), "/var/lib/ecp").Problems());

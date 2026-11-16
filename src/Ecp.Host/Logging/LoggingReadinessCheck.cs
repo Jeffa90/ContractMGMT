@@ -22,7 +22,7 @@ public sealed class LoggingReadinessCheck(LoggingSettings settings, StartupFacts
         if (facts.Mode == EcpMode.Production && facts.ApplicationDirectory.Length > 0
             && Path.GetFullPath(settings.Directory).StartsWith(Path.GetFullPath(facts.ApplicationDirectory), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             issues.Add("the log folder is inside the application folder, which a redeploy replaces");
-        var where = $"Rolling daily file log in {settings.Directory} (keeps {settings.RetainedFiles} files, {settings.FileSizeLimitBytes / (1024 * 1024)} MB each).";
+        var where = $"Rolling daily file log {settings.FileName} in {settings.Directory} (keeps {settings.RetainedFiles} files, {settings.FileSizeLimitBytes / (1024 * 1024)} MB each).";
         return Task.FromResult(issues.Count == 0
             ? new ReadinessResult(Id, Name, ReadinessStatus.Healthy, where)
             : new ReadinessResult(Id, Name, facts.Mode == EcpMode.Production ? ReadinessStatus.Unhealthy : ReadinessStatus.Degraded, where + " Attention: " + string.Join("; ", issues) + "."));

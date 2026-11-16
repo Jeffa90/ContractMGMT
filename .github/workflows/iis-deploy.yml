@@ -162,7 +162,9 @@ jobs:
             -CertificateDnsNames (& $split $env:CERT_DNS_NAMES) `
             -AppPoolUser $env:APP_POOL_USER `
             -AppPoolPassword $env:APP_POOL_PASSWORD `
-            -DataPath $appEnv["Ecp__DataDirectory"]
+            -DataPath $appEnv["Ecp__DataDirectory"] `
+            -LogPath $appEnv["Ecp__Logging__Directory"] `
+            -KeyPath $appEnv["Ecp__DataProtection__KeyDirectory"]
 
       - name: Clean up package
         if: always()

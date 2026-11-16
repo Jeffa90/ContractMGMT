@@ -82,3 +82,49 @@ class SetupScriptSafetyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class OfflineDryRunTests(unittest.TestCase):
+    """The offline dry run is the only mode these tests execute: it reads nothing from GitHub and writes nothing. gh is taken off the PATH to prove it."""
+
+    def run_script(self, values, *extra):
+        import tempfile
+        env = dict(os.environ); env['PATH'] = '/usr/bin:/bin'   # no gh here
+        with tempfile.NamedTemporaryFile('w', suffix='.env', delete=False) as f:
+            f.write(values); name = f.name
+        try:
+            return subprocess.run(['bash', SCRIPT, '--repo', 'owner/repo', '--values', name, '--dry-run', '--offline', *extra], capture_output=True, text=True, env=env)
+        finally:
+            os.unlink(name)
+
+    def test_the_JBS_values_plan_QA_without_touching_GitHub(self):
+        values = open(os.path.join(ROOT, 'docs', 'jbs', 'jbs-github-environments.env'), encoding='utf-8').read()
+        r = self.run_script(values, '--environment', 'QA')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = r.stdout
+        self.assertIn('DRY RUN (nothing is changed), OFFLINE', out)
+        self.assertIn("environment QA: deployments only from branch 'jbs/iis-integration'", out)
+        for line in ('set: QA APPENV_Ecp__Mode = Production', 'set: QA APPENV_Ecp__Logging__FileName = log-.txt', 'set: QA APPENV_Ecp__Logging__RetainedFiles = 31',
+                     'Integrated Security=True;Encrypt=True;TrustServerCertificate=True', 'set: QA IIS_APP_POOL_USER = AMH\\svc_jbsai_qa'):
+            self.assertIn(line, out)
+        self.assertNotIn('Production', out.split('NOT CHECKED')[0].replace('APPENV_Ecp__Mode = Production', ''))
+        self.assertNotIn('ApplicationInsights', out)
+        self.assertIn('Dry run complete: nothing was changed.', out)
+
+    def test_missing_and_placeholder_values_stop_before_any_plan(self):
+        r = self.run_script('QA_BRANCH=x\nQA_IIS_SITE_NAME=UPDATE ME\n', '--environment', 'QA')
+        self.assertEqual(r.returncode, 2)
+        self.assertIn('MISSING required values', r.stderr)
+        self.assertIn('QA_IIS_SITE_NAME', r.stderr)
+        self.assertNotIn('set: ', r.stdout)
+
+    def test_folders_inside_the_site_are_refused(self):
+        values = open(os.path.join(ROOT, 'docs', 'jbs', 'jbs-github-environments.env'), encoding='utf-8').read()
+        values = values.replace('QA_LOG_DIRECTORY=C:\\inetpub\\JbsContracts\\logs', 'QA_LOG_DIRECTORY=C:\\inetpub\\JbsContracts\\app\\logs')
+        r = self.run_script(values, '--environment', 'QA')
+        self.assertEqual(r.returncode, 2)
+        self.assertIn('QA_LOG_DIRECTORY is inside QA_IIS_SITE_PATH', r.stderr)
+
+    def test_offline_is_refused_outside_a_dry_run(self):
+        r = subprocess.run(['bash', SCRIPT, '--repo', 'o/r', '--values', EXAMPLE, '--offline'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)

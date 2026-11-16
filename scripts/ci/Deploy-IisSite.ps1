@@ -105,6 +105,10 @@ param(
 
     [string]$DataPath,
 
+    [string]$LogPath,
+
+    [string]$KeyPath,
+
     [int]$SmokeTestTimeoutSeconds = 120
 )
 
@@ -188,7 +192,7 @@ try {
             -SiteName $SiteName -AppPoolName $AppPoolName -SitePath $SitePath `
             -Binding $Binding `
             -AppPoolUser $AppPoolUser -AppPoolPassword $AppPoolPassword `
-            -WritableFolders $PreserveFolders -DataPath $DataPath
+            -WritableFolders $PreserveFolders -DataPath $DataPath -LogPath $LogPath -KeyPath $KeyPath
 
         # https sites: make sure the binding has a valid certificate (and renew it when it's close
         # to expiry). Runs every deploy; makes no changes when the certificate is fine.

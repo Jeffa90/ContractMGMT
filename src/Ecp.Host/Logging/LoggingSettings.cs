@@ -9,6 +9,7 @@ namespace Ecp.Host.Logging;
 /// </summary>
 public sealed record LoggingSettings(
     string Directory, string MinimumLevel, int RetainedFiles, long FileSizeLimitBytes, bool Console,
+    string FileName,
     string ApplicationInsightsConnectionRef, FatalEmailSettings FatalEmail)
 {
     public const string ApplicationName = "EnterpriseContractPlatform";
@@ -24,6 +25,7 @@ public sealed record LoggingSettings(
             Math.Clamp(section.GetValue("RetainedFiles", 31), 1, 3650),
             Math.Clamp(section.GetValue("FileSizeLimitBytes", 100L * 1024 * 1024), 1024 * 1024, 2L * 1024 * 1024 * 1024),
             section.GetValue("Console", true),
+            section["FileName"] is { Length: > 0 } name ? name.Trim() : "ecp-.log",
             section["ApplicationInsightsConnectionRef"] ?? "",
             new FatalEmailSettings(email.GetValue("Enabled", false), email["To"] ?? "", email["From"] ?? "", email["SmtpHost"] ?? "", email.GetValue("SmtpPort", 25),
                 email.GetValue("UseTls", true), email["CredentialRef"] ?? "", Math.Clamp(email.GetValue("MinimumMinutesBetween", 15), 1, 1440)));
@@ -35,6 +37,8 @@ public sealed record LoggingSettings(
     public IReadOnlyList<string> Problems()
     {
         var problems = new List<string>();
+        if (FileName.IndexOfAny(['/', '\\', ':']) >= 0 || FileName.Contains("..", StringComparison.Ordinal) || !FileName.Contains('.', StringComparison.Ordinal))
+            problems.Add("Ecp:Logging:FileName must be a plain file name with an extension, for example log-.txt (the date is inserted before the extension).");
         if (!LevelIsValid) problems.Add("Ecp:Logging:MinimumLevel must be Verbose, Debug, Information, Warning, Error or Fatal.");
         if (ApplicationInsightsConnectionRef.Length > 0 && !SecretReference.TryParse(ApplicationInsightsConnectionRef, out _))
             problems.Add("Ecp:Logging:ApplicationInsightsConnectionRef must be a secret reference (env:NAME or file:PATH), never the connection string itself.");

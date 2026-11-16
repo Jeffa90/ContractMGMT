@@ -21,7 +21,7 @@ public static class LoggingConfiguration
             .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .MinimumLevel.Override("System", LogEventLevel.Warning)
             .Enrich.With(new EcpLogEnricher(version, environment, databaseIdentifier, accessor))
-            .WriteTo.File(new RedactingJsonFormatter(), Path.Combine(settings.Directory, "ecp-.log"), rollingInterval: RollingInterval.Day,
+            .WriteTo.File(new RedactingJsonFormatter(), Path.Combine(settings.Directory, settings.FileName), rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: settings.RetainedFiles, fileSizeLimitBytes: settings.FileSizeLimitBytes, rollOnFileSizeLimit: true, shared: true,
                 flushToDiskInterval: TimeSpan.FromSeconds(1));
         if (settings.Console) logger.WriteTo.Console(new RedactingJsonFormatter());

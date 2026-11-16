@@ -62,7 +62,11 @@ param(
 
     [string[]]$WritableFolders = @("logs"),
 
-    [string]$DataPath
+    [string]$DataPath,
+
+    [string]$LogPath,
+
+    [string]$KeyPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -73,17 +77,11 @@ Import-Module WebAdministration
 $poolExists = Test-Path "IIS:\AppPools\$AppPoolName"
 $siteExists = Test-Path "IIS:\Sites\$SiteName"
 if ($poolExists -and $siteExists) {
-    # The always-on settings are the last setup step, so a first run that stopped part-way can leave
-    # them unset. Re-apply them only when they're missing; otherwise change nothing.
-    if ((Get-Item "IIS:\AppPools\$AppPoolName").startMode -ne "AlwaysRunning") {
-        Write-Host "==> App pool '$AppPoolName' isn't set to AlwaysRunning; applying the always-on settings"
-        & (Join-Path $PSScriptRoot "Set-IisAlwaysOn.ps1") -SiteName $SiteName -AppPoolName $AppPoolName
-    } else {
-        Write-Host "==> IIS site '$SiteName' and app pool '$AppPoolName' already exist; leaving them as they are."
-    }
-    return
+    # The site and pool are never re-created or re-bound here. The settings below are idempotent and are
+    # re-applied on every deploy (load user profile, folder grants, always-on and the anonymous /warmup path),
+    # so a change to them reaches an existing site too.
+    Write-Host "==> IIS site '$SiteName' and app pool '$AppPoolName' already exist; re-applying settings only."
 }
-
 Write-Host "==> Setting up IIS (site exists: $siteExists, app pool exists: $poolExists)"
 
 # --- Prerequisites ------------------------------------------------------------
@@ -148,6 +146,20 @@ if ($DataPath) {
     if ($LASTEXITCODE -ne 0) { throw "icacls failed granting Modify on $DataPath to $identity." }
     Write-Host "    granted $identity Modify on the data root $DataPath"
 }
+if ($LogPath) {
+    if (-not (Test-Path $LogPath)) { New-Item -ItemType Directory -Path $LogPath | Out-Null }
+    & icacls $LogPath /grant "$($identity):(OI)(CI)M" /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "icacls failed granting Modify on $LogPath to $identity." }
+    Write-Host "    granted $identity Modify on the log folder $LogPath"
+}
+# The data-protection key ring: only the pool account and local administrators. Inherited entries are removed
+# from this one folder (it holds the keys that protect sign-in cookies), and existing keys keep the same ACL.
+if ($KeyPath) {
+    if (-not (Test-Path $KeyPath)) { New-Item -ItemType Directory -Path $KeyPath | Out-Null }
+    & icacls $KeyPath /inheritance:r /grant:r "$($identity):(OI)(CI)M" "*S-1-5-32-544:(OI)(CI)F" /T /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "icacls failed restricting $KeyPath to $identity and Administrators." }
+    Write-Host "    restricted the key folder $KeyPath to $identity (Modify) and Administrators (Full)"
+}
 
 # --- Site ---------------------------------------------------------------------
 if (-not $siteExists) {
@@ -169,7 +181,7 @@ if (-not $siteExists) {
     Write-Host "    Windows Authentication on, Anonymous off"
 }
 
-# --- Always on (Hangfire jobs fire on schedule) -------------------------------
+# --- Always on (background jobs keep running) ---------------------------------
 & (Join-Path $PSScriptRoot "Set-IisAlwaysOn.ps1") -SiteName $SiteName -AppPoolName $AppPoolName
 
 Write-Host "==> IIS setup complete."

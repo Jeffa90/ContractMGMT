@@ -162,6 +162,9 @@ jobs:
           if-no-files-found: warn
       - name: SQL Server tests (includes real BACKUP DATABASE, RESTORE VERIFYONLY and RESTORE DATABASE of a populated synthetic installation, post-restore validation, and the operation-lease race)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category!=Performance" --logger "trx" --results-directory TestResults
+      - name: SQL Server permission probe for the DBA (prints what the proposed database roles can and cannot do; evidence, not a policy gate)
+        if: always()
+        run: dotnet test tests/Ecp.Integration.Tests/Ecp.Integration.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~SqlPermissionProbeTests" --logger "console;verbosity=detailed"
       - name: Performance baseline and query plans (SQL Server)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx" --results-directory TestResults
       - name: Print performance baseline and plan report (SQL Server)

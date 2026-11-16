@@ -12,13 +12,15 @@
 # Needs: bash, the GitHub CLI (gh) logged in as a repository ADMIN, and a values file.
 #
 # Usage:
-#   scripts/setup/setup-github-environments.sh --repo OWNER/REPO --values FILE [--dry-run] [--overwrite NAME]... [--overwrite-all]
+#   scripts/setup/setup-github-environments.sh --repo OWNER/REPO --values FILE [--dry-run [--offline]] [--environment QA|Production|all] [--overwrite NAME]... [--overwrite-all]
+#     --environment QA   sets up QA only (Production values and the Production reviewer are then not needed).
+#     --offline          (dry run only) reads nothing from GitHub: prints the full plan as if nothing existed yet, and says which checks were NOT done.
 #   scripts/setup/setup-github-environments.sh --list            (print every variable and secret, change nothing)
 #
 # The values file holds KEY=VALUE lines (see scripts/setup/environments.example.env). Keep the real one outside the repository.
 set -euo pipefail
 
-REPO=""; VALUES_FILE=""; DRY_RUN=0; OVERWRITE_ALL=0; LIST_ONLY=0
+REPO=""; VALUES_FILE=""; DRY_RUN=0; OVERWRITE_ALL=0; LIST_ONLY=0; OFFLINE=0; TARGET="all"
 declare -a OVERWRITE=()
 declare -A VALUE=()
 declare -a MISSING=() ERRORS=() PLAN=() SECRETS_MISSING=()
@@ -33,6 +35,8 @@ while [ $# -gt 0 ]; do
     --overwrite) OVERWRITE+=("${2:-}"); shift 2 ;;
     --overwrite-all) OVERWRITE_ALL=1; shift ;;
     --list) LIST_ONLY=1; shift ;;
+    --offline) OFFLINE=1; shift ;;
+    --environment) TARGET="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -59,6 +63,11 @@ OPTIONAL_PER_ENV=(
   "IIS_CERT_TEMPLATE|Certificate template, only with IIS_CERT_AUTO"
   "IIS_CERT_DNS_NAMES|Extra certificate names, space-separated, only with IIS_CERT_AUTO"
   "APP_NETWORK_PROXIES|Known proxy/load-balancer addresses, if any (NEEDS INFRASTRUCTURE ANSWER)"
+  "LOG_DIRECTORY|Absolute folder for the rolling log file, outside the site (default: <data root>\\logs)"
+  "LOG_FILE_NAME|Log file name; the date is inserted before the extension (default: ecp-.log)"
+  "LOG_RETAINED_FILES|Number of daily log files kept (default: 31)"
+  "KEY_DIRECTORY|Absolute folder for the data-protection key ring, outside the site (default: <data root>\\keyring)"
+  "PACKS_DIRECTORY|Absolute folder for installed solution packs, outside the site (default: <data root>\\packs)"
 )
 # Per repository (not per environment).
 REQUIRED_GLOBAL=(
@@ -90,6 +99,9 @@ print_contract() {
 }
 
 if [ "$LIST_ONLY" = 1 ]; then print_contract; exit 0; fi
+case "$TARGET" in QA|Production|all) ;; *) echo "ERROR: --environment must be QA, Production or all." >&2; exit 2 ;; esac
+[ "$OFFLINE" = 0 ] || [ "$DRY_RUN" = 1 ] || { echo "ERROR: --offline is only allowed with --dry-run." >&2; exit 2; }
+PREFIXES=(); [ "$TARGET" = "Production" ] || PREFIXES+=(QA); [ "$TARGET" = "QA" ] || PREFIXES+=(PROD)
 
 fail() { echo "ERROR: $*" >&2; exit 2; }
 [ -n "$REPO" ] || fail "--repo OWNER/REPO is required."
@@ -120,23 +132,37 @@ need() { # need KEY  -> records MISSING when absent or a placeholder
   return 0
 }
 
-for env in QA PROD; do
+for env in "${PREFIXES[@]}"; do
   for e in "${REQUIRED_PER_ENV[@]}"; do need "${env}_${e%%|*}" || true; done
   for e in "${OPTIONAL_PER_ENV[@]}"; do
     k="${env}_${e%%|*}"
     if [ -n "${VALUE[$k]+x}" ] && [ -n "${VALUE[$k]}" ] && is_placeholder "${VALUE[$k]}"; then ERRORS+=("$k holds a placeholder. Remove the line or supply a real value."); fi
   done
 done
-for e in "${REQUIRED_GLOBAL[@]}"; do need "${e%%|*}" || true; done
+for e in "${REQUIRED_GLOBAL[@]}"; do
+  k="${e%%|*}"
+  case "$k" in PROD_*) [ "$TARGET" = "QA" ] && continue ;; QA_*) [ "$TARGET" = "Production" ] && continue ;; esac
+  need "$k" || true
+done
 
 # Value shape checks that catch the commonest mistakes before anything is written.
-for env in QA PROD; do
+for env in "${PREFIXES[@]}"; do
   p="${VALUE[${env}_IIS_SITE_PATH]:-}"; d="${VALUE[${env}_DATA_DIRECTORY]:-}"
   if [ -n "$p" ] && [ -n "$d" ]; then
     lp="$(printf '%s' "$p" | tr '[:upper:]' '[:lower:]')"; ld="$(printf '%s' "$d" | tr '[:upper:]' '[:lower:]')"
     case "$ld" in "$lp"|"$lp"\\*|"$lp"/*) ERRORS+=("${env}_DATA_DIRECTORY is inside ${env}_IIS_SITE_PATH. A redeploy replaces the site folder; the data root must be outside it.") ;; esac
   fi
   [ -z "$d" ] || [[ "$d" =~ ^([A-Za-z]:\\|\\\\) ]] || ERRORS+=("${env}_DATA_DIRECTORY must be an absolute Windows path (drive letter or UNC).")
+  for k in LOG_DIRECTORY KEY_DIRECTORY PACKS_DIRECTORY; do
+    v="${VALUE[${env}_$k]:-}"; [ -n "$v" ] || continue
+    [[ "$v" =~ ^([A-Za-z]:\\|\\\\) ]] || ERRORS+=("${env}_$k must be an absolute Windows path.")
+    if [ -n "$p" ]; then
+      lv="$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')"; lp="$(printf '%s' "$p" | tr '[:upper:]' '[:lower:]')"
+      case "$lv" in "$lp"|"$lp"\\*|"$lp"/*) ERRORS+=("${env}_$k is inside ${env}_IIS_SITE_PATH; a redeploy replaces the site folder.") ;; esac
+    fi
+  done
+  f="${VALUE[${env}_LOG_FILE_NAME]:-}"; [ -z "$f" ] || [[ "$f" =~ ^[A-Za-z0-9._-]+\.[A-Za-z0-9]+$ ]] || ERRORS+=("${env}_LOG_FILE_NAME must be a plain file name such as log-.txt.")
+  r="${VALUE[${env}_LOG_RETAINED_FILES]:-}"; [ -z "$r" ] || [[ "$r" =~ ^[0-9]{1,4}$ ]] || ERRORS+=("${env}_LOG_RETAINED_FILES must be a whole number of files.")
   [ -z "${VALUE[${env}_IIS_APP_POOL_USER]:-}" ] || [[ "${VALUE[${env}_IIS_APP_POOL_USER]}" == *\\* ]] || ERRORS+=("${env}_IIS_APP_POOL_USER must be DOMAIN\\name.")
   [ -z "${VALUE[${env}_SMOKE_TEST_URL]:-}" ] || [[ "${VALUE[${env}_SMOKE_TEST_URL]}" == https://* ]] || ERRORS+=("${env}_SMOKE_TEST_URL must be an https:// address.")
   [[ -z "${VALUE[${env}_TRUST_SERVER_CERTIFICATE]:-}" || "${VALUE[${env}_TRUST_SERVER_CERTIFICATE]}" == true || "${VALUE[${env}_TRUST_SERVER_CERTIFICATE]}" == false ]] || ERRORS+=("${env}_TRUST_SERVER_CERTIFICATE must be true or false.")
@@ -162,22 +188,28 @@ if [ "${#MISSING[@]}" -gt 0 ] || [ "${#ERRORS[@]}" -gt 0 ]; then
   exit 2
 fi
 
-command -v gh >/dev/null 2>&1 || fail "The GitHub CLI (gh) is required."
+NOT_CHECKED=()
+REVIEWER="${VALUE[PROD_REVIEWER]:-}"; REVIEWER_ID="(not looked up)"; ME="(not checked)"
+if [ "$OFFLINE" = 1 ]; then
+  NOT_CHECKED+=("gh login and ADMIN rights on $REPO" "existing environments and variables (the plan assumes none exist)" "that the deployment branch(es) exist")
+  [ "$TARGET" = "QA" ] || NOT_CHECKED+=("that PROD_REVIEWER exists and is not the person running the script")
+else
+  command -v gh >/dev/null 2>&1 || fail "The GitHub CLI (gh) is required."
+  # ---- Checks that read from GitHub (read-only, also done in a dry run) -----------------------------------------------------------------
+  ME="$(gh api user -q .login 2>/dev/null)" || fail "gh is not logged in. Run: gh auth login (or use --dry-run --offline to see the plan)"
+  [ "$(gh api "repos/$REPO" -q .permissions.admin 2>/dev/null || echo false)" = "true" ] || fail "You need ADMIN rights on $REPO to create environments."
+  if [ "$TARGET" != "QA" ]; then
+    [ "$(printf '%s' "$REVIEWER" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$ME" | tr '[:upper:]' '[:lower:]')" ] || fail "PROD_REVIEWER is you ($ME). Production approval must be given by someone else; self-approval is not allowed."
+    REVIEWER_ID="$(gh api "users/$REVIEWER" -q .id 2>/dev/null)" || fail "GitHub user '$REVIEWER' was not found."
+  fi
+  for b in QA_BRANCH PROD_BRANCH; do
+    case "$b" in PROD_*) [ "$TARGET" = "QA" ] && continue ;; QA_*) [ "$TARGET" = "Production" ] && continue ;; esac
+    branch="${VALUE[$b]}"
+    gh api "repos/$REPO/branches/$(printf '%s' "$branch" | sed 's#/#%2F#g')" -q .name >/dev/null 2>&1 || fail "$b names '$branch' but that branch does not exist in $REPO."
+  done
+fi
 
-# ---- Checks that read from GitHub (read-only, also done in a dry run) -------------------------------------------------------------------
-ME="$(gh api user -q .login 2>/dev/null)" || fail "gh is not logged in. Run: gh auth login"
-[ "$(gh api "repos/$REPO" -q .permissions.admin 2>/dev/null || echo false)" = "true" ] || fail "You need ADMIN rights on $REPO to create environments."
-
-REVIEWER="${VALUE[PROD_REVIEWER]}"
-[ "$(printf '%s' "$REVIEWER" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$ME" | tr '[:upper:]' '[:lower:]')" ] || fail "PROD_REVIEWER is you ($ME). Production approval must be given by someone else; self-approval is not allowed."
-REVIEWER_ID="$(gh api "users/$REVIEWER" -q .id 2>/dev/null)" || fail "GitHub user '$REVIEWER' was not found."
-
-for b in QA_BRANCH PROD_BRANCH; do
-  branch="${VALUE[$b]}"
-  gh api "repos/$REPO/branches/$(printf '%s' "$branch" | sed 's#/#%2F#g')" -q .name >/dev/null 2>&1 || fail "$b names '$branch' but that branch does not exist in $REPO."
-done
-
-existing_var() { gh variable get "$2" --env "$1" -R "$REPO" 2>/dev/null || true; }
+existing_var() { [ "$OFFLINE" = 1 ] && return 0; gh variable get "$2" --env "$1" -R "$REPO" 2>/dev/null || true; }
 may_overwrite() { local n="$1"; [ "$OVERWRITE_ALL" = 1 ] && return 0; local o; for o in "${OVERWRITE[@]:-}"; do [ "$o" = "$n" ] && return 0; done; return 1; }
 
 # ---- Plan, then (unless --dry-run) apply ------------------------------------------------------------------------------------------------
@@ -191,7 +223,7 @@ set_var() { # set_var ENV NAME VALUE
   if [ -n "$cur" ] && ! may_overwrite "$name"; then
     PLAN+=("KEPT (already set to a different value; use --overwrite $name to change): $env $name"); return 0
   fi
-  PLAN+=("$([ -n "$cur" ] && echo change || echo set): $env $name")
+  if [ "$DRY_RUN" = 1 ]; then PLAN+=("$([ -n "$cur" ] && echo change || echo set): $env $name = $val"); else PLAN+=("$([ -n "$cur" ] && echo change || echo set): $env $name"); fi
   [ "$DRY_RUN" = 1 ] || gh variable set "$name" --env "$env" -R "$REPO" --body "$val" >/dev/null
 }
 
@@ -202,7 +234,7 @@ ensure_environment() { # ensure_environment ENV BRANCH [reviewer]
   else
     body="{\"deployment_branch_policy\":{\"protected_branches\":false,\"custom_branch_policies\":true}}"
   fi
-  PLAN+=("environment $env: deployments only from branch '$branch'$([ -n "$reviewer" ] && echo "; required reviewer $reviewer; self-review prevented")")
+  PLAN+=("environment $env: deployments only from branch '$branch'$([ -n "$reviewer" ] && echo "; required reviewer $reviewer; self-review prevented" || true)")
   if [ "$DRY_RUN" != 1 ]; then
     printf '%s' "$body" | gh api -X PUT "repos/$REPO/environments/$env" --input - >/dev/null
     # Replace the allowed-branch list with exactly the one named branch.
@@ -227,21 +259,27 @@ apply_env() { # apply_env GitHubEnvName PREFIX
   set_var "$env" APPENV_Ecp__DataDirectory "$data"
   set_var "$env" APPENV_Database__ConnectionString "$connection"
   [ -z "${VALUE[${p}_APP_NETWORK_PROXIES]:-}" ] || set_var "$env" APPENV_Ecp__Network__KnownProxies "${VALUE[${p}_APP_NETWORK_PROXIES]}"
+  [ -z "${VALUE[${p}_LOG_DIRECTORY]:-}" ] || set_var "$env" APPENV_Ecp__Logging__Directory "${VALUE[${p}_LOG_DIRECTORY]}"
+  [ -z "${VALUE[${p}_LOG_FILE_NAME]:-}" ] || set_var "$env" APPENV_Ecp__Logging__FileName "${VALUE[${p}_LOG_FILE_NAME]}"
+  [ -z "${VALUE[${p}_LOG_RETAINED_FILES]:-}" ] || set_var "$env" APPENV_Ecp__Logging__RetainedFiles "${VALUE[${p}_LOG_RETAINED_FILES]}"
+  [ -z "${VALUE[${p}_KEY_DIRECTORY]:-}" ] || set_var "$env" APPENV_Ecp__DataProtection__KeyDirectory "${VALUE[${p}_KEY_DIRECTORY]}"
+  [ -z "${VALUE[${p}_PACKS_DIRECTORY]:-}" ] || set_var "$env" APPENV_Ecp__Packs__StorageDirectory "${VALUE[${p}_PACKS_DIRECTORY]}"
 }
 
-echo "Repository: $REPO   Running as: $ME   Mode: $([ "$DRY_RUN" = 1 ] && echo 'DRY RUN (nothing is changed)' || echo APPLY)"
-ensure_environment QA "${VALUE[QA_BRANCH]}"
-apply_env QA QA
-ensure_environment Production "${VALUE[PROD_BRANCH]}" "$REVIEWER"
-apply_env Production PROD
+echo "Repository: $REPO   Running as: $ME   Environments: $TARGET   Mode: $([ "$DRY_RUN" = 1 ] && echo 'DRY RUN (nothing is changed)' || echo APPLY)$([ "$OFFLINE" = 1 ] && echo ', OFFLINE (nothing read from GitHub)')"
+if [ "$TARGET" != "Production" ]; then ensure_environment QA "${VALUE[QA_BRANCH]}"; apply_env QA QA; fi
+if [ "$TARGET" != "QA" ]; then ensure_environment Production "${VALUE[PROD_BRANCH]}" "$REVIEWER"; apply_env Production PROD; fi
 
 # Secrets: report which are missing (names only), never read or write a value.
 for e in "${SECRETS[@]}"; do
   IFS='|' read -r env name _ <<<"$e"
+  case "$env" in Production) [ "$TARGET" = "QA" ] && continue ;; QA) [ "$TARGET" = "Production" ] && continue ;; esac
+  if [ "$OFFLINE" = 1 ]; then SECRETS_MISSING+=("gh secret set $name --env $env -R $REPO   (not checked: offline)"); continue; fi
   if ! gh secret list --env "$env" -R "$REPO" 2>/dev/null | awk '{print $1}' | grep -qx "$name"; then SECRETS_MISSING+=("gh secret set $name --env $env -R $REPO"); fi
 done
 
 printf '%s\n' "${PLAN[@]}"
+if [ "${#NOT_CHECKED[@]}" -gt 0 ]; then echo; echo "NOT CHECKED in this offline dry run (run the dry run again with gh logged in as a repository admin):"; printf '  %s\n' "${NOT_CHECKED[@]}"; fi
 if [ "${#SECRETS_MISSING[@]}" -gt 0 ]; then
   echo; echo "Secrets still to set by hand (only if the application pool needs a password set by the pipeline; the command asks for the value):"
   printf '  %s\n' "${SECRETS_MISSING[@]}"

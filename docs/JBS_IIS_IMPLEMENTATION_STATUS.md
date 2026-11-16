@@ -4,6 +4,29 @@ Branch: jbs/iis-integration (created from the verified product state; pull reque
 
 Labels used throughout: **Implemented** (built and tested here, evidence named), **Not Verified** (built, but needs an environment this workspace does not have), **Needs Infrastructure answer**, **Needs DBA answer**, **Future**.
 
+## QA deployment preparation (2026-11-16)
+
+The owner supplied the Infrastructure and DBA answers (recorded in `docs/DEPLOYMENT.md`, "JBS QA deployment configuration"). This round prepared QA and changed no product behaviour beyond what the answers required:
+
+| Change | Status | Evidence |
+|---|---|---|
+| Anonymous `/warmup` for IIS preload: 200, empty body, nothing else; works before setup and over plain HTTP from the local warm-up | Implemented | `WarmupEndpointTests`; the anonymous-endpoint allowlist test still passes (the warm-up is a terminal middleware, not an endpoint) |
+| IIS warm-up page switched from `/health/live` to `/warmup`; anonymous access removed from `/health/live` | Implemented in `scripts/ci/Set-IisAlwaysOn.ps1`; **not run** | `WarmupEndpointTests` checks the script text |
+| Existing IIS sites get the idempotent settings on every deploy (load user profile, folder grants, always-on, warm-up); previously the script stopped early for an existing site | Implemented; **not run** | - |
+| Folders: data, keys, packs and logs as confirmed; `Data\Keys` restricted to the pool account and Administrators | Implemented (configuration and deploy script); **not run** | setup-script offline dry run |
+| Log file `log-.txt`, 31 files, console on | Implemented (`Ecp:Logging:FileName`, existing retention setting) | `LoggingTests` |
+| No Application Insights for JBS | Nothing to remove: no sink exists; the JBS values set none | dry run output; R-LOG-02 |
+| Setup script: `--environment QA`, `--dry-run --offline`, folder and log values | Implemented; dry run executed **offline only** | `tools/tests/test_setup_github_environments.py` (16 tests) |
+| SQL Server permission probe for the DBA | Implemented; result in `deploy/STATUS.md` after CI | `SqlPermissionProbeTests` |
+| Hangfire wording removed from the IIS scripts (the platform does not use Hangfire) | Done | - |
+
+### REQUIRED BEFORE QA
+
+- **Infrastructure:** confirm the site folder and names (proposed: site and pool `JbsContracts`, site folder `C:\inetpub\JbsContracts\app`); the `IIS_APP_POOL_PASSWORD` secret for `AMH\svc_jbsai_qa`, only if the deploy is to create the pool; the self-hosted runner on the QA server with label `iis-qa`, local administrator for the first site set-up, and its service account recorded as the migration identity; how the first-run setup wizard is reached (it answers only on loopback and the binding is host-name specific: either a temporary `localhost` binding on the server or, for the first set-up only, `Ecp__Setup__AllowRemote=true`, which is still protected by the one-time setup token; remove it afterwards).
+- **DBA:** database creation and the name JBSContracts; SQL Server version; compatibility level; collation; row-level security approval; application-lock approval (`sp_getapplock`); backup and recovery policy; copy-only pre-deploy backup decision; RPO and RTO; and the database rights the probe shows are needed beyond the proposed roles.
+- **SMTP:** host email.jbssa.com.au is known; port, authentication method, TLS and sender address are **not confirmed**. Until then QA uses the mock mail provider and the setup readiness step asks for that to be acknowledged; real mail is not tested.
+- **GitHub:** a repository administrator (not the Production reviewer) runs the setup script dry run **online** (`gh` logged in), reads it, then applies it for QA only.
+
 ## What changed, by owner decision
 
 | Item | Decision / requirement | Status | Evidence (tests are in the repository) |

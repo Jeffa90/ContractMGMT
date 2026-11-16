@@ -240,6 +240,18 @@ app.UseWhen(c => !c.Request.Path.StartsWithSegments("/api") && !c.Request.Path.S
 app.UseWhen(c => c.Request.Path.StartsWithSegments("/api") || c.Request.Path.StartsWithSegments("/health"), b => b.UseStatusCodePages());
 app.UseExceptionHandler();
 app.UseMiddleware<SecurityHeadersMiddleware>();
+// IIS Application Initialization warm-up (docs/DEPLOYMENT.md): the only anonymous path on an IIS site besides what the server itself serves. It answers 200 with an empty body
+// and nothing else: no version, mode, health detail or configuration. It runs before the setup gate and the HTTPS guard because IIS calls it on the local loopback, before any person.
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.Equals("/warmup", StringComparison.OrdinalIgnoreCase) && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
+    {
+        context.Response.StatusCode = StatusCodes.Status200OK;
+        context.Response.ContentLength = 0;
+        return;
+    }
+    await next(context);
+});
 if (secureCookies) app.UseHsts();
 app.UseStaticFiles();
 app.UseSerilogRequestLogging(o => o.GetLevel = (context, _, ex) =>

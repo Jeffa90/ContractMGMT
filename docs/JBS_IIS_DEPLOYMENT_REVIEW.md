@@ -11,6 +11,8 @@ The application changes in Section 4 were built on branch jbs/iis-integration. T
 
 CI: commit e0d2ac7 passed every job (Linux, Windows, SQL Server 2022, container); see `deploy/STATUS.md`. Nothing has run on IIS.
 
+QA preparation (2026-11-16): owner-confirmed QA values applied to configuration; CI [run 111](https://github.com/Jeffa90/ContractMGMT/actions/runs/43799781505) green; the permission probe proved the proposed migration-account roles cannot run the first install (row-level security and role creation need more), while the proposed runtime roles work. Details and the items required before QA: `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
+
 ## 1. Verdict
 
 `JBS_DEPLOYMENT_GAP_PLAN.md` is accurate in what it lists, and the architecture can stay as it is.

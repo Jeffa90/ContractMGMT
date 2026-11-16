@@ -26,7 +26,18 @@ The values below were confirmed by the owner from Infrastructure and DBA answers
 
 **Authentication.** IIS Windows Authentication, invite-only, no Windows-domain restriction in the application (the provider's domain list stays empty), no AD-group onboarding. Break-glass administrators stay configuration-controlled (the existing emergency-access mechanism; nothing new).
 
-**REQUIRED BEFORE QA** (not guessed; see `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`): the site folder and names above; the `IIS_APP_POOL_PASSWORD` secret for `AMH\svc_jbsai_qa` (needed only if the deploy creates the pool; it is set by hand with `gh secret set`); the DBA items (database, version, compatibility level, collation, row-level security and application-lock approval, the extra rights the probe shows the migration and runtime accounts need, backup and recovery policy, copy-only pre-deploy backup, RPO and RTO); SMTP port, authentication and TLS; how the first-run setup wizard is reached (it answers only on the server's loopback address, and the site binding is host-name specific).
+**SQL Server permission probe (CI [run 111](https://github.com/Jeffa90/ContractMGMT/actions/runs/43799781505), SQL Server 2022, SQL logins standing in for the Windows accounts; database-role permissions behave the same for Windows logins):**
+
+| Account and roles | Result |
+|---|---|
+| Migration account: db_ddladmin + db_datareader + db_datawriter, first install (`migrate`) | **Refused** - SQL 15247 "User does not have permission to perform this action" (the first migration creates the `ecp_runtime` role and grants on it) |
+| Migration account: the same + db_securityadmin | **Refused** - SQL 262 "ALTER ANY SECURITY POLICY permission denied" (the migrations create row-level security policies) |
+| Runtime account: db_datareader + db_datawriter | **Works** (provision a tenant, add reference data, create a draft contract). Readiness R-DB-02 will show a warning that the account is not in `ecp_runtime`; that is a notice, not a failure |
+| Runtime account: `ecp_runtime` only | **Works**, and is narrower (only the application's schemas) |
+
+What this means: the proposed **runtime** rights are sufficient for the operations probed; adding the account to `ecp_runtime` (created by the first migration) is recommended so readiness is clean. The proposed **migration** rights are **not** sufficient: the migration identity also needs to create roles and grant on them and `ALTER ANY SECURITY POLICY` (later releases add policies for new tables, so this is needed for upgrades too). The simplest grant the probe does not refute is db_owner for the migration identity only; a narrower grant (db_ddladmin + db_securityadmin + `ALTER ANY SECURITY POLICY`) was **not** tested end to end and is the DBA's choice. This is a DBA permission decision, not an application defect.
+
+**REQUIRED BEFORE QA** (not guessed; see `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`): the site folder and names above; the `IIS_APP_POOL_PASSWORD` secret for `AMH\svc_jbsai_qa` (needed only if the deploy creates the pool; it is set by hand with `gh secret set`); the DBA items (database, version, compatibility level, collation, row-level security and application-lock approval, the extra rights the migration account needs (see the probe below), backup and recovery policy, copy-only pre-deploy backup, RPO and RTO); SMTP port, authentication and TLS; how the first-run setup wizard is reached (it answers only on the server's loopback address, and the site binding is host-name specific).
 
 ## Workflows
 

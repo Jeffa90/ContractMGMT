@@ -40,6 +40,28 @@ public sealed class SqlPermissionProbeTests(ITestOutputHelper output)
         return $"{name}|{password}";
     }
 
+    private async Task<string> LoginWithGrantsAsync(string admin, string database, List<string> logins, string[] roles, string[] grants)
+    {
+        var login = await LoginAsync(admin, database, logins, roles);
+        foreach (var grant in grants) await ExecAsync(admin, $"USE [{database}]; GRANT {grant} TO [{login.Split('|')[0]}]");
+        return login;
+    }
+
+    /// <summary>Who owns what the migration created: an owner other than dbo keeps CONTROL over those objects even after its role memberships are removed.</summary>
+    private static async Task<string> OwnershipAsync(string admin, string database)
+    {
+        await using var c = new SqlConnection(new SqlConnectionStringBuilder(admin) { InitialCatalog = database }.ConnectionString); await c.OpenAsync();
+        await using var cmd = c.CreateCommand();
+        cmd.CommandText = @"SELECT 'schemas owned by ' + USER_NAME(s.principal_id) + ': ' + CAST(COUNT(*) AS varchar(10)) FROM sys.schemas s
+                            WHERE s.schema_id BETWEEN 5 AND 16383 GROUP BY s.principal_id
+                            UNION ALL SELECT 'role ecp_runtime owned by ' + USER_NAME(owning_principal_id) FROM sys.database_principals WHERE name = 'ecp_runtime'
+                            UNION ALL SELECT 'security policies: ' + CAST(COUNT(*) AS varchar(10)) FROM sys.security_policies";
+        var parts = new List<string>();
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync()) parts.Add(r.GetString(0));
+        return string.Join("; ", parts);
+    }
+
     private static string As(string connection, string login) => new SqlConnectionStringBuilder(connection) { UserID = login.Split('|')[0], Password = login.Split('|')[1], IntegratedSecurity = false }.ConnectionString;
 
     private async Task<string> MigrateAsAsync(TestApp app, string connection)
@@ -85,6 +107,37 @@ public sealed class SqlPermissionProbeTests(ITestOutputHelper output)
             var migrationPlus = await LoginAsync(admin, Db(empty2), logins, "db_ddladmin", "db_datareader", "db_datawriter", "db_securityadmin");
             report.Add("Migration account, the same + db_securityadmin, first install (migrate): " + await MigrateAsAsync(empty2, As(empty2.ConnectionString, migrationPlus)));
 
+            // Candidate narrower sets: db_ddladmin + db_datareader + db_datawriter plus explicit database permissions. Each runs the whole first install on its own empty database,
+            // then a separate runtime login (member of ecp_runtime only) does real work against the result, and the report says who owns the created objects.
+            var candidates = new (string Label, string[] Roles, string[] Grants)[]
+            {
+                ("+ CREATE ROLE + ALTER ANY SECURITY POLICY", ["db_ddladmin", "db_datareader", "db_datawriter"], ["CREATE ROLE", "ALTER ANY SECURITY POLICY"]),
+                ("+ CREATE ROLE + ALTER ANY ROLE + ALTER ANY SECURITY POLICY", ["db_ddladmin", "db_datareader", "db_datawriter"], ["CREATE ROLE", "ALTER ANY ROLE", "ALTER ANY SECURITY POLICY"]),
+                ("+ db_securityadmin + ALTER ANY SECURITY POLICY", ["db_ddladmin", "db_datareader", "db_datawriter", "db_securityadmin"], ["ALTER ANY SECURITY POLICY"]),
+                ("db_owner", ["db_owner"], []),
+            };
+            foreach (var (label, roles, grants) in candidates)
+            {
+                await using var target = await TestApp.CreateSqlServerAsync(migrate: false);
+                var login = await LoginWithGrantsAsync(admin, Db(target), logins, roles, grants);
+                var result = await MigrateAsAsync(target, As(target.ConnectionString, login));
+                var line = $"Migration candidate {(label.StartsWith('+') ? "db_ddladmin + db_datareader + db_datawriter " : "")}{label}: {result}";
+                if (result == "SUCCEEDED")
+                {
+                    line += " | ownership: " + await OwnershipAsync(admin, Db(target));
+                    var runtimeAfter = await LoginAsync(admin, Db(target), logins, RowLevelSecurity.RuntimeRole);
+                    line += " | runtime (ecp_runtime) afterwards: " + await RunAsAsync(target, As(target.ConnectionString, runtimeAfter), "after");
+                    if (label == "db_owner")
+                    {
+                        // Temporary db_owner: remove the membership after the migration and prove the application still works and the database is unchanged by the removal.
+                        await ExecAsync(admin, $"USE [{Db(target)}]; ALTER ROLE [db_owner] DROP MEMBER [{login.Split('|')[0]}]");
+                        var runtimeLater = await LoginAsync(admin, Db(target), logins, RowLevelSecurity.RuntimeRole);
+                        line += " | db_owner removed afterwards; runtime then: " + await RunAsAsync(target, As(target.ConnectionString, runtimeLater), "later");
+                    }
+                }
+                report.Add(line);
+            }
+
             var runtime = await LoginAsync(admin, Db(migrated), logins, "db_datareader", "db_datawriter");
             report.Add("Runtime account, db_datareader + db_datawriter: " + await RunAsAsync(migrated, As(migrated.ConnectionString, runtime), "rw"));
             var runtimeRole = await LoginAsync(admin, Db(migrated), logins, RowLevelSecurity.RuntimeRole);
@@ -97,6 +150,6 @@ public sealed class SqlPermissionProbeTests(ITestOutputHelper output)
             foreach (var login in logins)
                 try { await ExecAsync(admin, $"DROP LOGIN [{login}]"); } catch (SqlException) { /* the test database is dropped with its users; a leftover login is harmless and named for the run */ }
         }
-        Assert.Equal(5, report.Count);   // every case ran and reported; the outcomes are evidence for the DBA, not assertions about their policy
+        Assert.Equal(9, report.Count);   // every case ran and reported; the outcomes are evidence for the DBA, not assertions about their policy
     }
 }

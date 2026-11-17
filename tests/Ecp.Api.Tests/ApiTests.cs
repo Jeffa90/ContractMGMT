@@ -439,6 +439,24 @@ public class HostConfigurationTests
         Assert.Contains("Declared by DBA; not verified by this application", OperationsCli.Usage);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void The_confirmed_JBS_QA_layout_with_data_inside_the_site_folder_is_refused_and_a_sibling_site_folder_is_accepted(bool siteAtRoot)
+    {
+        // C:\inetpub\JbsContracts with Data and logs beneath it, expressed in this platform's path syntax.
+        var root = Path.Combine(Path.GetTempPath() is var t && OperatingSystem.IsWindows() ? Path.GetPathRoot(t)! : "/", "inetpub", "JbsContracts");
+        var site = siteAtRoot ? root : Path.Combine(root, "app");
+        var config = Config(new()
+        {
+            ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = Path.Combine(root, "Data"), ["Ecp:DataProtection:KeyDirectory"] = Path.Combine(root, "Data", "Keys"),
+            ["Database:Provider"] = "SqlServer", ["Database:ConnectionString"] = "Server=sql.example;Database=Ecp;Integrated Security=True;Encrypt=True",
+            ["Ecp:DataProtection:Protection"] = "None",
+        });
+        if (siteAtRoot) Assert.Contains("[R-ST-02]", Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(config, Secrets, site)).Message);
+        else Assert.Equal(Path.Combine(root, "Data"), HostConfiguration.Resolve(config, Secrets, site).Host.DataDirectory);
+    }
+
     [Fact]
     public void Production_refuses_the_lightweight_provider_even_when_a_connection_secret_is_supplied()
     {

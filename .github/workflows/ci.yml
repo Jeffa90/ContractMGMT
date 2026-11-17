@@ -112,8 +112,13 @@ jobs:
           path: TestResults/*.trx
 
   sqlserver-integration:
-    name: SQL Server integration (migrations, constraints, RLS, provider behaviour)
+    name: SQL Server ${{ matrix.sqlserver }} integration (migrations, constraints, RLS, provider behaviour)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 2022 is the long-standing baseline; 2025 (version 17.x) is what the JBS QA server runs.
+        sqlserver: ["2022-latest", "2025-latest"]
     timeout-minutes: 40
     needs: build-and-unit
     steps:
@@ -132,7 +137,7 @@ jobs:
           BK="$RUNNER_TEMP/ecp-backups"; mkdir -p "$BK"; chmod 0777 "$BK"
           command -v setfacl >/dev/null || sudo apt-get install -y -qq acl >/dev/null
           sudo setfacl -R -m "u:$(id -u):rwx" "$BK"; sudo setfacl -d -m "u:$(id -u):rwx" "$BK"
-          docker run -d --name ecp-sql --user root -p 14330:1433 -v "$BK:/ecp-backups" -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:2022-latest >/dev/null
+          docker run -d --name ecp-sql --user root -p 14330:1433 -v "$BK:/ecp-backups" -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:${{ matrix.sqlserver }} >/dev/null
           echo "ECP_TEST_SQL_BACKUP_DIR=$BK" >> "$GITHUB_ENV"
           echo "ECP_TEST_SQL_BACKUP_DIR_SERVER=/ecp-backups" >> "$GITHUB_ENV"
           for i in $(seq 1 60); do
@@ -157,7 +162,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: upgrade-rehearsal-evidence
+          name: upgrade-rehearsal-evidence-${{ matrix.sqlserver }}
           path: ${{ runner.temp }}/ecp-upgrade-evidence
           if-no-files-found: warn
       - name: SQL Server tests (includes real BACKUP DATABASE, RESTORE VERIFYONLY and RESTORE DATABASE of a populated synthetic installation, post-restore validation, and the operation-lease race)
@@ -183,7 +188,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-sql
+          name: test-results-sql-${{ matrix.sqlserver }}
           path: TestResults/*.trx
 
   docker-image:

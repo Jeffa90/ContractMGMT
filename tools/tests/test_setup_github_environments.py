@@ -100,15 +100,17 @@ class OfflineDryRunTests(unittest.TestCase):
     def jbs_values(self):
         return open(os.path.join(ROOT, 'docs', 'jbs', 'jbs-github-environments.env'), encoding='utf-8').read()
 
-    def test_the_confirmed_JBS_layout_is_refused_because_data_is_inside_the_site_folder(self):
-        r = self.run_script(self.jbs_values(), '--environment', 'QA')
+    def test_a_site_folder_at_the_data_root_is_refused_because_data_would_be_inside_it(self):
+        values = self.jbs_values().replace('QA_IIS_SITE_PATH=C:\\inetpub\\JbsContracts\\app\n', 'QA_IIS_SITE_PATH=C:\\inetpub\\JbsContracts\n')
+        r = self.run_script(values, '--environment', 'QA')
         self.assertEqual(r.returncode, 2)
         for key in ('QA_DATA_DIRECTORY', 'QA_LOG_DIRECTORY', 'QA_KEY_DIRECTORY', 'QA_PACKS_DIRECTORY'):
             self.assertIn(key + ' is inside QA_IIS_SITE_PATH', r.stderr)
         self.assertNotIn('set: ', r.stdout)
 
-    def test_with_a_site_folder_beside_the_data_the_JBS_values_plan_QA_without_touching_GitHub(self):
-        values = self.jbs_values().replace('QA_IIS_SITE_PATH=C:\\inetpub\\JbsContracts\n', 'QA_IIS_SITE_PATH=C:\\inetpub\\JbsContracts\\app\n')
+    def test_the_confirmed_JBS_values_plan_QA_without_touching_GitHub(self):
+        values = self.jbs_values()
+        self.assertIn('QA_IIS_SITE_PATH=C:\\inetpub\\JbsContracts\\app\n', values)
         r = self.run_script(values, '--environment', 'QA')
         self.assertEqual(r.returncode, 0, r.stderr)
         out = r.stdout
@@ -128,8 +130,7 @@ class OfflineDryRunTests(unittest.TestCase):
         self.assertNotIn('set: ', r.stdout)
 
     def test_folders_inside_the_site_are_refused(self):
-        values = self.jbs_values().replace('QA_IIS_SITE_PATH=C:\\inetpub\\JbsContracts\n', 'QA_IIS_SITE_PATH=C:\\inetpub\\JbsContracts\\app\n')
-        values = values.replace('QA_LOG_DIRECTORY=C:\\inetpub\\JbsContracts\\logs', 'QA_LOG_DIRECTORY=C:\\inetpub\\JbsContracts\\app\\logs')
+        values = self.jbs_values().replace('QA_LOG_DIRECTORY=C:\\inetpub\\JbsContracts\\logs', 'QA_LOG_DIRECTORY=C:\\inetpub\\JbsContracts\\app\\logs')
         r = self.run_script(values, '--environment', 'QA')
         self.assertEqual(r.returncode, 2)
         self.assertIn('QA_LOG_DIRECTORY is inside QA_IIS_SITE_PATH', r.stderr)

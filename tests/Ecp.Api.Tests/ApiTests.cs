@@ -442,9 +442,9 @@ public class HostConfigurationTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void The_confirmed_JBS_QA_layout_with_data_inside_the_site_folder_is_refused_and_a_sibling_site_folder_is_accepted(bool siteAtRoot)
+    public void The_confirmed_JBS_QA_layout_with_the_site_in_app_beside_Data_is_accepted_and_a_site_folder_at_the_data_root_is_refused(bool siteAtRoot)
     {
-        // C:\inetpub\JbsContracts with Data and logs beneath it, expressed in this platform's path syntax.
+        // Confirmed: site files in C:\inetpub\JbsContracts\app, data in C:\inetpub\JbsContracts\Data (siteAtRoot = the refused alternative), in this platform's path syntax.
         var root = Path.Combine(Path.GetTempPath() is var t && OperatingSystem.IsWindows() ? Path.GetPathRoot(t)! : "/", "inetpub", "JbsContracts");
         var site = siteAtRoot ? root : Path.Combine(root, "app");
         var config = Config(new()

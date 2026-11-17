@@ -14,7 +14,7 @@
 
 The application refuses to start in Production with SQLite, inline connection strings that hold credentials, demonstration identity or seed data, automatic migration, or storage inside the application folder (ProductionGuard).
 
-## JBS QA layout (recommended; the confirmed site folder C:\inetpub\JbsContracts conflicts with the data folders, see docs/DEPLOYMENT.md)
+## JBS QA layout (CONFIRMED by IT 2026-11-17)
 
 ```
 C:\inetpub\JbsContracts\

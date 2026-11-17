@@ -14,11 +14,11 @@
 
 The application refuses to start in Production with SQLite, inline connection strings that hold credentials, demonstration identity or seed data, automatic migration, or storage inside the application folder (ProductionGuard).
 
-## JBS QA layout (owner-confirmed; site folder PROPOSED)
+## JBS QA layout (recommended; the confirmed site folder C:\inetpub\JbsContracts conflicts with the data folders, see docs/DEPLOYMENT.md)
 
 ```
 C:\inetpub\JbsContracts\
-  app\                 site folder, replaced on every deploy (PROPOSED name; pool reads it)
+  app\                 site files, replaced on every deploy (site and pool JbsContracts; pool reads it)
   logs\                log-YYYYMMDD.txt, 31 kept (pool modifies)
   Data\                Ecp__DataDirectory (pool modifies)
     Documents\         contract documents and staged migration files

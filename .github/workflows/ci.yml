@@ -117,7 +117,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 2022 is the long-standing baseline; 2025 (version 17.x) is what the JBS QA server runs.
+        # 2022 is the long-standing baseline; 2025 (version 17.x) is the version of the first QA database server.
         sqlserver: ["2022-latest", "2025-latest"]
     timeout-minutes: 40
     needs: build-and-unit

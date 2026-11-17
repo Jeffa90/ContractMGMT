@@ -23,7 +23,7 @@ Still open and not guessed: the P3 questions (Infrastructure and DBA answers) ar
 
 CI: commit e0d2ac7 passed every job (Linux, Windows, SQL Server 2022, container); see `deploy/STATUS.md`. Nothing has run on IIS.
 
-QA preparation (2026-11-16): owner-confirmed QA values applied to configuration; CI [run 111](https://github.com/Jeffa90/ContractMGMT/actions/runs/43799781505) green; the permission probe proved the proposed migration-account roles cannot run the first install (row-level security and role creation need more), while the proposed runtime roles work. Details and the items required before QA: `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
+QA preparation (2026-11-16): owner-confirmed QA values applied to configuration; CI [run 111](https://github.com/Jeffa90/ContractMGMT/actions/runs/43799781505) green; the permission probe proved the proposed migration-account roles cannot run the first install (row-level security and role creation need more), while the proposed runtime roles work. Details and the items required before QA: `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`. Update 2026-11-17 (CI [run 115](https://github.com/Jeffa90/ContractMGMT/actions/runs/44028113300), SQL Server 2022 and 2025): the smallest working migration set is db_ddladmin + db_datareader + db_datawriter + `CREATE ROLE` + `ALTER ANY SECURITY POLICY` (db_owner not needed; both extra permissions revocable after each migration); see `docs/DEPLOYMENT.md`.
 
 ## 1. Ranking
 

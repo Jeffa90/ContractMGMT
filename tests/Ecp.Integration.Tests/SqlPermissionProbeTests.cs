@@ -152,4 +152,69 @@ public sealed class SqlPermissionProbeTests(ITestOutputHelper output)
         }
         Assert.Equal(9, report.Count);   // every case ran and reported; the outcomes are evidence for the DBA, not assertions about their policy
     }
+
+    private static async Task<int> CountAsync(string admin, string database, string sql)
+    {
+        await using var c = new SqlConnection(new SqlConnectionStringBuilder(admin) { InitialCatalog = database }.ConnectionString); await c.OpenAsync();
+        await using var cmd = c.CreateCommand(); cmd.CommandText = sql;
+        return Convert.ToInt32(await cmd.ExecuteScalarAsync());
+    }
+
+    /// <summary>
+    /// The smallest migration permission set the probe found, asserted rather than reported: db_ddladmin + db_datareader + db_datawriter plus the two database
+    /// permissions CREATE ROLE and ALTER ANY SECURITY POLICY install the whole schema (row-level security included), each of the two extra permissions is
+    /// necessary, a separate runtime account holding only ecp_runtime then works and is not db_owner, and after the two extra permissions are revoked a
+    /// re-run with nothing pending still succeeds and the runtime account still works (so the extra permissions are needed only while migrations are applied).
+    /// </summary>
+    [SqlServerFact]
+    public async Task The_minimum_migration_permission_set_is_sufficient_each_extra_permission_is_necessary_and_the_extra_permissions_can_be_revoked_afterwards()
+    {
+        var admin = SqlServerEnvironment.ConnectionString!;
+        var logins = new List<string>();
+        string Db(TestApp a) => new SqlConnectionStringBuilder(a.ConnectionString).InitialCatalog;
+        string[] baseRoles = ["db_ddladmin", "db_datareader", "db_datawriter"];
+        try
+        {
+            // Each extra permission is necessary: without CREATE ROLE the install stops at the runtime role; without ALTER ANY SECURITY POLICY it stops at the first policy.
+            await using (var noRole = await TestApp.CreateSqlServerAsync(migrate: false))
+            {
+                var login = await LoginWithGrantsAsync(admin, Db(noRole), logins, baseRoles, ["ALTER ANY SECURITY POLICY"]);
+                var result = await MigrateAsAsync(noRole, As(noRole.ConnectionString, login));
+                Assert.StartsWith("REFUSED - SQL 15247", result);
+            }
+            await using (var noPolicy = await TestApp.CreateSqlServerAsync(migrate: false))
+            {
+                var login = await LoginWithGrantsAsync(admin, Db(noPolicy), logins, baseRoles, ["CREATE ROLE"]);
+                var result = await MigrateAsAsync(noPolicy, As(noPolicy.ConnectionString, login));
+                Assert.StartsWith("REFUSED - SQL 262", result);
+            }
+
+            // The minimum set installs everything.
+            await using var target = await TestApp.CreateSqlServerAsync(migrate: false);
+            var migration = await LoginWithGrantsAsync(admin, Db(target), logins, baseRoles, ["CREATE ROLE", "ALTER ANY SECURITY POLICY"]);
+            Assert.Equal("SUCCEEDED", await MigrateAsAsync(target, As(target.ConnectionString, migration)));
+            Assert.True(await CountAsync(admin, Db(target), "SELECT COUNT(*) FROM sys.security_policies WHERE is_enabled = 1") > 0);
+            Assert.Equal(1, await CountAsync(admin, Db(target), $"SELECT COUNT(*) FROM sys.database_principals WHERE name = N'{RowLevelSecurity.RuntimeRole}' AND type = 'R'"));
+
+            // A separate least-privilege runtime account (ecp_runtime only) does real work and is neither db_owner nor the migration account.
+            var runtime = await LoginAsync(admin, Db(target), logins, RowLevelSecurity.RuntimeRole);
+            var first = await RunAsAsync(target, As(target.ConnectionString, runtime), "min");
+            Assert.StartsWith("SUCCEEDED", first);
+            Assert.Contains("runtime role member: True, db_owner: False", first);
+
+            // Revoke the two extra permissions: a re-run with nothing pending succeeds and the runtime account still works.
+            var migrationUser = migration.Split('|')[0];
+            await ExecAsync(admin, $"USE [{Db(target)}]; REVOKE CREATE ROLE FROM [{migrationUser}]; REVOKE ALTER ANY SECURITY POLICY FROM [{migrationUser}]");
+            Assert.Equal("SUCCEEDED", await MigrateAsAsync(target, As(target.ConnectionString, migration)));
+            var later = await RunAsAsync(target, As(target.ConnectionString, runtime), "rev");
+            Assert.StartsWith("SUCCEEDED", later);
+            Assert.Contains("runtime role member: True, db_owner: False", later);
+        }
+        finally
+        {
+            SqlConnection.ClearAllPools();
+            foreach (var login in logins)
+                try { await ExecAsync(admin, $"DROP LOGIN [{login}]"); } catch (SqlException) { /* the test database is dropped with its users; a leftover login is harmless */ }
+        }
+    }
 }

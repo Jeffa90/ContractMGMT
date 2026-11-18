@@ -1,5 +1,6 @@
-# Reusable deploy of a dotnet-spa-build.yml artifact onto an on-prem IIS site, run on a
-# self-hosted Windows runner installed on the target web server (see docs/deployment.md).
+# Reusable build-and-deploy onto an on-prem IIS site, run on a self-hosted Windows runner
+# installed on the target web server: it builds the commit (.github/actions/build-app) and
+# deploys the result in the same job, with no workflow artifacts (see docs/DEPLOYMENT.md).
 #
 # Per-environment settings live on the GitHub Environment, not in YAML:
 #   Variables:  IIS_SITE_PATH       (required) physical path of the IIS site
@@ -42,28 +43,10 @@ on:
         description: ASPNETCORE_ENVIRONMENT value, if different from the environment name.
         type: string
         default: ""
-      sql-migrations:
-        description: |
-          One "ConnectionStringName=folder" per line, folders relative to the sql artifact.
-          Connection strings are read from the package's appsettings.{env}.json. Empty = no migrations.
-        type: string
-        default: ""
-      sql-exclude:
-        description: Space-separated SQL file names never to run (e.g. demo seed data).
-        type: string
-        default: ""
       preserve-folders:
         description: Space-separated folder names in the site that hold runtime data and must not be overwritten or deleted.
         type: string
         default: "logs"
-      tools-repository:
-        description: Repository holding scripts/ci (set this when the reusable workflows live in a shared repo).
-        type: string
-        default: ""
-      tools-ref:
-        description: Ref of tools-repository to use.
-        type: string
-        default: ""
 
 permissions:
   contents: read
@@ -79,26 +62,16 @@ jobs:
       group: deploy-${{ github.repository }}-${{ inputs.environment }}
       cancel-in-progress: false
     steps:
-      - name: Get deploy scripts
+      # Build here, on the web server's runner, straight into the deploy package: no workflow
+      # artifacts (storage is shared across the account). QA and Production each build the
+      # same commit (github.sha) with the same locked package versions.
+      - name: Check out
         uses: actions/checkout@v7
-        with:
-          repository: ${{ inputs.tools-repository || github.repository }}
-          ref: ${{ inputs.tools-ref || github.sha }}
-          sparse-checkout: scripts/ci
-          path: tools
 
-      - name: Download app
-        uses: actions/download-artifact@v8
+      - name: Build
+        uses: ./.github/actions/build-app
         with:
-          name: app
-          path: ${{ runner.temp }}/package/app
-
-      - name: Download sql
-        if: inputs.sql-migrations != ''
-        uses: actions/download-artifact@v8
-        with:
-          name: sql
-          path: ${{ runner.temp }}/package/sql
+          output-path: ${{ runner.temp }}/package
 
       - name: Deploy
         shell: powershell
@@ -107,8 +80,6 @@ jobs:
           SITE_PATH: ${{ vars.IIS_SITE_PATH }}
           SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
           ASPNET_ENV: ${{ inputs.aspnetcore-environment || inputs.environment }}
-          SQL_MIGRATIONS: ${{ inputs.sql-migrations }}
-          SQL_EXCLUDE: ${{ inputs.sql-exclude }}
           PRESERVE_FOLDERS: ${{ inputs.preserve-folders }}
           SITE_NAME: ${{ vars.IIS_SITE_NAME }}
           APP_POOL: ${{ vars.IIS_APP_POOL }}
@@ -142,14 +113,12 @@ jobs:
           if ($appEnv.ContainsKey("Database__ConnectionString") -and $appEnv["Database__ConnectionString"] -match "(?i)(password|pwd)\s*=") { throw "Database__ConnectionString contains a password. Use Windows integrated authentication (no credential in the string)." }
 
           $split = { param($s) @($s -split '\s+' | Where-Object { $_ }) }
-          & "$env:GITHUB_WORKSPACE\tools\scripts\ci\Deploy-IisSite.ps1" `
+          # Database migrations are not run here; see deploy.yml.
+          & "$env:GITHUB_WORKSPACE\scripts\ci\Deploy-IisSite.ps1" `
             -PackagePath "$env:RUNNER_TEMP\package\app" `
-            -SqlPackagePath "$env:RUNNER_TEMP\package\sql" `
             -SitePath $env:SITE_PATH `
             -Environment $env:ASPNET_ENV `
             -EnvironmentVariables $appEnv `
-            -SqlMigrations $env:SQL_MIGRATIONS `
-            -SqlExclude (& $split $env:SQL_EXCLUDE) `
             -PreserveFolders (& $split $env:PRESERVE_FOLDERS) `
             -SmokeTestUrl $env:SMOKE_TEST_URL `
             -SiteName $env:SITE_NAME `

@@ -1,0 +1,61 @@
+# Builds the deployable package from a checked-out commit: locked restore, publish of
+# src/Ecp.Host, and the build manifest (commit, run, SHA-256 of every published file).
+#
+# Writes:  <output-path>/app  - publish output, environment-neutral (web.config is stamped
+#                               per environment at deploy time)
+#
+# Used by iis-deploy.yml on the self-hosted runner on the web server, which builds and
+# deploys in one job. Nothing is uploaded as a workflow artifact: artifact storage is
+# shared across the account. Tests are not run here: deploy.yml only deploys a commit
+# whose ci.yml run is green, and ci.yml runs every test (including on Windows).
+#
+# Windows PowerShell 5.1 ("powershell") throughout, so the web servers don't need
+# PowerShell 7. Keep this file ASCII-only.
+name: Build app package
+description: Locked restore, publish and build manifest for src/Ecp.Host
+
+inputs:
+  output-path:
+    description: Folder to write app/ into.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+
+    - name: Restore (locked)
+      shell: powershell
+      env:
+        DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+        DOTNET_NOLOGO: "1"
+      run: |
+        $ErrorActionPreference = "Stop"
+        dotnet restore src/Ecp.Host/Ecp.Host.csproj --locked-mode
+        if ($LASTEXITCODE -ne 0) { throw "restore failed" }
+
+    - name: Publish
+      shell: powershell
+      env:
+        DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+        DOTNET_NOLOGO: "1"
+      run: |
+        $ErrorActionPreference = "Stop"
+        $out = Join-Path "${{ inputs.output-path }}" "app"
+        if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+        dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release --no-restore -o $out
+        if ($LASTEXITCODE -ne 0) { throw "publish failed" }
+
+    - name: Record the build manifest (commit, run and a SHA-256 for every published file)
+      shell: powershell
+      run: |
+        $ErrorActionPreference = "Stop"
+        $app = (Resolve-Path (Join-Path "${{ inputs.output-path }}" "app")).Path
+        $files = Get-ChildItem -Path $app -Recurse -File | Where-Object { $_.Name -ne "web.config" -and $_.Name -ne "build-manifest.json" } | Sort-Object FullName | ForEach-Object {
+          [ordered]@{ path = $_.FullName.Substring($app.Length + 1).Replace("\", "/"); sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+        }
+        [ordered]@{ commit = $env:GITHUB_SHA; runId = $env:GITHUB_RUN_ID; builtUtc = (Get-Date).ToUniversalTime().ToString("o"); files = @($files) } |
+          ConvertTo-Json -Depth 4 | Set-Content (Join-Path $app "build-manifest.json") -Encoding UTF8
+        Write-Host "Recorded $(@($files).Count) files for commit $env:GITHUB_SHA"

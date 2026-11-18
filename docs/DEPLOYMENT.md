@@ -58,7 +58,7 @@ The earlier probe (CI runs 115 and 116, before ADR-0044) found the extra `CREATE
 | `deploy.yml` | Push to `main` (code changes) or manual | **Waits for CI to be green on the exact commit** (`verify-ci`; it does not repeat CI), then builds and deploys to **QA**, then builds the **same commit** and deploys it to **Production** after the Production environment's required reviewer approves. Production is deployed only from `main`; a manual run must ask for it (`promote-to-production`). No workflow artifacts are stored |
 | `iis-deploy.yml` | Reusable | Runs on the self-hosted runner on the IIS server; checks out the commit, builds it with `.github/actions/build-app` (locked-mode restore, publish, **build manifest**: commit, run, SHA-256 of every file) straight into the deploy package, verifies the manifest, stamps `APPENV_*` **variables** into `web.config`, and runs `scripts/ci/Deploy-IisSite.ps1`, all in one job |
 
-The runners need no .NET SDK installed in advance: `actions/setup-dotnet` installs the version pinned in `global.json` into the runner's tool cache on first use. Tests are not repeated on the web server, because the deploy only starts once `ci.yml` is green on the same commit (that includes the Windows test job).
+The runners need no .NET SDK installed in advance: the GitHub setup-dotnet action (called by `.github/actions/build-app/action.yml`) installs the version pinned in `global.json` into the runner's tool cache on first use. Tests are not repeated on the web server, because the deploy only starts once `ci.yml` is green on the same commit (that includes the Windows test job).
 
 `scripts/ci/*.ps1` run on Windows PowerShell 5.1: keep them ASCII-only.
 

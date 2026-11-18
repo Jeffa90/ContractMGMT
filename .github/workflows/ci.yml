@@ -38,6 +38,12 @@ jobs:
       - name: Honest result summary (Passed / Failed / Skipped / NOT VERIFIED)
         if: always()
         run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: IIS publish output (web.config, safe Production defaults, no Development settings or local data; files only, NOT an IIS run)
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/iis-publish
+          dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release --no-restore --no-build -o artifacts/iis-publish
+          python3 -I tools/check-iis-publish.py artifacts/iis-publish
       - name: Solution packs (build, reproducibility, sign and verify with an ephemeral key, no embedded packs, no committed private key)
         run: tools/check-packs.sh
       - name: Pack Publisher tool (pack the .NET tool, install that artefact alone, build/validate/report/sign/verify/inspect with it; no source checkout is used by the tool)
@@ -53,6 +59,8 @@ jobs:
           path: artifacts/pack-tool
       - name: Repository consistency checks (links, CSV/JSON, references, manifest, Mermaid structure)
         run: python3 -I tools/check-repo.py .
+      - name: Secrets scan (private keys, token formats and secret-looking assignments in tracked files; a safety net, not a guarantee)
+        run: python3 -I tools/check-secrets.py .
       - name: Implementation documentation consistency (guides name only real pages and permissions; retired statements absent)
         run: python3 -I tools/check-docs.py .
       - name: Tooling script tests
@@ -73,9 +81,44 @@ jobs:
           name: test-results-non-sql
           path: TestResults/*.trx
 
+  windows-build-and-test:
+    name: Windows - build, tests and IIS publish output (not an IIS run)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the S9 portability guard reads the git history against its baseline commit
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore (locked)
+        run: dotnet restore src/Ecp.sln --locked-mode
+      - name: Build (warnings are errors; NuGet audit is a gate)
+        run: dotnet build src/Ecp.sln -c Release --no-restore
+      - name: Test (everything that does not need SQL Server)
+        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category!=SqlServer" --logger "trx" --results-directory TestResults
+        env:
+          ECP_TEST_SQL: ""
+      - name: IIS publish output (files only; this runner has no IIS site for the application)
+        shell: pwsh
+        run: |
+          dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release --no-restore --no-build -o artifacts/iis-publish
+          python -I tools/check-iis-publish.py artifacts/iis-publish
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-windows
+          path: TestResults/*.trx
+
   sqlserver-integration:
-    name: SQL Server integration (migrations, constraints, RLS, provider behaviour)
+    name: SQL Server ${{ matrix.sqlserver }} integration (migrations, constraints, RLS, provider behaviour)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 2022 is the long-standing baseline; 2025 (version 17.x) is the version of the first QA database server.
+        sqlserver: ["2022-latest", "2025-latest"]
     timeout-minutes: 40
     needs: build-and-unit
     steps:
@@ -94,7 +137,7 @@ jobs:
           BK="$RUNNER_TEMP/ecp-backups"; mkdir -p "$BK"; chmod 0777 "$BK"
           command -v setfacl >/dev/null || sudo apt-get install -y -qq acl >/dev/null
           sudo setfacl -R -m "u:$(id -u):rwx" "$BK"; sudo setfacl -d -m "u:$(id -u):rwx" "$BK"
-          docker run -d --name ecp-sql --user root -p 14330:1433 -v "$BK:/ecp-backups" -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:2022-latest >/dev/null
+          docker run -d --name ecp-sql --user root -p 14330:1433 -v "$BK:/ecp-backups" -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:${{ matrix.sqlserver }} >/dev/null
           echo "ECP_TEST_SQL_BACKUP_DIR=$BK" >> "$GITHUB_ENV"
           echo "ECP_TEST_SQL_BACKUP_DIR_SERVER=/ecp-backups" >> "$GITHUB_ENV"
           for i in $(seq 1 60); do
@@ -119,11 +162,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: upgrade-rehearsal-evidence
+          name: upgrade-rehearsal-evidence-${{ matrix.sqlserver }}
           path: ${{ runner.temp }}/ecp-upgrade-evidence
           if-no-files-found: warn
       - name: SQL Server tests (includes real BACKUP DATABASE, RESTORE VERIFYONLY and RESTORE DATABASE of a populated synthetic installation, post-restore validation, and the operation-lease race)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category!=Performance" --logger "trx" --results-directory TestResults
+      - name: SQL Server permission probe for the DBA (prints what the proposed database roles can and cannot do; evidence, not a policy gate)
+        if: always()
+        run: dotnet test tests/Ecp.Integration.Tests/Ecp.Integration.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~SqlPermissionProbeTests" --logger "console;verbosity=detailed"
       - name: Performance baseline and query plans (SQL Server)
         run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx" --results-directory TestResults
       - name: Print performance baseline and plan report (SQL Server)
@@ -142,7 +188,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-sql
+          name: test-results-sql-${{ matrix.sqlserver }}
           path: TestResults/*.trx
 
   docker-image:

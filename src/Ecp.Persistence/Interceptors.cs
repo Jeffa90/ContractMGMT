@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Ecp.Persistence;
 
-/// <summary>Keeps the scope's shared connection open between EF operations so session context and transactions survive.</summary>
+/// <summary>Keeps the scope's shared connection open between EF operations so the unit-of-work transaction survives.</summary>
 public sealed class KeepScopedConnectionOpenInterceptor : DbConnectionInterceptor
 {
     public override InterceptionResult ConnectionClosing(DbConnection connection, ConnectionEventData eventData, InterceptionResult result)
@@ -17,30 +17,28 @@ public sealed class KeepScopedConnectionOpenInterceptor : DbConnectionIntercepto
 }
 
 /// <summary>
-/// Before every command on a scope's shared connection: (1) aligns the command's transaction with the scope's current unit-of-work
-/// transaction (or none), so a context can never use a finished transaction or miss the active one; and (2) makes sure the SQL Server
-/// session carries the current tenant scope, so Row-Level Security predicates always evaluate against the scope the application
-/// believes it is in (fail closed when none is set).
+/// Before every command on a scope's shared connection, aligns the command's transaction with the scope's current unit-of-work
+/// transaction (or none), so a context can never use a finished transaction or miss the active one.
 /// </summary>
-public sealed class TenantSessionContextInterceptor : DbCommandInterceptor
+public sealed class ScopedTransactionInterceptor : DbCommandInterceptor
 {
     public override InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
     { Apply(command); return result; }
 
-    public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
-    { await ApplyAsync(command, cancellationToken); return result; }
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+    { Apply(command); return ValueTask.FromResult(result); }
 
     public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
     { Apply(command); return result; }
 
-    public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
-    { await ApplyAsync(command, cancellationToken); return result; }
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    { Apply(command); return ValueTask.FromResult(result); }
 
     public override InterceptionResult<object> ScalarExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<object> result)
     { Apply(command); return result; }
 
-    public override async ValueTask<InterceptionResult<object>> ScalarExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
-    { await ApplyAsync(command, cancellationToken); return result; }
+    public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
+    { Apply(command); return ValueTask.FromResult(result); }
 
     /// <summary>
     /// While a unit of work is active every command joins its transaction. Otherwise a transaction EF started itself (for example while
@@ -58,19 +56,6 @@ public sealed class TenantSessionContextInterceptor : DbCommandInterceptor
 
     private static void Apply(DbCommand command)
     {
-        if (command.Connection is { } c && ScopedConnection.TryGet(c, out var scoped))
-        {
-            AlignTransaction(command, scoped);
-            scoped.EnsureSessionContext(c, command.Transaction);
-        }
-    }
-
-    private static async Task ApplyAsync(DbCommand command, CancellationToken ct)
-    {
-        if (command.Connection is { } c && ScopedConnection.TryGet(c, out var scoped))
-        {
-            AlignTransaction(command, scoped);
-            await scoped.EnsureSessionContextAsync(c, command.Transaction, ct);
-        }
+        if (command.Connection is { } c && ScopedConnection.TryGet(c, out var scoped)) AlignTransaction(command, scoped);
     }
 }

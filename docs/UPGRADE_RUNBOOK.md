@@ -12,6 +12,17 @@ For a trained operator. Policy and background: `docs/UPGRADES.md`. Way back: `do
 4. Book the maintenance window. Estimate its length from the rehearsal (step 3), not from a guess.
 5. Decide who signs off (section 10).
 
+### Databases created before ADR-0044 (retired row-level security)
+
+Platform 1.1.0 retires SQL Server Row-Level Security and the `ecp_runtime` role (ADR-0044). A database created by an earlier build still holds tenant security policies; this build sets no session context, so those policies would hide every row from it and the pre-flight would read nothing. Pre-flight UPF-053 (validation VAL-007) fails with this instruction while any such object remains.
+
+1. Take and verify the backup (section 4 of the runbook order still applies; the backup comes first).
+2. A DBA (db_owner or equivalent for this one run: `ALTER ANY SECURITY POLICY` and control of the role are needed) runs `deploy/sql/remove-retired-row-level-security.sql`. It drops every `TenantPolicy_*` policy, the two predicate functions, the empty `security` schema and the `ecp_runtime` role with its members, grants and DENY. Every statement is guarded, so it is safe to run twice; it touches no table, row or audit event.
+3. Continue with section 2 (pre-flight). The forward migration Audit migration `20261118000000_RemoveRowLevelSecurity` then finds nothing to do.
+4. Afterwards the runtime account needs only db_datareader + db_datawriter and the migration account only db_ddladmin + db_datareader + db_datawriter; remove the extra rights the earlier model needed.
+
+A fresh installation (the JBS case) needs none of this.
+
 ## 1. Deploy the new files without admitting users
 
 Deploy the new build next to the old one (new container image, same configuration and secrets, **do not route users to it yet**). The new build must not run `migrate` in Production: on a database that already holds an installation it refuses.
@@ -80,7 +91,7 @@ dotnet Ecp.Host.dll upgrade-apply <backup id> --reason "<change id and why>" --c
 
 ## 6. After a successful upgrade
 
-1. Open **Post-Upgrade Validation** (or `upgrade-history`) and read it: migration records, schema, row-level security, audit chains, documents.
+1. Open **Post-Upgrade Validation** (or `upgrade-history`) and read it: migration records, schema, no retired row-level security (VAL-007), audit chains, documents.
 2. Admit users to the new build. Watch health, notification dispatch and the first approvals.
 3. Run your own acceptance checks (a contract in each organisation: search, export, approve, document download). The CI journeys are the platform's check, not yours.
 4. Take a new backup with the new version and verify it. **Keep the pre-upgrade backup and the previous release's files** until the owner accepts the upgrade; then follow your retention policy.

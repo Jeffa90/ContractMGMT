@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ecp.Host.Pages.Admin.Setup;
 
 [Authorize(Policy = "perm:setup.run")]
-public sealed class StepModel(ISetupService setup, IAuthorizationService authorisation, IAccessService access, OidcSchemeManager oidc) : EcpPageModel
+public sealed class StepModel(ISetupService setup, IAuthorizationService authorisation, IAccessService access, OidcSchemeManager oidc, Ecp.Identity.Windows.IWindowsSignIn windows) : EcpPageModel
 {
     public StageDescriptor? Stage { get; private set; }
     public StageResult? Result { get; private set; }
@@ -37,7 +37,11 @@ public sealed class StepModel(ISetupService setup, IAuthorizationService authori
         Stage = await setup.DescribeAsync(id, amending: true, ct);
         if (Stage is null) return false;
         if (Guid.TryParse(User.FindFirstValue(EcpClaims.TenantId), out var tenantId) && id == "identity")
-            TestLinks = [.. oidc.ForTenant(tenantId).Select(p => new Ecp.Host.Pages.Setup.TestSignInLink(p.Scheme, p.Settings.Key, p.Settings.DisplayName))];
+        {
+            var links = oidc.ForTenant(tenantId).Select(p => new Ecp.Host.Pages.Setup.TestSignInLink(p.Scheme, p.Settings.Key, p.Settings.DisplayName)).ToList();
+            if (await windows.ProviderKeyAsync(ct) is { } windowsKey) links.Add(new Ecp.Host.Pages.Setup.TestSignInLink(Ecp.Host.Pages.Setup.TestSignInLink.WindowsScheme, windowsKey, "Windows"));   // the session already runs in this tenant
+            TestLinks = links;
+        }
         return true;
     }
 }

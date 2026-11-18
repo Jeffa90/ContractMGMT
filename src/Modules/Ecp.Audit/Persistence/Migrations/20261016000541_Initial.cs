@@ -73,7 +73,7 @@ namespace Ecp.Audit.Persistence.Migrations
             migrationBuilder.GrantRuntimeAccess("audit");
             // Append-only (INV-50): no UPDATE or DELETE, even for privileged logins. Tests disable the trigger only to simulate tampering.
             migrationBuilder.Sql(@"CREATE TRIGGER audit.TR_AuditEvent_AppendOnly ON audit.AuditEvent INSTEAD OF UPDATE, DELETE AS BEGIN SET NOCOUNT ON; THROW 51000, N'audit.AuditEvent is append-only.', 1; END");
-            migrationBuilder.Sql($"DENY UPDATE, DELETE ON audit.AuditEvent TO [{RowLevelSecurity.RuntimeRole}];");
+            // The DENY UPDATE, DELETE to the retired ecp_runtime role was removed with that role (ADR-0044); the trigger above refuses both for every login.
         }
 
         /// <inheritdoc />

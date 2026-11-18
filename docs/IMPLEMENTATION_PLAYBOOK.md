@@ -287,8 +287,8 @@ Rating for the whole section: **C**. A Business Administrator cannot do any of i
 
 | Setting | Purpose and example | Secret? |
 |---|---|---|
-| `Ecp__Mode` = `Production` | The mode. **A missing or unrecognised value silently becomes Production.** The shipped default file says Demo, so always set it explicitly | No |
-| `Ecp__DemoSeed` = `false` | Must be false. With true (the shipped default) the installation fills itself with fake data and **skips the setup wizard entirely** | No |
+| `Ecp__Mode` = `Production` | The mode. **A missing or unrecognised value silently becomes Production.** The published default file now says Production (Demo values live only in the unpublished `appsettings.Development.json`); set it explicitly anyway | No |
+| `Ecp__DemoSeed` = `false` | Must be false (the published default). With true the installation fills itself with fake data and **skips the setup wizard entirely** | No |
 | `Ecp__DemoTenantResolution` = `false` | Must be false in Production (default true) | No |
 | `Database__Provider` = `SqlServer` | Production refuses anything else (default is SQLite) | No |
 | `Database__ConnectionStringRef` = `file:/run/secrets/ecp-sql` | A reference to the secret file. Only `env:NAME` and `file:/path` work. A pasted connection string is refused in Production | The file's content |

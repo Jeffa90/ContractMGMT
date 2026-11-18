@@ -54,7 +54,7 @@ public static class UpgradeVersions
 
 internal sealed class UpgradePreflight(
     UpgradeCatalogue catalogue, IDatabaseBackupProvider database, IBackupCatalogue backups, IBackupVerifier verifier, IInstallationValidator validator, IInstallationInventory inventory,
-    IOptions<RecoveryOptions> recovery, IClock clock, StartupFacts facts) : IUpgradePreflight
+    IOptions<RecoveryOptions> recovery, IClock clock, StartupFacts facts, IExternalRecoveryPoints externalPoints) : IUpgradePreflight
 {
     private static readonly object Gate = new();
     private static MigrationLedger? _compiled;
@@ -148,7 +148,7 @@ internal sealed class UpgradePreflight(
         // ---- Historical migrations and recorded checksums ----
         await Run("UPF-015", "Historical migration checksums", async () =>
         {
-            var changed = new List<string>(); var unrecorded = 0; var generatorDiffers = 0;
+            var changed = new List<string>(); var unrecorded = 0; var generatorDiffers = 0; var amended = 0;
             var baseline = detected != "unknown" ? catalogue.Baseline(detected) : null;
             foreach (var (module, ids) in applied)
             {
@@ -157,7 +157,11 @@ internal sealed class UpgradePreflight(
                 {
                     var now = compiledModule?.Migrations.FirstOrDefault(m => m.Id == id);
                     var was = baseline?.Modules.FirstOrDefault(m => m.Module == module)?.Migrations.FirstOrDefault(m => m.Id == id);
-                    if (now is not null && was is not null && !string.Equals(now.Checksum, was.Checksum, StringComparison.Ordinal)) changed.Add($"{module}/{id} (differs from the {detected} baseline)");
+                    if (now is not null && was is not null && !string.Equals(now.Checksum, was.Checksum, StringComparison.Ordinal))
+                    {
+                        if (catalogue.Reviews.IsAmendment(module, id, was.Checksum, now.Checksum)) amended++;
+                        else changed.Add($"{module}/{id} (differs from the {detected} baseline)");
+                    }
                 }
             }
             await using var scope = target.Services.CreateAsyncScope();
@@ -169,7 +173,8 @@ internal sealed class UpgradePreflight(
                     if (now is null) continue;
                     if (!string.Equals(now.Checksum, r.Checksum, StringComparison.Ordinal))
                     {
-                        if (!string.Equals(r.Generator, compiled.Generator, StringComparison.Ordinal)) generatorDiffers++;
+                        if (catalogue.Reviews.IsAmendment(r.Module, r.MigrationId, r.Checksum, now.Checksum)) amended++;
+                        else if (!string.Equals(r.Generator, compiled.Generator, StringComparison.Ordinal)) generatorDiffers++;
                         else changed.Add($"{r.Module}/{r.MigrationId} (differs from the checksum recorded when it was applied)");
                     }
                 }
@@ -179,8 +184,9 @@ internal sealed class UpgradePreflight(
                     string.Join("; ", changed.Take(10)), "Do not upgrade. Obtain the release again, verify it, and compare the database with a verified backup."));
             else
                 checks.Add(Make("UPF-015", "Historical migration checksums", generatorDiffers > 0 || unrecorded > 0 && records is not null && detected == "unknown" ? CheckOutcome.Warning : CheckOutcome.Passed, CheckSeverity.Low,
-                    "Every applied migration matches its frozen baseline" + (records is null ? " (the platform has not recorded checksums for this database yet; they are recorded when the upgrade is applied)." : "; recorded checksums agree."),
-                    generatorDiffers > 0 ? $"{generatorDiffers} recorded checksum(s) were produced by another data-access library version and could not be compared." : "", ""));
+                    "Every applied migration matches its frozen baseline" + (amended > 0 ? " or an owner-approved amendment" : "") + (records is null ? " (the platform has not recorded checksums for this database yet; they are recorded when the upgrade is applied)." : "; recorded checksums agree."),
+                    string.Join(" ", new[] { generatorDiffers > 0 ? $"{generatorDiffers} recorded checksum(s) were produced by another data-access library version and could not be compared." : "",
+                        amended > 0 ? $"{amended} difference(s) are exactly the owner-approved amendments recorded in upgrades/migration-reviews.json (ADR-0044: retired row-level security helpers emit nothing)." : "" }.Where(x => x.Length > 0)), ""));
         });
 
         // ---- Schema drift ----
@@ -229,7 +235,7 @@ internal sealed class UpgradePreflight(
     {
         var code = c.Code switch
         {
-            "VAL-001" => "UPF-004", "VAL-006" => "UPF-052", "VAL-007" => "UPF-053", "VAL-008" => "UPF-054", "VAL-009" => "UPF-055", "VAL-010" => "UPF-056", "VAL-011" => "UPF-057", "VAL-013" => "UPF-061",
+            "VAL-001" => "UPF-004", "VAL-006" => "UPF-052", "VAL-007" => "UPF-053", "VAL-009" => "UPF-055", "VAL-010" => "UPF-056", "VAL-011" => "UPF-057", "VAL-013" => "UPF-061",
             "VAL-014" => "UPF-062", "VAL-015" => "UPF-063", "VAL-016" => "UPF-064", "VAL-017" => "UPF-065", "VAL-018" => "UPF-066", "VAL-019" => "UPF-067", "VAL-000" => "UPF-005", _ => "UPF-059"
         };
         return c with { Code = code, Title = $"{c.Title} ({c.Code})", CorrelationId = _correlation };
@@ -303,8 +309,49 @@ internal sealed class UpgradePreflight(
         }
     }
 
+    /// <summary>
+    /// Recovery owned by the database administrators (Ecp:Recovery:Mode = External): the rollback point is one they declared. The platform did not create it and cannot prove it restores, so the
+    /// check is NOT VERIFIED and the operator has to accept it by name; its age, environment and schema version are still checked against what they declared.
+    /// </summary>
+    private async Task ExternalPointAsync(PreflightOptions options, string detected, List<ValidationCheck> checks, CancellationToken ct)
+    {
+        const string title = "Recovery point owned by the DBA";
+        ExternalRecoveryPoint? point;
+        if (options.BackupId is { Length: > 0 } id) point = await externalPoints.FindAsync(id, ct);
+        else if (options.Phase == PreflightPhase.Apply)
+        {
+            checks.Add(Make("UPF-020", title, CheckOutcome.Failed, CheckSeverity.Critical, "An upgrade must name the recovery point it can be rolled back to.", "", "Ask the DBA to take and verify a recovery point, record it with declare-recovery-point, and name it."));
+            return;
+        }
+        else point = (await externalPoints.ListAsync(ct)).FirstOrDefault();
+        if (point is null)
+        {
+            checks.Add(Make("UPF-020", title, CheckOutcome.Failed, CheckSeverity.Critical, options.BackupId is { Length: > 0 } ? "The recovery point named for this upgrade has not been declared." : "No recovery point has been declared. An upgrade can only be rolled back to one.",
+                "", "The DBA takes a recovery point with their own tools; record it with declare-recovery-point (identifier, source, verifier, time, schema version, reason). A wrong identifier is refused, never guessed."));
+            return;
+        }
+        checks.Add(Make("UPF-020", title, CheckOutcome.NotVerified, CheckSeverity.High,
+            $"Recovery point {point.PointId} (“{point.Identifier}”, {point.Source}) is: {ExternalRecoveryStatements.DeclaredNotVerified}. The platform did not take it and cannot prove it can be restored. Verifier named by the DBA: {point.Verifier}. Changes made after {point.TakenUtc:yyyy-MM-dd HH:mm}Z would be lost by a rollback to it, and the platform cannot measure them.",
+            $"declared {point.DeclaredUtc:yyyy-MM-dd HH:mm}Z by {point.DeclaredBy}; record SHA-256 {point.RecordSha256}; correlation {point.CorrelationId}",
+            "Confirm with the DBA that this recovery point was restored successfully in a rehearsal, then accept this check by name (UPF-020). The acceptance is recorded in the upgrade evidence."));
+        var maxAge = TimeSpan.FromHours(Math.Max(1, 24));
+        if (clock.UtcNow - point.TakenUtc > maxAge)
+            checks.Add(Make("UPF-021", "Recovery point age", CheckOutcome.Warning, CheckSeverity.Medium, $"The declared recovery point is more than {maxAge.TotalHours:0} hours old. Anything done since then would be lost by a rollback.", $"taken {point.TakenUtc:yyyy-MM-dd HH:mm}Z", "Ask the DBA for a fresh recovery point and declare it, or accept this warning in writing."));
+        if (!string.Equals(point.Environment, facts.Mode.ToString(), StringComparison.OrdinalIgnoreCase))
+            checks.Add(Make("UPF-022", "Recovery point matches installation", CheckOutcome.Failed, CheckSeverity.Critical, $"The recovery point was declared for {point.Environment} but this installation runs in {facts.Mode} mode.", "", "Declare a recovery point taken from this environment's database."));
+        checks.Add(string.Equals(point.DatabaseSchemaVersion, detected, StringComparison.Ordinal)
+            ? Make("UPF-024", "Recovery point version", CheckOutcome.Passed, CheckSeverity.Info, $"The DBA declared that the recovery point holds the schema of platform {point.DatabaseSchemaVersion}, the version being upgraded from (this is the DBA's declaration, not something this application read from the backup).", "", "")
+            : Make("UPF-024", "Recovery point version", CheckOutcome.Failed, CheckSeverity.High, $"The DBA declared schema {point.DatabaseSchemaVersion}, but the installation being upgraded is at {detected}. Rolling back to it would not return the installation to the version being upgraded.", "", "Declare a recovery point taken at the current version."));
+    }
+
     private async Task BackupAsync(UpgradeTarget target, PreflightOptions options, UpgradeManifest? manifest, string detected, List<ValidationCheck> checks, CancellationToken ct)
     {
+        // Recovery owned by the DBA: unless the operator names one of this application's own verified backups (which are then genuinely verified below), the rollback point is a declared one.
+        if (Options.External && (!Options.BackupConfigured || options.BackupId is null || ExternalRecoveryStatements.IsExternalId(options.BackupId)))
+        {
+            await ExternalPointAsync(options, detected, checks, ct);
+            return;
+        }
         if (!Options.BackupConfigured)
         {
             checks.Add(Make("UPF-020", "Verified backup", CheckOutcome.Failed, CheckSeverity.Critical, "No backup directory is configured, so there is no way to take or check the pre-upgrade backup that rollback depends on.", "", "Configure backups (docs/BACKUP_AND_RESTORE.md) and take a verified backup first."));

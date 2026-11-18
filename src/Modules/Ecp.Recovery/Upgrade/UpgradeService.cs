@@ -102,7 +102,7 @@ internal sealed class UpgradeService(
                 var needs = e.Categories.Any(MigrationCategories.NeedReview.Contains);
                 var reviewed = !needs || catalogue.Reviews.Entries.Any(r => r.Module == m.Module && r.Migration == e.Id) || fresh?.Reviewed == true;
                 var rec = recorded?.FirstOrDefault(r => r.Module == m.Module && r.MigrationId == e.Id);
-                var recState = recorded is null ? "not recorded yet" : rec is null ? "not recorded" : rec.Checksum == e.Checksum ? "matches" : "DIFFERS";
+                var recState = recorded is null ? "not recorded yet" : rec is null ? "not recorded" : rec.Checksum == e.Checksum ? "matches" : catalogue.Reviews.IsAmendment(m.Module, e.Id, rec.Checksum, e.Checksum) ? "amended (owner-approved)" : "DIFFERS";
                 return new MigrationReportRow(e.Id, have.Contains(e.Id) ? "Applied" : "Pending", e.Categories, e.Objects, needs, reviewed, have.Contains(e.Id) ? recState : null);
             }).ToList();
             modules.Add(new MigrationReportModule(m.Module, m.SchemaVersion, rows.Count(r => r.Status == "Applied"), rows.Count(r => r.Status == "Pending"), rows));
@@ -188,12 +188,6 @@ internal sealed class UpgradeService(
 
             // 4. What the data looks like immediately before the first migration: the post-upgrade comparison is against this.
             var before = await inventory.CollectAsync(target.Services, Options.TableChecksums, ct);
-            IReadOnlyList<string> policiesBefore;
-            await using (var scope = target.Services.CreateAsyncScope())
-            {
-                using var _ = scope.ServiceProvider.GetRequiredService<TenantContext>().UseInstallationScope();
-                policiesBefore = await SchemaInspector.PoliciesAsync(scope.ServiceProvider, ct);
-            }
             recoveryLease.ThrowIfLost(); upgradeLease.ThrowIfLost();
 
             // 5. Migrate, one module at a time in tier order. The first failure stops everything.
@@ -220,7 +214,7 @@ internal sealed class UpgradeService(
 
             // 6. Record what was verified and applied, then validate.
             await RecordMigrationsAsync(target, request.Operator, correlation, compiled, appliedNow, from, run, ct);
-            validation = await ValidateAsync(target, manifest, before, policiesBefore, run, ct);
+            validation = await ValidateAsync(target, manifest, before, run, ct);
             if (validation.AllowsRelease)
             {
                 await InScope(target, request.Operator, correlation, s => s.GetRequiredService<IMaintenanceService>().DisableAsync($"Upgrade {from} to {manifest.TargetPlatformVersion} validated ({validation.Outcome})", request.Operator, acknowledgeRestoreState: true, ct));
@@ -306,11 +300,11 @@ internal sealed class UpgradeService(
     }
 
     /// <summary>The post-upgrade validation: the ordinary checks in their post-upgrade profile, plus the upgrade's own (UPV) checks.</summary>
-    private async Task<ValidationReport> ValidateAsync(UpgradeTarget target, UpgradeManifest manifest, InventorySnapshot before, IReadOnlyList<string> policiesBefore, Guid run, CancellationToken ct)
+    private async Task<ValidationReport> ValidateAsync(UpgradeTarget target, UpgradeManifest manifest, InventorySnapshot before, Guid run, CancellationToken ct)
     {
         var started = clock.UtcNow;
         var report = await validator.ValidateAsync(new ValidationTarget(target.Services, target.ConnectionString, target.DatabaseName, Restored: false, Manifest: null, HashDocumentContent: true, Subject: $"{target.Label} after upgrade to {manifest.TargetPlatformVersion}",
-            Profile: ValidationProfile.PostUpgrade, Upgrade: new UpgradeExpectation(manifest, before, policiesBefore)), ct);
+            Profile: ValidationProfile.PostUpgrade, Upgrade: new UpgradeExpectation(manifest, before)), ct);
         var extra = new List<ValidationCheck>();
         ValidationCheck Make(string code, string title, CheckOutcome o, CheckSeverity sev, string d, string detail, string fix) => new(code, title, o, sev, d, Redaction.Clean(detail), fix, report.CorrelationId);
         try
@@ -320,7 +314,7 @@ internal sealed class UpgradeService(
             using var _ = scope.ServiceProvider.GetRequiredService<TenantContext>().UseInstallationScope();
             var records = await scope.ServiceProvider.GetRequiredService<IMigrationRecords>().ListAsync(ct);
             var missing = compiled.All.Where(c => records is null || records.All(r => r.Module != c.Module || r.MigrationId != c.Entry.Id)).Select(c => $"{c.Module}/{c.Entry.Id}").ToList();
-            var wrong = records is null ? [] : records.Where(r => compiled.Find(r.Module)?.Migrations.FirstOrDefault(m => m.Id == r.MigrationId) is { } m && m.Checksum != r.Checksum).Select(r => $"{r.Module}/{r.MigrationId}").ToList();
+            var wrong = records is null ? [] : records.Where(r => compiled.Find(r.Module)?.Migrations.FirstOrDefault(m => m.Id == r.MigrationId) is { } m && m.Checksum != r.Checksum && !catalogue.Reviews.IsAmendment(r.Module, r.MigrationId, r.Checksum, m.Checksum)).Select(r => $"{r.Module}/{r.MigrationId}").ToList();
             extra.Add(missing.Count == 0 && wrong.Count == 0
                 ? Make("UPV-001", "Migration records", CheckOutcome.Passed, CheckSeverity.Info, "Every migration is recorded with the checksum the manifest declares.", $"{records?.Count} record(s)", "")
                 : Make("UPV-001", "Migration records", CheckOutcome.Failed, CheckSeverity.High, "The migration records are incomplete or disagree with the manifest.", $"missing: {string.Join(", ", missing.Take(5))}; differing: {string.Join(", ", wrong.Take(5))}", "Do not release this installation. Roll back by restoring the verified pre-upgrade backup."));

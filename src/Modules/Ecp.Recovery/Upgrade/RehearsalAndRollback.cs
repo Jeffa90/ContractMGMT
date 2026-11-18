@@ -43,6 +43,8 @@ internal sealed class UpgradeRehearsal(IRestoreService restores, UpgradeService 
     {
         if (string.IsNullOrWhiteSpace(request.Reason)) throw new DomainException("reason_required", "A reason is required to rehearse an upgrade.");
         var reason = Redaction.Clean(request.Reason.Trim());
+        if (ExternalRecoveryStatements.IsExternalId(request.BackupId))
+            throw new DomainException("external_recovery_point", "A rehearsal restores one of this application's own backups. A recovery point declared by the DBA is restored with the DBA's tools, so rehearse it there and record the outcome with the DBA's evidence.");
         if (!string.Equals(request.ConfirmationText?.Trim(), RehearsalPhrases.For(request.BackupId), StringComparison.Ordinal))
             throw new DomainException("confirmation_required", $"Type exactly “{RehearsalPhrases.For(request.BackupId)}” to confirm the rehearsal.");
         if (!recovery.Value.RestoreConfigured) throw new DomainException("restore_not_configured", "No restore target directory is configured (Ecp:Recovery:RestoreTargetDirectory), so a rehearsal cannot be restored.");
@@ -108,6 +110,8 @@ internal sealed class RollbackEvidenceService(IRestoreService restores, IBackupV
         var correlation = Guid.NewGuid().ToString("N");
         if (string.IsNullOrWhiteSpace(request.Reason)) throw new DomainException("reason_required", "A reason is required to prove a rollback.");
         var reason = Redaction.Clean(request.Reason.Trim());
+        if (ExternalRecoveryStatements.IsExternalId(request.BackupId))
+            throw new DomainException("external_recovery_point", "Rollback evidence restores one of this application's own backups. A recovery point declared by the DBA is restored with the DBA's tools; this application cannot prove it.");
         if (!string.Equals(request.ConfirmationText?.Trim(), RollbackPhrases.For(request.BackupId), StringComparison.Ordinal))
             throw new DomainException("confirmation_required", $"Type exactly “{RollbackPhrases.For(request.BackupId)}” to confirm.");
         if (!recovery.Value.RestoreConfigured) throw new DomainException("restore_not_configured", "No restore target directory is configured (Ecp:Recovery:RestoreTargetDirectory), so rollback cannot be proved.");

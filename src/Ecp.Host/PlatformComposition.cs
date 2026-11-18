@@ -96,6 +96,8 @@ public static class PlatformComposition
         else if (resolved.Host.Mode == EcpMode.Production) o.AdminConnectionString = "";
         if (!string.IsNullOrWhiteSpace(o.BackupDirectory) && !Path.IsPathRooted(o.BackupDirectory)) o.BackupDirectory = Path.GetFullPath(o.BackupDirectory, contentRoot);
         if (!string.IsNullOrWhiteSpace(o.RestoreTargetDirectory) && !Path.IsPathRooted(o.RestoreTargetDirectory)) o.RestoreTargetDirectory = Path.GetFullPath(o.RestoreTargetDirectory, contentRoot);
+        if (string.IsNullOrWhiteSpace(o.ExternalRecoveryPointsDirectory)) o.ExternalRecoveryPointsDirectory = Path.Combine(resolved.Host.DataDirectory, "recovery-points");
+        else if (!Path.IsPathRooted(o.ExternalRecoveryPointsDirectory)) o.ExternalRecoveryPointsDirectory = Path.GetFullPath(o.ExternalRecoveryPointsDirectory, contentRoot);
         o.ServedRoots = [webRoot, contentRoot];
     }
 }

@@ -1,6 +1,7 @@
 using Ecp.Lifecycle;
 using Ecp.Lifecycle.Domain;
 using Ecp.SharedKernel;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages;
@@ -13,6 +14,9 @@ public sealed record StepsView(string SubjectKind, Guid SubjectId, string Status
 /// The steps a contract and a Variation share: take a plain step, submit to Legal, send for signature, attach the executed copy, submit for register authorisation. Each handler passes the request to the
 /// service that owns the step; the page decides nothing, so a crafted post gets the same answer as a button would.
 /// </summary>
+[RequestSizeLimit(UploadLimits.DocumentRequestBytes)]
+[RequestFormLimits(MultipartBodyLengthLimit = UploadLimits.DocumentRequestBytes)]
+[RequestTimeout(UploadLimits.UploadTimeoutPolicy)]
 public abstract class StepsPageModel(ILifecycleService lifecycle, IVariationService variations, ILegalReviewService legal, ISignatureRequestService execution, IRegisterAuthorisationService approvals) : EcpPageModel
 {
     protected ILifecycleService Lifecycle { get; } = lifecycle;

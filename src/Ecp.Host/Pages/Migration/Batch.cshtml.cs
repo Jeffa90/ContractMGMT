@@ -2,6 +2,7 @@ using Ecp.DataMigration;
 using Ecp.DataMigration.Domain;
 using Ecp.Tenancy;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Migration;
@@ -10,8 +11,9 @@ namespace Ecp.Host.Pages.Migration;
 /// The migration wizard for one batch: load sources, choose the profile, dry run, review, confirm and commit, reconcile, accept, roll back. Each step is a service call that
 /// authorises on the server; the page only offers what the caller may do and explains what each step does.
 /// </summary>
-[RequestSizeLimit(2_147_483_648)]
-[RequestFormLimits(MultipartBodyLengthLimit = 2_147_483_648)]
+[RequestSizeLimit(UploadLimits.MigrationArchiveRequestBytes)]
+[RequestFormLimits(MultipartBodyLengthLimit = UploadLimits.MigrationArchiveRequestBytes)]
+[RequestTimeout(UploadLimits.MigrationTimeoutPolicy)]
 public sealed class BatchModel(IMigrationBatches batches, IMigrationIntake intake, IMigrationValidation validation, IMigrationCommit commit, IMigrationRollback rollback,
     IMigrationReports reports, IMappingProfiles profiles, IOrganisationStructureService organisations, IMaskedDataDeclarations masked, Microsoft.Extensions.Options.IOptions<MigrationOptions> migrationOptions) : MigrationPageModel
 {

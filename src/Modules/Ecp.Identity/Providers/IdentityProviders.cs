@@ -5,7 +5,16 @@ using Ecp.SharedKernel.Secrets;
 
 namespace Ecp.Identity.Providers;
 
-public enum IdentityProviderKind { Oidc, Entra, Demo }
+public enum IdentityProviderKind
+{
+    Oidc, Entra, Demo,
+
+    /// <summary>
+    /// Windows Authentication performed by the web server (IIS). It establishes who the person is and nothing else: no role, scope or permission comes from it.
+    /// The person must also have been invited, be active and hold effective access in the application (docs/DEPLOYMENT.md, "Windows Authentication").
+    /// </summary>
+    Windows
+}
 
 /// <summary>
 /// Non-secret settings of one identity provider plus a secret <em>reference</em> for the client secret (never the value).
@@ -15,6 +24,10 @@ public sealed record IdentityProviderSettings(
     string Key, IdentityProviderKind Kind, string DisplayName, string? Authority, string? ClientId, string? ClientSecretRef,
     string? EntraTenantId, string Scopes = "openid profile email", string GroupsClaim = "groups", bool Enabled = true)
 {
+    /// <summary>Windows only: the domains whose accounts may sign in (NetBIOS names, separated by commas or spaces). Held in the Authority field; empty means any domain the web server authenticates.</summary>
+    public IReadOnlyList<string> WindowsDomains => Kind != IdentityProviderKind.Windows ? [] :
+        (Authority ?? "").Split([',', ' ', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(d => d.ToUpperInvariant()).Distinct().ToList();
+
     /// <summary>The OpenID Connect authority. Entra's is derived from the directory id so a typo cannot point at another directory.</summary>
     public string? EffectiveAuthority => Kind == IdentityProviderKind.Entra && !string.IsNullOrWhiteSpace(EntraTenantId)
         ? $"https://login.microsoftonline.com/{EntraTenantId!.Trim()}/v2.0"
@@ -38,6 +51,16 @@ public static partial class IdentityProviderValidator
         {
             if (mode == EcpMode.Production) Add("demo_in_production", "Demonstration identity is refused in Production.");
             return issues;
+        }
+
+        if (s.Kind == IdentityProviderKind.Windows)
+        {
+            foreach (var domain in s.WindowsDomains)
+                if (!System.Text.RegularExpressions.Regex.IsMatch(domain, @"^[A-Z0-9][A-Z0-9._-]{0,62}$", RegexOptions.NonBacktracking))
+                    Add("windows_domain", $"'{domain}' is not a valid Windows domain name. Use the short (NetBIOS) name, for example the part before the backslash in DOMAIN\\user.");
+            if (s.WindowsDomains.Count == 0)
+                Add("windows_domains_open", "No domain is named, so an account from any domain the web server authenticates is accepted (it must still be invited). Name the domain(s) to narrow this.", blocking: false);
+            return issues;   // no authority, client or secret: the web server performs the authentication
         }
 
         if (s.Kind == IdentityProviderKind.Entra)

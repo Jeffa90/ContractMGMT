@@ -185,7 +185,7 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - `src/Modules/Ecp.Audit/`, `src/Modules/Ecp.Tenancy/`, `src/Modules/Ecp.Contracts/`, `src/Modules/Ecp.Documents/`, `src/Modules/Ecp.DataMigration/`, `src/Modules/Ecp.Operations/` (each with `packages.lock.json`; the bulk-migration module is `Ecp.DataMigration`, ADR-0015)
 - `tests/Ecp.Tests.Common/`, `tests/Ecp.UnitTests/`, `tests/Ecp.Integration.Tests/`, `tests/Ecp.Architecture.Tests/`, `tests/Ecp.Api.Tests/`
 - `tools/add-migration.sh`, `tools/check-repo.py`, `tools/compose-smoke.sh`, `tools/generate-migration-sample-attachments.py`, `tools/migration-demo.py`, `tools/dev-sandbox.sh`, `tools/docker-runtime-smoke.sh`, `tools/sqlserver-up.sh`, `tools/test-report.sh`
-- `deploy/README.md`, `deploy/STATUS.md`, `deploy/docker/` (Dockerfile, compose.yml, compose.production.yml, smoke.sh), `deploy/iis/` (web.config, README.md), `deploy/azure/` (main.bicep, README.md)
+- `deploy/README.md`, `deploy/STATUS.md`, `deploy/docker/` (Dockerfile, compose.yml, compose.production.yml, smoke.sh), `deploy/iis/` (README.md; the IIS web.config now lives in `src/Ecp.Host/web.config`), `deploy/azure/` (main.bicep, README.md)
 - `.github/workflows/ci.yml`
 - `docs/ENVIRONMENT.md`
 
@@ -365,3 +365,26 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 ## JBS standards review (documentation only, branch ux/guided-administration)
 
 - `docs/JBS_STANDARDS_COMPLIANCE.md`, `docs/JBS_DEPLOYMENT_GAP_PLAN.md`
+
+## JBS IIS integration plan (documentation only)
+
+- `docs/JBS_IIS_INTEGRATION_PLAN.md`
+
+## JBS IIS deployment (branch jbs/iis-integration; from pull request 1 and the IIS integration work)
+
+- `.github/workflows/deploy.yml`, `.github/workflows/dotnet-spa-build.yml`, `.github/workflows/iis-deploy.yml`, `.gitattributes`
+- `scripts/ci/Deploy-IisSite.ps1`, `scripts/ci/Initialize-IisSite.ps1`, `scripts/ci/Invoke-SqlMigrations.ps1`, `scripts/ci/Set-IisAlwaysOn.ps1`, `scripts/ci/Set-IisCertificate.ps1`, `scripts/ci/Set-WebConfigEnvironment.ps1`
+- `scripts/setup/setup-github-environments.sh`
+- `docs/DEPLOYMENT.md`, `docs/JBS_IIS_DEPLOYMENT_REVIEW.md`, `docs/JBS_IIS_INTEGRATION_PLAN.md`, `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`, `docs/JBS_DATABASE_SIMPLIFICATION_REVIEW.md`
+- `src/Ecp.Host/appsettings.Development.json` (local-run values only; never published)
+- `src/Ecp.Host/web.config`, `src/Ecp.Host/UploadLimits.cs`, `tools/check-iis-publish.py`, `tools/tests/test_check_iis_publish.py`, `tests/Ecp.Api.Tests/IisPackagingTests.cs`
+- `src/Ecp.Persistence/ConnectionInspection.cs`, `src/Modules/Ecp.Operations/DatabaseAccessReadinessCheck.cs`, `tests/Ecp.UnitTests/ConnectionInspectionTests.cs`, `tests/Ecp.Integration.Tests/RuntimePrivilegeSqlServerTests.cs`
+- `src/Ecp.Host/DataProtectionSettings.cs`, `tests/Ecp.Api.Tests/DataProtectionTests.cs`
+- Windows Authentication (invite-only): `src/Modules/Ecp.Identity/Windows/WindowsSignIn.cs`, `src/Ecp.Host/Security/WindowsSignInHost.cs`, `src/Ecp.Host/Pages/Account/WindowsSignIn.cshtml`, `src/Ecp.Host/Pages/Account/WindowsSignIn.cshtml.cs`, `src/Ecp.Host/Pages/Account/AccessRefused.cshtml`, `src/Ecp.Host/Pages/Account/AccessRefused.cshtml.cs`, `tests/Ecp.Integration.Tests/WindowsSignInScenarios.cs`, `tests/Ecp.Integration.Tests/WindowsSignInTests.cs`, `tests/Ecp.Api.Tests/WindowsAuthenticationHostTests.cs`
+- External (DBA-owned) recovery points: `src/Modules/Ecp.Recovery/ExternalRecoveryPoints.cs`, `tests/Ecp.Integration.Tests/ExternalRecoveryPointScenarios.cs`
+- Structured logging: `src/Ecp.SharedKernel/Secrets/LogRedactor.cs`, `src/Ecp.Host/Logging/LoggingSettings.cs`, `src/Ecp.Host/Logging/Enrichers.cs`, `src/Ecp.Host/Logging/RedactingFormatter.cs`, `src/Ecp.Host/Logging/FatalEmailSink.cs`, `src/Ecp.Host/Logging/LoggingConfiguration.cs`, `src/Ecp.Host/Logging/LoggingReadinessCheck.cs`, `tests/Ecp.Api.Tests/LoggingTests.cs`
+- Secrets scan and GitHub environment setup: `tools/check-secrets.py`, `tools/secrets-allowlist.json`, `tools/tests/test_check_secrets.py`, `scripts/setup/environments.example.env`
+- Pipeline safety: `scripts/ci/Test-BuildManifest.ps1`, `tools/tests/test_setup_github_environments.py`
+- `decisions/ADR-0042-windows-authentication-identity-only-invite-only.md`, `decisions/ADR-0043-recovery-points-owned-by-the-dba.md`, `decisions/ADR-0044-jbs-simplified-database-model.md`
+- JBS QA deployment preparation: `docs/jbs/jbs-github-environments.env` (owner-confirmed, non-secret environment values), `tests/Ecp.Api.Tests/WarmupEndpointTests.cs`, `tests/Ecp.Integration.Tests/SqlPermissionProbeTests.cs`
+- JBS simplified database model (ADR-0044): `src/Modules/Ecp.Audit/Persistence/Migrations/20261118000000_RemoveRowLevelSecurity.cs` (and its designer file), `deploy/sql/remove-retired-row-level-security.sql`, `tests/Ecp.Integration.Tests/SqlServerSimplifiedModelTests.cs`, `tests/Ecp.Architecture.Tests/DatabaseSimplificationGuardTests.cs`

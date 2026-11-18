@@ -174,7 +174,7 @@ Run automatically on a restored copy, and on demand on the running installation 
 | VAL-003 | Every table this version expects exists |
 | VAL-005 | Tenant, organisation, contract, counterparty, audit and every other table: counts (and, for a quiescent backup, content checksums) equal the backup's; for an online backup, within the recorded range |
 | VAL-006 | Foreign keys enabled, trusted and satisfied (including the composite tenant keys) |
-| VAL-007, 008 | Row-level security policies enabled and equal to the backup's; `SESSION_CONTEXT` behaviour (nothing visible with no tenant; only one tenant's rows with one) |
+| VAL-007 | No retired row-level security object remains (no security policy, `security`-schema object or `ecp_runtime` role; ADR-0044). VAL-008 (session-context isolation) was retired with Row-Level Security |
 | VAL-009 | Audit chain of every tenant verifies and ends where the backup recorded; a chain already broken at backup time is preserved and reported, not repaired |
 | VAL-010 | Document metadata matches content (presence, size and, in a restore, SHA-256), with no more damage than the backup recorded |
 | VAL-011 | Installed package files present, hashed to their record, signatures acceptable under the restored trust store, trust keys equal to the backup's |

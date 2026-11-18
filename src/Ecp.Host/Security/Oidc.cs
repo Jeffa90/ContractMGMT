@@ -36,7 +36,7 @@ public sealed class OidcSchemeManager(IAuthenticationSchemeProvider schemes, IOp
     {
         var scheme = SchemeName(tenantId, settings.Key);
         Remove(tenantId, settings.Key);
-        if (!settings.Enabled || settings.Kind == IdentityProviderKind.Demo) return;
+        if (!settings.Enabled || settings.Kind is IdentityProviderKind.Demo or IdentityProviderKind.Windows) return;   // Windows sign-in is performed by the web server, not by an OpenID Connect handler
         _providers[scheme] = new RegisteredOidcProvider(scheme, tenantId, settings);
         schemes.AddScheme(new AuthenticationScheme(scheme, settings.DisplayName, typeof(OpenIdConnectHandler)));
         logger.LogInformation("Registered identity provider {Provider} for tenant {Tenant}", settings.Key, tenantId);

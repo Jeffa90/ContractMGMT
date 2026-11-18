@@ -6,6 +6,13 @@ namespace Ecp.Recovery;
 /// </summary>
 public sealed class RecoveryOptions
 {
+    /// <summary>
+    /// Who owns backup and recovery. <c>Application</c> (default): the platform takes and verifies its own backups and an upgrade needs one it verified. <c>External</c>: the database administrators or infrastructure
+    /// team own backups; an upgrade needs a recovery point they have declared (docs/DEPLOYMENT.md, "Recovery points owned by the DBA"). The platform then never claims to have created or verified it.
+    /// </summary>
+    public string Mode { get; set; } = nameof(RecoveryMode.Application);
+    /// <summary>Where declared (external) recovery points are recorded, outside the web root. The host defaults it to a folder under the data directory.</summary>
+    public string ExternalRecoveryPointsDirectory { get; set; } = "";
     /// <summary>Where backups are written, as this application sees the path. Must be absolute and outside any served path. Empty means backups are not configured.</summary>
     public string BackupDirectory { get; set; } = "";
     /// <summary>The same directory as the database server sees it (a shared mount, a different drive letter or path). Empty means the same path.</summary>
@@ -33,6 +40,10 @@ public sealed class RecoveryOptions
     public int DatabaseCommandTimeoutSeconds { get; set; }
 
     public string SqlDirectory => string.IsNullOrWhiteSpace(SqlServerBackupDirectory) ? BackupDirectory : SqlServerBackupDirectory;
+    /// <summary>Unrecognised text is not silently treated as one mode or the other: the host refuses to start (R-REC-01).</summary>
+    public bool ModeIsValid => Enum.TryParse<RecoveryMode>(Mode, ignoreCase: true, out _);
+    public RecoveryMode RecoveryMode => Enum.TryParse<RecoveryMode>(Mode, ignoreCase: true, out var m) ? m : RecoveryMode.Application;
+    public bool External => RecoveryMode == RecoveryMode.External;
     public bool BackupConfigured => !string.IsNullOrWhiteSpace(BackupDirectory);
     public bool RestoreConfigured => !string.IsNullOrWhiteSpace(RestoreTargetDirectory);
     public bool EncryptionRequested => !string.IsNullOrWhiteSpace(EncryptionCertificate);

@@ -34,7 +34,7 @@ Categories (xUnit traits): `Unit`, `Architecture`, `Integration`, `E2E`, `Contra
 |---|---|
 | ARC-001 | Module dependency tiers and the same-tier edges in `docs/ARCHITECTURE.md` section 4; no cycles |
 | ARC-002 | A module references only other modules' public contract namespaces |
-| ARC-003 | Every tenant-owned entity implements `ITenantOwned`, has the global query filter and a Row-Level Security policy (generated from the model, compared with the database) |
+| ARC-003 | Every tenant-owned entity implements `ITenantOwned` and has the global query filter. Since ADR-0044 the database has **no** Row-Level Security policy (`No_table_has_a_row_level_security_policy_and_every_tenant_table_carries_TenantId`) |
 | ARC-004 | No data access outside a tenant scope (unscoped context use throws; domain code has no `DbContext` reference) |
 | ARC-005 | `IgnoreQueryFilters` and raw SQL appear only in an allowlist |
 | ARC-006 | Cache access only through the tenant-keyed helper |
@@ -49,7 +49,7 @@ Policy confirmed in DR-2026-10-15 D4:
 
 1. **Provider-independent tests** (domain, validators, interpreters, parsers, access evaluator logic) need no database and always run.
 2. A **lightweight test provider** (SQLite in-memory with foreign keys enabled) may be used for *limited application tests* (for example filter wiring, service flows). Results from it are labelled **"provider-independent (not SQL Server proof)"** in the report and are **never** counted as evidence of SQL Server behaviour.
-3. **Real SQL Server integration tests** cover migrations, constraints, composite foreign keys, Row-Level Security, `rowversion` concurrency, application locks, audit permissions, reporting views and any other provider-specific behaviour. They are tagged `SqlServer`.
+3. **Real SQL Server integration tests** cover migrations, constraints, composite foreign keys, the absence of the retired Row-Level Security and its removal from an older database (ADR-0044, `SqlServerSimplifiedModelTests`), the simplified SQL permissions, `rowversion` concurrency, application locks, audit permissions, reporting views and any other provider-specific behaviour. They are tagged `SqlServer`.
 4. SQL Server tests are skipped **only** when no SQL Server connection is available. The connection comes from the environment variable `ECP_TEST_SQL` (an external or CI SQL Server, or a local disposable one started by `tools/` scripts). A skipped SQL Server test is reported **NOT VERIFIED**, never Passed.
 5. **Report counters.** Every test run prints four counters: **Passed, Failed, Skipped, NOT VERIFIED**. Skipped = deliberately excluded (reason printed). NOT VERIFIED = needs an environment that was unavailable (SQL Server, container engine, IIS, Azure, live provider). A capability whose critical tests are NOT VERIFIED may not be labelled *implemented*; it is labelled *Implemented, not verified*.
 6. Docker, IIS and Azure artefacts that cannot be run in the workspace are labelled **Scaffolded / Not Verified**.
@@ -122,8 +122,8 @@ Two tenants (A, B) and, inside A, two organisations. Each surface has at least a
 | TEN-019 | Tenant resolution tampering: header, claim, host, route, body value |
 | TEN-020 | Suspended tenant is denied everywhere |
 | TEN-021 | Content de-duplication does not link across tenants |
-| TEN-030 | Layer-off test: EF filter disabled → RLS still blocks |
-| TEN-031 | Layer-off test: RLS disabled → EF filter still blocks |
+| TEN-030 | Retired with SQL Row-Level Security (ADR-0044). Was: EF filter disabled → RLS still blocks |
+| TEN-031 | The EF filter isolates on SQL Server and fails closed without a scope (`The_application_filter_exposes_only_the_current_tenants_rows_on_SQL_Server`, `Without_a_tenant_scope_tenant_data_cannot_be_queried_at_all`) |
 | TEN-032 | Composite foreign keys reject cross-tenant parent/child |
 | TEN-033 | Storage prefix enforcement rejects keys outside the tenant |
 | TEN-040 | Raw SQL wrapper requires scope and parameters |
@@ -714,7 +714,7 @@ Automated axe-core checks plus scripted keyboard tests on every page type; manua
 | PER-002 | Search by custom field with 50 fields per entity uses indexes (query plan check). **Done at 10,000 contracts and 35,000 values** on SQL Server 2022 in CI (plans in `PERFORMANCE_REVIEW.md`; configured-field text search 599 to 417 ms median). Not verified at 50 fields per entity or 100,000 contracts |
 | PER-003 | Migration of 25k contracts and 50k documents completes resumably within budget; memory bounded |
 | PER-004 | Export/report/import under concurrent load stays within rate limits and does not starve interactive users |
-| PER-005 | Row-Level Security overhead measured and within budget |
+| PER-005 | Retired with SQL Row-Level Security (ADR-0044) |
 | PER-006 | Audit append contention under concurrency |
 
 ## 15. Pipeline and reporting
@@ -747,6 +747,26 @@ Reported as Passed, Failed, Skipped and Not Verified separately. `GuidedFieldsUi
 Local totals after UX-10: unit 979, architecture 113, API 262, integration 731 including the real SQL Server wrappers (**2,085 passed, 0 failed, 0 skipped**).
 
 Unit-level behaviour that changed outside the Fields pages: the Create path of the contracts module applies the classification gate (found by this scenario; the assertion that a creator below a field's level is neither offered it nor allowed to write it is in the same scenario). Not Verified: a person completing the journey in a browser; screen-reader and zoom walkthroughs.
+
+## 21. JBS IIS integration suites (branch jbs/iis-integration)
+
+Reported as Passed, Failed, Skipped and Not Verified separately. Nothing here ran on IIS.
+
+| Area | Where | What it proves |
+|---|---|---|
+| Fail-safe Production defaults | `HostConfigurationTests`, `ProductionRefusalTests` (API) | The published base settings are Production, SQL Server, no demo, no auto-migrate; a host with no settings is never Demo; R-ST-01, R-ST-02, R-MIG-01, R-REC-01 |
+| IIS packaging and upload limits | `IisPackagingTests` (API), `tools/tests/test_check_iis_publish.py`, CI step running `tools/check-iis-publish.py` on the published folder | `web.config` is the V2 module, in-process, no secrets; every upload page has its own limit and a matching IIS location; only the migration URL is opened to 2 GiB |
+| Windows sign-in (service) | `WindowsSignInTests` (integration; SQLite always, SQL Server variants in CI) | Invited allowed; uninvited, invited-without-access, disabled, recreated-account and wrong-domain refused; refusal audited; no role from authentication; tenant isolation; first administrator |
+| Windows sign-in (host) | `WindowsAuthenticationHostTests` (API) | A server-supplied Windows principal is never a session; friendly refusal page; audit; setup wizard end to end with a Windows administrator; sign-out does not loop. The server's authentication is simulated; **IIS Not Verified** |
+| Data protection | `DataProtectionTests` (API) | Keys survive a new process; unusable settings refused; readiness never prints key material. Windows DPAPI only runs on the Windows CI job |
+| Integrated SQL authentication | `ConnectionInspectionTests` (unit), `HostConfigurationTests`, `RuntimePrivilegeSqlServerTests` | Credential-free strings accepted, strings with credentials refused; the runtime login and its roles are read from the server. Integrated authentication itself **Not Verified** |
+| External recovery points | `ExternalRecoveryPointTests_Sqlite` and `_SqlServer` (integration) | Declared, audited, never "verified"; preflight NOT VERIFIED; rehearsal refused; readiness wording |
+| Logging | `LoggingTests` (API) | Redaction, shared context, durable shared file, rate-limited fatal email (fake sender), settings validation, request events in the running host. Application Insights and a real mail server **Not Verified** |
+| Pipeline and scripts | `tools/tests/test_setup_github_environments.py`, `tools/tests/test_check_secrets.py` | The setup script's safeguards are present and it never writes a placeholder (it is **not executed**); the secrets scan finds planted secrets and the repository is clean |
+
+Local totals on branch jbs/iis-integration (Linux, SQLite; real SQL Server not available in this workspace): unit 991, architecture 113, integration 375 passed and 6 skipped, API 310 passed and 9 skipped (**1,789 passed, 0 failed, 15 skipped**; every skip is a SQL Server variant that runs in the CI job `sqlserver-integration`). Tooling tests 38 passed. Repository, documentation and secrets checks pass. CI on GitHub (commit e0d2ac7, [run 109](https://github.com/Jeffa90/ContractMGMT/actions/runs/43129533634), all jobs green): Windows 1,789 passed, 0 failed, 6 skipped; SQL Server 2022 400 passed, 0 failed, 0 skipped. Running on Windows found one product defect (backslash resource names hid the upgrade manifest) and one test defect; the SQL Server run found one test-cleanup defect. All fixed; see `deploy/STATUS.md`.
+
+Harness note: API test hosts now use polling file watchers and no configuration reload, because about 185 hosts in one run exhausted the per-user inotify limit (the new durable log made the exception visible).
 
 ## 16. Traceability to Master "Testing" and the Definition of Done
 

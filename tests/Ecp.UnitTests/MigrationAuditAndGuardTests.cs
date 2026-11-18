@@ -236,5 +236,5 @@ public class ProductionGuardTests
 
     [Fact]
     public void Several_problems_are_all_reported_together()
-        => Assert.True(ProductionGuard.Evaluate(Facts(provider: DatabaseProvider.Sqlite, secret: false, inline: true, demoTenant: true, seed: true, dir: "/tmp/z")).Count >= 5);
+        => Assert.True(ProductionGuard.Evaluate(Facts(provider: DatabaseProvider.Sqlite, secret: false, inline: true, demoTenant: true, seed: true, dir: Path.Combine(Path.GetTempPath(), "z"))).Count >= 5);   // the operating system's own temp folder is ephemeral on every platform ("/tmp/z" is not a full path on Windows)
 }

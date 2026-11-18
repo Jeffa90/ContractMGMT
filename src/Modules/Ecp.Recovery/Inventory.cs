@@ -61,6 +61,22 @@ internal sealed class InstallationInventory : IInstallationInventory
     }
 
     /// <summary>The lightweight provider has no COUNT_BIG.</summary>
+    /// <summary>
+    /// Binds the current tenant as <c>@tenant</c> for a reviewed raw SQL statement. Since ADR-0044 retired SQL Server Row-Level Security, every raw statement
+    /// that reads tenant-owned rows states its own <c>TenantId = @tenant</c> predicate; this is the only way it gets the value. GUIDs are bound as the provider
+    /// stores them (uniqueidentifier on SQL Server, upper-case text on the lightweight provider).
+    /// </summary>
+    internal static void BindTenant(DbCommand command, IScopedConnection connection, Guid tenantId)
+    {
+        var p = command.CreateParameter();
+        p.ParameterName = "@tenant";
+        p.Value = connection.Provider == DatabaseProvider.SqlServer ? tenantId : tenantId.ToString("D").ToUpperInvariant();
+        command.Parameters.Add(p);
+    }
+
+    /// <summary>The tenant the scope is in; reviewed raw SQL refuses to run without one.</summary>
+    internal static Guid CurrentTenant(IServiceProvider scope) => scope.GetRequiredService<ITenantContext>().RequireTenantId();
+
     internal static string ForProvider(IScopedConnection connection, string sql) => connection.Provider == DatabaseProvider.SqlServer ? sql : sql.Replace("COUNT_BIG(", "COUNT(", StringComparison.Ordinal);
 
     internal static string Qualified(IScopedConnection connection, string? schema, string table)
@@ -86,10 +102,13 @@ internal sealed class InstallationInventory : IInstallationInventory
                 var name = TableName(connection, type);
                 if (existing is not null && !existing.Contains(name)) continue;
                 if (!seen.Add(name)) continue;
-                var sql = $"SELECT COUNT_BIG(*){(checksums && connection.Provider == DatabaseProvider.SqlServer && !VolatileTables.Is(name) ? ", CHECKSUM_AGG(BINARY_CHECKSUM(*))" : ", NULL")} FROM {Qualified(connection, type.GetSchema(), type.GetTableName()!)}";
-                await connection.ApplyTenantScopeAsync(ct);
+                var tenantColumn = hasTenant ? type.FindProperty("TenantId")!.GetColumnName() : null;
+                var where = tenantColumn is null ? "" : $" WHERE {(connection.Provider == DatabaseProvider.SqlServer ? $"[{tenantColumn}]" : $"\"{tenantColumn}\"")} = @tenant";
+                var sql = $"SELECT COUNT_BIG(*){(checksums && connection.Provider == DatabaseProvider.SqlServer && !VolatileTables.Is(name) ? ", CHECKSUM_AGG(BINARY_CHECKSUM(*))" : ", NULL")} FROM {Qualified(connection, type.GetSchema(), type.GetTableName()!)}{where}";
+                await connection.EnsureOpenAsync(ct);
                 await using var cmd = connection.Connection.CreateCommand();
                 cmd.Transaction = connection.Transaction;
+                if (tenantColumn is not null) BindTenant(cmd, connection, CurrentTenant(scope));
                 cmd.CommandText = ForProvider(connection, sql);
                 await using var r = await cmd.ExecuteReaderAsync(ct);
                 await r.ReadAsync(ct);
@@ -103,7 +122,7 @@ internal sealed class InstallationInventory : IInstallationInventory
     internal static async Task<HashSet<string>?> ExistingTablesAsync(IScopedConnection connection, CancellationToken ct)
     {
         if (connection.Provider != DatabaseProvider.SqlServer) return null;
-        await connection.ApplyTenantScopeAsync(ct);
+        await connection.EnsureOpenAsync(ct);
         await using var cmd = connection.Connection.CreateCommand();
         cmd.Transaction = connection.Transaction;
         cmd.CommandText = "SELECT s.name + N'.' + t.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id";
@@ -116,10 +135,11 @@ internal sealed class InstallationInventory : IInstallationInventory
     private static async Task<long> ScalarAsync(IServiceProvider scope, string sql, CancellationToken ct)
     {
         var connection = scope.GetRequiredService<IScopedConnection>();
-        await connection.ApplyTenantScopeAsync(ct);
+        await connection.EnsureOpenAsync(ct);
         await using var cmd = connection.Connection.CreateCommand();
         cmd.Transaction = connection.Transaction;
         cmd.CommandText = ForProvider(connection, sql);
+        if (sql.Contains("@tenant", StringComparison.Ordinal)) BindTenant(cmd, connection, CurrentTenant(scope));
         var o = await cmd.ExecuteScalarAsync(ct);
         return o is null or DBNull ? 0 : Convert.ToInt64(o);
     }
@@ -140,10 +160,11 @@ internal sealed class InstallationInventory : IInstallationInventory
         var ids = new List<(Guid Id, string Name)>();
         if (counted.Any(t => t.Table.EndsWith("Organisation", StringComparison.Ordinal)))
         {
-            await connection.ApplyTenantScopeAsync(ct);
+            await connection.EnsureOpenAsync(ct);
             await using var cmd = connection.Connection.CreateCommand();
             cmd.Transaction = connection.Transaction;
-            cmd.CommandText = $"SELECT Id, Name FROM {T("tenancy", "Organisation")} ORDER BY Id";
+            cmd.CommandText = $"SELECT Id, Name FROM {T("tenancy", "Organisation")} WHERE TenantId = @tenant ORDER BY Id";
+            BindTenant(cmd, connection, tenantId);
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct)) ids.Add((r.GetGuid(0), r.GetString(1)));
         }
@@ -167,7 +188,7 @@ internal sealed class InstallationInventory : IInstallationInventory
         {
             var column = sqlServer ? $"[{projection}]" : "\"" + projection + "\"";
             gaps = await ScalarAsync(scope,
-                $"SELECT COUNT_BIG(*) FROM {T("contracts", "Supplier")} s WHERE s.{column} IS NOT NULL AND s.{column} <> '' AND NOT EXISTS (SELECT 1 FROM {T("contracts", "SupplierIdentifier")} i WHERE i.SupplierId = s.Id AND i.EffectiveToUtc IS NULL)", ct);
+                $"SELECT COUNT_BIG(*) FROM {T("contracts", "Supplier")} s WHERE s.TenantId = @tenant AND s.{column} IS NOT NULL AND s.{column} <> '' AND NOT EXISTS (SELECT 1 FROM {T("contracts", "SupplierIdentifier")} i WHERE i.TenantId = s.TenantId AND i.SupplierId = s.Id AND i.EffectiveToUtc IS NULL)", ct);
         }
 
         return new TenantEntry(tenantId, name, chain.EventsChecked, head?.Sequence ?? 0, head?.Hash ?? "", chain.IsValid, chain.Reason, organisations.OrderBy(o => o.Id).ToList(),

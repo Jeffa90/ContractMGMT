@@ -20,7 +20,8 @@ public static class TestIdentity
 /// <summary>One row of the People list.</summary>
 public sealed record PersonRow(Guid Id, string DisplayName, string Email, UserStatusView Status, bool IsTestPerson, IReadOnlyList<ProfileBadge> Profiles, string Roles, int OwnedCategories);
 
-public sealed record NewPerson(string DisplayName, string Email, bool AllowDemonstrationSignIn);
+/// <summary>A person to invite. <paramref name="WindowsAccount"/> (DOMAIN\name) is for installations that use Windows Authentication: it is how the invitation is matched at the first sign-in; the email is never used for that.</summary>
+public sealed record NewPerson(string DisplayName, string Email, bool AllowDemonstrationSignIn, string? WindowsAccount = null);
 
 public sealed record NewPersonResult(Guid UserId, bool IsTestPerson, AccessResult? Access);
 
@@ -105,7 +106,13 @@ internal sealed class PersonAccessService(
     {
         var name = Guard.NotBlank(person.DisplayName, "Name", 200);
         var email = Guard.NotBlank(person.Email, "Email", 254);
-        if (!person.AllowDemonstrationSignIn) return await admin.InviteAsync(name, email, ct);   // Production path, unchanged: a real invitation, linked at the first verified sign-in
+        if (!person.AllowDemonstrationSignIn)
+        {
+            // Production path: a real invitation, linked at the first verified sign-in. A Windows account, when given, is the identity it is matched to.
+            var invited = await admin.InviteAsync(name, email, ct);
+            if (!string.IsNullOrWhiteSpace(person.WindowsAccount)) await admin.SetWindowsAccountAsync(invited, person.WindowsAccount, ct);
+            return invited;
+        }
 
         // A synthetic test person. Refused in Production here, at the service, whatever the page showed.
         if (!DemonstrationSignInAllowed) throw new DomainException("test_only", "Demonstration sign-in is available only in Demo and Test. Invite the person instead.");

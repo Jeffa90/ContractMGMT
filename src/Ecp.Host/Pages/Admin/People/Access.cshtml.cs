@@ -15,6 +15,8 @@ public sealed class WizardInput
     public Guid? UserId { get; set; }
     public string? DisplayName { get; set; }
     public string? Email { get; set; }
+    /// <summary>Windows Authentication only: DOMAIN\name the invitation is matched to at the first sign-in. Never used to give access.</summary>
+    public string? WindowsAccount { get; set; }
     public bool AllowDemo { get; set; }
     public Guid? OrganisationId { get; set; }
     public List<string> Profiles { get; set; } = [];
@@ -41,7 +43,7 @@ public sealed record Choice(Guid Id, string Name);
 [Authorize(Policy = "perm:users.manage")]
 public sealed class AccessModel(
     IPersonAccessService people, IAccessProfileService profiles, IEffectiveAccess effective, IOrganisationStructureService organisations, ICategoryAdministration categories,
-    IApprovalAuthorities authorities, IAccessService access, DemoIdentityService demo) : EcpPageModel
+    IApprovalAuthorities authorities, IAccessService access, DemoIdentityService demo, Ecp.Identity.Windows.IWindowsSignIn windows) : EcpPageModel
 {
     [BindProperty(SupportsGet = true)] public WizardInput Input { get; set; } = new();
     [BindProperty(SupportsGet = true)] public int Step { get; set; } = 1;
@@ -61,6 +63,7 @@ public sealed class AccessModel(
     public AccessPlan? Plan { get; private set; }
     public AccessReview? Review { get; private set; }
     public EffectiveAccessReport? Current { get; private set; }
+    public bool WindowsEnabled { get; private set; }
     public bool DemoAvailable => people.DemonstrationSignInAllowed && demo.IsEnabled;
     public string DefaultCeiling { get; private set; } = "";
 
@@ -132,7 +135,7 @@ public sealed class AccessModel(
                 Flash(Summarise(result, PersonName ?? "The person"));
                 return Redirect("/Admin/People/Person/" + Input.UserId);
             }
-            var added = await people.AddAsync(new NewPerson(Input.DisplayName ?? "", Input.Email ?? "", Input.AllowDemo), change, ct);
+            var added = await people.AddAsync(new NewPerson(Input.DisplayName ?? "", Input.Email ?? "", Input.AllowDemo, Input.WindowsAccount), change, ct);
             Flash(added.IsTestPerson
                 ? $"{Input.DisplayName} is added as a test person. They can now be chosen on the sign-in page under Demonstration sign-in."
                 : $"{Input.DisplayName} is invited. They can sign in once your identity provider vouches for their email address. " + Summarise(added.Access, Input.DisplayName ?? "The person"));
@@ -201,7 +204,7 @@ public sealed class AccessModel(
         if (Input.Profiles.Count == 0 && EditMode) { Plan = new AccessPlan(false, [], ["Choose what this person will do."], null, null); return; }
         Plan = EditMode
             ? await profiles.PreviewAsync(Change(Input.UserId!.Value), ct)
-            : await people.PreviewNewAsync(new NewPerson(Input.DisplayName ?? "", Input.Email ?? "", Input.AllowDemo), Change(Guid.Empty), ct);
+            : await people.PreviewNewAsync(new NewPerson(Input.DisplayName ?? "", Input.Email ?? "", Input.AllowDemo, Input.WindowsAccount), Change(Guid.Empty), ct);
         if (Plan is { CanApply: true, After: { } after })
         {
             _ = Enum.TryParse<OwnershipChoice>(Input.Ownership, out var ownership);
@@ -214,6 +217,7 @@ public sealed class AccessModel(
 
     private async Task LoadAsync(CancellationToken ct)
     {
+        WindowsEnabled = await windows.ProviderKeyAsync(ct) is not null;
         var grants = await access.GrantsAsync("users.manage", ct);
         Organisations = (await organisations.ListOrganisationsAsync(ct)).Where(o => grants.Any(g => g.OrganisationIds is null || g.OrganisationIds.Contains(o.Id))).ToList();
         if (Input.OrganisationId is null && Organisations.Count == 1) Input.OrganisationId = Organisations[0].Id;

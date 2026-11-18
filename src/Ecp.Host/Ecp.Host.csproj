@@ -2,6 +2,9 @@
   <PropertyGroup>
     <RootNamespace>Ecp.Host</RootNamespace>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- IIS publish: the project web.config is kept and the SDK stamps processPath/arguments into it. The ASP.NET Core Module runs the app in-process (docs/DEPLOYMENT.md). -->
+    <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+    <AspNetCoreModuleName>AspNetCoreModuleV2</AspNetCoreModuleName>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Ecp.SharedKernel/Ecp.SharedKernel.csproj" />
@@ -27,8 +30,15 @@
     <ProjectReference Include="../Ecp.PackTool/Ecp.PackTool.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Local-run values only (Demo mode, SQLite, auto-migrate). They are never published, so a deployed host starts from the Production-safe appsettings.json. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <Content Remove="data/**" />
+    <None Remove="data/**" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>

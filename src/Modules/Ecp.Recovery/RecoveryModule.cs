@@ -30,6 +30,8 @@ public static class RecoveryModule
         services.AddSingleton<ILoggerProvider>(sp => sp.GetRequiredService<RecentLogBuffer>());
         services.AddScoped<OperationAudit>();
         services.AddScoped<IBackupService, BackupService>();
+        services.AddSingleton<StartupFactsAccessor>();
+        services.AddScoped<IExternalRecoveryPoints, ExternalRecoveryPointStore>();
         services.AddScoped<IRestoreService, RestoreService>();
         services.AddScoped<IEvidenceReports, EvidenceReports>();
         services.AddScoped<ISupportBundle, SupportBundle>();
@@ -51,15 +53,24 @@ public static class RecoveryModule
 }
 
 /// <summary>Production readiness for recovery: configured, protected, recent and verified. It reports; it never declares a deployment ready.</summary>
-internal sealed class BackupReadinessCheck(Microsoft.Extensions.Options.IOptions<RecoveryOptions> options, IDatabaseBackupProvider database, IBackupCatalogue catalogue, StartupFacts facts, IClock clock) : IReadinessCheck
+internal sealed class BackupReadinessCheck(Microsoft.Extensions.Options.IOptions<RecoveryOptions> options, IExternalRecoveryPoints external, IDatabaseBackupProvider database, IBackupCatalogue catalogue, StartupFacts facts, IClock clock) : IReadinessCheck
 {
     public string Id => "R-BKP-01";
     public async Task<ReadinessResult> RunAsync(CancellationToken ct = default)
     {
         const string description = "Backup and restore are configured, protected and recently verified";
+        var o = options.Value;
+        if (!o.ModeIsValid) return new ReadinessResult(Id, description, ReadinessStatus.Unhealthy, "Ecp:Recovery:Mode must be Application or External.");
+        if (o.External && !o.BackupConfigured)
+        {
+            var points = await external.ListAsync(ct);
+            var note = points.Count == 0 ? "No recovery point has been declared yet; one is needed before an upgrade."
+                : $"Latest declared recovery point {points[0].PointId} ({points[0].Source}, taken {points[0].TakenUtc:yyyy-MM-dd HH:mm}Z): {ExternalRecoveryStatements.DeclaredNotVerified}.";
+            return new ReadinessResult(Id, description, string.IsNullOrWhiteSpace(o.ExternalRecoveryPointsDirectory) ? ReadinessStatus.Degraded : ReadinessStatus.Healthy,
+                "Backup and recovery are owned by the database administrators and infrastructure team (Ecp:Recovery:Mode=External). This application does not create or verify backups. " + note);
+        }
         if (facts.Mode != EcpMode.Production && !options.Value.BackupConfigured)
             return new ReadinessResult(Id, description, ReadinessStatus.Healthy, "Not configured. Acceptable outside Production.");
-        var o = options.Value;
         if (!database.Supported) return new ReadinessResult(Id, description, ReadinessStatus.Degraded, database.UnsupportedReason);
         if (!o.BackupConfigured) return new ReadinessResult(Id, description, ReadinessStatus.Degraded, "No backup directory is configured (Ecp:Recovery:BackupDirectory). Backups cannot be taken from the platform.");
         var notes = new List<string>();

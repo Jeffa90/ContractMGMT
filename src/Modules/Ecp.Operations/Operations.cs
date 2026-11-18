@@ -23,7 +23,8 @@ public interface IReadinessCheck
 /// <summary>What the host was started with, reduced to facts the guard can judge (no secret values).</summary>
 public sealed record StartupFacts(
     EcpMode Mode, DatabaseProvider Provider, bool ConnectionFromSecretReference, bool InlineConnectionStringPresent,
-    bool DemoTenantResolutionEnabled, bool DemoSeedEnabled, string DataDirectory);
+    bool DemoTenantResolutionEnabled, bool DemoSeedEnabled, string DataDirectory,
+    string ApplicationDirectory = "", bool AutoMigrateEnabled = false, bool InlineConnectionCredentialFree = false, string KeyDirectory = "");
 
 public sealed record GuardViolation(string CheckId, string Message);
 
@@ -42,22 +43,39 @@ public static class ProductionGuard
             violations.Add(new("R-ID-01", "Demonstration tenant/identity resolution must be disabled in Production."));
         if (f.Provider != DatabaseProvider.SqlServer)
             violations.Add(new("R-DB-01", "Production requires SQL Server or Azure SQL; the lightweight provider is refused."));
-        if (f.InlineConnectionStringPresent)
-            violations.Add(new("R-SEC-02", "The database connection string must come from a secret reference, not from configuration values."));
-        else if (!f.ConnectionFromSecretReference)
-            violations.Add(new("R-SEC-02", "A database connection secret reference (env:, file:, keyvault:) is required in Production."));
+        // A connection string that carries no credential (Windows integrated authentication) is not a secret and may be ordinary configuration.
+        // Any string with a user name or password must come from a secret reference.
+        if (f.InlineConnectionStringPresent && !f.InlineConnectionCredentialFree)
+            violations.Add(new("R-SEC-02", "The database connection string must come from a secret reference, not from configuration values, unless it uses Windows integrated authentication and holds no user name or password."));
+        else if (!f.InlineConnectionStringPresent && !f.ConnectionFromSecretReference)
+            violations.Add(new("R-SEC-02", "A database connection is required in Production: a secret reference (env:, file:, keyvault:), or an integrated-authentication connection string that holds no credential."));
         if (f.DemoSeedEnabled)
             violations.Add(new("R-DEMO-01", "Demonstration data must not be present or seeded in Production."));
         if (string.IsNullOrWhiteSpace(f.DataDirectory) || IsEphemeral(f.DataDirectory))
-            violations.Add(new("R-ST-01", "Document storage must be a persistent directory, not a temporary location."));
+            violations.Add(new("R-ST-01", "Document storage must be a persistent directory outside the application folder; set Ecp:DataDirectory to an absolute path (for example a path on a data volume), not a temporary location."));
+        else if (IsInside(f.DataDirectory, f.ApplicationDirectory) || (f.KeyDirectory.Length > 0 && (IsInside(f.KeyDirectory, f.ApplicationDirectory) || IsEphemeral(f.KeyDirectory))))
+            violations.Add(new("R-ST-02", "Document storage and the data-protection key ring must be outside the application folder and not temporary, because a redeploy replaces that folder and a temporary folder loses the keys."));
+        if (f.AutoMigrateEnabled)
+            violations.Add(new("R-MIG-01", "Automatic database migration at start-up is refused in Production. Apply schema changes as a deliberate, audited release step (see docs/UPGRADE_RUNBOOK.md)."));
         return violations;
+    }
+
+    private static bool IsInside(string path, string parent)
+    {
+        if (string.IsNullOrWhiteSpace(parent)) return false;
+        var compare = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var child = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)) + Path.DirectorySeparatorChar;
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parent)) + Path.DirectorySeparatorChar;
+        return child.StartsWith(root, compare);
     }
 
     private static bool IsEphemeral(string path)
     {
         var full = Path.GetFullPath(path);
         var temp = Path.GetFullPath(Path.GetTempPath());
-        return full.StartsWith(temp, StringComparison.Ordinal) || full.StartsWith("/tmp/", StringComparison.Ordinal);
+        // Windows paths are case-insensitive; Unix paths are not.
+        var compare = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return full.StartsWith(temp, compare) || full.StartsWith("/tmp/", StringComparison.Ordinal);
     }
 }
 

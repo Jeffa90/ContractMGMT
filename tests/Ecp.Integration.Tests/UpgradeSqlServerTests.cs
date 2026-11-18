@@ -104,8 +104,8 @@ public sealed class UpgradeSqlServerTests(ITestOutputHelper output)
         await using var c = new SqlConnection(n1.App.ConnectionString);
         await c.OpenAsync();
         await using var cmd = c.CreateCommand();
-        // The tests change the database as an administrator would: with the installation scope, so row-level security does not hide the rows.
-        cmd.CommandText = $"EXEC sp_set_session_context N'TenantId', N'{SystemTenant.Id}'; EXEC sp_set_session_context N'IsInstallationScope', 1; " + sql;
+        // The tests change the database as an administrator would (there is no row-level security to step around since ADR-0044).
+        cmd.CommandText = sql;
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -291,8 +291,9 @@ public sealed class UpgradeSqlServerTests(ITestOutputHelper output)
         await using var n1 = await N1Installation.CreateAsync();
         var backup = await n1.BackupAsync();
         await n1.EnterMaintenanceAsync();
-        // A disabled policy that already has the name the migration is about to use makes the migration fail after it has started: the whole migration rolls back.
-        await ExecuteAsync(n1, "CREATE SECURITY POLICY security.[TenantPolicy_ops_MigrationRecord] ADD FILTER PREDICATE security.fn_TenantPredicate(TenantId) ON ops.OperationRun WITH (STATE = OFF);");
+        // A constraint on another table that already has the name of the primary key the migration is about to create makes the migration fail after it has
+        // started (object names are unique per schema): the whole migration rolls back.
+        await ExecuteAsync(n1, "ALTER TABLE ops.OperationRun ADD CONSTRAINT PK_MigrationRecord CHECK (1 = 1);");
         var report = await PreflightAsync(n1, backup.BackupId, PreflightPhase.Apply);
         var result = await ApplyAsync(n1, n1.Request(backup.BackupId, report.Warnings.Select(w => w.Code).ToList()));
         Assert.Equal("Failed", result.Outcome);

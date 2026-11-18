@@ -11,7 +11,7 @@ trap cleanup EXIT; cleanup
 fail() { echo "FAILED: $*" >&2; exit 1; }
 wait_for() { for i in $(seq 1 60); do curl -fsS "$1" >/dev/null 2>&1 && return 0; sleep 1; done; return 1; }
 
-docker run -d --name ecp-smoke "${NET[@]}" -e ASPNETCORE_URLS="http://127.0.0.1:$PORT" -e Ecp__Mode=Demo -e Ecp__Packs__AllowUnsignedSyntheticPacks=true \
+docker run -d --name ecp-smoke "${NET[@]}" -e ASPNETCORE_URLS="http://127.0.0.1:$PORT" -e Ecp__Mode=Demo -e Ecp__DemoTenantResolution=true -e Ecp__DemoSeed=true -e Database__AutoMigrate=true -e Ecp__Packs__AllowUnsignedSyntheticPacks=true \
   -e Database__Provider=Sqlite -e Database__ConnectionString="Data Source=/var/ecp/ecp-demo.db" "$IMAGE" >/dev/null
 wait_for "http://127.0.0.1:$PORT/health/ready" || { docker logs --tail 40 ecp-smoke >&2; fail "seeded Demo did not become ready"; }
 READY=$(curl -fsS "http://127.0.0.1:$PORT/health/ready")
@@ -22,7 +22,7 @@ echo "$READY" | grep -q '"id":"solution-packs","status":"Healthy"' || fail "the 
 PACKS=$(docker exec ecp-smoke sh -c 'ls /app/packs/*.ecpkg 2>/dev/null | wc -l'); [[ "$PACKS" -ge 2 ]] || fail "the image does not carry the shipped .ecpkg packs under /app/packs ($PACKS found)"
 USER_ID=$(docker exec ecp-smoke id -u); [[ "$USER_ID" != "0" ]] || fail "runs as root"
 
-docker run -d --name ecp-smoke-fresh "${NET[@]}" -e ASPNETCORE_URLS="http://127.0.0.1:$FRESH" -e Ecp__Mode=Demo -e Ecp__DemoSeed=false -e Ecp__Packs__AllowUnsignedSyntheticPacks=true \
+docker run -d --name ecp-smoke-fresh "${NET[@]}" -e ASPNETCORE_URLS="http://127.0.0.1:$FRESH" -e Ecp__Mode=Demo -e Ecp__DemoTenantResolution=true -e Database__AutoMigrate=true -e Ecp__DemoSeed=false -e Ecp__Packs__AllowUnsignedSyntheticPacks=true \
   -e Database__Provider=Sqlite -e Database__ConnectionString="Data Source=/var/ecp/ecp-fresh.db" "$IMAGE" >/dev/null
 wait_for "http://127.0.0.1:$FRESH/health/live" || { docker logs --tail 40 ecp-smoke-fresh >&2; fail "fresh installation did not start"; }
 LOC=$(curl -sS -o /dev/null -w '%{redirect_url}' "http://127.0.0.1:$FRESH/"); [[ "$LOC" == */Setup ]] || fail "fresh installation did not redirect to /Setup ($LOC)"

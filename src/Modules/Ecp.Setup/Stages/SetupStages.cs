@@ -259,7 +259,7 @@ internal sealed class IdentityStage : SetupStageBase
 
     public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)
     {
-        var kinds = new List<FieldOption> { new("Entra", "Microsoft Entra ID"), new("Oidc", "Other OpenID Connect provider") };
+        var kinds = new List<FieldOption> { new("Entra", "Microsoft Entra ID"), new("Oidc", "Other OpenID Connect provider"), new("Windows", "Windows sign-in (the web server's Windows Authentication; people must still be invited)") };
         if (env.HostMode != EcpMode.Production && env.DemoIdentityEnabled) kinds.Add(new("Demo", "Demonstration sign-in (no credentials; Demo and Test only)"));
         return
         [
@@ -271,11 +271,13 @@ internal sealed class IdentityStage : SetupStageBase
             new("clientId", "Client id", FieldKind.Text, false),
             new("clientSecretRef", "Client secret reference", FieldKind.SecretReference, false, "For example env:ECP_OIDC_SECRET or keyvault:ecp-oidc. Never paste the secret itself."),
             new("groupsClaim", "Groups claim", FieldKind.Text, false, "The claim that carries identity groups, normally 'groups'.", Value: "groups"),
+            new("windowsDomains", "Windows domains allowed", FieldKind.Text, false, "Windows sign-in only. The short domain name(s), separated by commas, whose accounts may sign in (the part before the backslash in DOMAIN\\name). Leave empty to accept any domain the web server authenticates; people must still be invited."),
         ];
     }
 
     public override IReadOnlyList<string> Notes(SetupDocument doc, SetupEnvironment env)
-        => ["After saving, use 'Test sign-in' on this step. The first administrator is linked to the provider by their first successful sign-in.",
+        => ["Windows sign-in: the web server proves who the person is; it never gives access. The person must be invited here or later under People & Access, must be active and must hold a role. Use the provider key 'windows'.",
+            "After saving, use 'Test sign-in' on this step. The first administrator is linked to the provider by their first successful sign-in.",
             "The provider is registered twice: once for the tenant and once for installation administrators. Register both callback addresses with the provider: /auth/callback/oidc-<tenant id without hyphens>-<key> (shown after saving) and the installation equivalent."];
 
     public override async Task<StageResult> ExecuteAsync(StageContext c)
@@ -285,6 +287,8 @@ internal sealed class IdentityStage : SetupStageBase
             return StageResult.Fail("Demonstration sign-in is refused here (it is available only in Demo and Test modes when enabled in host configuration).");
         var settings = kind == IdentityProviderKind.Demo
             ? new IdentityProviderSettings(SetupDemo.ProviderKey, kind, "Demonstration sign-in", null, null, null, null)
+            : kind == IdentityProviderKind.Windows
+            ? new IdentityProviderSettings(c.Value("key") is { Length: > 0 } wk && wk != "entra" ? wk : "windows", kind, c.Required("displayName", "Name"), c.Value("windowsDomains"), null, null, null)
             : new IdentityProviderSettings(c.Required("key", "Provider key"), kind, c.Required("displayName", "Name"), c.Value("authority"), c.Value("clientId"),
                 c.Value("clientSecretRef"), c.Value("entraTenantId"), GroupsClaim: c.Value("groupsClaim") ?? "groups");
         using var tenantScope = c.UseTenant();
@@ -305,6 +309,7 @@ internal sealed class IdentityStage : SetupStageBase
         c.Remember("kind", kind.ToString()); c.Remember("key", settings.Key); c.Remember("displayName", settings.DisplayName);
         c.Remember("entraTenantId", settings.EntraTenantId); c.Remember("authority", settings.Authority); c.Remember("clientId", settings.ClientId);
         c.Remember("clientSecretRef", settings.ClientSecretRef); c.Remember("groupsClaim", settings.GroupsClaim);
+        if (kind == IdentityProviderKind.Windows) c.Remember("windowsDomains", settings.Authority);
         c.Record.Data["providerKey"] = settings.Key;
         return StageResult.Ok($"Identity provider '{settings.DisplayName}' saved.", [.. issues.Where(i => !i.Blocking).Select(i => i.Message)]);
     }
@@ -323,6 +328,7 @@ internal sealed class AdminStage : SetupStageBase
         [
             new("displayName", "Full name", FieldKind.Text, true),
             new("email", "Email address", FieldKind.Text, true, "Must match the address your identity provider asserts for this person. Accounts link by provider and subject, not by email alone."),
+            new("windowsAccount", "Windows account", FieldKind.Text, false, "Needed when people sign in with Windows: the administrator's sign-in name as DOMAIN\\name. The invitation is matched to this account at their first sign-in; the email address is not used for that."),
             new("installationAdmin", "Also make this person an installation administrator", FieldKind.Checkbox, false,
                 "Only installation administrators can reopen setup later (permission setup.run). Recommended.", Value: "true"),
             new("doManage", "Create and manage [[contract|plural|lower]]", FieldKind.Checkbox, false,
@@ -351,9 +357,18 @@ internal sealed class AdminStage : SetupStageBase
         var assignments = c.Get<IRoleAssignmentService>();
         var existing = await users.FindByEmailAsync(email, c.Ct);
         var demo = c.Doc.Get("identity", "in.kind") == nameof(IdentityProviderKind.Demo);
+        var windowsSignIn = c.Doc.Get("identity", "in.kind") == nameof(IdentityProviderKind.Windows);
+        var windowsAccount = c.Value("windowsAccount");
+        if (windowsSignIn && string.IsNullOrWhiteSpace(windowsAccount))
+            throw new DomainException("windowsAccount", "Enter the administrator's Windows account as DOMAIN\\name. Without it they could not sign in with Windows.");
         var userId = existing?.Id ?? (demo
             ? await users.CreateActiveTrustedAsync(name, email, SetupDemo.ProviderKey, SetupDemo.Issuer, email, "setup", c.Ct)
             : await users.InviteAsync(name, email, c.Ct));
+        if (windowsSignIn)
+        {
+            var windows = c.Get<Ecp.Identity.Windows.IWindowsAccounts>();
+            if (await windows.GetAsync(userId, c.Ct) is not { Linked: true }) await windows.SetInvitedAccountAsync(userId, windowsAccount!, "setup", c.Ct);   // an administrator who already signed in keeps the link they made
+        }
         var held = (await assignments.ListForUserAsync(userId, includeEnded: false, c.Ct)).Any(a => a.RoleCode == RoleCodes.TenantAdministrator && a.IsActive);
         if (!held)
         {
@@ -371,6 +386,11 @@ internal sealed class AdminStage : SetupStageBase
             var sysId = sysExisting?.Id ?? (demo
                 ? await sysUsers.CreateActiveTrustedAsync(name, email, SetupDemo.ProviderKey, SetupDemo.Issuer, email, "setup", c.Ct)
                 : await sysUsers.InviteAsync(name, email, c.Ct));
+            if (windowsSignIn)
+            {
+                var sysWindows = installationServices.ServiceProvider.GetRequiredService<Ecp.Identity.Windows.IWindowsAccounts>();
+                if (await sysWindows.GetAsync(sysId, c.Ct) is not { Linked: true }) await sysWindows.SetInvitedAccountAsync(sysId, windowsAccount!, "setup", c.Ct);
+            }
             if (!(await sysAssignments.ListForUserAsync(sysId, includeEnded: false, c.Ct)).Any(a => a.RoleCode == RoleCodes.SystemAdministrator && a.IsActive))
                 await sysAssignments.GrantTrustedAsync(new GrantRequest(sysId, RoleCodes.SystemAdministrator, null, ScopeSet.Installation("Public"),
                     Reason: "Installation administrator named during setup"), AssignmentSource.Setup, "setup:" + c.Actor.Label, null, c.Ct);

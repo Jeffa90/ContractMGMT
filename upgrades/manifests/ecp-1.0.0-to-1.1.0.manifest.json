@@ -8,7 +8,7 @@
     "1.0.0"
   ],
   "sourceLedgerSha256": "dc6242cab14aa459f345e553cdd3a7d90e249fba69552e6ef552750c3c5aa64f",
-  "targetLedgerSha256": "c50d479a934070e3d0c8b2e0b6d8c41bfcc208ea164284d28dc0de4f0ca5a723",
+  "targetLedgerSha256": "b61034f3c1d1edc8a9d7e94124e05fa5a0b31a8058071d51bfa5a609925ee43c",
   "moduleOrder": [
     "Audit",
     "Tenancy",
@@ -29,15 +29,14 @@
       "module": "Audit",
       "tier": 1,
       "schema": "audit",
-      "schemaVersion": "20261016050743_AuditEventClassification",
+      "schemaVersion": "20261118000000_RemoveRowLevelSecurity",
       "migrations": [
         {
           "id": "20261016000541_Initial",
-          "checksum": "b528798c2027cd108de548e3600301744857f67535125078b6bf28b1dccdb8ae",
+          "checksum": "af93e747932a675c979025164eb08c9a652c48199e690074b9fe36df256104fa",
           "categories": [
             "IndexOrConstraint",
-            "RawSql",
-            "RowLevelSecurity"
+            "RawSql"
           ],
           "objects": [
             "create index audit.AuditEvent.IX_AuditEvent_TenantId_CorrelationId",
@@ -45,18 +44,9 @@
             "create index audit.AuditEvent.IX_AuditEvent_TenantId_Sequence",
             "create table audit.AuditEvent",
             "ensure schema audit",
-            "sql: CREATE FUNCTION security.fn_TenantPredicate(@TenantId uniqueidentifier) RETURNS TABLE WITH\u2026",
-            "sql: CREATE FUNCTION security.fn_TenantRegistryPredicate(@TenantId uniqueidentifier) RETURNS TA\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_audit_AuditEvent] ADD FILTER PREDICATE secur\u2026",
-            "sql: CREATE TRIGGER audit.TR_AuditEvent_AppendOnly ON audit.AuditEvent INSTEAD OF UPDATE, DELET\u2026",
-            "sql: DENY UPDATE, DELETE ON audit.AuditEvent TO [ecp_runtime];",
-            "sql: GRANT SELECT ON OBJECT::security.fn_TenantPredicate TO [ecp_runtime];",
-            "sql: GRANT SELECT ON OBJECT::security.fn_TenantRegistryPredicate TO [ecp_runtime];",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[audit] TO [ecp_runtime];",
-            "sql: IF DATABASE_PRINCIPAL_ID(N\u0027ecp_runtime\u0027) IS NULL CREATE ROLE [ecp_runtime];",
-            "sql: IF SCHEMA_ID(N\u0027security\u0027) IS NULL EXEC(N\u0027CREATE SCHEMA security\u0027);"
+            "sql: CREATE TRIGGER audit.TR_AuditEvent_AppendOnly ON audit.AuditEvent INSTEAD OF UPDATE, DELET\u2026"
           ],
-          "operations": 15
+          "operations": 6
         },
         {
           "id": "20261016050743_AuditEventClassification",
@@ -64,6 +54,18 @@
           "categories": [],
           "objects": [
             "add column audit.AuditEvent.Classification"
+          ],
+          "operations": 1
+        },
+        {
+          "id": "20261118000000_RemoveRowLevelSecurity",
+          "checksum": "2a3f21630f6888156c3171ed187044ae2664460b28f9bfab2d4397e2a8ba97d4",
+          "categories": [
+            "Destructive",
+            "RowLevelSecurity"
+          ],
+          "objects": [
+            "sql: DECLARE @sql nvarchar(max); DECLARE policies CURSOR LOCAL FAST_FORWARD FOR SELECT N\u0027DROP S\u2026"
           ],
           "operations": 1
         }
@@ -77,10 +79,9 @@
       "migrations": [
         {
           "id": "20261016000544_Initial",
-          "checksum": "7da3f19415948ea328986d726d789f68ce5e93e3912e75ad293dfb4fe68d9778",
+          "checksum": "6d1c9f07ad6a6b6d0d1c4412bec8319e6ca3664223c50b9a28cd7902d7a4a8f0",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index tenancy.Organisation.IX_Organisation_TenantId_Name",
@@ -88,19 +89,15 @@
             "create index tenancy.Tenant.IX_Tenant_Name",
             "create table tenancy.Organisation",
             "create table tenancy.Tenant",
-            "ensure schema tenancy",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_Organisation] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_Tenant] ADD FILTER PREDICATE securit\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[tenancy] TO [ecp_runtime];"
+            "ensure schema tenancy"
           ],
-          "operations": 9
+          "operations": 6
         },
         {
           "id": "20261016005319_OrganisationStructure",
-          "checksum": "93d7372261946c56e7e38dd7add3d87e545000ea2ad6bd74441949ab7b01b5f2",
+          "checksum": "48cc423cf84849a6dea43c40198d7d5291b2084b6fb2f04b82cab2246267a69c",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index tenancy.BusinessUnit.IX_BusinessUnit_TenantId_DivisionId",
@@ -111,14 +108,9 @@
             "create table tenancy.BusinessUnit",
             "create table tenancy.Division",
             "create table tenancy.LegalEntity",
-            "create table tenancy.Site",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_BusinessUnit] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_Division] ADD FILTER PREDICATE secur\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_LegalEntity] ADD FILTER PREDICATE se\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_tenancy_Site] ADD FILTER PREDICATE security.\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[tenancy] TO [ecp_runtime];"
+            "create table tenancy.Site"
           ],
-          "operations": 14
+          "operations": 9
         }
       ]
     },
@@ -130,10 +122,9 @@
       "migrations": [
         {
           "id": "20261016010618_Initial",
-          "checksum": "1d75eb8354dc922b0a754f36fef23c954ee99fd9e80d8b5772d4733a9b2d356d",
+          "checksum": "e535f9a952ad6579e55fdf358a7220acc30edf18e0192cea1a0d32533e505675",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index identity.ExternalIdentity.IX_ExternalIdentity_TenantId_Issuer_Subject",
@@ -148,46 +139,34 @@
             "create table identity.IdentityProvider",
             "create table identity.RoleAssignment",
             "create table identity.UserProfile",
-            "ensure schema identity",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_ExternalIdentity] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_GroupRoleMapping] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_IdentityProvider] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_RoleAssignment] ADD FILTER PREDICAT\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_UserProfile] ADD FILTER PREDICATE s\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
+            "ensure schema identity"
           ],
-          "operations": 19
+          "operations": 13
         },
         {
           "id": "20261016050707_ElevationAndPrivilegedAccess",
-          "checksum": "81d67955ce69b10d71b5930d2f6143f76181f3135b27b662850f95ed8757c323",
+          "checksum": "a559108934289dc09d003b2442a9ed989c99da442ab2385e72780a11519095bc",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "add column identity.RoleAssignment.PrivilegedAccess",
             "create index identity.Elevation.IX_Elevation_TenantId_RequestedUtc",
-            "create table identity.Elevation",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_Elevation] ADD FILTER PREDICATE sec\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
+            "create table identity.Elevation"
           ],
-          "operations": 5
+          "operations": 3
         },
         {
           "id": "20261018094912_AddApproverGroups",
-          "checksum": "09b2ed00f43f2105176330f4f674f76ab05110189c1be61ed7f7628b8d100a3e",
+          "checksum": "e00311ca761fbc955117d66d39fbef5fbd20a1a9adb765647c59828e692775b6",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index identity.ApproverGroup.IX_ApproverGroup_TenantId_Key",
-            "create table identity.ApproverGroup",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_ApproverGroup] ADD FILTER PREDICATE\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
+            "create table identity.ApproverGroup"
           ],
-          "operations": 4
+          "operations": 2
         }
       ]
     },
@@ -199,29 +178,24 @@
       "migrations": [
         {
           "id": "20261016010627_Initial",
-          "checksum": "36f6f98c824e62af4657749ebec2664256de637c207a72262f22fc46a8484bb1",
+          "checksum": "291eeee61ac40352fbaf8b9fa6914dd510e58e69922f1aea3cc276bbe45f567b",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index configuration.ConfigurationDraft.IX_ConfigurationDraft_TenantId_OrganisationId_Kind_Status",
             "create index configuration.ConfigurationRelease.IX_ConfigurationRelease_TenantId_OrganisationId_Kind_Number",
             "create table configuration.ConfigurationDraft",
             "create table configuration.ConfigurationRelease",
-            "ensure schema configuration",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ConfigurationDraft] ADD FILTER\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ConfigurationRelease] ADD FILT\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
+            "ensure schema configuration"
           ],
-          "operations": 8
+          "operations": 5
         },
         {
           "id": "20261017024249_AddSolutionPacks",
-          "checksum": "93a23c8f19537f390541e26d88f402ca03be97470d8b80e4fe935b06a9525439",
+          "checksum": "f86ee64f8f7dcfb80cc95c765197a499346c296a2baaef922413b5b2380e57f7",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index configuration.InstalledPack.IX_InstalledPack_TenantId_PackKey_Version",
@@ -231,33 +205,24 @@
             "create index configuration.TrustedPublisherKey.IX_TrustedPublisherKey_TenantId_KeyId",
             "create table configuration.InstalledPack",
             "create table configuration.PackAssignment",
-            "create table configuration.TrustedPublisherKey",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_InstalledPack] ADD FILTER PRED\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_PackAssignment] ADD FILTER PRE\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_TrustedPublisherKey] ADD FILTE\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
+            "create table configuration.TrustedPublisherKey"
           ],
-          "operations": 12
+          "operations": 8
         },
         {
           "id": "20261018094305_AddConfigurationReview",
-          "checksum": "5ca523a214eb783854acb15d271ec08c36f7ea496e5436d3e363c182281565f0",
+          "checksum": "838d0d54b7c66c687176fe4897608ad20cfb0e4ee635bf6352aa6f672369ed89",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index configuration.ConfigurationReviewEvent.IX_ConfigurationReviewEvent_TenantId_DraftId_OccurredUtc",
             "create index configuration.DraftReview.IX_DraftReview_TenantId_State",
             "create table configuration.ConfigurationReviewEvent",
             "create table configuration.DraftReview",
-            "create table configuration.ReleaseEvidence",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ConfigurationReviewEvent] ADD \u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_DraftReview] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ReleaseEvidence] ADD FILTER PR\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
+            "create table configuration.ReleaseEvidence"
           ],
-          "operations": 9
+          "operations": 5
         }
       ]
     },
@@ -269,21 +234,18 @@
       "migrations": [
         {
           "id": "20261016074930_Initial",
-          "checksum": "25b1d35b80c2ef8d59b95ded6b23a4af48068fa785efa2646f56dcbbba9f0d91",
+          "checksum": "3049e9e60ff8f70d0d2b09d15e11b03350314ef3cb6124670cba26abaddeb477",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index approvals.ApprovalDelegation.IX_ApprovalDelegation_TenantId_FromUserId_ValidToUtc",
             "create index approvals.ApprovalDelegation.IX_ApprovalDelegation_TenantId_OrganisationId_GroupKey_ValidToUtc",
             "create index approvals.ApprovalDelegation.IX_ApprovalDelegation_TenantId_ToUserId_ValidToUtc",
             "create table approvals.ApprovalDelegation",
-            "ensure schema approvals",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_approvals_ApprovalDelegation] ADD FILTER PRE\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[approvals] TO [ecp_runtime];"
+            "ensure schema approvals"
           ],
-          "operations": 7
+          "operations": 5
         }
       ]
     },
@@ -295,10 +257,9 @@
       "migrations": [
         {
           "id": "20261016000547_Initial",
-          "checksum": "d30eb1ba72c026cb2ada9393648cdd2b32011b0e7a59193033f6f6beca6fd754",
+          "checksum": "790957b5c90460b23218b7a1563676821c9adb21d7d3fba1f4d32c66a222abab",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index contracts.Category.IX_Category_TenantId_OrganisationId_Code",
@@ -313,20 +274,15 @@
             "create table contracts.Category",
             "create table contracts.Contract",
             "create table contracts.Supplier",
-            "ensure schema contracts",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_Category] ADD FILTER PREDICATE sec\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_Contract] ADD FILTER PREDICATE sec\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_Supplier] ADD FILTER PREDICATE sec\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];"
+            "ensure schema contracts"
           ],
-          "operations": 17
+          "operations": 13
         },
         {
           "id": "20261016010330_AccessScopes",
-          "checksum": "cc00084bf11c65e656f5f2630961ce3d33ba503230f35e5c2861a6e4c73d627e",
+          "checksum": "eefd4f4be95a2f7470be6cbcd0953984135304e89696b9c0e127888cf49a0dbf",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "add column contracts.Category.DivisionId",
@@ -335,12 +291,9 @@
             "create index contracts.CategoryAssignment.IX_CategoryAssignment_TenantId_CategoryId_EffectiveToUtc",
             "create index contracts.CategoryAssignment.IX_CategoryAssignment_TenantId_UserId",
             "create table contracts.CategoryAssignment",
-            "create table contracts.ReferenceCounter",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_CategoryAssignment] ADD FILTER PRE\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_ReferenceCounter] ADD FILTER PREDI\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];"
+            "create table contracts.ReferenceCounter"
           ],
-          "operations": 10
+          "operations": 7
         },
         {
           "id": "20261016034846_MigrationSupport",
@@ -415,10 +368,9 @@
         },
         {
           "id": "20261016114641_CustomFieldValues",
-          "checksum": "70526e67379bfb49a1dcc0a2e0dd1dac906aebd1a6b80d6af19c95e311b55bef",
+          "checksum": "d2b8dd9ddac9dfd6afd9436de4a0eb36d18dedf99a99ce072d62c103f1a18645",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index contracts.ContractCustomValue.IX_ContractCustomValue_TenantId_MigrationBatchId",
@@ -429,34 +381,28 @@
             "create index contracts.ContractCustomValue.IX_CustomValue_Number",
             "create index contracts.ContractCustomValue.IX_CustomValue_Ref",
             "create index contracts.ContractCustomValue.IX_CustomValue_Text",
-            "create table contracts.ContractCustomValue",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_ContractCustomValue] ADD FILTER PR\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];"
+            "create table contracts.ContractCustomValue"
           ],
-          "operations": 11
+          "operations": 9
         },
         {
           "id": "20261016122859_SavedViews",
-          "checksum": "9f54a5f16b759457c5f1326482b313b53a8aaeb29ae683a94fa03d242c7c7656",
+          "checksum": "de0a6fe78ca675f1ec42dda97b2ea13a0694e4c9d485ed8e46e0dfbf681831c3",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index contracts.SavedView.IX_SavedView_TenantId_OwnerUserId_Name",
-            "create table contracts.SavedView",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_SavedView] ADD FILTER PREDICATE se\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];"
+            "create table contracts.SavedView"
           ],
-          "operations": 4
+          "operations": 2
         },
         {
           "id": "20261017151009_SupplierIdentifiers",
-          "checksum": "4e7badf3a0ec6e31d51244b288b5470515b0666a90a04003e016a21ea6d5e90f",
+          "checksum": "8fa45bcdea6bd793a9edb7653e14d0d11d0ebf17461f006a94532e1ac69fd930",
           "categories": [
             "DataRewrite",
             "IndexOrConstraint",
-            "RowLevelSecurity",
             "SchemaAlteration"
           ],
           "objects": [
@@ -471,11 +417,9 @@
             "create index contracts.SupplierIdentifier.IX_SupplierIdentifier_TenantId_OrganisationId_TypeKey_NormalisedValue",
             "create index contracts.SupplierIdentifier.IX_SupplierIdentifier_TenantId_SupplierId_TypeKey",
             "create table contracts.SupplierIdentifier",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_contracts_SupplierIdentifier] ADD FILTER PRE\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[contracts] TO [ecp_runtime];",
             "sql: INSERT INTO [contracts].[SupplierIdentifier] ([Id], [TenantId], [OrganisationId], [Supplie\u2026"
           ],
-          "operations": 14
+          "operations": 12
         }
       ]
     },
@@ -487,10 +431,9 @@
       "migrations": [
         {
           "id": "20261016000551_Initial",
-          "checksum": "04ef7c87b249988ffeb050c2805ef94999f0a172d1497cdd3f32d065350ddf2f",
+          "checksum": "4694b550c4cc1d05dfd747988d5c27ad7812a8fadf3707326d864e700fffd605",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index documents.Document.IX_Document_TenantId_ContractId",
@@ -499,12 +442,9 @@
             "create index documents.DocumentVersion.IX_DocumentVersion_TenantId_Sha256",
             "create table documents.Document",
             "create table documents.DocumentVersion",
-            "ensure schema documents",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_documents_DocumentVersion] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_documents_Document] ADD FILTER PREDICATE sec\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[documents] TO [ecp_runtime];"
+            "ensure schema documents"
           ],
-          "operations": 10
+          "operations": 7
         },
         {
           "id": "20261016034900_MigrationSupport",
@@ -523,19 +463,16 @@
         },
         {
           "id": "20261018103354_AddScanAttempts",
-          "checksum": "ba85ed48a5be891e154cc766d38ccbea0e59b69045772d50a6bc9d93d3817a3f",
+          "checksum": "674e571d9dc310c251b22a58a1af0ffaab83f47aa21a0b8bb7bf90673aa5227e",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index documents.DocumentScanAttempt.IX_DocumentScanAttempt_TenantId_Outcome_AttemptedUtc",
             "create index documents.DocumentScanAttempt.IX_DocumentScanAttempt_TenantId_VersionId_AttemptedUtc",
-            "create table documents.DocumentScanAttempt",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_documents_DocumentScanAttempt] ADD FILTER PR\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[documents] TO [ecp_runtime];"
+            "create table documents.DocumentScanAttempt"
           ],
-          "operations": 5
+          "operations": 3
         }
       ]
     },
@@ -547,10 +484,9 @@
       "migrations": [
         {
           "id": "20261016060002_Initial",
-          "checksum": "a1b621fad61027006269e9d36778f92dc3842b96db84f37fd470eadcc1efed94",
+          "checksum": "ffcf26bb97d520e85bbe5598ec989662276dccd1f94b57087933bbab907026b9",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index lifecycle.ApprovalRequest.IX_ApprovalRequest_TenantId_ContractId_SubmittedUtc",
@@ -593,30 +529,15 @@
             "create table lifecycle.StatusHistory",
             "create table lifecycle.SubjectDocument",
             "create table lifecycle.Variation",
-            "ensure schema lifecycle",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_ApprovalRequest] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_ExecutionRecord] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalAttachment] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalComment] ADD FILTER PREDICATE\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalEvent] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalReview] ADD FILTER PREDICATE \u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LegalRound] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_LifecycleEvent] ADD FILTER PREDICA\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_RecordUnlock] ADD FILTER PREDICATE\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_Renewal] ADD FILTER PREDICATE secu\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_StatusHistory] ADD FILTER PREDICAT\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_SubjectDocument] ADD FILTER PREDIC\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_Variation] ADD FILTER PREDICATE se\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[lifecycle] TO [ecp_runtime];"
+            "ensure schema lifecycle"
           ],
-          "operations": 55
+          "operations": 41
         },
         {
           "id": "20261016074947_AddApprovalPlans",
-          "checksum": "e6ba70e588471c3accc7769bd69596a563742f7579b5c206ef76c4d223f04a82",
+          "checksum": "5370327470538f926a2188eae983a8b3b3b32651b50b98a2c60b68c07116c65e",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "add column lifecycle.ApprovalRequest.ActiveGroupKeys",
@@ -627,19 +548,16 @@
             "add unique constraint lifecycle.ApprovalRequest.AK_ApprovalRequest_TenantId_Id",
             "create index lifecycle.ApprovalStepResponse.IX_ApprovalStepResponse_TenantId_RequestId_Sequence",
             "create index lifecycle.ApprovalStepResponse.IX_ApprovalStepResponse_TenantId_RequestId_StepKey_UserId",
-            "create table lifecycle.ApprovalStepResponse",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_ApprovalStepResponse] ADD FILTER P\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[lifecycle] TO [ecp_runtime];"
+            "create table lifecycle.ApprovalStepResponse"
           ],
-          "operations": 11
+          "operations": 9
         },
         {
           "id": "20261017040140_SignatureRequestVocabulary",
-          "checksum": "2be2bd753353b0bba94ba3c2cac9142e75385e91db1934420d5b9a887f99e1ee",
+          "checksum": "779faf6afe5a91c209a227eb67c7de779f77f362ea520649a1422d4a96d84c1c",
           "categories": [
             "IndexOrConstraint",
             "RawSql",
-            "RowLevelSecurity",
             "SchemaAlteration"
           ],
           "objects": [
@@ -661,13 +579,9 @@
             "create index lifecycle.SignatureRequest.IX_SignatureRequest_TenantId_Provider_ProviderRequestId",
             "create table lifecycle.SignatureProviderEvent",
             "rename index lifecycle.SignatureRequest.IX_ExecutionRecord_TenantId_SubjectKind_SubjectId_IsCurrent",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_SignatureProviderEvent] ADD FILTER\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_lifecycle_SignatureRequest] ADD FILTER PREDI\u2026",
-            "sql: DROP SECURITY POLICY IF EXISTS security.[TenantPolicy_lifecycle_ExecutionRecord];",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[lifecycle] TO [ecp_runtime];",
             "sql: IF OBJECT_ID(N\u0027[lifecycle].[PK_ExecutionRecord]\u0027, N\u0027PK\u0027) IS NOT NULL EXEC sp_rename N\u0027[lif\u2026"
           ],
-          "operations": 23
+          "operations": 19
         }
       ]
     },
@@ -679,29 +593,24 @@
       "migrations": [
         {
           "id": "20261016000554_Initial",
-          "checksum": "bbb680aca2b318c3f0378e38e56afa708bfba4a607e4d267bab4934a4c626b23",
+          "checksum": "c5a1a034a8fe7ac74b590e060070201a52b012aab84d6593dd6df22236c8daac",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index migration.MigrationBatch.IX_MigrationBatch_TenantId_ProjectId",
             "create index migration.MigrationProject.IX_MigrationProject_TenantId_OrganisationId_Name",
             "create table migration.MigrationBatch",
             "create table migration.MigrationProject",
-            "ensure schema migration",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MigrationBatch] ADD FILTER PREDICA\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MigrationProject] ADD FILTER PREDI\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
+            "ensure schema migration"
           ],
-          "operations": 8
+          "operations": 5
         },
         {
           "id": "20261016034919_MigrationSlice",
-          "checksum": "49335c5bd7d6bd096991c1a2623ea4dd92711465b7cade3183bb2c2882596439",
+          "checksum": "a9dab2ad5b0e7f7b2d0f2354025ce420214f82c290d77c3224f841390a7ef6ef",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "add column migration.MigrationBatch.AcceptanceNote",
@@ -764,40 +673,24 @@
             "create table migration.SourceFile",
             "create table migration.StagedFile",
             "create table migration.StagingMessage",
-            "create table migration.StagingRow",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_AttachmentManifestEntry] ADD FILTE\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_Checkpoint] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MappingProfileVersion] ADD FILTER \u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MappingProfile] ADD FILTER PREDICA\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MatchProposal] ADD FILTER PREDICAT\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_ProvenanceRecord] ADD FILTER PREDI\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_ReconciliationReport] ADD FILTER P\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_SourceFile] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_StagedFile] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_StagingMessage] ADD FILTER PREDICA\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_StagingRow] ADD FILTER PREDICATE s\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
+            "create table migration.StagingRow"
           ],
-          "operations": 73
+          "operations": 61
         },
         {
           "id": "20261018233142_AddMaskedDataDeclarations",
-          "checksum": "20b85c4700ab3f8dabe7f6910f998cdc408ca186a841568073c99e58aab3de39",
+          "checksum": "613910b61a8e9fa5a1007d6a941eb539e189cfd5295a9e7cb8cbc3d167068097",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index migration.BatchDataClassification.IX_BatchDataClassification_TenantId_BatchId",
             "create index migration.BatchDataClassification.IX_BatchDataClassification_TenantId_DeclarationId",
             "create index migration.MaskedDataDeclaration.IX_MaskedDataDeclaration_TenantId_OrganisationId_DeclaredUtc",
             "create table migration.BatchDataClassification",
-            "create table migration.MaskedDataDeclaration",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_BatchDataClassification] ADD FILTE\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MaskedDataDeclaration] ADD FILTER \u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
+            "create table migration.MaskedDataDeclaration"
           ],
-          "operations": 8
+          "operations": 5
         }
       ]
     },
@@ -809,10 +702,9 @@
       "migrations": [
         {
           "id": "20261029100354_AddAccessTables",
-          "checksum": "867395d50c7300a5425ffbdc7f7220144ec8455cc9e56b51890bcdc7115681d4",
+          "checksum": "43edcdac5ac27d9e3e6ae3535008bf8c769152eac28437e838ea53305eb05650",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index access.PreviewSession.IX_PreviewSession_TenantId_PreviewerUserId_StartedUtc",
@@ -821,27 +713,21 @@
             "create index access.ProfileApplication.IX_ProfileApplication_TenantId_UserId",
             "create table access.PreviewSession",
             "create table access.ProfileApplication",
-            "ensure schema access",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_PreviewSession] ADD FILTER PREDICATE \u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_ProfileApplication] ADD FILTER PREDIC\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
+            "ensure schema access"
           ],
-          "operations": 10
+          "operations": 7
         },
         {
           "id": "20261029234110_AddCategoryOwnershipPolicy",
-          "checksum": "f2531c5c66f3499401c9cf6e784b5db521e0cefe64c0298a930ff58ca9286c5e",
+          "checksum": "ab41172c98a17997b0ce51c762f49e08cd2be65732c62c8bcc2ac34711b0a64e",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index access.CategoryOwnershipPolicy.IX_CategoryOwnershipPolicy_TenantId_OrganisationId_UserId",
-            "create table access.CategoryOwnershipPolicy",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_CategoryOwnershipPolicy] ADD FILTER P\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
+            "create table access.CategoryOwnershipPolicy"
           ],
-          "operations": 4
+          "operations": 2
         }
       ]
     },
@@ -853,10 +739,9 @@
       "migrations": [
         {
           "id": "20261017231302_Initial",
-          "checksum": "be03fb7bbc96b6a37325c0d63241f13b3c1f3d253f9a28c021a422631968eef8",
+          "checksum": "7543176321ffe168e90a58254e897d4d6a515e6b9fe63f196886921c8adcaeee",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index ops.OperationLease.IX_OperationLease_TenantId_Name_ScopeKey",
@@ -865,48 +750,36 @@
             "create table ops.MaintenanceState",
             "create table ops.OperationLease",
             "create table ops.OperationRun",
-            "ensure schema ops",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_MaintenanceState] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_OperationLease] ADD FILTER PREDICATE sec\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_OperationRun] ADD FILTER PREDICATE secur\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
+            "ensure schema ops"
           ],
-          "operations": 11
+          "operations": 7
         },
         {
           "id": "20261018003226_AddMigrationRecords",
-          "checksum": "20276a7b97c1094f06867474fac4bfdb86c9890c33554575da6203a1f913f651",
+          "checksum": "c90b103c56ecd68dfb23cdae1dade48ab6a11f4cdbce2aa139079504f7bffbb8",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index ops.MigrationRecord.IX_MigrationRecord_TenantId_Module_MigrationId",
-            "create table ops.MigrationRecord",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_MigrationRecord] ADD FILTER PREDICATE se\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
+            "create table ops.MigrationRecord"
           ],
-          "operations": 4
+          "operations": 2
         },
         {
           "id": "20261018225821_AddEmailAndAcceptedExceptions",
-          "checksum": "691ea9420246815cdeeb04d777c9dd6e4e32a68c3c696816f9a0d12278a9e931",
+          "checksum": "a78a4561ea778d11ba62aed12b92e07f56bd755a9817da31a47a3568f6cfe32a",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index ops.AcceptedException.IX_AcceptedException_TenantId_Kind_Code",
             "create index ops.EmailTestResult.IX_EmailTestResult_TenantId_TestedUtc",
             "create table ops.AcceptedException",
             "create table ops.EmailConfiguration",
-            "create table ops.EmailTestResult",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_AcceptedException] ADD FILTER PREDICATE \u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_EmailConfiguration] ADD FILTER PREDICATE\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_EmailTestResult] ADD FILTER PREDICATE se\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
+            "create table ops.EmailTestResult"
           ],
-          "operations": 9
+          "operations": 5
         }
       ]
     },
@@ -918,10 +791,9 @@
       "migrations": [
         {
           "id": "20261016061227_Initial",
-          "checksum": "67a8606cb23e736a1610c0a4ea585d70cdc2106d83d54f1cf7dabe54db4b2c74",
+          "checksum": "3194e40053c71a9dcf5fde75531ea35cdaac889ac9827af74502cfaf25ad54a9",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index notifications.CapturedEmail.IX_CapturedEmail_TenantId_CapturedUtc",
@@ -943,18 +815,9 @@
             "create table notifications.NotificationDelivery",
             "create table notifications.ReminderTracking",
             "create table notifications.ReminderWindow",
-            "ensure schema notifications",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_CapturedEmail] ADD FILTER PRED\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_DeliveryAttempt] ADD FILTER PR\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_DispatchCursor] ADD FILTER PRE\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_JobRun] ADD FILTER PREDICATE s\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_NotificationDelivery] ADD FILT\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_Notification] ADD FILTER PREDI\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_ReminderTracking] ADD FILTER P\u2026",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_notifications_ReminderWindow] ADD FILTER PRE\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[notifications] TO [ecp_runtime];"
+            "ensure schema notifications"
           ],
-          "operations": 29
+          "operations": 20
         }
       ]
     },
@@ -966,50 +829,54 @@
       "migrations": [
         {
           "id": "20261016015437_Initial",
-          "checksum": "bc7ee670bea42dd4af0187d6000cc115681c732b575a5a78b58c82f958343a92",
-          "categories": [
-            "RowLevelSecurity"
-          ],
+          "checksum": "8a35f6e0b8387bb19280f2322116d0d55079ee91c6fbb7204d1b5403508704d3",
+          "categories": [],
           "objects": [
             "create table setup.SetupRecord",
-            "ensure schema setup",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_setup_SetupRecord] ADD FILTER PREDICATE secu\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[setup] TO [ecp_runtime];"
+            "ensure schema setup"
           ],
-          "operations": 4
+          "operations": 2
         },
         {
           "id": "20261016020943_OnboardingLedger",
-          "checksum": "9d0e1c2a6521d5302460a60a8c20844de8416edbfd2ca5833b2a8cbb3a5afd84",
+          "checksum": "cda2b34932cbb2bb1c2d201b57d6e724d49e9aa792d6ead41fa2263ba0e3ca4e",
           "categories": [
-            "IndexOrConstraint",
-            "RowLevelSecurity"
+            "IndexOrConstraint"
           ],
           "objects": [
             "create index setup.OnboardingItem.IX_OnboardingItem_TenantId_OrganisationId_ItemType_ItemKey",
-            "create table setup.OnboardingItem",
-            "sql: CREATE SECURITY POLICY security.[TenantPolicy_setup_OnboardingItem] ADD FILTER PREDICATE s\u2026",
-            "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[setup] TO [ecp_runtime];"
+            "create table setup.OnboardingItem"
           ],
-          "operations": 4
+          "operations": 2
         }
       ]
     }
   ],
   "newMigrations": [
     {
-      "module": "Identity",
-      "id": "20261018094912_AddApproverGroups",
-      "checksum": "09b2ed00f43f2105176330f4f674f76ab05110189c1be61ed7f7628b8d100a3e",
+      "module": "Audit",
+      "id": "20261118000000_RemoveRowLevelSecurity",
+      "checksum": "2a3f21630f6888156c3171ed187044ae2664460b28f9bfab2d4397e2a8ba97d4",
       "categories": [
-        "IndexOrConstraint",
+        "Destructive",
         "RowLevelSecurity"
       ],
       "objects": [
+        "sql: DECLARE @sql nvarchar(max); DECLARE policies CURSOR LOCAL FAST_FORWARD FOR SELECT N\u0027DROP S\u2026"
+      ],
+      "reviewRequired": true,
+      "reviewed": true
+    },
+    {
+      "module": "Identity",
+      "id": "20261018094912_AddApproverGroups",
+      "checksum": "e00311ca761fbc955117d66d39fbef5fbd20a1a9adb765647c59828e692775b6",
+      "categories": [
+        "IndexOrConstraint"
+      ],
+      "objects": [
         "create index identity.ApproverGroup.IX_ApproverGroup_TenantId_Key",
-        "create table identity.ApproverGroup",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_identity_ApproverGroup] ADD FILTER PREDICATE\u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[identity] TO [ecp_runtime];"
+        "create table identity.ApproverGroup"
       ],
       "reviewRequired": false,
       "reviewed": true
@@ -1017,21 +884,16 @@
     {
       "module": "Configuration",
       "id": "20261018094305_AddConfigurationReview",
-      "checksum": "5ca523a214eb783854acb15d271ec08c36f7ea496e5436d3e363c182281565f0",
+      "checksum": "838d0d54b7c66c687176fe4897608ad20cfb0e4ee635bf6352aa6f672369ed89",
       "categories": [
-        "IndexOrConstraint",
-        "RowLevelSecurity"
+        "IndexOrConstraint"
       ],
       "objects": [
         "create index configuration.ConfigurationReviewEvent.IX_ConfigurationReviewEvent_TenantId_DraftId_OccurredUtc",
         "create index configuration.DraftReview.IX_DraftReview_TenantId_State",
         "create table configuration.ConfigurationReviewEvent",
         "create table configuration.DraftReview",
-        "create table configuration.ReleaseEvidence",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ConfigurationReviewEvent] ADD \u2026",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_DraftReview] ADD FILTER PREDIC\u2026",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_configuration_ReleaseEvidence] ADD FILTER PR\u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[configuration] TO [ecp_runtime];"
+        "create table configuration.ReleaseEvidence"
       ],
       "reviewRequired": false,
       "reviewed": true
@@ -1039,17 +901,14 @@
     {
       "module": "Documents",
       "id": "20261018103354_AddScanAttempts",
-      "checksum": "ba85ed48a5be891e154cc766d38ccbea0e59b69045772d50a6bc9d93d3817a3f",
+      "checksum": "674e571d9dc310c251b22a58a1af0ffaab83f47aa21a0b8bb7bf90673aa5227e",
       "categories": [
-        "IndexOrConstraint",
-        "RowLevelSecurity"
+        "IndexOrConstraint"
       ],
       "objects": [
         "create index documents.DocumentScanAttempt.IX_DocumentScanAttempt_TenantId_Outcome_AttemptedUtc",
         "create index documents.DocumentScanAttempt.IX_DocumentScanAttempt_TenantId_VersionId_AttemptedUtc",
-        "create table documents.DocumentScanAttempt",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_documents_DocumentScanAttempt] ADD FILTER PR\u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[documents] TO [ecp_runtime];"
+        "create table documents.DocumentScanAttempt"
       ],
       "reviewRequired": false,
       "reviewed": true
@@ -1057,20 +916,16 @@
     {
       "module": "Migration",
       "id": "20261018233142_AddMaskedDataDeclarations",
-      "checksum": "20b85c4700ab3f8dabe7f6910f998cdc408ca186a841568073c99e58aab3de39",
+      "checksum": "613910b61a8e9fa5a1007d6a941eb539e189cfd5295a9e7cb8cbc3d167068097",
       "categories": [
-        "IndexOrConstraint",
-        "RowLevelSecurity"
+        "IndexOrConstraint"
       ],
       "objects": [
         "create index migration.BatchDataClassification.IX_BatchDataClassification_TenantId_BatchId",
         "create index migration.BatchDataClassification.IX_BatchDataClassification_TenantId_DeclarationId",
         "create index migration.MaskedDataDeclaration.IX_MaskedDataDeclaration_TenantId_OrganisationId_DeclaredUtc",
         "create table migration.BatchDataClassification",
-        "create table migration.MaskedDataDeclaration",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_BatchDataClassification] ADD FILTE\u2026",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_migration_MaskedDataDeclaration] ADD FILTER \u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[migration] TO [ecp_runtime];"
+        "create table migration.MaskedDataDeclaration"
       ],
       "reviewRequired": false,
       "reviewed": true
@@ -1078,10 +933,9 @@
     {
       "module": "Access",
       "id": "20261029100354_AddAccessTables",
-      "checksum": "867395d50c7300a5425ffbdc7f7220144ec8455cc9e56b51890bcdc7115681d4",
+      "checksum": "43edcdac5ac27d9e3e6ae3535008bf8c769152eac28437e838ea53305eb05650",
       "categories": [
-        "IndexOrConstraint",
-        "RowLevelSecurity"
+        "IndexOrConstraint"
       ],
       "objects": [
         "create index access.PreviewSession.IX_PreviewSession_TenantId_PreviewerUserId_StartedUtc",
@@ -1090,10 +944,7 @@
         "create index access.ProfileApplication.IX_ProfileApplication_TenantId_UserId",
         "create table access.PreviewSession",
         "create table access.ProfileApplication",
-        "ensure schema access",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_PreviewSession] ADD FILTER PREDICATE \u2026",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_ProfileApplication] ADD FILTER PREDIC\u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
+        "ensure schema access"
       ],
       "reviewRequired": false,
       "reviewed": true
@@ -1101,16 +952,13 @@
     {
       "module": "Access",
       "id": "20261029234110_AddCategoryOwnershipPolicy",
-      "checksum": "f2531c5c66f3499401c9cf6e784b5db521e0cefe64c0298a930ff58ca9286c5e",
+      "checksum": "ab41172c98a17997b0ce51c762f49e08cd2be65732c62c8bcc2ac34711b0a64e",
       "categories": [
-        "IndexOrConstraint",
-        "RowLevelSecurity"
+        "IndexOrConstraint"
       ],
       "objects": [
         "create index access.CategoryOwnershipPolicy.IX_CategoryOwnershipPolicy_TenantId_OrganisationId_UserId",
-        "create table access.CategoryOwnershipPolicy",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_access_CategoryOwnershipPolicy] ADD FILTER P\u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[access] TO [ecp_runtime];"
+        "create table access.CategoryOwnershipPolicy"
       ],
       "reviewRequired": false,
       "reviewed": true
@@ -1118,16 +966,13 @@
     {
       "module": "Operations",
       "id": "20261018003226_AddMigrationRecords",
-      "checksum": "20276a7b97c1094f06867474fac4bfdb86c9890c33554575da6203a1f913f651",
+      "checksum": "c90b103c56ecd68dfb23cdae1dade48ab6a11f4cdbce2aa139079504f7bffbb8",
       "categories": [
-        "IndexOrConstraint",
-        "RowLevelSecurity"
+        "IndexOrConstraint"
       ],
       "objects": [
         "create index ops.MigrationRecord.IX_MigrationRecord_TenantId_Module_MigrationId",
-        "create table ops.MigrationRecord",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_MigrationRecord] ADD FILTER PREDICATE se\u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
+        "create table ops.MigrationRecord"
       ],
       "reviewRequired": false,
       "reviewed": true
@@ -1135,21 +980,16 @@
     {
       "module": "Operations",
       "id": "20261018225821_AddEmailAndAcceptedExceptions",
-      "checksum": "691ea9420246815cdeeb04d777c9dd6e4e32a68c3c696816f9a0d12278a9e931",
+      "checksum": "a78a4561ea778d11ba62aed12b92e07f56bd755a9817da31a47a3568f6cfe32a",
       "categories": [
-        "IndexOrConstraint",
-        "RowLevelSecurity"
+        "IndexOrConstraint"
       ],
       "objects": [
         "create index ops.AcceptedException.IX_AcceptedException_TenantId_Kind_Code",
         "create index ops.EmailTestResult.IX_EmailTestResult_TenantId_TestedUtc",
         "create table ops.AcceptedException",
         "create table ops.EmailConfiguration",
-        "create table ops.EmailTestResult",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_AcceptedException] ADD FILTER PREDICATE \u2026",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_EmailConfiguration] ADD FILTER PREDICATE\u2026",
-        "sql: CREATE SECURITY POLICY security.[TenantPolicy_ops_EmailTestResult] ADD FILTER PREDICATE se\u2026",
-        "sql: GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[ops] TO [ecp_runtime];"
+        "create table ops.EmailTestResult"
       ],
       "reviewRequired": false,
       "reviewed": true
@@ -1203,7 +1043,11 @@
     },
     {
       "code": "CMP-002",
-      "text": "The upgrade adds one table (the migration record) to the operations schema, with row-level security. It changes no existing table, row, audit event, configuration release, pack or document."
+      "text": "The upgrade adds one table (the migration record) to the operations schema. It changes no existing table, row, audit event, configuration release, pack or document."
+    },
+    {
+      "code": "CMP-003",
+      "text": "SQL Server Row-Level Security and the ecp_runtime database role are retired (ADR-0044). The upgrade removes every tenant security policy, the predicate functions, the security schema and the role where present; tenant isolation stays in the application (EF query filters, refusal of cross-tenant writes, composite TenantId foreign keys, explicit TenantId predicates in reviewed SQL). A database that still holds those objects shows no data to this version until they are removed: a DBA runs deploy/sql/remove-retired-row-level-security.sql after a verified backup, before the pre-flight (docs/UPGRADE_RUNBOOK.md). The runtime account then needs only db_datareader and db_datawriter; the migration account only db_ddladmin, db_datareader and db_datawriter."
     }
   ],
   "breakingChanges": [],
@@ -1212,7 +1056,6 @@
     "VAL-005",
     "VAL-006",
     "VAL-007",
-    "VAL-008",
     "VAL-009",
     "VAL-010",
     "VAL-011",
@@ -1236,5 +1079,5 @@
     ],
     "dataLossStatement": "Rolling back discards everything created after the pre-upgrade backup, including anything done after the upgrade finished. It cannot be recovered from the backup."
   },
-  "manifestSha256": "04a6a5470ece06a44c7d2adf0e4b18b25b5a436f798c21ebe3b0b5f92ee94902"
+  "manifestSha256": "5a445d9a56c7528b732c53354cde8d10e664e215bf63e26e7504ef10849e34b7"
 }

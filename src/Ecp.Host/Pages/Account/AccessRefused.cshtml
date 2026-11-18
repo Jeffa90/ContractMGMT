@@ -1,0 +1,18 @@
+@page "/Account/AccessRefused"
+@model Ecp.Host.Pages.Account.AccessRefusedModel
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@{ ViewData["Title"] = L["You cannot sign in yet"].Value; }
+<h1>@L["You cannot sign in yet"]</h1>
+<div class="error-summary" role="alert" tabindex="-1" id="refused">
+    <h2>@Model.Heading</h2>
+    <p>@Model.Explanation</p>
+</div>
+@if (Model.Account is not null)
+{
+    <section class="card" aria-labelledby="who-h">
+        <h2 id="who-h">@L["What to tell the administrator"]</h2>
+        <p>@L["Your Windows account is"] <strong>@Model.Account</strong>.</p>
+        <p class="hint">@L["Signing in with Windows proves who you are. It does not give you access: an administrator must invite you and give you a role first."]</p>
+    </section>
+}
+<p><a class="button secondary" href="/SignIn?reason=refused">@L["Back to sign-in"]</a></p>

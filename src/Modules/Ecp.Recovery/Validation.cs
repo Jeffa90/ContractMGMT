@@ -41,7 +41,7 @@ public sealed record ValidationReport(string Subject, DateTime StartedUtc, DateT
 public enum ValidationProfile { Full, Preflight, PostUpgrade }
 
 /// <summary>What an upgrade was supposed to produce, for the post-upgrade profile: the manifest that governs it, the inventory and isolation policies taken immediately before the first migration ran (what the upgraded data is compared with).</summary>
-public sealed record UpgradeExpectation(UpgradeManifest Manifest, InventorySnapshot? BeforeInventory, IReadOnlyList<string>? PoliciesBefore);
+public sealed record UpgradeExpectation(UpgradeManifest Manifest, InventorySnapshot? BeforeInventory);
 
 /// <summary>What validation looks at: an installation reachable through <see cref="Services"/> (the running application, or a restored copy opened beside it) and, for a restore, the manifest it was restored from.</summary>
 public sealed record ValidationTarget(IServiceProvider Services, string ConnectionString, string DatabaseName, bool Restored, BackupManifest? Manifest, bool HashDocumentContent, string Subject,
@@ -91,8 +91,7 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
             return preflight ? [] : CompareInventory(target, snapshot);
         });
         await Run("VAL-006", "Referential integrity", () => ConstraintsAsync(target, ct));
-        await Run("VAL-007", "Row-level security policies", () => PoliciesAsync(target, ct));
-        await Run("VAL-008", "Tenant isolation behaviour (session context)", () => IsolationAsync(target, ct));
+        await Run("VAL-007", "No retired row-level security remains", () => RetiredRowLevelSecurityAsync(target, ct));
         if (snapshot is not null)
         {
             checks.AddRange(AuditChecks(target, snapshot));
@@ -128,9 +127,10 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
     private static async Task<long> ScalarAsync(AsyncServiceScope scope, string sql, CancellationToken ct)
     {
         var c = scope.ServiceProvider.GetRequiredService<IScopedConnection>();
-        await c.ApplyTenantScopeAsync(ct);
+        await c.EnsureOpenAsync(ct);
         await using var cmd = c.Connection.CreateCommand();
         cmd.Transaction = c.Transaction; cmd.CommandText = InstallationInventory.ForProvider(c, sql);
+        if (sql.Contains("@tenant", StringComparison.Ordinal)) InstallationInventory.BindTenant(cmd, c, InstallationInventory.CurrentTenant(scope.ServiceProvider));
         var o = await cmd.ExecuteScalarAsync(ct);
         return o is null or DBNull ? 0 : Convert.ToInt64(o);
     }
@@ -205,7 +205,7 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
         if (connection.Provider != DatabaseProvider.SqlServer)
             return [Check("VAL-003", "Module schemas and tables", CheckOutcome.NotVerified, CheckSeverity.Low, "Table presence is verified against SQL Server only.", "", "")];
         var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        await connection.ApplyTenantScopeAsync(ct);
+        await connection.EnsureOpenAsync(ct);
         await using (var cmd = connection.Connection.CreateCommand())
         {
             cmd.Transaction = connection.Transaction;
@@ -284,7 +284,7 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
         await using var scope = t.Services.CreateAsyncScope();
         using var _ = scope.ServiceProvider.GetRequiredService<TenantContext>().UseInstallationScope();
         var connection = scope.ServiceProvider.GetRequiredService<IScopedConnection>();
-        await connection.ApplyTenantScopeAsync(ct);
+        await connection.EnsureOpenAsync(ct);
         await using var cmd = connection.Connection.CreateCommand();
         cmd.Transaction = connection.Transaction;
         var rows = 0; var sample = new List<string>();
@@ -312,59 +312,31 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
             : Check("VAL-006", "Referential integrity", CheckOutcome.Failed, CheckSeverity.Critical, $"{rows} constraint problem(s) were found.", detail, "Do not use this copy. Restore again from a verified backup.")];
     }
 
-    private async Task<IEnumerable<ValidationCheck>> PoliciesAsync(ValidationTarget t, CancellationToken ct)
+    /// <summary>
+    /// VAL-007 (ADR-0044). SQL Server Row-Level Security and the ecp_runtime role were retired; this version sets no session context, so a policy left behind
+    /// would hide every row from the application. A copy that still holds any of those objects (for example a backup taken before the change) is not usable
+    /// until its pending migrations have been applied.
+    /// </summary>
+    private async Task<IEnumerable<ValidationCheck>> RetiredRowLevelSecurityAsync(ValidationTarget t, CancellationToken ct)
     {
         await using var scope = t.Services.CreateAsyncScope();
         using var _ = scope.ServiceProvider.GetRequiredService<TenantContext>().UseInstallationScope();
-        if (scope.ServiceProvider.GetRequiredService<IScopedConnection>().Provider != DatabaseProvider.SqlServer)
-            return [Check("VAL-007", "Row-level security policies", CheckOutcome.NotVerified, CheckSeverity.Medium, "Row-level security exists on SQL Server only.", "", "")];
-        var policies = await SchemaInspector.PoliciesAsync(scope.ServiceProvider, ct);
-        if (policies.Count == 0) return [Check("VAL-007", "Row-level security policies", CheckOutcome.Failed, CheckSeverity.Critical, "No tenant isolation policy is enabled in this database.", "", "Do not use this copy.")];
-        if (t.Profile == ValidationProfile.PostUpgrade && t.Upgrade is { PoliciesBefore: not null } upgraded)
-        {
-            // An upgrade may add policies (for the tables it creates) and must never remove one.
-            var before = upgraded.PoliciesBefore.ToHashSet(StringComparer.Ordinal);
-            var removed = before.Where(p => !policies.Contains(p)).ToList();
-            var created = upgraded.Manifest.NewMigrations.SelectMany(n => n.Objects).Where(o => o.StartsWith("create table ", StringComparison.Ordinal)).Select(o => o["create table ".Length..].Replace('.', '_')).ToHashSet(StringComparer.Ordinal);
-            var unexplained = policies.Where(p => !before.Contains(p) && !created.Any(c => p.EndsWith("TenantPolicy_" + c, StringComparison.Ordinal))).ToList();
-            return removed.Count == 0 && unexplained.Count == 0
-                ? [Pass("VAL-007", "Row-level security policies", $"{policies.Count} tenant isolation policies are enabled: all {before.Count} from before the upgrade, and {policies.Count - before.Count} added for the tables the upgrade created.")]
-                : [Check("VAL-007", "Row-level security policies", CheckOutcome.Failed, CheckSeverity.Critical, "The isolation policies after the upgrade are not the ones before it plus those the manifest explains.", $"removed: {string.Join(", ", removed.Take(5))}; unexplained: {string.Join(", ", unexplained.Take(5))}", "Do not release this installation. Roll back by restoring the verified pre-upgrade backup.")];
-        }
-        if (t.Manifest is not null && !t.Manifest.Schema.SecurityPolicies.OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(policies.OrderBy(p => p, StringComparer.Ordinal)))
-            return [Check("VAL-007", "Row-level security policies", CheckOutcome.Failed, CheckSeverity.Critical, "The enabled isolation policies are not the ones the backup had.", $"{policies.Count} enabled, {t.Manifest.Schema.SecurityPolicyCount} expected", "Do not use this copy.")];
-        return [Pass("VAL-007", "Row-level security policies", $"{policies.Count} tenant isolation policies are enabled" + (t.Manifest is null ? "." : ", the same as the backup."))];
-    }
-
-    private async Task<IEnumerable<ValidationCheck>> IsolationAsync(ValidationTarget t, CancellationToken ct)
-    {
-        await using var probe = t.Services.CreateAsyncScope();
-        if (probe.ServiceProvider.GetRequiredService<IScopedConnection>().Provider != DatabaseProvider.SqlServer)
-            return [Check("VAL-008", "Tenant isolation behaviour (session context)", CheckOutcome.NotVerified, CheckSeverity.Medium, "Session-context isolation exists on SQL Server only.", "", "")];
-        var tenants = await TenantsAsync(t, ct);
-        var customer = tenants.FirstOrDefault(x => x != SystemTenant.Id);
-        await using var connection = new SqlConnection(new SqlConnectionStringBuilder(t.ConnectionString) { Pooling = false }.ConnectionString);
-        await connection.OpenAsync(ct);
-        async Task<(long Rows, long Tenants)> Read(string? tenant)
-        {
-            await using (var set = connection.CreateCommand())
-            {
-                set.CommandText = "EXEC sp_set_session_context N'TenantId', @t; EXEC sp_set_session_context N'IsInstallationScope', 0;";
-                set.Parameters.Add(new SqlParameter("@t", SqlDbType.NVarChar, 36) { Value = (object?)tenant ?? DBNull.Value });
-                await set.ExecuteNonQueryAsync(ct);
-            }
-            await using var q = connection.CreateCommand();
-            q.CommandText = "SELECT COUNT_BIG(*), COUNT(DISTINCT TenantId) FROM audit.AuditEvent";
-            await using var r = await q.ExecuteReaderAsync(ct);
-            await r.ReadAsync(ct);
-            return (r.GetInt64(0), r.GetInt32(1));
-        }
-        var none = await Read(null);
-        if (none.Rows != 0) return [Check("VAL-008", "Tenant isolation behaviour (session context)", CheckOutcome.Failed, CheckSeverity.Critical, "With no tenant set, data was still visible: isolation does not fail closed in this database.", $"{none.Rows} row(s) visible", "Do not use this copy.")];
-        if (customer == Guid.Empty) return [Pass("VAL-008", "Tenant isolation behaviour (session context)", "With no tenant set nothing is visible. (There is no customer tenant to test a positive case.)")];
-        var one = await Read(customer.ToString());
-        if (one.Tenants > 1) return [Check("VAL-008", "Tenant isolation behaviour (session context)", CheckOutcome.Failed, CheckSeverity.Critical, "With one tenant set, another tenant's rows were visible.", $"{one.Tenants} tenants visible", "Do not use this copy.")];
-        return [Pass("VAL-008", "Tenant isolation behaviour (session context)", "With no tenant set nothing is visible, and with one tenant set only that tenant's rows are.", $"{one.Rows} row(s) for the sample tenant")];
+        var connection = scope.ServiceProvider.GetRequiredService<IScopedConnection>();
+        if (connection.Provider != DatabaseProvider.SqlServer)
+            return [Pass("VAL-007", "No retired row-level security remains", "The lightweight provider never had row-level security.")];
+        await connection.EnsureOpenAsync(ct);
+        await using var cmd = connection.Connection.CreateCommand();
+        cmd.Transaction = connection.Transaction;
+        cmd.CommandText = "SELECT (SELECT COUNT(*) FROM sys.security_policies), (SELECT COUNT(*) FROM sys.objects WHERE schema_id = SCHEMA_ID(N'security')), CASE WHEN DATABASE_PRINCIPAL_ID(N'ecp_runtime') IS NULL THEN 0 ELSE 1 END";
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        await r.ReadAsync(ct);
+        var (policies, functions, role) = (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2));
+        return policies == 0 && functions == 0 && role == 0
+            ? [Pass("VAL-007", "No retired row-level security remains", "No security policy, predicate function or ecp_runtime role is present; tenant isolation is enforced by the application (ADR-0044).")]
+            : [Check("VAL-007", "No retired row-level security remains", CheckOutcome.Failed, CheckSeverity.Critical,
+                "This database still holds row-level security objects from a version before ADR-0044. This version sets no session context, so those policies would hide every row from the application.",
+                $"{policies} security policy(ies), {functions} object(s) in the security schema, ecp_runtime role {(role == 1 ? "present" : "absent")}",
+                "Apply the pending migrations to this copy (docs/UPGRADE_RUNBOOK.md, 'Databases created before ADR-0044'), then validate again.")];
     }
 
     private IEnumerable<ValidationCheck> AuditChecks(ValidationTarget t, InventorySnapshot actual)
@@ -539,9 +511,9 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
             string Q(string schema, string table) => InstallationInventory.Qualified(connection, schema, table);
             var tables = scope.ServiceProvider.GetServices<ModuleDescriptor>().SelectMany(m => ((DbContext)scope.ServiceProvider.GetRequiredService(m.DbContextType)).Model.GetEntityTypes().Select(e => e.GetTableName())).ToHashSet();
             if (tables.Contains("Contract") && tables.Contains("ConfigurationRelease"))
-                orphanPins += await ScalarAsync(scope, $"SELECT COUNT_BIG(*) FROM {Q("contracts", "Contract")} c WHERE c.ConfigReleaseId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {Q("configuration", "ConfigurationRelease")} r WHERE r.Id = c.ConfigReleaseId)", ct);
+                orphanPins += await ScalarAsync(scope, $"SELECT COUNT_BIG(*) FROM {Q("contracts", "Contract")} c WHERE c.TenantId = @tenant AND c.ConfigReleaseId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {Q("configuration", "ConfigurationRelease")} r WHERE r.TenantId = c.TenantId AND r.Id = c.ConfigReleaseId)", ct);
             if (tables.Contains("Document") && tables.Contains("Contract"))
-                orphanDocs += await ScalarAsync(scope, $"SELECT COUNT_BIG(*) FROM {Q("documents", "Document")} d WHERE d.ContractId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {Q("contracts", "Contract")} c WHERE c.Id = d.ContractId)", ct);
+                orphanDocs += await ScalarAsync(scope, $"SELECT COUNT_BIG(*) FROM {Q("documents", "Document")} d WHERE d.TenantId = @tenant AND d.ContractId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {Q("contracts", "Contract")} c WHERE c.TenantId = d.TenantId AND c.Id = d.ContractId)", ct);
         }
         results.Add(orphanPins == 0 ? Pass("VAL-014", "Pinned workflows", "Every contract's pinned configuration release exists, so its workflow resolves exactly as before.")
             : Check("VAL-014", "Pinned workflows", CheckOutcome.Failed, CheckSeverity.Critical, $"{orphanPins} contract(s) are pinned to a configuration release that does not exist.", "", "Do not use this copy."));
@@ -561,8 +533,8 @@ internal sealed class InstallationValidator(IInstallationInventory inventory, IC
             string Q(string schema, string table) => InstallationInventory.Qualified(connection, schema, table);
             var tables = scope.ServiceProvider.GetServices<ModuleDescriptor>().SelectMany(m => ((DbContext)scope.ServiceProvider.GetRequiredService(m.DbContextType)).Model.GetEntityTypes().Select(e => e.GetTableName())).ToHashSet();
             if (!tables.Contains("NotificationDelivery") || !tables.Contains("Notification")) continue;
-            orphan += await ScalarAsync(scope, $"SELECT COUNT_BIG(*) FROM {Q("notifications", "NotificationDelivery")} d WHERE NOT EXISTS (SELECT 1 FROM {Q("notifications", "Notification")} n WHERE n.Id = d.NotificationId)", ct);
-            pending += await ScalarAsync(scope, $"SELECT COUNT_BIG(*) FROM {Q("notifications", "NotificationDelivery")} d WHERE d.Status IN ('Pending','Retrying')", ct);
+            orphan += await ScalarAsync(scope, $"SELECT COUNT_BIG(*) FROM {Q("notifications", "NotificationDelivery")} d WHERE d.TenantId = @tenant AND NOT EXISTS (SELECT 1 FROM {Q("notifications", "Notification")} n WHERE n.TenantId = d.TenantId AND n.Id = d.NotificationId)", ct);
+            pending += await ScalarAsync(scope, $"SELECT COUNT_BIG(*) FROM {Q("notifications", "NotificationDelivery")} d WHERE d.TenantId = @tenant AND d.Status IN ('Pending','Retrying')", ct);
         }
         return [orphan == 0 ? Pass("VAL-016", "Notification and outbox consistency", $"Every queued delivery has its notification. {pending} delivery(ies) are waiting; they resume when maintenance mode is released.")
             : Check("VAL-016", "Notification and outbox consistency", CheckOutcome.Failed, CheckSeverity.High, $"{orphan} queued delivery(ies) have no notification.", "", "Do not use this copy.")];

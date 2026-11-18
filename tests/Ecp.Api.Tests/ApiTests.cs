@@ -27,6 +27,14 @@ public sealed class EcpFactory : WebApplicationFactory<Program>
 
     private readonly Action<IServiceCollection>? _services;
 
+    static EcpFactory()
+    {
+        // Test hosts never need configuration files to reload; each reloading file watcher costs an inotify instance, and the per-user limit (128 by default, also on CI runners) is shared by every host a test run creates.
+        Environment.SetEnvironmentVariable("DOTNET_hostBuilder__reloadConfigOnChange", "false");
+        // The static-file version provider (asp-append-version) also watches wwwroot once per host; polling uses no inotify instance, so a long run of test hosts cannot exhaust the per-user limit.
+        Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "true");
+    }
+
     public EcpFactory(Dictionary<string, string?> settings, Action<IServiceCollection>? services = null)
     {
         _services = services;
@@ -189,7 +197,7 @@ public class DemoHostTests
         string[] anonymousAllowlist =
         [
             "/health/live", "/health/startup", "/health/ready", "/api/v1/info", "/api/v1/openapi.json",
-            "/SignIn", "/SignOut", "/Error", "/Account/Challenge", "/css/branding.css",
+            "/SignIn", "/SignOut", "/Error", "/Account/Challenge", "/Account/WindowsSignIn", "/Account/AccessRefused", "/css/branding.css",
             // Setup pages are reachable only through the one-time token (and exist only until installation is complete); see SetupTests.
             "/Setup", "/Setup/Step/{id}", "/Setup/Report"
         ];
@@ -299,6 +307,170 @@ public class HostConfigurationTests
             ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "SqlServer", ["Database:ConnectionStringRef"] = "env:ECP_DOES_NOT_EXIST_" + Guid.NewGuid().ToString("N"),
         }), Secrets, "/app"));
         Assert.Contains("[R-SEC-02]", ex.Message);
+    }
+
+    private static string RepositoryFile(string relative)
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+            if (File.Exists(Path.Combine(dir.FullName, relative))) return Path.Combine(dir.FullName, relative);
+        throw new FileNotFoundException(relative);
+    }
+
+    [Fact]
+    public void The_shipped_base_settings_file_is_safe_for_Production_and_never_falls_back_to_Demo()
+    {
+        // Only the file that is published, with no environment, no secret and no override: the host must refuse, and must name what is missing.
+        var shipped = new ConfigurationBuilder().AddJsonFile(RepositoryFile("src/Ecp.Host/appsettings.json")).Build();
+        Assert.Equal("Production", shipped["Ecp:Mode"]);
+        Assert.Equal("SqlServer", shipped["Database:Provider"]);
+        Assert.False(shipped.GetValue("Ecp:DemoSeed", true));
+        Assert.False(shipped.GetValue("Ecp:DemoTenantResolution", true));
+        Assert.False(shipped.GetValue("Database:AutoMigrate", true));
+        var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(shipped, Secrets, "/app"));
+        Assert.Contains("[R-SEC-02]", ex.Message);
+        Assert.Contains("[R-ST-01]", ex.Message);
+        Assert.DoesNotContain("[R-DB-01]", ex.Message); // the provider is already SQL Server
+    }
+
+    [Fact]
+    public void A_host_with_no_settings_at_all_resolves_as_Production_not_Demo()
+    {
+        var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()), Secrets, "/app"));
+        Assert.Contains("[R-SEC-02]", ex.Message);
+        Assert.Contains("[R-ST-01]", ex.Message);
+        Assert.True(new EcpHostOptions().Mode == EcpMode.Production);
+    }
+
+    [Fact]
+    public void The_Development_settings_file_is_not_published()
+    {
+        var csproj = File.ReadAllText(RepositoryFile("src/Ecp.Host/Ecp.Host.csproj"));
+        Assert.Contains("appsettings.Development.json", csproj);
+        Assert.Contains("CopyToPublishDirectory=\"Never\"", csproj);
+        var shipped = File.ReadAllText(RepositoryFile("src/Ecp.Host/appsettings.json"));
+        Assert.DoesNotContain("Sqlite", shipped);
+        Assert.DoesNotContain("ecp-demo", shipped);
+    }
+
+    [Theory]
+    [InlineData("true", "/var/lib/ecp", "R-MIG-01")]
+    [InlineData("false", "/app/data", "R-ST-02")]
+    [InlineData("false", "/app", "R-ST-02")]
+    public void Production_refuses_automatic_migration_and_storage_inside_the_application_folder(string autoMigrate, string dataDirectory, string expected)
+    {
+        var name = "ECP_CFG_" + Guid.NewGuid().ToString("N");
+        Environment.SetEnvironmentVariable(name, "Server=db.example;Database=ecp;User Id=app;Password=not-a-real-secret");
+        try
+        {
+            var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()
+            {
+                ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = dataDirectory, ["Database:Provider"] = "SqlServer", ["Database:ConnectionStringRef"] = "env:" + name,
+                ["Database:AutoMigrate"] = autoMigrate,
+            }), Secrets, "/app"));
+            Assert.Contains($"[{expected}]", ex.Message);
+        }
+        finally { Environment.SetEnvironmentVariable(name, null); }
+    }
+
+    [Fact]
+    public void Production_accepts_integrated_authentication_in_ordinary_configuration_without_a_secret_file()
+    {
+        var resolved = HostConfiguration.Resolve(Config(new()
+        {
+            ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "SqlServer",
+            ["Database:ConnectionString"] = "Server=db.example;Database=Ecp;Integrated Security=True;Encrypt=True",
+        }), Secrets, "/app");
+        Assert.Equal(DatabaseProvider.SqlServer, resolved.Database.Provider);
+        Assert.False(resolved.Facts.ConnectionFromSecretReference);
+        Assert.True(resolved.Facts.InlineConnectionCredentialFree);
+    }
+
+    [Theory]
+    [InlineData("Server=db.example;Database=Ecp;User Id=app;Password=SuperSecretValue123")]
+    [InlineData("Server=db.example;Database=Ecp;Integrated Security=True;User Id=app;Password=SuperSecretValue123")]
+    [InlineData("Server=db.example;Database=Ecp")]
+    public void Production_still_refuses_an_inline_string_that_holds_a_credential_or_names_no_method(string connection)
+    {
+        var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()
+        {
+            ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "SqlServer", ["Database:ConnectionString"] = connection,
+        }), Secrets, "/app"));
+        Assert.Contains("[R-SEC-02]", ex.Message);
+        Assert.DoesNotContain("SuperSecretValue123", ex.Message);
+    }
+
+    [Fact]
+    public void Production_refuses_the_lightweight_provider_even_with_an_integrated_looking_string()
+    {
+        var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()
+        {
+            ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "Sqlite", ["Database:ConnectionString"] = "Server=x;Database=y;Integrated Security=True",
+        }), Secrets, "/app"));
+        Assert.Contains("[R-DB-01]", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("External", false)]
+    [InlineData("application", false)]
+    [InlineData("Extrnal", true)]
+    [InlineData("DbaOwned", true)]
+    public void The_recovery_mode_must_be_one_of_the_two_known_values(string mode, bool refused)
+    {
+        var name = "ECP_REC_" + Guid.NewGuid().ToString("N");
+        Environment.SetEnvironmentVariable(name, "Server=db.example;Database=ecp;User Id=app;Password=not-a-real-secret");
+        try
+        {
+            Func<ResolvedConfiguration> resolve = () => HostConfiguration.Resolve(Config(new()
+            {
+                ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "SqlServer", ["Database:ConnectionStringRef"] = "env:" + name,
+                ["Ecp:Recovery:Mode"] = mode,
+            }), Secrets, "/app");
+            if (refused) Assert.Contains("[R-REC-01]", Assert.Throws<StartupRefusedException>(() => resolve()).Message);
+            else Assert.NotNull(resolve());
+        }
+        finally { Environment.SetEnvironmentVariable(name, null); }
+    }
+
+    [Fact]
+    public void The_command_line_offers_the_recovery_point_commands()
+    {
+        Assert.Contains("declare-recovery-point", OperationsCli.Commands);
+        Assert.Contains("list-recovery-points", OperationsCli.Commands);
+        Assert.Contains("Declared by DBA; not verified by this application", OperationsCli.Usage);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void The_confirmed_JBS_QA_layout_with_the_site_in_app_beside_Data_is_accepted_and_a_site_folder_at_the_data_root_is_refused(bool siteAtRoot)
+    {
+        // Confirmed: site files in C:\inetpub\JbsContracts\app, data in C:\inetpub\JbsContracts\Data (siteAtRoot = the refused alternative), in this platform's path syntax.
+        var root = Path.Combine(Path.GetTempPath() is var t && OperatingSystem.IsWindows() ? Path.GetPathRoot(t)! : "/", "inetpub", "JbsContracts");
+        var site = siteAtRoot ? root : Path.Combine(root, "app");
+        var config = Config(new()
+        {
+            ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = Path.Combine(root, "Data"), ["Ecp:DataProtection:KeyDirectory"] = Path.Combine(root, "Data", "Keys"),
+            ["Database:Provider"] = "SqlServer", ["Database:ConnectionString"] = "Server=sql.example;Database=Ecp;Integrated Security=True;Encrypt=True",
+            ["Ecp:DataProtection:Protection"] = "None",
+        });
+        if (siteAtRoot) Assert.Contains("[R-ST-02]", Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(config, Secrets, site)).Message);
+        else Assert.Equal(Path.Combine(root, "Data"), HostConfiguration.Resolve(config, Secrets, site).Host.DataDirectory);
+    }
+
+    [Fact]
+    public void Production_refuses_the_lightweight_provider_even_when_a_connection_secret_is_supplied()
+    {
+        var name = "ECP_CFG_" + Guid.NewGuid().ToString("N");
+        Environment.SetEnvironmentVariable(name, "Data Source=/var/lib/ecp/x.db");
+        try
+        {
+            var ex = Assert.Throws<StartupRefusedException>(() => HostConfiguration.Resolve(Config(new()
+            {
+                ["Ecp:Mode"] = "Production", ["Ecp:DataDirectory"] = "/var/lib/ecp", ["Database:Provider"] = "Sqlite", ["Database:ConnectionStringRef"] = "env:" + name,
+            }), Secrets, "/app"));
+            Assert.Contains("[R-DB-01]", ex.Message);
+        }
+        finally { Environment.SetEnvironmentVariable(name, null); }
     }
 
     [Fact]

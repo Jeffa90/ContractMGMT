@@ -43,7 +43,19 @@ public sealed record ReleaseNotes(
 
 public sealed record MigrationReviewEntry(string Module, string Migration, IReadOnlyList<string> Categories, string Basis, string Summary, string Evidence);
 
-public sealed record MigrationReviewRegister(int FormatVersion, IReadOnlyList<MigrationReviewEntry> Entries);
+/// <summary>
+/// An owner-approved change to a migration that was already released (ADR-0044). The upgrade integrity checks (UPM-012, UPF-015) refuse any historical
+/// migration whose checksum differs from its baseline or recorded value, unless the difference is exactly the one recorded here: the same module and migration,
+/// from this checksum to this checksum. Anything else still fails as tampering.
+/// </summary>
+public sealed record MigrationAmendment(string Module, string Migration, string FromChecksum, string ToChecksum, string Decision, string Reason);
+
+public sealed record MigrationReviewRegister(int FormatVersion, IReadOnlyList<MigrationReviewEntry> Entries, IReadOnlyList<MigrationAmendment>? Amendments = null)
+{
+    /// <summary>True only when this exact change (module, migration, old checksum, new checksum) is a recorded amendment.</summary>
+    public bool IsAmendment(string module, string migration, string fromChecksum, string toChecksum)
+        => (Amendments ?? []).Any(a => a.Module == module && a.Migration == migration && a.FromChecksum == fromChecksum && a.ToChecksum == toChecksum);
+}
 
 public static class UpgradeJson
 {
@@ -99,13 +111,16 @@ public sealed class UpgradeCatalogue
 
     public static UpgradeCatalogue FromAssembly(Assembly assembly)
     {
-        var names = assembly.GetManifestResourceNames().Where(n => n.StartsWith("upgrades/", StringComparison.Ordinal)).Order(StringComparer.Ordinal).ToList();
+        // The build names these resources from the file's folder. On Windows the folder separator is a backslash ("upgrades/manifests\x.json"), so names are compared with forward slashes
+        // and the stream is opened by its real name; otherwise a Windows build would find no manifest and could not be upgraded.
+        var names = assembly.GetManifestResourceNames().Where(n => n.StartsWith("upgrades/", StringComparison.Ordinal))
+            .Select(n => (Real: n, Logical: n.Replace('\\', '/'))).OrderBy(n => n.Logical, StringComparer.Ordinal).ToList();
         byte[] Read(string name) { using var s = assembly.GetManifestResourceStream(name)!; using var m = new MemoryStream(); s.CopyTo(m); return m.ToArray(); }
-        var baselines = names.Where(n => n.StartsWith("upgrades/baselines/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<ReleaseLedger>(Read(n))).ToList();
-        var manifests = names.Where(n => n.StartsWith("upgrades/manifests/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<UpgradeManifest>(Read(n))).ToList();
-        var notes = names.Where(n => n.StartsWith("upgrades/release-notes/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<ReleaseNotes>(Read(n))).ToList();
-        var review = names.FirstOrDefault(n => n == "upgrades/migration-reviews.json");
-        var register = review is null ? new MigrationReviewRegister(1, []) : UpgradeJson.Parse<MigrationReviewRegister>(Read(review));
+        var baselines = names.Where(n => n.Logical.StartsWith("upgrades/baselines/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<ReleaseLedger>(Read(n.Real))).ToList();
+        var manifests = names.Where(n => n.Logical.StartsWith("upgrades/manifests/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<UpgradeManifest>(Read(n.Real))).ToList();
+        var notes = names.Where(n => n.Logical.StartsWith("upgrades/release-notes/", StringComparison.Ordinal)).Select(n => UpgradeJson.Parse<ReleaseNotes>(Read(n.Real))).ToList();
+        var review = names.FirstOrDefault(n => n.Logical == "upgrades/migration-reviews.json");
+        var register = review.Real is null ? new MigrationReviewRegister(1, []) : UpgradeJson.Parse<MigrationReviewRegister>(Read(review.Real));
         return new UpgradeCatalogue(baselines, manifests, register, notes);
     }
 
@@ -177,7 +192,7 @@ public static class UpgradeManifestValidator
                 {
                     var same = now.Migrations.FirstOrDefault(e => e.Id == old.Id);
                     if (same is null) Critical("UPM-011", $"Migration {module.Module}/{old.Id} existed in the source version but is missing from the target (a historical migration was removed).");
-                    else if (!string.Equals(same.Checksum, old.Checksum, StringComparison.Ordinal)) Critical("UPM-012", $"Migration {module.Module}/{old.Id} has changed since the source version was released (a historical migration was modified).");
+                    else if (!string.Equals(same.Checksum, old.Checksum, StringComparison.Ordinal) && !catalogue.Reviews.IsAmendment(module.Module, old.Id, old.Checksum, same.Checksum)) Critical("UPM-012", $"Migration {module.Module}/{old.Id} has changed since the source version was released (a historical migration was modified).");
                 }
                 if (!now.Migrations.Take(module.Migrations.Count).Select(e => e.Id).SequenceEqual(module.Migrations.Select(e => e.Id))) Critical("UPM-013", $"Module {module.Module}: the source migrations are not the first migrations of the target, in the same order.");
             }

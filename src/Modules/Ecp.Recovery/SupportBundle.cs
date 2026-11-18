@@ -81,13 +81,13 @@ internal sealed class SupportBundle(IServiceScopeFactory scopes, ReadinessServic
                 var connection = ts.ServiceProvider.GetRequiredService<IScopedConnection>();
                 long orgCount = 0;
                 var orgTable = InstallationInventory.Qualified(connection, "tenancy", "Organisation");
-                await connection.ApplyTenantScopeAsync(ct);
-                await using (var cmd = connection.Connection.CreateCommand()) { cmd.Transaction = connection.Transaction; cmd.CommandText = InstallationInventory.ForProvider(connection, $"SELECT COUNT_BIG(*) FROM {orgTable}"); orgCount = Convert.ToInt64(await cmd.ExecuteScalarAsync(ct)); }
+                await connection.EnsureOpenAsync(ct);
+                await using (var cmd = connection.Connection.CreateCommand()) { cmd.Transaction = connection.Transaction; cmd.CommandText = InstallationInventory.ForProvider(connection, $"SELECT COUNT_BIG(*) FROM {orgTable} WHERE TenantId = @tenant"); InstallationInventory.BindTenant(cmd, connection, t.Id); orgCount = Convert.ToInt64(await cmd.ExecuteScalarAsync(ct)); }
                 organisations += orgCount;
                 var deliveries = InstallationInventory.Qualified(connection, "notifications", "NotificationDelivery");
                 await using (var cmd = connection.Connection.CreateCommand())
                 {
-                    cmd.Transaction = connection.Transaction; cmd.CommandText = InstallationInventory.ForProvider(connection, $"SELECT Status, COUNT_BIG(*) FROM {deliveries} GROUP BY Status");
+                    cmd.Transaction = connection.Transaction; cmd.CommandText = InstallationInventory.ForProvider(connection, $"SELECT Status, COUNT_BIG(*) FROM {deliveries} WHERE TenantId = @tenant GROUP BY Status"); InstallationInventory.BindTenant(cmd, connection, t.Id);
                     await using var r = await cmd.ExecuteReaderAsync(ct);
                     while (await r.ReadAsync(ct)) { var key = Convert.ToString(r.GetValue(0)) ?? "?"; queue[key] = queue.GetValueOrDefault(key) + r.GetInt64(1); }
                 }

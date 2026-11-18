@@ -76,7 +76,7 @@ public sealed class BackupRestoreSqlServerTests
                 Assert.Contains(manifest.Packs.Installed, p => p.PackKey == HarborlineWorld.PackKey);
                 Assert.NotEmpty(manifest.Packs.Shipped);
                 Assert.All(manifest.InventoryAfter.Tenants, t => Assert.True(t.AuditChainValid));
-                Assert.True(manifest.Schema.SecurityPolicyCount > 0);
+                Assert.Equal(0, manifest.Schema.SecurityPolicyCount);   // ADR-0044: row-level security is retired; the manifest records that none is present
                 Assert.Contains(manifest.Schema.Modules, m => m.Module == "Operations" && m.AppliedMigrations.Count > 0);
                 Assert.Contains(manifest.Files, f => f.Kind == "database");
                 Assert.Contains(manifest.Files, f => f.Kind == "package");
@@ -112,7 +112,7 @@ public sealed class BackupRestoreSqlServerTests
                 Assert.True(restored.Validation!.AllowsRelease);
                 Assert.Equal(0, restored.Validation.Count(CheckOutcome.Failed));
                 Assert.True(restored.Released);
-                foreach (var code in new[] { "VAL-001", "VAL-002", "VAL-003", "VAL-005", "VAL-006", "VAL-007", "VAL-008", "VAL-009", "VAL-010", "VAL-011", "VAL-013", "VAL-014", "VAL-016", "VAL-017", "VAL-019", "VAL-021" })
+                foreach (var code in new[] { "VAL-001", "VAL-002", "VAL-003", "VAL-005", "VAL-006", "VAL-007", "VAL-009", "VAL-010", "VAL-011", "VAL-013", "VAL-014", "VAL-016", "VAL-017", "VAL-019", "VAL-021" })
                     Assert.Contains(restored.Validation.Checks, c => c.Code == code && c.Outcome == CheckOutcome.Passed);
                 Assert.NotNull(restored.EvidenceFile);
                 Assert.True(File.Exists(Path.Combine(layout.BackupDirectory, restored.EvidenceFile!)));

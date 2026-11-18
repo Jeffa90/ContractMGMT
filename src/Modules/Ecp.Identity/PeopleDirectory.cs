@@ -38,6 +38,9 @@ public sealed record PersonName(Guid Id, string DisplayName);
 public interface IUserAdministration
 {
     Task<Guid> InviteAsync(string displayName, string email, CancellationToken ct = default);
+
+    /// <summary>Records the Windows account (DOMAIN\name) an invited person will sign in with. Needs users.manage. No role comes from it.</summary>
+    Task SetWindowsAccountAsync(Guid userId, string account, CancellationToken ct = default);
     Task DisableAsync(Guid userId, string reason, CancellationToken ct = default);
     Task ReactivateAsync(Guid userId, CancellationToken ct = default);
 }
@@ -114,7 +117,7 @@ internal sealed class PeopleDirectory(IdentityDbContext db, IAccessService acces
         => new(u.Id, u.DisplayName, u.Email, u.Status, assignments.Where(a => a.IsActiveAt(now)).Select(a => a.RoleCode + (a.ViewerKind is { } k ? $" ({k})" : "")).Distinct().ToList());
 }
 
-internal sealed class UserAdministration(IAccessService access, IUserService users, IPeopleDirectory people) : IUserAdministration
+internal sealed class UserAdministration(IAccessService access, IUserService users, IPeopleDirectory people, Ecp.Identity.Windows.IWindowsAccounts windows) : IUserAdministration
 {
     private async Task RequireAsync(CancellationToken ct)
     {
@@ -125,6 +128,12 @@ internal sealed class UserAdministration(IAccessService access, IUserService use
     {
         await RequireAsync(ct);
         return await users.InviteAsync(displayName, email, ct);
+    }
+
+    public async Task SetWindowsAccountAsync(Guid userId, string account, CancellationToken ct = default)
+    {
+        await people.GetManageableUserAsync(userId, ct);
+        await windows.SetInvitedAccountAsync(userId, account, "people", ct);
     }
 
     public async Task DisableAsync(Guid userId, string reason, CancellationToken ct = default)

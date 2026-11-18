@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +60,15 @@ builder.Configuration.GetSection("Identity:Demo").Bind(demoIdentity);
 builder.Services.AddSingleton(demoIdentity);
 
 var hostVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+
+// Structured logging (docs/DEPLOYMENT.md, "Logging"): one place, a durable rolling file, shared context on every event, secrets redacted before anything is written.
+var loggingSettings = Ecp.Host.Logging.LoggingSettings.From(builder.Configuration, resolved.Host.DataDirectory);
+builder.Services.AddSingleton(loggingSettings);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.Logging.LoggingReadinessCheck>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.Logging.LogDestinationsReadinessCheck>();
+builder.Host.UseSerilog((context, services, logger) => Ecp.Host.Logging.LoggingConfiguration.Apply(logger, loggingSettings, hostVersion, resolved.Host.Mode.ToString(),
+    Ecp.Host.Logging.EcpLogEnricher.DatabaseIdentifier(resolved.Database.Provider, resolved.Database.ConnectionString), services.GetService<IHttpContextAccessor>(), secrets, () => DateTime.UtcNow), writeToProviders: true);
 builder.Services.AddEcpPlatformModules(builder.Configuration, resolved, PlatformComposition.PathsFor(resolved.Host.DataDirectory, builder.Configuration), hostVersion, builder.Environment.ContentRootPath, builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"));
 builder.Services.AddSingleton<Ecp.Recovery.IRestoreTargetFactory>(new RestoreTargetFactory(builder.Configuration, resolved, hostVersion, builder.Environment.ContentRootPath, builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot")));
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.PackReadinessCheck>();
@@ -66,6 +76,7 @@ builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.CapabilityRe
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.RegionalReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.DocumentScanReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.GovernanceReadinessCheck>();
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Operations.DatabaseAccessReadinessCheck>();
 builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Operations.EmailReadinessCheck>();
 builder.Services.AddHostedService<BackgroundJobService>();
 builder.Services.AddSingleton<DemoSeeder>();
@@ -74,9 +85,13 @@ builder.Services.AddSingleton<IDemoDataApplier, DemoDataApplier>();
 builder.Services.AddScoped<BrandingAccessor>();
 
 // Keys for cookies, antiforgery and temp data live in the data directory (persistent volume) so sessions survive restarts (R-SEC-04).
-var dataProtection = builder.Services.AddDataProtection().SetApplicationName("EnterpriseContractPlatform")
-    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(resolved.Host.DataDirectory, "keyring")));
-if (OperatingSystem.IsWindows()) dataProtection.ProtectKeysWithDpapi();
+// The directory, the protection and the diagnostics are described in docs/DEPLOYMENT.md ("Data protection"). A recycled pool, a redeploy and a restart all reuse the same ring.
+var dataProtectionSettings = DataProtectionSettings.From(builder.Configuration, resolved.Host.DataDirectory);
+Directory.CreateDirectory(dataProtectionSettings.KeyDirectory);
+dataProtectionSettings.Apply(builder.Services.AddDataProtection());
+builder.Services.AddSingleton(dataProtectionSettings);
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<Ecp.Operations.IReadinessCheck, Ecp.Host.DataProtectionReadinessCheck>();
 builder.Services.AddSingleton<Ecp.Operations.IKeyRingInspector, DataProtectionKeyRingInspector>();
 
 // Sessions: a signed cookie issued after a verified sign-in. Organisation identity providers register their own schemes at run time.
@@ -125,6 +140,16 @@ builder.Services.AddAntiforgery(o =>
     o.HeaderName = "X-CSRF-TOKEN";
 });
 builder.Services.AddRazorPages().AddViewLocalization();
+// Request size and time policy (docs/DEPLOYMENT.md "Upload limits and timeouts"): a small default for every endpoint; only the upload endpoints raise it, each to its own limit.
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(o => o.Limits.MaxRequestBodySize = UploadLimits.DefaultRequestBytes);
+// Under IIS the same default is enforced by requestFiltering in web.config before the request reaches the application (IISServerOptions is a Windows-only type and is not used here).
+builder.Services.AddRequestTimeouts(o =>
+{
+    TimeSpan Seconds(string key, TimeSpan fallback) => builder.Configuration.GetValue<int?>($"Ecp:Http:{key}") is > 0 and var s ? TimeSpan.FromSeconds(s) : fallback;
+    o.DefaultPolicy = new Microsoft.AspNetCore.Http.Timeouts.RequestTimeoutPolicy { Timeout = Seconds("RequestTimeoutSeconds", UploadLimits.DefaultTimeout) };
+    o.AddPolicy(UploadLimits.UploadTimeoutPolicy, Seconds("UploadTimeoutSeconds", UploadLimits.UploadTimeout));
+    o.AddPolicy(UploadLimits.MigrationTimeoutPolicy, Seconds("MigrationTimeoutSeconds", UploadLimits.MigrationTimeout));
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ProblemExceptionHandler>();
 builder.Services.AddOpenApi();
@@ -215,8 +240,22 @@ app.UseWhen(c => !c.Request.Path.StartsWithSegments("/api") && !c.Request.Path.S
 app.UseWhen(c => c.Request.Path.StartsWithSegments("/api") || c.Request.Path.StartsWithSegments("/health"), b => b.UseStatusCodePages());
 app.UseExceptionHandler();
 app.UseMiddleware<SecurityHeadersMiddleware>();
+// IIS Application Initialization warm-up (docs/DEPLOYMENT.md): the only anonymous path on an IIS site besides what the server itself serves. It answers 200 with an empty body
+// and nothing else: no version, mode, health detail or configuration. It runs before the setup gate and the HTTPS guard because IIS calls it on the local loopback, before any person.
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.Equals("/warmup", StringComparison.OrdinalIgnoreCase) && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
+    {
+        context.Response.StatusCode = StatusCodes.Status200OK;
+        context.Response.ContentLength = 0;
+        return;
+    }
+    await next(context);
+});
 if (secureCookies) app.UseHsts();
 app.UseStaticFiles();
+app.UseSerilogRequestLogging(o => o.GetLevel = (context, _, ex) =>
+    context.Request.Path.StartsWithSegments("/health") ? Serilog.Events.LogEventLevel.Verbose : ex is not null || context.Response.StatusCode >= 500 ? Serilog.Events.LogEventLevel.Error : Serilog.Events.LogEventLevel.Information);
 app.UseMiddleware<Ecp.Host.Network.NetworkGuardMiddleware>();
 app.UseMiddleware<SetupGateMiddleware>();
 app.UseRequestLocalization(o =>
@@ -230,6 +269,8 @@ app.UseRequestLocalization(o =>
 app.UseRateLimiter();
 app.UseMiddleware<MaintenanceMiddleware>();
 app.UseRouting();
+app.UseRequestTimeouts();
+app.UseMiddleware<Ecp.Host.Security.WindowsIdentityCaptureMiddleware>();   // before UseAuthentication: a server-supplied Windows principal is not an application session
 app.UseAuthentication();
 app.UseMiddleware<SessionMiddleware>();
 app.UseAuthorization();

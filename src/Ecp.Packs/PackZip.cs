@@ -126,6 +126,8 @@ public static class PackZipReader
                 var mode = (attributes >> 16) & 0xF000;
                 if (mode != 0 && mode != 0x8000) return Fail(PackCodes.UnsafeFeature, "Links and special files are not allowed.", "Packages contain regular files only.", name);
             }
+            // An archive made on a Windows host marks a link as a reparse point in the DOS attribute bits (0x400); refuse it the same way as a Unix link.
+            if (platform != 3 && (attributes & 0x400) != 0) return Fail(PackCodes.UnsafeFeature, "Links and special files are not allowed.", "Packages contain regular files only.", name);
             if ((attributes & 0x10) != 0) return Fail(PackCodes.UnsafeFeature, "Directory entries are not allowed.", "Packages contain regular files only.", name);
             if (method == 0 && csize != usize) return Fail(PackCodes.EntryCorrupt, "An entry's declared sizes disagree.", "The package is damaged; obtain it again.", name);
             if (usize > limits.MaxEntryBytes) return Fail(PackCodes.EntryTooLarge, $"An entry is larger than the {limits.MaxEntryBytes / (1024 * 1024)} MB limit.", "A package holds small JSON documents.", name);

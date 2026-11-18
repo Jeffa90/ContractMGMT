@@ -10,12 +10,12 @@ namespace Ecp.Host.Pages;
 /// (prompt=login, max_age=0); the demonstration provider offers an explicit confirmation and exists only in Demo and Test modes.
 /// </summary>
 [Authorize]
-public sealed class ReauthModel(OidcSchemeManager oidc, DemoIdentityService demo, SessionIssuer sessions) : EcpPageModel
+public sealed class ReauthModel(OidcSchemeManager oidc, DemoIdentityService demo, SessionIssuer sessions, Ecp.Identity.Windows.IWindowsSignIn windows, Ecp.SharedKernel.TenantContext tenantContext) : EcpPageModel
 {
     public string ReturnUrl { get; private set; } = "/";
     public bool IsDemo { get; private set; }
 
-    public IActionResult OnGet(string? returnUrl)
+    public async Task<IActionResult> OnGetAsync(string? returnUrl, CancellationToken ct)
     {
         ReturnUrl = IsLocal(returnUrl) ? returnUrl! : "/";
         var provider = User.FindFirstValue(EcpClaims.Provider);
@@ -23,6 +23,18 @@ public sealed class ReauthModel(OidcSchemeManager oidc, DemoIdentityService demo
         {
             IsDemo = demo.IsEnabled;
             return IsDemo ? Page() : Forbid();
+        }
+        if (Guid.TryParse(User.FindFirstValue(EcpClaims.TenantId), out var windowsTenant) && provider is not null && Guid.TryParse(User.FindFirstValue(EcpClaims.UserId), out var windowsUser))
+        {
+            using var _ = tenantContext.Use(windowsTenant);
+            if (await windows.ProviderKeyAsync(ct) == provider)
+            {
+                // Windows cannot ask for a password again: the web server proves the same Windows identity is still behind this browser. That is the strongest step-up this method offers.
+                var login = WindowsIdentityCaptureMiddleware.From(HttpContext);
+                if (login is null || !await windows.IsLinkedAsync(windowsUser, login, ct)) return Forbid();
+                await sessions.RefreshReauthenticationAsync(HttpContext);
+                return LocalRedirect(ReturnUrl);
+            }
         }
         if (Guid.TryParse(User.FindFirstValue(EcpClaims.TenantId), out var tenantId) && provider is not null)
         {

@@ -10,7 +10,7 @@ namespace Ecp.Host;
 /// </summary>
 public static class OperationsCli
 {
-    public static readonly string[] Commands = ["backup", "list-backups", "verify-backup", "restore", "validate", "maintenance", "support-bundle", "evidence", "upgrade-baseline"];
+    public static readonly string[] Commands = ["backup", "list-backups", "verify-backup", "restore", "validate", "maintenance", "support-bundle", "evidence", "upgrade-baseline", "declare-recovery-point", "list-recovery-points"];
 
     public const string Usage = """
         Operations commands:
@@ -23,6 +23,9 @@ public static class OperationsCli
           maintenance on|off --reason "<why>" [--acknowledge-restore-state]
           support-bundle <file>
           evidence <file> [--csv]
+          declare-recovery-point --id "<identifier>" --source "<how it was taken>" --verifier "<who confirmed it can be restored>" --taken "<UTC time, e.g. 2026-11-12T01:30:00Z>" --schema-version <platform version in the database> --environment <Production|Test|...> --reason "<why>"
+                                (Ecp:Recovery:Mode=External: record a recovery point the DBA took. Declared by DBA; not verified by this application.)
+          list-recovery-points
           upgrade-baseline <platform version> <file> --note "<what this baseline is>"      (release engineering: freeze the migration inventory of a release)
         """;
 
@@ -55,6 +58,22 @@ public static class OperationsCli
                     if (result.Failure is not null) Console.Error.WriteLine(Redaction.Clean(result.Failure));
                     return result.Succeeded ? 0 : 2;
                 }
+                case "declare-recovery-point":
+                {
+                    if (!DateTime.TryParse(Option(args, "--taken"), System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var taken))
+                    { Console.Error.WriteLine("--taken must be a UTC time such as 2026-11-12T01:30:00Z."); return 2; }
+                    var point = await provider.GetRequiredService<IExternalRecoveryPoints>().DeclareAsync(new ExternalRecoveryPointRequest(
+                        Option(args, "--id") ?? "", Option(args, "--source") ?? "", Option(args, "--environment") ?? "", Option(args, "--verifier") ?? "", taken,
+                        Option(args, "--schema-version") ?? "", reason), who, ct);
+                    Console.WriteLine($"Recovery point {point.PointId} recorded. {point.Statement}.");
+                    Console.WriteLine($"Name it in an upgrade with --backup {point.PointId}. Record SHA-256: {point.RecordSha256}");
+                    return 0;
+                }
+                case "list-recovery-points":
+                    foreach (var p in await provider.GetRequiredService<IExternalRecoveryPoints>().ListAsync(ct))
+                        Console.WriteLine($"{p.PointId}  taken {p.TakenUtc:yyyy-MM-dd HH:mm}Z  schema {p.DatabaseSchemaVersion}  {p.Environment}  verifier: {p.Verifier}  [{p.Statement}]");
+                    return 0;
                 case "list-backups":
                     foreach (var b in await provider.GetRequiredService<IBackupCatalogue>().ListAsync(ct))
                         Console.WriteLine($"{b.BackupId}  {b.State,-20} {b.CreatedUtc:yyyy-MM-dd HH:mm}Z  {b.Bytes,14:N0} bytes  {b.Warnings} warning(s)  {b.Detail}");

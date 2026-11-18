@@ -4,6 +4,27 @@ Status: **Review only. No application code was changed.** Reviewed branch ux/gui
 
 Source of the standards: NEW-APP-STANDARDS-GUIDE.md ("Building a New Web App at JBS Australia"), read in full. This platform is a product with a JBS reference configuration, not a JBS-only application (CLAUDE.md, PORTABILITY_AND_NO_CODE.md); several findings turn on that.
 
+## Update: state after the JBS IIS integration slice (branch jbs/iis-integration)
+
+The review below describes the code as it was reviewed. Since then branch jbs/iis-integration changed the following (details and evidence in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`; none of it has run on IIS, so each moved item is at best **COMPLIANT** with the IIS part **NOT VERIFIED**):
+
+| Area | Reviewed as | Now |
+|---|---|---|
+| IIS hosting, ASP.NET Core Module V2 (`src/Ecp.Host/web.config`) | Scaffold only | Published with `dotnet publish`; in-process; checked in CI. NOT VERIFIED on IIS |
+| Windows Authentication | NON-COMPLIANT (not built) | COMPLIANT WITH DIFFERENT IMPLEMENTATION: IIS authenticates; the application authorises by invitation and its own roles (owner decision). NOT VERIFIED on IIS |
+| Configuration conventions, safe defaults | Demo values in the base settings file | Production-safe base file; Development file never published; Production refuses blank, temporary or in-application storage and automatic migration |
+| Secrets and connection strings | Production forced a secret file | Integrated authentication needs no secret; anything with a credential must be a secret reference |
+| Logging (Serilog, correlation, redaction, durable file) | NON-COMPLIANT | Foundation COMPLIANT; Application Insights and fatal-error email are configurable and NOT VERIFIED |
+| Data protection | Per-user DPAPI by default, undocumented | Explicit settings, readiness R-SEC-04, documented; NOT VERIFIED on Windows |
+| Request limits and timeouts | Defaults only; document uploads would have stopped at 30 MB | Explicit per-URL limits and timeout policy, tested for consistency |
+| Backups owned by the DBA | The application's backup feature was the only path | External recovery points, declared and audited; JUSTIFIED DEVIATION recorded in ADR-0043 pending DBA confirmation |
+| Database permissions (ADR-0044) | Application-created role, row-level security policies, migration account needing `CREATE ROLE` and `ALTER ANY SECURITY POLICY` | Standard roles only: runtime db_datareader + db_datawriter; migration db_ddladmin + db_datareader + db_datawriter. Row-Level Security retired for the single-tenant deployment; application-layer security, audit trigger, composite keys and `sp_getapplock` kept. Verified on SQL Server 2022 and 2025 (CI); NOT VERIFIED on the JBS server |
+| Pipeline | Pull request 1 as written | Waits for green CI on the commit, one verified build, rollback of a half-copied site, no secrets in `web.config`, rewritten environment setup script (not executed) |
+
+Items that belong to JBS Infrastructure or the DBA remain **REQUIRES JBS INFRASTRUCTURE CONFIRMATION** and are listed in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.
+
+CI: commit e0d2ac7 passed every job (Linux, Windows, SQL Server 2022, container); see `deploy/STATUS.md`. Nothing has run on IIS.
+
 ## 1. How to read this document
 
 **Method.** Each rule was compared with the real code, project files, configuration, authentication, persistence, logging, deployment files, tests and CI. Evidence names files so it can be checked. Nothing was run on Windows, IIS, Azure DevOps or a JBS SQL Server; those are labelled **NOT VERIFIED** rather than assumed.
@@ -129,12 +150,12 @@ Columns: ID, guide section, the rule, classification, and the evidence or reason
 | ID | § | Rule | Classification | Evidence and notes |
 |---|---|---|---|---|
 | J-45 | 6.3 | Internal apps use Windows (Negotiate) authentication via `Microsoft.AspNetCore.Authentication.Negotiate` | NON-COMPLIANT | Not present. People sign in through OpenID Connect (generic and a Microsoft Entra adapter, live tenant Not Verified), or the Demo identity (Demo/Test only). Detail D-45 |
-| J-46 | 6.1 | ASP.NET Core Module V2 | COMPLIANT | `deploy/iis/web.config` maps `AspNetCoreModuleV2`. Scaffold only; see J-55 |
+| J-46 | 6.1 | ASP.NET Core Module V2 | COMPLIANT | `src/Ecp.Host/web.config` maps `AspNetCoreModuleV2`. Scaffold only; see J-55 |
 | J-47 | 6.1 | In-process hosting model | COMPLIANT | `hostingModel="inprocess"` in the scaffold |
 | J-48 | 6.1 | Needs the .NET 10 Hosting Bundle | REQUIRES JBS INFRASTRUCTURE CONFIRMATION | Documented as step 1 of `deploy/iis/README.md`. Which bundle versions are on JBS servers is Infrastructure's (J-52) |
 | J-49 | 6.1 | `web.config` shape; `stdoutLogEnabled="false"` normally | COMPLIANT WITH DIFFERENT IMPLEMENTATION | Handlers, location and `stdoutLogEnabled="false"` match. `processPath="dotnet" arguments=".\Ecp.Host.dll"` (framework-dependent) instead of an `.exe`. Environment values in the file are non-secret. **The file is not part of the publish output** (J-51). Detail D-49 |
 | J-50 | 6.1 | Set `requestTimeout` explicitly for long requests and document why | NON-COMPLIANT | Not set. Large exports and data-migration uploads are long requests. Detail D-50 |
-| J-51 | 6.1 | Environment-specific values come from the environment, not code | COMPLIANT | `Ecp__*` and `Database__*` environment variables in `web.config`; secrets by file or environment reference. The deliverable gap is that `dotnet publish` generates its own `web.config` and the README does not say to overlay `deploy/iis/web.config` (Detail D-49) |
+| J-51 | 6.1 | Environment-specific values come from the environment, not code | COMPLIANT | `Ecp__*` and `Database__*` environment variables in `web.config`; secrets by file or environment reference. The deliverable gap is that `dotnet publish` generates its own `web.config` and the README does not say to overlay `src/Ecp.Host/web.config` (Detail D-49) |
 | J-53 | 6.1 | `ASPNETCORE_HTTPS_PORT` for a non-default HTTPS port behind IIS | NOT APPLICABLE | The application does not redirect to HTTPS; in Production it requires HTTPS and refuses plain HTTP with an explanation (`docs/REVERSE_PROXY.md`). Revisit only if a non-default port is used |
 | J-54 | 6.2 | Vue SPA rewrite rule, URL Rewrite module, API as a separate IIS application | NOT APPLICABLE | No SPA |
 | J-55 | 6.1-6.3 | The IIS deployment has been run | NOT VERIFIED | The build workspace is Linux. IIS, Windows Server, Windows authentication and the scaffold were never executed (`deploy/STATUS.md`) |
@@ -282,7 +303,7 @@ Each entry gives: current implementation; the JBS requirement; risk; whether cod
 
 ### D-49 / D-50 `web.config` content, packaging and long requests (J-49, J-50, J-51, J-89)
 
-* **Current implementation.** `deploy/iis/web.config` (Scaffolded, never executed) with the V2 module, in-process hosting, `stdoutLogEnabled="false"`, non-secret environment variables, request filtering with a 100 MB content limit, and header removal. The Host project has no `web.config`, so `dotnet publish` generates a default one; `deploy/iis/README.md` says to publish and copy the output, and does not say to overlay the supplied file. No `requestTimeout` is set (Microsoft's reference describes this attribute for out-of-process hosting, so whether it matters in-process is to be confirmed on the target server). The data-migration upload page accepts up to 2 GB (`[RequestSizeLimit(2_147_483_648)]`, `Migration:MaxUploadBytes`) while the supplied IIS limit is 100 MB, and the pack upload is 9 MB.
+* **Current implementation.** `src/Ecp.Host/web.config` (Scaffolded, never executed) with the V2 module, in-process hosting, `stdoutLogEnabled="false"`, non-secret environment variables, request filtering with a 100 MB content limit, and header removal. The Host project has no `web.config`, so `dotnet publish` generates a default one; `deploy/iis/README.md` says to publish and copy the output, and does not say to overlay the supplied file. No `requestTimeout` is set (Microsoft's reference describes this attribute for out-of-process hosting, so whether it matters in-process is to be confirmed on the target server). The data-migration upload page accepts up to 2 GB (`[RequestSizeLimit(2_147_483_648)]`, `Migration:MaxUploadBytes`) while the supplied IIS limit is 100 MB, and the pack upload is 9 MB.
 * **JBS requirement.** A correct `web.config`; `requestTimeout` set explicitly and documented where long requests exist.
 * **Risk.** **Medium.** A default generated `web.config` omits the environment variables Production needs, so the host would start as the base file says (J-33) and be refused or run wrongly; the 100 MB limit would silently block large migration uploads that work under Kestrel.
 * **Code must change.** Small: include `web.config` in the publish output (or generate it from the supplied file) and align the limits. No application logic.

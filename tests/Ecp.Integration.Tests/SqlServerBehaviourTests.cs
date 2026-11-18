@@ -53,11 +53,12 @@ public sealed class SqlServerBehaviourTests(SqlServerFixture fx)
 {
     private TestApp App => fx.App!;
 
-    private async Task<SqlConnection> OpenAsync(Guid? tenant = null, bool installation = false)
+    /// <summary>An administrator's connection. Row-level security is retired (ADR-0044), so no session state is set; the tenant argument names the intent only.</summary>
+    private async Task<SqlConnection> OpenAsync(Guid? tenant = null)
     {
+        _ = tenant;
         var c = new SqlConnection(App.ConnectionString);
         await c.OpenAsync();
-        if (tenant is not null) await Exec(c, "EXEC sp_set_session_context N'TenantId', @t; EXEC sp_set_session_context N'IsInstallationScope', @i;", ("@t", tenant), ("@i", installation));
         return c;
     }
 
@@ -108,73 +109,56 @@ public sealed class SqlServerBehaviourTests(SqlServerFixture fx)
     }
 
     [SqlServerFact]
-    public async Task Every_mapped_table_has_a_row_level_security_policy()
+    public async Task No_table_has_a_row_level_security_policy_and_every_tenant_table_carries_TenantId()
     {
+        // ADR-0044: SQL Server Row-Level Security is retired; tenant isolation is enforced by the application layers tested below.
         await using var c = await OpenAsync();
+        Assert.Equal(0, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.security_policies"));
+        Assert.Equal(0, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.database_principals WHERE name = N'ecp_runtime'"));
         var tables = await App.EntityTablesAsync();
         Assert.True(tables.Count >= 10);
         foreach (var (schema, table, module) in tables)
+            Assert.True(await Scalar<int>(c, "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(@t) AND name IN (N'TenantId', N'Id')", ("@t", $"{schema}.{table}")) >= 1,
+                $"{module}: {schema}.{table} has neither TenantId nor Id");
+    }
+
+    [SqlServerFact]
+    public async Task The_application_filter_exposes_only_the_current_tenants_rows_on_SQL_Server()
+    {
+        await using (var b = App.ScopeFor(fx.TenantB))
         {
-            var kinds = await Scalar<int>(c, @"SELECT COUNT(DISTINCT pr.predicate_type_desc + ISNULL(pr.operation_desc, ''))
-                FROM sys.security_predicates pr JOIN sys.security_policies p ON p.object_id = pr.object_id
-                WHERE p.is_enabled = 1 AND pr.target_object_id = OBJECT_ID(@t)", ("@t", $"{schema}.{table}"));
-            Assert.True(kinds == 3, $"{module}: {schema}.{table} must have FILTER, BLOCK AFTER INSERT and BLOCK AFTER UPDATE predicates"); // FILTER, BLOCK AFTER INSERT, BLOCK AFTER UPDATE
-        }
-    }
-
-    [SqlServerFact]
-    public async Task Rls_exposes_only_the_current_tenants_rows_and_nothing_without_a_scope()
-    {
-        await using var none = await OpenAsync();
-        Assert.Equal(0, await Scalar<int>(none, "SELECT COUNT(*) FROM contracts.Contract")); // fail closed with no session context
-        await using var a = await OpenAsync(fx.TenantA);
-        Assert.Equal(1, await Scalar<int>(a, "SELECT COUNT(*) FROM contracts.Contract WHERE AgreementReference = 'AAA-000001'"));
-        Assert.Equal(0, await Scalar<int>(a, "SELECT COUNT(*) FROM contracts.Contract WHERE AgreementReference = 'BBB-000001'"));
-        await using var other = await OpenAsync(Guid.NewGuid());
-        Assert.Equal(0, await Scalar<int>(other, "SELECT COUNT(*) FROM contracts.Contract"));
-    }
-
-    [SqlServerFact]
-    public async Task Layer_off_with_the_application_filter_ignored_row_level_security_still_blocks_other_tenants()
-    {
-        await using var b = App.ScopeFor(fx.TenantB);
-        var tenants = await b.Get<ContractsDbContext>().Contracts.IgnoreQueryFilters().Select(c => c.TenantId).Distinct().ToListAsync();
-        Assert.Equal([fx.TenantB], tenants); // TEN-030: the EF filter is off, the database still isolates
-    }
-
-    [SqlServerFact]
-    public async Task Layer_off_with_row_level_security_disabled_the_application_filter_still_blocks_other_tenants()
-    {
-        const string policy = "security.[TenantPolicy_contracts_Contract]";
-        await using var admin = await OpenAsync();
-        await Exec(admin, $"ALTER SECURITY POLICY {policy} WITH (STATE = OFF)");
-        try
-        {
-            Assert.True(await Scalar<int>(admin, "SELECT COUNT(DISTINCT TenantId) FROM contracts.Contract") >= 2); // proof the policy really is off
-            await using var b = App.ScopeFor(fx.TenantB);
             var tenants = await b.Get<ContractsDbContext>().Contracts.Select(c => c.TenantId).Distinct().ToListAsync();
-            Assert.Equal([fx.TenantB], tenants); // TEN-031: RLS is off, the EF filter still isolates
+            Assert.Equal([fx.TenantB], tenants);                                                  // TEN-031: the EF filter isolates
+            Assert.Null(await b.Get<IContractService>().GetAsync(fx.ContractA));                 // another tenant's contract is not found, not forbidden
         }
-        finally { await Exec(admin, $"ALTER SECURITY POLICY {policy} WITH (STATE = ON)"); }
+        await using var admin = await OpenAsync();
+        Assert.True(await Scalar<int>(admin, "SELECT COUNT(DISTINCT TenantId) FROM contracts.Contract") >= 2);   // the rows are really there for both tenants
     }
 
     [SqlServerFact]
-    public async Task Rls_blocks_inserts_and_updates_that_would_cross_tenants()
+    public async Task Without_a_tenant_scope_tenant_data_cannot_be_queried_at_all()
     {
-        await using var a = await OpenAsync(fx.TenantA);
-        var insert = await Assert.ThrowsAsync<SqlException>(() => Exec(a,
-            "INSERT INTO contracts.Category (Id, TenantId, OrganisationId, Code, Name, IsActive) VALUES (@id, @t, @o, 'CROSS', 'Cross', 1)",
-            ("@id", Guid.NewGuid()), ("@t", fx.TenantB), ("@o", fx.OrgB)));
-        Assert.Equal(33504, insert.Number); // block predicate conflicts with the operation
+        await using var scope = App.Services.CreateAsyncScope();
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => scope.ServiceProvider.GetRequiredService<ContractsDbContext>().Contracts.CountAsync());
+        Assert.Contains(Flatten(ex), e => e is TenantScopeMissingException);                      // fails closed in the application, not with an empty result
+    }
 
-        var own = Guid.NewGuid(); // an unreferenced row, so only the block predicate is in play
-        await Exec(a, "INSERT INTO contracts.Category (Id, TenantId, OrganisationId, Code, Name, IsActive) VALUES (@id, @t, @o, 'MOVEME', 'Move me', 1)",
-            ("@id", own), ("@t", fx.TenantA), ("@o", fx.OrgA));
-        var update = await Assert.ThrowsAsync<SqlException>(() => Exec(a, "UPDATE contracts.Category SET TenantId = @b WHERE Id = @id", ("@b", fx.TenantB), ("@id", own)));
-        Assert.Equal(33504, update.Number);
+    private static IEnumerable<Exception> Flatten(Exception ex) { for (Exception? e = ex; e is not null; e = e.InnerException) yield return e; }
 
-        // A referenced row cannot change tenant either: the composite foreign key refuses first.
-        var referenced = await Assert.ThrowsAsync<SqlException>(() => Exec(a, "UPDATE contracts.Category SET TenantId = @b WHERE Id = @id", ("@b", fx.TenantB), ("@id", fx.CategoryA)));
+    [SqlServerFact]
+    public async Task The_application_refuses_writes_that_would_cross_tenants_and_the_database_refuses_a_cross_tenant_reference()
+    {
+        await using (var a = App.ScopeFor(fx.TenantA))
+        {
+            var db = a.Get<ContractsDbContext>();
+            db.Categories.Add(Ecp.Contracts.Domain.Category.Create(fx.TenantB, fx.OrgB, "CROSS", "Cross"));
+            var ex = await Assert.ThrowsAnyAsync<Exception>(() => a.Get<IUnitOfWork>().ExecuteAsync(ct => db.SaveChangesAsync(ct)));
+            Assert.Contains(Flatten(ex), e => e is TenantMismatchException);
+        }
+        await using var admin = await OpenAsync();
+        Assert.Equal(0, await Scalar<int>(admin, "SELECT COUNT(*) FROM contracts.Category WHERE Code = 'CROSS'"));
+        // A referenced row cannot change tenant: the composite foreign key refuses it in the database itself.
+        var referenced = await Assert.ThrowsAsync<SqlException>(() => Exec(admin, "UPDATE contracts.Category SET TenantId = @b WHERE Id = @id", ("@b", fx.TenantB), ("@id", fx.CategoryA)));
         Assert.Equal(547, referenced.Number);
     }
 
@@ -220,22 +204,24 @@ public sealed class SqlServerBehaviourTests(SqlServerFixture fx)
     }
 
     [SqlServerFact]
-    public async Task The_runtime_role_can_read_and_write_business_data_but_not_update_or_delete_audit()
+    public async Task A_db_datareader_and_db_datawriter_user_can_read_and_write_business_data_but_not_change_audit_or_the_schema()
     {
         await using var admin = await OpenAsync();
-        await Exec(admin, "IF DATABASE_PRINCIPAL_ID('ecp_probe') IS NULL CREATE USER ecp_probe WITHOUT LOGIN; ALTER ROLE ecp_runtime ADD MEMBER ecp_probe;");
+        await Exec(admin, "IF DATABASE_PRINCIPAL_ID('ecp_probe') IS NULL CREATE USER ecp_probe WITHOUT LOGIN; ALTER ROLE db_datareader ADD MEMBER ecp_probe; ALTER ROLE db_datawriter ADD MEMBER ecp_probe;");
         await using var c = await OpenAsync(fx.TenantA);
         await Exec(c, "EXECUTE AS USER = 'ecp_probe'");
         try
         {
             Assert.True(await Scalar<int>(c, "SELECT COUNT(*) FROM audit.AuditEvent") > 0);      // SELECT allowed
-            Assert.Equal(1, await Scalar<int>(c, "SELECT COUNT(*) FROM contracts.Contract"));    // RLS applies to the runtime role
+            Assert.True(await Scalar<int>(c, "SELECT COUNT(*) FROM contracts.Contract") >= 2);   // reads see the table; tenant isolation is the application's (ADR-0044)
             var upd = await Assert.ThrowsAsync<SqlException>(() => Exec(c, "UPDATE audit.AuditEvent SET Action = 'x'"));
-            Assert.Equal(229, upd.Number);                                                       // permission denied (DENY UPDATE)
+            Assert.Equal(51000, upd.Number);                                                     // the append-only trigger refuses it
             var del = await Assert.ThrowsAsync<SqlException>(() => Exec(c, "DELETE FROM audit.AuditEvent"));
-            Assert.Equal(229, del.Number);
+            Assert.Equal(51000, del.Number);
+            var disable = await Assert.ThrowsAsync<SqlException>(() => Exec(c, "DISABLE TRIGGER audit.TR_AuditEvent_AppendOnly ON audit.AuditEvent"));
+            Assert.Contains(disable.Number, new[] { 1088, 3701 });                               // cannot switch the protection off
             var ddl = await Assert.ThrowsAsync<SqlException>(() => Exec(c, "CREATE TABLE contracts.Evil (x int)"));
-            Assert.Equal(262, ddl.Number);                                                       // no schema-owner rights (R-DB-03)
+            Assert.Equal(262, ddl.Number);                                                       // no schema rights (R-DB-03)
         }
         finally { await Exec(c, "REVERT"); }
     }
@@ -311,14 +297,18 @@ public sealed class SqlServerBehaviourTests(SqlServerFixture fx)
     }
 
     [SqlServerFact]
-    public async Task Session_context_follows_scope_changes_within_one_dependency_injection_scope()
+    public async Task The_tenant_filter_follows_scope_changes_within_one_dependency_injection_scope_and_no_session_state_is_set()
     {
         await using var scope = App.Services.CreateAsyncScope();
         var tenant = scope.ServiceProvider.GetRequiredService<TenantContext>();
         var db = scope.ServiceProvider.GetRequiredService<ContractsDbContext>();
         using (tenant.Use(fx.TenantA)) Assert.Equal([fx.TenantA], await db.Contracts.Select(c => c.TenantId).Distinct().ToListAsync());
         using (tenant.Use(fx.TenantB)) Assert.Equal([fx.TenantB], await db.Contracts.Select(c => c.TenantId).Distinct().ToListAsync());
-        using (tenant.Use(fx.TenantB)) Assert.Equal([fx.TenantB], await db.Contracts.IgnoreQueryFilters().Select(c => c.TenantId).Distinct().ToListAsync());
+        // ADR-0044: the shared connection carries no session context any more.
+        var connection = scope.ServiceProvider.GetRequiredService<IScopedConnection>();
+        await using var cmd = connection.Connection.CreateCommand();
+        cmd.CommandText = "SELECT CAST(SESSION_CONTEXT(N'TenantId') AS nvarchar(36))";
+        Assert.True(await cmd.ExecuteScalarAsync() is null or DBNull);
     }
 
     [SqlServerFact]

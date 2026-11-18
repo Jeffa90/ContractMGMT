@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Migration.Profiles;
 
+[RequestSizeLimit(UploadLimits.MappingFileRequestBytes)]
+[Microsoft.AspNetCore.Http.Timeouts.RequestTimeout(UploadLimits.UploadTimeoutPolicy)]
 public sealed class DetailsModel(IMappingProfiles profiles) : MigrationPageModel
 {
     public ProfileDetail Profile { get; private set; } = null!;

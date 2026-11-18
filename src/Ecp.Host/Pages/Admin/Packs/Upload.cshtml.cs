@@ -1,12 +1,14 @@
 using Ecp.Configuration;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host.Pages.Admin.Packs;
 
 /// <summary>Step 1 of 3. The file goes to quarantine and is checked; nothing is installed.</summary>
 [Authorize(Policy = "perm:packs.upload")]
-[RequestSizeLimit(9 * 1024 * 1024)]
+[RequestSizeLimit(UploadLimits.PackRequestBytes)]
+[RequestTimeout(UploadLimits.UploadTimeoutPolicy)]
 public sealed class UploadModel(IPackManager packs, IAuthorizationService authorisation) : PackPage(authorisation)
 {
     public long MaxMegabytes { get; } = 8;

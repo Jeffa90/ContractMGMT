@@ -1,6 +1,6 @@
 # JBS database simplification review
 
-Status: **Review only. Nothing in this document has been implemented.** Prepared 2026-11-18 on branch `jbs/iis-integration` at commit 4969a79 (CI run 118 green on SQL Server 2022 and 2025).
+Status: **Review only. Nothing in this document has been implemented.** Prepared 2026-11-18 on branch jbs/iis-integration at commit 4969a79 (CI run 118 green on SQL Server 2022 and 2025).
 
 Question from IT: are the `ecp_runtime` database role, SQL Server Row-Level Security (RLS) and `sp_getapplock` leftovers from the multi-customer design that a JBS-only deployment does not need?
 
@@ -19,7 +19,7 @@ Short answer:
 1. **Why it exists.** ADR-0003 and `R-DB-03`: give the runtime login data access to the application's schemas only, with no schema-owner rights, and make it the principal that RLS predicates and the audit DENY are written against.
 2. **Every place it is used.**
    - `src/Ecp.Persistence/RowLevelSecurity.cs`: `CREATE ROLE`, `GRANT SELECT` on the two predicate functions, and `GrantRuntimeAccess` (`GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA`).
-   - Migrations: 31 `GrantRuntimeAccess` calls in 31 migration files; `CreateInfrastructure` in `Ecp.Audit/.../20261016000541_Initial.cs`, which also does `DENY UPDATE, DELETE ON audit.AuditEvent TO ecp_runtime`.
+   - Migrations: 31 `GrantRuntimeAccess` calls in 31 migration files; `CreateInfrastructure` in `src/Modules/Ecp.Audit/Persistence/Migrations/20261016000541_Initial.cs`, which also does `DENY UPDATE, DELETE ON audit.AuditEvent TO ecp_runtime`.
    - Readiness: `src/Ecp.Persistence/ConnectionInspection.cs` (`IS_MEMBER('ecp_runtime')`) and `src/Modules/Ecp.Operations/DatabaseAccessReadinessCheck.cs` (R-DB-02 warns when the runtime login is not a member).
    - Tests: `SqlServerBehaviourTests.The_runtime_role_can_read_and_write_business_data_but_not_update_or_delete_audit`, `RuntimePrivilegeSqlServerTests`, `SqlPermissionProbeTests`.
 3. **JBS requirement it satisfies.** None specific to JBS. The JBS requirement is "runtime account least privilege, not db_owner, no schema changes". db_datareader + db_datawriter in a database that holds only this application meets that equally well.

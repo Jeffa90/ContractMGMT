@@ -55,15 +55,16 @@ The earlier probe (CI runs 115 and 116, before ADR-0044) found the extra `CREATE
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | Push to any branch, pull requests | Full build, unit, architecture, API, SQL Server integration, Docker image checks, repository and documentation checks, secrets scan, supply-chain checks, IIS publish output check; plus the **Windows** job (`windows-build-and-test`) that builds and runs every non-SQL test on Windows |
-| `deploy.yml` | Push to `main` (code changes) or manual | **Waits for CI to be green on the exact commit** (`verify-ci`; it does not repeat CI), builds once on Windows, deploys to **QA**, then the **same artifact** to **Production** after the Production environment's required reviewer approves. Production is deployed only from `main`; a manual run must ask for it (`promote-to-production`) |
-| `dotnet-spa-build.yml` | Reusable | Locked-mode restore, unit tests, publish, and a **build manifest** (commit, run, SHA-256 of every file) |
-| `iis-deploy.yml` | Reusable | Runs on the self-hosted runner on the IIS server; verifies the manifest, stamps `APPENV_*` **variables** into `web.config`, and runs `scripts/ci/Deploy-IisSite.ps1` |
+| `deploy.yml` | Push to `main` (code changes) or manual | **Waits for CI to be green on the exact commit** (`verify-ci`; it does not repeat CI), then builds and deploys to **QA**, then builds the **same commit** and deploys it to **Production** after the Production environment's required reviewer approves. Production is deployed only from `main`; a manual run must ask for it (`promote-to-production`). No workflow artifacts are stored |
+| `iis-deploy.yml` | Reusable | Runs on the self-hosted runner on the IIS server; checks out the commit, builds it with `.github/actions/build-app` (locked-mode restore, publish, **build manifest**: commit, run, SHA-256 of every file) straight into the deploy package, verifies the manifest, stamps `APPENV_*` **variables** into `web.config`, and runs `scripts/ci/Deploy-IisSite.ps1`, all in one job |
+
+The runners need no .NET SDK installed in advance: `actions/setup-dotnet` installs the version pinned in `global.json` into the runner's tool cache on first use. Tests are not repeated on the web server, because the deploy only starts once `ci.yml` is green on the same commit (that includes the Windows test job).
 
 `scripts/ci/*.ps1` run on Windows PowerShell 5.1: keep them ASCII-only.
 
 **Safety properties of the pipeline** (each is in the files; none has been run on a server):
 
-- One immutable build: the package QA receives is the package Production receives; `scripts/ci/Test-BuildManifest.ps1` fails on any missing, changed or extra file (web.config is excluded because it is stamped per environment).
+- Same commit everywhere: QA and Production each build exactly `github.sha` on their own runner, with every package version pinned by the lock files (`--locked-mode`), and no build is kept as a workflow artifact (account artifact storage is shared). `scripts/ci/Test-BuildManifest.ps1` checks the package against its manifest before anything is copied and fails on any missing, changed or extra file (web.config is excluded because it is stamped per environment).
 - Fail before touching the server: the deploy step refuses to run without `Ecp__Mode`, `Ecp__DataDirectory` and `Database__ConnectionString`, refuses Demo mode, and refuses a connection string that contains a password.
 - No secret is ever written to `web.config`: only `APPENV_` **variables** are stamped, and the pipeline does not read secrets for that purpose. The only secret it uses is `IIS_APP_POOL_PASSWORD` (set on the environment by hand), and only to set the application-pool account.
 - A deploy that fails while copying restores the snapshot taken just before; if the restore also fails, the site is left **offline**, never half-copied and online.

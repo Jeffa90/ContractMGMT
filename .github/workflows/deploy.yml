@@ -1,5 +1,7 @@
-# Enterprise Contract Platform: build once on Windows, deploy to QA (IIS), then promote the same
-# artifact to Production after approval (the Production environment's Required reviewers).
+# Enterprise Contract Platform: once CI is green on the commit, build and deploy it to QA on the
+# QA server's runner, then build the same commit and deploy it to Production on the Production
+# server's runner after approval (the Production environment's Required reviewers). Each deploy
+# job builds and deploys in one step (iis-deploy.yml); no workflow artifacts are stored.
 # Pull-request / branch checks stay in ci.yml. Setup: docs/DEPLOYMENT.md.
 #
 # Database migrations are NOT run by this pipeline: the app runs them deliberately with
@@ -51,17 +53,8 @@ jobs:
           done
           echo "::error::CI did not finish green within 60 minutes for $SHA. Nothing is deployed."; exit 1
 
-  build:
-    needs: verify-ci
-    uses: ./.github/workflows/dotnet-spa-build.yml
-    with:
-      api-project: src/Ecp.Host/Ecp.Host.csproj
-      test-project: tests/Ecp.UnitTests/Ecp.UnitTests.csproj
-      dotnet-version: "10.0.x"
-      ui-path: ""
-
   deploy-qa:
-    needs: build
+    needs: verify-ci
     uses: ./.github/workflows/iis-deploy.yml
     with:
       environment: QA
@@ -69,7 +62,7 @@ jobs:
       preserve-folders: logs
     secrets: inherit
 
-  # The same artifact, promoted. Production only from main, only when the push (or the manual run asked for it), and only after the Production environment's required reviewer approves.
+  # The same commit, built again on the Production runner (lock files pin every package version). Production only from main, only when the push (or the manual run asked for it), and only after the Production environment's required reviewer approves.
   deploy-prod:
     needs: deploy-qa
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.promote-to-production)

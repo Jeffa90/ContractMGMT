@@ -478,6 +478,7 @@ Owner decisions of 2026-11-11 (invite-only Windows access; integration branch; p
 - [x] JBS-H Integrated SQL authentication without a secret file; readiness R-DB-02 (runtime login and privileges).
 - [x] JBS-I Serilog foundation: structured JSON, shared context, redaction, durable rolling file, readiness R-LOG-01/02. Application Insights and fatal-error email configurable, **Not Verified**.
 - [x] JBS-J Pipeline safety (CI gate, one verified build, rollback, no secrets in web.config), rewritten environment setup script (not executed), secrets scan.
+- [x] JBS-N Simplified database model (ADR-0044, owner decision 2026-11-18): Row-Level Security, its functions and `security` schema, `SESSION_CONTEXT` and the `ecp_runtime` role retired; retired helpers emit nothing; forward migration Audit migration `20261118000000_RemoveRowLevelSecurity` removes them where present; explicit TenantId predicates in reviewed raw SQL; recorded checksum amendments; DBA removal script; migration account db_ddladmin + db_datareader + db_datawriter, runtime db_datareader + db_datawriter; tests on SQL Server 2022 and 2025.
 - [ ] JBS-K Run on IIS in QA (needs Infrastructure and DBA answers; the verification run). Not started.
 - [ ] JBS-L Active Directory group-driven onboarding (deferred by the owner).
 - [ ] JBS-M Application Insights sink (needs the decision and a package approval).

@@ -23,7 +23,7 @@ public sealed class SignatureVocabularyMigrationTests
     {
         var c = new SqlConnection(app.ConnectionString);
         await c.OpenAsync();
-        await Exec(c, "EXEC sp_set_session_context N'TenantId', @t; EXEC sp_set_session_context N'IsInstallationScope', 0;", ("@t", tenant));
+        _ = tenant;   // row-level security is retired (ADR-0044): an administrator's connection sees the rows without any session state
         return c;
     }
 
@@ -57,7 +57,7 @@ public sealed class SignatureVocabularyMigrationTests
     }
 
     [SqlServerFact]
-    public async Task The_rename_keeps_every_existing_row_and_value_and_the_security_policy()
+    public async Task The_rename_keeps_every_existing_row_and_value_and_creates_no_security_policy()
     {
         await using var app = await TestApp.CreateSqlServerAsync(migrate: false);
         await MigrateAsync(app, Previous);                                                       // every module as it was, the lifecycle schema before this migration
@@ -97,17 +97,17 @@ public sealed class SignatureVocabularyMigrationTests
         {
             Assert.Equal(0, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.tables WHERE name = N'ExecutionRecord' AND schema_id = SCHEMA_ID(N'lifecycle')"));
             Assert.Equal(0, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'lifecycle.SignatureRequest') AND name = N'EnvelopeId'"));
-            Assert.Equal(1, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.security_policies WHERE name = N'TenantPolicy_lifecycle_SignatureRequest'"));
-            Assert.Equal(1, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.security_policies WHERE name = N'TenantPolicy_lifecycle_SignatureProviderEvent'"));
-            Assert.Equal(0, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.security_policies WHERE name = N'TenantPolicy_lifecycle_ExecutionRecord'"));
+            Assert.Equal(0, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.security_policies"));   // ADR-0044: no row-level security, before or after the rename
             Assert.Equal(1, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.indexes WHERE name = N'PK_SignatureRequest' AND object_id = OBJECT_ID(N'lifecycle.SignatureRequest')"));
             Assert.Equal(1, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_SignatureRequest_TenantId_Provider_ProviderRequestId' AND has_filter = 1"));
             Assert.Equal(0, await Scalar<int>(c, "SELECT COUNT(*) FROM sys.indexes WHERE name LIKE N'%ExecutionRecord%' OR name LIKE N'%Envelope%'"));
         }
 
-        // The tenant boundary still holds under the new name: another tenant sees nothing.
-        await using (var other = await OpenAsync(app, Guid.NewGuid()))
-            Assert.Equal(0, await Scalar<int>(other, "SELECT COUNT(*) FROM lifecycle.SignatureRequest"));
+        // The tenant boundary still holds under the new name: the application's tenant filter shows another tenant nothing (ADR-0044: no RLS).
+        await using (var other = app.ScopeFor(Guid.NewGuid()))
+            Assert.Equal(0, await other.Get<Ecp.Lifecycle.Persistence.LifecycleDbContext>().SignatureRequests.CountAsync());
+        await using (var own = app.ScopeFor(tenant))
+            Assert.Equal(1, await own.Get<Ecp.Lifecycle.Persistence.LifecycleDbContext>().SignatureRequests.CountAsync());
 
         await MigrateAsync(app, null);                                                           // running again changes nothing
         await using (var c = await OpenAsync(app, tenant))

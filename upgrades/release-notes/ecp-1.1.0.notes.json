@@ -43,7 +43,11 @@
     },
     {
       "code": "CMP-002",
-      "text": "The upgrade adds one table (the migration record) to the operations schema, with row-level security. It changes no existing table, row, audit event, configuration release, pack or document."
+      "text": "The upgrade adds one table (the migration record) to the operations schema. It changes no existing table, row, audit event, configuration release, pack or document."
+    },
+    {
+      "code": "CMP-003",
+      "text": "SQL Server Row-Level Security and the ecp_runtime database role are retired (ADR-0044). The upgrade removes every tenant security policy, the predicate functions, the security schema and the role where present; tenant isolation stays in the application (EF query filters, refusal of cross-tenant writes, composite TenantId foreign keys, explicit TenantId predicates in reviewed SQL). A database that still holds those objects shows no data to this version until they are removed: a DBA runs deploy/sql/remove-retired-row-level-security.sql after a verified backup, before the pre-flight (docs/UPGRADE_RUNBOOK.md). The runtime account then needs only db_datareader and db_datawriter; the migration account only db_ddladmin, db_datareader and db_datawriter."
     }
   ],
   "breakingChanges": [],
@@ -52,7 +56,6 @@
     "VAL-005",
     "VAL-006",
     "VAL-007",
-    "VAL-008",
     "VAL-009",
     "VAL-010",
     "VAL-011",

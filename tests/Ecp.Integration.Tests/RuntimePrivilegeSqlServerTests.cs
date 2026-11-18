@@ -31,7 +31,8 @@ public sealed class RuntimePrivilegeSqlServerTests
             {
                 $"CREATE LOGIN [{login}] WITH PASSWORD = '{password}', CHECK_POLICY = OFF",
                 $"USE [{database}]; CREATE USER [{login}] FOR LOGIN [{login}]",
-                $"USE [{database}]; ALTER ROLE [{RowLevelSecurity.RuntimeRole}] ADD MEMBER [{login}]"
+                $"USE [{database}]; ALTER ROLE [db_datareader] ADD MEMBER [{login}]",
+                $"USE [{database}]; ALTER ROLE [db_datawriter] ADD MEMBER [{login}]"
             })
             {
                 await using var cmd = c.CreateCommand(); cmd.CommandText = sql; await cmd.ExecuteNonQueryAsync();
@@ -48,7 +49,21 @@ public sealed class RuntimePrivilegeSqlServerTests
 
             var privilege = await RuntimePrivilegeProbe.ProbeAsync(runtime);
             Assert.NotNull(privilege);
-            Assert.True(privilege!.IsRuntimeRoleMember); Assert.False(privilege.IsSysAdmin); Assert.False(privilege.IsDbOwner);
+            Assert.True(privilege!.IsDataReader); Assert.True(privilege.IsDataWriter);
+            Assert.False(privilege.IsSysAdmin); Assert.False(privilege.IsDbOwner); Assert.False(privilege.CanChangeSchema);
+            Assert.Contains("db_datareader and db_datawriter", healthy.Message);
+
+            // A runtime login that can change the schema (db_ddladmin) is flagged: schema changes belong to the separate migration account (ADR-0044).
+            await using (var c = new SqlConnection(admin))
+            {
+                await c.OpenAsync();
+                await using var cmd = c.CreateCommand(); cmd.CommandText = $"USE [{database}]; ALTER ROLE [db_ddladmin] ADD MEMBER [{login}]"; await cmd.ExecuteNonQueryAsync();
+            }
+            SqlConnection.ClearAllPools();
+            var ddl = await new DatabaseAccessReadinessCheck(new DatabaseOptions { Provider = DatabaseProvider.SqlServer, ConnectionString = runtime },
+                Facts(EcpMode.Test)).RunAsync(default);
+            Assert.Equal(ReadinessStatus.Degraded, ddl.Status);
+            Assert.Contains("can change the database schema", ddl.Message);
 
             var flagged = await new DatabaseAccessReadinessCheck(new DatabaseOptions { Provider = DatabaseProvider.SqlServer, ConnectionString = app.ConnectionString },
                 Facts(EcpMode.Test)).RunAsync(default);

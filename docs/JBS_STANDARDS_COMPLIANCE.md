@@ -18,6 +18,7 @@ The review below describes the code as it was reviewed. Since then branch jbs/ii
 | Data protection | Per-user DPAPI by default, undocumented | Explicit settings, readiness R-SEC-04, documented; NOT VERIFIED on Windows |
 | Request limits and timeouts | Defaults only; document uploads would have stopped at 30 MB | Explicit per-URL limits and timeout policy, tested for consistency |
 | Backups owned by the DBA | The application's backup feature was the only path | External recovery points, declared and audited; JUSTIFIED DEVIATION recorded in ADR-0043 pending DBA confirmation |
+| Database permissions (ADR-0044) | Application-created role, row-level security policies, migration account needing `CREATE ROLE` and `ALTER ANY SECURITY POLICY` | Standard roles only: runtime db_datareader + db_datawriter; migration db_ddladmin + db_datareader + db_datawriter. Row-Level Security retired for the single-tenant deployment; application-layer security, audit trigger, composite keys and `sp_getapplock` kept. Verified on SQL Server 2022 and 2025 (CI); NOT VERIFIED on the JBS server |
 | Pipeline | Pull request 1 as written | Waits for green CI on the commit, one verified build, rollback of a half-copied site, no secrets in `web.config`, rewritten environment setup script (not executed) |
 
 Items that belong to JBS Infrastructure or the DBA remain **REQUIRES JBS INFRASTRUCTURE CONFIRMATION** and are listed in `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`.

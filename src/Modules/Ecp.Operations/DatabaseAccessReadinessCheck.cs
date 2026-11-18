@@ -5,8 +5,8 @@ namespace Ecp.Operations;
 
 /// <summary>
 /// R-DB-02: how the application signs in to SQL Server and what that login can do. It reads the login and its roles from the server rather than trusting
-/// the configuration, never prints a credential, and flags an over-privileged runtime account (sysadmin or db_owner) because the runtime should only hold
-/// the least-privilege runtime role; schema changes belong to a separate, deliberate migration identity (docs/DEPLOYMENT.md).
+/// the configuration, never prints a credential, and flags an over-privileged runtime account (sysadmin, db_owner, or the right to change the schema) because
+/// the runtime should hold only db_datareader and db_datawriter; schema changes belong to a separate, deliberate migration identity (docs/DEPLOYMENT.md, ADR-0044).
 /// It cannot judge whether the database administrator's grants are correct; that stays a database-administrator answer.
 /// </summary>
 public sealed class DatabaseAccessReadinessCheck(DatabaseOptions database, StartupFacts facts) : IReadinessCheck
@@ -28,11 +28,11 @@ public sealed class DatabaseAccessReadinessCheck(DatabaseOptions database, Start
         detail += $" Database login: {privilege.Login}.";
         if (privilege.IsSysAdmin) issues.Add("the runtime login is a SQL Server sysadmin");
         if (privilege.IsDbOwner) issues.Add("the runtime login is db_owner in this database");
-        if (!privilege.IsRuntimeRoleMember && !privilege.IsDbOwner) issues.Add($"the runtime login is not a member of the {RowLevelSecurity.RuntimeRole} role");
+        if (privilege.CanChangeSchema && !privilege.IsDbOwner && !privilege.IsSysAdmin) issues.Add("the runtime login can change the database schema (for example db_ddladmin)");
         if (facts.Mode == EcpMode.Production && !connection.Encrypt) issues.Add("the connection does not require encryption");
         if (facts.Mode == EcpMode.Production && connection.TrustServerCertificate) issues.Add("the server certificate is trusted without validation (TrustServerCertificate=True): an infrastructure answer is needed to remove it");
         return issues.Count == 0
-            ? new ReadinessResult(Id, Name, ReadinessStatus.Healthy, detail + " The runtime login holds the runtime role only.")
+            ? new ReadinessResult(Id, Name, ReadinessStatus.Healthy, detail + (privilege.IsDataReader && privilege.IsDataWriter ? " The runtime login holds db_datareader and db_datawriter and cannot change the schema." : " The runtime login cannot change the schema; it is not a member of db_datareader and db_datawriter, so its data rights come from the database administrator's own grants."))
             : new ReadinessResult(Id, Name, ReadinessStatus.Degraded, detail + " Attention: " + string.Join("; ", issues) + ".");
     }
 }

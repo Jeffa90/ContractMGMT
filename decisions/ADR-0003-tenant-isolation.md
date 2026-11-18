@@ -1,6 +1,6 @@
 # ADR-0003: Tenant Isolation
 
-Status: Proposed
+Status: Proposed. **Partly superseded by ADR-0044 (2026-11-18, owner decision for the JBS IIS deployment):** the SQL Server Row-Level Security layer, its `SESSION_CONTEXT` plumbing and the `ecp_runtime` role are retired. TenantId, EF query filters, cross-tenant write refusal, composite foreign keys, tenant-prefixed storage keys and the cross-tenant tests stand. Multi-tenant hosting is unsupported for that deployment unless database-level isolation is reintroduced.
 
 ## Decision
 Enforce tenant isolation in database access, service policies and tests.

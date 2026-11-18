@@ -28,7 +28,7 @@ internal static class SchemaInspector
         var connection = scope.GetRequiredService<IScopedConnection>();
         var list = new List<string>();
         if (connection.Provider != DatabaseProvider.SqlServer) return list;
-        await connection.ApplyTenantScopeAsync(ct);
+        await connection.EnsureOpenAsync(ct);
         await using var cmd = connection.Connection.CreateCommand();
         cmd.Transaction = connection.Transaction;
         cmd.CommandText = "SELECT name FROM sys.security_policies WHERE is_enabled = 1 ORDER BY name";

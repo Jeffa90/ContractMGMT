@@ -97,7 +97,7 @@ internal static class SchemaDrift
     {
         var connection = scopeServices.GetRequiredService<IScopedConnection>();
         if (connection.Provider != DatabaseProvider.SqlServer) return null;
-        await connection.ApplyTenantScopeAsync(ct);
+        await connection.EnsureOpenAsync(ct);
         var columns = new Dictionary<(string Schema, string Table), Dictionary<string, (string Type, bool Nullable)>>();
         await using (var cmd = connection.Connection.CreateCommand())
         {

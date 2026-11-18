@@ -1,6 +1,6 @@
 # JBS database simplification review
 
-Status: **Review only. Nothing in this document has been implemented.** Prepared 2026-11-18 on branch jbs/iis-integration at commit 4969a79 (CI run 118 green on SQL Server 2022 and 2025).
+Status: **Approved by the owner 2026-11-18 and implemented (ADR-0044).** The review below is kept as written; see "Implementation" at the end for what was built and how it was verified. Prepared 2026-11-18 on branch jbs/iis-integration at commit 4969a79 (CI run 118 green on SQL Server 2022 and 2025).
 
 Question from IT: are the `ecp_runtime` database role, SQL Server Row-Level Security (RLS) and `sp_getapplock` leftovers from the multi-customer design that a JBS-only deployment does not need?
 
@@ -162,3 +162,17 @@ Assessed separately from RLS, as asked.
 - Runtime (`AMH\svc_jbsai_qa`): `db_datareader`, `db_datawriter`. Never db_owner.
 
 **Timing:** change before the first QA deployment if the owner approves the ADR-0003 amendment now. Otherwise QA proceeds with the current, proven design (migration account additionally `CREATE ROLE` + `ALTER ANY SECURITY POLICY`), and the simplification follows as an upgrade.
+
+---
+
+## Implementation (2026-11-18, ADR-0044)
+
+Implemented as recommended, with these details the review did not foresee:
+
+* **Raw SQL needed explicit tenant predicates.** The backup/restore inventory, post-restore validation and support-bundle queries had no `TenantId` filter of their own; RLS supplied it. Each now states `TenantId = @tenant` (bound from the scope), so per-tenant counts and checks stay correct without RLS.
+* **Release integrity.** Making the retired helpers emit nothing changes the generated SQL, and so the checksum, of 31 released migrations. The upgrade checks (UPM-012, UPF-015, UPV-001) refuse any changed historical migration; they now accept a difference only when it is exactly an owner-approved amendment recorded in `upgrades/migration-reviews.json` (module, migration, old and new checksum, `ADR-0044`). The 1.0.0-to-1.1.0 manifest was rebuilt with `upgrade-manifest-build` and verifies.
+* **One historical migration line edited:** the `DENY UPDATE, DELETE ... TO [ecp_runtime]` in Audit migration `20261016000541_Initial` (it would fail without the role). No other historical migration file changed.
+* **Databases created before ADR-0044.** This version sets no session context, so a database still holding the policies would show no data and its pre-flight inventories would read nothing. Such a database is cleaned before the pre-flight with `deploy/sql/remove-retired-row-level-security.sql` (a DBA, after a verified backup; same SQL as the forward migration, kept identical by a test). VAL-007 / UPF-053 fails with that instruction while anything remains. No JBS database exists, so JBS is unaffected.
+* **Readiness R-DB-02** now flags a runtime login that is sysadmin, db_owner or can change the schema, and reports whether it holds db_datareader and db_datawriter.
+
+Impact as built: 1 new migration (Audit `20261118000000_RemoveRowLevelSecurity`); 84 policies no longer created (and removed where present); 1 historical migration line removed; 31 checksum amendments recorded; about 14 source files and 12 test files changed; no table, column, row, TenantId value, index, foreign key or audit event changed. Verification: `SqlServerSimplifiedModelTests`, `SqlPermissionProbeTests`, `RuntimePrivilegeSqlServerTests`, `SqlServerBehaviourTests`, `AccessScenarioTests_SqlServer`, classification scenarios, backup/restore, N-1 to N upgrade rehearsal and `DatabaseSimplificationGuardTests`, on SQL Server 2022 and 2025 in CI (results in `deploy/STATUS.md`).

@@ -241,7 +241,7 @@ public sealed class BackupFailureSqlServerTests
             await c.OpenAsync();
             await using var cmd = c.CreateCommand();
             // The table refuses updates; only someone who can switch its protection off can do this, which is exactly the attacker the chain exists to expose.
-            cmd.CommandText = "EXEC sp_set_session_context N'TenantId', @t; EXEC sp_set_session_context N'IsInstallationScope', 0; ALTER TABLE audit.AuditEvent DISABLE TRIGGER ALL; UPDATE audit.AuditEvent SET Action = N'rewritten' WHERE TenantId = @t AND Sequence = 3; ALTER TABLE audit.AuditEvent ENABLE TRIGGER ALL;";
+            cmd.CommandText = "ALTER TABLE audit.AuditEvent DISABLE TRIGGER ALL; UPDATE audit.AuditEvent SET Action = N'rewritten' WHERE TenantId = @t AND Sequence = 3; ALTER TABLE audit.AuditEvent ENABLE TRIGGER ALL;";
             cmd.Parameters.AddWithValue("@t", rig.Installation.TenantId.ToString());
             await cmd.ExecuteNonQueryAsync();
         }

@@ -11,8 +11,7 @@ public static class DesignTime
     {
         var tenant = new TenantContext();
         var connection = new ScopedConnection(
-            new DatabaseOptions { Provider = DatabaseProvider.SqlServer, ConnectionString = "Server=design-time-only;Database=design;Trusted_Connection=True;TrustServerCertificate=True" },
-            tenant);
+            new DatabaseOptions { Provider = DatabaseProvider.SqlServer, ConnectionString = "Server=design-time-only;Database=design;Trusted_Connection=True;TrustServerCertificate=True" });
         var options = new DbContextOptionsBuilder<T>()
             .UseSqlServer(connection.Connection, o => o.MigrationsHistoryTable("__EFMigrationsHistory", schema))
             .ReplaceService<IModelCacheKeyFactory, ProviderAwareModelCacheKeyFactory>()

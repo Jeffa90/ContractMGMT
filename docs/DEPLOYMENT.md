@@ -26,37 +26,29 @@ The values below were confirmed by the owner from Infrastructure and DBA answers
 
 **Authentication.** IIS Windows Authentication, invite-only, no Windows-domain restriction in the application (the provider's domain list stays empty), no AD-group onboarding. Break-glass administrators stay configuration-controlled (the existing emergency-access mechanism; nothing new).
 
-**SQL Server permission probe** (CI [run 115](https://github.com/Jeffa90/ContractMGMT/actions/runs/44028113300), commit 54855e9, on **SQL Server 2022 and SQL Server 2025** (the QA server reports 17.0.4065.4, which is SQL Server 2025); identical results on both. SQL logins stand in for the Windows accounts; database-role permissions behave the same for Windows logins.) Each migration case runs the whole first install on its own empty database, then a separate login that is a member of `ecp_runtime` only provisions a tenant, adds reference data and creates a draft contract.
+**SQL Server model: simplified for JBS (ADR-0044, owner decision 2026-11-18).** SQL Server Row-Level Security, its predicate functions and `security` schema, the `SESSION_CONTEXT` plumbing and the `ecp_runtime` role are retired. Kept: `sp_getapplock` for the audit chain, EF Core's migration lock, the audit append-only trigger, TenantId with composite foreign keys, EF tenant filters, all application-layer organisation, business-unit, site, category, ownership and classification security, and SQL-backed operation leases. Multi-tenant hosting is unsupported for this deployment.
 
-| Account and rights | Result (2022 and 2025) |
-|---|---|
-| Migration: db_ddladmin + db_datareader + db_datawriter (the current grant) | **Refused** - SQL 15247 (creating the `ecp_runtime` role) |
-| Migration: the same + db_securityadmin | **Refused** - SQL 262 "ALTER ANY SECURITY POLICY permission denied" |
-| Migration: db_ddladmin + db_datareader + db_datawriter + `CREATE ROLE` + `ALTER ANY SECURITY POLICY` | **Works**; 84 security policies created; runtime afterwards works (member of `ecp_runtime`, not db_owner). **Smallest set found** |
-| Migration: the same + `ALTER ANY ROLE` | Works (the extra permission is not needed) |
-| Migration: db_ddladmin + r + w + db_securityadmin + `ALTER ANY SECURITY POLICY` | Works (wider than needed) |
-| Migration: db_owner, then db_owner removed | Works; after removal the runtime account still works |
-| Runtime: db_datareader + db_datawriter | Works (R-DB-02 warns that it is not in `ecp_runtime`) |
-| Runtime: `ecp_runtime` only | Works, narrower (only the application's schemas) |
-
-Asserted, not just reported, by `SqlPermissionProbeTests.The_minimum_migration_permission_set_is_sufficient_each_extra_permission_is_necessary_and_the_extra_permissions_can_be_revoked_afterwards`: the smallest set installs everything; without `CREATE ROLE` the install is refused (SQL 15247) and without `ALTER ANY SECURITY POLICY` it is refused (SQL 262), so both are necessary; after both are revoked a re-run with nothing pending succeeds and the runtime account still works.
-
-**Exact DBA requirement for the migration identity** (the `iis-qa` runner's service account, run deliberately with `dotnet Ecp.Host.dll migrate`; the pipeline never migrates):
+| Account | Database roles (exactly) | Not required |
+|---|---|---|
+| Migration: the `iis-qa` runner's service account, run deliberately with `dotnet Ecp.Host.dll migrate` (the pipeline never migrates) | `db_ddladmin`, `db_datareader`, `db_datawriter` (the grant the DBA has already made) | db_owner, db_securityadmin, `CREATE ROLE`, `ALTER ANY SECURITY POLICY` |
+| Runtime: `AMH\svc_jbsai_qa` | `db_datareader`, `db_datawriter` | db_owner, db_ddladmin, any application role |
 
 ```sql
 USE [JBSContracts];
--- already granted: db_ddladmin, db_datareader, db_datawriter
-GRANT CREATE ROLE TO [<runner service account>];
-GRANT ALTER ANY SECURITY POLICY TO [<runner service account>];
+ALTER ROLE db_ddladmin   ADD MEMBER [<runner service account>];
+ALTER ROLE db_datareader ADD MEMBER [<runner service account>];
+ALTER ROLE db_datawriter ADD MEMBER [<runner service account>];
+ALTER ROLE db_datareader ADD MEMBER [AMH\svc_jbsai_qa];
+ALTER ROLE db_datawriter ADD MEMBER [AMH\svc_jbsai_qa];
 ```
 
-What each piece is for: `CREATE ROLE` - the first migration creates the `ecp_runtime` role (the migration identity then owns it, so it can grant on it without `ALTER ANY ROLE` or db_securityadmin); `ALTER ANY SECURITY POLICY` - the row-level security policies (one per tenant table, and new releases add policies for new tables); db_ddladmin - schemas, tables, indexes, constraints, the predicate functions and the migration journal (`__EFMigrationsHistory` per module); db_datareader + db_datawriter - the journal rows and the data the migrations read and write. The `GRANT ... ON SCHEMA` and `GRANT SELECT ON OBJECT` statements need no further permission because the migration identity owns the schemas it creates. db_owner is not needed.
+Proven on SQL Server 2022 and 2025 by `SqlServerSimplifiedModelTests`: a fresh install with exactly the three migration roles (no other permission) succeeds and leaves no security policy, predicate function, `security`-schema object or `ecp_runtime` role; a re-run with nothing pending succeeds; the runtime account with db_datareader + db_datawriter provisions a tenant, adds reference data and creates and reads a contract; it cannot create, alter or drop tables, schemas or indexes, cannot disable, alter or drop the audit trigger, and its audit UPDATE and DELETE are refused (SQL 51000) with the events unchanged. R-DB-02 readiness flags a runtime login that is sysadmin, db_owner or able to change the schema. `SqlPermissionProbeTests` prints the same facts for the DBA in the CI step "SQL Server permission probe". The schemas the migration account creates are owned by it; if that account is ever replaced, move ownership of all application schemas together first.
 
-**Temporary?** Yes, proven: the two extra permissions can be revoked after a migration (`REVOKE CREATE ROLE FROM ...; REVOKE ALTER ANY SECURITY POLICY FROM ...;`), and re-granted for the next release that contains migrations. If the DBA prefers db_owner during the window, removal afterwards was also proven safe; the narrower pair is recommended. Two consequences the DBA should know: the migration identity **owns** the 14 application schemas and the `ecp_runtime` role it created, and ownership stays after the extra permissions are revoked (an owner keeps control of its own schemas); and if the runner account is ever replaced, ownership must be moved first (`ALTER AUTHORIZATION ON SCHEMA::... TO dbo` for all application schemas together, so the row-level security predicate functions keep the same owner as the tables). The runtime account `AMH\svc_jbsai_qa` stays separate: member of `ecp_runtime` only (recommended) or db_datareader + db_datawriter; never db_owner, never the migration identity.
+The earlier probe (CI runs 115 and 116, before ADR-0044) found the extra `CREATE ROLE` + `ALTER ANY SECURITY POLICY` grant necessary; that grant is **no longer needed** and should not be made. A database created before ADR-0044 must have the retired objects removed first: see `docs/UPGRADE_RUNBOOK.md`, "Databases created before ADR-0044". No JBS database exists yet, so JBS starts with the simplified model.
 
 **First-run setup on IIS (recommended method).** The setup wizard stays as designed: it answers only on the server's loopback address and needs the one-time token printed on the server by `dotnet Ecp.Host.dll setup-token`; nothing is weakened. On IIS the site binding is host-name specific, so from the server itself the safest way in is a temporary hosts-file entry on that server, `127.0.0.1 jbs-contracts-qa.jbssa.com.au`, then `https://jbs-contracts-qa.jbssa.com.au/Setup` in a browser on the server: the request arrives on loopback, the existing binding and certificate match the host name, and no binding or setting changes. Remove the hosts entry when setup is complete. Not verified on IIS: Windows Authentication for a loopback request to the site's host name normally uses the confirmed SPN (Kerberos); if the server falls back to NTLM, Windows' loopback check can refuse it, and IT would then add the host name to the server's `BackConnectionHostNames` for the duration. Fallback only if neither works: `Ecp__Setup__AllowRemote=true` for the set-up window (the token is still required), removed immediately afterwards. A localhost binding is not required.
 
-**REQUIRED BEFORE QA** (not guessed; see `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`): the site folder and names above; the `IIS_APP_POOL_PASSWORD` secret for `AMH\svc_jbsai_qa` (needed only if the deploy creates the pool; it is set by hand with `gh secret set`); the DBA items (database, version, compatibility level, collation, row-level security and application-lock approval, `GRANT CREATE ROLE` and `GRANT ALTER ANY SECURITY POLICY` to the migration identity (see the probe above), backup and recovery policy, copy-only pre-deploy backup, RPO and RTO); SMTP port, authentication and TLS; how the first-run setup wizard is reached (it answers only on the server's loopback address, and the site binding is host-name specific).
+**REQUIRED BEFORE QA** (not guessed; see `docs/JBS_IIS_IMPLEMENTATION_STATUS.md`): the site folder and names above; the `IIS_APP_POOL_PASSWORD` secret for `AMH\svc_jbsai_qa` (needed only if the deploy creates the pool; it is set by hand with `gh secret set`); the DBA items (database, version, compatibility level, collation, row-level security and application-lock approval, the database roles above (no `CREATE ROLE` or `ALTER ANY SECURITY POLICY` since ADR-0044), backup and recovery policy, copy-only pre-deploy backup, RPO and RTO); SMTP port, authentication and TLS; how the first-run setup wizard is reached (it answers only on the server's loopback address, and the site binding is host-name specific).
 
 ## Workflows
 
@@ -147,7 +139,7 @@ The record (identifier, source, environment, verifier, time taken, schema versio
 2. Service account for the application pool; Kerberos SPN for the site's host name (`setspn`).
 3. DNS and a certificate for the site (set `IIS_CERT_THUMBPRINT`).
 4. Data root outside the site: Modify for the pool account.
-5. Database: created by the DBA; runtime account in the `ecp_runtime` role; a migration identity with rights to change the schema.
+5. Database: created by the DBA; runtime account with db_datareader + db_datawriter only; a separate migration identity with db_ddladmin + db_datareader + db_datawriter (ADR-0044).
 6. IIS: Hosting Bundle, Windows Authentication feature, Application Initialization (warm-up). The application pool is set to Always Running with no idle time-out and **load user profile**.
 7. First install: `dotnet Ecp.Host.dll migrate` as the migration identity, then `setup-token` and the `/Setup` wizard from the server (`deploy/iis/README.md`).
 

@@ -56,11 +56,12 @@ public static class SqlConnectionInspector
 }
 
 /// <summary>The database login the application actually runs as and the privileges it holds. Read from the server, never assumed.</summary>
-public sealed record RuntimePrivilege(string Login, bool IsSysAdmin, bool IsDbOwner, bool IsRuntimeRoleMember);
+/// <param name="CanChangeSchema">The login can create tables in this database (for example db_ddladmin): a runtime account must not.</param>
+public sealed record RuntimePrivilege(string Login, bool IsSysAdmin, bool IsDbOwner, bool CanChangeSchema, bool IsDataReader, bool IsDataWriter);
 
 public static class RuntimePrivilegeProbe
 {
-    /// <summary>Asks SQL Server who the connection is and which of the powerful roles it holds. Returns null if the server cannot be reached.</summary>
+    /// <summary>Asks SQL Server who the connection is and which of the powerful roles and rights it holds. Returns null if the server cannot be reached.</summary>
     public static async Task<RuntimePrivilege?> ProbeAsync(string connectionString, CancellationToken ct = default)
     {
         try
@@ -68,12 +69,11 @@ public static class RuntimePrivilegeProbe
             await using var connection = new SqlConnection(connectionString);
             await connection.OpenAsync(ct);
             await using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT SUSER_SNAME(), IS_SRVROLEMEMBER('sysadmin'), IS_MEMBER('db_owner'), IS_MEMBER(@role)";
-            cmd.Parameters.AddWithValue("@role", RowLevelSecurity.RuntimeRole);
+            cmd.CommandText = "SELECT SUSER_SNAME(), IS_SRVROLEMEMBER('sysadmin'), IS_MEMBER('db_owner'), HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE TABLE'), IS_MEMBER('db_datareader'), IS_MEMBER('db_datawriter')";
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct)) return null;
             static bool Yes(object v) => v is not DBNull && Convert.ToInt32(v) == 1;
-            return new RuntimePrivilege(reader.IsDBNull(0) ? "" : reader.GetString(0), Yes(reader.GetValue(1)), Yes(reader.GetValue(2)), Yes(reader.GetValue(3)));
+            return new RuntimePrivilege(reader.IsDBNull(0) ? "" : reader.GetString(0), Yes(reader.GetValue(1)), Yes(reader.GetValue(2)), Yes(reader.GetValue(3)), Yes(reader.GetValue(4)), Yes(reader.GetValue(5)));
         }
         catch (Exception) { return null; }
     }

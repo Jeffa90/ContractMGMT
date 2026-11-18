@@ -10,7 +10,7 @@ Related documents: `docs/DOMAIN_MODEL.md`, `docs/SECURITY.md`, `docs/THREAT_MODE
 |---|---|---|
 | Portable: business change by configuration, not source forks | `PORTABILITY_AND_NO_CODE.md` | Metadata-driven fields, forms, rules, workflows, approvals; business names exist only in packs (ASM-19); portability tests PRT-001 to PRT-015 |
 | No arbitrary code in configuration | `CLAUDE.md` | Closed-vocabulary interpreters only; no scripting engines |
-| Tenant, organisation, role, ownership, classification, lifecycle and lock rules enforced server-side | `CLAUDE.md` | One access evaluator; query filters plus Row-Level Security; domain-layer lock enforcement |
+| Tenant, organisation, role, ownership, classification, lifecycle and lock rules enforced server-side | `CLAUDE.md` | One access evaluator; tenant query filters, cross-tenant write refusal and composite TenantId keys (SQL Row-Level Security retired by ADR-0044); domain-layer lock enforcement |
 | Three deployment models with identical behaviour | `DEPLOYMENT_REQUIREMENTS.md` | Host abstractions for storage, secrets, key ring, scheduling; one codebase and one schema |
 | Migration is Phase 1 mandatory | `CONFIRMED_DECISIONS.md` | Migration is a first-class module built before the designers |
 | Audit, immutability, evidence | Master | Append-only hash-chained audit committed in the same transaction as changes |
@@ -166,12 +166,12 @@ Defence in depth; each layer is independently tested so that one failure cannot 
 | Identity | Tenant derived from the authenticated principal or validated host mapping; never from client input (`TENANCY_AND_ORGANISATION_SPEC.md` section 3) |
 | Request/Job scope | `ITenantContext` is set by middleware (requests) or by the job runner from the job record. Data access without a scope throws. No ambient/thread-static state: the context flows through DI scope |
 | ORM | A base `TenantDbContext` applies a global query filter on `TenantId` to every tenant-owned entity (discovered by marker interface; a test fails when an entity lacks the marker or filter). `IgnoreQueryFilters` is banned by analyzer except in an allowlisted installation-level service |
-| Database | **Row-Level Security** with a predicate on `TenantId` using `SESSION_CONTEXT('TenantId')`, set by a connection interceptor on every open and cleared on return to the pool. Foreign keys include `TenantId` in composite keys so a child cannot reference a parent from another tenant. Unique indexes include `TenantId` |
+| Database | **Row-Level Security retired (ADR-0044, 2026-11-18, JBS IIS deployment):** no security policy, predicate function, `security` schema or `ecp_runtime` role, and no `SESSION_CONTEXT`; reviewed raw SQL states `TenantId = @tenant` itself. The runtime account holds db_datareader + db_datawriter; the migration account db_ddladmin + db_datareader + db_datawriter. Foreign keys include `TenantId` in composite keys so a child cannot reference a parent from another tenant. Unique indexes include `TenantId` |
 | Raw SQL | Only through a wrapper that requires a scope and parameters; reviewed list of allowed raw queries |
 | Cache | Cache keys are constructed by a helper that always prefixes tenant id; a test asserts no cache key lacks a tenant segment |
 | Files | Storage key prefix `t/{tenantId}/…`; the provider rejects keys outside the current prefix; no listing across prefixes |
 | Jobs/outbox | Messages carry `TenantId`; the dispatcher opens a scope per message |
-| Search/reports | Same filters; reporting views are filtered by RLS and per-tenant principals (`REPORTING_QLIK_SPEC.md`) |
+| Search/reports | Same filters; reporting views are filtered by tenant in the view definition and by per-tenant principals (RLS retired, ADR-0044) (`REPORTING_QLIK_SPEC.md`) |
 | Logs/traces | Tenant id is a structured field; support bundles are per tenant |
 | Tests | Cross-tenant matrix across records, documents, jobs, caches, reports, imports and exports (`docs/TESTING.md` section 5) |
 
@@ -232,7 +232,7 @@ All images use a non-root user, include ICU and time-zone data (L-06), run read-
 
 - **Outbox** rows are written in the same transaction as the change. A dispatcher claims batches using `UPDLOCK, READPAST`, sends via the adapter with retries and jitter, marks processed, and dead-letters after the limit. Consumers are idempotent by `dedupeKey`.
 - **Inbox** rows are inserted with a unique `(provider, externalEventId)` key; a duplicate insert means "already seen".
-- **Scheduled jobs:** reminders, unlock expiry, projection refresh, outbox dispatch, orphan-blob sweeper, audit verification, export expiry. Each job takes a named `sp_getapplock` lease, runs within an explicit tenant scope per unit of work, and is resumable.
+- **Scheduled jobs:** reminders, unlock expiry, projection refresh, outbox dispatch, orphan-blob sweeper, audit verification, export expiry. Each job holds a SQL-backed operation lease (`ops.OperationLease`, ADR-0034), runs within an explicit tenant scope per unit of work, and is resumable.
 - **Egress guard:** all outbound HTTP uses one `HttpClient` factory with SSRF protections (`ADAPTER_CATALOGUE.md`, README rule 7).
 
 ### 9.1 Lifecycle and notifications architecture (as implemented; ADR-0019 to ADR-0021, `docs/LIFECYCLE_AND_NOTIFICATIONS.md`)

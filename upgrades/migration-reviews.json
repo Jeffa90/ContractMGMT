@@ -31,6 +31,267 @@
       "basis": "baseline-accepted",
       "summary": "Renames the execution record table and its columns to the provider-neutral signature-request vocabulary and replaces one index. Data-preserving renames; no rows are changed.",
       "evidence": "Recorded when the upgrade ledger was introduced (OPS-02). Exercised by the S3 SQL Server scenarios. Accepted as part of the platform 1.0.0 baseline, not a fresh review."
+    },
+    {
+      "module": "Audit",
+      "migration": "20261118000000_RemoveRowLevelSecurity",
+      "categories": [
+        "Destructive",
+        "RowLevelSecurity"
+      ],
+      "basis": "owner-decision",
+      "summary": "Removes SQL Server Row-Level Security and the ecp_runtime database role where present: every TenantPolicy_* security policy, the two predicate functions, the security schema when empty, and the role with its members (dropping the role also removes its schema grants and the DENY on audit.AuditEvent). Every statement is guarded by an existence check, so on a fresh installation nothing runs. No table, column, row, index, foreign key, TenantId value, audit event or the audit append-only trigger is touched.",
+      "evidence": "Owner decision 2026-11-18 recorded in ADR-0044 and docs/JBS_DATABASE_SIMPLIFICATION_REVIEW.md. SQL Server tests on 2022 and 2025: SqlServerSimplifiedModelTests (fresh install with db_ddladmin + db_datareader + db_datawriter only; removal from a database that has the retired objects, with every row kept) and the N-1 to N upgrade rehearsal."
+    }
+  ],
+  "amendments": [
+    {
+      "module": "Audit",
+      "migration": "20261016000541_Initial",
+      "fromChecksum": "b528798c2027cd108de548e3600301744857f67535125078b6bf28b1dccdb8ae",
+      "toChecksum": "af93e747932a675c979025164eb08c9a652c48199e690074b9fe36df256104fa",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Tenancy",
+      "migration": "20261016000544_Initial",
+      "fromChecksum": "7da3f19415948ea328986d726d789f68ce5e93e3912e75ad293dfb4fe68d9778",
+      "toChecksum": "6d1c9f07ad6a6b6d0d1c4412bec8319e6ca3664223c50b9a28cd7902d7a4a8f0",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Tenancy",
+      "migration": "20261016005319_OrganisationStructure",
+      "fromChecksum": "93d7372261946c56e7e38dd7add3d87e545000ea2ad6bd74441949ab7b01b5f2",
+      "toChecksum": "48cc423cf84849a6dea43c40198d7d5291b2084b6fb2f04b82cab2246267a69c",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Identity",
+      "migration": "20261016010618_Initial",
+      "fromChecksum": "1d75eb8354dc922b0a754f36fef23c954ee99fd9e80d8b5772d4733a9b2d356d",
+      "toChecksum": "e535f9a952ad6579e55fdf358a7220acc30edf18e0192cea1a0d32533e505675",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Identity",
+      "migration": "20261016050707_ElevationAndPrivilegedAccess",
+      "fromChecksum": "81d67955ce69b10d71b5930d2f6143f76181f3135b27b662850f95ed8757c323",
+      "toChecksum": "a559108934289dc09d003b2442a9ed989c99da442ab2385e72780a11519095bc",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Identity",
+      "migration": "20261018094912_AddApproverGroups",
+      "fromChecksum": "09b2ed00f43f2105176330f4f674f76ab05110189c1be61ed7f7628b8d100a3e",
+      "toChecksum": "e00311ca761fbc955117d66d39fbef5fbd20a1a9adb765647c59828e692775b6",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Configuration",
+      "migration": "20261016010627_Initial",
+      "fromChecksum": "36f6f98c824e62af4657749ebec2664256de637c207a72262f22fc46a8484bb1",
+      "toChecksum": "291eeee61ac40352fbaf8b9fa6914dd510e58e69922f1aea3cc276bbe45f567b",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Configuration",
+      "migration": "20261017024249_AddSolutionPacks",
+      "fromChecksum": "93a23c8f19537f390541e26d88f402ca03be97470d8b80e4fe935b06a9525439",
+      "toChecksum": "f86ee64f8f7dcfb80cc95c765197a499346c296a2baaef922413b5b2380e57f7",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Configuration",
+      "migration": "20261018094305_AddConfigurationReview",
+      "fromChecksum": "5ca523a214eb783854acb15d271ec08c36f7ea496e5436d3e363c182281565f0",
+      "toChecksum": "838d0d54b7c66c687176fe4897608ad20cfb0e4ee635bf6352aa6f672369ed89",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Approvals",
+      "migration": "20261016074930_Initial",
+      "fromChecksum": "25b1d35b80c2ef8d59b95ded6b23a4af48068fa785efa2646f56dcbbba9f0d91",
+      "toChecksum": "3049e9e60ff8f70d0d2b09d15e11b03350314ef3cb6124670cba26abaddeb477",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Contracts",
+      "migration": "20261016000547_Initial",
+      "fromChecksum": "d30eb1ba72c026cb2ada9393648cdd2b32011b0e7a59193033f6f6beca6fd754",
+      "toChecksum": "790957b5c90460b23218b7a1563676821c9adb21d7d3fba1f4d32c66a222abab",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Contracts",
+      "migration": "20261016010330_AccessScopes",
+      "fromChecksum": "cc00084bf11c65e656f5f2630961ce3d33ba503230f35e5c2861a6e4c73d627e",
+      "toChecksum": "eefd4f4be95a2f7470be6cbcd0953984135304e89696b9c0e127888cf49a0dbf",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Contracts",
+      "migration": "20261016114641_CustomFieldValues",
+      "fromChecksum": "70526e67379bfb49a1dcc0a2e0dd1dac906aebd1a6b80d6af19c95e311b55bef",
+      "toChecksum": "d2b8dd9ddac9dfd6afd9436de4a0eb36d18dedf99a99ce072d62c103f1a18645",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Contracts",
+      "migration": "20261016122859_SavedViews",
+      "fromChecksum": "9f54a5f16b759457c5f1326482b313b53a8aaeb29ae683a94fa03d242c7c7656",
+      "toChecksum": "de0a6fe78ca675f1ec42dda97b2ea13a0694e4c9d485ed8e46e0dfbf681831c3",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Contracts",
+      "migration": "20261017151009_SupplierIdentifiers",
+      "fromChecksum": "4e7badf3a0ec6e31d51244b288b5470515b0666a90a04003e016a21ea6d5e90f",
+      "toChecksum": "8fa45bcdea6bd793a9edb7653e14d0d11d0ebf17461f006a94532e1ac69fd930",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Documents",
+      "migration": "20261016000551_Initial",
+      "fromChecksum": "04ef7c87b249988ffeb050c2805ef94999f0a172d1497cdd3f32d065350ddf2f",
+      "toChecksum": "4694b550c4cc1d05dfd747988d5c27ad7812a8fadf3707326d864e700fffd605",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Documents",
+      "migration": "20261018103354_AddScanAttempts",
+      "fromChecksum": "ba85ed48a5be891e154cc766d38ccbea0e59b69045772d50a6bc9d93d3817a3f",
+      "toChecksum": "674e571d9dc310c251b22a58a1af0ffaab83f47aa21a0b8bb7bf90673aa5227e",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Lifecycle",
+      "migration": "20261016060002_Initial",
+      "fromChecksum": "a1b621fad61027006269e9d36778f92dc3842b96db84f37fd470eadcc1efed94",
+      "toChecksum": "ffcf26bb97d520e85bbe5598ec989662276dccd1f94b57087933bbab907026b9",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Lifecycle",
+      "migration": "20261016074947_AddApprovalPlans",
+      "fromChecksum": "e6ba70e588471c3accc7769bd69596a563742f7579b5c206ef76c4d223f04a82",
+      "toChecksum": "5370327470538f926a2188eae983a8b3b3b32651b50b98a2c60b68c07116c65e",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Lifecycle",
+      "migration": "20261017040140_SignatureRequestVocabulary",
+      "fromChecksum": "2be2bd753353b0bba94ba3c2cac9142e75385e91db1934420d5b9a887f99e1ee",
+      "toChecksum": "779faf6afe5a91c209a227eb67c7de779f77f362ea520649a1422d4a96d84c1c",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Migration",
+      "migration": "20261016000554_Initial",
+      "fromChecksum": "bbb680aca2b318c3f0378e38e56afa708bfba4a607e4d267bab4934a4c626b23",
+      "toChecksum": "c5a1a034a8fe7ac74b590e060070201a52b012aab84d6593dd6df22236c8daac",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Migration",
+      "migration": "20261016034919_MigrationSlice",
+      "fromChecksum": "49335c5bd7d6bd096991c1a2623ea4dd92711465b7cade3183bb2c2882596439",
+      "toChecksum": "a9dab2ad5b0e7f7b2d0f2354025ce420214f82c290d77c3224f841390a7ef6ef",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Migration",
+      "migration": "20261018233142_AddMaskedDataDeclarations",
+      "fromChecksum": "20b85c4700ab3f8dabe7f6910f998cdc408ca186a841568073c99e58aab3de39",
+      "toChecksum": "613910b61a8e9fa5a1007d6a941eb539e189cfd5295a9e7cb8cbc3d167068097",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Access",
+      "migration": "20261029100354_AddAccessTables",
+      "fromChecksum": "867395d50c7300a5425ffbdc7f7220144ec8455cc9e56b51890bcdc7115681d4",
+      "toChecksum": "43edcdac5ac27d9e3e6ae3535008bf8c769152eac28437e838ea53305eb05650",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Access",
+      "migration": "20261029234110_AddCategoryOwnershipPolicy",
+      "fromChecksum": "f2531c5c66f3499401c9cf6e784b5db521e0cefe64c0298a930ff58ca9286c5e",
+      "toChecksum": "ab41172c98a17997b0ce51c762f49e08cd2be65732c62c8bcc2ac34711b0a64e",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Operations",
+      "migration": "20261017231302_Initial",
+      "fromChecksum": "be03fb7bbc96b6a37325c0d63241f13b3c1f3d253f9a28c021a422631968eef8",
+      "toChecksum": "7543176321ffe168e90a58254e897d4d6a515e6b9fe63f196886921c8adcaeee",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Operations",
+      "migration": "20261018003226_AddMigrationRecords",
+      "fromChecksum": "20276a7b97c1094f06867474fac4bfdb86c9890c33554575da6203a1f913f651",
+      "toChecksum": "c90b103c56ecd68dfb23cdae1dade48ab6a11f4cdbce2aa139079504f7bffbb8",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Operations",
+      "migration": "20261018225821_AddEmailAndAcceptedExceptions",
+      "fromChecksum": "691ea9420246815cdeeb04d777c9dd6e4e32a68c3c696816f9a0d12278a9e931",
+      "toChecksum": "a78a4561ea778d11ba62aed12b92e07f56bd755a9817da31a47a3568f6cfe32a",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Notifications",
+      "migration": "20261016061227_Initial",
+      "fromChecksum": "67a8606cb23e736a1610c0a4ea585d70cdc2106d83d54f1cf7dabe54db4b2c74",
+      "toChecksum": "3194e40053c71a9dcf5fde75531ea35cdaac889ac9827af74502cfaf25ad54a9",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Setup",
+      "migration": "20261016015437_Initial",
+      "fromChecksum": "bc7ee670bea42dd4af0187d6000cc115681c732b575a5a78b58c82f958343a92",
+      "toChecksum": "8a35f6e0b8387bb19280f2322116d0d55079ee91c6fbb7204d1b5403508704d3",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
+    },
+    {
+      "module": "Setup",
+      "migration": "20261016020943_OnboardingLedger",
+      "fromChecksum": "9d0e1c2a6521d5302460a60a8c20844de8416edbfd2ca5833b2a8cbb3a5afd84",
+      "toChecksum": "cda2b34932cbb2bb1c2d201b57d6e724d49e9aa792d6ead41fa2263ba0e3ca4e",
+      "decision": "ADR-0044",
+      "reason": "The retired row-level security helpers (CreateInfrastructure, AddTenantPolicy, DropTenantPolicy, GrantRuntimeAccess, DropInfrastructure) emit nothing, and the DENY to the retired ecp_runtime role was removed, so a fresh installation needs no CREATE ROLE or ALTER ANY SECURITY POLICY. Only those statements were removed; every table, column, index, constraint, trigger and data statement of this migration is unchanged."
     }
   ]
 }

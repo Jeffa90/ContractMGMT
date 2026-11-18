@@ -58,14 +58,29 @@ internal static class UpgradeFoundationScenarios
         var notes = catalogue.Notes.Single(n => n.To == UpgradeVersions.Current);
         var rebuilt = UpgradeManifestBuilder.Build(notes, catalogue.Baseline(notes.From)!, compiled, catalogue.Reviews);
         Assert.Equal(UpgradeJson.Serialise(manifest!), UpgradeJson.Serialise(rebuilt));
-        // Every frozen baseline is intact (its hash is its content's), and every migration it lists is still in this build, unchanged.
+        // Every frozen baseline is intact (its hash is its content's), and every migration it lists is still in this build, unchanged or changed exactly as an
+        // owner-approved amendment records (ADR-0044: the retired row-level security helpers emit nothing). No other difference is accepted.
         foreach (var baseline in catalogue.Baselines)
         {
             Assert.Equal(baseline.LedgerSha256, UpgradeJson.LedgerHash(baseline.Modules));
             foreach (var module in baseline.Modules)
                 foreach (var migration in module.Migrations)
-                    Assert.Equal(migration.Checksum, compiled.Find(module.Module)!.Migrations.Single(m => m.Id == migration.Id).Checksum);
+                {
+                    var now = compiled.Find(module.Module)!.Migrations.Single(m => m.Id == migration.Id).Checksum;
+                    Assert.True(now == migration.Checksum || catalogue.Reviews.IsAmendment(module.Module, migration.Id, migration.Checksum, now), $"{module.Module}/{migration.Id} changed without a recorded amendment");
+                }
         }
+        // Every amendment names a real migration and is in force: its new checksum is the build's, it was recorded under ADR-0044, and only the retired
+        // row-level security statements left the migration (it is no longer classified as a row-level security change).
+        Assert.NotEmpty(catalogue.Reviews.Amendments!);
+        foreach (var a in catalogue.Reviews.Amendments!)
+        {
+            var entry = compiled.Find(a.Module)!.Migrations.Single(m => m.Id == a.Migration);
+            Assert.Equal(a.ToChecksum, entry.Checksum);
+            Assert.Equal("ADR-0044", a.Decision);
+            Assert.DoesNotContain(MigrationCategories.RowLevelSecurity, entry.Categories);
+        }
+        Assert.Equal([MigrationCategories.Destructive, MigrationCategories.RowLevelSecurity], compiled.Find("Audit")!.Migrations.Single(m => m.Id == "20261118000000_RemoveRowLevelSecurity").Categories);
         // Order is deterministic, identifiers are unique per module, and every module declares its current schema version.
         Assert.Equal(compiled.Modules.OrderBy(m => m.Tier).ThenBy(m => m.Module, StringComparer.Ordinal).Select(m => m.Module), compiled.Modules.Select(m => m.Module));
         foreach (var module in compiled.Modules)

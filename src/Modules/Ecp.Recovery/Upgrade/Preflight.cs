@@ -148,7 +148,7 @@ internal sealed class UpgradePreflight(
         // ---- Historical migrations and recorded checksums ----
         await Run("UPF-015", "Historical migration checksums", async () =>
         {
-            var changed = new List<string>(); var unrecorded = 0; var generatorDiffers = 0;
+            var changed = new List<string>(); var unrecorded = 0; var generatorDiffers = 0; var amended = 0;
             var baseline = detected != "unknown" ? catalogue.Baseline(detected) : null;
             foreach (var (module, ids) in applied)
             {
@@ -157,7 +157,11 @@ internal sealed class UpgradePreflight(
                 {
                     var now = compiledModule?.Migrations.FirstOrDefault(m => m.Id == id);
                     var was = baseline?.Modules.FirstOrDefault(m => m.Module == module)?.Migrations.FirstOrDefault(m => m.Id == id);
-                    if (now is not null && was is not null && !string.Equals(now.Checksum, was.Checksum, StringComparison.Ordinal)) changed.Add($"{module}/{id} (differs from the {detected} baseline)");
+                    if (now is not null && was is not null && !string.Equals(now.Checksum, was.Checksum, StringComparison.Ordinal))
+                    {
+                        if (catalogue.Reviews.IsAmendment(module, id, was.Checksum, now.Checksum)) amended++;
+                        else changed.Add($"{module}/{id} (differs from the {detected} baseline)");
+                    }
                 }
             }
             await using var scope = target.Services.CreateAsyncScope();
@@ -169,7 +173,8 @@ internal sealed class UpgradePreflight(
                     if (now is null) continue;
                     if (!string.Equals(now.Checksum, r.Checksum, StringComparison.Ordinal))
                     {
-                        if (!string.Equals(r.Generator, compiled.Generator, StringComparison.Ordinal)) generatorDiffers++;
+                        if (catalogue.Reviews.IsAmendment(r.Module, r.MigrationId, r.Checksum, now.Checksum)) amended++;
+                        else if (!string.Equals(r.Generator, compiled.Generator, StringComparison.Ordinal)) generatorDiffers++;
                         else changed.Add($"{r.Module}/{r.MigrationId} (differs from the checksum recorded when it was applied)");
                     }
                 }
@@ -179,8 +184,9 @@ internal sealed class UpgradePreflight(
                     string.Join("; ", changed.Take(10)), "Do not upgrade. Obtain the release again, verify it, and compare the database with a verified backup."));
             else
                 checks.Add(Make("UPF-015", "Historical migration checksums", generatorDiffers > 0 || unrecorded > 0 && records is not null && detected == "unknown" ? CheckOutcome.Warning : CheckOutcome.Passed, CheckSeverity.Low,
-                    "Every applied migration matches its frozen baseline" + (records is null ? " (the platform has not recorded checksums for this database yet; they are recorded when the upgrade is applied)." : "; recorded checksums agree."),
-                    generatorDiffers > 0 ? $"{generatorDiffers} recorded checksum(s) were produced by another data-access library version and could not be compared." : "", ""));
+                    "Every applied migration matches its frozen baseline" + (amended > 0 ? " or an owner-approved amendment" : "") + (records is null ? " (the platform has not recorded checksums for this database yet; they are recorded when the upgrade is applied)." : "; recorded checksums agree."),
+                    string.Join(" ", new[] { generatorDiffers > 0 ? $"{generatorDiffers} recorded checksum(s) were produced by another data-access library version and could not be compared." : "",
+                        amended > 0 ? $"{amended} difference(s) are exactly the owner-approved amendments recorded in upgrades/migration-reviews.json (ADR-0044: retired row-level security helpers emit nothing)." : "" }.Where(x => x.Length > 0)), ""));
         });
 
         // ---- Schema drift ----
@@ -229,7 +235,7 @@ internal sealed class UpgradePreflight(
     {
         var code = c.Code switch
         {
-            "VAL-001" => "UPF-004", "VAL-006" => "UPF-052", "VAL-007" => "UPF-053", "VAL-008" => "UPF-054", "VAL-009" => "UPF-055", "VAL-010" => "UPF-056", "VAL-011" => "UPF-057", "VAL-013" => "UPF-061",
+            "VAL-001" => "UPF-004", "VAL-006" => "UPF-052", "VAL-007" => "UPF-053", "VAL-009" => "UPF-055", "VAL-010" => "UPF-056", "VAL-011" => "UPF-057", "VAL-013" => "UPF-061",
             "VAL-014" => "UPF-062", "VAL-015" => "UPF-063", "VAL-016" => "UPF-064", "VAL-017" => "UPF-065", "VAL-018" => "UPF-066", "VAL-019" => "UPF-067", "VAL-000" => "UPF-005", _ => "UPF-059"
         };
         return c with { Code = code, Title = $"{c.Title} ({c.Code})", CorrelationId = _correlation };

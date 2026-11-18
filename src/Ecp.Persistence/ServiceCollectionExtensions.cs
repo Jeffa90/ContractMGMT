@@ -25,7 +25,7 @@ public static class PersistenceServiceCollectionExtensions
         services.TryAddScoped<IAfterCommit>(sp => sp.GetRequiredService<AfterCommitQueue>());
         services.TryAddScoped<IUnitOfWork, UnitOfWork>();
         services.TryAddSingleton<KeepScopedConnectionOpenInterceptor>();
-        services.TryAddSingleton<TenantSessionContextInterceptor>();
+        services.TryAddSingleton<ScopedTransactionInterceptor>();
         services.TryAddSingleton<MigrationRunner>();
         return services;
     }
@@ -45,7 +45,7 @@ public static class PersistenceServiceCollectionExtensions
             builder.ReplaceService<IModelCacheKeyFactory, ProviderAwareModelCacheKeyFactory>();
             builder.AddInterceptors(
                 sp.GetRequiredService<KeepScopedConnectionOpenInterceptor>(),
-                sp.GetRequiredService<TenantSessionContextInterceptor>());
+                sp.GetRequiredService<ScopedTransactionInterceptor>());
         });
         services.AddScoped<IRollbackHook>(sp => new ChangeTrackerReset(() => sp.GetRequiredService<TContext>()));
         return services;

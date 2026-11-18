@@ -43,7 +43,19 @@ public sealed record ReleaseNotes(
 
 public sealed record MigrationReviewEntry(string Module, string Migration, IReadOnlyList<string> Categories, string Basis, string Summary, string Evidence);
 
-public sealed record MigrationReviewRegister(int FormatVersion, IReadOnlyList<MigrationReviewEntry> Entries);
+/// <summary>
+/// An owner-approved change to a migration that was already released (ADR-0044). The upgrade integrity checks (UPM-012, UPF-015) refuse any historical
+/// migration whose checksum differs from its baseline or recorded value, unless the difference is exactly the one recorded here: the same module and migration,
+/// from this checksum to this checksum. Anything else still fails as tampering.
+/// </summary>
+public sealed record MigrationAmendment(string Module, string Migration, string FromChecksum, string ToChecksum, string Decision, string Reason);
+
+public sealed record MigrationReviewRegister(int FormatVersion, IReadOnlyList<MigrationReviewEntry> Entries, IReadOnlyList<MigrationAmendment>? Amendments = null)
+{
+    /// <summary>True only when this exact change (module, migration, old checksum, new checksum) is a recorded amendment.</summary>
+    public bool IsAmendment(string module, string migration, string fromChecksum, string toChecksum)
+        => (Amendments ?? []).Any(a => a.Module == module && a.Migration == migration && a.FromChecksum == fromChecksum && a.ToChecksum == toChecksum);
+}
 
 public static class UpgradeJson
 {
@@ -180,7 +192,7 @@ public static class UpgradeManifestValidator
                 {
                     var same = now.Migrations.FirstOrDefault(e => e.Id == old.Id);
                     if (same is null) Critical("UPM-011", $"Migration {module.Module}/{old.Id} existed in the source version but is missing from the target (a historical migration was removed).");
-                    else if (!string.Equals(same.Checksum, old.Checksum, StringComparison.Ordinal)) Critical("UPM-012", $"Migration {module.Module}/{old.Id} has changed since the source version was released (a historical migration was modified).");
+                    else if (!string.Equals(same.Checksum, old.Checksum, StringComparison.Ordinal) && !catalogue.Reviews.IsAmendment(module.Module, old.Id, old.Checksum, same.Checksum)) Critical("UPM-012", $"Migration {module.Module}/{old.Id} has changed since the source version was released (a historical migration was modified).");
                 }
                 if (!now.Migrations.Take(module.Migrations.Count).Select(e => e.Id).SequenceEqual(module.Migrations.Select(e => e.Id))) Critical("UPM-013", $"Module {module.Module}: the source migrations are not the first migrations of the target, in the same order.");
             }

@@ -115,7 +115,7 @@ class OfflineDryRunTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         out = r.stdout
         self.assertIn('DRY RUN (nothing is changed), OFFLINE', out)
-        self.assertIn("environment QA: deployments only from branch 'jbs/iis-integration'", out)
+        self.assertIn("environment QA: deployments only from branch 'main'", out)
         for line in ('set: QA APPENV_Ecp__Mode = Production', 'set: QA APPENV_Ecp__Logging__FileName = log-.txt', 'set: QA APPENV_Ecp__Logging__RetainedFiles = 31',
                      'Server=AUQLDDC01QA2Xi;Database=JBSContracts;Integrated Security=True;Encrypt=True;TrustServerCertificate=True', 'set: QA IIS_APP_POOL_USER = AMH\\svc_jbsai_qa'):
             self.assertIn(line, out)

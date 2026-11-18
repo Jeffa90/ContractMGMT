@@ -103,6 +103,22 @@ if (-not $siteExists) {
     if (-not $port) { throw "Invalid binding '$Binding'; expected protocol:ip:port:hostname." }
 }
 
+# App pool identity, checked before anything in IIS is created or changed, so a missing password can never leave
+# a half-made pool behind that later runs under the wrong account.
+$poolIdentityWrong = $false
+if ($AppPoolUser -and $poolExists) {
+    $model = Get-ItemProperty "IIS:\AppPools\$AppPoolName" -Name processModel
+    $poolIdentityWrong = ([string]$model.identityType -ne "SpecificUser") -or ([string]$model.userName -ne $AppPoolUser)
+}
+if ($AppPoolUser -and -not $AppPoolPassword) {
+    if (-not $poolExists) {
+        throw "The app pool '$AppPoolName' doesn't exist and IIS needs the password of $AppPoolUser to create it. Either ask IT to create the app pool '$AppPoolName' (No Managed Code, identity $AppPoolUser) on this server, or set the IIS_APP_POOL_PASSWORD secret on the GitHub environment. Nothing in IIS was changed."
+    }
+    if ($poolIdentityWrong) {
+        throw "The app pool '$AppPoolName' exists but does not run as $AppPoolUser. Ask IT to set its identity to $AppPoolUser in IIS Manager (Application Pools > $AppPoolName > Advanced Settings > Identity), or set the IIS_APP_POOL_PASSWORD secret so the deploy can set it. Nothing in IIS was changed."
+    }
+}
+
 # --- App pool -----------------------------------------------------------------
 if (-not $poolExists) {
     Write-Host "    creating app pool '$AppPoolName'"
@@ -111,13 +127,16 @@ if (-not $poolExists) {
     Set-ItemProperty $pool -Name managedRuntimeVersion -Value ""
     Set-ItemProperty $pool -Name managedPipelineMode -Value "Integrated"
     if ($AppPoolUser) {
-        if (-not $AppPoolPassword) { throw "IIS_APP_POOL_USER is set but the IIS_APP_POOL_PASSWORD secret is missing." }
         Set-ItemProperty $pool -Name processModel -Value @{ userName = $AppPoolUser; password = $AppPoolPassword; identityType = 3 }
         Write-Host "    app pool runs as $AppPoolUser"
     } else {
         Set-ItemProperty $pool -Name processModel.identityType -Value "ApplicationPoolIdentity"
         Write-Host "    app pool runs as ApplicationPoolIdentity (SQL sees $env:USERDOMAIN\$env:COMPUTERNAME`$)"
     }
+} elseif ($poolIdentityWrong) {
+    # An existing pool running as another account (for example one left by an earlier failed deploy) is corrected; the password is known here.
+    Set-ItemProperty "IIS:\AppPools\$AppPoolName" -Name processModel -Value @{ userName = $AppPoolUser; password = $AppPoolPassword; identityType = 3 }
+    Write-Host "    existing app pool '$AppPoolName' set to run as $AppPoolUser"
 }
 
 # The data protection key ring is protected per user unless the app is told otherwise, and a user's keys need the account profile to be loaded.

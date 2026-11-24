@@ -26,6 +26,11 @@ public sealed class PackOptions
     public string? StorageDirectory { get; set; }
     /// <summary>Demo and Test only: accept an unsigned package that is marked synthetic. Production ignores this setting and refuses unsigned packages.</summary>
     public bool AllowUnsignedSyntheticPacks { get; set; }
+    /// <summary>
+    /// ADR-0047: in Production, trust an unsigned pack that ships inside the application folder (it comes with the code, through the same pipeline). Uploaded packs
+    /// always need a trusted signature. Set false to require signatures on shipped packs too.
+    /// </summary>
+    public bool TrustShippedPacks { get; set; } = true;
     /// <summary>The installation mode. The host sets it; the default is the safest.</summary>
     public EcpMode Mode { get; set; } = EcpMode.Production;
     public List<ConfiguredTrustKey> TrustedKeys { get; set; } = [];
@@ -37,5 +42,16 @@ public sealed class PackOptions
 
     public bool IsProduction => Mode == EcpMode.Production;
     public string ResolvedShippedDirectory => string.IsNullOrWhiteSpace(ShippedDirectory) ? Path.Combine(AppContext.BaseDirectory, "packs") : ShippedDirectory;
+    /// <summary>True when the shipped pack folder is inside the application folder, so its files come with the deployed code.</summary>
+    public bool ShippedDirectoryInsideApplication
+    {
+        get
+        {
+            var app = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var dir = Path.GetFullPath(ResolvedShippedDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return dir.StartsWith(app, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+        }
+    }
+
     public string ResolvedStorageDirectory => string.IsNullOrWhiteSpace(StorageDirectory) ? Path.Combine(Path.GetTempPath(), "ecp-pack-store") : StorageDirectory;
 }

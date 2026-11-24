@@ -1,6 +1,6 @@
 # ADR-0046: Shipped solution packs are signed by the deploy pipeline
 
-Status: Implemented in `.github/actions/build-app/action.yml`; sign and Production verify dry-run locally with a throw-away key; **Not Verified on IIS**. Owner decision 2026-11-24 (Jeff, through Clayton). Builds on ADR-0014 and ADR-0038. Production approval remains external governance and is not declared.
+Status: **Optional since ADR-0047** (shipped packs are trusted without a signature; the signing step runs only when an environment holds `PACK_SIGNING_KEY`). Implemented in `.github/actions/build-app/action.yml`; sign and Production verify dry-run locally with a throw-away key; **Not Verified on IIS**. Owner decision 2026-11-24 (Jeff, through Clayton). Builds on ADR-0014 and ADR-0038. Production approval remains external governance and is not declared.
 
 ## Context
 

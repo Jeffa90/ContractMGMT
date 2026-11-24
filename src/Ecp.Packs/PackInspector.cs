@@ -43,6 +43,7 @@ public static class PackInspector
         return trust.Status switch
         {
             TrustStatus.Trusted => $"valid, key {trust.KeyId} ({trust.Algorithm}), {trust.KeySource}",
+            TrustStatus.ShippedWithApplication => "unsigned, trusted because it ships inside the application folder (ADR-0047)",
             TrustStatus.UnsignedSyntheticAllowed => "UNSIGNED (accepted only as a synthetic package in a non-Production environment)",
             _ => $"not accepted: {trust.Status}" + (trust.KeyId is null ? "" : $" (key {trust.KeyId})")
         };

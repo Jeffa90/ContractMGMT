@@ -163,6 +163,38 @@ public sealed class PackSigningTests
     }
 
     [Fact]
+    public async Task ADR_0047_an_unsigned_pack_shipped_inside_the_application_is_trusted_in_production_and_nothing_else_is()
+    {
+        var unsigned = await Evaluate(PackTestKit.Build(synthetic: false), [], production: true);
+        Assert.Equal(TrustStatus.Missing, unsigned.Status);
+
+        // Shipped, unsigned, Production, setting on, folder inside the application: trusted.
+        var shipped = ShippedPackTrust.Apply(unsigned, unsigned: true, production: true, trustShippedPacks: true, folderInsideApplication: true);
+        Assert.Equal(TrustStatus.ShippedWithApplication, shipped.Status);
+        Assert.True(shipped.IsTrusted); Assert.True(shipped.IsAcceptable);
+        Assert.Equal(ShippedPackTrust.KeySource, shipped.KeySource);
+
+        // Any condition missing: the original refusal stands.
+        Assert.Equal(TrustStatus.Missing, ShippedPackTrust.Apply(unsigned, unsigned: true, production: true, trustShippedPacks: false, folderInsideApplication: true).Status);
+        Assert.Equal(TrustStatus.Missing, ShippedPackTrust.Apply(unsigned, unsigned: true, production: true, trustShippedPacks: true, folderInsideApplication: false).Status);
+
+        // Outside Production the existing rules are unchanged.
+        var demo = await Evaluate(PackTestKit.Build(), [], production: false, allowUnsigned: true);
+        Assert.Equal(TrustStatus.UnsignedSyntheticAllowed, ShippedPackTrust.Apply(demo, unsigned: true, production: false, trustShippedPacks: true, folderInsideApplication: true).Status);
+    }
+
+    [Fact]
+    public async Task ADR_0047_a_shipped_pack_whose_signature_fails_is_still_refused()
+    {
+        using var key = new TestSigningKey();
+        var unknownKey = await Evaluate(PackTestKit.Sign(PackTestKit.Build(), key), [], production: true);
+        Assert.Equal(TrustStatus.UnknownKey, unknownKey.Status);
+        var result = ShippedPackTrust.Apply(unknownKey, unsigned: false, production: true, trustShippedPacks: true, folderInsideApplication: true);
+        Assert.Equal(TrustStatus.UnknownKey, result.Status);
+        Assert.False(result.IsAcceptable);
+    }
+
+    [Fact]
     public async Task A_signed_package_from_an_untrusted_key_is_not_rescued_by_the_unsigned_setting()
     {
         using var key = new TestSigningKey();

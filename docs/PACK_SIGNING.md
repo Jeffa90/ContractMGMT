@@ -83,7 +83,7 @@ There are two places, both holding **public** keys only.
 
 ## 5. Production
 
-Production accepts a package only if it has a valid signature from a **trusted, active, in-date key** with a supported algorithm and every hash matches. The shipped Blank and reference packs are built **unsigned** (no private key exists in the repository), so a Production operator must sign them with their own key and trust that key, or install their own signed packs, before organisations can be given a pack. Until then readiness reports *Degraded* with that reason. This is by design: it is the evidence that Production refuses unsigned packs.
+Production accepts a package only if it has a valid signature from a **trusted, active, in-date key** with a supported algorithm and every hash matches. The shipped Blank and reference packs are built **unsigned** (no private key exists in the repository), so a Production operator must sign them with their own key and trust that key, or install their own signed packs, before organisations can be given a pack. Until then readiness reports *Degraded* with that reason. **Since ADR-0047** the packs that ship inside the application folder are trusted without a signature (status `ShippedWithApplication`; switch off with `Ecp:Packs:TrustShippedPacks=false`), so the paragraph above applies only to uploaded packs, to a shipped folder outside the application folder, and to installations that switch the rule off. A shipped pack whose signature fails is still refused.
 
 | Situation | Result in Production | Code |
 |---|---|---|

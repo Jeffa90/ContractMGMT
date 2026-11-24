@@ -184,7 +184,8 @@ internal sealed class PackStage : SetupStageBase
     public PackStage(ISolutionPackCatalogue catalogue) => _catalogue = catalogue;
 
     private static string Label(Ecp.Configuration.PackCatalogueEntry e)
-        => $"{e.Name()} (version {e.Version}) from {e.PublisherName}" + (e.Trust.IsTrusted ? ", signed" : ", UNSIGNED (Demo and Test only)");
+        => $"{e.Name()} (version {e.Version}) from {e.PublisherName}"
+            + (e.Trust.Status == Ecp.Packs.TrustStatus.ShippedWithApplication ? ", shipped with the application" : e.Trust.IsTrusted ? ", signed" : ", UNSIGNED (Demo and Test only)");
 
     // Nothing is chosen for the administrator: the starting pack is an explicit decision, and the choices come from the pack catalogue (external, verified packages), never from a name in code.
     public override IReadOnlyList<StageField> Fields(SetupDocument doc, SetupEnvironment env, Func<string, string?> remembered)
@@ -197,7 +198,7 @@ internal sealed class PackStage : SetupStageBase
         var entries = _catalogue.ListEntries();
         var notes = new List<string>();
         if (entries.Count == 0)
-            notes.Add("No [[solution.pack|lower]] is available. Packs ship as signed packages next to the application; in Production only packs signed by a trusted publisher are offered. Ask the person who installed the application to check Administration, [[solution.pack|plural|sentence]], or see docs/PACK_SIGNING.md.");
+            notes.Add("No [[solution.pack|lower]] is available. Packs ship as packages next to the application; in Production only those packs and packs signed by a trusted publisher are offered. Ask the person who installed the application to check Administration, [[solution.pack|plural|sentence]], or see docs/PACK_SIGNING.md.");
         else if (entries.Count == 1)
             notes.Add("Only one pack is available. Additional packs can be installed later under Administration, [[solution.pack|plural|sentence]].");
         foreach (var p in entries)

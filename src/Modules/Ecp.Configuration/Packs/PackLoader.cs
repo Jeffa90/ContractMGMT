@@ -26,9 +26,13 @@ internal sealed class PackTrustEvaluator(PlatformKeyResolver platform, TenantKey
     private readonly PackTrustPolicy _policy = new(new CompositeKeyResolver([platform, tenantKeys]));
     public IPackKeyResolver Keys { get; } = new CompositeKeyResolver([platform, tenantKeys]);
 
-    public Task<TrustResult> EvaluateAsync(OpenedPackage package, CancellationToken ct)
-        => _policy.EvaluateAsync(package.Manifest!, package.CanonicalManifest, package.SignatureFile,
+    /// <param name="shipped">True only for a pack read from the shipped folder; uploaded packs always need a trusted signature (ADR-0047).</param>
+    public async Task<TrustResult> EvaluateAsync(OpenedPackage package, CancellationToken ct, bool shipped = false)
+    {
+        var result = await _policy.EvaluateAsync(package.Manifest!, package.CanonicalManifest, package.SignatureFile,
             new TrustContext(options.Value.IsProduction, options.Value.AllowUnsignedSyntheticPacks, clock.UtcNow), options.Value.Limits, ct);
+        return shipped ? ShippedPackTrust.Apply(result, package.SignatureFile is null, options.Value.IsProduction, options.Value.TrustShippedPacks, options.Value.ShippedDirectoryInsideApplication) : result;
+    }
 }
 
 /// <summary>
@@ -120,7 +124,7 @@ internal sealed class PackLoader(ShippedPackSource shipped, PackPackageCache cac
     private async Task<PackCatalogueEntry> DescribeAsync(OpenedPackage package, string source, bool retired, string? unavailable, DateTime? installedUtc, string? uploadedBy, string? fileName, CancellationToken ct)
     {
         var m = package.Manifest!;
-        var trustResult = await trust.EvaluateAsync(package, ct);
+        var trustResult = await trust.EvaluateAsync(package, ct, shipped: source == PackSourceTypes.Shipped);
         var compat = PackReader.CheckCompatibility(package, new PackCompatibilityContext(PlatformVersion.Current, kinds.Known));
         SolutionPackInfo? info = null;
         try
@@ -147,7 +151,9 @@ internal sealed class ShippedSolutionPackCatalogue(ShippedPackSource shipped, Pl
         foreach (var (package, fileName) in shipped.Packs)
         {
             var m = package.Manifest!;
-            var trust = policy.EvaluateAsync(m, package.CanonicalManifest, package.SignatureFile, new TrustContext(options.Value.IsProduction, options.Value.AllowUnsignedSyntheticPacks, clock.UtcNow), options.Value.Limits).GetAwaiter().GetResult();
+            var trust = ShippedPackTrust.Apply(
+                policy.EvaluateAsync(m, package.CanonicalManifest, package.SignatureFile, new TrustContext(options.Value.IsProduction, options.Value.AllowUnsignedSyntheticPacks, clock.UtcNow), options.Value.Limits).GetAwaiter().GetResult(),
+                package.SignatureFile is null, options.Value.IsProduction, options.Value.TrustShippedPacks, options.Value.ShippedDirectoryInsideApplication);
             var compat = PackReader.CheckCompatibility(package, new PackCompatibilityContext(PlatformVersion.Current, knownKinds));
             SolutionPackInfo? info = null;
             try { info = package.Document(PackReader.SolutionPackKind) is { } json ? JsonSerializer.Deserialize<SolutionPackInfo>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web)) : null; } catch (JsonException) { }

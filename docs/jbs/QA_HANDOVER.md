@@ -6,7 +6,7 @@ Branch: `Deployment-Pipeline-Change`. This builds on ADR-0045 (unattended first 
 
 You no longer need to log on to the web server. Each deploy now does the following:
 
-1. **Builds the app and signs the shipped solution packs** with the QA key, then checks them the way Production mode will.
+1. **Builds the app.** The shipped solution packs need no signing key: Production mode trusts the packs that ship inside the application folder (ADR-0047).
 2. **Creates the database tables** on an empty database (`deploy-migrate`). If a later release changes an existing database, the deploy stops before copying anything and the old site keeps running. Follow `docs/UPGRADE_RUNBOOK.md`, then re-run the deploy.
 3. **Copies the site.**
 4. **Runs first-run setup** from `docs/jbs/setup-answers.qa.json` (`setup-apply`), using the same steps as the wizard. It also makes sure everyone in the failsafe admin list has administrator access, and it repeats that check on every deploy.
@@ -30,17 +30,8 @@ gh variable set APPENV_Ecp__Security__FailsafeAdmins__0__Email       --env QA --
 
 To add more admins later, use `__1__`, `__2__` and so on. To remove an admin, delete their variables **and** end their role in People & Access. If you only end the role, the next deploy gives it back.
 
-### 3. Create the pack signing key (once)
-Run this on your PC. The private key **must not** be saved in the repository folder.
-
-```powershell
-dotnet src\Ecp.PackTool\bin\Release\net10.0\Ecp.PackTool.dll keygen --out-private C:\keys\jbs-packs-qa.key --out-public C:\keys\jbs-packs-qa.pub.pem
-gh secret   set PACK_SIGNING_KEY --env QA --repo Jeffa90/ContractMGMT < C:\keys\jbs-packs-qa.key
-gh variable set APPENV_Ecp__Packs__TrustedKeys__0__KeyId        --env QA --repo Jeffa90/ContractMGMT --body "jbs-packs-qa"
-gh variable set APPENV_Ecp__Packs__TrustedKeys__0__PublicKeyPem --env QA --repo Jeffa90/ContractMGMT < C:\keys\jbs-packs-qa.pub.pem
-```
-
-(Build the solution in Release first so the tool exists.) Keep an offline copy of the private key, then delete it from your PC. Production will need its own key pair later.
+### 3. Pack signing key: not needed
+Since ADR-0047 the shipped packs are trusted without a signature, so there is no key to create and no `PACK_SIGNING_KEY` secret to set.
 
 ### 4. Confirm the values in `docs/jbs/setup-answers.qa.json`
 - **Tenant name:** currently "JBS Australia" (an assumption). Change it now if it's wrong. It's hard to change once setup has created the tenant.
@@ -68,6 +59,7 @@ Everything above has passed tests, but none of it has run on the real QA server 
 
 ## Background reading
 - `decisions/ADR-0045-unattended-first-install-and-failsafe-administrators.md`
-- `decisions/ADR-0046-shipped-packs-signed-by-the-deploy-pipeline.md`
+- `decisions/ADR-0046-shipped-packs-signed-by-the-deploy-pipeline.md` (optional since ADR-0047)
+- `decisions/ADR-0047-shipped-packs-trusted-without-a-signature.md`
 - `docs/DEPLOYMENT.md`, "First-run setup from the pipeline"
 - `docs/jbs/CLAUDE_SKILL_IIS_UNATTENDED_INSTALL.md`: copy it to `%USERPROFILE%\.claude\skills\jbs-iis-unattended-install\SKILL.md` so Claude Code on your machine knows this pattern for future projects.

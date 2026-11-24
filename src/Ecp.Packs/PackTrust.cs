@@ -33,6 +33,12 @@ public enum TrustStatus
 {
     /// <summary>Signed by a trusted, active key, and the signature verifies.</summary>
     Trusted,
+    /// <summary>
+    /// Not signed, but shipped inside the application's own folder and deployed with the code (ADR-0047). Anyone who can change that folder can already change the
+    /// application, so a signature there adds nothing. Only a pack with no signature at all qualifies: a shipped pack whose signature fails is still refused.
+    /// Uploaded packs never get this status.
+    /// </summary>
+    ShippedWithApplication,
     /// <summary>No signature, but the package is marked synthetic and the environment explicitly allows unsigned synthetic packs (never in Production).</summary>
     UnsignedSyntheticAllowed,
     Missing,
@@ -50,9 +56,25 @@ public sealed record TrustContext(bool IsProduction, bool AllowUnsignedSynthetic
 
 public sealed record TrustResult(TrustStatus Status, string? KeyId, string? Algorithm, string? KeySource, IReadOnlyList<PackIssue> Issues)
 {
-    public bool IsTrusted => Status == TrustStatus.Trusted;
+    /// <summary>Trusted for Production: signed by a trusted key, or shipped with the application (ADR-0047).</summary>
+    public bool IsTrusted => Status is TrustStatus.Trusted or TrustStatus.ShippedWithApplication;
     /// <summary>Trusted, or unsigned-but-allowed in a non-Production environment. Everything else is refused.</summary>
-    public bool IsAcceptable => Status is TrustStatus.Trusted or TrustStatus.UnsignedSyntheticAllowed;
+    public bool IsAcceptable => IsTrusted || Status == TrustStatus.UnsignedSyntheticAllowed;
+}
+
+/// <summary>ADR-0047: the trust rule for packs that ship inside the application's own folder.</summary>
+public static class ShippedPackTrust
+{
+    public const string KeySource = "shipped with the application";
+
+    /// <summary>
+    /// In Production, an <b>unsigned</b> shipped pack is trusted as <see cref="TrustStatus.ShippedWithApplication"/> when the setting allows it and the pack folder is
+    /// inside the application folder. A signed shipped pack keeps the result of its signature check (a failing signature is still refused); other modes are unchanged.
+    /// </summary>
+    public static TrustResult Apply(TrustResult evaluated, bool unsigned, bool production, bool trustShippedPacks, bool folderInsideApplication)
+        => production && unsigned && trustShippedPacks && folderInsideApplication && evaluated.Status == TrustStatus.Missing
+            ? new TrustResult(TrustStatus.ShippedWithApplication, null, null, KeySource, [])
+            : evaluated;
 }
 
 /// <summary>

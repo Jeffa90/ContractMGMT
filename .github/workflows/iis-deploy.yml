@@ -166,7 +166,9 @@ jobs:
           elseif (-not $appEnv.ContainsKey("Ecp__Security__FailsafeAdmins__0__Account")) { Write-Host "::warning::No APPENV_Ecp__Security__FailsafeAdmins__0__Account on this environment; setup-apply skipped." }
           else {
             $code = & $runApp @("setup-apply", "--answers", $answers)
-            if ($code -eq 3) { Write-Host "::warning::Setup is not complete yet; the step list above says what is waiting. Re-run this workflow once it is resolved." }
+            # Exit 3 means "waiting on a person or a setting": a warning, not a failed deploy. The step's own exit code is reset, because PowerShell
+            # would otherwise end the step with the last native command's code (3) and mark a working deployment as failed.
+            if ($code -eq 3) { Write-Host "::warning::Setup is not complete yet; the step list above says what is waiting. Re-run this workflow once it is resolved."; $global:LASTEXITCODE = 0 }
             elseif ($code -ne 0) { throw "setup-apply failed (exit $code). The new build is deployed; setup is unchanged where a step failed." }
           }
 

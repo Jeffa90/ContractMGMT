@@ -80,6 +80,12 @@ SECRETS=(
   "QA|IIS_APP_POOL_PASSWORD|Password of IIS_APP_POOL_USER, only if the pool runs as a domain account that needs a password to be set by the pipeline"
   "Production|IIS_APP_POOL_PASSWORD|Same, for Production"
 )
+# Optional settings this script does not write: set by hand on the environment when used (ADR-0045, ADR-0046; docs/jbs/QA_HANDOVER.md).
+BY_HAND=(
+  "variable  SETUP_ANSWERS_FILE  Repository path of the setup answers file; with the FailsafeAdmins variables the deploy completes first-run setup"
+  "variable  APPENV_Ecp__Security__FailsafeAdmins__N__Account / __DisplayName / __Email  Administrators from configuration (N = 0, 1, ...)"
+  "secret    PACK_SIGNING_KEY  Private key that signs the shipped packs at build time; with APPENV_Ecp__Packs__TrustedKeys__0__KeyId / __PublicKeyPem"
+)
 # Settings the script writes with fixed, safe values (not supplied by you): Production mode, no demonstration data, SQL Server, no automatic migration, recovery owned by the DBA.
 FIXED=(
   "APPENV_Ecp__Mode=Production" "APPENV_Ecp__DemoTenantResolution=false" "APPENV_Ecp__DemoSeed=false" "APPENV_Database__Provider=SqlServer"
@@ -96,6 +102,8 @@ print_contract() {
   for e in "${FIXED[@]}"; do printf '  %s\n' "$e"; done
   echo "Secrets (set by hand; this script never sees them):"
   for e in "${SECRETS[@]}"; do IFS='|' read -r env name note <<<"$e"; printf '  %-11s %-22s %s\n' "$env" "$name" "$note"; done
+  echo "Optional, set by hand when used (not written by this script):"
+  for e in "${BY_HAND[@]}"; do printf '  %s\n' "$e"; done
 }
 
 if [ "$LIST_ONLY" = 1 ]; then print_contract; exit 0; fi
@@ -285,6 +293,10 @@ if [ "${#SECRETS_MISSING[@]}" -gt 0 ]; then
   printf '  %s\n' "${SECRETS_MISSING[@]}"
 fi
 cat <<MSG
+
+Optional, set by hand on the environment when used (ADR-0045, ADR-0046; docs/jbs/QA_HANDOVER.md):
+  * SETUP_ANSWERS_FILE and APPENV_Ecp__Security__FailsafeAdmins__N__Account / __DisplayName / __Email (unattended first-run setup)
+  * Secret PACK_SIGNING_KEY with APPENV_Ecp__Packs__TrustedKeys__0__KeyId / __PublicKeyPem (signed shipped packs)
 
 Not done by this script (each needs the owner of the thing):
   * On each server: create the data root with Modify access for the application pool account only (NEEDS INFRASTRUCTURE ANSWER).

@@ -44,7 +44,7 @@ gh variable set APPENV_Ecp__Packs__TrustedKeys__0__PublicKeyPem --env QA --repo 
 
 ### 4. Confirm the values in `docs/jbs/setup-answers.qa.json`
 - **Tenant name:** currently "JBS Australia" (an assumption). Change it now if it's wrong. It's hard to change once setup has created the tenant.
-- **Organisation:** the name, time zone (`Australia/Brisbane`) and currency (`AUD`).
+- **Organisation:** the name, time zone (Australia/Brisbane) and currency (`AUD`).
 - **Email (SMTP):** this is the main open item, because Production mode won't finish setup without a working, tested mail server. Get these from IT for `email.jbssa.com.au`:
   - the sender address (fill in `from`),
   - the port and whether TLS is used (`port`, `useTls`),

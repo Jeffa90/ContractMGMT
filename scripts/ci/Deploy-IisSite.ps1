@@ -114,6 +114,46 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PackagePath = (Resolve-Path $PackagePath).Path
+$deployStarted = Get-Date
+
+# Called only when the smoke test fails: prints why the application did not start, so the reason is in the
+# pipeline log without anyone signing in to the server. Sources: the smoke test response body, the Windows
+# Application event log entries written by the ASP.NET Core Module and the .NET runtime since this deploy
+# started (they hold the start-up exception), and the error lines of the newest application log file.
+# The application never writes secrets to its logs. Diagnostics never hide the original failure.
+function Write-StartupDiagnostics([string]$body) {
+    Write-Host "==> Start-up diagnostics"
+    try {
+        if ($body) {
+            $text = if ($body.Length -gt 3000) { $body.Substring(0, 3000) + " ...(truncated)" } else { $body }
+            Write-Host "--- Smoke test response body:"
+            Write-Host $text
+        }
+    } catch { Write-Host "    (response body not available: $($_.Exception.Message))" }
+    try {
+        $providers = @("IIS AspNetCore Module V2", ".NET Runtime", "Application Error", "WAS")
+        $events = Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = $deployStarted.AddMinutes(-1); Level = 1, 2, 3 } -ErrorAction SilentlyContinue |
+            Where-Object { $providers -contains $_.ProviderName } | Select-Object -First 5
+        if (-not $events) { Write-Host "--- No ASP.NET Core Module or .NET runtime events in the Application event log since the deploy started." }
+        foreach ($e in $events) {
+            $message = [string]$e.Message
+            if ($message.Length -gt 4000) { $message = $message.Substring(0, 4000) + " ...(truncated)" }
+            Write-Host "--- Event log: $($e.TimeCreated.ToString('s')) $($e.ProviderName) (id $($e.Id))"
+            Write-Host $message
+        }
+    } catch { Write-Host "    (event log not readable: $($_.Exception.Message))" }
+    try {
+        if ($LogPath -and (Test-Path $LogPath)) {
+            $newest = Get-ChildItem -Path $LogPath -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge $deployStarted.AddMinutes(-1) } |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($newest) {
+                $lines = Get-Content -Path $newest.FullName -Tail 400 -ErrorAction SilentlyContinue | Where-Object { $_ -match '(?i)"@l":"(Error|Fatal)"|\b(fail|crit|Unhandled|Exception)\b' } | Select-Object -Last 30
+                Write-Host "--- Error lines from $($newest.Name):"
+                if ($lines) { $lines | ForEach-Object { Write-Host $_ } } else { Write-Host "    (none)" }
+            } else { Write-Host "--- No application log file in $LogPath was written since the deploy started." }
+        }
+    } catch { Write-Host "    (application log not readable: $($_.Exception.Message))" }
+}
 
 function Invoke-Robocopy([string]$source, [string]$destination, [string[]]$extraArgs) {
     $robocopyArgs = @($source, $destination, "/MIR", "/R:3", "/W:5", "/NP", "/NFL", "/NDL") + $extraArgs
@@ -235,18 +275,28 @@ if ($SmokeTestUrl) {
     Write-Host "==> Smoke test: $SmokeTestUrl"
     $deadline = (Get-Date).AddSeconds($SmokeTestTimeoutSeconds)
     $status = $null
+    $body = $null
     do {
         try {
             $response = Invoke-WebRequest -Uri $SmokeTestUrl -UseDefaultCredentials -UseBasicParsing -TimeoutSec 60
             $status = [int]$response.StatusCode
         } catch [System.Net.WebException] {
             $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { $null }
+            $body = $null
+            try {
+                if ($_.Exception.Response) {
+                    $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                    $body = $reader.ReadToEnd()
+                    $reader.Dispose()
+                }
+            } catch { $body = $null }
         }
         if ($null -ne $status -and $status -lt 500) { break }
         Start-Sleep -Seconds 5
     } while ((Get-Date) -lt $deadline)
 
     if ($null -eq $status -or $status -ge 500) {
+        Write-StartupDiagnostics $body
         throw "Smoke test failed (last status: $status). The new version is still in place. Check the application log in the data root (logs folder). Roll back the FILES with: robocopy `"$backupPath`" `"$SitePath`" /MIR /XD $($PreserveFolders -join ' '). Do not roll back the files if the database has already been upgraded: an older application must never run against a newer database; restore a database recovery point instead."
     }
     Write-Host "    HTTP $status - app is up."

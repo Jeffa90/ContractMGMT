@@ -4,8 +4,10 @@
 # job builds and deploys in one step (iis-deploy.yml); no workflow artifacts are stored.
 # Pull-request / branch checks stay in ci.yml. Setup: docs/DEPLOYMENT.md.
 #
-# Database migrations are NOT run by this pipeline: the app runs them deliberately with
-# `dotnet Ecp.Host.dll migrate` under a migration identity (deploy/iis/README.md, gap plan P1-5).
+# Database (ADR-0045): each deploy runs `deploy-migrate` as the runner account (the migration identity) before copying files.
+# It creates the schema on a fresh database and does nothing on a current one; a release that would change an installed
+# database stops the deploy until the upgrade runbook has been followed (docs/UPGRADE_RUNBOOK.md). After the copy,
+# `setup-apply` completes first-run setup from the SETUP_ANSWERS_FILE answers file and keeps the failsafe administrators.
 name: Deploy
 
 on:

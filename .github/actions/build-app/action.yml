@@ -18,6 +18,18 @@ inputs:
   output-path:
     description: Folder to write app/ into.
     required: true
+  pack-signing-key:
+    description: Private ES256 key (PEM) that signs the shipped solution packs (ADR-0046). Pass a secret. Empty = packs stay unsigned (Demo/Test only).
+    required: false
+    default: ""
+  pack-key-id:
+    description: Key id written into each pack signature; must match Ecp__Packs__TrustedKeys__0__KeyId.
+    required: false
+    default: ""
+  pack-public-key:
+    description: Public key (PEM) the installation trusts; every signed pack is verified against it for Production before it is shipped.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -47,6 +59,39 @@ runs:
         if (Test-Path $out) { Remove-Item $out -Recurse -Force }
         dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release --no-restore -o $out
         if ($LASTEXITCODE -ne 0) { throw "publish failed" }
+
+    # ADR-0046: the shipped packs are built by this same build, so they are signed here with the environment's key, then
+    # verified exactly as a Production installation will verify them. The private key exists only in this step's environment.
+    - name: Sign the shipped solution packs
+      shell: powershell
+      env:
+        PACK_SIGNING_KEY: ${{ inputs.pack-signing-key }}
+        PACK_KEY_ID: ${{ inputs.pack-key-id }}
+        PACK_PUBLIC_KEY: ${{ inputs.pack-public-key }}
+        DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+        DOTNET_NOLOGO: "1"
+      run: |
+        $ErrorActionPreference = "Stop"
+        if (-not $env:PACK_SIGNING_KEY) { Write-Host "No pack signing key on this environment; shipped packs stay unsigned (accepted in Demo and Test only)."; exit 0 }
+        if (-not $env:PACK_KEY_ID -or -not $env:PACK_PUBLIC_KEY) { throw "A pack signing key is set, but the key id or public key variable is missing (APPENV_Ecp__Packs__TrustedKeys__0__KeyId / __PublicKeyPem)." }
+        $tool = (Resolve-Path "src/Ecp.PackTool/bin/Release/net10.0/Ecp.PackTool.dll").Path
+        $packs = Join-Path "${{ inputs.output-path }}" "app\packs"
+        $work = Join-Path "${{ inputs.output-path }}" "pack-signing"
+        New-Item -ItemType Directory -Force $work | Out-Null
+        $pub = Join-Path $work "trusted.pub.pem"
+        [IO.File]::WriteAllText($pub, $env:PACK_PUBLIC_KEY)
+        $files = @(Get-ChildItem $packs -Filter *.ecpkg)
+        if ($files.Count -eq 0) { throw "No shipped packs found in $packs." }
+        foreach ($f in $files) {
+          $signed = Join-Path $work $f.Name
+          & dotnet $tool sign --package $f.FullName --out $signed --key-id $env:PACK_KEY_ID --key-ref env:PACK_SIGNING_KEY
+          if ($LASTEXITCODE -ne 0) { throw "Signing $($f.Name) failed (exit $LASTEXITCODE)." }
+          & dotnet $tool verify --package $signed --public-key $pub --key-id $env:PACK_KEY_ID --production
+          if ($LASTEXITCODE -ne 0) { throw "$($f.Name) did not verify for Production against the trusted public key (exit $LASTEXITCODE). Is the public key the pair of the signing key?" }
+          Move-Item $signed $f.FullName -Force
+        }
+        Remove-Item $work -Recurse -Force
+        Write-Host "Signed and verified $($files.Count) pack(s) with key '$env:PACK_KEY_ID'."
 
     - name: Record the build manifest (commit, run and a SHA-256 for every published file)
       shell: powershell

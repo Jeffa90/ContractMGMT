@@ -50,7 +50,7 @@
   </ItemGroup>
   <!--
     Shipped solution packs are external, read-only .ecpkg packages, never embedded resources (docs/PACK_ARCHITECTURE.md). The pack tool builds them from templates/packs into <output>/packs on build and publish.
-    They are built unsigned. An operator who runs Production signs them with their own key (docs/PACK_SIGNING.md); no private key is held in this repository.
+    They are built unsigned. An operator who runs Production signs them with their own key (docs/PACK_SIGNING.md); the deploy build does so when the environment holds a key (ADR-0046). No private key is held in this repository.
   -->
   <PropertyGroup>
     <PackSourceDirectory>$(MSBuildThisFileDirectory)../../templates/packs</PackSourceDirectory>

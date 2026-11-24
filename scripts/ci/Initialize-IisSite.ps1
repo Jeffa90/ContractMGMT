@@ -172,12 +172,20 @@ if ($LogPath) {
     Write-Host "    granted $identity Modify on the log folder $LogPath"
 }
 # The data-protection key ring: only the pool account and local administrators. Inherited entries are removed
-# from this one folder (it holds the keys that protect sign-in cookies), and existing keys keep the same ACL.
+# from this one folder (it holds the keys that protect sign-in cookies), and every existing key file inherits that ACL.
 if ($KeyPath) {
     if (-not (Test-Path $KeyPath)) { New-Item -ItemType Directory -Path $KeyPath | Out-Null }
-    & icacls $KeyPath /inheritance:r /grant:r "$($identity):(OI)(CI)M" "*S-1-5-32-544:(OI)(CI)F" /T /Q | Out-Null
+    & icacls $KeyPath /inheritance:r /grant:r "$($identity):(OI)(CI)M" "*S-1-5-32-544:(OI)(CI)F" /Q | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "icacls failed restricting $KeyPath to $identity and Administrators." }
-    Write-Host "    restricted the key folder $KeyPath to $identity (Modify) and Administrators (Full)"
+    # Every key file already in the folder is reset to inherit exactly the folder's rules, whoever created it (a key written by another account,
+    # or with its own explicit entries, would otherwise stay unreadable to the app pool and stop the application at start-up).
+    if (Get-ChildItem -Path $KeyPath -Force -ErrorAction SilentlyContinue) {
+        & icacls (Join-Path $KeyPath "*") /reset /T /C /Q | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "icacls failed resetting the permissions of the files in $KeyPath." }
+    }
+    Write-Host "    restricted the key folder $KeyPath to $identity (Modify) and Administrators (Full); existing key files reset to inherit it"
+    # Permissions only (no key content), so a key ring problem can be diagnosed from the pipeline log.
+    & icacls (Join-Path $KeyPath "*") | ForEach-Object { if ("$_".Trim()) { Write-Host "      $_" } }
 }
 
 # --- Site ---------------------------------------------------------------------

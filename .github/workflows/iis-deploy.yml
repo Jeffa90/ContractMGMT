@@ -16,7 +16,11 @@
 #                                   needs IIS_CERT_CA and IIS_CERT_TEMPLATE
 #               IIS_CERT_DNS_NAMES  (optional, with IIS_CERT_AUTO) extra certificate names, space-separated
 #               IIS_APP_POOL_USER   (optional) domain account (DOMAIN\user) for the app pool; default ApplicationPoolIdentity
+#               SETUP_ANSWERS_FILE  (optional) repository path of the setup answers file; with APPENV_Ecp__Security__FailsafeAdmins__0__*
+#                                   the deploy completes first-run setup without the wizard (ADR-0045)
 #   Secrets:    IIS_APP_POOL_PASSWORD (with IIS_APP_POOL_USER)
+#               PACK_SIGNING_KEY    (optional) private ES256 key (PEM) that signs the shipped packs at build time (ADR-0046);
+#                                   with APPENV_Ecp__Packs__TrustedKeys__0__KeyId and __PublicKeyPem as variables
 #   Variables prefixed APPENV_ are stamped into web.config as environment variables with the prefix
 #   removed, e.g. APPENV_Ecp__Mode -> Ecp__Mode. Only VARIABLES are stamped: a secret would end up in
 #   web.config in clear text, so this pipeline never reads secrets for that purpose. (The application
@@ -72,6 +76,9 @@ jobs:
         uses: ./.github/actions/build-app
         with:
           output-path: ${{ runner.temp }}/package
+          pack-signing-key: ${{ secrets.PACK_SIGNING_KEY }}
+          pack-key-id: ${{ vars.APPENV_Ecp__Packs__TrustedKeys__0__KeyId }}
+          pack-public-key: ${{ vars.APPENV_Ecp__Packs__TrustedKeys__0__PublicKeyPem }}
 
       - name: Deploy
         shell: powershell
@@ -92,6 +99,7 @@ jobs:
           CERT_DNS_NAMES: ${{ vars.IIS_CERT_DNS_NAMES }}
           APP_POOL_USER: ${{ vars.IIS_APP_POOL_USER }}
           APP_POOL_PASSWORD: ${{ secrets.IIS_APP_POOL_PASSWORD }}
+          SETUP_ANSWERS_FILE: ${{ vars.SETUP_ANSWERS_FILE }}
         run: |
           $ErrorActionPreference = "Stop"
           if (-not $env:SITE_PATH) { throw "Set the IIS_SITE_PATH variable on the '${{ inputs.environment }}' environment." }
@@ -113,7 +121,22 @@ jobs:
           if ($appEnv.ContainsKey("Database__ConnectionString") -and $appEnv["Database__ConnectionString"] -match "(?i)(password|pwd)\s*=") { throw "Database__ConnectionString contains a password. Use Windows integrated authentication (no credential in the string)." }
 
           $split = { param($s) @($s -split '\s+' | Where-Object { $_ }) }
-          # Database migrations are not run here; see deploy.yml.
+
+          # Runs a command of the new build with the same settings IIS gives the site (the APPENV_ values), as this runner's account (the migration identity).
+          $appDll = "$env:RUNNER_TEMP\package\app\Ecp.Host.dll"
+          $runApp = {
+            param([string[]]$cliArgs)
+            foreach ($k in $appEnv.Keys) { [Environment]::SetEnvironmentVariable($k, $appEnv[$k], "Process") }
+            $env:ASPNETCORE_ENVIRONMENT = $env:ASPNET_ENV
+            & dotnet $appDll @cliArgs | Out-Host
+            return $LASTEXITCODE
+          }
+
+          # Schema first, before any file is copied (ADR-0045): a fresh database is created; a current one is left alone; an installed database that this release
+          # would change stops the deploy here, with the old site still running, until the upgrade runbook has been followed.
+          $code = & $runApp @("deploy-migrate")
+          if ($code -ne 0) { throw "deploy-migrate failed (exit $code). Nothing was deployed." }
+
           & "$env:GITHUB_WORKSPACE\scripts\ci\Deploy-IisSite.ps1" `
             -PackagePath "$env:RUNNER_TEMP\package\app" `
             -SitePath $env:SITE_PATH `
@@ -134,6 +157,18 @@ jobs:
             -DataPath $appEnv["Ecp__DataDirectory"] `
             -LogPath $appEnv["Ecp__Logging__Directory"] `
             -KeyPath $appEnv["Ecp__DataProtection__KeyDirectory"]
+
+          # First-run setup without the wizard (ADR-0045): the same setup stages, driven from the SETUP_ANSWERS_FILE answers file, with the administrators taken
+          # from APPENV_Ecp__Security__FailsafeAdmins__N__Account/DisplayName/Email. Once setup is complete this only keeps those administrators in place.
+          $answers = if ($env:SETUP_ANSWERS_FILE) { Join-Path $env:GITHUB_WORKSPACE $env:SETUP_ANSWERS_FILE } else { $null }
+          if (-not $answers) { Write-Host "No SETUP_ANSWERS_FILE variable on this environment; setup-apply skipped." }
+          elseif (-not (Test-Path $answers)) { throw "SETUP_ANSWERS_FILE '$env:SETUP_ANSWERS_FILE' is not in the repository." }
+          elseif (-not $appEnv.ContainsKey("Ecp__Security__FailsafeAdmins__0__Account")) { Write-Host "::warning::No APPENV_Ecp__Security__FailsafeAdmins__0__Account on this environment; setup-apply skipped." }
+          else {
+            $code = & $runApp @("setup-apply", "--answers", $answers)
+            if ($code -eq 3) { Write-Host "::warning::Setup is not complete yet; the step list above says what is waiting. Re-run this workflow once it is resolved." }
+            elseif ($code -ne 0) { throw "setup-apply failed (exit $code). The new build is deployed; setup is unchanged where a step failed." }
+          }
 
       - name: Clean up package
         if: always()

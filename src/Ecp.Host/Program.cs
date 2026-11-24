@@ -198,12 +198,14 @@ if (args.Length > 0 && !args[0].StartsWith('-'))
                 return 0;
             }
             catch (DomainException ex) { Console.Error.WriteLine(ex.Message); return 1; }
+        case var deployment when DeploymentCli.Commands.Contains(deployment):
+            return await DeploymentCli.RunAsync(deployment, args, app.Services, app.Configuration, resolved.Host.Mode);
         case var operation when OperationsCli.Commands.Contains(operation):
             return await OperationsCli.RunAsync(operation, args, app.Services);
         case var upgrade when UpgradeCli.Commands.Contains(upgrade):
             return await UpgradeCli.RunAsync(upgrade, args, app.Services);
         default:
-            Console.Error.WriteLine("Unknown command. Use: migrate | verify-audit <tenant name> | setup-token | " + string.Join(" | ", OperationsCli.Commands.Concat(UpgradeCli.Commands)));
+            Console.Error.WriteLine("Unknown command. Use: migrate | verify-audit <tenant name> | setup-token | " + DeploymentCli.Usage + " | " + string.Join(" | ", OperationsCli.Commands.Concat(UpgradeCli.Commands)));
             Console.Error.WriteLine(OperationsCli.Usage);
             Console.Error.WriteLine(UpgradeCli.Usage);
             return 64;

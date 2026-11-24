@@ -1,0 +1,25 @@
+{
+  "_about": "JBS QA answers for `dotnet Ecp.Host.dll setup-apply --answers <this file>` (ADR-0045). Run by the deploy pipeline after every QA deploy until setup is complete. Fields left out take the wizard's own defaults (pack defaults for locale, currency, branding, classification). The administrator comes from Ecp:Security:FailsafeAdmins on the GitHub environment, never from this file. No personal data and no secrets here: SMTP credentials are env:/file: references resolved on the server.",
+  "_toConfirm": "tenantName (assumed). SMTP from, port, TLS and the two credential references (docs/JBS_IIS_IMPLEMENTATION_STATUS.md: not confirmed). Readiness warnings that fire on QA need an acknowledgement here as \"ack.<check id>\": \"<reason>\".",
+  "stages": {
+    "mode": { "deployment": "IIS", "tenancyMode": "SingleOrganisation" },
+    "tenant": { "tenantName": "JBS Australia" },
+    "pack": { "packId": "jbs-procurement" },
+    "identity": { "kind": "Windows", "key": "windows", "displayName": "JBS Windows sign-in" },
+    "admin": { "installationAdmin": true, "doManage": true, "doOwn": true },
+    "organisation": { "organisationName": "JBS Australia", "country": "AU", "culture": "en-AU", "timeZone": "Australia/Brisbane", "currency": "AUD" },
+    "notifications": {
+      "provider": "Smtp",
+      "host": "email.jbssa.com.au",
+      "port": "25",
+      "useTls": true,
+      "from": "",
+      "userRef": "env:ECP_SMTP_USER",
+      "passwordRef": "env:ECP_SMTP_PASSWORD"
+    },
+    "access": { "confirm": true },
+    "readiness": {
+      "ack.R-ADM-02": "Installation administrator named through Ecp:Security:FailsafeAdmins."
+    }
+  }
+}

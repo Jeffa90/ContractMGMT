@@ -1,6 +1,6 @@
 {
   "_about": "JBS QA answers for `dotnet Ecp.Host.dll setup-apply --answers <this file>` (ADR-0045). Run by the deploy pipeline after every QA deploy until setup is complete. Fields left out take the wizard's own defaults (pack defaults for locale, currency, branding, classification). The administrator comes from Ecp:Security:FailsafeAdmins on the GitHub environment, never from this file. No personal data and no secrets here. SMTP is an anonymous relay (no credentials).",
-  "_confirmed": "SMTP (owner, 2026-11-25): email.jbssa.com.au port 25 with STARTTLS, anonymous relay from AUQLDDC01QA2WI tested, sender no-reply@jbssa.com.au. Port 25 offers no login, so there are no credential references.",
+  "_confirmed": "SMTP (owner, 2026-11-25): email.jbssa.com.au port 25 with STARTTLS, anonymous relay from AUQLDDC01QA2WI tested, sender no-reply@jbssa.com.au. Port 25 offers no login, so there are no credential references; the QA environment sets APPENV_Ecp__Email__AllowAnonymousRelay=true (ADR-0048).",
   "_toConfirm": "Readiness warnings that fire on QA need an acknowledgement here as \"ack.<check id>\": \"<reason>\".",
   "stages": {
     "mode": { "deployment": "IIS", "tenancyMode": "SingleOrganisation" },
@@ -18,7 +18,8 @@
     },
     "access": { "confirm": true },
     "readiness": {
-      "ack.R-ADM-02": "Installation administrator named through Ecp:Security:FailsafeAdmins."
+      "ack.R-ADM-02": "Installation administrator named through Ecp:Security:FailsafeAdmins.",
+      "ack.R-NOT-02": "Owner decision 2026-11-25 (ADR-0048): email.jbssa.com.au relays for AUQLDDC01QA2WI on port 25 with TLS and offers no login; relaying is restricted by the mail server."
     }
   }
 }

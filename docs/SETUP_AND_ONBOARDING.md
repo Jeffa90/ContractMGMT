@@ -51,7 +51,7 @@ Stages run in this order; each saves its progress, can be repeated safely, and r
 | `readiness` | Runs the checks. Blocking failures must be fixed; each failed **warning** needs a recorded reason (who, when, why) | |
 | `complete` | Re-runs the checks, audits `setup.completed`, clears the token and session, writes the marker | |
 
-Checks: `R-OPS-01` (database, data directory, ICU/time-zone), `R-ST-01` storage, `R-SEC-01` Production guard, `R-DEMO-01` no Demo identity or data in Production, `R-ID-01` provider valid, `R-ID-02` test sign-in succeeded (blocking in Production), `R-ADM-01` active administrator (invited counts as a warning, blocking in Production), `R-ADM-02` installation administrator named, `R-ORG-01`, `R-CFG-01` pack, branding and classification published, `R-NOT-01` email delivers (Mock/Disabled is blocking in Production), `R-AUD-01` audit chain verifies.
+Checks: `R-OPS-01` (database, data directory, ICU/time-zone), `R-ST-01` storage, `R-SEC-01` Production guard, `R-DEMO-01` no Demo identity or data in Production, `R-ID-01` provider valid, `R-ID-02` test sign-in succeeded (blocking in Production), `R-ADM-01` active administrator (invited counts as a warning, blocking in Production), `R-ADM-02` installation administrator named, `R-ORG-01`, `R-CFG-01` pack, branding and classification published, `R-NOT-01` email delivers (Mock/Disabled is blocking in Production), `R-NOT-02` anonymous SMTP relay in Production (warning, ADR-0048), `R-AUD-01` audit chain verifies.
 
 **Test sign-in.** On the `identity`, `admin` and `readiness` steps, *Test sign-in* sends the administrator through the real provider and signs them in; success records `R-ID-02`. This is also the administrator's first sign-in, which links their account.
 

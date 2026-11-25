@@ -610,7 +610,7 @@ internal sealed class NotificationsStage : SetupStageBase
         _ = int.TryParse(c.Value("port"), out var port);
         var settings = new EmailSettings(kind, c.Value("from"), c.Value("host"), port == 0 ? 587 : port, c.Flag("useTls"), c.Value("userRef"), c.Value("passwordRef"));
         var providerKey = kind switch { EmailProviderKind.Smtp => EmailProviderKeys.Smtp, EmailProviderKind.Mock => EmailProviderKeys.DevCapture, _ => EmailProviderKeys.Disabled };
-        var issues = EmailRules.Validate(c.Get<IEmailSenderFactory>(), settings, providerKey, c.Env.HostMode);
+        var issues = EmailRules.Validate(c.Get<IEmailSenderFactory>(), settings, providerKey, c.Env.HostMode, c.Get<EmailHostPolicy>().AllowAnonymousRelay);
         if (issues.Count > 0) return StageResult.Fail("The email settings are not valid.", [.. issues.Select(i => i.Message)]);
         var email = c.Get<IEmailConfigurationService>();
         var by = new OperatorIdentity("setup:" + c.Actor.Label, c.Actor.Label);

@@ -50,6 +50,30 @@ public class EmailRulesTests
     }
 
     [Fact]
+    public void ADR_0048_Production_accepts_an_anonymous_tls_relay_only_when_the_host_allows_it()
+    {
+        var factory = Factory();
+        var anonymous = Smtp(userRef: null, passwordRef: null);
+        // Off (the default): refused as before.
+        Assert.Contains(EmailRules.Validate(factory, anonymous, "smtp", EcpMode.Production), i => i.Code == "credentials_required");
+        // On: no credential references are needed ...
+        Assert.Empty(EmailRules.Validate(factory, anonymous, "smtp", EcpMode.Production, allowAnonymousRelay: true));
+        // ... but TLS is still required, and one reference without the other is still refused.
+        Assert.Contains(EmailRules.Validate(factory, Smtp(userRef: null, passwordRef: null, tls: false), "smtp", EcpMode.Production, allowAnonymousRelay: true), i => i.Code == "tls");
+        Environment.SetEnvironmentVariable("ECP_UNIT_USER", "u");
+        try { Assert.Contains(EmailRules.Validate(factory, Smtp(passwordRef: null), "smtp", EcpMode.Production, allowAnonymousRelay: true), i => i.Code == "credentials"); }
+        finally { Environment.SetEnvironmentVariable("ECP_UNIT_USER", null); }
+    }
+
+    [Fact]
+    public void ADR_0048_the_relay_setting_is_off_unless_the_host_turns_it_on()
+    {
+        var services = new ServiceCollection();
+        services.AddOperationsModule(Path.Combine(Path.GetTempPath(), "ecp-email-" + Guid.NewGuid().ToString("N")));
+        Assert.False(services.BuildServiceProvider().GetRequiredService<EmailHostPolicy>().AllowAnonymousRelay);
+    }
+
+    [Fact]
     public void Production_refuses_a_secret_reference_that_does_not_resolve()
         => Assert.Contains(EmailRules.Validate(Factory(), Smtp("env:ECP_UNIT_NOT_SET_USER", "env:ECP_UNIT_NOT_SET_PASSWORD"), "smtp", EcpMode.Production), i => i.Code == "user_unresolved");
 

@@ -424,6 +424,7 @@ The page lists the checks in a table (Check, Result, Detail). Results are Pass, 
 | R-ORG-01 | The organisation exists | Blocking | Stage 8 |
 | R-CFG-01 | The pack choice, branding and classification are published | Blocking | Stages 8 to 10 |
 | R-NOT-01 | The email provider was reached by a real, recent test through the saved settings | Blocking in Production, a warning elsewhere, if email was never set up or the test is missing, failed, stale or from a simulated provider | Stage 11 |
+| R-NOT-02 | Email is sent through a relay without signing in (ADR-0048) | A warning in Production when the saved SMTP settings have no credentials, which the host allows only with `Ecp:Email:AllowAnonymousRelay`; passes outside Production | Stage 11 |
 | R-AUD-01 | The audit chain verifies | Blocking | Contact the supplier with the report |
 
 **Warnings need a reason.** After a run that has warnings, one text box appears for each, named by check id: "Acknowledge R-xx-nn: description" (for example R-OPS-01, R-ADM-02 or R-NOT-01). Type a reason (at most 300 characters; longer is cut) and press **Run checks** again. Finish setup refuses while any warning has no acknowledgement. Who, when and why are recorded and appear in the report.

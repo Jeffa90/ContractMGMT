@@ -75,6 +75,7 @@ public static class PlatformComposition
         configuration.GetSection("Notifications").Bind(startingNotifications);
         services.AddSingleton(new HostModeAccessor(resolved.Host.Mode));
         services.AddSingleton(new EmailEnvironmentDefaults(startingNotifications.EmailProvider, startingNotifications.Smtp));
+        services.AddSingleton(new EmailHostPolicy(configuration.GetValue("Ecp:Email:AllowAnonymousRelay", false)));   // ADR-0048, host configuration only
         services.AddSingleton(new EmailReadinessOptions { MaxAge = TimeSpan.FromHours(Math.Clamp(configuration.GetValue("Ecp:Email:ReadinessMaxAgeHours", 168), 1, 24 * 90)) });
         services.AddAccessModule();
         services.AddOperationsModule(paths.DataDirectory);

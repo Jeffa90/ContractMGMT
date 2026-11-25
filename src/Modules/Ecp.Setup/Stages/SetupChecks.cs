@@ -16,7 +16,7 @@ public static class SetupChecks
     public static IReadOnlyList<Type> All() =>
     [
         typeof(PlatformCheck), typeof(StorageCheck), typeof(ProductionGuardCheck), typeof(DemoExclusionCheck), typeof(IdentityProviderCheck), typeof(TestSignInCheck),
-        typeof(AdministratorCheck), typeof(InstallationAdminCheck), typeof(OrganisationCheck), typeof(ConfigurationCheck), typeof(EmailCheck), typeof(AuditChainCheck)
+        typeof(AdministratorCheck), typeof(InstallationAdminCheck), typeof(OrganisationCheck), typeof(ConfigurationCheck), typeof(EmailCheck), typeof(AnonymousRelayCheck), typeof(AuditChainCheck)
     ];
 }
 
@@ -187,6 +187,24 @@ internal sealed class EmailCheck : ISetupCheck
         // Only a real, recent, passing test counts. A simulated provider, an untested one, a stale pass and a failed test are all "not ready": a warning outside Production, a blocker in it.
         var level = c.Env.HostMode == EcpMode.Production ? CheckLevel.Blocking : CheckLevel.Warning;
         return CheckOutcome.Fail($"Email is {info.State}: {info.Summary}", level);
+    }
+}
+
+/// <summary>ADR-0048: an SMTP relay used without signing in is allowed only by host configuration, and is a recorded risk acceptance (warning) rather than silent.</summary>
+internal sealed class AnonymousRelayCheck : ISetupCheck
+{
+    public string Id => "R-NOT-02";
+    public string Description => "Email is sent through a relay without signing in";
+
+    public async Task<CheckOutcome> RunAsync(CheckContext c)
+    {
+        // Outside Production an SMTP server without credentials is an ordinary choice; in Production it exists only by the host setting and is recorded.
+        if (c.Env.HostMode != EcpMode.Production) return CheckOutcome.Pass("Not Production: no relay policy applies.");
+        var view = await c.Services.GetRequiredService<IEmailConfigurationService>().EffectiveAsync(c.Ct);
+        var anonymous = view.ProviderKey == EmailProviderKeys.Smtp && string.IsNullOrWhiteSpace(view.UserRef) && string.IsNullOrWhiteSpace(view.PasswordRef);
+        return anonymous
+            ? CheckOutcome.Fail($"SMTP is sent through {view.Host}:{view.Port} without signing in (Ecp:Email:AllowAnonymousRelay). The mail server must restrict relaying to this server.", CheckLevel.Warning)
+            : CheckOutcome.Pass("Email does not use an anonymous relay.");
     }
 }
 

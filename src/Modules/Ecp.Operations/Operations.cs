@@ -200,6 +200,7 @@ public static class OperationsModule
         services.AddScoped<ReadinessService>();
         services.AddSingleton<IEmailSenderFactory, EmailSenderFactory>();
         services.TryAddSingleton(new EmailReadinessOptions());
+        services.TryAddSingleton(new EmailHostPolicy());
         services.AddScoped<IEmailConfigurationService, EmailConfigurationService>();
         services.AddScoped<IAcceptedExceptions, AcceptedExceptions>();
         services.AddScoped<Ecp.SharedKernel.IMockScannerAcceptance, MockScannerAcceptance>();

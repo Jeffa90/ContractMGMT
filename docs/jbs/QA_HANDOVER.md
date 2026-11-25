@@ -36,7 +36,7 @@ Since ADR-0047 the shipped packs are trusted without a signature, so there is no
 ### 4. Confirm the values in `docs/jbs/setup-answers.qa.json`
 - **Tenant name:** currently "JBS Australia" (an assumption). Change it now if it's wrong. It's hard to change once setup has created the tenant.
 - **Organisation:** the name, time zone (Australia/Brisbane) and currency (`AUD`).
-- **Email (SMTP): confirmed 2026-11-25.** `email.jbssa.com.au`, port 25 with TLS (STARTTLS), anonymous relay from AUQLDDC01QA2WI (tested; port 25 offers no login), sender `no-reply@jbssa.com.au`. No SMTP username or password and no server environment variables.
+- **Email (SMTP): confirmed 2026-11-25.** `email.jbssa.com.au`, port 25 with TLS (STARTTLS), anonymous relay from AUQLDDC01QA2WI (tested; port 25 offers no login), sender `no-reply@jbssa.com.au`. No SMTP username or password and no server environment variables. Production mode accepts this only with the GitHub QA variable `APPENV_Ecp__Email__AllowAnonymousRelay` = `true` (ADR-0048); readiness then shows warning R-NOT-02, acknowledged in the answers file.
 - The setup test email goes to the first failsafe admin's email address.
 
 ### 5. Ask IT to check the server

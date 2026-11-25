@@ -28,6 +28,13 @@ public static class EmailProviderKeys
 /// <summary>The settings the host was started with (<c>Notifications:*</c>). They apply until an administrator saves settings in the application, which then take over.</summary>
 public sealed record EmailEnvironmentDefaults(string ProviderKey, EmailSettings? Smtp);
 
+/// <summary>
+/// ADR-0048: host-only email policy (<c>Ecp:Email:AllowAnonymousRelay</c>, default false). When true, Production accepts SMTP with neither credential reference,
+/// for a relay that authorises the server itself (for example by address). TLS is still required. Only the host configuration can turn it on; nothing in the
+/// application changes it, and setup readiness R-NOT-02 records it as a warning that must be acknowledged.
+/// </summary>
+public sealed record EmailHostPolicy(bool AllowAnonymousRelay = false);
+
 public sealed class EmailReadinessOptions
 {
     /// <summary>How long a passed test counts. After this the provider reads "Stale" until it is tested again (<c>Ecp:Email:ReadinessMaxAgeHours</c>, default seven days).</summary>
@@ -154,7 +161,7 @@ public static class EmailConfigurationFingerprint
 /// <summary>The rules every email setting must meet, independent of where it is entered (Setup, the Email page, or the host's starting configuration).</summary>
 public static class EmailRules
 {
-    public static IReadOnlyList<EmailIssue> Validate(IEmailSenderFactory senders, EmailSettings settings, string providerKey, EcpMode mode)
+    public static IReadOnlyList<EmailIssue> Validate(IEmailSenderFactory senders, EmailSettings settings, string providerKey, EcpMode mode, bool allowAnonymousRelay = false)
     {
         var issues = new List<EmailIssue>();
         if (!EmailProviderKeys.All.Contains(providerKey)) { issues.Add(new("provider", "Choose one of the listed email providers.")); return issues; }
@@ -168,14 +175,16 @@ public static class EmailRules
         }
         else if (providerKey is EmailProviderKeys.DevCapture or EmailProviderKeys.DemoLog && !string.IsNullOrWhiteSpace(settings.From) && !MailAddress.TryCreate(settings.From, out _))
             issues.Add(new("from", "The From address is not valid."));   // a simulated provider sends nothing, so a From address is optional
-        if (production && providerKey == EmailProviderKeys.Smtp && (string.IsNullOrWhiteSpace(settings.UserRef) || string.IsNullOrWhiteSpace(settings.PasswordRef)))
+        // An anonymous relay (neither reference) is accepted only when the host allows it (ADR-0048); one reference without the other is refused by the sender validation either way.
+        var anonymous = string.IsNullOrWhiteSpace(settings.UserRef) && string.IsNullOrWhiteSpace(settings.PasswordRef);
+        if (production && providerKey == EmailProviderKeys.Smtp && (string.IsNullOrWhiteSpace(settings.UserRef) || string.IsNullOrWhiteSpace(settings.PasswordRef)) && !(anonymous && allowAnonymousRelay))
             issues.Add(new("credentials_required", "Production requires the SMTP user and password as secret references (env:, file: or keyvault:)."));
         return issues;
     }
 }
 
 internal sealed class EmailConfigurationService(OperationsDbContext db, IUnitOfWork uow, IAuditWriter audit, TenantContext tenant, IClock clock, IActorContext actor, IEmailSenderFactory senders, ISecretProvider secrets,
-    EmailReadinessOptions readiness, EmailEnvironmentDefaults? environmentDefaults = null, HostModeAccessor? hostMode = null) : IEmailConfigurationService
+    EmailReadinessOptions readiness, EmailEnvironmentDefaults? environmentDefaults = null, HostModeAccessor? hostMode = null, EmailHostPolicy? hostPolicy = null) : IEmailConfigurationService
 {
     // Where the host states neither, the installation is treated as Production (the stricter reading) and email as not configured.
     private EmailEnvironmentDefaults defaults => environmentDefaults ?? new EmailEnvironmentDefaults(EmailProviderKeys.Disabled, null);
@@ -201,7 +210,7 @@ internal sealed class EmailConfigurationService(OperationsDbContext db, IUnitOfW
     }
 
     public Task<IReadOnlyList<EmailIssue>> ValidateAsync(EmailSettings settings, string providerKey, CancellationToken ct = default)
-        => Task.FromResult(EmailRules.Validate(senders, settings, providerKey, mode.Mode));
+        => Task.FromResult(EmailRules.Validate(senders, settings, providerKey, mode.Mode, (hostPolicy ?? new EmailHostPolicy()).AllowAnonymousRelay));
 
     public async Task<EmailConfigView> SaveAsync(string providerKey, EmailSettings settings, OperatorIdentity by, CancellationToken ct = default)
     {

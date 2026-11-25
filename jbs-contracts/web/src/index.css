@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+/* JBS's own typeface, served by the app from the server's Data\fonts folder (never in the repository, decision D-34).
+   If the files aren't there, the browser falls back to Inter. */
+@font-face {
+  font-family: "JBS Text";
+  src: url("/fonts/JBSVariableText.woff2") format("woff2-variations");
+  font-weight: 300 700;
+  font-style: normal italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JBS Display";
+  src: url("/fonts/JBSVariableDisplay.woff2") format("woff2-variations");
+  font-weight: 300 700;
+  font-style: normal italic;
+  font-display: swap;
+}
+
+/* Design tokens: docs/design-system.md section 5. Components use only these, never raw colours. */
+:root {
+  --primary: #232378;
+  --primary-foreground: #ffffff;
+  --primary-hover: #1b1b5e;
+  --primary-active: #14143c;
+  --primary-soft: #e1e6f5;
+  --primary-soft-foreground: #232378;
+  --background: #f7f8fc;
+  --card: #ffffff;
+  --foreground: #14143c;
+  --muted: #eef0f7;
+  --muted-foreground: #5b6280;
+  --border: #dde1ee;
+  --input: #8890ae;
+  --ring: #232378;
+  --success: #15803d;
+  --success-soft: #f0fdf4;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --info: #0369a1;
+  --info-soft: #f0f9ff;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --primary: #41cdf5;
+  --primary-foreground: #14143c;
+  --primary-hover: #7ddcf8;
+  --primary-active: #c3ebfa;
+  --primary-soft: #232378;
+  --primary-soft-foreground: #e1e6f5;
+  --background: #0f1029;
+  --card: #1a1c3a;
+  --foreground: #e1e6f5;
+  --muted: #2a2d4f;
+  --muted-foreground: #a3aac4;
+  --border: #2a2d4f;
+  --input: #7a819f;
+  --ring: #41cdf5;
+  --success: #4ade80;
+  --success-soft: #052e16;
+  --warning: #fbbf24;
+  --warning-soft: #451a03;
+  --danger: #f87171;
+  --danger-soft: #450a0a;
+  --info: #38bdf8;
+  --info-soft: #082f49;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
+  --color-background: var(--background);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --font-sans: "JBS Text", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "JBS Display", "JBS Text", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale: 30 / 24 / 20 / 17 / 15 / 13 px only. */
+  --text-xs: 13px;
+  --text-xs--line-height: 18px;
+  --text-sm: 15px;
+  --text-sm--line-height: 22px;
+  --text-base: 17px;
+  --text-base--line-height: 26px;
+  --text-lg: 20px;
+  --text-lg--line-height: 28px;
+  --text-xl: 24px;
+  --text-xl--line-height: 32px;
+  --text-2xl: 30px;
+  --text-2xl--line-height: 38px;
+
+  --radius-control: 10px;
+  --radius-card: 12px;
+}
+
+@layer base {
+  html {
+    background: var(--background);
+  }
+  body {
+    @apply bg-background text-foreground font-sans text-sm antialiased;
+    font-feature-settings: "kern";
+  }
+  @media (max-width: 767px) {
+    body {
+      font-size: 16px;
+    }
+  }
+  /* Inputs at least 16px so phones don't zoom. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: 15px;
+    }
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* The full-colour logo in light theme, the white logo in dark theme (design-system.md section 6). */
+:root[data-theme="dark"] [data-logo="light"],
+:root:not([data-theme="dark"]) [data-logo="dark"] {
+  display: none;
+}

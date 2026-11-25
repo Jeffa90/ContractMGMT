@@ -1,0 +1,31 @@
+import { firstName, formatDateTime, formatLongDate, greeting, initials, timeAgo } from './format'
+
+describe('dates are shown in Brisbane time, Australian style', () => {
+  it('formats a UTC time as "Tue 4 Nov, 3:00pm" in Brisbane (UTC+10, no daylight saving)', () => {
+    expect(formatDateTime('2025-11-04T05:00:00Z')).toBe('Tue 4 Nov, 3:00pm')
+    expect(formatDateTime('2025-11-03T23:05:00Z')).toBe('Tue 4 Nov, 9:05am')
+  })
+  it('formats the long date for the greeting', () => {
+    expect(formatLongDate(new Date('2026-11-25T02:00:00Z'))).toBe('Wednesday 25 November')
+  })
+  it('greets by Brisbane time of day', () => {
+    expect(greeting(new Date('2026-11-24T21:00:00Z'))).toBe('Good morning') // 7am
+    expect(greeting(new Date('2026-11-25T04:00:00Z'))).toBe('Good afternoon') // 2pm
+    expect(greeting(new Date('2026-11-25T09:00:00Z'))).toBe('Good evening') // 7pm
+  })
+  it('says how long ago in plain words', () => {
+    const now = new Date('2026-11-25T04:00:00Z')
+    expect(timeAgo('2026-11-25T03:59:30Z', now)).toBe('just now')
+    expect(timeAgo('2026-11-25T03:40:00Z', now)).toBe('20 minutes ago')
+    expect(timeAgo('2026-11-24T04:00:00Z', now)).toBe('yesterday')
+  })
+})
+
+describe('names', () => {
+  it('makes initials and first names', () => {
+    expect(initials('Jeff Judd')).toBe('JJ')
+    expect(initials('Ann Marie Ho')).toBe('AH')
+    expect(initials('Cher')).toBe('C')
+    expect(firstName('Jeff Judd')).toBe('Jeff')
+  })
+})

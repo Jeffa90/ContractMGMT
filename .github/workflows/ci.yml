@@ -1,7 +1,6 @@
-# CI for the Enterprise Contract Platform.
-# Status: Scaffolded / Not Verified until it has run on a GitHub runner (subject to runner availability and repository policy).
-# The SQL Server integration suite runs against a disposable SQL Server service container with a generated password;
-# if the service cannot start, the suite is reported NOT VERIFIED (never Passed).
+# CI for JBS Contracts (jbs-contracts/). Deploy only deploys a commit whose CI run is green (deploy.yml, verify-ci).
+# The old Enterprise Contract Platform's CI is in git history (tag legacy-ecp-final); its code is not built here.
+# No Docker in the app or its deploy: the one container below is a throwaway SQL Server for the API tests only.
 name: ci
 on:
   push:
@@ -15,188 +14,71 @@ concurrency:
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
   DOTNET_NOLOGO: "1"
+
 jobs:
-  build-and-unit:
-    name: Build, unit, architecture, API and lightweight-provider tests
+  web:
+    name: Front end (lint, unit tests, build)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4   # TODO(SEC-060): pin third-party actions to commit SHAs once the repository policy is set
-        with:
-          fetch-depth: 0   # the S9 portability guard reads the git history against its baseline commit
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-      - name: Restore (locked)
-        run: dotnet restore src/Ecp.sln --locked-mode
-      - name: Build (warnings are errors; NuGet audit is a gate)
-        run: dotnet build src/Ecp.sln -c Release --no-restore
-      - name: Test (everything that does not need SQL Server)
-        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category!=SqlServer" --logger "trx" --results-directory TestResults
-        env:
-          ECP_TEST_SQL: ""
-      - name: Honest result summary (Passed / Failed / Skipped / NOT VERIFIED)
-        if: always()
-        run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: IIS publish output (web.config, safe Production defaults, no Development settings or local data; files only, NOT an IIS run)
-        run: |
-          set -euo pipefail
-          rm -rf artifacts/iis-publish
-          dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release --no-restore --no-build -o artifacts/iis-publish
-          python3 -I tools/check-iis-publish.py artifacts/iis-publish
-      - name: Solution packs (build, reproducibility, sign and verify with an ephemeral key, no embedded packs, no committed private key)
-        run: tools/check-packs.sh
-      - name: Pack Publisher tool (pack the .NET tool, install that artefact alone, build/validate/report/sign/verify/inspect with it; no source checkout is used by the tool)
-        run: |
-          set -euo pipefail
-          rm -rf artifacts/pack-tool && mkdir -p artifacts/pack-tool
-          dotnet pack src/Ecp.PackTool/Ecp.PackTool.csproj -c Release --no-restore -o artifacts/pack-tool
-          ECP_PACK_TOOL_PACKAGE_DIR="$PWD/artifacts/pack-tool" dotnet test tests/Ecp.Integration.Tests/Ecp.Integration.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~PackToolArtefact"
-          (cd artifacts/pack-tool && sha256sum *.nupkg | tee SHA256SUMS)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ecp-pack-tool
-          path: artifacts/pack-tool
-      - name: Repository consistency checks (links, CSV/JSON, references, manifest, Mermaid structure)
-        run: python3 -I tools/check-repo.py .
-      - name: Secrets scan (private keys, token formats and secret-looking assignments in tracked files; a safety net, not a guarantee)
-        run: python3 -I tools/check-secrets.py .
-      - name: Implementation documentation consistency (guides name only real pages and permissions; retired statements absent)
-        run: python3 -I tools/check-docs.py .
-      - name: Tooling script tests
-        run: python3 -I -m unittest discover -s tools/tests
-      - name: Supply chain (vulnerabilities, SBOM, licence policy)
-        run: tools/supply-chain.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: supply-chain
-          path: |
-            artifacts/sbom/ecp.bom.json
-            artifacts/licences/licence-report.md
-            artifacts/vulnerabilities.txt
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-non-sql
-          path: TestResults/*.trx
-
-  windows-build-and-test:
-    name: Windows - build, tests and IIS publish output (not an IIS run)
-    runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: jbs-contracts/web
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          fetch-depth: 0   # the S9 portability guard reads the git history against its baseline commit
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-      - name: Restore (locked)
-        run: dotnet restore src/Ecp.sln --locked-mode
-      - name: Build (warnings are errors; NuGet audit is a gate)
-        run: dotnet build src/Ecp.sln -c Release --no-restore
-      - name: Test (everything that does not need SQL Server)
-        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category!=SqlServer" --logger "trx" --results-directory TestResults
-        env:
-          ECP_TEST_SQL: ""
-      - name: IIS publish output (files only; this runner has no IIS site for the application)
-        shell: pwsh
-        run: |
-          dotnet publish src/Ecp.Host/Ecp.Host.csproj -c Release --no-restore --no-build -o artifacts/iis-publish
-          python -I tools/check-iis-publish.py artifacts/iis-publish
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-windows
-          path: TestResults/*.trx
+          node-version: 22
+          cache: npm
+          cache-dependency-path: jbs-contracts/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
 
-  sqlserver-integration:
-    name: SQL Server ${{ matrix.sqlserver }} integration (migrations, constraints, RLS, provider behaviour)
+  api:
+    name: API (build, tests against real SQL Server)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # 2022 is the long-standing baseline; 2025 (version 17.x) is the version of the first QA database server.
-        sqlserver: ["2022-latest", "2025-latest"]
-    timeout-minutes: 40
-    needs: build-and-unit
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: jbs-contracts
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-      - name: Start disposable SQL Server (generated, masked password)
-        id: sql
+      - name: Start a throwaway SQL Server 2025 (generated password, masked)
         run: |
           set -euo pipefail
-          PW="Aa1!$(openssl rand -hex 16)"
-          echo "::add-mask::$PW"
-          # The backup and restore tests need the server's .bak files to be readable by the test process: the server runs as root in this disposable container, writes into a bind-mounted directory, and a default ACL on
-          # that directory lets the runner user read whatever the server creates there (docs/BACKUP_AND_RESTORE.md, "Shared backup directory").
-          BK="$RUNNER_TEMP/ecp-backups"; mkdir -p "$BK"; chmod 0777 "$BK"
-          command -v setfacl >/dev/null || sudo apt-get install -y -qq acl >/dev/null
-          sudo setfacl -R -m "u:$(id -u):rwx" "$BK"; sudo setfacl -d -m "u:$(id -u):rwx" "$BK"
-          docker run -d --name ecp-sql --user root -p 14330:1433 -v "$BK:/ecp-backups" -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$PW" mcr.microsoft.com/mssql/server:${{ matrix.sqlserver }} >/dev/null
-          echo "ECP_TEST_SQL_BACKUP_DIR=$BK" >> "$GITHUB_ENV"
-          echo "ECP_TEST_SQL_BACKUP_DIR_SERVER=/ecp-backups" >> "$GITHUB_ENV"
+          pw="Aa1!$(openssl rand -hex 16)"
+          echo "::add-mask::$pw"
+          docker run -d --name sql -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=$pw" -p 1433:1433 mcr.microsoft.com/mssql/server:2025-latest >/dev/null
           for i in $(seq 1 60); do
-            if docker exec ecp-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$PW" -Q "SELECT 1" >/dev/null 2>&1; then
-              echo "ECP_TEST_SQL=Server=127.0.0.1,14330;User Id=sa;Password=$PW;TrustServerCertificate=True;Encrypt=True" >> "$GITHUB_ENV"
-              echo "available=true" >> "$GITHUB_OUTPUT"; exit 0
-            fi; sleep 2
+            if docker logs sql 2>&1 | grep -q "SQL Server is now ready for client connections"; then break; fi
+            sleep 2
           done
-          echo "available=false" >> "$GITHUB_OUTPUT"
-          echo "::warning::SQL Server did not start; SQL Server tests are NOT VERIFIED"
-      - run: dotnet restore src/Ecp.sln --locked-mode
-      - run: dotnet build src/Ecp.sln -c Release --no-restore
-      - name: N-1 to N upgrade rehearsal on SQL Server (populate the frozen 1.0.0 schema, back up, restore, pre-flight, upgrade, post-upgrade validation, journeys, rollback-by-restore evidence)
-        env:
-          ECP_TEST_EVIDENCE_DIR: ${{ runner.temp }}/ecp-upgrade-evidence
-        run: |
-          mkdir -p "$ECP_TEST_EVIDENCE_DIR"
-          dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&FullyQualifiedName~Upgrade" --logger "trx;LogFileName=upgrade-rehearsal.trx" --results-directory TestResults
-          ls -l "$ECP_TEST_EVIDENCE_DIR"
-          # The evidence must hold no secret: refuse the build if any file names a password, key or connection string.
-          if grep -rEil 'Password=|User Id=|MSSQL_SA_PASSWORD|BEGIN [A-Z ]*PRIVATE KEY' "$ECP_TEST_EVIDENCE_DIR"; then echo "::error::Upgrade evidence appears to contain a secret"; exit 1; fi
-      - uses: actions/upload-artifact@v4
-        if: always()
+          docker logs sql 2>&1 | grep -q "SQL Server is now ready for client connections" || { docker logs sql | tail -20; echo "::error::SQL Server did not start."; exit 1; }
+          echo "JBS_TEST_SQL=Server=localhost,1433;User Id=sa;Password=$pw;TrustServerCertificate=True;Encrypt=True" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v4
         with:
-          name: upgrade-rehearsal-evidence-${{ matrix.sqlserver }}
-          path: ${{ runner.temp }}/ecp-upgrade-evidence
-          if-no-files-found: warn
-      - name: SQL Server tests (includes real BACKUP DATABASE, RESTORE VERIFYONLY and RESTORE DATABASE of a populated synthetic installation, post-restore validation, and the operation-lease race)
-        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category!=Performance" --logger "trx" --results-directory TestResults
-      - name: SQL Server permission probe for the DBA (prints what the proposed database roles can and cannot do; evidence, not a policy gate)
-        if: always()
-        run: dotnet test tests/Ecp.Integration.Tests/Ecp.Integration.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~SqlPermissionProbeTests" --logger "console;verbosity=detailed"
-      - name: Performance baseline and query plans (SQL Server)
-        run: dotnet test src/Ecp.sln -c Release --no-build --filter "Category=SqlServer&Category=Performance" --logger "trx" --results-directory TestResults
-      - name: Print performance baseline and plan report (SQL Server)
-        if: always()
-        run: |
-          echo "runner: $(uname -sr) cpus=$(nproc) mem=$(free -m | awk '/Mem:/{print $2}')MB"
-          echo "== SUMMARY: user, median ms, p95 ms, operation"
-          jq -r '.samples[] | [.User,.MedianMs,.P95Ms,.Operation] | @tsv' artifacts/performance/sqlserver.json || true
-          echo "== FULL"
-          cat artifacts/performance/sqlserver.json || echo "no baseline file written"
-          echo "== PLANS"
-          cat artifacts/performance/plans-sqlserver.txt || echo "no plan report written"
-      - name: Honest result summary
-        if: always()
-        run: tools/test-report.sh TestResults | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-sql-${{ matrix.sqlserver }}
-          path: TestResults/*.trx
+          global-json-file: jbs-contracts/global.json
+      - name: Restore (locked)
+        run: dotnet restore JbsContracts.sln --locked-mode
+      - name: Build (warnings are errors; NuGet audit is a gate)
+        run: dotnet build JbsContracts.sln -c Release --no-restore
+      - name: Test (real SQL Server; never skipped)
+        run: dotnet test --solution JbsContracts.sln -c Release --no-build
 
-  docker-image:
-    name: Container image build and smoke test
+  checks:
+    name: Repository checks (links, manifest, secrets, ASCII scripts)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: build-and-unit
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      # Host networking keeps the probes simple: the container binds loopback, so setup (loopback-only by default) is reachable exactly as on a server.
-      - run: deploy/docker/smoke.sh --network host
+      - name: Repository consistency checks
+        run: python3 -I tools/check-repo.py .
+      - name: Secrets scan (a safety net, not a guarantee)
+        run: python3 -I tools/check-secrets.py .
+      - name: Deploy scripts are ASCII-only (Windows PowerShell 5.1 reads them as ANSI)
+        run: |
+          if LC_ALL=C grep -nP '[^\x00-\x7F]' scripts/ci/*.ps1; then echo "::error::Non-ASCII characters in scripts/ci/*.ps1"; exit 1; fi
+      - name: No JBS font files committed (decision D-34)
+        run: |
+          if git ls-files | grep -iE '\.(woff2?|eot|ttf|otf)$'; then echo "::error::Font files must not be committed (JBS fonts are licensed; this repository is public)."; exit 1; fi

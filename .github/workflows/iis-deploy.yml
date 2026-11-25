@@ -1,54 +1,36 @@
-# Reusable build-and-deploy onto an on-prem IIS site, run on a self-hosted Windows runner
-# installed on the target web server: it builds the commit (.github/actions/build-app) and
-# deploys the result in the same job, with no workflow artifacts (see docs/DEPLOYMENT.md).
+# Reusable deploy of the JBS Contracts package onto an on-prem IIS site, run on the self-hosted Windows runner
+# installed on the target web server (decision D-20). The package is built once by deploy.yml ("build" job).
 #
-# Per-environment settings live on the GitHub Environment, not in YAML:
-#   Variables:  IIS_SITE_PATH       (required) physical path of the IIS site
-#               SMOKE_TEST_URL      (optional) URL to GET after deploy
-#               IIS_SITE_NAME       (optional) site name; when set, the site and app pool are
-#                                   created on first deploy if missing (Initialize-IisSite.ps1)
-#               IIS_APP_POOL        (optional) app pool name, defaults to IIS_SITE_NAME
-#               IIS_BINDING         (needed to create the site) e.g. https:*:443:myapp.example.org
-#               IIS_CERT_THUMBPRINT (https) certificate IT installed on the server - the usual
-#                                   option while the organisation's web certificates are issued by hand
-#               IIS_CERT_AUTO       (https, instead) "true" = request the certificate from an AD CS
-#                                   CA and renew it within 40 days of expiry (Set-IisCertificate.ps1);
-#                                   needs IIS_CERT_CA and IIS_CERT_TEMPLATE
-#               IIS_CERT_DNS_NAMES  (optional, with IIS_CERT_AUTO) extra certificate names, space-separated
-#               IIS_APP_POOL_USER   (optional) domain account (DOMAIN\user) for the app pool; default ApplicationPoolIdentity
-#               SETUP_ANSWERS_FILE  (optional) repository path of the setup answers file; with APPENV_Ecp__Security__FailsafeAdmins__0__*
-#                                   the deploy completes first-run setup without the wizard (ADR-0045)
-#   Secrets:    IIS_APP_POOL_PASSWORD (with IIS_APP_POOL_USER)
-#               PACK_SIGNING_KEY    (optional) private ES256 key (PEM) that signs the shipped packs at build time (ADR-0046);
-#                                   with APPENV_Ecp__Packs__TrustedKeys__0__KeyId and __PublicKeyPem as variables
-#   Variables prefixed APPENV_ are stamped into web.config as environment variables with the prefix
-#   removed, e.g. APPENV_Ecp__Mode -> Ecp__Mode. Only VARIABLES are stamped: a secret would end up in
-#   web.config in clear text, so this pipeline never reads secrets for that purpose. (The application
-#   needs none: SQL Server uses integrated authentication, and any secret is a file or environment
-#   reference resolved on the server.)
+# Per-environment settings live on the GitHub Environment, not in YAML (see docs/jbs/QA_CONFIGURATION_RECORD.md):
+#   Variables:  IIS_SITE_PATH (required), IIS_SITE_NAME, IIS_APP_POOL, IIS_BINDING, IIS_CERT_THUMBPRINT,
+#               IIS_APP_POOL_USER, SMOKE_TEST_URL (as for the old app; unchanged)
+#               APPENV_*  stamped into web.config as environment variables with the prefix removed. JBS Contracts
+#                         reads the old app's names (decision D-36), so the existing QA variables work as they are:
+#                           APPENV_Database__ConnectionString          (required, Windows integrated authentication)
+#                           APPENV_Ecp__DataDirectory                  (required; documents and fonts live under it)
+#                           APPENV_Ecp__Logging__Directory / __FileName / __RetainedFiles
+#                           APPENV_Ecp__DataProtection__KeyDirectory
+#                           APPENV_Ecp__Security__FailsafeAdmins__N__Account / __DisplayName / __Email  (first admins)
+#               RESET_DATABASE_CONFIRM  one-off: the database name, to replace the old app's tables (then delete it)
+#   Secrets:    IIS_APP_POOL_PASSWORD only if the deploy must create the app pool itself. No other secret is used.
+# Only VARIABLES are stamped into web.config: a secret would end up there in clear text.
 #
-# Approval gates (e.g. who signs off Production) are the Environment's "Required reviewers".
-#
-# Callers must pass `secrets: inherit` so the Environment's secrets are visible here.
+# Callers must pass `secrets: inherit`. Keep the PowerShell here and in scripts/ci ASCII-only.
 name: Deploy to IIS (reusable)
 
 on:
   workflow_call:
     inputs:
       environment:
-        description: GitHub Environment name (QA, Production, ...). Also the default ASPNETCORE_ENVIRONMENT.
+        description: GitHub Environment name (QA, Production). Also the ASPNETCORE_ENVIRONMENT value.
         type: string
         required: true
       runner-label:
-        description: Label of the self-hosted runner on the target web server (e.g. iis-qa, iis-prod).
+        description: Label of the self-hosted runner on the target web server (iis-qa, iis-prod).
         type: string
         required: true
-      aspnetcore-environment:
-        description: ASPNETCORE_ENVIRONMENT value, if different from the environment name.
-        type: string
-        default: ""
       preserve-folders:
-        description: Space-separated folder names in the site that hold runtime data and must not be overwritten or deleted.
+        description: Space-separated folder names in the site that hold runtime data and must not be overwritten.
         type: string
         default: "logs"
 
@@ -66,19 +48,14 @@ jobs:
       group: deploy-${{ github.repository }}-${{ inputs.environment }}
       cancel-in-progress: false
     steps:
-      # Build here, on the web server's runner, straight into the deploy package: no workflow
-      # artifacts (storage is shared across the account). QA and Production each build the
-      # same commit (github.sha) with the same locked package versions.
-      - name: Check out
+      - name: Check out (deploy scripts only)
         uses: actions/checkout@v7
 
-      - name: Build
-        uses: ./.github/actions/build-app
+      - name: Download the package built for this commit
+        uses: actions/download-artifact@v4
         with:
-          output-path: ${{ runner.temp }}/package
-          pack-signing-key: ${{ secrets.PACK_SIGNING_KEY }}
-          pack-key-id: ${{ vars.APPENV_Ecp__Packs__TrustedKeys__0__KeyId }}
-          pack-public-key: ${{ vars.APPENV_Ecp__Packs__TrustedKeys__0__PublicKeyPem }}
+          name: jbs-contracts-package
+          path: ${{ runner.temp }}/package
 
       - name: Deploy
         shell: powershell
@@ -86,23 +63,19 @@ jobs:
           ALL_VARS: ${{ toJSON(vars) }}
           SITE_PATH: ${{ vars.IIS_SITE_PATH }}
           SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
-          ASPNET_ENV: ${{ inputs.aspnetcore-environment || inputs.environment }}
+          ASPNET_ENV: ${{ inputs.environment }}
           PRESERVE_FOLDERS: ${{ inputs.preserve-folders }}
           SITE_NAME: ${{ vars.IIS_SITE_NAME }}
           APP_POOL: ${{ vars.IIS_APP_POOL }}
           BINDING: ${{ vars.IIS_BINDING }}
-          # Not sensitive, so it belongs in Variables, but accept a secret too (an easy mix-up).
           CERT_THUMBPRINT: ${{ vars.IIS_CERT_THUMBPRINT || secrets.IIS_CERT_THUMBPRINT }}
-          CERT_AUTO: ${{ vars.IIS_CERT_AUTO }}
-          CERT_CA: ${{ vars.IIS_CERT_CA }}
-          CERT_TEMPLATE: ${{ vars.IIS_CERT_TEMPLATE }}
-          CERT_DNS_NAMES: ${{ vars.IIS_CERT_DNS_NAMES }}
           APP_POOL_USER: ${{ vars.IIS_APP_POOL_USER }}
           APP_POOL_PASSWORD: ${{ secrets.IIS_APP_POOL_PASSWORD }}
-          SETUP_ANSWERS_FILE: ${{ vars.SETUP_ANSWERS_FILE }}
+          RESET_CONFIRM: ${{ vars.RESET_DATABASE_CONFIRM }}
         run: |
           $ErrorActionPreference = "Stop"
           if (-not $env:SITE_PATH) { throw "Set the IIS_SITE_PATH variable on the '${{ inputs.environment }}' environment." }
+          $package = Join-Path $env:RUNNER_TEMP "package"
 
           # APPENV_-prefixed VARIABLES only. Values are never printed, only the names.
           $appEnv = @{}
@@ -113,32 +86,35 @@ jobs:
           }
           Write-Host "Injecting $($appEnv.Count) app setting(s): $(($appEnv.Keys | Sort-Object) -join ', ')"
 
-          # Fail safely before anything on the server is touched: a Production-mode installation needs these, and they are not guessed.
-          foreach ($required in @("Ecp__Mode", "Ecp__DataDirectory", "Database__ConnectionString")) {
-            if (-not $appEnv.ContainsKey($required) -or -not $appEnv[$required]) { throw "The '${{ inputs.environment }}' environment has no APPENV_$required variable. Set it (scripts/setup/setup-github-environments.sh lists every value)." }
+          # Fail safely before anything on the server is touched.
+          $connectionString = $appEnv["Database__ConnectionString"]
+          if (-not $connectionString) { throw "The '${{ inputs.environment }}' environment has no APPENV_Database__ConnectionString variable." }
+          if ($connectionString -match "(?i)(password|pwd)\s*=") { throw "Database__ConnectionString contains a password. Use Windows integrated authentication (no credential in the string)." }
+          $dataPath = if ($appEnv["Contracts__DataDirectory"]) { $appEnv["Contracts__DataDirectory"] } else { $appEnv["Ecp__DataDirectory"] }
+          if (-not $dataPath) { throw "The '${{ inputs.environment }}' environment has no APPENV_Ecp__DataDirectory (or APPENV_Contracts__DataDirectory) variable." }
+          foreach ($localOnly in @("Contracts__AuthMode", "Contracts__ApplyDatabaseScripts")) {
+            if ($appEnv.ContainsKey($localOnly)) { throw "APPENV_$localOnly is for local development only and must not be set on a server environment." }
           }
-          if ($appEnv["Ecp__Mode"] -eq "Demo") { throw "Ecp__Mode is Demo. A deployed environment must not run in Demo mode." }
-          if ($appEnv.ContainsKey("Database__ConnectionString") -and $appEnv["Database__ConnectionString"] -match "(?i)(password|pwd)\s*=") { throw "Database__ConnectionString contains a password. Use Windows integrated authentication (no credential in the string)." }
-
+          $logPath = if ($appEnv["Contracts__Logging__Directory"]) { $appEnv["Contracts__Logging__Directory"] } else { $appEnv["Ecp__Logging__Directory"] }
+          $keyPath = $appEnv["Ecp__DataProtection__KeyDirectory"]
           $split = { param($s) @($s -split '\s+' | Where-Object { $_ }) }
 
-          # Runs a command of the new build with the same settings IIS gives the site (the APPENV_ values), as this runner's account (the migration identity).
-          $appDll = "$env:RUNNER_TEMP\package\app\Ecp.Host.dll"
-          $runApp = {
-            param([string[]]$cliArgs)
-            foreach ($k in $appEnv.Keys) { [Environment]::SetEnvironmentVariable($k, $appEnv[$k], "Process") }
-            $env:ASPNETCORE_ENVIRONMENT = $env:ASPNET_ENV
-            & dotnet $appDll @cliArgs | Out-Host
-            return $LASTEXITCODE
-          }
+          # 1. One-off switch-over from the old app (does nothing once JBS Contracts is installed, or on an empty database).
+          & "$env:GITHUB_WORKSPACE\scripts\ci\Reset-LegacyDatabase.ps1" -ConnectionString $connectionString -Confirm "$env:RESET_CONFIRM" -DataPath $dataPath
 
-          # Schema first, before any file is copied (ADR-0045): a fresh database is created; a current one is left alone; an installed database that this release
-          # would change stops the deploy here, with the old site still running, until the upgrade runbook has been followed.
-          $code = & $runApp @("deploy-migrate")
-          if ($code -ne 0) { throw "deploy-migrate failed (exit $code). Nothing was deployed." }
+          # 2. Database scripts, as this runner's account (the migration identity), before any file is copied.
+          #    Each script runs once, in a transaction, and must work with the version of the app that is still running.
+          & "$env:GITHUB_WORKSPACE\scripts\ci\Invoke-SqlMigrations.ps1" -ConnectionString $connectionString -ScriptsPath (Join-Path $package "database")
 
+          # 3. The folder for JBS's own font files (copied there by hand once; never in the repository, decision D-34).
+          $fonts = Join-Path $dataPath "fonts"
+          if (-not (Test-Path $fonts)) { New-Item -ItemType Directory -Path $fonts | Out-Null; Write-Host "==> Created $fonts for the JBS font files" }
+          $fontCount = @(Get-ChildItem -Path $fonts -Filter *.woff2 -ErrorAction SilentlyContinue).Count
+          if ($fontCount -eq 0) { Write-Host "::warning::No JBS font files in $fonts yet; the app shows Inter until JBSVariableText.woff2 and JBSVariableDisplay.woff2 are copied there." }
+
+          # 4. Files, IIS site and certificate, then the smoke test (/health/live also checks the database).
           & "$env:GITHUB_WORKSPACE\scripts\ci\Deploy-IisSite.ps1" `
-            -PackagePath "$env:RUNNER_TEMP\package\app" `
+            -PackagePath (Join-Path $package "app") `
             -SitePath $env:SITE_PATH `
             -Environment $env:ASPNET_ENV `
             -EnvironmentVariables $appEnv `
@@ -148,29 +124,11 @@ jobs:
             -AppPoolName $env:APP_POOL `
             -Binding $env:BINDING `
             -CertificateThumbprint $env:CERT_THUMBPRINT `
-            -CertificateAuto:($env:CERT_AUTO -eq "true") `
-            -CertificateAuthority $env:CERT_CA `
-            -CertificateTemplate $env:CERT_TEMPLATE `
-            -CertificateDnsNames (& $split $env:CERT_DNS_NAMES) `
             -AppPoolUser $env:APP_POOL_USER `
             -AppPoolPassword $env:APP_POOL_PASSWORD `
-            -DataPath $appEnv["Ecp__DataDirectory"] `
-            -LogPath $appEnv["Ecp__Logging__Directory"] `
-            -KeyPath $appEnv["Ecp__DataProtection__KeyDirectory"]
-
-          # First-run setup without the wizard (ADR-0045): the same setup stages, driven from the SETUP_ANSWERS_FILE answers file, with the administrators taken
-          # from APPENV_Ecp__Security__FailsafeAdmins__N__Account/DisplayName/Email. Once setup is complete this only keeps those administrators in place.
-          $answers = if ($env:SETUP_ANSWERS_FILE) { Join-Path $env:GITHUB_WORKSPACE $env:SETUP_ANSWERS_FILE } else { $null }
-          if (-not $answers) { Write-Host "No SETUP_ANSWERS_FILE variable on this environment; setup-apply skipped." }
-          elseif (-not (Test-Path $answers)) { throw "SETUP_ANSWERS_FILE '$env:SETUP_ANSWERS_FILE' is not in the repository." }
-          elseif (-not $appEnv.ContainsKey("Ecp__Security__FailsafeAdmins__0__Account")) { Write-Host "::warning::No APPENV_Ecp__Security__FailsafeAdmins__0__Account on this environment; setup-apply skipped." }
-          else {
-            $code = & $runApp @("setup-apply", "--answers", $answers)
-            # Exit 3 means "waiting on a person or a setting": a warning, not a failed deploy. The step's own exit code is reset, because PowerShell
-            # would otherwise end the step with the last native command's code (3) and mark a working deployment as failed.
-            if ($code -eq 3) { Write-Host "::warning::Setup is not complete yet; the step list above says what is waiting. Re-run this workflow once it is resolved."; $global:LASTEXITCODE = 0 }
-            elseif ($code -ne 0) { throw "setup-apply failed (exit $code). The new build is deployed; setup is unchanged where a step failed." }
-          }
+            -DataPath $dataPath `
+            -LogPath $logPath `
+            -KeyPath $keyPath
 
       - name: Clean up package
         if: always()

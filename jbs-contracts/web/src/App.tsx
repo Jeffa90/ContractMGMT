@@ -1,0 +1,69 @@
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { createBrowserRouter, RouterProvider } from 'react-router'
+import { Toaster } from 'sonner'
+import { Shell } from './components/Shell'
+import { Skeleton } from './components/ui'
+import { api, ApiError, type Me } from './lib/api'
+import { MeProvider } from './lib/me'
+import { HomePage } from './pages/Home'
+import { PeoplePage } from './pages/People'
+import { NoAccessPage, NotFoundPage, SignInProblemPage } from './pages/StatusPages'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: (count, error) => !(error instanceof ApiError && error.status >= 400 && error.status < 500) && count < 2,
+    },
+  },
+})
+
+const router = createBrowserRouter([
+  {
+    element: <Shell />,
+    children: [
+      { index: true, element: <HomePage /> },
+      { path: 'admin/people', element: <PeoplePage /> },
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+])
+
+function SignedIn() {
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/api/me') })
+  if (me.isPending) {
+    return (
+      <div className="flex min-h-dvh" aria-busy="true" aria-label="Loading JBS Contracts">
+        <div className="hidden w-64 flex-col gap-3 border-r border-border bg-card p-4 md:flex">
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="mt-6 h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="flex flex-1 flex-col gap-4 p-8">
+          <Skeleton className="h-8 w-72" />
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="mt-4 h-32 w-full max-w-3xl" />
+        </div>
+      </div>
+    )
+  }
+  if (me.isError) {
+    const error = me.error instanceof ApiError ? me.error : new ApiError(0, { code: 'error', message: 'Something went wrong. Try again.' })
+    if (error.code === 'no-access') return <NoAccessPage error={error} />
+    return <SignInProblemPage error={error} onRetry={() => me.refetch()} />
+  }
+  return (
+    <MeProvider me={me.data}>
+      <RouterProvider router={router} />
+    </MeProvider>
+  )
+}
+
+export function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SignedIn />
+      <Toaster position="bottom-center" richColors closeButton toastOptions={{ duration: 5000 }} />
+    </QueryClientProvider>
+  )
+}

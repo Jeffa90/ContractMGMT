@@ -5,3 +5,9 @@
 *.eot
 *.ttf
 *.otf
+
+# Built front end (produced by `npm run build` in web/, served by the API)
+api/wwwroot/
+# Playwright output
+web/test-results/
+web/playwright-report/

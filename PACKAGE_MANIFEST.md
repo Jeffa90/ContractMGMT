@@ -394,4 +394,4 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - External scanning before upload (ADR-0049): `decisions/ADR-0049-external-scanning-before-upload.md`
 - Redesign planning notes (not decided): `docs/redesign/REDESIGN_BRIEF.md`, `docs/redesign/STYLE_GUIDE.md`
 - JBS QA configuration record: `docs/jbs/QA_CONFIGURATION_RECORD.md`
-- JBS Contracts redesign (the new JBS-only app, built on the `redesign` branch; its own rules are in its CLAUDE.md): `jbs-contracts/`
+- JBS Contracts redesign (the new JBS-only app, built on the `redesign` branch; its own rules are in its CLAUDE.md): `jbs-contracts/`, and its one-off switch-over script `scripts/ci/Reset-LegacyDatabase.ps1`

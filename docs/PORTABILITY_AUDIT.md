@@ -232,7 +232,7 @@ Slice S10 audited every regional assumption, then replaced the Australian and fi
 
 ### 1.1 What was scanned
 
-Every text file in the repository outside generated and local directories (`bin/`, `obj/`, `TestResults/`, `artifacts/`, `.git/`): C# and Razor sources, project files, JSON, CSV, Markdown, shell and Python tools, workflows, deployment files. Binary files, `packages.lock.json` and the generated EF migrations designer files were not read as sources (migrations were scanned and contain no hits).
+Every text file in the repository outside generated and local directories (`bin/`, `obj/`, TestResults folder, `artifacts/`, `.git/`): C# and Razor sources, project files, JSON, CSV, Markdown, shell and Python tools, workflows, deployment files. Binary files, `packages.lock.json` and the generated EF migrations designer files were not read as sources (migrations were scanned and contain no hits).
 
 ### 1.2 What was searched for
 

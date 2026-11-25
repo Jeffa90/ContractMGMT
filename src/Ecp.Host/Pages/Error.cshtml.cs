@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -27,6 +28,9 @@ public sealed class ErrorModel : PageModel
             429 => ("Too many requests", "Please wait a moment and try again."),
             _ => ("Something went wrong", "An unexpected error occurred. Nothing was changed by this request.")
         };
+        // The server's own reason for a refusal, when it gave one (ProblemExceptionHandler), replaces the generic sentence.
+        if (code == 403 && HttpContext.RequestServices.GetService<RefusalReason>()?.Text is { Length: > 0 } reason)
+            Detail = reason + " If you think you should be able to, ask an administrator.";
         Response.StatusCode = code is >= 400 and < 600 ? code.Value : 500;
     }
 }

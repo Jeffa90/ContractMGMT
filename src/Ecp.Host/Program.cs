@@ -152,6 +152,7 @@ builder.Services.AddRequestTimeouts(o =>
 });
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ProblemExceptionHandler>();
+builder.Services.AddScoped<RefusalReason>();
 builder.Services.AddOpenApi();
 builder.Services.AddRateLimiter(o =>
 {

@@ -219,7 +219,12 @@ public sealed class ApprovalMatrixUiTests
         Assert.Contains("Resolution trace", asAdmin);
         Assert.Contains("small", asAdmin);                                                 // the row that applied
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await Post(owner, approval, "Approve", ("Comment", "me"))).StatusCode);
+        var refused = await Post(owner, approval, "Approve", ("Comment", "me"));
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        // The error page names the server's own reason for the refusal instead of only the generic sentence.
+        var refusedPage = await refused.Content.ReadAsStringAsync();
+        Assert.Contains("If you think you should be able to, ask an administrator.", refusedPage);
+        Assert.DoesNotContain("You do not have permission to do that.", refusedPage);
         Assert.Equal(HttpStatusCode.Redirect, (await Post(head, approval, "Approve", ("Comment", "Approved"))).StatusCode);
         var details = await owner.GetStringAsync($"/Contracts/Details/{id}");
         Assert.Contains("Effective", details);

@@ -1,8 +1,15 @@
+using Microsoft.Extensions.DependencyInjection;
 using Ecp.SharedKernel;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ecp.Host;
+
+/// <summary>The reason a request was refused (403), kept for the error page of the same request. Scoped to the request; holds no tenant or identity state.</summary>
+public sealed class RefusalReason
+{
+    public string? Text { get; set; }
+}
 
 /// <summary>Maps exceptions to RFC 9457 problem details with stable codes. Internals are never returned.</summary>
 public sealed class ProblemExceptionHandler(IProblemDetailsService problems, ILogger<ProblemExceptionHandler> logger) : IExceptionHandler
@@ -31,6 +38,13 @@ public sealed class ProblemExceptionHandler(IProblemDetailsService problems, ILo
             _ => (StatusCodes.Status500InternalServerError, "internal_error", "An unexpected error occurred.")
         };
         if (status >= 500) logger.LogError(exception, "Unhandled exception. CorrelationId={CorrelationId}", context.TraceIdentifier);
+        // A refusal carries a reason written for the person refused (for example "You do not manage people for that organisation."). The error page shows it and the log
+        // keeps it against the reference, so "Access denied" can be explained without guessing.
+        if (exception is ForbiddenException refused)
+        {
+            context.RequestServices.GetRequiredService<RefusalReason>().Text = refused.Message;
+            logger.LogInformation("Request refused: {Reason} CorrelationId={CorrelationId}", refused.Message, context.TraceIdentifier);
+        }
         context.Response.StatusCode = status;
         // Pages answer with an HTML error page produced by status-code re-execution; only API and health callers get problem details.
         if (!context.Request.Path.StartsWithSegments("/api") && !context.Request.Path.StartsWithSegments("/health")) return true;

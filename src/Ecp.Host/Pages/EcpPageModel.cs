@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Ecp.Host.Pages;
 
@@ -28,13 +29,21 @@ public abstract class EcpPageModel : PageModel
     {
         try { return await body(); }
         catch (ResourceNotFoundException) { return NotFound(); }
-        catch (ForbiddenException) { return Forbid(); }
+        catch (ForbiddenException ex) { return Refused(ex); }
         catch (DomainException ex)
         {
             ModelState.AddModelError(string.Empty, ex.RawMessage);   // tokens are expanded when the message is shown
             if (reload is not null) await reload(); // redisplay the page with fresh data and the message
             return Page();
         }
+    }
+
+    /// <summary>A 403 that keeps the service's reason, written for the person refused: the Access denied page shows it and the log records it against the reference.</summary>
+    protected IActionResult Refused(ForbiddenException ex)
+    {
+        HttpContext.RequestServices.GetRequiredService<RefusalReason>().Text = T(ex.Message);
+        HttpContext.RequestServices.GetRequiredService<ILogger<EcpPageModel>>().LogInformation("Request refused: {Reason} CorrelationId={CorrelationId}", ex.Message, HttpContext.TraceIdentifier);
+        return Forbid();
     }
 
     /// <summary>

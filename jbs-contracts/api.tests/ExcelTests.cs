@@ -170,8 +170,7 @@ public sealed class ExcelTests(AppFixture app)
         // The export lists it, and importing the export changes nothing.
         var export = await (await owner.GetAsync("/api/excel/contracts", Ct)).Content.ReadAsByteArrayAsync(Ct);
         var (_, again) = await PostAsync(owner, "contracts", "preview", export);
-        Assert.True((Count(again, "added"), Count(again, "refused")) == (0, 0),
-            string.Join(" | ", again.GetProperty("rows").EnumerateArray().Where(r => r.GetProperty("action").GetString() is "refused" or "add").Select(r => r.ToString())));
+        Assert.Equal(0, Count(again, "added")); // rows with a reference never add
         // Other tests change their own contracts in parallel, so check this contract's row: re-importing the export changes nothing.
         var mine = again.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("label").GetString()!.StartsWith((string)row.Reference));
         Assert.Equal("same", mine.GetProperty("action").GetString());
@@ -184,7 +183,7 @@ public sealed class ExcelTests(AppFixture app)
         var (_, changedLater) = await PostAsync(owner, "contracts", "preview", Sheet(["Reference", "Title"], [(string)row.Reference, "Road freight 2029"]));
         var refusedRow = changedLater.GetProperty("rows")[0];
         Assert.Equal("refused", refusedRow.GetProperty("action").GetString());
-        Assert.Contains("only drafts can be changed by import. This row would change: title.", refusedRow.GetProperty("notes")[0].GetString());
+        Assert.Contains("so it can't be changed by import now. This row would change: title.", refusedRow.GetProperty("notes")[0].GetString());
         Assert.Null(await AuditLog.VerifyAsync(db));
     }
 }

@@ -36,7 +36,13 @@ public static class DocumentEndpoints
         [".jpeg"] = "image/jpeg",
     };
 
-    public static bool CanUpload(Person me, ContractRow c) => me.IsContractOwner && !c.IsLocked && c.Stage == "Draft";
+    /// <summary>Contract owners add documents until a contract is approved; during a Legal review, Legal can too (mark-ups), on either side's turn.</summary>
+    public static bool CanUpload(Person me, ContractRow c) => !c.IsLocked && c.Stage switch
+    {
+        "Draft" or "Signing" => me.IsContractOwner,
+        "LegalReview" => me.IsContractOwner || me.IsLegal,
+        _ => false,
+    };
 
     private sealed class DocRow
     {
@@ -152,9 +158,11 @@ public static class DocumentEndpoints
                 await audit.WriteAsync(c, tx, me.AsActor(), version == 1 ? "document.added" : "document.version-added", "Document", documentId,
                     version == 1 ? $"{me.Name} added the {Kinds[kind].ToLowerInvariant()} {fileName}." : $"{me.Name} added version {version} of {title} ({fileName}).",
                     new { fileName, kind, version, sizeBytes = file.Length, sha256 = sha }, contractId: id);
-                await c.ExecuteAsync("UPDATE contracts.Contract SET UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id", new { id, me = me.Id }, tx);
+                // The contract's row version changes too; it's returned so the page can carry on (for example, attach then hand over).
+                var rowVersion = await c.ExecuteScalarAsync<byte[]>(
+                    "UPDATE contracts.Contract SET UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me OUTPUT INSERTED.RowVersion WHERE Id = @id", new { id, me = me.Id }, tx);
                 await tx.CommitAsync();
-                return Results.Created($"/api/documents/{versionId}/file", new { documentId, versionId, version });
+                return Results.Created($"/api/documents/{versionId}/file", new { documentId, versionId, version, rowVersion = Convert.ToBase64String(rowVersion!) });
             }
             catch
             {

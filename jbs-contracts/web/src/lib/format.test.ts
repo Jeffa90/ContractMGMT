@@ -1,4 +1,4 @@
-import { daysUntil, firstName, formatBytes, formatDate, formatDateTime, formatLongDate, formatMoney, greeting, initials, timeAgo } from './format'
+import { daysUntil, firstName, formatBytes, formatDate, formatDateTime, formatLongDate, formatMoney, greeting, initials, timeAgo, waited } from './format'
 
 describe('dates, money and sizes', () => {
   it('shows date-only values without shifting the day', () => {
@@ -44,5 +44,14 @@ describe('names', () => {
     expect(initials('Ann Marie Ho')).toBe('AH')
     expect(initials('Cher')).toBe('C')
     expect(firstName('Jeff Judd')).toBe('Jeff')
+  })
+})
+
+describe('waiting time', () => {
+  it('says how long something has waited in whole days', () => {
+    const now = new Date('2026-11-25T02:00:00Z')
+    expect(waited('2026-11-25T01:00:00Z', now)).toBe('today')
+    expect(waited('2026-11-24T01:00:00Z', now)).toBe('1 day')
+    expect(waited('2026-11-19T01:00:00Z', now)).toBe('6 days')
   })
 })

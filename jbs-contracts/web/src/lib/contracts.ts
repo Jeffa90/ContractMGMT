@@ -15,6 +15,9 @@ export type Supplier = {
   rowVersion: string
 }
 
+export type WhoseTurn = 'Legal' | 'Owner'
+export type LegalStatus = 'NotStarted' | 'Reviewing' | 'WaitingOnSupplier' | 'WaitingOnOwner'
+
 export type Stage = 'Draft' | 'LegalReview' | 'Signing' | 'Approval' | 'Effective' | 'Ended' | 'Archived' | 'Withdrawn'
 
 export type ContractListItem = {
@@ -36,6 +39,9 @@ export type ContractListItem = {
   isEvergreen: boolean
   noticeDeadline: string | null
   updatedUtc: string
+  whoseTurn: WhoseTurn | null
+  legalPersonName: string | null
+  turnSinceUtc: string | null
   /** Added fields offered as list columns: plain words by field key. */
   fields: Record<string, string>
 }
@@ -84,8 +90,44 @@ export type Contract = {
 export type DocumentVersion = { id: number; versionNumber: number; fileName: string; sizeBytes: number; uploadedUtc: string; uploadedByName: string }
 export type ContractDocument = { id: number; kind: string; kindName: string; title: string; currentVersion: number; versions: DocumentVersion[] }
 export type Activity = { id: number; occurredUtc: string; actorName: string; action: string; summary: string }
+export type LegalState = {
+  whoseTurn: WhoseTurn | null
+  legalPersonId: number | null
+  legalPersonName: string | null
+  status: LegalStatus | null
+  statusName: string | null
+  note: string | null
+  turnSinceUtc: string | null
+  outcome: string | null
+  clearedByName: string | null
+  clearedUtc: string | null
+}
+
+export type LegalEntry = {
+  number: number
+  action: 'SentToLegal' | 'Taken' | 'Assigned' | 'StatusChanged' | 'SentToOwner' | 'Cleared'
+  byName: string
+  atUtc: string
+  whoseTurn: WhoseTurn | null
+  legalPersonName: string | null
+  status: LegalStatus | null
+  statusName: string | null
+  note: string | null
+  documents: { documentId: number; versionId: number; versionNumber: number; title: string; fileName: string }[]
+}
+
+/** What the signed-in person can do now (the server checks again). */
+export type ContractAction = 'sendToLegal' | 'readyForSigning' | 'take' | 'assign' | 'updateStatus' | 'sendToOwner' | 'clear'
+
 export type ContractDetail = {
   contract: Contract
+  legal: LegalState
+  conversation: LegalEntry[]
+  actions: ContractAction[]
+  /** Required fields still empty (Draft only): checked when it is sent on. */
+  missingRequired: string[]
+  /** People in Legal (only sent to Legal people, for "Give to"). */
+  legalPeople: { id: number; name: string }[]
   /** Added fields: the value for the form and plain words for display. */
   fieldValues: Record<string, { value: string | number | boolean | string[] | null; display: string }>
   canEdit: boolean
@@ -134,5 +176,5 @@ export async function uploadDocument(contractId: number, file: File, kind: strin
   if (!response.ok) {
     throw new ApiError(response.status, body?.message ? body : { code: 'error', message: 'The upload failed. Try again.' })
   }
-  return body as { documentId: number; versionId: number; version: number }
+  return body as { documentId: number; versionId: number; version: number; rowVersion: string }
 }

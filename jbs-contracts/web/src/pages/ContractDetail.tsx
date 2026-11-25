@@ -6,12 +6,14 @@ import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { Select, StageBadge, Textarea } from '@/components/form'
 import { HelpButton } from '@/components/Help'
+import { ConversationCard, ProgressPanel } from '@/components/LegalReview'
 import { Alert, Button, Card, EmptyState, Field, Skeleton } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { documentKinds, journey, uploadDocument, type Contract, type ContractDetail, type ContractDocument } from '@/lib/contracts'
 import { daysUntil, formatBytes, formatDate, formatDateTime, formatMoney, timeAgo } from '@/lib/format'
 import { arrange, type Layout, type LayoutField } from '@/lib/layout'
+import { useMe } from '@/lib/me'
 import { help } from '@/help'
 
 function Tracker({ c }: { c: Contract }) {
@@ -157,7 +159,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
             </p>
           </div>
           {data.canEdit && (
-            <Link to={`/contracts/${c.id}/edit`} className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-primary px-4 font-medium text-primary-foreground hover:bg-primary-hover">
+            <Link to={`/contracts/${c.id}/edit`} className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-input bg-card px-4 font-medium hover:bg-muted">
               <Pencil aria-hidden className="size-4" /> Edit details
             </Link>
           )}
@@ -175,11 +177,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
         <Alert tone={notice < 0 ? 'danger' : 'warning'} title={notice < 0 ? `The notice deadline passed ${-notice} days ago (${formatDate(c.noticeDeadline)}).` : `The notice deadline is in ${notice} days (${formatDate(c.noticeDeadline)}).`} />
       )}
 
-      {c.stage !== 'Withdrawn' && (
-        <Card className="p-5 md:p-6">
-          <Tracker c={c} />
-        </Card>
-      )}
+      {c.stage !== 'Withdrawn' && <ProgressPanel data={data} tracker={<Tracker c={c} />} />}
 
       <Card className="p-5 md:p-6">
         <h2 className="sr-only">Essentials</h2>
@@ -209,6 +207,8 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
         </dl>
       </Card>
 
+      <ConversationCard data={data} />
+
       <DocumentsCard data={data} />
 
       {arrange(layout).map(({ section, fields }) => (
@@ -226,7 +226,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
       {data.canWithdraw && (
         <div>
           <Button variant="ghost" className="text-danger" icon={<Trash2 aria-hidden className="size-4" />} onClick={() => setWithdrawing(true)}>
-            Withdraw this draft
+            Withdraw this contract
           </Button>
         </div>
       )}
@@ -239,7 +239,9 @@ function DocumentsCard({ data }: { data: ContractDetail }) {
   const c = data.contract
   const queryClient = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
-  const [kind, setKind] = useState('Draft')
+  const { person } = useMe()
+  // Legal mostly adds mark-ups; contract owners mostly add drafts.
+  const [kind, setKind] = useState(person.roles.legal && !person.roles.contractOwner ? 'LegalMarkup' : 'Draft')
   const [newVersionOf, setNewVersionOf] = useState<ContractDocument | null>(null)
   const [error, setError] = useState<string | null>(null)
   const upload = useMutation({

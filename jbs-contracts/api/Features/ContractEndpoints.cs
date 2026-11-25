@@ -33,6 +33,14 @@ public sealed class ContractRow
     public DateTime StageSinceUtc { get; set; }
     public bool IsLocked { get; set; }
     public string? WithdrawnReason { get; set; }
+    public string? WhoseTurn { get; set; }
+    public int? LegalPersonId { get; set; }
+    public string? LegalStatus { get; set; }
+    public string? LegalNote { get; set; }
+    public DateTime? TurnSinceUtc { get; set; }
+    public string? LegalOutcome { get; set; }
+    public DateTime? LegalClearedUtc { get; set; }
+    public int? LegalClearedById { get; set; }
     public DateTime CreatedUtc { get; set; }
     public int CreatedById { get; set; }
     public DateTime UpdatedUtc { get; set; }
@@ -47,6 +55,8 @@ public sealed class ContractRow
     public string OwnerName { get; set; } = "";
     public string? BackupOwnerName { get; set; }
     public string CreatedByName { get; set; } = "";
+    public string? LegalPersonName { get; set; }
+    public string? LegalClearedByName { get; set; }
 
     /// <summary>The last day to give notice: end date (or, for an evergreen contract, review date) minus the notice period.</summary>
     public DateTime? NoticeDeadline => NoticePeriodDays is not { } days ? null
@@ -74,7 +84,7 @@ public static class ContractEndpoints
     private const string SelectContract = """
         SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName,
-               o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName
+               o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName
         FROM contracts.Contract k
         LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
         LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId
@@ -85,6 +95,8 @@ public static class ContractEndpoints
         JOIN contracts.Person o ON o.Id = k.OwnerId
         LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId
         JOIN contracts.Person cr ON cr.Id = k.CreatedById
+        LEFT JOIN contracts.Person lp ON lp.Id = k.LegalPersonId
+        LEFT JOIN contracts.Person lc ON lc.Id = k.LegalClearedById
         """;
 
     public static void MapContractEndpoints(this IEndpointRouteBuilder app)
@@ -100,6 +112,7 @@ public static class ContractEndpoints
             {
                 case "mine": where.Add("(k.OwnerId = @meId OR k.BackupOwnerId = @meId) AND k.Stage NOT IN (N'Withdrawn', N'Archived')"); break;
                 case "drafts": where.Add("k.Stage = N'Draft'"); break;
+                case "legal": where.Add("k.Stage = N'LegalReview'"); break;
                 case "closed": where.Add("k.Stage IN (N'Ended', N'Archived', N'Withdrawn')"); break;
                 default: where.Add("k.Stage NOT IN (N'Withdrawn', N'Archived')"); break;
             }
@@ -135,8 +148,13 @@ public static class ContractEndpoints
             {
                 contract = DetailView(row),
                 fieldValues = values.ToDictionary(v => v.Key, v => new { value = v.Value.Value, display = v.Value.Display }),
-                canEdit = ContractAccess.CanEdit(me!, row.Stage, row.IsLocked),
-                canWithdraw = me!.IsContractOwner && row.Stage == "Draft",
+                legal = LegalEndpoints.View(row),
+                conversation = await LegalEndpoints.ConversationAsync(c, id),
+                actions = LegalEndpoints.Actions(me!, row),
+                missingRequired = row.Stage == "Draft" ? (await LegalEndpoints.MissingRequiredAsync(c, null, row, definitions)).Select(m => m.Label) : [],
+                legalPeople = me!.IsLegal ? await c.QueryAsync("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 AND IsLegal = 1 ORDER BY Name") : [],
+                canEdit = ContractAccess.CanEdit(me!, row),
+                canWithdraw = ContractAccess.CanWithdraw(me!, row),
                 canUpload = DocumentEndpoints.CanUpload(me, row),
                 documents,
                 activity = activity.Select(a => new { a.Id, OccurredUtc = DateTime.SpecifyKind((DateTime)a.OccurredUtc, DateTimeKind.Utc), a.ActorName, a.Action, a.Summary }),
@@ -166,10 +184,12 @@ public static class ContractEndpoints
             if (before is null || !ContractAccess.CanSee(me!, before.IsConfidential, before.OwnerId, before.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
             if (!me!.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can change contracts.");
-            if (!ContractAccess.CanEdit(me, before.Stage, before.IsLocked))
+            if (!ContractAccess.CanEdit(me, before))
                 return ApiResults.NotAllowed(before.IsLocked
                     ? "This contract is Effective and locked. Changes are made through a Variation."
-                    : $"You can't change this contract while it's in {StageNames[before.Stage]}.");
+                    : before is { Stage: "LegalReview", WhoseTurn: "Legal" }
+                        ? "It's Legal's turn, so the details can't be changed right now. You can still add documents."
+                        : $"You can't change this contract while it's in {StageNames[before.Stage]}.");
             if (Convert.ToBase64String(before.RowVersion) != body.RowVersion)
                 return ApiResults.Changed("Someone else changed this contract while you were editing. Your changes weren't saved. Reload to see the latest, then make your changes again.");
             var (errors2, after) = await UpdateDraftAsync(c, tx, audit, me, before, body);
@@ -188,13 +208,17 @@ public static class ContractEndpoints
             if (before is null || !ContractAccess.CanSee(me!, before.IsConfidential, before.OwnerId, before.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
             if (!me!.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can withdraw contracts.");
-            if (before.Stage != "Draft") return ApiResults.NotAllowed($"You can't withdraw this contract while it's in {StageNames[before.Stage]}.");
+            if (!ContractAccess.CanWithdraw(me, before)) return ApiResults.NotAllowed($"You can't withdraw this contract while it's in {StageNames[before.Stage]}.");
             if (Convert.ToBase64String(before.RowVersion) != body.RowVersion)
                 return ApiResults.Changed("Someone else changed this contract a moment ago. Reload it and try again.");
             var reason = (body.Reason ?? "").Trim();
             if (reason.Length == 0) return ApiResults.Invalid("Say why it's being withdrawn.", new() { ["reason"] = "Add a short reason, for example \"Supplier pulled out\"." });
             if (reason.Length > 1000) return ApiResults.Invalid("Keep the reason shorter.", new() { ["reason"] = "Keep it under 1,000 characters." });
-            await c.ExecuteAsync("UPDATE contracts.Contract SET Stage = N'Withdrawn', StageSinceUtc = SYSUTCDATETIME(), IsLocked = 1, WithdrawnReason = @reason, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id",
+            await c.ExecuteAsync("""
+                UPDATE contracts.Contract SET Stage = N'Withdrawn', StageSinceUtc = SYSUTCDATETIME(), IsLocked = 1, WithdrawnReason = @reason,
+                    WhoseTurn = NULL, LegalStatus = NULL, LegalNote = NULL, TurnSinceUtc = NULL, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                WHERE Id = @id
+                """,
                 new { reason, me = me.Id, id }, tx);
             await audit.WriteAsync(c, tx, me.AsActor(), "contract.withdrawn", "Contract", id, $"{me.Name} withdrew {before.Reference}: {reason}", new { reason }, contractId: id);
             await tx.CommitAsync();
@@ -305,7 +329,10 @@ public static class ContractEndpoints
         r.Id, r.Reference, r.Title, r.SupplierName, r.Stage, StageName = StageNames[r.Stage], StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc),
         r.OwnerId, r.OwnerName, r.BackupOwnerId, r.IsConfidential, r.CategoryDisplay, r.Value, r.CurrencyCode,
         EndDate = D(r.EndDate), r.IsEvergreen, NoticeDeadline = D(r.NoticeDeadline), UpdatedUtc = DateTime.SpecifyKind(r.UpdatedUtc, DateTimeKind.Utc),
+        r.WhoseTurn, r.LegalPersonName, TurnSinceUtc = Utc(r.TurnSinceUtc),
     };
+
+    public static DateTime? Utc(DateTime? d) => d is { } v ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : null;
 
     private static object DetailView(ContractRow r) => new
     {

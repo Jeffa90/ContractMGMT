@@ -50,6 +50,12 @@ export function timeAgo(iso: string, now = new Date()): string {
   return formatDateTime(iso)
 }
 
+/** How long something has waited: "today", "1 day", "6 days". */
+export function waited(iso: string, now = new Date()): string {
+  const days = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000))
+  return days === 0 ? 'today' : days === 1 ? '1 day' : `${days} days`
+}
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'

@@ -326,8 +326,8 @@ The new app replaces the old one on QA from slice 0. QA has no real data (confir
 |---|---|---|---|
 | 0 | Switch-over; app shell (sidebar, JBS brand, light and dark); Windows sign-in; People admin; no-access page; audit table | Opens QA, is greeted by name, adds a person and ticks roles | On QA (deployed 25 Nov 2026) |
 | 1 | Suppliers; lists; add and edit contract with built-in fields; documents; Contracts list and search; contract page; Confidential | Raises a contract with documents and finds it again | Built and tested (35 API tests on SQL Server; browser walkthrough at 375px and 1280px, light and dark); deploying to QA |
-| 2 | Contract fields and sections (add, move, rename, hide, require, preview, history, put back, after-Effective rule); added fields in forms, list columns, filters and CSV | Adds "Insurance expiry" and "Site contact" fields and sees them on contracts | Built and tested (designer with preview, history and put back; added fields on forms, contract page and list columns). Added fields are columns in the Contracts Excel export and import (D-52); Filters on the Contracts list (D-54). Still to do in this slice: required-field check when leaving Draft (needs slice 3) |
-| 3 | Legal back-and-forth; progress tracker; Activity; hand-over emails | Sends to Legal, gets it back, always sees whose turn it is | Not started |
+| 2 | Contract fields and sections (add, move, rename, hide, require, preview, history, put back, after-Effective rule); added fields in forms, list columns, filters and CSV | Adds "Insurance expiry" and "Site contact" fields and sees them on contracts | Built and tested (designer with preview, history and put back; added fields on forms, contract page and list columns). Added fields are columns in the Contracts Excel export and import (D-52); Filters on the Contracts list (D-54). Required fields are checked when a contract leaves Draft (built with slice 3). Done |
+| 3 | Legal back-and-forth; progress tracker; Activity; hand-over emails | Sends to Legal, gets it back, always sees whose turn it is | Built and tested (Send to Legal, I'll take it, status, give to a colleague, send to owner, Legal cleared with outcome; Ready for signing when Legal is unticked; withdraw up to Signing; Legal conversation; "With Legal" list; emails per D-57; 50 API tests on SQL Server, 10 runs green; browser walkthrough as owner and Legal, phone and dark). Deploying to QA |
 | 4 | Signing; approval and register; lock; phone approve page | Approves from a phone; the contract locks | Not started |
 | 5 | Home tiles; Urgent; Choose what I see; Ctrl+K | Their own to-do list | Not started |
 | 6 | Reminders job and emails; escalation; renewal radar; renewal decisions; Renew; End; Archive | Gets a reminder email and records a decision | Not started |
@@ -342,6 +342,7 @@ Help ("?") ships with each screen, not as a slice of its own.
 ## 18. Planned for later
 
 - **In-app Feedback** button and page, shared with other JBS apps: see features/feedback.md.
+- **Different forms and fields for different types of contract** (Jeff, 25 Nov): for example a freight agreement asking for different fields from an NDA. To talk through with Jeff before designing; it builds on Admin, Contract fields (slice 2).
 
 ## 18a. Not in version 1
 

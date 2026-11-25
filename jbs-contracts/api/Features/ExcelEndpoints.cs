@@ -551,8 +551,8 @@ public static class ExcelEndpoints
                     before = await ContractEndpoints.LoadByReferenceAsync(x.C, x.Tx, reference);
                     if (before is null || !ContractAccess.CanSee(x.Me, before.IsConfidential, before.OwnerId, before.BackupOwnerId))
                     { r.Refuse($"Reference: there's no contract {reference}. Leave Reference blank to add a new contract."); continue; }
-                    if (!ContractAccess.CanEdit(x.Me, before.Stage, before.IsLocked))
-                        onlyDrafts = $"{before.Reference} is in {ContractEndpoints.StageNames[before.Stage]}; only drafts can be changed by import.";
+                    if (!ContractAccess.CanEdit(x.Me, before))
+                        onlyDrafts = $"{before.Reference} is in {ContractEndpoints.StageNames[before.Stage]}, so it can't be changed by import now.";
                     r.Label = $"{before.Reference} {before.Title}";
                 }
 

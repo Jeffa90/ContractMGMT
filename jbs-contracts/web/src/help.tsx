@@ -70,7 +70,7 @@ export const help = {
         </p>
         <p>
           Fields your admin added have their own columns. For a pick-from-a-list field, type the option as it's shown (several are separated by commas); for a person,
-          their Windows logon or full name. Only drafts can be changed by import; rows for other contracts are fine as long as they change nothing.
+          their Windows logon or full name. Only contracts you could edit on screen (drafts, or ones back with the owner from Legal) can be changed by import; rows for other contracts are fine as long as they change nothing.
         </p>
       </>
     ),
@@ -79,9 +79,17 @@ export const help = {
     title: 'Working on a contract',
     body: (
       <>
-        <p>The top of the page shows where the contract is up to: Draft, Legal review, Signing, Approval, then Effective.</p>
+        <p>The top of the page shows where the contract is up to (Draft, Legal review, Signing, Approval, then Effective), who has it and what happens next.</p>
         <p>
-          <strong>While it is a draft</strong>, click <strong>Edit details</strong> to fill in or change anything. Only a title is needed to start; the rest can wait.
+          <strong>While it is a draft</strong>, click <strong>Edit details</strong> to fill in or change anything. Only a title is needed to start; the rest can wait
+          until you send it on, when the required fields are checked.
+        </p>
+        <p>
+          <strong>Legal review</strong> passes back and forth. <strong>Send to Legal</strong> hands it over; someone in Legal clicks <strong>I'll take it</strong>.
+          Legal can <strong>Send to owner</strong> with what's needed (often to negotiate with the supplier), and any contract owner can make the changes and send
+          it back. On Legal's turn the details are frozen, but anyone involved can still add documents. When Legal is happy they click{' '}
+          <strong>Legal cleared</strong> with a short outcome, and it moves to Signing. Each hand-over emails the people whose turn it is, and is kept in the{' '}
+          <strong>Legal conversation</strong>.
         </p>
         <p>
           <strong>Documents</strong>: choose the kind, then <strong>Add document</strong>. Use <strong>New version</strong> to replace a document while keeping the earlier ones.
@@ -90,7 +98,7 @@ export const help = {
         <p>
           <strong>Activity</strong> lists everything that has happened to the contract, newest first. It can't be changed.
         </p>
-        <p>If a draft isn't going ahead, use <strong>Withdraw this draft</strong> at the bottom and say why. Nothing is deleted.</p>
+        <p>If a contract isn't going ahead (before it's approved), use <strong>Withdraw this contract</strong> at the bottom and say why. Nothing is deleted.</p>
       </>
     ),
   },

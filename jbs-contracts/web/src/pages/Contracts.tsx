@@ -11,11 +11,23 @@ import { api } from '@/lib/api'
 import { chosenFilters, filterFields, filterPrefix } from '@/lib/filters'
 import type { Layout } from '@/lib/layout'
 import type { ContractListItem } from '@/lib/contracts'
-import { daysUntil, formatDate } from '@/lib/format'
+import { daysUntil, formatDate, waited } from '@/lib/format'
 import { useMe } from '@/lib/me'
 import { help } from '@/help'
 
-type View = 'mine' | 'all' | 'drafts' | 'closed'
+type View = 'mine' | 'all' | 'legal' | 'drafts' | 'closed'
+
+/** During Legal review: whose turn and for how long, e.g. "Legal's turn · Sam Lee · 6 days". */
+function Turn({ c }: { c: ContractListItem }) {
+  if (c.stage !== 'LegalReview' || !c.whoseTurn) return null
+  const who = c.whoseTurn === 'Legal' ? (c.legalPersonName ? `Legal's turn · ${c.legalPersonName}` : 'New for Legal to pick up') : "Owner's turn"
+  return (
+    <span className="mt-1 block text-xs text-muted-foreground">
+      {who}
+      {c.turnSinceUtc && ` · ${waited(c.turnSinceUtc)}`}
+    </span>
+  )
+}
 
 /** The one date that matters most: the notice deadline, else the end date. */
 function KeyDate({ c }: { c: ContractListItem }) {
@@ -35,7 +47,7 @@ export function ContractsPage() {
   const { person } = useMe()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const view = (params.get('view') as View) || (person.roles.contractOwner ? 'mine' : 'all')
+  const view = (params.get('view') as View) || (person.roles.contractOwner ? 'mine' : person.roles.legal ? 'legal' : 'all')
   const q = params.get('q') ?? ''
   const [search, setSearch] = useState(q)
 
@@ -113,6 +125,7 @@ export function ContractsPage() {
             options={[
               ...(person.roles.contractOwner ? [{ value: 'mine' as View, label: 'My contracts' }] : []),
               { value: 'all', label: 'All' },
+              { value: 'legal', label: 'With Legal' },
               { value: 'drafts', label: 'Drafts' },
               { value: 'closed', label: 'Closed' },
             ]}
@@ -162,7 +175,9 @@ export function ContractsPage() {
                 ? `No contracts match "${q}".`
                 : view === 'mine'
                   ? "You don't own any contracts yet. Contracts you add, or are made owner or backup of, appear here."
-                  : view === 'drafts'
+                  : view === 'legal'
+                    ? 'Nothing is with Legal right now.'
+                    : view === 'drafts'
                     ? 'No drafts right now.'
                     : view === 'closed'
                       ? 'No closed contracts yet.'
@@ -217,6 +232,7 @@ export function ContractsPage() {
                     <td className="px-4 py-3">{c.supplierName ?? <span className="text-muted-foreground">Not chosen</span>}</td>
                     <td className="px-4 py-3">
                       <StageBadge stage={c.stage} name={c.stageName} />
+                      <Turn c={c} />
                     </td>
                     <td className="px-4 py-3">{c.ownerName}</td>
                     <td className="tabular px-4 py-3">
@@ -242,6 +258,7 @@ export function ContractsPage() {
                 <span className="mt-1 block text-xs text-muted-foreground">
                   {c.reference} · {c.supplierName ?? 'No supplier yet'}
                 </span>
+                <Turn c={c} />
                 <span className="tabular mt-2 block text-sm">
                   <KeyDate c={c} />
                 </span>

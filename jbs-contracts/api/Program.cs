@@ -59,6 +59,7 @@ app.MapPeopleEndpoints();
 app.MapListsEndpoints();
 app.MapSupplierEndpoints();
 app.MapContractEndpoints();
+app.MapLegalEndpoints();
 app.MapDocumentEndpoints();
 app.MapExcelEndpoints();
 app.MapLayoutEndpoints();

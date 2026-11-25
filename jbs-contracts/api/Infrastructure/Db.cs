@@ -17,11 +17,17 @@ public sealed class Db(AppSettings settings)
     }
 
     /// <summary>
-    /// Takes turns on one area (people, lists, suppliers) for the rest of the transaction. Every change to an area takes its lock first,
-    /// so two changes to the same area queue for a moment instead of deadlocking. The audit lock is always taken after it.
+    /// Begins a transaction that changes data. Every change takes the same short turn first (an application lock held until the
+    /// transaction ends), so changes queue for a moment and can never deadlock one another, whatever they touch. The audit chain is
+    /// written one event at a time anyway, so this costs nothing in practice for an app of this size.
     /// </summary>
-    public static Task LockAsync(SqlConnection c, SqlTransaction tx, string area) =>
-        c.ExecuteAsync("EXEC sp_getapplock @Resource = @area, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 30000", new { area = $"contracts.{area}" }, tx);
+    public static async Task<SqlTransaction> BeginWriteAsync(SqlConnection c)
+    {
+        var tx = c.BeginTransaction();
+        await c.ExecuteAsync("EXEC sp_getapplock @Resource = N'contracts.write', @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 60000",
+            transaction: tx);
+        return tx;
+    }
 
     public async Task<SqlConnection> OpenAsync(CancellationToken ct = default)
     {

@@ -140,7 +140,7 @@ public static class ContractEndpoints
             if (refusal is not null) return refusal;
             if (!me!.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can add contracts. Ask your admin if you need to.");
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction();
+            await using var tx = await Db.BeginWriteAsync(c);
             var (id, reference, errors) = await CreateDraftAsync(c, tx, audit, me, body);
             if (errors is not null) return ApiResults.Invalid("Check the highlighted details.", errors);
             await tx.CommitAsync();
@@ -152,7 +152,7 @@ public static class ContractEndpoints
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction();
+            await using var tx = await Db.BeginWriteAsync(c);
             var before = await LoadForUpdateAsync(c, tx, id);
             if (before is null || !ContractAccess.CanSee(me!, before.IsConfidential, before.OwnerId, before.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
@@ -174,7 +174,7 @@ public static class ContractEndpoints
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction();
+            await using var tx = await Db.BeginWriteAsync(c);
             var before = await LoadForUpdateAsync(c, tx, id);
             if (before is null || !ContractAccess.CanSee(me!, before.IsConfidential, before.OwnerId, before.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");

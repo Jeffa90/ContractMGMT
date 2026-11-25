@@ -18,6 +18,11 @@ public sealed class AppSettings
     /// <summary>Apply database/*.sql at start-up. Local development and tests only; on the servers the deploy applies them.</summary>
     public bool ApplyDatabaseScripts { get; init; }
 
+    /// <summary>The address people open, used for links in emails (e.g. https://jbs-contracts-qa.jbssa.com.au).</summary>
+    public string? SiteUrl { get; init; }
+    /// <summary>The JBS mail relay. When no host is set, emails are kept in the outbox and logged, not sent (local development and tests).</summary>
+    public EmailSettings Email { get; init; } = new();
+
     public string? FontsDirectory => string.IsNullOrWhiteSpace(DataDirectory) ? null : Path.Combine(DataDirectory, "fonts");
     public string? DocumentsDirectory => string.IsNullOrWhiteSpace(DataDirectory) ? null : Path.Combine(DataDirectory, "documents");
 
@@ -67,9 +72,27 @@ public sealed class AppSettings
             LogRetainedFiles = int.TryParse(Read("Logging:RetainedFiles", "Ecp:Logging:RetainedFiles"), out var n) && n > 0 ? n : 31,
             FirstAdmins = admins,
             AuthMode = authMode,
+            SiteUrl = Read("SiteUrl")?.TrimEnd('/'),
+            Email = new EmailSettings
+            {
+                Host = Read("Email:Host"),
+                Port = int.TryParse(Read("Email:Port"), out var port) ? port : 25,
+                From = Read("Email:From") ?? "no-reply@jbssa.com.au",
+                FromName = Read("Email:FromName") ?? "JBS Contracts",
+                PollSeconds = int.TryParse(Read("Email:PollSeconds"), out var poll) && poll > 0 ? poll : 30,
+            },
             ApplyDatabaseScripts = applyScripts,
         };
     }
+}
+
+public sealed class EmailSettings
+{
+    public string? Host { get; init; }
+    public int Port { get; init; } = 25;
+    public string From { get; init; } = "no-reply@jbssa.com.au";
+    public string FromName { get; init; } = "JBS Contracts";
+    public int PollSeconds { get; init; } = 30;
 }
 
 public sealed record FirstAdmin(string Account, string Name, string Email);

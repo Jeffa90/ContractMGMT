@@ -54,8 +54,7 @@ public static class PeopleEndpoints
             if (invalid is not null) return invalid;
 
             await using var connection = await db.OpenAsync();
-            await using var tx = connection.BeginTransaction();
-            await Db.LockAsync(connection, tx, "people");
+            await using var tx = await Db.BeginWriteAsync(connection);
             var clash = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WITH (UPDLOCK, HOLDLOCK) WHERE AccountKey = @key",
                 new { key = WindowsAccount.Key(input.Account) }, tx);
             if (clash is not null)
@@ -75,6 +74,7 @@ public static class PeopleEndpoints
             if (previousHead is not null)
                 await audit.WriteAsync(connection, tx, me.AsActor(), "person.group-head-moved", "Person", previousHead.Id,
                     $"{me.Name} made {input.Name} the Group Head in place of {previousHead.Name}, who stays an approver (backup).");
+            await QueueWelcomeAsync(connection, tx, id, input.Name, input.Email, input.Account, Describe(input.Roles), me.Name, settings);
             await tx.CommitAsync();
             var saved = await connection.QuerySingleAsync<Person>("SELECT * FROM contracts.Person WHERE Id = @id", new { id });
             return Results.Created($"/api/people/{id}", PersonView.From(saved));
@@ -90,8 +90,7 @@ public static class PeopleEndpoints
             if (invalid is not null) return invalid;
 
             await using var connection = await db.OpenAsync();
-            await using var tx = connection.BeginTransaction();
-            await Db.LockAsync(connection, tx, "people");
+            await using var tx = await Db.BeginWriteAsync(connection);
             var before = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that person.");
             if (Convert.ToBase64String(before.RowVersion) != input.RowVersion)
@@ -141,6 +140,12 @@ public static class PeopleEndpoints
             return Results.Ok(PersonView.From(saved));
         });
     }
+
+    /// <summary>"You've been given access" email, queued with the change (sent by the background sender).</summary>
+    public static Task QueueWelcomeAsync(SqlConnection c, SqlTransaction tx, int personId, string name, string email, string account, string roles, string addedBy, AppSettings settings) =>
+        EmailOutbox.QueueAsync(c, tx, "access-granted", email, name,
+            EmailTemplates.AccessGranted(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? name, addedBy, roles, account, settings.SiteUrl),
+            personId: personId, dedupeKey: $"access-granted:{personId}");
 
     private sealed record Input(string Account, string Name, string Email, Roles Roles, bool? IsActive, string? RowVersion);
 

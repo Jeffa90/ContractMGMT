@@ -166,7 +166,10 @@ public sealed class ExcelTests(AppFixture app)
         // The export lists it, and importing the export changes nothing.
         var export = await (await owner.GetAsync("/api/excel/contracts", Ct)).Content.ReadAsByteArrayAsync(Ct);
         var (_, again) = await PostAsync(owner, "contracts", "preview", export);
-        Assert.Equal((0, 0, 0), (Count(again, "added"), Count(again, "updated"), Count(again, "refused")));
+        Assert.Equal((0, 0), (Count(again, "added"), Count(again, "refused")));
+        // Other tests change their own contracts in parallel, so check this contract's row: re-importing the export changes nothing.
+        var mine = again.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("label").GetString()!.StartsWith((string)row.Reference));
+        Assert.Equal("same", mine.GetProperty("action").GetString());
         Assert.Null(await AuditLog.VerifyAsync(db));
     }
 }

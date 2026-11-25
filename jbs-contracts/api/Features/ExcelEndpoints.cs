@@ -84,9 +84,7 @@ public static class ExcelEndpoints
         if (problem is not null) return ApiResults.Invalid(problem, new() { ["file"] = problem });
 
         await using var c = await db.OpenAsync();
-        await using var tx = c.BeginTransaction();
-        // Take turns with other changes to the same area (contracts may add suppliers).
-        await Db.LockAsync(c, tx, k.Name == "contracts" ? "suppliers" : k.Name);
+        await using var tx = await Db.BeginWriteAsync(c);
         var ctx = new Ctx(c, tx, me!, audit, settings);
         var plan = await k.Plan(ctx, rows);
         var counts = new
@@ -219,6 +217,7 @@ public static class ExcelEndpoints
                             OUTPUT INSERTED.Id VALUES (@acc, @n, @e, @co, @le, @ap, @gh, @ad, @au, @act, @me, @me)
                             """, args, x.Tx);
                         await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "person.added", "Person", id, $"{x.Me.Name} added {n} ({acc}) as {roleText}{Via}.", args);
+                        await PeopleEndpoints.QueueWelcomeAsync(x.C, x.Tx, id, n, e, acc, roleText, x.Me.Name, x.Settings);
                     }
                     else
                     {

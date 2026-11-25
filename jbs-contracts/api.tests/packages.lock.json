@@ -483,6 +483,11 @@
         "resolved": "5.0.0",
         "contentHash": "dDoKi0PnDz31yAyETfRntsLArTlVAVzUzCIvvEDsDsucrl33Dl8pIJG06ePTJTI3tGpeyHS9Cq7Foc/s4EeKcg=="
       },
+      "MimeKit.Core": {
+        "type": "Transitive",
+        "resolved": "5.0.0",
+        "contentHash": "0RLaVyex/BjUGqiw9xtGwzyCMaBcsu33Rth61bDCeVeQaaQK7tjcy4TA+nHKTqwUdp4OGd+gnhuq2fuR+c20qA=="
+      },
       "RBush.Signed": {
         "type": "Transitive",
         "resolved": "4.0.0",
@@ -690,6 +695,7 @@
         "dependencies": {
           "ClosedXML": "[0.105.1, )",
           "Dapper": "[2.1.100, )",
+          "MailKit": "[5.0.0, )",
           "Microsoft.Data.SqlClient": "[7.1.2, )",
           "Serilog.AspNetCore": "[11.0.0, )",
           "Serilog.Formatting.Compact": "[3.0.0, )",
@@ -714,6 +720,15 @@
         "requested": "[2.1.100, )",
         "resolved": "2.1.100",
         "contentHash": "zKwgGfxkDIVLGU2WIsl57DwTgj17+fa5v0u2eiVMxU92GXN2fRIn2M8QMGtyGFrPSbVOYKgGFxAxEFL6CB9tTw=="
+      },
+      "MailKit": {
+        "type": "CentralTransitive",
+        "requested": "[5.0.0, )",
+        "resolved": "5.0.0",
+        "contentHash": "PG6hnsklTzd/iK9A6j03OxDOas9mh8zOBkbPzcsLmFOODE8Hw3HTy7HAKiJvVHXNpKc3/KMVG/4QvOAKCBbGhA==",
+        "dependencies": {
+          "MimeKit.Core": "5.0.0"
+        }
       },
       "Microsoft.Data.SqlClient": {
         "type": "CentralTransitive",

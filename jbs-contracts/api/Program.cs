@@ -12,6 +12,16 @@ builder.Services.AddSingleton<AuditLog>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUser>();
 builder.Services.AddAppAuthentication(settings);
+// Email (decision D-45): the JBS relay when a host is set; otherwise emails are kept and logged, not sent.
+if (!string.IsNullOrWhiteSpace(settings.Email.Host))
+    builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+else
+{
+    builder.Services.AddSingleton<CaptureEmailSender>();
+    builder.Services.AddSingleton<IEmailSender>(sp => sp.GetRequiredService<CaptureEmailSender>());
+}
+builder.Services.AddSingleton<EmailDispatcher>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<EmailDispatcher>());
 
 var app = builder.Build();
 

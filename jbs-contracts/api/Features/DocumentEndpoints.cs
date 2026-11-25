@@ -95,7 +95,7 @@ public static class DocumentEndpoints
             if (fields.Count > 0) return ApiResults.Invalid("Check the file.", fields);
 
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction();
+            await using var tx = await Db.BeginWriteAsync(c);
             var contract = await ContractEndpoints.LoadForUpdateAsync(c, tx, id);
             if (contract is null || !ContractAccess.CanSee(me!, contract.IsConfidential, contract.OwnerId, contract.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
@@ -186,7 +186,7 @@ public static class DocumentEndpoints
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction();
+            await using var tx = await Db.BeginWriteAsync(c);
             var contract = await ContractEndpoints.LoadForUpdateAsync(c, tx, id);
             if (contract is null || !ContractAccess.CanSee(me!, contract.IsConfidential, contract.OwnerId, contract.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");

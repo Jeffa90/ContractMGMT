@@ -129,7 +129,7 @@ public sealed class ApprovalTests(AppFixture app)
         Assert.False(effective.GetProperty("canEdit").GetBoolean());
         Assert.False(effective.GetProperty("canUpload").GetBoolean());
         Assert.False(effective.GetProperty("canWithdraw").GetBoolean());
-        Assert.Empty(Actions(effective));
+        Assert.Equal(["recordDecision", "endEarly", "reviewDone"], Actions(effective)); // only its renewal actions (slice 6)
         Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.EmailOutbox WHERE ContractId = @id AND Kind = 'approved' AND PersonId = @ownerId", new { id, ownerId }));
 
         // Locked means locked: edits, documents and withdrawal are refused on the server.

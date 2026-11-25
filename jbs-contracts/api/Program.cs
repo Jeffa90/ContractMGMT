@@ -22,6 +22,8 @@ else
 }
 builder.Services.AddSingleton<EmailDispatcher>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<EmailDispatcher>());
+builder.Services.AddSingleton<ReminderJob>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ReminderJob>());
 
 var app = builder.Build();
 
@@ -63,6 +65,8 @@ app.MapLegalEndpoints();
 app.MapApprovalEndpoints();
 app.MapHomeEndpoints();
 app.MapDemoDataEndpoints();
+app.MapRenewalEndpoints();
+app.MapReminderAdminEndpoints();
 app.MapDocumentEndpoints();
 app.MapExcelEndpoints();
 app.MapLayoutEndpoints();

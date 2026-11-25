@@ -14,6 +14,7 @@ import {
   Inbox,
   ListChecks,
   Scale,
+  RefreshCw,
   Search,
   Sparkles,
   SlidersHorizontal,
@@ -47,6 +48,7 @@ const tileIcons: Record<string, ReactNode> = {
   'ending-90': <CalendarClock aria-hidden className="size-5" />,
   'legal-waiting-owner': <Hourglass aria-hidden className="size-5" />,
   'owner-inactive': <UserX aria-hidden className="size-5" />,
+  'no-decision': <RefreshCw aria-hidden className="size-5" />,
 }
 
 function TileCard({ tile }: { tile: Tile }) {
@@ -80,7 +82,7 @@ function Urgent({ items }: { items: HomeData['urgent'] }) {
           {shown.map((u) => {
             const overdue = u.days < 0
             return (
-              <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <li key={`${u.kind}-${u.id}`} className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div className="flex min-w-0 items-start gap-3">
                   {overdue ? (
                     <AlertTriangle aria-hidden className="mt-0.5 size-5 shrink-0 text-danger" />
@@ -93,7 +95,9 @@ function Urgent({ items }: { items: HomeData['urgent'] }) {
                       {u.title} <span className="text-sm font-normal text-muted-foreground">{u.reference}{u.supplierName ? ` · ${u.supplierName}` : ''}</span>
                     </p>
                     <p className={overdue ? 'text-sm font-medium text-danger' : 'text-sm font-medium text-warning'}>
-                      {overdue
+                      {u.kind === 'Ended'
+                        ? `Its end date passed ${-u.days === 1 ? 'yesterday' : `${-u.days} days ago`} (${formatDate(u.deadline)}) with no decision`
+                        : overdue
                         ? `The notice deadline was ${-u.days === 1 ? 'yesterday' : `${-u.days} days ago`} (${formatDate(u.deadline)})`
                         : u.days === 0
                           ? `The notice deadline is today (${formatDate(u.deadline)})`
@@ -101,8 +105,8 @@ function Urgent({ items }: { items: HomeData['urgent'] }) {
                     </p>
                   </div>
                 </div>
-                <Link to={`/contracts/${u.id}`} className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-input bg-card px-4 text-sm font-medium hover:bg-muted">
-                  Open
+                <Link to={`/contracts/${u.id}?decide=1`} className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-input bg-card px-4 text-sm font-medium hover:bg-muted">
+                  Record decision
                 </Link>
               </li>
             )

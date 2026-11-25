@@ -44,6 +44,17 @@ public sealed class ContractRow
     public DateTime? RegisteredUtc { get; set; }
     public int? RegisteredById { get; set; }
     public bool? RegisteredAsBackup { get; set; }
+    public string? RenewalDecision { get; set; }
+    public DateTime? RenewalDecisionUtc { get; set; }
+    public int? RenewalDecisionById { get; set; }
+    public string? RenewalDecisionNote { get; set; }
+    public DateTime? PlannedEndDate { get; set; }
+    public DateTime? EndedOn { get; set; }
+    public string? EndedReason { get; set; }
+    public int? EndedById { get; set; }
+    public int? RenewsContractId { get; set; }
+    public DateTime? LastReviewedOn { get; set; }
+    public int? LastReviewedById { get; set; }
     public DateTime CreatedUtc { get; set; }
     public int CreatedById { get; set; }
     public DateTime UpdatedUtc { get; set; }
@@ -61,6 +72,12 @@ public sealed class ContractRow
     public string? LegalPersonName { get; set; }
     public string? LegalClearedByName { get; set; }
     public string? RegisteredByName { get; set; }
+    public string? RenewalDecisionByName { get; set; }
+    public string? EndedByName { get; set; }
+    public string? RenewsReference { get; set; }
+    public int? RenewedById { get; set; }
+    public string? RenewedByReference { get; set; }
+    public string? RenewedByStage { get; set; }
 
     /// <summary>The last day to give notice: end date (or, for an evergreen contract, review date) minus the notice period.</summary>
     public DateTime? NoticeDeadline => NoticePeriodDays is not { } days ? null
@@ -88,7 +105,8 @@ public static class ContractEndpoints
     private const string SelectContract = """
         SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName,
-               o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName, rb.Name AS RegisteredByName
+               o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName, rb.Name AS RegisteredByName,
+               rd.Name AS RenewalDecisionByName, eb.Name AS EndedByName, ren.Reference AS RenewsReference, rn.RenewedById, rn.RenewedByReference, rn.RenewedByStage
         FROM contracts.Contract k
         LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
         LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId
@@ -102,6 +120,11 @@ public static class ContractEndpoints
         LEFT JOIN contracts.Person lp ON lp.Id = k.LegalPersonId
         LEFT JOIN contracts.Person lc ON lc.Id = k.LegalClearedById
         LEFT JOIN contracts.Person rb ON rb.Id = k.RegisteredById
+        LEFT JOIN contracts.Person rd ON rd.Id = k.RenewalDecisionById
+        LEFT JOIN contracts.Person eb ON eb.Id = k.EndedById
+        LEFT JOIN contracts.Contract ren ON ren.Id = k.RenewsContractId
+        OUTER APPLY (SELECT TOP (1) r2.Id AS RenewedById, r2.Reference AS RenewedByReference, r2.Stage AS RenewedByStage FROM contracts.Contract r2
+                     WHERE r2.RenewsContractId = k.Id AND r2.Stage <> N'Withdrawn' ORDER BY r2.Id DESC) rn
         """;
 
     public static void MapContractEndpoints(this IEndpointRouteBuilder app)
@@ -160,6 +183,8 @@ public static class ContractEndpoints
                 conversation = await LegalEndpoints.ConversationAsync(c, id),
                 actions = LegalEndpoints.Actions(me!, row),
                 approvals = await ApprovalEndpoints.HistoryAsync(c, id),
+                renewal = RenewalEndpoints.View(row),
+                reminders = await RenewalEndpoints.RemindersAsync(c, id),
                 sentBack = await ApprovalEndpoints.SentBackAsync(c, row),
                 cannotApproveReason = row.Stage == "Approval" && me!.IsApprover && ApprovalEndpoints.IsInvolved(me, row)
                     ? "You can't approve this one because you raised it, own it or are its backup. Another approver can." : null,
@@ -355,6 +380,8 @@ public static class ContractEndpoints
         r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
         StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc), r.IsLocked, r.WithdrawnReason,
         RegisteredUtc = Utc(r.RegisteredUtc), r.RegisteredByName, r.RegisteredAsBackup,
+        r.RenewsContractId, r.RenewsReference, r.RenewedById, r.RenewedByReference, RenewedByStageName = r.RenewedByStage is { } rs ? StageNames[rs] : null,
+        EndedOn = D(r.EndedOn), r.EndedReason, r.EndedByName, LastReviewedOn = D(r.LastReviewedOn),
         CreatedUtc = DateTime.SpecifyKind(r.CreatedUtc, DateTimeKind.Utc), r.CreatedByName, RowVersion = Convert.ToBase64String(r.RowVersion),
     };
 

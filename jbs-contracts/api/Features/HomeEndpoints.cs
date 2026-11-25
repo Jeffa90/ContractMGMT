@@ -32,6 +32,12 @@ public static class HomeEndpoints
             $"k.Stage = N'Signing' AND {Mine} AND {LatestSentBack}"),
         new("signed-copy-due", "turn", "Signed copy due", "In Signing: send for approval once signed", p => p.IsContractOwner,
             $"k.Stage = N'Signing' AND {Mine} AND NOT {LatestSentBack}"),
+        new("no-decision", "turn", "No renewal decision", "Notice deadline or end date within 90 days, and no decision yet", p => p.IsContractOwner,
+            $"""
+            k.Stage = N'Effective' AND {Mine} AND k.RenewalDecision IS NULL
+            AND ((k.NoticePeriodDays IS NOT NULL AND {NoticeDeadline} <= DATEADD(DAY, 90, @today))
+                 OR (k.NoticePeriodDays IS NULL AND k.IsEvergreen = 0 AND k.EndDate <= DATEADD(DAY, 90, @today)))
+            """),
         new("drafts", "turn", "Your drafts", "Not sent on yet", p => p.IsContractOwner,
             $"k.Stage = N'Draft' AND {Mine}"),
         // Legal.
@@ -44,7 +50,7 @@ public static class HomeEndpoints
             $"k.Stage = N'Approval' AND {NotInvolved}"),
         // Coming up.
         new("notice-30", "coming", "Notice deadline in 30 days", "Your Effective contracts: the last day to give notice is close", p => p.IsContractOwner,
-            $"k.Stage = N'Effective' AND {Mine} AND k.NoticePeriodDays IS NOT NULL AND {NoticeDeadline} BETWEEN @today AND DATEADD(DAY, 30, @today)"),
+            $"k.Stage = N'Effective' AND {Mine} AND k.RenewalDecision IS NULL AND k.NoticePeriodDays IS NOT NULL AND {NoticeDeadline} BETWEEN @today AND DATEADD(DAY, 30, @today)"),
         new("ending-90", "coming", "Ending in 90 days", "Your Effective contracts with an end date soon", p => p.IsContractOwner,
             $"k.Stage = N'Effective' AND {Mine} AND k.EndDate BETWEEN @today AND DATEADD(DAY, 90, @today)"),
         new("legal-waiting-owner", "coming", "Waiting on the owner", "Your Legal reviews that are with the owner", p => p.IsLegal,
@@ -62,6 +68,7 @@ public static class HomeEndpoints
 
     private sealed class UrgentRow
     {
+        public string Kind { get; set; } = "Notice";
         public int Id { get; set; }
         public string Reference { get; set; } = "";
         public string Title { get; set; } = "";
@@ -100,10 +107,14 @@ public static class HomeEndpoints
             // Urgent: notice deadlines on their Effective contracts that have passed (while the contract hasn't ended) or are within 7 days.
             var urgent = me!.IsContractOwner
                 ? (await c.QueryAsync<UrgentRow>($"""
-                    SELECT k.Id, k.Reference, k.Title, s.Name AS SupplierName, {NoticeDeadline} AS Deadline
+                    SELECT N'Notice' AS Kind, k.Id, k.Reference, k.Title, s.Name AS SupplierName, {NoticeDeadline} AS Deadline
                     FROM contracts.Contract k LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
                     WHERE {ContractAccess.VisibleSql("k")} AND k.Stage = N'Effective' AND {Mine} AND k.NoticePeriodDays IS NOT NULL
-                      AND {NoticeDeadline} <= DATEADD(DAY, 7, @today) AND (k.IsEvergreen = 1 OR k.EndDate >= @today)
+                      AND k.RenewalDecision IS NULL AND {NoticeDeadline} <= DATEADD(DAY, 7, @today) AND (k.IsEvergreen = 1 OR k.EndDate >= @today)
+                    UNION ALL
+                    -- Its end date has passed, it's still Effective and nobody decided anything.
+                    SELECT N'Ended' AS Kind, k.Id, k.Reference, k.Title, s.Name AS SupplierName, k.EndDate AS Deadline FROM contracts.Contract k LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
+                    WHERE {ContractAccess.VisibleSql("k")} AND k.Stage = N'Effective' AND {Mine} AND k.RenewalDecision IS NULL AND k.IsEvergreen = 0 AND k.EndDate < @today
                     ORDER BY Deadline
                     """, parameters)).ToList()
                 : [];
@@ -117,7 +128,7 @@ public static class HomeEndpoints
                 urgent = urgent.Select(u =>
                 {
                     var deadline = DateOnly.FromDateTime(u.Deadline);
-                    return new { u.Id, u.Reference, u.Title, u.SupplierName, Deadline = deadline, Days = deadline.DayNumber - today.DayNumber };
+                    return new { u.Kind, u.Id, u.Reference, u.Title, u.SupplierName, Deadline = deadline, Days = deadline.DayNumber - today.DayNumber };
                 }),
                 preferences = new { hiddenTiles = JsonSerializer.Deserialize<string[]>(pref.HiddenTiles) ?? [], firstGroup = pref.FirstGroup },
             });

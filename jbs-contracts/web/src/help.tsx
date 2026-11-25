@@ -114,7 +114,48 @@ export const help = {
           filled in for you). The Group Head confirms it and it becomes Effective and locked. If details must change during Signing, use{' '}
           <strong>Send back to Legal</strong> (or <strong>Back to draft</strong> if it didn't need Legal).
         </p>
+        <p>
+          <strong>Once it's Effective</strong>, the Renewal card is where you <strong>record a decision</strong> (Renew, Let it end or Renegotiate) before the
+          notice deadline, mark a <strong>review done</strong>, or <strong>end it early</strong> with a reason. Reminder emails stop once there's a decision.
+        </p>
         <p>If a contract isn't going ahead (before it's approved), use <strong>Withdraw this contract</strong> at the bottom and say why. Nothing is deleted.</p>
+      </>
+    ),
+  },
+  renewals: {
+    title: 'Renewals',
+    body: (
+      <>
+        <p>
+          Renewals lists Effective contracts whose <strong>notice deadline</strong> (the last day to give notice: the end date minus the notice period) or end date
+          is coming up, overdue first. The dots show the same contracts along the next 30, 60, 90 or 180 days; hollow dots already have a decision.
+        </p>
+        <p>
+          <strong>Record decision</strong>: <strong>Renew</strong> starts a new draft linked to this contract (it ends when the renewal becomes Effective);{' '}
+          <strong>Let it end</strong> ends it on its end date (for an evergreen contract, on the date you choose); <strong>Renegotiate</strong> means you're
+          changing terms through a Variation. Recording a decision stops the notice and end-date reminders.
+        </p>
+        <p>
+          Reminder emails go to the owner and backup before notice deadlines, end dates and review dates. Seven days before a notice deadline with no decision,
+          the Group Head is told too.
+        </p>
+      </>
+    ),
+  },
+  reminders: {
+    title: 'Reminders',
+    body: (
+      <>
+        <p>Reminders are checked every morning at 7:00am Brisbane time. A missed morning catches up the next day, and no reminder is ever sent twice.</p>
+        <p>
+          <strong>Days before</strong>: when each reminder goes out, for example 90, 60, 30, 14 and 7 days before the notice deadline. If a contract is added
+          late, only the most recent reminder is sent, not all the earlier ones.
+        </p>
+        <p>
+          <strong>Wording</strong>: plain text with placeholders such as {'{Reference}'} and {'{Due date}'}, filled in for each contract. Use the buttons to add
+          them. Anything else in braces is refused, and text is never treated as code or formatting. The preview shows it with a sample contract.
+        </p>
+        <p>Every saved change is kept in the History, with who made it and when.</p>
       </>
     ),
   },

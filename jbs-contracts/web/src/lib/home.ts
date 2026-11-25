@@ -3,7 +3,7 @@ export type TileGroup = 'turn' | 'coming' | 'admin'
 
 export type Tile = { key: string; group: TileGroup; label: string; help: string; count: number }
 
-export type UrgentItem = { id: number; reference: string; title: string; supplierName: string | null; deadline: string; days: number }
+export type UrgentItem = { kind: 'Notice' | 'Ended'; id: number; reference: string; title: string; supplierName: string | null; deadline: string; days: number }
 
 export type HomeData = {
   tiles: Tile[]

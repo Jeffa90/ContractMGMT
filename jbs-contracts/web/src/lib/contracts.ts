@@ -16,6 +16,7 @@ export type Supplier = {
 }
 
 export type WhoseTurn = 'Legal' | 'Owner'
+export type RenewalDecision = 'Renew' | 'LetItEnd' | 'Renegotiate'
 export type LegalStatus = 'NotStarted' | 'Reviewing' | 'WaitingOnSupplier' | 'WaitingOnOwner'
 
 export type Stage = 'Draft' | 'LegalReview' | 'Signing' | 'Approval' | 'Effective' | 'Ended' | 'Archived' | 'Withdrawn'
@@ -85,6 +86,15 @@ export type Contract = {
   registeredUtc: string | null
   registeredByName: string | null
   registeredAsBackup: boolean | null
+  renewsContractId: number | null
+  renewsReference: string | null
+  renewedById: number | null
+  renewedByReference: string | null
+  renewedByStageName: string | null
+  endedOn: string | null
+  endedReason: string | null
+  endedByName: string | null
+  lastReviewedOn: string | null
   createdUtc: string
   createdByName: string
   rowVersion: string
@@ -133,6 +143,10 @@ export type ContractAction =
   | 'backToDraft'
   | 'approve'
   | 'sendBack'
+  | 'recordDecision'
+  | 'endEarly'
+  | 'reviewDone'
+  | 'archive'
 
 export type ApprovalDecision = { decision: 'Approved' | 'SentBack'; byName: string; asBackupForName: string | null; atUtc: string; reason: string | null }
 
@@ -141,6 +155,16 @@ export type ContractDetail = {
   legal: LegalState
   conversation: LegalEntry[]
   actions: ContractAction[]
+  renewal: {
+    decision: RenewalDecision | null
+    decisionName: string | null
+    decidedByName: string | null
+    decidedUtc: string | null
+    note: string | null
+    plannedEndDate: string | null
+  }
+  /** Reminders sent for this contract, newest first. */
+  reminders: { kind: 'Notice' | 'Escalation' | 'End' | 'Review'; dueDate: string; daysBefore: number; sentUtc: string; recipients: string }[]
   /** Approval decisions, newest first. */
   approvals: ApprovalDecision[]
   /** While it's back in Signing because an approver sent it back: that decision. */

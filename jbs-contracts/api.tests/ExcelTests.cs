@@ -173,7 +173,7 @@ public sealed class ExcelTests(AppFixture app)
         Assert.Equal(0, Count(again, "added")); // rows with a reference never add
         // Other tests change their own contracts in parallel, so check this contract's row: re-importing the export changes nothing.
         var mine = again.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("label").GetString()!.StartsWith((string)row.Reference));
-        Assert.Equal("same", mine.GetProperty("action").GetString());
+        Assert.True(mine.GetProperty("action").GetString() == "same", mine.ToString());
 
         // Once a contract has moved past Draft, an unchanged row is fine and a change is refused.
         var rowVersion = (await owner.GetFromJsonAsync<JsonElement>($"/api/contracts/{(int)row.Id}", Ct)).GetProperty("contract").GetProperty("rowVersion").GetString();

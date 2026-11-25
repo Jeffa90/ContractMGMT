@@ -36,7 +36,7 @@ public static class LegalEndpoints
     public static List<string> Actions(Person me, ContractRow c)
     {
         var actions = new List<string>();
-        if (c.IsLocked) return actions;
+        if (c.IsLocked) return RenewalEndpoints.Actions(me, c); // Effective and Ended contracts are locked; only their own actions apply
         if (c.Stage == "Draft" && me.IsContractOwner) actions.Add(c.NeedsLegalReview ? "sendToLegal" : "readyForSigning");
         if (c.Stage == "LegalReview")
         {
@@ -54,6 +54,7 @@ public static class LegalEndpoints
         if (c.Stage == "Signing" && me.IsContractOwner)
             actions.AddRange(["sendForApproval", c.LegalClearedUtc is not null ? "sendBackToLegal" : "backToDraft"]);
         if (c.Stage == "Approval" && me.IsApprover && !ApprovalEndpoints.IsInvolved(me, c)) actions.AddRange(["approve", "sendBack"]);
+        actions.AddRange(RenewalEndpoints.Actions(me, c));
         return actions;
     }
 
@@ -144,7 +145,7 @@ public static class LegalEndpoints
 
         // Draft (needs Legal) or the owner's turn: hand it to Legal.
         group.MapPost("/send-to-legal", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (!x.Me.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can send a contract to Legal.");
@@ -176,7 +177,7 @@ public static class LegalEndpoints
 
         // A draft that doesn't need Legal goes straight to Signing.
         group.MapPost("/ready-for-signing", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (!x.Me.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can send a contract on.");
@@ -192,7 +193,7 @@ public static class LegalEndpoints
 
         // Legal: "I'll take it".
         group.MapPost("/legal/take", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (LegalOnly(x) is { } refusal) return refusal;
@@ -207,7 +208,7 @@ public static class LegalEndpoints
 
         // Legal: give it to a Legal colleague (or yourself).
         group.MapPost("/legal/assign", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (LegalOnly(x) is { } refusal) return refusal;
@@ -231,7 +232,7 @@ public static class LegalEndpoints
 
         // Legal, on Legal's turn: where it's up to (Reviewing or Waiting on supplier), with a short note. Doesn't change whose turn.
         group.MapPost("/legal/status", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (LegalOnly(x) is { } refusal) return refusal;
@@ -253,7 +254,7 @@ public static class LegalEndpoints
 
         // Legal, on Legal's turn: hand it to the owner, with a note saying what's needed.
         group.MapPost("/legal/send-to-owner", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (LegalOnly(x) is { } refusal) return refusal;
@@ -278,7 +279,7 @@ public static class LegalEndpoints
 
         // Legal, on Legal's turn: cleared, with an outcome note. The contract moves to Signing.
         group.MapPost("/legal/clear", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (LegalOnly(x) is { } refusal) return refusal;
@@ -303,10 +304,21 @@ public static class LegalEndpoints
 
     // ---------------------------------------------------------------- Helpers
 
-    internal sealed record Ctx(SqlConnection C, SqlTransaction Tx, Person Me, ContractRow Contract);
+    internal sealed record Ctx(SqlConnection C, SqlTransaction Tx, Person Me, ContractRow Contract, AuditLog? Log = null)
+    {
+        /// <summary>Anything the action returns to the page (for example the id of a renewal draft it started).</summary>
+        public object? Result { get; set; }
+
+        /// <summary>An audit event on this contract (shown in its Activity).</summary>
+        public Task Audit(string action, string summary, object? details) => AuditFor(Contract.Id, action, summary, details);
+
+        public Task AuditFor(int contractId, string action, string summary, object? details) =>
+            (Log ?? throw new InvalidOperationException("No audit log for this action."))
+                .WriteAsync(C, Tx, Me.AsActor(), action, "Contract", contractId, summary, details, contractId: contractId);
+    }
 
     /// <summary>Loads and locks the contract, checks it can be seen and the page isn't stale, runs the action, and commits when it succeeds.</summary>
-    internal static async Task<IResult> ActAsync(int id, LegalAction body, CurrentUser current, Db db, Func<Ctx, Task<IResult?>> action)
+    internal static async Task<IResult> ActAsync(int id, string? rowVersion, CurrentUser current, Db db, Func<Ctx, Task<IResult?>> action, AuditLog? audit = null)
     {
         var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
         if (refusal is not null) return refusal;
@@ -315,13 +327,14 @@ public static class LegalEndpoints
         var contract = await ContractEndpoints.LoadForUpdateAsync(c, tx, id);
         if (contract is null || !ContractAccess.CanSee(me!, contract.IsConfidential, contract.OwnerId, contract.BackupOwnerId))
             return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
-        if (Convert.ToBase64String(contract.RowVersion) != body.RowVersion)
+        if (Convert.ToBase64String(contract.RowVersion) != rowVersion)
             return ApiResults.Changed("Someone else changed this contract a moment ago, so nothing was done. Reload it to see the latest, then try again.");
-        var problem = await action(new Ctx(c, tx, me!, contract));
+        var x = new Ctx(c, tx, me!, contract, audit);
+        var problem = await action(x);
         if (problem is not null) return problem;
         await tx.CommitAsync();
-        var rowVersion = await c.ExecuteScalarAsync<byte[]>("SELECT RowVersion FROM contracts.Contract WHERE Id = @id", new { id });
-        return Results.Ok(new { id, rowVersion = Convert.ToBase64String(rowVersion!) });
+        var after = await c.ExecuteScalarAsync<byte[]>("SELECT RowVersion FROM contracts.Contract WHERE Id = @id", new { id });
+        return Results.Ok(new { id, rowVersion = Convert.ToBase64String(after!), x.Result });
     }
 
     private static IResult? LegalOnly(Ctx x) =>

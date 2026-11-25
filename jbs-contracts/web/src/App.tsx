@@ -12,6 +12,8 @@ import { ContractFieldsPage } from './pages/ContractFields'
 import { ContractFormPage } from './pages/ContractForm'
 import { ContractsPage } from './pages/Contracts'
 import { ListsPage } from './pages/Lists'
+import { ReminderSettingsPage } from './pages/ReminderSettings'
+import { RenewalsPage } from './pages/Renewals'
 import { PeoplePage } from './pages/People'
 import { SuppliersPage } from './pages/Suppliers'
 import { NoAccessPage, NotFoundPage, SignInProblemPage } from './pages/StatusPages'
@@ -35,10 +37,12 @@ const router = createBrowserRouter([
       { path: 'contracts/:id', element: <ContractDetailPage /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage /> },
       { path: 'contracts/:id/approve', element: <ApprovePage /> },
+      { path: 'renewals', element: <RenewalsPage /> },
       { path: 'suppliers', element: <SuppliersPage /> },
       { path: 'admin/people', element: <PeoplePage /> },
       { path: 'admin/lists', element: <ListsPage /> },
       { path: 'admin/fields', element: <ContractFieldsPage /> },
+      { path: 'admin/reminders', element: <ReminderSettingsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

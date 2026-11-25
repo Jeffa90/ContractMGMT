@@ -1,6 +1,6 @@
 // Left sidebar (collapsible) on desktop, top bar with a menu on phones (design-system.md section 2).
 import * as Menu from '@radix-ui/react-dropdown-menu'
-import { Building2, ChevronsLeft, ChevronsRight, FileText, Home, LayoutList, ListChecks, Menu as MenuIcon, Monitor, Moon, Search as SearchIcon, Sun, Users, X } from 'lucide-react'
+import { BellRing, Building2, CalendarClock, ChevronsLeft, ChevronsRight, FileText, Home, LayoutList, ListChecks, Menu as MenuIcon, Monitor, Moon, Search as SearchIcon, Sun, Users, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { openSearch } from '@/lib/search'
@@ -20,6 +20,7 @@ function useNav(): { main: NavItem[]; admin: NavItem[] } {
     main: [
       { to: '/', label: 'Home', icon: <Home aria-hidden className="size-5" />, end: true },
       { to: '/contracts', label: 'Contracts', icon: <FileText aria-hidden className="size-5" /> },
+      { to: '/renewals', label: 'Renewals', icon: <CalendarClock aria-hidden className="size-5" /> },
       { to: '/suppliers', label: 'Suppliers', icon: <Building2 aria-hidden className="size-5" /> },
     ],
     // Features not built yet are hidden, never greyed out.
@@ -28,6 +29,7 @@ function useNav(): { main: NavItem[]; admin: NavItem[] } {
           { to: '/admin/people', label: 'People', icon: <Users aria-hidden className="size-5" /> },
           { to: '/admin/lists', label: 'Lists', icon: <ListChecks aria-hidden className="size-5" /> },
           { to: '/admin/fields', label: 'Contract fields', icon: <LayoutList aria-hidden className="size-5" /> },
+          { to: '/admin/reminders', label: 'Reminders', icon: <BellRing aria-hidden className="size-5" /> },
         ]
       : [],
   }

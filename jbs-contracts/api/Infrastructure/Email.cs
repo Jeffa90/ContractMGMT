@@ -211,4 +211,14 @@ public static class EmailTemplates
             Said(approver, reason),
             "Fix what's needed (for example, add the right signed copy), then choose Send for approval again.",
         ], link);
+
+    /// <summary>
+    /// An email from wording an admin wrote (reminders): the subject is the heading, blank lines separate paragraphs. Everything is
+    /// treated as plain text and HTML-encoded, so wording can never add HTML, links or code.
+    /// </summary>
+    public static (string Subject, string Text, string Html) FromWording(string subject, string body, string? link)
+    {
+        var paragraphs = body.Replace("\r\n", "\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return Contract(subject, subject, paragraphs, link);
+    }
 }

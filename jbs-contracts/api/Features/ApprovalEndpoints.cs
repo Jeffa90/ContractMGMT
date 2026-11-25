@@ -52,7 +52,7 @@ public static class ApprovalEndpoints
 
         // Owner, in Signing: the signed copy is on the contract and the effective date is entered (required, never filled in for you: D-61).
         group.MapPost("/send-for-approval", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (!x.Me.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can send a contract for approval.");
@@ -89,7 +89,7 @@ public static class ApprovalEndpoints
 
         // Approver: confirm, register and lock.
         group.MapPost("/approval/approve", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (ApproverOnly(x) is { } refusal) return refusal;
@@ -107,12 +107,28 @@ public static class ApprovalEndpoints
                     new { asBackupFor = groupHead?.Id }, contractId: id);
                 await EmailOwnersAsync(x, $"approval:{id}:{approvalId}", "approved",
                     p => EmailTemplates.Approved(First(p.Name), x.Me.Name, c.Reference, c.Title, Link(settings, id)));
+
+                // A renewal: the contract it renews ends now (D-12), "Ended, renewed by ...".
+                if (c.RenewsContractId is { } oldId)
+                {
+                    var old = await x.C.QuerySingleOrDefaultAsync<(string Reference, string Stage)>("SELECT Reference, Stage FROM contracts.Contract WITH (UPDLOCK) WHERE Id = @oldId", new { oldId }, x.Tx);
+                    if (old.Stage == "Effective")
+                    {
+                        await x.C.ExecuteAsync("""
+                            UPDATE contracts.Contract SET Stage = N'Ended', StageSinceUtc = SYSUTCDATETIME(), EndedOn = CAST(SYSUTCDATETIME() AS DATE), EndedReason = @reason,
+                                EndedById = @me, PlannedEndDate = NULL, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                            WHERE Id = @oldId
+                            """, new { reason = $"Renewed by {c.Reference}.", me = x.Me.Id, oldId }, x.Tx);
+                        await audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "contract.ended", "Contract", oldId,
+                            $"{old.Reference} ended: it was renewed by {c.Reference}, which {x.Me.Name} approved.", new { renewedBy = id }, contractId: oldId);
+                    }
+                }
                 return null;
             }));
 
         // Approver: something isn't right; back to Signing with the reason (D-62).
         group.MapPost("/approval/send-back", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (ApproverOnly(x) is { } refusal) return refusal;
@@ -134,7 +150,7 @@ public static class ApprovalEndpoints
 
         // Owner, in Signing, when details must change: back to Legal (if Legal cleared it) or back to Draft (if it skipped Legal). Reason required.
         group.MapPost("/send-back-to-legal", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (OwnerInSigning(x) is { } refusal) return refusal;
@@ -157,7 +173,7 @@ public static class ApprovalEndpoints
             }));
 
         group.MapPost("/back-to-draft", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit) =>
-            ActAsync(id, body, current, db, async x =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
             {
                 var c = x.Contract;
                 if (OwnerInSigning(x) is { } refusal) return refusal;

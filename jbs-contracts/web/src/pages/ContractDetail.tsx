@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronLeft, Download, FileText, History, Lock, Pencil, Trash2, Upload } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { Select, StageBadge, Textarea } from '@/components/form'
 import { HelpButton } from '@/components/Help'
 import { ConversationCard, ProgressPanel } from '@/components/LegalReview'
+import { RenewalCard } from '@/components/Renewal'
 import { Alert, Button, Card, EmptyState, Field, Skeleton } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -133,6 +134,9 @@ export function ContractDetailPage() {
 function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
   const c = data.contract
   const navigate = useNavigate()
+  // From the Renewals page: open the decision straight away.
+  const [params] = useSearchParams()
+  const openDecision = params.get('decide') === '1'
   const [withdrawing, setWithdrawing] = useState(false)
   const notice = c.noticeDeadline ? daysUntil(c.noticeDeadline) : null
 
@@ -151,6 +155,11 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-muted-foreground">
               <span>{c.reference}</span>
+              {c.renewsContractId && (
+                <Link to={`/contracts/${c.renewsContractId}`} className="text-primary hover:underline">
+                  Renews {c.renewsReference}
+                </Link>
+              )}
               {c.isConfidential && (
                 <span className="inline-flex items-center gap-1">
                   <Lock aria-hidden className="size-4" /> Confidential
@@ -178,11 +187,13 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
           {data.sentBack.reason}
         </Alert>
       )}
-      {notice !== null && c.stage === 'Effective' && notice <= 30 && (
+      {notice !== null && c.stage === 'Effective' && !data.renewal.decision && notice <= 30 && (
         <Alert tone={notice < 0 ? 'danger' : 'warning'} title={notice < 0 ? `The notice deadline passed ${-notice} days ago (${formatDate(c.noticeDeadline)}).` : `The notice deadline is in ${notice} days (${formatDate(c.noticeDeadline)}).`} />
       )}
 
       {c.stage !== 'Withdrawn' && <ProgressPanel data={data} tracker={<Tracker c={c} />} />}
+
+      <RenewalCard data={data} openDecision={openDecision} />
 
       <Card className="p-5 md:p-6">
         <h2 className="sr-only">Essentials</h2>

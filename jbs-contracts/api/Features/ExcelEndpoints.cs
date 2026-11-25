@@ -26,7 +26,8 @@ public static class ExcelEndpoints
         public PlannedRow Refuse(string why) { Action = "refused"; Notes.Add(why); Apply = null; return this; }
     }
 
-    private sealed record Ctx(SqlConnection C, SqlTransaction Tx, Person Me, AuditLog Audit, AppSettings Settings);
+    /// <param name="ExtraColumns">For an export: the added-field columns actually written, so each row's values line up with them.</param>
+    private sealed record Ctx(SqlConnection C, SqlTransaction Tx, Person Me, AuditLog Audit, AppSettings Settings, IReadOnlyList<Excel.Column>? ExtraColumns = null);
 
     private sealed record Kind(
         string Name, string Label, string Sheet, Excel.Column[] Columns, string[] Required, string[] ExportOnly,
@@ -48,9 +49,11 @@ public static class ExcelEndpoints
             if (!k.CanExport(me!)) return ApiResults.NotAllowed(k.Refusal);
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
-            var rows = await k.Export(new Ctx(c, tx, me!, audit, settings));
+            // The added-field columns are read once, and each row is filled to match them (an admin may change fields meanwhile).
+            var extra = k.ExtraColumns is null ? [] : await k.ExtraColumns(c, tx);
+            var rows = await k.Export(new Ctx(c, tx, me!, audit, settings, extra));
             // Columns to fill in, then any added contract fields, then columns that are for information only (not imported).
-            var columns = k.Columns.Concat(k.ExtraColumns is null ? [] : await k.ExtraColumns(c, tx))
+            var columns = k.Columns.Concat(extra)
                 .Concat(k.ExportOnly.Select(h => new Excel.Column(h, "For information only. Changes here aren't imported.", 16))).ToList();
             await tx.CommitAsync();
             var date = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), Brisbane).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -470,8 +473,9 @@ public static class ExcelEndpoints
         {
             var rows = (await ContractEndpoints.ListVisibleAsync(x.C, x.Tx, x.Me)).Where(r => r.Stage != "Withdrawn").ToList();
             var people = (await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person", transaction: x.Tx)).ToDictionary(p => p.Id);
-            var added = Fields.ExcelFields(await Fields.LoadAsync(x.C, x.Tx), ContractHeaders());
-            var values = await Fields.ReadAsync(x.C, x.Tx, rows.Select(r => r.Id), added.Select(a => a.Field).ToList());
+            var byHeader = Fields.ExcelFields(await Fields.LoadAsync(x.C, x.Tx), ContractHeaders()).ToDictionary(a => a.Header);
+            var added = (x.ExtraColumns ?? []).Select(col => byHeader.GetValueOrDefault(col.Header)).ToList(); // null: that field changed meanwhile (blank cells)
+            var values = await Fields.ReadAsync(x.C, x.Tx, rows.Select(r => r.Id), added.OfType<Fields.ExcelField>().Select(a => a.Field).ToList());
             static DateOnly? D(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
             return rows.Select(r => new object?[]
             {
@@ -480,7 +484,7 @@ public static class ExcelEndpoints
                 r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.NoticePeriodDays, D(r.ReviewDate), r.NeedsLegalReview,
                 r.Description,
             }
-            .Concat(added.Select(a => values[r.Id].TryGetValue(a.Field.Key, out var v) ? Fields.ExcelValue(a.Field, v, id => people.GetValueOrDefault(id)?.WindowsAccount) : null))
+            .Concat(added.Select(a => a is not null && values[r.Id].TryGetValue(a.Field.Key, out var v) ? Fields.ExcelValue(a.Field, v, id => people.GetValueOrDefault(id)?.WindowsAccount) : null))
             .Concat([ContractEndpoints.StageNames[r.Stage], D(r.NoticeDeadline)]).ToArray());
         },
         async (x, rows) =>

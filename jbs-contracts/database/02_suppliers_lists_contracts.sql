@@ -47,7 +47,13 @@ INSERT INTO contracts.ListItem (ListName, Value, SortOrder) VALUES
     (N'Currency', N'AUD', 0), (N'Currency', N'USD', 1), (N'Currency', N'NZD', 2), (N'Currency', N'EUR', 3), (N'Currency', N'GBP', 4);
 GO
 
-CREATE SEQUENCE contracts.ContractNumber AS INT START WITH 1 INCREMENT BY 1 NO CACHE;
+-- Running numbers (JBSAUS-0001 ...). A plain table, not a SEQUENCE: the runtime account only has db_datareader and
+-- db_datawriter, and NEXT VALUE FOR needs UPDATE permission on the sequence, which those roles don't give.
+CREATE TABLE contracts.Counter (
+    Name       NVARCHAR(50) NOT NULL CONSTRAINT PK_Counter PRIMARY KEY,
+    NextValue  INT NOT NULL
+);
+INSERT INTO contracts.Counter (Name, NextValue) VALUES (N'ContractNumber', 1);
 GO
 
 CREATE TABLE contracts.Contract (

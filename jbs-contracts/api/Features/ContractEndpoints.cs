@@ -199,7 +199,7 @@ public static class ContractEndpoints
     {
         var (input, errors) = await ValidateAsync(c, tx, body with { OwnerId = body.OwnerId ?? me.Id }, before: null);
         if (errors is not null) return (0, "", errors);
-        var number = await c.ExecuteScalarAsync<int>("SELECT NEXT VALUE FOR contracts.ContractNumber", transaction: tx);
+        var number = await c.ExecuteScalarAsync<int>("UPDATE contracts.Counter SET NextValue = NextValue + 1 OUTPUT DELETED.NextValue WHERE Name = N'ContractNumber'", transaction: tx);
         var reference = $"JBSAUS-{number.ToString("0000", CultureInfo.InvariantCulture)}";
         var id = await c.ExecuteScalarAsync<int>("""
             INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,

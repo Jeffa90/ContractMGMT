@@ -136,7 +136,7 @@ test('Send feedback from any screen and find it on the Feedback page', async ({ 
   await page.getByRole('button', { name: 'Feedback', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByText(phone ? 'From: Feedback (/feedback)' : 'From: Suppliers (/suppliers)')).toBeVisible()
-  await dialog.getByRole('radio', { name: 'Improvement' }).click()
+  await dialog.getByLabel('What kind of feedback?').selectOption('Improvement')
   await dialog.getByLabel(/Tell us what happened/).fill(words)
   await expectAccessible(page)
   await dialog.getByRole('button', { name: 'Send feedback' }).click()

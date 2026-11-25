@@ -7,8 +7,8 @@ import { toast } from 'sonner'
 import { api, ApiError } from '@/lib/api'
 import { feedbackKinds } from '@/lib/feedback'
 import { Dialog } from './Dialog'
-import { Textarea } from './form'
-import { Button, Field, Segmented } from './ui'
+import { Select, Textarea } from './form'
+import { Button, Field } from './ui'
 
 /**
  * Floating, bottom right, on wider screens. On a phone it would sit over forms' Save bars, so there it's on the Feedback page instead
@@ -39,8 +39,8 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState('Bug')
   const [comment, setComment] = useState('')
   const [error, setError] = useState<string | undefined>()
-  // The screen it came from: the page's heading and address.
-  const heading = document.querySelector('main h1')?.textContent?.trim()
+  // The screen it came from: the page's heading (Home's is a greeting, so it's called Home) and address.
+  const heading = location.pathname === '/' ? 'Home' : document.querySelector('main h1')?.textContent?.trim()
   const screen = `${heading ? `${heading} ` : ''}(${location.pathname}${location.search})`
   const send = useMutation({
     mutationFn: () => api.post('/api/feedback', { kind, comment, screen }),
@@ -66,12 +66,17 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">What kind of feedback?</span>
-          <div className="overflow-x-auto">
-            <Segmented label="What kind of feedback?" value={kind} onChange={setKind} options={feedbackKinds.map((k) => ({ value: k.value, label: k.label }))} />
-          </div>
-        </div>
+        <Field label="What kind of feedback?">
+          {(p) => (
+            <Select {...p} value={kind} onChange={(e) => setKind(e.target.value)}>
+              {feedbackKinds.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
         <Field label="Tell us what happened" required error={error}>
           {(p) => (
             <Textarea

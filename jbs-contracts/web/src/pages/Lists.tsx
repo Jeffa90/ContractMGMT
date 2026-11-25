@@ -5,6 +5,7 @@ import { Eye, EyeOff, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
+import { ExcelButtons } from '@/components/ExcelImport'
 import { PageHeader } from '@/components/Help'
 import { Alert, Badge, Button, Card, Field, Segmented, Skeleton, TextInput } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
@@ -61,7 +62,12 @@ export function ListsPage() {
 
   return (
     <>
-      <PageHeader title="Lists" description="The choices people pick from on a contract." help={help.lists} />
+      <PageHeader
+        title="Lists"
+        description="The choices people pick from on a contract."
+        help={help.lists}
+        action={<ExcelButtons kind="lists" canImport invalidate={[['lists']]} />}
+      />
       <div className="overflow-x-auto">
         <Segmented label="List" value={tab} onChange={setTab} options={tabs.map((t) => ({ value: t.value, label: t.label }))} />
       </div>

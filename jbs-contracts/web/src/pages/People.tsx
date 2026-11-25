@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, Search, UserPlus, Users } from 'lucide-react'
+import { Search, UserPlus, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
+import { ExcelButtons } from '@/components/ExcelImport'
 import { PageHeader } from '@/components/Help'
 import { Alert, Avatar, Badge, Button, Card, Checkbox, EmptyState, Field, Segmented, Skeleton, TextInput } from '@/components/ui'
 import { api, ApiError, type Person, type Roles } from '@/lib/api'
@@ -37,27 +38,6 @@ function RoleBadges({ roles }: { roles: Roles }) {
       ))}
     </span>
   )
-}
-
-function exportCsv(people: Person[]) {
-  const quote = (v: string) => `"${v.replace(/"/g, '""')}"`
-  const rows = [
-    ['Name', 'Windows logon', 'Email', 'Contract owner', 'Legal', 'Approver', 'Group Head', 'Admin', 'Auditor', 'Access'],
-    ...people.map((p) => [
-      p.name,
-      p.account,
-      p.email,
-      ...(['contractOwner', 'legal', 'approver', 'groupHead', 'admin', 'auditor'] as const).map((k) => (p.roles[k] ? 'Yes' : 'No')),
-      p.isActive ? 'On' : 'Switched off',
-    ]),
-  ]
-  const blob = new Blob(['﻿' + rows.map((r) => r.map(quote).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'jbs-contracts-people.csv'
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 export function PeoplePage() {
@@ -121,9 +101,7 @@ export function PeoplePage() {
             ]}
           />
         </div>
-        <Button variant="ghost" icon={<Download aria-hidden className="size-5" />} onClick={() => exportCsv(visible)} disabled={visible.length === 0}>
-          Export CSV
-        </Button>
+        <ExcelButtons kind="people" canImport invalidate={[['people'], ['me'], ['lists']]} />
       </div>
 
       {people.isPending ? (

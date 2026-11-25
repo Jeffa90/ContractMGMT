@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { Download, FilePlus2, FileText, Lock, Search } from 'lucide-react'
+import { FilePlus2, FileText, Lock, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
+import { ExcelButtons } from '@/components/ExcelImport'
 import { StageBadge } from '@/components/form'
 import { PageHeader } from '@/components/Help'
 import { Alert, Card, EmptyState, Segmented, Skeleton, TextInput } from '@/components/ui'
@@ -25,21 +26,6 @@ function KeyDate({ c }: { c: ContractListItem }) {
       {label} {formatDate(value)}
     </span>
   )
-}
-
-function exportCsv(rows: ContractListItem[]) {
-  const quote = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const lines = [
-    ['Reference', 'Title', 'Supplier', 'Stage', 'Owner', 'Category', 'Value', 'Currency', 'End date', 'Notice deadline', 'Confidential'],
-    ...rows.map((c) => [c.reference, c.title, c.supplierName, c.stageName, c.ownerName, c.categoryDisplay, c.value, c.currencyCode, c.endDate, c.noticeDeadline, c.isConfidential ? 'Yes' : 'No']),
-  ]
-  const blob = new Blob(['﻿' + lines.map((l) => l.map(quote).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'jbs-contracts.csv'
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 export function ContractsPage() {
@@ -102,14 +88,7 @@ export function ContractsPage() {
             ]}
           />
         </div>
-        <button
-          type="button"
-          onClick={() => exportCsv(rows)}
-          disabled={rows.length === 0}
-          className="inline-flex min-h-11 items-center gap-2 self-start rounded-[var(--radius-control)] px-4 font-medium hover:bg-muted disabled:opacity-60"
-        >
-          <Download aria-hidden className="size-5" /> Export CSV
-        </button>
+        <ExcelButtons kind="contracts" canImport={person.roles.contractOwner} invalidate={[['contracts'], ['suppliers'], ['contract']]} />
       </div>
 
       {contracts.isPending ? (

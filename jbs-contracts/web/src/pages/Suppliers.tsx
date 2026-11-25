@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Building2, Plus, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
+import { ExcelButtons } from '@/components/ExcelImport'
 import { PageHeader } from '@/components/Help'
 import { Alert, Badge, Button, Card, EmptyState, Segmented, Skeleton, TextInput } from '@/components/ui'
 import { api } from '@/lib/api'
@@ -41,6 +42,7 @@ export function SuppliersPage() {
           ) : undefined
         }
       />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="relative md:w-80">
           <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted-foreground" />
@@ -55,6 +57,8 @@ export function SuppliersPage() {
             { value: 'hidden', label: 'Hidden', count: all.filter((s) => !s.isActive).length },
           ]}
         />
+      </div>
+        <ExcelButtons kind="suppliers" canImport={canChange} invalidate={[['suppliers']]} />
       </div>
 
       {suppliers.isPending ? (

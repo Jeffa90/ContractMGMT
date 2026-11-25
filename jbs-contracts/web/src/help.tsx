@@ -41,6 +41,11 @@ export const help = {
           <strong>When someone leaves</strong>, open them and click <strong>Switch off access</strong>. Nothing they did is lost, and you can switch them
           back on later.
         </p>
+        <p>
+          <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, change or add rows in that file and use{' '}
+          <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
+          cells leave what's there.
+        </p>
       </>
     ),
   },
@@ -54,6 +59,11 @@ export const help = {
         <p>Type in the search box to find a contract by its title, reference (for example JBSAUS-0012), supplier or SAP number.</p>
         <p>The <strong>Key date</strong> is the notice deadline if there is one, otherwise the end date. It turns amber within 30 days and red once it has passed.</p>
         <p>Contracts marked Confidential only show for their owner and backup, Legal, approvers, admins and auditors.</p>
+        <p>
+          <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, change or add rows in that file and use{' '}
+          <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
+          cells leave what's there.
+        </p>
       </>
     ),
   },
@@ -83,6 +93,11 @@ export const help = {
         <p>Every contract is with a supplier. Add a supplier here, or straight from a contract with <strong>Add new supplier</strong>.</p>
         <p>The ABN is checked for typing mistakes (it doesn't look anything up). The SAP vendor number is optional.</p>
         <p>Click a supplier's contract count to see their contracts.</p>
+        <p>
+          <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, change or add rows in that file and use{' '}
+          <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
+          cells leave what's there.
+        </p>
       </>
     ),
   },
@@ -95,6 +110,11 @@ export const help = {
           <strong>Hide</strong> takes something out of the choices without changing contracts that already use it. You can show it again at any time. Nothing is deleted.
         </p>
         <p>Every change is recorded with who made it and when.</p>
+        <p>
+          <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, change or add rows in that file and use{' '}
+          <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
+          cells leave what's there.
+        </p>
       </>
     ),
   },

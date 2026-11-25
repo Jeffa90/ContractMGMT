@@ -343,6 +343,7 @@ Help ("?") ships with each screen, not as a slice of its own.
 ## 18. Planned for later
 
 - **In-app Feedback** button and page, shared with other JBS apps: see features/feedback.md.
+- **Supplier documents** (Jeff, 25 Nov; D-88), next after the help centre: on the Supplier page, every document from the supplier's contracts in one place; the supplier's own documents (types from an admin list) uploaded by people ticked Procurement and seen by everyone; optional expiry dates with an opt-in reminder. Later: a structured business review log.
 - **Different forms and fields for different types of contract** (Jeff, 25 Nov): for example a freight agreement asking for different fields from an NDA. To talk through with Jeff before designing; it builds on Admin, Contract fields (slice 2).
 
 ## 18a. Not in version 1

@@ -9,8 +9,11 @@ import { PageHeader } from "@/components/Help";
 import {
   Alert,
   Button,
+  Badge,
   Card,
+  Checkbox,
   Field,
+  Segmented,
   Skeleton,
   TextInput,
 } from "@/components/ui";
@@ -26,16 +29,19 @@ type Kind = {
   placeholders: string[];
   button: string;
   days: number[] | null;
+  /** Reminders only: false when an admin switched it off (D-99). */
+  isOn: boolean | null;
   subject: string;
   body: string;
 };
 type Data = {
+  delivery: string;
   emails: Kind[];
   history: {
     id: number;
     kind: string;
     kindName: string;
-    what: "Days" | "Wording";
+    what: "Days" | "Wording" | "OnOff" | "Delivery";
     before: string;
     after: string;
     byName: string;
@@ -97,6 +103,7 @@ export function ReminderSettingsPage() {
               ? `Last checked ${formatDateTime(data.data.lastRunUtc)}.`
               : "They haven't run yet."}
           </p>
+          <DeliveryCard delivery={data.data.delivery} />
           {[...new Set(data.data.emails.map((e) => e.group))].map((group) => (
             <section
               key={group}
@@ -135,7 +142,9 @@ export function ReminderSettingsPage() {
                       {h.byName} changed the {h.kindName.toLowerCase()}{" "}
                       {h.what === "Days"
                         ? `days from ${h.before} to ${h.after}`
-                        : "wording"}
+                        : h.what === "Wording"
+                          ? "wording"
+                          : `from ${h.before.toLowerCase()} to ${h.after.toLowerCase()}`}
                     </span>
                     {h.what === "Wording" && (
                       <details className="text-xs">
@@ -163,6 +172,46 @@ export function ReminderSettingsPage() {
         </>
       )}
     </>
+  );
+}
+
+const deliveryOptions = [
+  { value: "Each", label: "As they happen" },
+  { value: "Daily", label: "One email a day" },
+  { value: "Weekly", label: "One email a week" },
+];
+
+/** The default for how reminder emails come, for everyone who hasn't chosen their own (D-99). */
+function DeliveryCard({ delivery }: { delivery: string }) {
+  const queryClient = useQueryClient();
+  const save = useMutation({
+    mutationFn: (value: string) => api.put("/api/admin/reminders/delivery", { delivery: value }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["reminder-settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
+      toast.success("Saved. It applies from the next morning's reminders.");
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "That didn't save. Try again."),
+  });
+  return (
+    <Card className="flex flex-col gap-3 p-5 md:p-6">
+      <div>
+        <h2 className="font-display text-lg font-semibold">How reminder emails come</h2>
+        <p className="text-sm text-muted-foreground">
+          For everyone who hasn't chosen their own; each person can change theirs by clicking their name and choosing Email reminders.
+          A summary puts all of someone's reminders in one email. A weekly one goes on Mondays, and sooner when something is a week or less
+          away. Emails that hand over a turn (sent to Legal, waiting for approval) always go straight away.
+        </p>
+      </div>
+      <div>
+        <Segmented
+          label="How reminder emails come"
+          value={save.isPending ? save.variables : delivery}
+          onChange={(v) => save.mutate(v)}
+          options={deliveryOptions}
+        />
+      </div>
+    </Card>
   );
 }
 
@@ -237,6 +286,11 @@ function KindCard({ kind }: { kind: Kind }) {
     });
   };
   const changed = subject !== kind.subject || body !== kind.body;
+  const switchOn = useMutation({
+    mutationFn: (isOn: boolean) => api.put("/api/admin/reminders/on", { kind: kind.kind, isOn }),
+    onSuccess: (_, isOn) => done(isOn ? `${kind.name} switched on.` : `${kind.name} switched off. Nobody gets it until it's switched on again.`)(),
+    onError: fail,
+  });
 
   return (
     <Card className="p-0">
@@ -253,6 +307,7 @@ function KindCard({ kind }: { kind: Kind }) {
                 <Mail aria-hidden className="size-5" />
               )}{" "}
               {kind.name}
+              {kind.isOn === false && <Badge tone="warning">Off</Badge>}
             </span>
             <span className="block text-sm text-muted-foreground">
               {kind.when}
@@ -269,6 +324,14 @@ function KindCard({ kind }: { kind: Kind }) {
         </summary>
         <div className="flex flex-col gap-5 px-5 pb-5 md:px-6 md:pb-6">
           {errors.form && <Alert tone="danger" title={errors.form} />}
+          {kind.isOn !== null && (
+            <Checkbox
+              label="Send this reminder"
+              description="Untick to stop it for everyone. Its days and wording are kept for when it's switched back on."
+              checked={switchOn.isPending ? switchOn.variables : kind.isOn}
+              onChange={(v) => switchOn.mutate(v)}
+            />
+          )}
           {kind.days && (
             <div className="flex flex-wrap items-end gap-3">
               <Field

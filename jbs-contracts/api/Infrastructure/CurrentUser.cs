@@ -15,6 +15,8 @@ public sealed class Person
     public bool IsAdmin { get; set; }
     public bool IsAuditor { get; set; }
     public bool IsProcurement { get; set; }
+    /// <summary>Each, Daily or Weekly; null uses the default an admin set (D-99).</summary>
+    public string? ReminderDelivery { get; set; }
     public bool IsActive { get; set; }
     public DateTime? LastSignInUtc { get; set; }
     public byte[] RowVersion { get; set; } = [];

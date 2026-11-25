@@ -55,6 +55,9 @@ public sealed class AppFixture : IAsyncLifetime
             b.UseSetting("Ecp:Security:FailsafeAdmins:0:Email", "alex.admin@example.com");
         });
         _ = Factory.Server; // start the app: applies the scripts and adds the first admin
+        // Reminders one email each by default in tests (their counts are checked); summaries are tested with people who choose them (D-99).
+        await using var c = new SqlConnection(ConnectionString);
+        await c.ExecuteAsync("UPDATE contracts.AppSetting SET Value = N'Each' WHERE Name = N'ReminderDelivery'");
     }
 
     public async ValueTask DisposeAsync()

@@ -180,6 +180,15 @@ const topics = {
           <strong>Reminders</strong> are checked every morning at 7:00am Brisbane time; a missed morning catches up the next day and no reminder is sent twice.{' '}
           <strong>Days before</strong> sets when each one goes out. If a contract is added late, only the most recent reminder is sent.
         </p>
+        <p>
+          <strong>How reminder emails come</strong>: as they happen (one email each), in one email a day, or in one email a week on Mondays (sooner when something
+          is a week or less away). This is the default for everyone; each person can choose their own by clicking their name and choosing{' '}
+          <strong>Email reminders</strong>. Emails that hand over a turn, such as sent to Legal or waiting for approval, always go straight away.
+        </p>
+        <p>
+          <strong>Send this reminder</strong>: untick it to stop a reminder for everyone, for example end-date reminders. Its days and wording are kept for when
+          it's switched back on.
+        </p>
         <p>Every saved change is kept in the History, with who made it and when.</p>
       </>
     ),

@@ -5,6 +5,8 @@ namespace JbsContracts.Api.Features;
 
 public sealed record SaveReminderDays(string? Kind, int[]? Days);
 public sealed record SaveReminderWording(string? Kind, string? Subject, string? Body);
+public sealed record SaveReminderOn(string? Kind, bool IsOn);
+public sealed record SaveReminderDelivery(string? Delivery);
 
 /// <summary>
 /// Admin, Emails and reminders: the days each reminder is sent, and every email's wording (D-13, D-70, D-73). Closed choices only: whole days, and plain text
@@ -21,7 +23,8 @@ public static class ReminderAdminEndpoints
             var (me, refusal) = await RequireAdminAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            var days = (await c.QueryAsync<(string Kind, string Days)>("SELECT Kind, Days FROM contracts.ReminderSetting")).ToDictionary(d => d.Kind, d => d.Days);
+            var settingRows = (await c.QueryAsync<(string Kind, string Days, bool IsOn)>("SELECT Kind, Days, IsOn FROM contracts.ReminderSetting")).ToDictionary(d => d.Kind);
+            var days = settingRows.ToDictionary(d => d.Key, d => d.Value.Days);
             var wording = (await c.QueryAsync<(string Kind, string Subject, string Body)>("SELECT Kind, Subject, Body FROM contracts.EmailTemplate")).ToDictionary(w => w.Kind);
             var history = await c.QueryAsync("""
                 SELECT TOP (50) h.Id, h.Kind, h.What, h.OldValue, h.NewValue, p.Name AS ByName, h.AtUtc
@@ -34,14 +37,16 @@ public static class ReminderAdminEndpoints
                 {
                     kind = k.Key, name = k.Name, group = k.Group, when = k.When, placeholders = k.Placeholders, button = k.Button,
                     days = k.HasDays ? days[k.Key].Split(',').Select(int.Parse).OrderByDescending(d => d).ToArray() : null,
+                    isOn = k.HasDays ? settingRows[k.Key].IsOn : (bool?)null,
                     subject = wording[k.Key].Subject, body = wording[k.Key].Body,
                 }),
                 history = history.Select(h => new
                 {
-                    id = (int)h.Id, kind = (string)h.Kind, kindName = EmailWording.ByKey.TryGetValue((string)h.Kind, out var hk) ? hk.Name : (string)h.Kind, what = (string)h.What,
+                    id = (int)h.Id, kind = (string)h.Kind, kindName = (string)h.Kind == "Delivery" ? "How reminder emails come" : EmailWording.ByKey.TryGetValue((string)h.Kind, out var hk) ? hk.Name : (string)h.Kind, what = (string)h.What,
                     before = (string)h.OldValue, after = (string)h.NewValue, byName = (string)h.ByName, atUtc = DateTime.SpecifyKind((DateTime)h.AtUtc, DateTimeKind.Utc),
                 }),
                 lastRunUtc = lastRun is { } l ? DateTime.SpecifyKind(l, DateTimeKind.Utc) : (DateTime?)null,
+                delivery = await DefaultDeliveryAsync(db),
             });
         });
 
@@ -63,6 +68,46 @@ public static class ReminderAdminEndpoints
             await c.ExecuteAsync("INSERT INTO contracts.ReminderChange (Kind, What, OldValue, NewValue, ById) VALUES (@kind, N'Days', @before, @after, @me)", new { kind, before, after, me = me.Id }, tx);
             await audit.WriteAsync(c, tx, me.AsActor(), "reminders.days", "ReminderSetting", null,
                 $"{me.Name} changed the {EmailWording.ByKey[kind].Name.ToLowerInvariant()} days from {List(before)} to {List(after)} days before.", new { kind, before, after });
+            await tx.CommitAsync();
+            return Results.Ok(new { changed = true });
+        });
+
+        // Switch a whole reminder on or off (D-99). Its days and wording are kept.
+        group.MapPut("/on", async (SaveReminderOn body, CurrentUser current, Db db, AuditLog audit) =>
+        {
+            var (me, refusal) = await RequireAdminAsync(current, db);
+            if (refusal is not null) return refusal;
+            if (body.Kind is not { } kind || !EmailWording.ReminderKinds.Contains(kind)) return ApiResults.Invalid("Choose a reminder.", new() { ["kind"] = "Choose a reminder." });
+            await using var c = await db.OpenAsync();
+            await using var tx = await Db.BeginWriteAsync(c);
+            var before = await c.QuerySingleAsync<bool>("SELECT IsOn FROM contracts.ReminderSetting WITH (UPDLOCK) WHERE Kind = @kind", new { kind }, tx);
+            if (before == body.IsOn) return Results.Ok(new { changed = false });
+            await c.ExecuteAsync("UPDATE contracts.ReminderSetting SET IsOn = @on, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Kind = @kind", new { on = body.IsOn, me = me!.Id, kind }, tx);
+            await c.ExecuteAsync("INSERT INTO contracts.ReminderChange (Kind, What, OldValue, NewValue, ById) VALUES (@kind, N'OnOff', @before, @after, @me)",
+                new { kind, before = before ? "On" : "Off", after = body.IsOn ? "On" : "Off", me = me.Id }, tx);
+            await audit.WriteAsync(c, tx, me.AsActor(), "reminders.on-off", "ReminderSetting", null,
+                $"{me.Name} switched the {EmailWording.ByKey[kind].Name.ToLowerInvariant()} {(body.IsOn ? "on" : "off")}.", new { kind, isOn = body.IsOn });
+            await tx.CommitAsync();
+            return Results.Ok(new { changed = true });
+        });
+
+        // The default for how reminder emails come, for everyone who hasn't chosen their own (D-99).
+        group.MapPut("/delivery", async (SaveReminderDelivery body, CurrentUser current, Db db, AuditLog audit) =>
+        {
+            var (me, refusal) = await RequireAdminAsync(current, db);
+            if (refusal is not null) return refusal;
+            if (body.Delivery is not ("Each" or "Daily" or "Weekly")) return ApiResults.Invalid("Choose how reminders come.", new() { ["delivery"] = "Choose as they happen, daily or weekly." });
+            await using var c = await db.OpenAsync();
+            await using var tx = await Db.BeginWriteAsync(c);
+            var before = await c.QuerySingleAsync<string>("SELECT Value FROM contracts.AppSetting WITH (UPDLOCK) WHERE Name = N'ReminderDelivery'", transaction: tx);
+            if (before == body.Delivery) return Results.Ok(new { changed = false });
+            await c.ExecuteAsync("UPDATE contracts.AppSetting SET Value = @value, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Name = N'ReminderDelivery'",
+                new { value = body.Delivery, me = me!.Id }, tx);
+            await c.ExecuteAsync("INSERT INTO contracts.ReminderChange (Kind, What, OldValue, NewValue, ById) VALUES (N'Delivery', N'Delivery', @before, @after, @me)",
+                new { before = DeliveryNames[before], after = DeliveryNames[body.Delivery], me = me.Id }, tx);
+            await audit.WriteAsync(c, tx, me.AsActor(), "reminders.delivery", "AppSetting", null,
+                $"{me.Name} changed how reminder emails come, for everyone who hasn't chosen their own, from {DeliveryNames[before].ToLowerInvariant()} to {DeliveryNames[body.Delivery].ToLowerInvariant()}.",
+                new { before, after = body.Delivery });
             await tx.CommitAsync();
             return Results.Ok(new { changed = true });
         });
@@ -100,6 +145,14 @@ public static class ReminderAdminEndpoints
     }
 
     private static string List(string days) => string.Join(", ", days.Split(','));
+
+    public static readonly Dictionary<string, string> DeliveryNames = new() { ["Each"] = "As they happen", ["Daily"] = "One email a day", ["Weekly"] = "One email a week" };
+
+    public static async Task<string> DefaultDeliveryAsync(Db db)
+    {
+        await using var c = await db.OpenAsync();
+        return await c.ExecuteScalarAsync<string?>("SELECT Value FROM contracts.AppSetting WHERE Name = N'ReminderDelivery'") ?? "Daily";
+    }
 
     private static async Task<(Person? Me, IResult? Refusal)> RequireAdminAsync(CurrentUser current, Db db)
     {

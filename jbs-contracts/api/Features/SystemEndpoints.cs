@@ -3,6 +3,8 @@ using JbsContracts.Api.Infrastructure;
 
 namespace JbsContracts.Api.Features;
 
+public sealed record ReminderDeliveryChoice(string? Delivery);
+
 public static class SystemEndpoints
 {
     public static void MapSystemEndpoints(this IEndpointRouteBuilder app)
@@ -38,7 +40,23 @@ public static class SystemEndpoints
                 // QA only: admins can try the app as someone else (D-81).
                 canTryAs = current.Real is { IsAdmin: true } && settings.AllowDemoData,
                 tryingAs = person.TriedById is null ? null : new { realName = person.TriedByName },
+                // How their reminder emails come (D-99): their own choice, or the default.
+                reminderDelivery = person.ReminderDelivery,
+                defaultReminderDelivery = await ReminderAdminEndpoints.DefaultDeliveryAsync(db),
             });
+        });
+
+        // Each person chooses how their reminder emails come: as they happen, a daily summary or a weekly one; null goes back to the default.
+        // Their own preference, not a change to any contract, so not audited (like Choose what I see).
+        app.MapPut("/api/me/reminder-delivery", async (ReminderDeliveryChoice body, CurrentUser current, Db db) =>
+        {
+            var (person, refusal) = await ApiResults.RequirePersonAsync(current, db);
+            if (refusal is not null) return refusal;
+            if (body.Delivery is not (null or "Each" or "Daily" or "Weekly"))
+                return ApiResults.Invalid("Choose how your reminders come.", new() { ["delivery"] = "Choose as they happen, daily or weekly." });
+            await using var c = await db.OpenAsync();
+            await c.ExecuteAsync("UPDATE contracts.Person SET ReminderDelivery = @delivery WHERE Id = @id", new { delivery = body.Delivery, id = person!.Id });
+            return Results.Ok(new { delivery = body.Delivery });
         });
     }
 }

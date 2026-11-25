@@ -91,4 +91,7 @@ export type Me = {
   /** QA only: admins can try the app as someone else (D-81). */
   canTryAs: boolean
   tryingAs: { realName: string } | null
+  /** How their reminder emails come (D-99): their own choice, or null for the default. */
+  reminderDelivery: 'Each' | 'Daily' | 'Weekly' | null
+  defaultReminderDelivery: 'Each' | 'Daily' | 'Weekly'
 }

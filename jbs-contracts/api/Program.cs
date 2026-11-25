@@ -49,9 +49,10 @@ staticTypes.Mappings[".vtt"] = "text/vtt"; // the help videos' captions (D-89)
 app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = staticTypes,
-    // index.html and the help videos (same names when re-recorded) are checked each time; hashed assets can be cached.
+    // Only the build's hashed assets (/assets) are cached for good; everything else (index.html, the help videos, the tab icons) is checked each time.
     OnPrepareResponse = c => c.Context.Response.Headers.CacheControl =
-        c.File.Name == "index.html" || c.Context.Request.Path.StartsWithSegments("/help-videos") ? "no-cache" : "public, max-age=31536000, immutable",
+        c.File.Name == "index.html" || c.Context.Request.Path.StartsWithSegments("/help-videos") || !c.Context.Request.Path.StartsWithSegments("/assets")
+            ? "no-cache" : "public, max-age=31536000, immutable",
 });
 app.UseBrandFonts(settings);
 app.UseAuthentication();

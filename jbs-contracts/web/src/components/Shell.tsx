@@ -24,7 +24,10 @@ import {
   X,
   Sparkles,
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { NavLink, Outlet } from "react-router";
 import { openSearch } from "@/lib/search";
 import { SearchPalette } from "./SearchPalette";
@@ -184,7 +187,19 @@ function NavLinks({
 }
 
 function PersonMenu({ collapsed }: { collapsed?: boolean }) {
-  const { person, canTryAs, demoData } = useMe();
+  const { person, canTryAs, demoData, reminderDelivery, defaultReminderDelivery } = useMe();
+  const queryClient = useQueryClient();
+  // How their reminder emails come (D-99). Saved straight away; the default is marked.
+  const delivery = useMutation({
+    mutationFn: (value: string) => api.put("/api/me/reminder-delivery", { delivery: value }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
+      toast.success("Saved. Your reminders come that way from tomorrow morning.");
+    },
+    onError: () => toast.error("That didn't save. Try again."),
+  });
+  const deliveryNow = delivery.isPending ? delivery.variables : (reminderDelivery ?? defaultReminderDelivery);
+  const deliveryLabel = (value: string, label: string) => (reminderDelivery === null && value === defaultReminderDelivery ? `${label} (default)` : label);
   const [tryAs, setTryAs] = useState(false);
   const [demo, setDemo] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(readThemeChoice);
@@ -255,6 +270,22 @@ function PersonMenu({ collapsed }: { collapsed?: boolean }) {
                   ✓
                 </Menu.ItemIndicator>
               </Menu.RadioItem>
+            </Menu.RadioGroup>
+            <Menu.Separator className="my-1 h-px bg-border" />
+            <Menu.Label className="px-3 py-1 text-xs text-muted-foreground">
+              Email reminders
+            </Menu.Label>
+            <Menu.RadioGroup value={deliveryNow} onValueChange={(v) => delivery.mutate(v)}>
+              {[
+                { value: "Each", label: "As they happen" },
+                { value: "Daily", label: "One email a day" },
+                { value: "Weekly", label: "One email a week" },
+              ].map((o) => (
+                <Menu.RadioItem key={o.value} value={o.value} className={item}>
+                  <BellRing aria-hidden className="size-4" /> {deliveryLabel(o.value, o.label)}
+                  <Menu.ItemIndicator className="ml-auto text-xs">✓</Menu.ItemIndicator>
+                </Menu.RadioItem>
+              ))}
             </Menu.RadioGroup>
             {canTryAs && (
               <>

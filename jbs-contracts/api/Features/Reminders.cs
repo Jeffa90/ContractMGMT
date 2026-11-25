@@ -186,9 +186,10 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
                 $"{e.Reference} ended on {endedOn.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}, as decided (Let it end).", new { endedOn = DateOnly.FromDateTime(endedOn) }, contractId: e.Id);
         }
 
-        // 2. Reminders.
-        var offsets = (await c.QueryAsync<(string Kind, string Days)>("SELECT Kind, Days FROM contracts.ReminderSetting", transaction: tx))
-            .ToDictionary(o => o.Kind, o => o.Days.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).OrderBy(d => d).ToArray());
+        // 2. Reminders. A reminder an admin switched off has no steps, so nothing is sent for it (D-99).
+        var offsets = (await c.QueryAsync<(string Kind, string Days, bool IsOn)>("SELECT Kind, Days, IsOn FROM contracts.ReminderSetting", transaction: tx))
+            .ToDictionary(o => o.Kind, o => o.IsOn ? o.Days.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).OrderBy(d => d).ToArray() : []);
+        var delivery = new Delivery(await c.ExecuteScalarAsync<string?>("SELECT Value FROM contracts.AppSetting WHERE Name = N'ReminderDelivery'", transaction: tx) ?? "Daily");
         var wording = (await c.QueryAsync<Wording>("SELECT Kind, Subject, Body FROM contracts.EmailTemplate", transaction: tx)).ToDictionary(w => w.Kind);
         var people = (await c.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1", transaction: tx)).ToDictionary(p => p.Id);
         var groupHead = people.Values.FirstOrDefault(p => p.IsGroupHead);
@@ -206,19 +207,22 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
             if (undecided && k.NoticePeriodDays is { } notice && anchor is { } a)
             {
                 var deadline = DateOnly.FromDateTime(a.AddDays(-notice));
-                sent += await SendAsync(c, tx, k, "Notice", deadline, today, offsets["Notice"], wording, Owners(k, people));
+                sent += await SendAsync(c, tx, k, "Notice", deadline, today, offsets["Notice"], wording, Owners(k, people), delivery);
                 var escalateTo = Owners(k, people);
                 if (groupHead is not null && groupHead.Id != k.OwnerId && groupHead.Id != k.BackupOwnerId) escalateTo.Insert(0, groupHead);
-                sent += await SendAsync(c, tx, k, "Escalation", deadline, today, offsets["Escalation"], wording, escalateTo);
+                sent += await SendAsync(c, tx, k, "Escalation", deadline, today, offsets["Escalation"], wording, escalateTo, delivery);
             }
             if (undecided && !k.IsEvergreen && k.EndDate is { } end)
-                sent += await SendAsync(c, tx, k, "End", DateOnly.FromDateTime(end), today, offsets["End"], wording, Owners(k, people));
+                sent += await SendAsync(c, tx, k, "End", DateOnly.FromDateTime(end), today, offsets["End"], wording, Owners(k, people), delivery);
             if (k.ReviewDate is { } review)
-                sent += await SendAsync(c, tx, k, "Review", DateOnly.FromDateTime(review), today, offsets["Review"], wording, Owners(k, people));
+                sent += await SendAsync(c, tx, k, "Review", DateOnly.FromDateTime(review), today, offsets["Review"], wording, Owners(k, people), delivery);
         }
 
         // 3. Suppliers: documents expiring (to whoever ticked Remind me) and business reviews due (to the relationship owner).
-        sent += await SupplierRemindersAsync(c, tx, today, offsets, wording, people);
+        sent += await SupplierRemindersAsync(c, tx, today, offsets, wording, people, delivery);
+
+        // 4. Summary emails: everything waiting for people who get their reminders daily, or weekly when it's Monday or something is close.
+        await SendSummariesAsync(c, tx, today, people, delivery);
 
         await c.ExecuteAsync("""
             MERGE contracts.JobRun AS t USING (SELECT @JobName AS Name) AS s ON t.Name = s.Name
@@ -230,7 +234,7 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
     }
 
     private async Task<int> SupplierRemindersAsync(SqlConnection c, SqlTransaction tx, DateOnly today, Dictionary<string, int[]> offsets, Dictionary<string, Wording> wording,
-        Dictionary<int, Person> people)
+        Dictionary<int, Person> people, Delivery delivery)
     {
         var sent = 0;
         int? Step(DateOnly due, string kind)
@@ -238,7 +242,6 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
             var left = due.DayNumber - today.DayNumber;
             return left < 0 ? null : offsets[kind].Where(d => left <= d).Cast<int?>().FirstOrDefault();
         }
-        string Day(DateOnly d) => d.ToString("ddd d MMM yyyy", CultureInfo.InvariantCulture);
 
         var watched = await c.QueryAsync<(int DocumentId, int PersonId, DateTime ExpiresOn, string Title, string TypeName, int SupplierId, string Supplier)>("""
             SELECT d.Id, w.PersonId, d.ExpiresOn, d.Title, t.Value, s.Id, s.Name
@@ -261,9 +264,12 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
                 ["Due date"] = Day(due), ["Days"] = (due.DayNumber - today.DayNumber).ToString(CultureInfo.InvariantCulture),
             };
             var t = wording["SupplierExpiry"];
-            await EmailOutbox.QueueAsync(c, tx, "supplier-expiry", person.Email, person.Name,
-                EmailWording.Compose("SupplierExpiry", t.Subject, t.Body, values, settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{w.SupplierId}?tab=documents"),
-                personId: person.Id, supplierId: w.SupplierId, dedupeKey: $"supplier-expiry:{w.DocumentId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
+            var docLink = settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{w.SupplierId}?tab=documents";
+            var left = due.DayNumber - today.DayNumber;
+            if (!await HoldAsync(c, tx, person, delivery, "SupplierExpiry", $"{w.Supplier}: \"{w.Title}\" ({w.TypeName.ToLowerInvariant()}) expires {Day(due)}, {In(left)}.", docLink, due, left, null, w.SupplierId))
+                await EmailOutbox.QueueAsync(c, tx, "supplier-expiry", person.Email, person.Name,
+                    EmailWording.Compose("SupplierExpiry", t.Subject, t.Body, values, docLink),
+                    personId: person.Id, supplierId: w.SupplierId, dedupeKey: $"supplier-expiry:{w.DocumentId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
             sent++;
         }
 
@@ -286,9 +292,12 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
                 ["Days"] = (due.DayNumber - today.DayNumber).ToString(CultureInfo.InvariantCulture),
             };
             var t = wording["SupplierReview"];
-            await EmailOutbox.QueueAsync(c, tx, "supplier-review", person.Email, person.Name,
-                EmailWording.Compose("SupplierReview", t.Subject, t.Body, values, settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{r.SupplierId}?tab=reviews"),
-                personId: person.Id, supplierId: r.SupplierId, dedupeKey: $"supplier-review:{r.SupplierId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
+            var reviewLink = settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{r.SupplierId}?tab=reviews";
+            var left = due.DayNumber - today.DayNumber;
+            if (!await HoldAsync(c, tx, person, delivery, "SupplierReview", $"{r.Supplier}: business review due {Day(due)}, {In(left)}. You're the relationship owner.", reviewLink, due, left, null, r.SupplierId))
+                await EmailOutbox.QueueAsync(c, tx, "supplier-review", person.Email, person.Name,
+                    EmailWording.Compose("SupplierReview", t.Subject, t.Body, values, reviewLink),
+                    personId: person.Id, supplierId: r.SupplierId, dedupeKey: $"supplier-review:{r.SupplierId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
             sent++;
         }
         return sent;
@@ -302,7 +311,7 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
     /// Nothing is sent once the date has passed.
     /// </summary>
     private async Task<int> SendAsync(SqlConnection c, SqlTransaction tx, Row k, string kind, DateOnly due, DateOnly today, int[] steps,
-        Dictionary<string, Wording> wording, List<Person> recipients)
+        Dictionary<string, Wording> wording, List<Person> recipients, Delivery delivery)
     {
         var left = due.DayNumber - today.DayNumber;
         if (left < 0 || recipients.Count == 0) return 0;
@@ -323,10 +332,82 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
                 ["Owner"] = k.OwnerName, ["Due date"] = due.ToString("ddd d MMM yyyy", CultureInfo.InvariantCulture), ["Days"] = left.ToString(CultureInfo.InvariantCulture),
             };
             var link = settings.SiteUrl is null ? null : $"{settings.SiteUrl}/contracts/{k.Id}";
+            var name = $"{k.Reference} {k.Title}" + (k.SupplierName is { } sn ? $" ({sn})" : "");
+            var line = kind switch
+            {
+                "Notice" => $"Notice deadline for {name}: {Day(due)}, {In(left)}. Decide whether to renew, let it end or renegotiate.",
+                "Escalation" => $"No renewal decision yet for {name} (owner {k.OwnerName}). The notice deadline is {Day(due)}, {In(left)}.",
+                "End" => $"{name} ends on {Day(due)}, {In(left)}.",
+                _ => $"Review due for {name}: {Day(due)}, {In(left)}.",
+            };
+            if (await HoldAsync(c, tx, person, delivery, kind, line, link, due, left, k.Id, null)) continue;
             await EmailOutbox.QueueAsync(c, tx, $"reminder-{kind.ToLowerInvariant()}", person.Email, person.Name,
                 EmailWording.Compose(kind, w.Subject, w.Body, values, link),
                 personId: person.Id, contractId: k.Id, dedupeKey: $"reminder:{k.Id}:{kind}:{due:yyyy-MM-dd}:{step}:{person.Id}");
         }
         return 1;
+    }
+
+    // ------------------------------------------------------------ Summaries (D-99)
+
+    /// <summary>The default an admin set; each person's own choice wins.</summary>
+    private sealed record Delivery(string Default)
+    {
+        public string For(Person p) => p.ReminderDelivery ?? Default;
+    }
+
+    private static string Day(DateOnly d) => d.ToString("ddd d MMM yyyy", CultureInfo.InvariantCulture);
+    private static string In(int days) => days switch { 0 => "today", 1 => "tomorrow", _ => $"in {days} days" };
+
+    /// <summary>For someone who gets summaries: keeps the reminder for their next summary email instead of sending it now. False: send it now.</summary>
+    private static async Task<bool> HoldAsync(SqlConnection c, SqlTransaction tx, Person person, Delivery delivery, string kind, string line, string? link, DateOnly due,
+        int left, int? contractId, int? supplierId)
+    {
+        if (delivery.For(person) == "Each") return false;
+        await c.ExecuteAsync("""
+            IF NOT EXISTS (SELECT 1 FROM contracts.Contract WHERE Id = @contractId AND IsDemo = 1)
+               AND NOT EXISTS (SELECT 1 FROM contracts.Supplier WHERE Id = @supplierId AND IsDemo = 1)
+            INSERT INTO contracts.ReminderSummaryItem (PersonId, Kind, Line, Link, DueDate, DaysLeft, ContractId, SupplierId)
+            VALUES (@personId, @kind, @line, @link, @due, @left, @contractId, @supplierId)
+            """, new { personId = person.Id, kind, line, link, due = due.ToDateTime(TimeOnly.MinValue), left, contractId, supplierId }, tx);
+        return true;
+    }
+
+    /// <summary>
+    /// One email per person with everything waiting: every day for Daily; for Weekly on Mondays, or sooner when something is a week or
+    /// less away (so a weekly summary never makes someone miss a date). Someone who switched to "as they happen" gets what was waiting now.
+    /// </summary>
+    private async Task SendSummariesAsync(SqlConnection c, SqlTransaction tx, DateOnly today, Dictionary<int, Person> people, Delivery delivery)
+    {
+        var waiting = (await c.QueryAsync<(int Id, int PersonId, string Line, string? Link, DateTime DueDate)>(
+            "SELECT Id, PersonId, Line, Link, DueDate FROM contracts.ReminderSummaryItem WITH (UPDLOCK) WHERE SentUtc IS NULL ORDER BY DueDate, Id", transaction: tx)).ToList();
+        foreach (var group in waiting.GroupBy(w => w.PersonId))
+        {
+            var items = group.ToList();
+            var ids = System.Text.Json.JsonSerializer.Serialize(items.Select(i => i.Id));
+            if (!people.TryGetValue(group.Key, out var person))
+            {
+                // Switched off since: nothing to send.
+                await c.ExecuteAsync("UPDATE contracts.ReminderSummaryItem SET SentUtc = SYSUTCDATETIME() WHERE Id IN (SELECT value FROM OPENJSON(@ids))", new { ids }, tx);
+                continue;
+            }
+            var how = delivery.For(person);
+            var close = items.Any(i => DateOnly.FromDateTime(i.DueDate).DayNumber - today.DayNumber <= 7);
+            if (how == "Weekly" && today.DayOfWeek != DayOfWeek.Monday && !close) continue;
+            var paragraphs = new List<string>
+            {
+                $"Hi {LegalEndpoints.First(person.Name)},",
+                items.Count == 1 ? "Here's what's coming up:" : $"Here are the {items.Count} things coming up:",
+            };
+            paragraphs.AddRange(items.Select(i => "• " + i.Line + (i.Link is { } l ? $"\nOpen it: {l}" : "")));
+            paragraphs.Add(how == "Weekly"
+                ? "You get your reminders in one email a week, on Mondays (sooner when something is a week or less away). To change that, open JBS Contracts, click your name and choose Email reminders."
+                : "You get your reminders in one email a day. To change that, open JBS Contracts, click your name and choose Email reminders.");
+            var subject = items.Count == 1 ? "Your JBS Contracts reminder: 1 thing coming up" : $"Your JBS Contracts reminders: {items.Count} things coming up";
+            await EmailOutbox.QueueAsync(c, tx, "reminder-summary", person.Email, person.Name,
+                EmailTemplates.FromWording(subject, [.. paragraphs], settings.SiteUrl, "Open JBS Contracts"),
+                personId: person.Id, dedupeKey: $"summary:{person.Id}:{today:yyyy-MM-dd}");
+            await c.ExecuteAsync("UPDATE contracts.ReminderSummaryItem SET SentUtc = SYSUTCDATETIME() WHERE Id IN (SELECT value FROM OPENJSON(@ids))", new { ids }, tx);
+        }
     }
 }

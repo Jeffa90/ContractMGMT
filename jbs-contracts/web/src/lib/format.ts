@@ -13,11 +13,15 @@ const dateTime = new Intl.DateTimeFormat('en-AU', {
 const longDate = new Intl.DateTimeFormat('en-AU', { timeZone: zone, weekday: 'long', day: 'numeric', month: 'long' })
 const hourOnly = new Intl.DateTimeFormat('en-AU', { timeZone: zone, hour: 'numeric', hourCycle: 'h23' })
 
+// Fixed short month names: Australian locale data spells some out ("June", "Sept"), which reads unevenly in lists.
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 /** "Tue 4 Nov, 3:00pm" */
 export function formatDateTime(iso: string | Date): string {
   const parts = dateTime.formatToParts(typeof iso === 'string' ? new Date(iso) : iso)
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
-  return `${get('weekday')} ${get('day')} ${get('month')}, ${get('hour')}:${get('minute')}${get('dayPeriod').toLowerCase().replace(/\./g, '')}`
+  const monthIndex = Number(new Intl.DateTimeFormat('en-AU', { timeZone: zone, month: 'numeric' }).format(typeof iso === 'string' ? new Date(iso) : iso)) - 1
+  return `${get('weekday')} ${get('day')} ${months[monthIndex]}, ${get('hour')}:${get('minute')}${get('dayPeriod').toLowerCase().replace(/\./g, '')}`
 }
 
 /** "Wednesday 25 November" */
@@ -56,12 +60,11 @@ export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name
 }
 
-const dateOnly = new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' })
-
 /** A date-only value ("2027-12-31") as "31 Dec 2027". Date-only values have no time zone. */
 export function formatDate(value: string | null | undefined): string {
   if (!value) return ''
-  return dateOnly.format(new Date(`${value}T00:00:00Z`))
+  const [y, m, d] = value.split('-').map(Number)
+  return `${d} ${months[m - 1]} ${y}`
 }
 
 /** Whole days from today (Brisbane) to a date-only value; negative when it has passed. */

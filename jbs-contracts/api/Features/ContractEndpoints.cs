@@ -59,7 +59,7 @@ public sealed record SaveContract(
     string? Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int? BusinessUnitId, int? SiteId,
     int? OwnerId, int? BackupOwnerId, bool? IsConfidential, decimal? Value, string? CurrencyCode, string? SapOutlineAgreement,
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool? IsEvergreen, int? NoticePeriodDays, DateOnly? ReviewDate,
-    bool? NeedsLegalReview, string? RowVersion);
+    bool? NeedsLegalReview, string? RowVersion, Dictionary<string, System.Text.Json.JsonElement>? Fields = null);
 
 public sealed record WithdrawContract(string? Reason, string? RowVersion);
 
@@ -109,7 +109,10 @@ public static class ContractEndpoints
             await using var c = await db.OpenAsync();
             var rows = await c.QueryAsync<ContractRow>($"{SelectContract} WHERE {string.Join(" AND ", where)} ORDER BY k.UpdatedUtc DESC",
                 ContractAccess.Params(me!, new { like = $"%{EscapeLike(search)}%" }));
-            return Results.Ok(rows.Select(r => ListView(r)));
+            var list = rows.ToList();
+            var definitions = await Fields.LoadAsync(c);
+            var values = await Fields.ReadAsync(c, null, list.Select(r => r.Id), definitions, f => f.ShowInList && !f.IsHidden);
+            return Results.Ok(list.Select(r => ListView(r, values[r.Id].ToDictionary(v => v.Key, v => v.Value.Display))));
         });
 
         contracts.MapGet("/{id:int}", async (int id, CurrentUser current, Db db) =>
@@ -122,10 +125,13 @@ public static class ContractEndpoints
             if (row is null || !ContractAccess.CanSee(me!, row.IsConfidential, row.OwnerId, row.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
             var documents = await DocumentEndpoints.ListAsync(c, id);
+            var definitions = await Fields.LoadAsync(c);
+            var values = (await Fields.ReadAsync(c, null, [id], definitions))[id];
             var activity = await c.QueryAsync("SELECT Id, OccurredUtc, ActorName, Action, Summary FROM contracts.AuditEvent WHERE ContractId = @id ORDER BY Id DESC", new { id });
             return Results.Ok(new
             {
                 contract = DetailView(row),
+                fieldValues = values.ToDictionary(v => v.Key, v => new { value = v.Value.Value, display = v.Value.Display }),
                 canEdit = ContractAccess.CanEdit(me!, row.Stage, row.IsLocked),
                 canWithdraw = me!.IsContractOwner && row.Stage == "Draft",
                 canUpload = DocumentEndpoints.CanUpload(me, row),
@@ -198,7 +204,9 @@ public static class ContractEndpoints
     public static async Task<(int Id, string Reference, Dictionary<string, string>? Errors)> CreateDraftAsync(SqlConnection c, SqlTransaction tx, AuditLog audit, Person me, SaveContract body, string via = "")
     {
         var (input, errors) = await ValidateAsync(c, tx, body with { OwnerId = body.OwnerId ?? me.Id }, before: null);
-        if (errors is not null) return (0, "", errors);
+        var definitions = await Fields.LoadAsync(c, tx);
+        var (fieldValues, fieldErrors) = await Fields.ParseAsync(c, tx, body.Fields, definitions);
+        if (errors is not null || fieldErrors.Count > 0) return (0, "", (errors ?? []).Concat(fieldErrors).ToDictionary(e => e.Key, e => e.Value));
         var number = await c.ExecuteScalarAsync<int>("UPDATE contracts.Counter SET NextValue = NextValue + 1 OUTPUT DELETED.NextValue WHERE Name = N'ContractNumber'", transaction: tx);
         var reference = $"JBSAUS-{number.ToString("0000", CultureInfo.InvariantCulture)}";
         var id = await c.ExecuteScalarAsync<int>("""
@@ -211,9 +219,10 @@ public static class ContractEndpoints
                 @me, @me)
             """, Params(input!, new { reference, me = me.Id }), tx);
         var saved = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
+        var added = await Fields.SaveAsync(c, tx, id, fieldValues, definitions);
         await audit.WriteAsync(c, tx, me.AsActor(), "contract.created", "Contract", id,
             $"{me.Name} started the draft {reference} {saved.Title}" + (saved.OwnerId != me.Id ? $", owned by {saved.OwnerName}" : "") + $"{via}.",
-            Snapshot(saved), contractId: id);
+            new { fields = Snapshot(saved), added }, contractId: id);
         return (id, reference, null);
     }
 
@@ -222,7 +231,9 @@ public static class ContractEndpoints
     {
         var id = before.Id;
         var (input, errors) = await ValidateAsync(c, tx, body, before);
-        if (errors is not null) return (errors, null);
+        var definitions = await Fields.LoadAsync(c, tx);
+        var (fieldValues, fieldErrors) = await Fields.ParseAsync(c, tx, body.Fields, definitions);
+        if (errors is not null || fieldErrors.Count > 0) return ((errors ?? []).Concat(fieldErrors).ToDictionary(e => e.Key, e => e.Value), null);
         await c.ExecuteAsync("""
             UPDATE contracts.Contract SET Title = @Title, Description = @Description, SupplierId = @SupplierId, CategoryId = @CategoryId,
                 AgreementTypeId = @AgreementTypeId, BusinessUnitId = @BusinessUnitId, SiteId = @SiteId, OwnerId = @OwnerId, BackupOwnerId = @BackupOwnerId,
@@ -234,11 +245,13 @@ public static class ContractEndpoints
         var after = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
         var (oldValues, newValues) = (Snapshot(before), Snapshot(after));
         var changed = oldValues.Keys.Where(k => oldValues[k] != newValues[k]).ToList();
-        if (changed.Count > 0)
+        var described = changed.Select(k => newValues[k] is null ? $"cleared {k}" : oldValues[k] is null ? $"set {k} to {newValues[k]}" : $"{k} from {oldValues[k]} to {newValues[k]}").ToList();
+        var fieldChanges = await Fields.SaveAsync(c, tx, id, fieldValues, definitions);
+        described.AddRange(fieldChanges);
+        if (described.Count > 0)
         {
-            var described = changed.Select(k => newValues[k] is null ? $"cleared {k}" : oldValues[k] is null ? $"set {k} to {newValues[k]}" : $"{k} from {oldValues[k]} to {newValues[k]}");
             await audit.WriteAsync(c, tx, me.AsActor(), "contract.changed", "Contract", id, $"{me.Name} changed {string.Join("; ", described)}{via}.",
-                new { before = changed.ToDictionary(k => k, k => oldValues[k]), after = changed.ToDictionary(k => k, k => newValues[k]) }, contractId: id);
+                new { before = changed.ToDictionary(k => k, k => oldValues[k]), after = changed.ToDictionary(k => k, k => newValues[k]), added = fieldChanges }, contractId: id);
         }
         return (null, after);
     }
@@ -283,8 +296,9 @@ public static class ContractEndpoints
 
     private static DateOnly? D(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
 
-    public static object ListView(ContractRow r) => new
+    public static object ListView(ContractRow r, Dictionary<string, string>? fields = null) => new
     {
+        Fields = fields ?? [],
         r.Id, r.Reference, r.Title, r.SupplierName, r.Stage, StageName = StageNames[r.Stage], StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc),
         r.OwnerId, r.OwnerName, r.BackupOwnerId, r.IsConfidential, r.CategoryDisplay, r.Value, r.CurrencyCode,
         EndDate = D(r.EndDate), r.IsEvergreen, NoticeDeadline = D(r.NoticeDeadline), UpdatedUtc = DateTime.SpecifyKind(r.UpdatedUtc, DateTimeKind.Utc),
@@ -303,7 +317,7 @@ public static class ContractEndpoints
     /// <summary>Plain-words values for the Activity history and the audit record (label to display value).</summary>
     private static Dictionary<string, string?> Snapshot(ContractRow r)
     {
-        static string? Date(DateTime? d) => d?.ToString("d MMM yyyy", CultureInfo.GetCultureInfo("en-AU"));
+        static string? Date(DateTime? d) => d?.ToString("d MMM yyyy", CultureInfo.InvariantCulture);
         return new()
         {
             ["title"] = r.Title,

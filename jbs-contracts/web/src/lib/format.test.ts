@@ -3,6 +3,8 @@ import { daysUntil, firstName, formatBytes, formatDate, formatDateTime, formatLo
 describe('dates, money and sizes', () => {
   it('shows date-only values without shifting the day', () => {
     expect(formatDate('2027-12-31')).toBe('31 Dec 2027')
+    expect(formatDate('2027-06-30')).toBe('30 Jun 2027')
+    expect(formatDate('2027-09-01')).toBe('1 Sep 2027')
     expect(daysUntil('2026-12-05', new Date('2026-11-25T02:00:00Z'))).toBe(10)
     expect(daysUntil('2026-11-20', new Date('2026-11-25T02:00:00Z'))).toBe(-5)
   })
@@ -18,6 +20,7 @@ describe('dates are shown in Brisbane time, Australian style', () => {
   it('formats a UTC time as "Tue 4 Nov, 3:00pm" in Brisbane (UTC+10, no daylight saving)', () => {
     expect(formatDateTime('2025-11-04T05:00:00Z')).toBe('Tue 4 Nov, 3:00pm')
     expect(formatDateTime('2025-11-03T23:05:00Z')).toBe('Tue 4 Nov, 9:05am')
+    expect(formatDateTime('2026-06-30T00:00:00Z')).toBe('Tue 30 Jun, 10:00am')
   })
   it('formats the long date for the greeting', () => {
     expect(formatLongDate(new Date('2026-11-25T02:00:00Z'))).toBe('Wednesday 25 November')

@@ -18,8 +18,8 @@ public static class HomeEndpoints
     private const string Mine = "(k.OwnerId = @meId OR k.BackupOwnerId = @meId)";
     private const string NoticeDeadline = "DATEADD(DAY, -k.NoticePeriodDays, CASE WHEN k.IsEvergreen = 1 THEN k.ReviewDate ELSE k.EndDate END)";
     private const string LatestSentBack = """
-        EXISTS (SELECT 1 FROM contracts.Approval a WHERE a.ContractId = k.Id AND a.Decision = N'SentBack' AND a.AtUtc >= DATEADD(SECOND, -5, k.StageSinceUtc)
-                AND a.Id = (SELECT MAX(a2.Id) FROM contracts.Approval a2 WHERE a2.ContractId = k.Id))
+        EXISTS (SELECT 1 FROM contracts.Approval a WHERE a.ContractId = k.Id AND a.VariationId IS NULL AND a.Decision = N'SentBack' AND a.AtUtc >= DATEADD(SECOND, -5, k.StageSinceUtc)
+                AND a.Id = (SELECT MAX(a2.Id) FROM contracts.Approval a2 WHERE a2.ContractId = k.Id AND a2.VariationId IS NULL))
         """;
     private const string NotInvolved = "(k.CreatedById <> @meId AND k.OwnerId <> @meId AND ISNULL(k.BackupOwnerId, 0) <> @meId)";
 
@@ -48,6 +48,13 @@ public static class HomeEndpoints
         // Approvers.
         new("to-approve", "turn", "To approve", "Signed and waiting for your confirmation", p => p.IsApprover,
             $"k.Stage = N'Approval' AND {NotInvolved}"),
+        // Variations (D-80): to finish (owners), for Legal, and to approve.
+        new("variation-owner", "turn", "Variations to finish", "Your contracts' Variations that are drafts or back with you", p => p.IsContractOwner,
+            $"{Mine} AND EXISTS (SELECT 1 FROM contracts.Variation v WHERE v.ContractId = k.Id AND (v.Stage = N'Draft' OR (v.Stage = N'LegalReview' AND v.WhoseTurn = N'Owner')))"),
+        new("variation-legal", "turn", "Variations for Legal", "Variations with Legal that you have, or that nobody has picked up", p => p.IsLegal,
+            "EXISTS (SELECT 1 FROM contracts.Variation v WHERE v.ContractId = k.Id AND v.Stage = N'LegalReview' AND v.WhoseTurn = N'Legal' AND (v.LegalPersonId = @meId OR v.LegalPersonId IS NULL))"),
+        new("variation-to-approve", "turn", "Variations to approve", "Changes to Effective contracts waiting for your approval", p => p.IsApprover,
+            $"k.OwnerId <> @meId AND ISNULL(k.BackupOwnerId, 0) <> @meId AND EXISTS (SELECT 1 FROM contracts.Variation v WHERE v.ContractId = k.Id AND v.Stage = N'Approval' AND v.CreatedById <> @meId)"),
         // Coming up.
         new("notice-30", "coming", "Notice deadline in 30 days", "Your Effective contracts: the last day to give notice is close", p => p.IsContractOwner,
             $"k.Stage = N'Effective' AND {Mine} AND k.RenewalDecision IS NULL AND k.NoticePeriodDays IS NOT NULL AND {NoticeDeadline} BETWEEN @today AND DATEADD(DAY, 30, @today)"),

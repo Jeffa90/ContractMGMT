@@ -33,10 +33,10 @@ public static class LegalEndpoints
     };
 
     /// <summary>The actions this person can take on the contract now, by name (the page shows a button for each; the server checks again).</summary>
-    public static List<string> Actions(Person me, ContractRow c)
+    public static List<string> Actions(Person me, ContractRow c, bool hasAnyTimeFields = false)
     {
         var actions = new List<string>();
-        if (c.IsLocked) return RenewalEndpoints.Actions(me, c); // Effective and Ended contracts are locked; only their own actions apply
+        if (c.IsLocked) return [.. RenewalEndpoints.Actions(me, c), .. LockedChangeEndpoints.Actions(me, c, hasAnyTimeFields)]; // locked: only their own actions
         if (c.Stage == "Draft" && me.IsContractOwner) actions.Add(c.NeedsLegalReview ? "sendToLegal" : "readyForSigning");
         if (c.Stage == "LegalReview")
         {
@@ -55,6 +55,7 @@ public static class LegalEndpoints
             actions.AddRange(["sendForApproval", c.LegalClearedUtc is not null ? "sendBackToLegal" : "backToDraft"]);
         if (c.Stage == "Approval" && me.IsApprover && !ApprovalEndpoints.IsInvolved(me, c)) actions.AddRange(["approve", "sendBack"]);
         actions.AddRange(RenewalEndpoints.Actions(me, c));
+        actions.AddRange(LockedChangeEndpoints.Actions(me, c, hasAnyTimeFields));
         return actions;
     }
 
@@ -82,19 +83,19 @@ public static class LegalEndpoints
     }
 
     /// <summary>The Legal conversation, oldest first, with the documents attached to each entry as they were then.</summary>
-    public static async Task<IEnumerable<object>> ConversationAsync(SqlConnection c, int contractId)
+    public static async Task<IEnumerable<object>> ConversationAsync(SqlConnection c, int contractId, int? variationId = null)
     {
         var entries = (await c.QueryAsync<Entry>("""
             SELECT t.Id, t.Number, t.Action, by_.Name AS ByName, t.AtUtc, t.WhoseTurn, lp.Name AS LegalPersonName, t.Status, t.Note
             FROM contracts.LegalTurn t JOIN contracts.Person by_ ON by_.Id = t.ById LEFT JOIN contracts.Person lp ON lp.Id = t.LegalPersonId
-            WHERE t.ContractId = @contractId ORDER BY t.Number
-            """, new { contractId })).ToList();
+            WHERE t.ContractId = @contractId AND ((@variationId IS NULL AND t.VariationId IS NULL) OR t.VariationId = @variationId) ORDER BY t.Number
+            """, new { contractId, variationId })).ToList();
         var documents = (await c.QueryAsync<EntryDocument>("""
             SELECT td.LegalTurnId, d.Id AS DocumentId, v.Id AS VersionId, v.VersionNumber, d.Title, v.FileName
             FROM contracts.LegalTurnDocument td JOIN contracts.LegalTurn t ON t.Id = td.LegalTurnId
             JOIN contracts.DocumentVersion v ON v.Id = td.DocumentVersionId JOIN contracts.Document d ON d.Id = v.DocumentId
-            WHERE t.ContractId = @contractId
-            """, new { contractId })).ToLookup(d => d.LegalTurnId);
+            WHERE t.ContractId = @contractId AND ((@variationId IS NULL AND t.VariationId IS NULL) OR t.VariationId = @variationId)
+            """, new { contractId, variationId })).ToLookup(d => d.LegalTurnId);
         return entries.Select(e => (object)new
         {
             e.Number, e.Action, e.ByName, AtUtc = DateTime.SpecifyKind(e.AtUtc, DateTimeKind.Utc), e.WhoseTurn, e.LegalPersonName, e.Status,
@@ -371,15 +372,23 @@ public static class LegalEndpoints
         await x.C.ExecuteAsync("UPDATE contracts.Contract SET LegalPersonId = @personId, LegalStatus = @status, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id",
             new { personId, status, me = x.Me.Id, id = x.Contract.Id }, x.Tx);
 
-    internal static async Task<int> AddEntryAsync(Ctx x, string action, string? whoseTurn, int? legalPersonId, string? status, string? note, int[] documentVersionIds)
+    internal static Task<int> AddEntryAsync(Ctx x, string action, string? whoseTurn, int? legalPersonId, string? status, string? note, int[] documentVersionIds) =>
+        AddEntryAsync(x.C, x.Tx, x.Me, x.Contract.Id, null, action, whoseTurn, legalPersonId, status, note, documentVersionIds);
+
+    /// <summary>A numbered entry in the Legal conversation of the contract, or of one of its Variations.</summary>
+    internal static async Task<int> AddEntryAsync(SqlConnection c, SqlTransaction tx, Person me, int contractId, int? variationId, string action, string? whoseTurn,
+        int? legalPersonId, string? status, string? note, int[] documentVersionIds)
     {
-        var number = await x.C.ExecuteScalarAsync<int>("SELECT ISNULL(MAX(Number), 0) + 1 FROM contracts.LegalTurn WHERE ContractId = @id", new { id = x.Contract.Id }, x.Tx);
-        var turnId = await x.C.ExecuteScalarAsync<int>("""
-            INSERT INTO contracts.LegalTurn (ContractId, Number, Action, ById, WhoseTurn, LegalPersonId, Status, Note)
-            OUTPUT INSERTED.Id VALUES (@contractId, @number, @action, @me, @whoseTurn, @legalPersonId, @status, @note)
-            """, new { contractId = x.Contract.Id, number, action, me = x.Me.Id, whoseTurn, legalPersonId, status, note }, x.Tx);
+        var number = await c.ExecuteScalarAsync<int>("""
+            SELECT ISNULL(MAX(Number), 0) + 1 FROM contracts.LegalTurn
+            WHERE ContractId = @contractId AND ((@variationId IS NULL AND VariationId IS NULL) OR VariationId = @variationId)
+            """, new { contractId, variationId }, tx);
+        var turnId = await c.ExecuteScalarAsync<int>("""
+            INSERT INTO contracts.LegalTurn (ContractId, VariationId, Number, Action, ById, WhoseTurn, LegalPersonId, Status, Note)
+            OUTPUT INSERTED.Id VALUES (@contractId, @variationId, @number, @action, @me, @whoseTurn, @legalPersonId, @status, @note)
+            """, new { contractId, variationId, number, action, me = me.Id, whoseTurn, legalPersonId, status, note }, tx);
         foreach (var versionId in documentVersionIds)
-            await x.C.ExecuteAsync("INSERT INTO contracts.LegalTurnDocument (LegalTurnId, DocumentVersionId) VALUES (@turnId, @versionId)", new { turnId, versionId }, x.Tx);
+            await c.ExecuteAsync("INSERT INTO contracts.LegalTurnDocument (LegalTurnId, DocumentVersionId) VALUES (@turnId, @versionId)", new { turnId, versionId }, tx);
         return number;
     }
 

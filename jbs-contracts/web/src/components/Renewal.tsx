@@ -9,6 +9,7 @@ import { ApiError } from '@/lib/api'
 import type { ContractDetail, RenewalDecision } from '@/lib/contracts'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { Dialog } from './Dialog'
+import { StartVariationButton } from './LockedChanges'
 import { Textarea } from './form'
 import { Alert, Badge, Button, Card, Field, TextInput } from './ui'
 
@@ -63,6 +64,11 @@ export function RenewalCard({ data, openDecision }: { data: ContractDetail; open
           </p>
           {r.note && <p>{r.note}</p>}
           {r.plannedEndDate && <p>It ends on {formatDate(r.plannedEndDate)}.</p>}
+          {r.decision === 'Renegotiate' && data.actions.includes('startVariation') && (
+            <div className="mt-1">
+              <StartVariationButton data={data} />
+            </div>
+          )}
           {r.decision === 'LetItEnd' && !r.plannedEndDate && c.endDate && <p>It ends on its end date, {formatDate(c.endDate)}.</p>}
           {c.renewedById && (
             <p>

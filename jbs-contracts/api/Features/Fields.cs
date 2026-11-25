@@ -480,4 +480,24 @@ public static partial class Fields
         }
         return sql;
     }
+
+    /// <summary>A parsed value in plain words, as the contract page would show it (for Variations: old and new side by side).</summary>
+    public static async Task<string> DisplayAsync(SqlConnection c, SqlTransaction? tx, Parsed p)
+    {
+        if (p.IsEmpty) return "";
+        var f = p.Field;
+        return f.Kind switch
+        {
+            "WholeNumber" => p.Number?.ToString("N0", AU) ?? "",
+            "Decimal" => p.Number?.ToString("#,##0.####", AU) ?? "",
+            "Money" => p.Number is { } m ? $"${m.ToString("N2", AU)}" : "",
+            "Date" => p.Date?.ToString("d MMM yyyy", CultureInfo.InvariantCulture) ?? "",
+            "YesNo" => p.Bool is null ? "" : p.Bool.Value ? "Yes" : "No",
+            "Choice" => f.Choices.FirstOrDefault(x => x.Key == p.Text)?.Label ?? p.Text ?? "",
+            "MultiChoice" => string.Join(", ", (JsonSerializer.Deserialize<string[]>(p.Text ?? "[]") ?? []).Select(k => f.Choices.FirstOrDefault(x => x.Key == k)?.Label ?? k)),
+            "Person" => await c.ExecuteScalarAsync<string>("SELECT Name FROM contracts.Person WHERE Id = @id", new { id = p.PersonId }, tx) ?? "",
+            "Supplier" => await c.ExecuteScalarAsync<string>("SELECT Name FROM contracts.Supplier WHERE Id = @id", new { id = p.SupplierId }, tx) ?? "",
+            _ => p.Text ?? "",
+        };
+    }
 }

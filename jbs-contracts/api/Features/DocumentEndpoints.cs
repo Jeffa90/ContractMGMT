@@ -37,12 +37,15 @@ public static class DocumentEndpoints
     };
 
     /// <summary>Contract owners add documents until a contract is approved; during a Legal review, Legal can too (mark-ups), on either side's turn.</summary>
-    public static bool CanUpload(Person me, ContractRow c) => !c.IsLocked && c.Stage switch
-    {
-        "Draft" or "Signing" => me.IsContractOwner,
-        "LegalReview" => me.IsContractOwner || me.IsLegal,
-        _ => false,
-    };
+    /// <remarks>During an emergency unlock, admins can add and remove documents too (D-79). Documents for a Variation go through it instead.</remarks>
+    public static bool CanUpload(Person me, ContractRow c) => c.IsLocked
+        ? me.IsAdmin && c.UnlockId is not null && c.Stage is "Effective" or "Ended"
+        : c.Stage switch
+        {
+            "Draft" or "Signing" => me.IsContractOwner,
+            "LegalReview" => me.IsContractOwner || me.IsLegal,
+            _ => false,
+        };
 
     private sealed class DocRow
     {
@@ -56,24 +59,29 @@ public static class DocumentEndpoints
         public long SizeBytes { get; set; }
         public DateTime UploadedUtc { get; set; }
         public string UploadedByName { get; set; } = "";
+        public int? VariationId { get; set; }
+        public int? VariationNumber { get; set; }
     }
 
-    public static async Task<object> ListAsync(SqlConnection c, int contractId)
+    /// <summary>The contract's documents (each Variation's included, marked with its number), or only one Variation's.</summary>
+    public static async Task<object> ListAsync(SqlConnection c, int contractId, int? variationId = null)
     {
         var rows = (await c.QueryAsync<DocRow>("""
-            SELECT d.Id, d.Kind, d.Title, d.CurrentVersion, v.Id AS VersionId, v.VersionNumber, v.FileName, v.SizeBytes, v.UploadedUtc, p.Name AS UploadedByName
+            SELECT d.Id, d.Kind, d.Title, d.CurrentVersion, v.Id AS VersionId, v.VersionNumber, v.FileName, v.SizeBytes, v.UploadedUtc, p.Name AS UploadedByName,
+                   d.VariationId, vr.Number AS VariationNumber
             FROM contracts.Document d
             JOIN contracts.DocumentVersion v ON v.DocumentId = d.Id
             JOIN contracts.Person p ON p.Id = v.UploadedById
-            WHERE d.ContractId = @contractId AND d.IsRemoved = 0
+            LEFT JOIN contracts.Variation vr ON vr.Id = d.VariationId
+            WHERE d.ContractId = @contractId AND d.IsRemoved = 0 AND (@variationId IS NULL OR d.VariationId = @variationId)
             ORDER BY d.Id, v.VersionNumber DESC
-            """, new { contractId })).ToList();
+            """, new { contractId, variationId })).ToList();
         return rows.GroupBy(r => r.Id).Select(g =>
         {
             var first = g.First();
             return new
             {
-                first.Id, first.Kind, KindName = Kinds[first.Kind], first.Title, first.CurrentVersion,
+                first.Id, first.Kind, KindName = Kinds[first.Kind], first.Title, first.CurrentVersion, first.VariationId, first.VariationNumber,
                 Versions = g.Select(v => new { Id = v.VersionId, v.VersionNumber, v.FileName, v.SizeBytes, UploadedUtc = DateTime.SpecifyKind(v.UploadedUtc, DateTimeKind.Utc), v.UploadedByName }),
             };
         }).ToList();
@@ -92,6 +100,7 @@ public static class DocumentEndpoints
             var file = form.Files.GetFile("file");
             var kind = form["kind"].ToString();
             int? documentId = int.TryParse(form["documentId"], out var d) ? d : null;
+            int? variationId = int.TryParse(form["variationId"], out var vid) ? vid : null;
             var fields = new Dictionary<string, string>();
             if (file is null || file.Length == 0) fields["file"] = "Choose a file to upload.";
             else if (file.Length > MaxBytes) fields["file"] = "That file is over 25 MB. Make it smaller (for example, save it as a PDF) and try again.";
@@ -105,7 +114,15 @@ public static class DocumentEndpoints
             var contract = await ContractEndpoints.LoadForUpdateAsync(c, tx, id);
             if (contract is null || !ContractAccess.CanSee(me!, contract.IsConfidential, contract.OwnerId, contract.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
-            if (!CanUpload(me!, contract))
+            if (variationId is { } v)
+            {
+                // An open Variation's documents: its owner side, and Legal while it's with Legal.
+                var stage = await c.QuerySingleOrDefaultAsync<string>("SELECT Stage FROM contracts.Variation WHERE Id = @v AND ContractId = @id", new { v, id }, tx);
+                if (stage is null) return ApiResults.NotFound("We couldn't find that Variation.");
+                if (stage is not ("Draft" or "LegalReview" or "Approval") || !(me!.IsContractOwner || (me.IsLegal && stage == "LegalReview")))
+                    return ApiResults.NotAllowed("You can't add documents to this Variation at the moment.");
+            }
+            else if (!CanUpload(me!, contract))
                 return ApiResults.NotAllowed(contract.IsLocked ? "This contract is locked. Documents are added through a Variation." : "You can't add documents to this contract at the moment.");
 
             // Safe name: the uploaded file name is only kept as text, never used as a path.
@@ -148,8 +165,8 @@ public static class DocumentEndpoints
                     title = Path.GetFileNameWithoutExtension(fileName);
                     if (title.Length == 0) title = "Document";
                     if (title.Length > 200) title = title[..200];
-                    documentId = await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Document (ContractId, Kind, Title, CreatedById) OUTPUT INSERTED.Id VALUES (@id, @kind, @title, @me)",
-                        new { id, kind, title, me = me!.Id }, tx);
+                    documentId = await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Document (ContractId, VariationId, Kind, Title, CreatedById) OUTPUT INSERTED.Id VALUES (@id, @variationId, @kind, @title, @me)",
+                        new { id, variationId, kind, title, me = me!.Id }, tx);
                 }
                 var versionId = await c.ExecuteScalarAsync<int>("""
                     INSERT INTO contracts.DocumentVersion (DocumentId, VersionNumber, FileName, ContentType, SizeBytes, Sha256, StoredName, UploadedById)

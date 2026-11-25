@@ -118,7 +118,29 @@ export const help = {
           <strong>Once it's Effective</strong>, the Renewal card is where you <strong>record a decision</strong> (Renew, Let it end or Renegotiate) before the
           notice deadline, mark a <strong>review done</strong>, or <strong>end it early</strong> with a reason. Reminder emails stop once there's a decision.
         </p>
+        <p>
+          <strong>Changes</strong> to an Effective (locked) contract: <strong>Start a Variation</strong> to change dates, value and the like;{' '}
+          <strong>Hand over</strong> to change the owner or backup at any time. Admins can change Confidential (with a reason) and, for a mistake a Variation
+          can't fix, use an <strong>emergency unlock</strong> of up to 4 hours.
+        </p>
         <p>If a contract isn't going ahead (before it's approved), use <strong>Withdraw this contract</strong> at the bottom and say why. Nothing is deleted.</p>
+      </>
+    ),
+  },
+  variation: {
+    title: 'Variations',
+    body: (
+      <>
+        <p>
+          A Variation is how an Effective contract changes: its dates, notice period, value, business unit, site and most added fields. Nothing changes on the
+          contract until the Variation is approved; then every change applies at once and is recorded.
+        </p>
+        <p>
+          Choose what changes (now and new are side by side) and <strong>Save changes</strong>. If <strong>Needs Legal review</strong> is ticked, send it to
+          Legal; it goes back and forth like a contract's review until Legal clears it. Then <strong>Send for approval</strong>. Adding the signed variation
+          document is optional; the approver decides whether it's needed.
+        </p>
+        <p>An approver who finds a problem sends it back with a reason. Withdrawing a Variation changes nothing. A contract has one open Variation at a time.</p>
       </>
     ),
   },

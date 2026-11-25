@@ -16,6 +16,7 @@ import { ReminderSettingsPage } from './pages/ReminderSettings'
 import { RenewalsPage } from './pages/Renewals'
 import { PeoplePage } from './pages/People'
 import { SuppliersPage } from './pages/Suppliers'
+import { VariationPage } from './pages/Variation'
 import { NoAccessPage, NotFoundPage, SignInProblemPage } from './pages/StatusPages'
 
 const queryClient = new QueryClient({
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
       { path: 'contracts/:id', element: <ContractDetailPage /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage /> },
       { path: 'contracts/:id/approve', element: <ApprovePage /> },
+      { path: 'contracts/:id/variations/:vid', element: <VariationPage /> },
       { path: 'renewals', element: <RenewalsPage /> },
       { path: 'suppliers', element: <SuppliersPage /> },
       { path: 'admin/people', element: <PeoplePage /> },

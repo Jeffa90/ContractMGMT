@@ -44,6 +44,12 @@ public sealed class ContractRow
     public DateTime? RegisteredUtc { get; set; }
     public int? RegisteredById { get; set; }
     public bool? RegisteredAsBackup { get; set; }
+    // The emergency unlock open now, if any (D-79), and the open Variation, if any.
+    public int? UnlockId { get; set; }
+    public string? UnlockReason { get; set; }
+    public DateTime? UnlockExpiresUtc { get; set; }
+    public string? UnlockByName { get; set; }
+    public int? OpenVariationId { get; set; }
     public string? RenewalDecision { get; set; }
     public DateTime? RenewalDecisionUtc { get; set; }
     public int? RenewalDecisionById { get; set; }
@@ -106,6 +112,7 @@ public static class ContractEndpoints
         SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName,
                o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName, rb.Name AS RegisteredByName,
+               ul.UnlockId, ul.UnlockReason, ul.UnlockExpiresUtc, ul.UnlockByName, ovr.OpenVariationId,
                rd.Name AS RenewalDecisionByName, eb.Name AS EndedByName, ren.Reference AS RenewsReference, rn.RenewedById, rn.RenewedByReference, rn.RenewedByStage
         FROM contracts.Contract k
         LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
@@ -123,6 +130,10 @@ public static class ContractEndpoints
         LEFT JOIN contracts.Person rd ON rd.Id = k.RenewalDecisionById
         LEFT JOIN contracts.Person eb ON eb.Id = k.EndedById
         LEFT JOIN contracts.Contract ren ON ren.Id = k.RenewsContractId
+        OUTER APPLY (SELECT TOP (1) u.Id AS UnlockId, u.Reason AS UnlockReason, u.ExpiresUtc AS UnlockExpiresUtc, up.Name AS UnlockByName
+                     FROM contracts.Unlock u JOIN contracts.Person up ON up.Id = u.ById
+                     WHERE u.ContractId = k.Id AND u.ClosedUtc IS NULL AND u.ExpiresUtc > SYSUTCDATETIME() ORDER BY u.Id DESC) ul
+        OUTER APPLY (SELECT TOP (1) ov.Id AS OpenVariationId FROM contracts.Variation ov WHERE ov.ContractId = k.Id AND ov.Stage IN (N'Draft', N'LegalReview', N'Approval')) ovr
         OUTER APPLY (SELECT TOP (1) r2.Id AS RenewedById, r2.Reference AS RenewedByReference, r2.Stage AS RenewedByStage FROM contracts.Contract r2
                      WHERE r2.RenewsContractId = k.Id AND r2.Stage <> N'Withdrawn' ORDER BY r2.Id DESC) rn
         """;
@@ -181,7 +192,8 @@ public static class ContractEndpoints
                 fieldValues = values.ToDictionary(v => v.Key, v => new { value = v.Value.Value, display = v.Value.Display }),
                 legal = LegalEndpoints.View(row),
                 conversation = await LegalEndpoints.ConversationAsync(c, id),
-                actions = LegalEndpoints.Actions(me!, row),
+                actions = LegalEndpoints.Actions(me!, row, definitions.Any(f => !f.IsBuiltIn && !f.IsHidden && f.AfterEffective == "AnyTime")),
+                variations = await VariationEndpoints.ListAsync(c, id),
                 approvals = await ApprovalEndpoints.HistoryAsync(c, id),
                 renewal = RenewalEndpoints.View(row),
                 reminders = await RenewalEndpoints.RemindersAsync(c, id),
@@ -221,7 +233,7 @@ public static class ContractEndpoints
             var before = await LoadForUpdateAsync(c, tx, id);
             if (before is null || !ContractAccess.CanSee(me!, before.IsConfidential, before.OwnerId, before.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
-            if (!me!.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can change contracts.");
+            if (!me!.IsContractOwner && !ContractAccess.IsUnlockedFor(me, before)) return ApiResults.NotAllowed("Only contract owners can change contracts.");
             if (!ContractAccess.CanEdit(me, before))
                 return ApiResults.NotAllowed(before.IsLocked
                     ? "This contract is Effective and locked. Changes are made through a Variation."
@@ -230,7 +242,9 @@ public static class ContractEndpoints
                         : $"You can't change this contract while it's in {StageNames[before.Stage]}.");
             if (Convert.ToBase64String(before.RowVersion) != body.RowVersion)
                 return ApiResults.Changed("Someone else changed this contract while you were editing. Your changes weren't saved. Reload to see the latest, then make your changes again.");
-            var (errors2, after) = await UpdateDraftAsync(c, tx, audit, me, before, body);
+            // During an emergency unlock every change carries the unlock and its reason (D-79).
+            var via = ContractAccess.IsUnlockedFor(me, before) ? $" (emergency unlock by {before.UnlockByName}: {before.UnlockReason})" : "";
+            var (errors2, after) = await UpdateDraftAsync(c, tx, audit, me, before, body, via);
             if (errors2 is not null) return ApiResults.Invalid("Check the highlighted details.", errors2);
             await tx.CommitAsync();
             return Results.Ok(new { id, rowVersion = Convert.ToBase64String(after!.RowVersion) });
@@ -380,6 +394,8 @@ public static class ContractEndpoints
         r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
         StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc), r.IsLocked, r.WithdrawnReason,
         RegisteredUtc = Utc(r.RegisteredUtc), r.RegisteredByName, r.RegisteredAsBackup,
+        Unlock = r.UnlockId is null ? null : new { Id = r.UnlockId, Reason = r.UnlockReason, ExpiresUtc = Utc(r.UnlockExpiresUtc), ByName = r.UnlockByName },
+        r.OpenVariationId,
         r.RenewsContractId, r.RenewsReference, r.RenewedById, r.RenewedByReference, RenewedByStageName = r.RenewedByStage is { } rs ? StageNames[rs] : null,
         EndedOn = D(r.EndedOn), r.EndedReason, r.EndedByName, LastReviewedOn = D(r.LastReviewedOn),
         CreatedUtc = DateTime.SpecifyKind(r.CreatedUtc, DateTimeKind.Utc), r.CreatedByName, RowVersion = Convert.ToBase64String(r.RowVersion),

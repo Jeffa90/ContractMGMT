@@ -7,6 +7,7 @@ import { Dialog } from '@/components/Dialog'
 import { Select, StageBadge, Textarea } from '@/components/form'
 import { HelpButton } from '@/components/Help'
 import { ConversationCard, ProgressPanel } from '@/components/LegalReview'
+import { ChangesCard, UnlockBanner } from '@/components/LockedChanges'
 import { RenewalCard } from '@/components/Renewal'
 import { Alert, Button, Card, EmptyState, Field, Skeleton } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
@@ -181,6 +182,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
         </div>
       </header>
 
+      <UnlockBanner data={data} />
       {c.stage === 'Withdrawn' && <Alert tone="info" title="This contract was withdrawn.">{c.withdrawnReason}</Alert>}
       {data.sentBack && (
         <Alert tone="warning" title={`${data.sentBack.byName} sent it back from approval, ${formatDateTime(data.sentBack.atUtc)}`}>
@@ -194,6 +196,8 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
       {c.stage !== 'Withdrawn' && <ProgressPanel data={data} tracker={<Tracker c={c} />} />}
 
       <RenewalCard data={data} openDecision={openDecision} />
+
+      <ChangesCard data={data} layout={layout} />
 
       <Card className="p-5 md:p-6">
         <h2 className="sr-only">Essentials</h2>
@@ -337,7 +341,7 @@ function DocumentsCard({ data }: { data: ContractDetail }) {
                     {d.title}
                   </a>
                   <p className="text-xs text-muted-foreground">
-                    {d.kindName} · version {d.currentVersion} · {formatBytes(latest.sizeBytes)} · {latest.uploadedByName}, {formatDateTime(latest.uploadedUtc)}
+                    {d.kindName}{d.variationNumber ? ` (Variation ${d.variationNumber})` : ''} · version {d.currentVersion} · {formatBytes(latest.sizeBytes)} · {latest.uploadedByName}, {formatDateTime(latest.uploadedUtc)}
                   </p>
                   {d.versions.length > 1 && (
                     <details className="mt-1 text-xs">

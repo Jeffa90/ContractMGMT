@@ -67,6 +67,8 @@ app.MapHomeEndpoints();
 app.MapDemoDataEndpoints();
 app.MapRenewalEndpoints();
 app.MapReminderAdminEndpoints();
+app.MapLockedChangeEndpoints();
+app.MapVariationEndpoints();
 app.MapDocumentEndpoints();
 app.MapExcelEndpoints();
 app.MapLayoutEndpoints();

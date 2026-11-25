@@ -95,13 +95,15 @@ export type Contract = {
   endedReason: string | null
   endedByName: string | null
   lastReviewedOn: string | null
+  unlock: { id: number; reason: string; expiresUtc: string; byName: string } | null
+  openVariationId: number | null
   createdUtc: string
   createdByName: string
   rowVersion: string
 }
 
 export type DocumentVersion = { id: number; versionNumber: number; fileName: string; sizeBytes: number; uploadedUtc: string; uploadedByName: string }
-export type ContractDocument = { id: number; kind: string; kindName: string; title: string; currentVersion: number; versions: DocumentVersion[] }
+export type ContractDocument = { id: number; kind: string; kindName: string; title: string; currentVersion: number; versions: DocumentVersion[]; variationId: number | null; variationNumber: number | null }
 export type Activity = { id: number; occurredUtc: string; actorName: string; action: string; summary: string }
 export type LegalState = {
   whoseTurn: WhoseTurn | null
@@ -147,6 +149,12 @@ export type ContractAction =
   | 'endEarly'
   | 'reviewDone'
   | 'archive'
+  | 'handOver'
+  | 'confidential'
+  | 'anyTimeFields'
+  | 'unlock'
+  | 'closeUnlock'
+  | 'startVariation'
 
 export type ApprovalDecision = { decision: 'Approved' | 'SentBack'; byName: string; asBackupForName: string | null; atUtc: string; reason: string | null }
 
@@ -163,6 +171,7 @@ export type ContractDetail = {
     note: string | null
     plannedEndDate: string | null
   }
+  variations: VariationSummary[]
   /** Reminders sent for this contract, newest first. */
   reminders: { kind: 'Notice' | 'Escalation' | 'End' | 'Review'; dueDate: string; daysBefore: number; sentUtc: string; recipients: string }[]
   /** Approval decisions, newest first. */
@@ -204,11 +213,12 @@ export const journey: { stage: Stage; label: string }[] = [
 ]
 
 /** Uploads a file with the request-forgery header (multipart, so not through the JSON helper). */
-export async function uploadDocument(contractId: number, file: File, kind: string, documentId?: number) {
+export async function uploadDocument(contractId: number, file: File, kind: string, documentId?: number, variationId?: number) {
   const form = new FormData()
   form.append('file', file)
   form.append('kind', kind)
   if (documentId) form.append('documentId', String(documentId))
+  if (variationId) form.append('variationId', String(variationId))
   let response: Response
   try {
     response = await fetch(`/api/contracts/${contractId}/documents`, {
@@ -225,4 +235,64 @@ export async function uploadDocument(contractId: number, file: File, kind: strin
     throw new ApiError(response.status, body?.message ? body : { code: 'error', message: 'The upload failed. Try again.' })
   }
   return body as { documentId: number; versionId: number; version: number; rowVersion: string }
+}
+
+export type VariationStage = 'Draft' | 'LegalReview' | 'Approval' | 'Approved' | 'Withdrawn'
+
+export type VariationSummary = {
+  id: number
+  number: number
+  reason: string
+  stage: VariationStage
+  stageName: string
+  stageSinceUtc: string
+  createdByName: string
+  applied: { key: string; label: string; old: string; new: string }[] | null
+}
+
+export type VariationAction = 'edit' | 'sendToLegal' | 'take' | 'sendToOwner' | 'clear' | 'sendForApproval' | 'approve' | 'sendBack' | 'withdraw'
+
+export type VariationDetail = {
+  variation: {
+    id: number
+    number: number
+    reference: string
+    reason: string
+    stage: VariationStage
+    stageName: string
+    stageSinceUtc: string
+    needsLegalReview: boolean
+    whoseTurn: WhoseTurn | null
+    legalPersonName: string | null
+    turnSinceUtc: string | null
+    legalOutcome: string | null
+    legalClearedByName: string | null
+    legalClearedUtc: string | null
+    closedReason: string | null
+    createdByName: string
+    createdUtc: string
+    rowVersion: string
+  }
+  contract: { id: number; reference: string; title: string; stage: Stage; ownerName: string; backupOwnerName: string | null; supplierName: string | null; isConfidential: boolean }
+  fields: {
+    key: string
+    label: string
+    kind: string
+    choices: { key: string; label: string; hidden: boolean }[]
+    help: string | null
+    minValue: number | null
+    maxValue: number | null
+    maxLength: number | null
+    current: string | number | boolean | string[] | null
+    currentDisplay: string
+    proposed: string | number | boolean | string[] | null
+    changed: boolean
+  }[]
+  changes: { key: string; label: string; old: string; new: string }[]
+  problems: Record<string, string>
+  conversation: LegalEntry[]
+  documents: ContractDocument[]
+  approvals: ApprovalDecision[]
+  actions: VariationAction[]
+  cannotApproveReason: string | null
 }

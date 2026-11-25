@@ -95,7 +95,7 @@ public sealed class RenewalTests(AppFixture app)
         // ---- Renew: a linked draft; approving it ends the old contract.
         var old = await EffectiveAsync(owner, approver, new { title = "Freight renewal test", endDate = D(60), noticePeriodDays = 30, value = 500000 });
         var effective = await DetailAsync(owner, old);
-        Assert.Equal(["recordDecision", "endEarly", "reviewDone"], effective.GetProperty("actions").EnumerateArray().Select(a => a.GetString()!).ToArray());
+        Assert.Equal(["recordDecision", "endEarly", "reviewDone", "handOver", "startVariation"], effective.GetProperty("actions").EnumerateArray().Select(a => a.GetString()!).ToArray());
         Assert.Equal(HttpStatusCode.Forbidden, (await ActAsync(viewer, old, "renewal-decision", new { decision = "Renew" })).Status);
         Assert.Equal(HttpStatusCode.BadRequest, (await ActAsync(owner, old, "renewal-decision", new { decision = "Maybe" })).Status);
         var (renewStatus, renew) = await ActAsync(owner, old, "renewal-decision", new { decision = "Renew", note = "Rates are good; renew for two years." });

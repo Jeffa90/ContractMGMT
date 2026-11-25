@@ -28,7 +28,10 @@ public static class ContractAccess
     /// On Legal's turn, and from Signing on, details are frozen.
     /// </summary>
     public static bool CanEdit(Person me, ContractRow c) =>
-        me.IsContractOwner && !c.IsLocked && (c.Stage == "Draft" || c is { Stage: "LegalReview", WhoseTurn: "Owner" });
+        (me.IsContractOwner && !c.IsLocked && (c.Stage == "Draft" || c is { Stage: "LegalReview", WhoseTurn: "Owner" })) || IsUnlockedFor(me, c);
+
+    /// <summary>An admin, while an emergency unlock is open on an Effective or Ended contract (D-79: admins only).</summary>
+    public static bool IsUnlockedFor(Person me, ContractRow c) => me.IsAdmin && c.UnlockId is not null && c.Stage is "Effective" or "Ended";
 
     /// <summary>Contract owners can withdraw a contract that isn't Effective yet: from Draft, Legal review or Signing, with a reason.</summary>
     public static bool CanWithdraw(Person me, ContractRow c) => me.IsContractOwner && !c.IsLocked && c.Stage is "Draft" or "LegalReview" or "Signing";

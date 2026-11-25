@@ -28,21 +28,21 @@ public static class ApprovalEndpoints
     private const string SelectApprovals = """
         SELECT a.Decision, p.Name AS ByName, gh.Name AS AsBackupForName, a.AtUtc, a.Reason
         FROM contracts.Approval a JOIN contracts.Person p ON p.Id = a.ById LEFT JOIN contracts.Person gh ON gh.Id = a.AsBackupFor
-        WHERE a.ContractId = @id
+        WHERE a.ContractId = @id AND ((@variationId IS NULL AND a.VariationId IS NULL) OR a.VariationId = @variationId)
         """;
 
     private static object View(ApprovalRow a) =>
         new { a.Decision, a.ByName, a.AsBackupForName, AtUtc = DateTime.SpecifyKind(a.AtUtc, DateTimeKind.Utc), a.Reason };
 
     /// <summary>Every decision on the contract, newest first.</summary>
-    public static async Task<IEnumerable<object>> HistoryAsync(SqlConnection c, int id) =>
-        (await c.QueryAsync<ApprovalRow>($"{SelectApprovals} ORDER BY a.Id DESC", new { id })).Select(View);
+    public static async Task<IEnumerable<object>> HistoryAsync(SqlConnection c, int id, int? variationId = null) =>
+        (await c.QueryAsync<ApprovalRow>($"{SelectApprovals} ORDER BY a.Id DESC", new { id, variationId })).Select(View);
 
     /// <summary>While a contract is back in Signing because an approver sent it back, that decision (shown at the top of the page).</summary>
     public static async Task<object?> SentBackAsync(SqlConnection c, ContractRow r)
     {
         if (r.Stage != "Signing") return null;
-        var last = await c.QuerySingleOrDefaultAsync<ApprovalRow>($"SELECT TOP (1) * FROM ({SelectApprovals}) x ORDER BY AtUtc DESC", new { id = r.Id });
+        var last = await c.QuerySingleOrDefaultAsync<ApprovalRow>($"SELECT TOP (1) * FROM ({SelectApprovals}) x ORDER BY AtUtc DESC", new { id = r.Id, variationId = (int?)null });
         return last is { Decision: "SentBack" } && last.AtUtc >= r.StageSinceUtc.AddSeconds(-5) ? View(last) : null;
     }
 

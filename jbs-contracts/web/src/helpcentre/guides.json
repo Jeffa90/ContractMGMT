@@ -1,13 +1,41 @@
 {
   "groups": [
-    { "id": "start", "title": "Getting started" },
-    { "id": "contracts", "title": "Raising contracts" },
-    { "id": "legal", "title": "Legal review" },
-    { "id": "signing", "title": "Signing and approval" },
-    { "id": "renewals", "title": "Renewals" },
-    { "id": "changes", "title": "Changing an Effective contract" },
-    { "id": "reports", "title": "Reports and your team" },
-    { "id": "admin", "title": "Admin" }
+    {
+      "id": "start",
+      "title": "Getting started"
+    },
+    {
+      "id": "contracts",
+      "title": "Raising contracts"
+    },
+    {
+      "id": "legal",
+      "title": "Legal review"
+    },
+    {
+      "id": "signing",
+      "title": "Signing and approval"
+    },
+    {
+      "id": "renewals",
+      "title": "Renewals"
+    },
+    {
+      "id": "changes",
+      "title": "Changing an Effective contract"
+    },
+    {
+      "id": "suppliers",
+      "title": "Suppliers"
+    },
+    {
+      "id": "reports",
+      "title": "Reports and your team"
+    },
+    {
+      "id": "admin",
+      "title": "Admin"
+    }
   ],
   "guides": [
     {
@@ -220,6 +248,52 @@
         "Open the contract and click **Emergency unlock**.",
         "Say why, choose how long (1 to 4 hours), and confirm. A banner shows while it's unlocked, and only admins can edit.",
         "Fix the mistake, then click **Lock it again now**. Every edit records the unlock and its reason."
+      ]
+    },
+    {
+      "id": "supplier-details",
+      "group": "suppliers",
+      "title": "Set up a supplier's details",
+      "summary": "Relationship owner, tier, risk, next business review and contacts.",
+      "who": ["procurement", "admin"],
+      "screens": ["supplier", "suppliers"],
+      "video": true,
+      "steps": [
+        "Go to **Suppliers** and click the supplier's name.",
+        "On **Overview**, click **Edit**. Choose the **Relationship owner** and the **Tier**.",
+        "Set the **Risk** and say why, and when the **Next business review** is due. Click **Save details**.",
+        "Click **Add contact** to add someone at the supplier, with their role, email and phone."
+      ]
+    },
+    {
+      "id": "supplier-documents",
+      "group": "suppliers",
+      "title": "Add a supplier document",
+      "summary": "Insurance, certificates and the like, with an expiry date and an optional reminder.",
+      "who": ["procurement", "admin"],
+      "screens": ["supplier"],
+      "video": true,
+      "steps": [
+        "Open the supplier and choose **Documents**, then **Add document**.",
+        "Choose the **Kind**, choose the file and, if it expires, the date. Click **Upload**.",
+        "Tick **Remind me before it expires** to get an email 60 and 30 days before. Anyone can tick it for themselves.",
+        "When a renewed one arrives, click **New version** and give its new expiry date. The earlier version is kept."
+      ]
+    },
+    {
+      "id": "business-review",
+      "group": "suppliers",
+      "title": "Record a business review",
+      "summary": "Who attended, a summary, ratings, the actions agreed and the deck.",
+      "who": ["procurement", "admin", "contractOwner"],
+      "screens": ["supplier"],
+      "video": true,
+      "steps": [
+        "Open the supplier and choose **Business reviews**, then **Add business review**. Procurement, admins and the supplier's relationship owner can.",
+        "Enter when it was held, who attended and a short summary.",
+        "Give an overall rating, and score quality, delivery, service and cost from 1 to 5.",
+        "Click **Add an action** for each thing agreed: what, who and when. Then set when the next review is due.",
+        "Click **Add review**, then **Attach a file** for the deck or minutes. Each action's owner is emailed and sees it on Home until they tick it done."
       ]
     },
     {

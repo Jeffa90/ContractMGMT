@@ -31,6 +31,7 @@ export const roleNames: Record<Role, string> = {
   groupHead: "Group Head",
   admin: "Admins",
   auditor: "Auditors",
+  procurement: "Procurement",
 };
 
 /** Where the files for a guide's video are (built into the app, so nothing leaves the JBS server). */

@@ -182,7 +182,8 @@ public sealed class ReportsTests(AppFixture app)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using (var book = new XLWorkbook(new MemoryStream(await response.Content.ReadAsByteArrayAsync(Ct))))
         {
-            Assert.Equal(["Contracts", "Documents", "Legal review", "Approvals", "Variations", "Reminders sent", "Suppliers", "People", "Lists"],
+            Assert.Equal(["Contracts", "Documents", "Legal review", "Approvals", "Variations", "Reminders sent", "Suppliers", "Supplier documents", "Supplier contacts",
+                "Business reviews", "Review actions", "People", "Lists"],
                 book.Worksheets.Select(w => w.Name));
             var contracts = book.Worksheet("Contracts");
             var stage = contracts.Row(1).CellsUsed().First(c => c.GetString() == "Stage").Address.ColumnNumber;

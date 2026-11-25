@@ -13,13 +13,15 @@ import type { Category, ListItem, Lists } from '@/lib/contracts'
 import { useMe } from '@/lib/me'
 import { help } from '@/help'
 
-type Tab = 'Category' | 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency'
+type Tab = 'Category' | 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier'
 const tabs: { value: Tab; label: string; single: string }[] = [
   { value: 'Category', label: 'Categories', single: 'category' },
   { value: 'AgreementType', label: 'Agreement types', single: 'agreement type' },
   { value: 'BusinessUnit', label: 'Business units', single: 'business unit' },
   { value: 'Site', label: 'Sites', single: 'site' },
   { value: 'Currency', label: 'Currencies', single: 'currency' },
+  { value: 'SupplierDocumentType', label: 'Supplier document types', single: 'supplier document type' },
+  { value: 'SupplierTier', label: 'Supplier tiers', single: 'supplier tier' },
 ]
 
 type Editing = { kind: 'add'; parent: Category | null } | { kind: 'rename'; item: ListItem | Category }

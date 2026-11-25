@@ -14,6 +14,7 @@ public sealed class Person
     public bool IsGroupHead { get; set; }
     public bool IsAdmin { get; set; }
     public bool IsAuditor { get; set; }
+    public bool IsProcurement { get; set; }
     public bool IsActive { get; set; }
     public DateTime? LastSignInUtc { get; set; }
     public byte[] RowVersion { get; set; } = [];

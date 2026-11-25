@@ -69,6 +69,7 @@ export type Roles = {
   groupHead: boolean
   admin: boolean
   auditor: boolean
+  procurement: boolean
 }
 
 export type Person = {

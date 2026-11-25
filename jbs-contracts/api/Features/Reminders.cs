@@ -36,6 +36,12 @@ public static partial class EmailWording
         new("VariationWaiting", "Variation waiting for approval", "Variations and hand-overs", "To the Group Head when a Variation is sent for approval.", [.. ContractFields, "Variation", "Sent by", "Reason", "Changes"]),
         new("VariationApproved", "Variation approved", "Variations and hand-overs", "To the owner and backup when a Variation is approved and its changes apply.", [.. ContractFields, "Variation", "Approver", "Changes"]),
         new("VariationSentBack", "Variation sent back", "Variations and hand-overs", "To the owner and backup when an approver sends a Variation back.", [.. ContractFields, "Variation", "Approver", "Reason"]),
+        new("SupplierExpiry", "Supplier document expiring", "Suppliers", "Before a supplier document expires, to each person who ticked Remind me before it expires.",
+            ["First name", "Supplier", "Document", "Document type", "Due date", "Days"], HasDays: true, Button: "Open the supplier"),
+        new("SupplierReview", "Business review due", "Suppliers", "Before a supplier's next business review is due, to its relationship owner.",
+            ["First name", "Supplier", "Due date", "Days"], HasDays: true, Button: "Open the supplier"),
+        new("ReviewAction", "Business review action given to you", "Suppliers", "To the person given an action at a business review (not when you give one to yourself).",
+            ["First name", "Supplier", "Review date", "Due date", "Action"], Button: "Open the supplier"),
     ];
 
     public static readonly Dictionary<string, Kind> ByKey = Kinds.ToDictionary(k => k.Key);
@@ -207,6 +213,9 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
                 sent += await SendAsync(c, tx, k, "Review", DateOnly.FromDateTime(review), today, offsets["Review"], wording, Owners(k, people));
         }
 
+        // 3. Suppliers: documents expiring (to whoever ticked Remind me) and business reviews due (to the relationship owner).
+        sent += await SupplierRemindersAsync(c, tx, today, offsets, wording, people);
+
         await c.ExecuteAsync("""
             MERGE contracts.JobRun AS t USING (SELECT @JobName AS Name) AS s ON t.Name = s.Name
             WHEN MATCHED THEN UPDATE SET LastRunDate = @today, LastRunUtc = SYSUTCDATETIME()
@@ -214,6 +223,71 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
             """, new { JobName, today = todayDate }, tx);
         await tx.CommitAsync(ct);
         return new Result(sent, ending.Count);
+    }
+
+    private async Task<int> SupplierRemindersAsync(SqlConnection c, SqlTransaction tx, DateOnly today, Dictionary<string, int[]> offsets, Dictionary<string, Wording> wording,
+        Dictionary<int, Person> people)
+    {
+        var sent = 0;
+        int? Step(DateOnly due, string kind)
+        {
+            var left = due.DayNumber - today.DayNumber;
+            return left < 0 ? null : offsets[kind].Where(d => left <= d).Cast<int?>().FirstOrDefault();
+        }
+        string Day(DateOnly d) => d.ToString("ddd d MMM yyyy", CultureInfo.InvariantCulture);
+
+        var watched = await c.QueryAsync<(int DocumentId, int PersonId, DateTime ExpiresOn, string Title, string TypeName, int SupplierId, string Supplier)>("""
+            SELECT d.Id, w.PersonId, d.ExpiresOn, d.Title, t.Value, s.Id, s.Name
+            FROM contracts.SupplierDocumentWatch w JOIN contracts.SupplierDocument d ON d.Id = w.DocumentId JOIN contracts.ListItem t ON t.Id = d.TypeId
+            JOIN contracts.Supplier s ON s.Id = d.SupplierId
+            WHERE d.IsRemoved = 0 AND d.ExpiresOn IS NOT NULL
+            """, transaction: tx);
+        foreach (var w in watched)
+        {
+            var due = DateOnly.FromDateTime(w.ExpiresOn);
+            if (Step(due, "SupplierExpiry") is not { } step || !people.TryGetValue(w.PersonId, out var person)) continue;
+            var inserted = await c.ExecuteAsync("""
+                IF NOT EXISTS (SELECT 1 FROM contracts.SupplierDocumentReminder WHERE DocumentId = @doc AND PersonId = @person AND ExpiresOn = @due AND DaysBefore = @step)
+                INSERT INTO contracts.SupplierDocumentReminder (DocumentId, PersonId, ExpiresOn, DaysBefore) VALUES (@doc, @person, @due, @step)
+                """, new { doc = w.DocumentId, person = person.Id, due = w.ExpiresOn, step }, tx);
+            if (inserted == 0) continue;
+            var values = new Dictionary<string, string?>
+            {
+                ["First name"] = LegalEndpoints.First(person.Name), ["Supplier"] = w.Supplier, ["Document"] = w.Title, ["Document type"] = w.TypeName.ToLowerInvariant(),
+                ["Due date"] = Day(due), ["Days"] = (due.DayNumber - today.DayNumber).ToString(CultureInfo.InvariantCulture),
+            };
+            var t = wording["SupplierExpiry"];
+            await EmailOutbox.QueueAsync(c, tx, "supplier-expiry", person.Email, person.Name,
+                EmailWording.Compose("SupplierExpiry", t.Subject, t.Body, values, settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{w.SupplierId}?tab=documents"),
+                personId: person.Id, dedupeKey: $"supplier-expiry:{w.DocumentId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
+            sent++;
+        }
+
+        var reviews = await c.QueryAsync<(int SupplierId, string Supplier, int OwnerId, DateTime NextReviewDue)>("""
+            SELECT Id, Name, RelationshipOwnerId, NextReviewDue FROM contracts.Supplier
+            WHERE IsActive = 1 AND RelationshipOwnerId IS NOT NULL AND NextReviewDue IS NOT NULL
+            """, transaction: tx);
+        foreach (var r in reviews)
+        {
+            var due = DateOnly.FromDateTime(r.NextReviewDue);
+            if (Step(due, "SupplierReview") is not { } step || !people.TryGetValue(r.OwnerId, out var person)) continue;
+            var inserted = await c.ExecuteAsync("""
+                IF NOT EXISTS (SELECT 1 FROM contracts.SupplierReviewReminder WHERE SupplierId = @supplier AND PersonId = @person AND DueOn = @due AND DaysBefore = @step)
+                INSERT INTO contracts.SupplierReviewReminder (SupplierId, PersonId, DueOn, DaysBefore) VALUES (@supplier, @person, @due, @step)
+                """, new { supplier = r.SupplierId, person = person.Id, due = r.NextReviewDue, step }, tx);
+            if (inserted == 0) continue;
+            var values = new Dictionary<string, string?>
+            {
+                ["First name"] = LegalEndpoints.First(person.Name), ["Supplier"] = r.Supplier, ["Due date"] = Day(due),
+                ["Days"] = (due.DayNumber - today.DayNumber).ToString(CultureInfo.InvariantCulture),
+            };
+            var t = wording["SupplierReview"];
+            await EmailOutbox.QueueAsync(c, tx, "supplier-review", person.Email, person.Name,
+                EmailWording.Compose("SupplierReview", t.Subject, t.Body, values, settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{r.SupplierId}?tab=reviews"),
+                personId: person.Id, dedupeKey: $"supplier-review:{r.SupplierId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
+            sent++;
+        }
+        return sent;
     }
 
     private static List<Person> Owners(Row k, Dictionary<int, Person> people) =>

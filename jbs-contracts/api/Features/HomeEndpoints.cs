@@ -126,6 +126,21 @@ public static class HomeEndpoints
                     """, parameters)).ToList()
                 : [];
 
+            // Suppliers (D-90): your open business review actions, reviews due for suppliers you look after, and documents you asked to be reminded about.
+            var supplierItems = (await c.QueryAsync<SupplierItemRow>("""
+                SELECT N'Action' AS Kind, s.Id AS SupplierId, s.Name AS SupplierName, a.Text AS What, a.DueOn AS Due
+                FROM contracts.BusinessReviewAction a JOIN contracts.BusinessReview r ON r.Id = a.ReviewId JOIN contracts.Supplier s ON s.Id = r.SupplierId
+                WHERE a.OwnerId = @me AND a.DoneUtc IS NULL AND r.IsRemoved = 0
+                UNION ALL
+                SELECT N'ReviewDue', s.Id, s.Name, N'Business review', s.NextReviewDue FROM contracts.Supplier s
+                WHERE s.RelationshipOwnerId = @me AND s.IsActive = 1 AND s.NextReviewDue IS NOT NULL AND s.NextReviewDue <= DATEADD(DAY, 30, @today)
+                UNION ALL
+                SELECT N'Expiring', s.Id, s.Name, d.Title, d.ExpiresOn FROM contracts.SupplierDocumentWatch w JOIN contracts.SupplierDocument d ON d.Id = w.DocumentId
+                JOIN contracts.Supplier s ON s.Id = d.SupplierId
+                WHERE w.PersonId = @me AND d.IsRemoved = 0 AND d.ExpiresOn IS NOT NULL AND d.ExpiresOn <= DATEADD(DAY, 60, @today)
+                ORDER BY Due
+                """, new { me = me.Id, today = Today(clock) })).ToList();
+
             var pref = await c.QuerySingleOrDefaultAsync<PreferenceRow>("SELECT HiddenTiles, FirstGroup FROM contracts.HomePreference WHERE PersonId = @id", new { id = me.Id })
                 ?? new PreferenceRow();
             var today = DateOnly.FromDateTime(Today(clock));
@@ -138,6 +153,11 @@ public static class HomeEndpoints
                     return new { u.Kind, u.Id, u.Reference, u.Title, u.SupplierName, Deadline = deadline, Days = deadline.DayNumber - today.DayNumber };
                 }),
                 preferences = new { hiddenTiles = JsonSerializer.Deserialize<string[]>(pref.HiddenTiles) ?? [], firstGroup = pref.FirstGroup },
+                suppliers = supplierItems.Select(x =>
+                {
+                    var due = DateOnly.FromDateTime(x.Due);
+                    return new { x.Kind, x.SupplierId, x.SupplierName, x.What, Due = due, Days = due.DayNumber - today.DayNumber };
+                }),
             });
         });
 
@@ -185,5 +205,14 @@ public static class HomeEndpoints
                 people = people.Select(x => new { id = (int)x.Id, name = (string)x.Name, windowsAccount = (string)x.WindowsAccount }),
             });
         });
+    }
+
+    private sealed class SupplierItemRow
+    {
+        public string Kind { get; set; } = "";
+        public int SupplierId { get; set; }
+        public string SupplierName { get; set; } = "";
+        public string What { get; set; } = "";
+        public DateTime Due { get; set; }
     }
 }

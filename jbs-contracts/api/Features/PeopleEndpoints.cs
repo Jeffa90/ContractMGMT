@@ -5,12 +5,12 @@ using Microsoft.Data.SqlClient;
 
 namespace JbsContracts.Api.Features;
 
-public sealed record Roles(bool ContractOwner, bool Legal, bool Approver, bool GroupHead, bool Admin, bool Auditor);
+public sealed record Roles(bool ContractOwner, bool Legal, bool Approver, bool GroupHead, bool Admin, bool Auditor, bool Procurement = false);
 
 public sealed record PersonView(int Id, string Account, string Name, string Email, Roles Roles, bool IsActive, DateTime? LastSignInUtc, string RowVersion)
 {
     public static PersonView From(Person p) => new(p.Id, p.WindowsAccount, p.Name, p.Email,
-        new Roles(p.IsContractOwner, p.IsLegal, p.IsApprover, p.IsGroupHead, p.IsAdmin, p.IsAuditor), p.IsActive,
+        new Roles(p.IsContractOwner, p.IsLegal, p.IsApprover, p.IsGroupHead, p.IsAdmin, p.IsAuditor, p.IsProcurement), p.IsActive,
         p.LastSignInUtc is { } t ? DateTime.SpecifyKind(t, DateTimeKind.Utc) : null, Convert.ToBase64String(p.RowVersion));
 }
 
@@ -21,7 +21,7 @@ public static class PeopleEndpoints
     private static readonly (string Label, Func<Roles, bool> Has)[] RoleLabels =
     [
         ("Contract owner", r => r.ContractOwner), ("Legal", r => r.Legal), ("Approver", r => r.Approver),
-        ("Group Head", r => r.GroupHead), ("Admin", r => r.Admin), ("Auditor", r => r.Auditor),
+        ("Group Head", r => r.GroupHead), ("Procurement", r => r.Procurement), ("Admin", r => r.Admin), ("Auditor", r => r.Auditor),
     ];
 
     public static string Describe(Roles r)
@@ -74,10 +74,10 @@ public static class PeopleEndpoints
 
             var previousHead = input.Roles.GroupHead ? await ClearGroupHeadAsync(connection, tx, null) : null;
             var id = await connection.ExecuteScalarAsync<int>("""
-                INSERT INTO contracts.Person (WindowsAccount, Name, Email, IsContractOwner, IsLegal, IsApprover, IsGroupHead, IsAdmin, IsAuditor, CreatedById, UpdatedById)
+                INSERT INTO contracts.Person (WindowsAccount, Name, Email, IsContractOwner, IsLegal, IsApprover, IsGroupHead, IsAdmin, IsAuditor, IsProcurement, CreatedById, UpdatedById)
                 OUTPUT INSERTED.Id
-                VALUES (@Account, @Name, @Email, @ContractOwner, @Legal, @Approver, @GroupHead, @Admin, @Auditor, @me, @me)
-                """, new { input.Account, input.Name, input.Email, input.Roles.ContractOwner, input.Roles.Legal, input.Roles.Approver, input.Roles.GroupHead, input.Roles.Admin, input.Roles.Auditor, me = me.Id }, tx);
+                VALUES (@Account, @Name, @Email, @ContractOwner, @Legal, @Approver, @GroupHead, @Admin, @Auditor, @Procurement, @me, @me)
+                """, new { input.Account, input.Name, input.Email, input.Roles.ContractOwner, input.Roles.Legal, input.Roles.Approver, input.Roles.GroupHead, input.Roles.Admin, input.Roles.Auditor, input.Roles.Procurement, me = me.Id }, tx);
             await audit.WriteAsync(connection, tx, me.AsActor(), "person.added", "Person", id,
                 $"{me.Name} added {input.Name} ({input.Account}) as {Describe(input.Roles)}.", new { input.Account, input.Name, input.Email, input.Roles });
             if (previousHead is not null)
@@ -121,10 +121,10 @@ public static class PeopleEndpoints
             var previousHead = input.Roles.GroupHead && !before.IsGroupHead ? await ClearGroupHeadAsync(connection, tx, id) : null;
             await connection.ExecuteAsync("""
                 UPDATE contracts.Person SET WindowsAccount = @Account, Name = @Name, Email = @Email,
-                    IsContractOwner = @ContractOwner, IsLegal = @Legal, IsApprover = @Approver, IsGroupHead = @GroupHead, IsAdmin = @Admin, IsAuditor = @Auditor,
+                    IsContractOwner = @ContractOwner, IsLegal = @Legal, IsApprover = @Approver, IsGroupHead = @GroupHead, IsAdmin = @Admin, IsAuditor = @Auditor, IsProcurement = @Procurement,
                     IsActive = @active, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
                 WHERE Id = @id
-                """, new { input.Account, input.Name, input.Email, input.Roles.ContractOwner, input.Roles.Legal, input.Roles.Approver, input.Roles.GroupHead, input.Roles.Admin, input.Roles.Auditor, active, me = me.Id, id }, tx);
+                """, new { input.Account, input.Name, input.Email, input.Roles.ContractOwner, input.Roles.Legal, input.Roles.Approver, input.Roles.GroupHead, input.Roles.Admin, input.Roles.Auditor, input.Roles.Procurement, active, me = me.Id, id }, tx);
 
             var beforeView = PersonView.From(before);
             var changes = new List<string>();

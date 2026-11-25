@@ -320,6 +320,77 @@ const videos = {
       await s.click(d.getByRole('button', { name: 'Hand over' }), 2300)
     }),
 
+  'supplier-details': (b) =>
+    record(b, 'supplier-details', { start: '/suppliers' }, async (s) => {
+      const p = s.page
+      await s.step(1)
+      await s.click(p.getByRole('link', { name: 'Southern Cross Freight (demo)' }), 1200)
+      await s.step(2)
+      await s.click(p.getByRole('button', { name: 'Edit', exact: true }), 800)
+      const d = p.getByRole('dialog')
+      await s.select(d.getByLabel('Relationship owner'), 'Priya Patel (demo)')
+      await s.select(d.getByLabel('Tier'), 'Strategic')
+      await s.step(3)
+      await s.click(d.getByRole('radio', { name: 'Medium' }), 500)
+      await s.type(d.getByLabel(/Why/), 'Main linehaul carrier; few alternatives.')
+      await s.fill(d.getByLabel('Next business review due'), '2027-02-10')
+      await s.click(d.getByRole('button', { name: 'Save details' }), 1500)
+      await s.step(4)
+      await s.click(p.getByRole('button', { name: 'Add contact' }), 700)
+      const c = p.getByRole('dialog')
+      await s.type(c.getByLabel(/Name/), 'Dana Brooks')
+      await s.type(c.getByLabel('Role'), 'Account manager')
+      await s.type(c.getByLabel('Email'), 'dana.brooks@example.com')
+      await s.click(c.getByRole('button', { name: 'Add contact' }), 2000)
+    }),
+
+  'supplier-documents': (b) =>
+    record(b, 'supplier-documents', { start: '/suppliers/1' }, async (s) => {
+      const p = s.page
+      await s.step(1)
+      await s.click(p.getByRole('radio', { name: /Documents/ }), 800)
+      await s.click(p.getByRole('button', { name: 'Add document' }), 800)
+      const d = p.getByRole('dialog')
+      await s.step(2)
+      await s.select(d.getByLabel(/Kind/), 'Insurance certificate')
+      await s.upload(d.getByRole('button', { name: 'Choose file' }), pdf('Public liability 2026.pdf'), 700)
+      await s.fill(d.getByLabel('Expires'), '2027-01-20')
+      await s.click(d.getByRole('button', { name: 'Upload' }), 1600)
+      await s.step(3)
+      await s.click(p.getByLabel('Remind me before it expires'), 1600)
+      await s.step(4)
+      await s.click(p.getByRole('button', { name: /New version of Public liability/ }), 800)
+      const v = p.getByRole('dialog')
+      await s.upload(v.getByRole('button', { name: 'Choose file' }), pdf('Public liability 2027.pdf'), 700)
+      await s.fill(v.getByLabel('New expiry date'), '2028-01-20')
+      await s.click(v.getByRole('button', { name: 'Upload' }), 2000)
+    }),
+
+  'business-review': (b) =>
+    record(b, 'business-review', { start: '/suppliers/1?tab=reviews' }, async (s) => {
+      const p = s.page
+      await s.step(1)
+      await s.click(p.getByRole('button', { name: 'Add business review' }), 800)
+      const d = p.getByRole('dialog')
+      await s.step(2)
+      await s.select(d.getByLabel('JBS people who attended'), 'Priya Patel (demo)')
+      await s.type(d.getByLabel('Supplier people who attended'), 'Dana Brooks (Account manager)')
+      await s.type(d.getByLabel(/Summary/), 'On-time delivery is back to 96%. Fuel levy stays until June.')
+      await s.step(3)
+      await s.click(d.getByRole('radio', { name: 'Good' }), 400)
+      for (const [label, n] of [['Quality', '4'], ['Delivery', '4'], ['Service', '5'], ['Cost', '3']])
+        await s.click(d.getByRole('radiogroup', { name: label }).getByRole('radio', { name: n, exact: true }), 300)
+      await s.step(4)
+      await s.click(d.getByRole('button', { name: 'Add an action' }), 500)
+      await s.type(d.getByLabel(/Action 1/), 'Send the revised Christmas delivery schedule')
+      await s.select(d.getByLabel(/^Who/), 'Priya Patel (demo)')
+      await s.fill(d.getByLabel(/^Due/), '2026-12-05')
+      await s.fill(d.getByLabel('Next business review due'), '2027-03-10')
+      await s.step(5)
+      await s.click(d.getByRole('button', { name: 'Add review' }), 1500)
+      await s.upload(p.getByRole('button', { name: 'Attach a file' }), pdf('Quarterly review deck.pdf'), 2200)
+    }),
+
   register: (b) =>
     record(b, 'register', { start: '/reports' }, async (s) => {
       const p = s.page

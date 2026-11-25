@@ -36,6 +36,42 @@ public static class DocumentEndpoints
         [".jpeg"] = "image/jpeg",
     };
 
+    /// <summary>What's wrong with an uploaded file, in plain words, or null if it's fine (size and kind). Shared with supplier documents.</summary>
+    public static string? FileProblem(IFormFile? file)
+    {
+        if (file is null || file.Length == 0) return "Choose a file to upload.";
+        if (file.Length > MaxBytes) return "That file is over 25 MB. Make it smaller (for example, save it as a PDF) and try again.";
+        if (!Types.ContainsKey(Path.GetExtension(file.FileName))) return "That kind of file can't be added. Use PDF, Word, Excel, Outlook email, text, CSV, PNG or JPG.";
+        return null;
+    }
+
+    public sealed record StoredFile(string FileName, string ContentType, long Size, string Sha256, string StoredName, string Path);
+
+    /// <summary>
+    /// Saves an uploaded file under a random name in the documents folder (the uploaded name is kept only as text, never used as a path) and
+    /// works out its SHA-256 on the way. The caller deletes <see cref="StoredFile.Path"/> if the database change doesn't go ahead.
+    /// </summary>
+    public static async Task<StoredFile> StoreAsync(string root, IFormFile file)
+    {
+        var extension = System.IO.Path.GetExtension(file.FileName);
+        var fileName = System.IO.Path.GetFileName(file.FileName.Replace('\\', '/'));
+        if (fileName.Length > 255) fileName = fileName[^255..];
+        var stored = $"{DateTime.UtcNow:yyyy}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var path = System.IO.Path.Combine(root, stored.Replace('/', System.IO.Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+        await using var input = file.OpenReadStream();
+        await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[81920];
+        int read;
+        while ((read = await input.ReadAsync(buffer)) > 0)
+        {
+            hash.AppendData(buffer, 0, read);
+            await output.WriteAsync(buffer.AsMemory(0, read));
+        }
+        return new StoredFile(fileName, Types[extension], file.Length, Convert.ToHexString(hash.GetHashAndReset()), stored, path);
+    }
+
     /// <summary>Contract owners add documents until a contract is approved; during a Legal review, Legal can too (mark-ups), on either side's turn.</summary>
     /// <remarks>During an emergency unlock, admins can add and remove documents too (D-79). Documents for a Variation go through it instead.</remarks>
     public static bool CanUpload(Person me, ContractRow c) => c.IsLocked

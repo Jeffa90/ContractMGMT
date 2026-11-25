@@ -24,7 +24,7 @@ public static class TryAsEndpoints
             return Results.Ok(people.Select(p => new
             {
                 p.Id, p.Name, p.WindowsAccount, IsYou = p.Id == current.Real.Id,
-                Roles = string.Join(", ", new[] { p.IsContractOwner ? "Contract owner" : null, p.IsLegal ? "Legal" : null, p.IsGroupHead ? "Group Head" : p.IsApprover ? "Approver" : null, p.IsAdmin ? "Admin" : null, p.IsAuditor ? "Auditor" : null }.OfType<string>()),
+                Roles = string.Join(", ", new[] { p.IsContractOwner ? "Contract owner" : null, p.IsLegal ? "Legal" : null, p.IsGroupHead ? "Group Head" : p.IsApprover ? "Approver" : null, p.IsProcurement ? "Procurement" : null, p.IsAdmin ? "Admin" : null, p.IsAuditor ? "Auditor" : null }.OfType<string>()),
             }));
         });
 

@@ -128,6 +128,7 @@ public static class ExcelEndpoints
     [
         ("Contract owner", p => p.IsContractOwner, "Contract owner"), ("Legal", p => p.IsLegal, "Legal"), ("Approver", p => p.IsApprover, "Approver"),
         ("Group Head", p => p.IsGroupHead, "Group Head"), ("Admin", p => p.IsAdmin, "Admin"), ("Auditor", p => p.IsAuditor, "Auditor"),
+        ("Procurement", p => p.IsProcurement, "Procurement"),
     ];
 
     private static Kind People() => new(
@@ -137,14 +138,14 @@ public static class ExcelEndpoints
             new("Name", "Required for someone new.", 26), new("Email", "Required for someone new. Reminders and approvals go here.", 32),
             new("Contract owner", "Yes or No", 15), new("Legal", "Yes or No", 10), new("Approver", "Yes or No", 11),
             new("Group Head", "Yes or No. Only one person can be Group Head; it implies Approver.", 12), new("Admin", "Yes or No", 10),
-            new("Auditor", "Yes or No", 10), new("Active", "Yes or No. No switches off their access (nothing is deleted).", 10),
+            new("Auditor", "Yes or No", 10), new("Procurement", "Yes or No. Adds and looks after supplier documents, details and reviews.", 13), new("Active", "Yes or No. No switches off their access (nothing is deleted).", 10),
         ],
         ["Windows logon"], ["Last seen"],
         me => me.IsAdmin, me => me.IsAdmin, "Only admins can import or export people.",
         async x =>
         {
             var people = await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person ORDER BY Name", transaction: x.Tx);
-            return people.Select(p => new object?[] { p.WindowsAccount, p.Name, p.Email, p.IsContractOwner, p.IsLegal, p.IsApprover, p.IsGroupHead, p.IsAdmin, p.IsAuditor, p.IsActive });
+            return people.Select(p => new object?[] { p.WindowsAccount, p.Name, p.Email, p.IsContractOwner, p.IsLegal, p.IsApprover, p.IsGroupHead, p.IsAdmin, p.IsAuditor, p.IsProcurement, p.IsActive });
         },
         async (x, rows) =>
         {
@@ -217,12 +218,12 @@ public static class ExcelEndpoints
                             await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "person.group-head-moved", "Person", previous.Id, $"{x.Me.Name} made {n} the Group Head in place of {previous.Name}, who stays an approver (backup){Via}.");
                         }
                     }
-                    var args = new { acc, n, e, co = ro["Contract owner"], le = ro["Legal"], ap = ro["Approver"], gh = ro["Group Head"], ad = ro["Admin"], au = ro["Auditor"], act, me = x.Me.Id, id = b?.Id };
+                    var args = new { acc, n, e, co = ro["Contract owner"], le = ro["Legal"], ap = ro["Approver"], gh = ro["Group Head"], ad = ro["Admin"], au = ro["Auditor"], pr = ro["Procurement"], act, me = x.Me.Id, id = b?.Id };
                     if (b is null)
                     {
                         var id = await x.C.ExecuteScalarAsync<int>("""
-                            INSERT INTO contracts.Person (WindowsAccount, Name, Email, IsContractOwner, IsLegal, IsApprover, IsGroupHead, IsAdmin, IsAuditor, IsActive, CreatedById, UpdatedById)
-                            OUTPUT INSERTED.Id VALUES (@acc, @n, @e, @co, @le, @ap, @gh, @ad, @au, @act, @me, @me)
+                            INSERT INTO contracts.Person (WindowsAccount, Name, Email, IsContractOwner, IsLegal, IsApprover, IsGroupHead, IsAdmin, IsAuditor, IsProcurement, IsActive, CreatedById, UpdatedById)
+                            OUTPUT INSERTED.Id VALUES (@acc, @n, @e, @co, @le, @ap, @gh, @ad, @au, @pr, @act, @me, @me)
                             """, args, x.Tx);
                         await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "person.added", "Person", id, $"{x.Me.Name} added {n} ({acc}) as {roleText}{Via}.", args);
                         await PeopleEndpoints.QueueWelcomeAsync(x.C, x.Tx, id, n, e, acc, roleText, x.Me.Name, x.Settings);
@@ -231,7 +232,7 @@ public static class ExcelEndpoints
                     {
                         await x.C.ExecuteAsync("""
                             UPDATE contracts.Person SET Name = @n, Email = @e, IsContractOwner = @co, IsLegal = @le, IsApprover = @ap, IsGroupHead = @gh, IsAdmin = @ad,
-                                IsAuditor = @au, IsActive = @act, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id
+                                IsAuditor = @au, IsProcurement = @pr, IsActive = @act, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id
                             """, args, x.Tx);
                         await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "person.changed", "Person", b.Id, $"{x.Me.Name} changed {n}: {string.Join("; ", r.Notes).Replace("Change: ", "")}".TrimEnd('.') + $"{Via}.", args);
                     }
@@ -247,12 +248,13 @@ public static class ExcelEndpoints
     {
         ["category"] = ("Category", "Category"), ["agreementtype"] = ("AgreementType", "Agreement type"), ["businessunit"] = ("BusinessUnit", "Business unit"),
         ["site"] = ("Site", "Site"), ["currency"] = ("Currency", "Currency"),
+        ["supplierdocumenttype"] = ("SupplierDocumentType", "Supplier document type"), ["suppliertier"] = ("SupplierTier", "Supplier tier"),
     };
 
     private static Kind Lists() => new(
         "lists", "lists", "Lists",
         [
-            new("List", "Required: Category, Agreement type, Business unit, Site or Currency.", 18),
+            new("List", "Required: Category, Agreement type, Business unit, Site, Currency, Supplier document type or Supplier tier.", 22),
             new("Name", "Required. For a currency, the three-letter code (AUD).", 30),
             new("Parent category", "Only for subcategories: the category it sits under.", 24),
             new("Active", "Yes or No. No hides it from the choices; contracts that use it keep it.", 10),
@@ -287,7 +289,7 @@ public static class ExcelEndpoints
                 var name = Clean(row.Text("Name"));
                 var parent = Clean(row.Text("Parent category"));
                 r.Label = parent is null ? $"{listText}: {name}" : $"{listText}: {parent} > {name}";
-                if (!ListNames.TryGetValue(Excel.Normalise(listText), out var list)) { r.Refuse($"List: \"{listText}\" isn't one of Category, Agreement type, Business unit, Site or Currency."); continue; }
+                if (!ListNames.TryGetValue(Excel.Normalise(listText), out var list)) { r.Refuse($"List: \"{listText}\" isn't one of Category, Agreement type, Business unit, Site, Currency, Supplier document type or Supplier tier."); continue; }
                 if (name is null) { r.Refuse("Name: add a name."); continue; }
                 if (name.Length > 100) { r.Refuse("Name: keep it under 100 characters."); continue; }
                 var active = row.YesNo("Active", out var ap);

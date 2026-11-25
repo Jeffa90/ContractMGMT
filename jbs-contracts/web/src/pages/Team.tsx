@@ -58,6 +58,15 @@ type Person = {
   legalTurn: number;
   owns: number;
   backsUp: number;
+  supplierWork: number;
+  suppliers: {
+    kind: "Action" | "ReviewDue";
+    supplierId: number;
+    supplierName: string;
+    what: string;
+    due: string;
+    days: number;
+  }[];
   items: Item[];
 };
 type Data = {
@@ -144,7 +153,7 @@ function Pill({
 
 function PersonCard({ p }: { p: Person }) {
   const [open, setOpen] = useState(false);
-  const nothing = p.items.length === 0;
+  const nothing = p.items.length === 0 && p.supplierWork === 0;
   const roles = [p.isContractOwner && "Contract owner", p.isLegal && "Legal"]
     .filter(Boolean)
     .join(" · ");
@@ -184,6 +193,7 @@ function PersonCard({ p }: { p: Person }) {
                 tone="primary"
               />
               <Pill count={p.waitingOnOthers} label="waiting on others" />
+              <Pill count={p.supplierWork} label="supplier" tone="primary" />
               <ChevronDown
                 aria-hidden
                 className={cn(
@@ -256,6 +266,41 @@ function PersonCard({ p }: { p: Person }) {
               </section>
             );
           })}
+          {p.suppliers.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold">
+                Suppliers{" "}
+                <span className="tabular font-normal text-muted-foreground">
+                  ({p.suppliers.length})
+                </span>
+              </h2>
+              <ul className="mt-1 flex flex-col gap-2">
+                {p.suppliers.map((x, i) => (
+                  <li key={i} className="text-sm">
+                    <Link
+                      to={`/suppliers/${x.supplierId}?tab=reviews`}
+                      className="font-medium hover:underline"
+                    >
+                      {x.supplierName}
+                    </Link>{" "}
+                    <span
+                      className={cn(
+                        "text-muted-foreground",
+                        x.days < 0 && "text-danger",
+                      )}
+                    >
+                      ·{" "}
+                      {x.kind === "Action"
+                        ? `Action: "${x.what}"`
+                        : "Business review"}{" "}
+                      due {formatDate(x.due)}
+                      {x.days < 0 ? `, ${-x.days} days overdue` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
       )}
     </li>

@@ -247,7 +247,7 @@ Notice deadlines  ●●  ●   ●●●      ●    ●       ●
 ```
 
 ### Other screens
-- **Suppliers**: list; supplier page with all its contracts, total value and upcoming dates.
+- **Suppliers**: list; supplier page (slice 8b) with details, contacts, documents, business reviews and contracts.
 - **Variation**: old and new values side by side, reason, document, send.
 - **Reports** (slice 8): register (choose columns, filter, Excel with every column, print to PDF), pipeline, approvals ("who approved what, when"), audit trail with Excel download; download everything (one workbook) and all documents (ZIP, admins).
 - **Team** (slice 8): who has what coming up and outstanding, per person; for admins, auditors and Group Heads.
@@ -336,6 +336,7 @@ The new app replaces the old one on QA from slice 0. QA has no real data (confir
 | 8 | Reports: register Excel and PDF, pipeline, approvals, audit export; Team page | Exports the register; sees who has what coming up | Built and tested (Register with Excel download and print to PDF; Pipeline; Approvals with days waited; Audit trail with search, chain check and Excel download; Team page for admins, auditors and Group Heads; Register columns chosen per person and the Contracts list's filters; Download everything (Excel workbook) and all documents (ZIP); D-82 to D-87. 65 API tests on SQL Server; browser walkthrough at 375px and 1280px, light and dark; axe clean). On QA (deployed 25 Nov 2026) |
 | 1b | Excel import and export (Jeff, 25 Nov): People, Lists, Suppliers and Contracts (details only, no files). Preview before anything changes; new rows added, existing rows updated, nothing deleted; blank cells leave existing values unchanged; every row audited | Loads people, lists and suppliers from a spreadsheet, exports them, edits and re-imports | Built and tested (42 API tests; browser check of preview and import) |
 | 1c | Email foundation and "You've been given access" email (JBS relay) | Adds a person and they get an email | Built and tested (queue, background sender with retries, real SMTP conversation tested); deploying to QA |
+| 8b | Suppliers: supplier page with documents (types from a list, versions, expiry, opt-in reminders), documents from contracts, details (relationship owner, tier, risk, contacts, next review), structured business reviews with actions; Procurement tick | Adds an insurance certificate with a reminder; records a business review with actions | Built and tested (D-88, D-90; 69 API tests on SQL Server; browser walkthrough at 1280px and 375px dark; axe clean; three new help guides with videos). Deploying to QA |
 | 9 | Import: spreadsheet (for example a Medius export) with column mapping, dry run, error report; ZIP of files matched by agreement reference; legacy Effective contracts loaded locked with their original registered date | Loads a fictional sample | Not started |
 
 Help ("?") ships with each screen, not as a slice of its own. The **help centre** (D-89) adds step-by-step guides with short silent videos; when a screen changes, update its guide and re-record its video (web/help-videos/record.cjs).
@@ -343,7 +344,6 @@ Help ("?") ships with each screen, not as a slice of its own. The **help centre*
 ## 18. Planned for later
 
 - **In-app Feedback** button and page, shared with other JBS apps: see features/feedback.md.
-- **Supplier documents** (Jeff, 25 Nov; D-88), next after the help centre: on the Supplier page, every document from the supplier's contracts in one place; the supplier's own documents (types from an admin list) uploaded by people ticked Procurement and seen by everyone; optional expiry dates with an opt-in reminder. Later: a structured business review log.
 - **Different forms and fields for different types of contract** (Jeff, 25 Nov): for example a freight agreement asking for different fields from an NDA. To talk through with Jeff before designing; it builds on Admin, Contract fields (slice 2).
 
 ## 18a. Not in version 1

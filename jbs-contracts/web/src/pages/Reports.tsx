@@ -973,7 +973,8 @@ function EverythingDownloads() {
     "Approvals: every decision, by whom and why",
     "Variations: why, where they are and what they change",
     "Reminders sent by the daily job",
-    "Suppliers, people and their roles, and lists",
+    "Suppliers with their details, contacts, documents, business reviews and actions",
+    "People and their roles, and lists",
   ];
   return (
     <section aria-label="Download everything" className="flex flex-col gap-4">
@@ -1003,7 +1004,7 @@ function EverythingDownloads() {
             All documents, as a ZIP
           </h2>
           <p className="text-muted-foreground">
-            Every version of every file, in a folder per contract reference,
+            Every version of every file, in a folder per contract reference (and per supplier for supplier documents),
             with an index that says which file is which. It can be large and
             take a few minutes. Admins only.
           </p>

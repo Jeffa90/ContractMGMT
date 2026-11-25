@@ -72,7 +72,7 @@ function Palette({ onClose }: { onClose: () => void }) {
     for (const c of results.data.contracts)
       items.push({ key: `c${c.id}`, group: 'Contracts', icon: <FileText aria-hidden className="size-4" />, label: c.title, detail: `${c.reference} · ${c.stageName}${c.supplierName ? ` · ${c.supplierName}` : ''}`, to: `/contracts/${c.id}` })
     for (const s of results.data.suppliers)
-      items.push({ key: `s${s.id}`, group: 'Suppliers', icon: <Building2 aria-hidden className="size-4" />, label: s.name, to: `/suppliers?q=${encodeURIComponent(s.name)}` })
+      items.push({ key: `s${s.id}`, group: 'Suppliers', icon: <Building2 aria-hidden className="size-4" />, label: s.name, to: `/suppliers/${s.id}` })
     for (const p of results.data.people)
       items.push({ key: `p${p.id}`, group: 'People', icon: <User aria-hidden className="size-4" />, label: p.name, detail: p.windowsAccount, to: `/admin/people?q=${encodeURIComponent(p.name)}` })
   }

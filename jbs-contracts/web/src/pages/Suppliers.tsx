@@ -91,13 +91,9 @@ export function SuppliersPage() {
               {visible.map((s) => (
                 <li key={s.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    {canChange ? (
-                      <button type="button" className="text-left font-medium text-primary hover:underline" onClick={() => setEditing(s)}>
-                        {s.name}
-                      </button>
-                    ) : (
-                      <span className="font-medium">{s.name}</span>
-                    )}
+                    <Link to={`/suppliers/${s.id}`} className="font-medium text-primary hover:underline">
+                      {s.name}
+                    </Link>
                     <p className="tabular text-xs text-muted-foreground">
                       {[s.abn ? `ABN ${formatAbn(s.abn)}` : null, s.vendorNumber ? `Vendor ${s.vendorNumber}` : null].filter(Boolean).join(' · ') || 'No ABN or vendor number yet'}
                     </p>

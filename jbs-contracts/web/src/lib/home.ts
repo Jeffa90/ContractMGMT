@@ -5,9 +5,13 @@ export type Tile = { key: string; group: TileGroup; label: string; help: string;
 
 export type UrgentItem = { kind: 'Notice' | 'Ended'; id: number; reference: string; title: string; supplierName: string | null; deadline: string; days: number }
 
+/** Supplier items (D-90): your open business review actions, reviews due for suppliers you look after, documents you're reminded about. */
+export type SupplierItem = { kind: 'Action' | 'ReviewDue' | 'Expiring'; supplierId: number; supplierName: string; what: string; due: string; days: number }
+
 export type HomeData = {
   tiles: Tile[]
   urgent: UrgentItem[]
+  suppliers: SupplierItem[]
   preferences: { hiddenTiles: string[]; firstGroup: 'turn' | 'coming' }
 }
 

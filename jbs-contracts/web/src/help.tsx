@@ -206,12 +206,39 @@ const topics = {
       <>
         <p>Every contract is with a supplier. Add a supplier here, or straight from a contract with <strong>Add new supplier</strong>.</p>
         <p>The ABN is checked for typing mistakes (it doesn't look anything up). The SAP vendor number is optional.</p>
-        <p>Click a supplier's contract count to see their contracts.</p>
+        <p>Click a supplier's name to open its page: its details and contacts, its documents (and those from its contracts), business reviews and contracts.</p>
         <p>
           <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, change or add rows in that file and use{' '}
           <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
           cells leave what's there.
         </p>
+      </>
+    ),
+  },
+  supplier: {
+    title: 'A supplier',
+    body: (
+      <>
+        <p>Everything about one supplier in one place. Everyone can read it; people ticked Procurement (and admins) look after it.</p>
+        <ul>
+          <li>
+            <strong>Overview</strong>: who looks after the supplier (the relationship owner), its tier, its risk and why, when the next business review is due, and
+            its contacts.
+          </li>
+          <li>
+            <strong>Documents</strong>: the supplier's own documents, such as insurance and certificates, with their expiry dates, and below them every document
+            from its contracts. Tick <strong>Remind me before it expires</strong> on a document to get an email before it expires (60 and 30 days before, unless
+            your admin changes it). When a renewed certificate arrives, use <strong>New version</strong> and give its new expiry date; earlier versions are kept.
+          </li>
+          <li>
+            <strong>Business reviews</strong>: a log of each review with who attended, a summary, an overall rating, scores from 1 to 5, the actions agreed and the
+            deck. Each action's owner is emailed and sees it on their Home until they tick it done. Procurement, admins and the relationship owner add reviews.
+          </li>
+          <li>
+            <strong>Contracts</strong>: this supplier's contracts you can see.
+          </li>
+        </ul>
+        <p>Every change is recorded. Removing a document or contact hides it; nothing is deleted.</p>
       </>
     ),
   },

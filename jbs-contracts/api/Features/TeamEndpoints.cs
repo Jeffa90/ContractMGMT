@@ -120,6 +120,16 @@ public static class TeamEndpoints
                 LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
                 WHERE k.Id IN (SELECT value FROM OPENJSON(@ids))
                 """, new { ids = System.Text.Json.JsonSerializer.Serialize(ids) })).ToDictionary(d => d.Id);
+            // Supplier work (D-90): open business review actions, and business reviews due for the suppliers each person looks after.
+            var supplierWork = (await c.QueryAsync<(int PersonId, string Kind, int SupplierId, string SupplierName, string What, DateTime Due)>("""
+                SELECT a.OwnerId, N'Action', s.Id, s.Name, a.Text, a.DueOn
+                FROM contracts.BusinessReviewAction a JOIN contracts.BusinessReview r ON r.Id = a.ReviewId JOIN contracts.Supplier s ON s.Id = r.SupplierId
+                WHERE a.DoneUtc IS NULL AND r.IsRemoved = 0 AND a.DueOn <= @until
+                UNION ALL
+                SELECT s.RelationshipOwnerId, N'ReviewDue', s.Id, s.Name, N'Business review', s.NextReviewDue FROM contracts.Supplier s
+                WHERE s.IsActive = 1 AND s.RelationshipOwnerId IS NOT NULL AND s.NextReviewDue <= @until
+                """, new { until = today.AddDays(window).ToDateTime(TimeOnly.MinValue) }))
+                .ToLookup(x => x.PersonId);
             var byPerson = items.ToLookup(i => i.PersonId);
             int Count(int id, string what) => byPerson[id].Count(i => i.What == what);
             var rows = people
@@ -131,6 +141,12 @@ public static class TeamEndpoints
                     TheirTurn = byPerson[person.Id].Count(i => i.What is What.Draft or What.BackFromLegal or What.Signing or What.Variation),
                     WaitingOnOthers = byPerson[person.Id].Count(i => i.What is What.WithLegal or What.InApproval),
                     LegalTurn = Count(person.Id, What.LegalTurn),
+                    SupplierWork = supplierWork[person.Id].Count(),
+                    Suppliers = supplierWork[person.Id].OrderBy(x => x.Due).Select(x =>
+                    {
+                        var due = DateOnly.FromDateTime(x.Due);
+                        return new { x.Kind, x.SupplierId, x.SupplierName, x.What, Due = due, Days = due.DayNumber - today.DayNumber };
+                    }),
                     Owns = effective.Count(r => r.OwnerId == person.Id),
                     BacksUp = effective.Count(r => r.BackupOwnerId == person.Id),
                     Items = byPerson[person.Id]
@@ -148,8 +164,8 @@ public static class TeamEndpoints
                         }),
                 })
                 // Only people with something to show: contract owners, Legal, and anyone who still owns or has work.
-                .Where(r => r.IsContractOwner || r.IsLegal || r.Owns > 0 || r.BacksUp > 0 || r.Items.Any())
-                .OrderByDescending(r => r.Overdue).ThenByDescending(r => r.ComingUp + r.TheirTurn + r.LegalTurn).ThenBy(r => r.Name)
+                .Where(r => r.IsContractOwner || r.IsLegal || r.Owns > 0 || r.BacksUp > 0 || r.Items.Any() || r.SupplierWork > 0)
+                .OrderByDescending(r => r.Overdue).ThenByDescending(r => r.ComingUp + r.TheirTurn + r.LegalTurn + r.SupplierWork).ThenBy(r => r.Name)
                 .ToList();
 
             return Results.Ok(new

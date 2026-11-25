@@ -29,7 +29,7 @@ public static class ListsEndpoints
 {
     public static readonly Dictionary<string, string> ListLabels = new()
     {
-        ["AgreementType"] = "agreement type", ["BusinessUnit"] = "business unit", ["Site"] = "site", ["Currency"] = "currency",
+        ["AgreementType"] = "agreement type", ["BusinessUnit"] = "business unit", ["Site"] = "site", ["Currency"] = "currency", ["SupplierDocumentType"] = "supplier document type", ["SupplierTier"] = "supplier tier",
     };
 
     public static void MapListsEndpoints(this IEndpointRouteBuilder app)

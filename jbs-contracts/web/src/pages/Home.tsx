@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Circle,
   FileEdit,
+  FilePen,
   FilePlus2,
   FileSignature,
   Hourglass,
@@ -26,6 +27,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Dialog } from "@/components/Dialog";
+import { DemoDataDialog } from "@/components/DemoDataDialog";
 import { HelpButton } from "@/components/Help";
 import {
   Alert,
@@ -35,7 +37,7 @@ import {
   EmptyState,
   Skeleton,
 } from "@/components/ui";
-import { api, ApiError, type Person } from "@/lib/api";
+import { api, type Person } from "@/lib/api";
 import type { Lists } from "@/lib/contracts";
 import { firstName, formatDate, formatLongDate, greeting } from "@/lib/format";
 import {
@@ -61,6 +63,9 @@ const tileIcons: Record<string, ReactNode> = {
   "legal-waiting-owner": <Hourglass aria-hidden className="size-5" />,
   "owner-inactive": <UserX aria-hidden className="size-5" />,
   "no-decision": <RefreshCw aria-hidden className="size-5" />,
+  "variation-owner": <FilePen aria-hidden className="size-5" />,
+  "variation-legal": <Scale aria-hidden className="size-5" />,
+  "variation-to-approve": <BadgeCheck aria-hidden className="size-5" />,
 };
 
 function TileCard({ tile }: { tile: Tile }) {
@@ -224,21 +229,7 @@ function Urgent({ items }: { items: HomeData["urgent"] }) {
 
 /** QA only: one click fills the app with fictional data so every screen has something to show (D-66). */
 function DemoDataCard() {
-  const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
-  const load = useMutation({
-    mutationFn: () =>
-      api.post<{ contracts: number }>("/api/admin/demo-data", {}),
-    onSuccess: (r) => {
-      queryClient.invalidateQueries();
-      toast.success(`Demo data loaded: ${r.contracts} fictional contracts.`);
-      setConfirming(false);
-    },
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "That didn't work. Try again.",
-      ),
-  });
   return (
     <Card className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between md:p-6">
       <div className="flex items-start gap-3">
@@ -248,51 +239,15 @@ function DemoDataCard() {
             Try it with demo data
           </h2>
           <p className="text-sm text-muted-foreground">
-            Fills QA with fictional contracts in every stage, so every screen
-            has something to show.
+            Fills QA with made-up contracts and suppliers, shared out across
+            everyone by role, so every screen has something to show. Demo
+            items never send email.
           </p>
         </div>
       </div>
       <Button onClick={() => setConfirming(true)}>Load demo data</Button>
       {confirming && (
-        <Dialog
-          open
-          onOpenChange={(o) => !o && setConfirming(false)}
-          title="Load demo data?"
-          description="This is only offered on QA."
-          footer={
-            <>
-              <Button onClick={() => setConfirming(false)}>Cancel</Button>
-              <Button
-                variant="primary"
-                loading={load.isPending}
-                onClick={() => load.mutate()}
-              >
-                Load demo data
-              </Button>
-            </>
-          }
-        >
-          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
-            <li>
-              Adds 15 fictional contracts in every stage (drafts, with Legal,
-              signing, approval, Effective), most owned by you so your Home
-              fills up.
-            </li>
-            <li>
-              Adds fictional suppliers and four demo people (Legal, an approver
-              and an owner), all marked "(demo)". They can't sign in.
-            </li>
-            <li>
-              Nothing you've already added is changed or removed, and no emails
-              are sent.
-            </li>
-            <li>
-              It can't be taken out again afterwards (nothing in JBS Contracts
-              is deleted), so it's for QA only.
-            </li>
-          </ul>
-        </Dialog>
+        <DemoDataDialog refresh={false} onClose={() => setConfirming(false)} />
       )}
     </Card>
   );

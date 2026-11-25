@@ -243,10 +243,10 @@ public static class RenewalEndpoints
         p.Add("start", c.EndDate is { } end && !c.IsEvergreen ? end.AddDays(1) : (DateTime?)null, System.Data.DbType.Date);
         var newId = await x.C.ExecuteScalarAsync<int>("""
             INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, NoticePeriodDays, NeedsLegalReview, RenewsContractId, CreatedById, UpdatedById)
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, NoticePeriodDays, NeedsLegalReview, RenewsContractId, CreatedById, UpdatedById, IsDemo)
             OUTPUT INSERTED.Id
             SELECT @reference, @title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, NoticePeriodDays, 1, Id, @me, @me
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, NoticePeriodDays, 1, Id, @me, @me, IsDemo
             FROM contracts.Contract WHERE Id = @id
             """, p, x.Tx);
         // Added fields come across too.

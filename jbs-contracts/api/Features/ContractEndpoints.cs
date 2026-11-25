@@ -43,6 +43,7 @@ public sealed class ContractRow
     public int? LegalClearedById { get; set; }
     public DateTime? RegisteredUtc { get; set; }
     public string? LegacyReference { get; set; }
+    public bool IsDemo { get; set; }
     public DateTime? ImportedUtc { get; set; }
     public string? ImportedFrom { get; set; }
     public int? RegisteredById { get; set; }
@@ -417,7 +418,7 @@ public static class ContractEndpoints
         r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
         StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc), r.IsLocked, r.WithdrawnReason,
         RegisteredUtc = Utc(r.RegisteredUtc), r.RegisteredByName, r.RegisteredAsBackup,
-        r.LegacyReference, ImportedUtc = Utc(r.ImportedUtc), r.ImportedFrom,
+        r.LegacyReference, ImportedUtc = Utc(r.ImportedUtc), r.ImportedFrom, r.IsDemo,
         Unlock = r.UnlockId is null ? null : new { Id = r.UnlockId, Reason = r.UnlockReason, ExpiresUtc = Utc(r.UnlockExpiresUtc), ByName = r.UnlockByName },
         r.OpenVariationId,
         r.RenewsContractId, r.RenewsReference, r.RenewedById, r.RenewedByReference, RenewedByStageName = r.RenewedByStage is { } rs ? StageNames[rs] : null,

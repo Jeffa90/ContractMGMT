@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ChevronLeft, Download, FileText, History, Lock, Pencil, Trash2, Upload } from 'lucide-react'
+import { Check, ChevronLeft, Download, FileText, History, Lock, Pencil, Sparkles, Trash2, Upload } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -164,6 +164,11 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
               {c.isConfidential && (
                 <span className="inline-flex items-center gap-1">
                   <Lock aria-hidden className="size-4" /> Confidential
+                </span>
+              )}
+              {c.isDemo && (
+                <span className="inline-flex items-center gap-1" title="Made-up demo data for trying the app on QA. It never sends email.">
+                  <Sparkles aria-hidden className="size-4" /> Demo (no emails)
                 </span>
               )}
             </p>

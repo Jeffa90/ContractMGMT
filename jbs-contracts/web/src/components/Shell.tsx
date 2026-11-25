@@ -22,12 +22,14 @@ import {
   UserRoundSearch,
   Users,
   X,
+  Sparkles,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { NavLink, Outlet } from "react-router";
 import { openSearch } from "@/lib/search";
 import { SearchPalette } from "./SearchPalette";
 import { TryAsBanner, TryAsDialog } from "./TryAs";
+import { DemoDataDialog } from "./DemoDataDialog";
 import logo from "@/assets/jbs-logo.webp";
 import logoWhite from "@/assets/jbs-logo-white.webp";
 import { cn } from "@/lib/cn";
@@ -182,8 +184,9 @@ function NavLinks({
 }
 
 function PersonMenu({ collapsed }: { collapsed?: boolean }) {
-  const { person, canTryAs } = useMe();
+  const { person, canTryAs, demoData } = useMe();
   const [tryAs, setTryAs] = useState(false);
+  const [demo, setDemo] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(readThemeChoice);
   const choose = (choice: ThemeChoice) => {
     setTheme(choice);
@@ -194,6 +197,7 @@ function PersonMenu({ collapsed }: { collapsed?: boolean }) {
   return (
     <>
       {tryAs && <TryAsDialog onClose={() => setTryAs(false)} />}
+      {demo && <DemoDataDialog refresh={demoData === "loaded"} onClose={() => setDemo(false)} />}
       <Menu.Root>
         <Menu.Trigger
           className={cn(
@@ -260,6 +264,12 @@ function PersonMenu({ collapsed }: { collapsed?: boolean }) {
                   someone else (QA)
                 </Menu.Item>
               </>
+            )}
+            {demoData && (
+              <Menu.Item className={item} onSelect={() => setDemo(true)}>
+                <Sparkles aria-hidden className="size-4" />
+                {demoData === "loaded" ? "Refresh demo data (QA)" : "Load demo data (QA)"}
+              </Menu.Item>
             )}
           </Menu.Content>
         </Menu.Portal>

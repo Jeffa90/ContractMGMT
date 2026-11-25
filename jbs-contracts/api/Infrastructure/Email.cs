@@ -49,14 +49,17 @@ public sealed class CaptureEmailSender(ILogger<CaptureEmailSender> logger) : IEm
 /// <summary>Queues emails in the same transaction as the change that causes them.</summary>
 public static class EmailOutbox
 {
+    /// <summary>Nothing is queued about a demo contract or demo supplier (D-97): QA testers aren't emailed about made-up data.</summary>
     public static async Task QueueAsync(SqlConnection c, SqlTransaction tx, string kind, string toAddress, string toName, (string Subject, string Text, string Html) content,
-        int? personId = null, int? contractId = null, string? dedupeKey = null)
+        int? personId = null, int? contractId = null, string? dedupeKey = null, int? supplierId = null)
     {
         await c.ExecuteAsync("""
-            IF @dedupeKey IS NULL OR NOT EXISTS (SELECT 1 FROM contracts.EmailOutbox WHERE DedupeKey = @dedupeKey)
+            IF (@dedupeKey IS NULL OR NOT EXISTS (SELECT 1 FROM contracts.EmailOutbox WHERE DedupeKey = @dedupeKey))
+               AND NOT EXISTS (SELECT 1 FROM contracts.Contract WHERE Id = @contractId AND IsDemo = 1)
+               AND NOT EXISTS (SELECT 1 FROM contracts.Supplier WHERE Id = @supplierId AND IsDemo = 1)
             INSERT INTO contracts.EmailOutbox (Kind, ToAddress, ToName, Subject, BodyText, BodyHtml, PersonId, ContractId, DedupeKey)
             VALUES (@kind, @toAddress, @toName, @subject, @text, @html, @personId, @contractId, @dedupeKey)
-            """, new { kind, toAddress, toName, subject = content.Subject, text = content.Text, html = content.Html, personId, contractId, dedupeKey }, tx);
+            """, new { kind, toAddress, toName, subject = content.Subject, text = content.Text, html = content.Html, personId, contractId, dedupeKey, supplierId }, tx);
     }
 }
 

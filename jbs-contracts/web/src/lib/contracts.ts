@@ -89,6 +89,8 @@ export type Contract = {
   legacyReference: string | null
   importedUtc: string | null
   importedFrom: string | null
+  /** Made-up QA demo data (D-97): it never sends email. */
+  isDemo: boolean
   renewsContractId: number | null
   renewsReference: string | null
   renewedById: number | null

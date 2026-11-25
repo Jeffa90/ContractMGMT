@@ -263,7 +263,7 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
             var t = wording["SupplierExpiry"];
             await EmailOutbox.QueueAsync(c, tx, "supplier-expiry", person.Email, person.Name,
                 EmailWording.Compose("SupplierExpiry", t.Subject, t.Body, values, settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{w.SupplierId}?tab=documents"),
-                personId: person.Id, dedupeKey: $"supplier-expiry:{w.DocumentId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
+                personId: person.Id, supplierId: w.SupplierId, dedupeKey: $"supplier-expiry:{w.DocumentId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
             sent++;
         }
 
@@ -288,7 +288,7 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
             var t = wording["SupplierReview"];
             await EmailOutbox.QueueAsync(c, tx, "supplier-review", person.Email, person.Name,
                 EmailWording.Compose("SupplierReview", t.Subject, t.Body, values, settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{r.SupplierId}?tab=reviews"),
-                personId: person.Id, dedupeKey: $"supplier-review:{r.SupplierId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
+                personId: person.Id, supplierId: r.SupplierId, dedupeKey: $"supplier-review:{r.SupplierId}:{due:yyyy-MM-dd}:{step}:{person.Id}");
             sent++;
         }
         return sent;

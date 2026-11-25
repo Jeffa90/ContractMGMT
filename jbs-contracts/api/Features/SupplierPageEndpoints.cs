@@ -654,7 +654,7 @@ public static class SupplierPageEndpoints
             };
             await EmailOutbox.QueueAsync(c, tx, "review-action", owner.Email, owner.Name,
                 await EmailWording.RenderAsync(c, tx, "ReviewAction", values, settings.SiteUrl is null ? null : $"{settings.SiteUrl}/suppliers/{s.Id}?tab=reviews"),
-                personId: owner.Id, dedupeKey: $"review-action:{actionId}");
+                personId: owner.Id, supplierId: s.Id, dedupeKey: $"review-action:{actionId}");
         }
         return actionId;
     }

@@ -173,6 +173,11 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
       </header>
 
       {c.stage === 'Withdrawn' && <Alert tone="info" title="This contract was withdrawn.">{c.withdrawnReason}</Alert>}
+      {data.sentBack && (
+        <Alert tone="warning" title={`${data.sentBack.byName} sent it back from approval, ${formatDateTime(data.sentBack.atUtc)}`}>
+          {data.sentBack.reason}
+        </Alert>
+      )}
       {notice !== null && c.stage === 'Effective' && notice <= 30 && (
         <Alert tone={notice < 0 ? 'danger' : 'warning'} title={notice < 0 ? `The notice deadline passed ${-notice} days ago (${formatDate(c.noticeDeadline)}).` : `The notice deadline is in ${notice} days (${formatDate(c.noticeDeadline)}).`} />
       )}

@@ -190,4 +190,25 @@ public static class EmailTemplates
             $"Outcome: \u201c{outcome}\u201d",
             "Next: sign it in DocuSign, then upload the signed copy on the contract page.",
         ], link);
+
+    public static (string Subject, string Text, string Html) WaitingForApproval(string firstName, string sentBy, string reference, string title, string? link) =>
+        Contract($"{reference} {title} is waiting for your approval", "A contract is ready to approve", [
+            $"Hi {firstName},",
+            $"{sentBy} has sent {reference} {title} for approval. It has been signed in DocuSign and the signed copy is attached to the contract.",
+            "Check the signed copy and details. Approve and register makes it Effective; if something isn't right, send it back with a reason.",
+        ], link);
+
+    public static (string Subject, string Text, string Html) Approved(string firstName, string approver, string reference, string title, string? link) =>
+        Contract($"{reference} {title} is approved and Effective", "Your contract is Effective", [
+            $"Hi {firstName},",
+            $"{approver} has approved and registered {reference} {title}. It is now Effective and locked.",
+        ], link);
+
+    public static (string Subject, string Text, string Html) SentBackByApprover(string firstName, string approver, string reference, string title, string reason, string? link) =>
+        Contract($"{reference} {title} was sent back from approval", "A contract was sent back from approval", [
+            $"Hi {firstName},",
+            $"{approver} sent {reference} {title} back to Signing.",
+            Said(approver, reason),
+            "Fix what's needed (for example, add the right signed copy), then choose Send for approval again.",
+        ], link);
 }

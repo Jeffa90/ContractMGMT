@@ -82,6 +82,9 @@ export type Contract = {
   stageSinceUtc: string
   isLocked: boolean
   withdrawnReason: string | null
+  registeredUtc: string | null
+  registeredByName: string | null
+  registeredAsBackup: boolean | null
   createdUtc: string
   createdByName: string
   rowVersion: string
@@ -117,13 +120,34 @@ export type LegalEntry = {
 }
 
 /** What the signed-in person can do now (the server checks again). */
-export type ContractAction = 'sendToLegal' | 'readyForSigning' | 'take' | 'assign' | 'updateStatus' | 'sendToOwner' | 'clear'
+export type ContractAction =
+  | 'sendToLegal'
+  | 'readyForSigning'
+  | 'take'
+  | 'assign'
+  | 'updateStatus'
+  | 'sendToOwner'
+  | 'clear'
+  | 'sendForApproval'
+  | 'sendBackToLegal'
+  | 'backToDraft'
+  | 'approve'
+  | 'sendBack'
+
+export type ApprovalDecision = { decision: 'Approved' | 'SentBack'; byName: string; asBackupForName: string | null; atUtc: string; reason: string | null }
 
 export type ContractDetail = {
   contract: Contract
   legal: LegalState
   conversation: LegalEntry[]
   actions: ContractAction[]
+  /** Approval decisions, newest first. */
+  approvals: ApprovalDecision[]
+  /** While it's back in Signing because an approver sent it back: that decision. */
+  sentBack: ApprovalDecision | null
+  /** For an approver who raised, owns or backs up this contract. */
+  cannotApproveReason: string | null
+  hasSignedCopy: boolean
   /** Required fields still empty (Draft only): checked when it is sent on. */
   missingRequired: string[]
   /** People in Legal (only sent to Legal people, for "Give to"). */

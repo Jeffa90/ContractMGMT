@@ -151,10 +151,20 @@ public sealed class LegalTests(AppFixture app)
         Assert.False(cleared.GetProperty("canEdit").GetBoolean());
         Assert.Equal(2, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.EmailOutbox WHERE ContractId = @id AND Kind = 'legal-cleared'", new { id }));
 
+
+        // From Signing, the owner can send it back to Legal with a reason when something must change; it goes to Lee, who cleared it.
+        Assert.Equal(["sendForApproval", "sendBackToLegal"], Actions(cleared));
+        Assert.Equal(HttpStatusCode.BadRequest, (await ActAsync(owner, id, "send-back-to-legal")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(owner, id, "send-back-to-legal", new { note = "Supplier wants to change the start date." })).Status);
+        var reopened = await DetailAsync(lee, id);
+        Assert.Equal(("LegalReview", "Legal", leeName), (reopened.GetProperty("contract").GetProperty("stage").GetString(), reopened.GetProperty("legal").GetProperty("whoseTurn").GetString(), reopened.GetProperty("legal").GetProperty("legalPersonName").GetString()));
+        Assert.Equal(JsonValueKind.Null, reopened.GetProperty("legal").GetProperty("outcome").ValueKind);
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(lee, id, "legal/clear", new { note = "Cleared again. Start date change is fine." })).Status);
+
         // The conversation is numbered, keeps the mark-up as it was, and is visible to anyone who can see the contract (D-58).
         var conversation = (await DetailAsync(viewer, id)).GetProperty("conversation").EnumerateArray().ToList();
-        Assert.Equal(["SentToLegal", "Taken", "StatusChanged", "SentToOwner", "SentToLegal", "Assigned", "Cleared"], conversation.Select(e => e.GetProperty("action").GetString()!).ToArray());
-        Assert.Equal(Enumerable.Range(1, 7), conversation.Select(e => e.GetProperty("number").GetInt32()));
+        Assert.Equal(["SentToLegal", "Taken", "StatusChanged", "SentToOwner", "SentToLegal", "Assigned", "Cleared", "SentToLegal", "Cleared"], conversation.Select(e => e.GetProperty("action").GetString()!).ToArray());
+        Assert.Equal(Enumerable.Range(1, 9), conversation.Select(e => e.GetProperty("number").GetInt32()));
         Assert.Equal("markup.txt", conversation[3].GetProperty("documents")[0].GetProperty("fileName").GetString());
         Assert.Equal(otherName, conversation[4].GetProperty("byName").GetString());
 
@@ -162,6 +172,7 @@ public sealed class LegalTests(AppFixture app)
         await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() => db.ExecuteAsync("UPDATE contracts.LegalTurn SET Note = 'changed' WHERE ContractId = @id", new { id }));
         var activity = await db.QueryAsync<string>("SELECT Summary FROM contracts.AuditEvent WHERE ContractId = @id", new { id });
         Assert.Contains(activity, s => s.StartsWith($"{leeName} cleared"));
+        Assert.DoesNotContain(activity, s => s.Contains(".\"."));  // no doubled full stops after a quoted note
         Assert.Null(await AuditLog.VerifyAsync(db));
     }
 

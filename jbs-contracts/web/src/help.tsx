@@ -98,7 +98,28 @@ export const help = {
         <p>
           <strong>Activity</strong> lists everything that has happened to the contract, newest first. It can't be changed.
         </p>
+        <p>
+          <strong>Signing</strong>: sign it in DocuSign, then <strong>Send for approval</strong> with the signed copy and the effective date (it's required and never
+          filled in for you). The Group Head confirms it and it becomes Effective and locked. If details must change during Signing, use{' '}
+          <strong>Send back to Legal</strong> (or <strong>Back to draft</strong> if it didn't need Legal).
+        </p>
         <p>If a contract isn't going ahead (before it's approved), use <strong>Withdraw this contract</strong> at the bottom and say why. Nothing is deleted.</p>
+      </>
+    ),
+  },
+  approve: {
+    title: 'Approving a contract',
+    body: (
+      <>
+        <p>
+          The contract has already been approved and signed in DocuSign. Approving it here confirms the signed copy and the details are right, puts it on the
+          register and makes it <strong>Effective</strong> from its effective date. It is then locked.
+        </p>
+        <p>
+          Open the signed copy and check it matches the details. If something isn't right, choose <strong>Send back</strong> and say what needs fixing; it goes back
+          to Signing and the owner gets an email.
+        </p>
+        <p>You can't approve a contract you raised, own or are the backup for. Another approver can.</p>
       </>
     ),
   },

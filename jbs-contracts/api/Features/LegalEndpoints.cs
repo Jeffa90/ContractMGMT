@@ -5,7 +5,8 @@ using Microsoft.Data.SqlClient;
 
 namespace JbsContracts.Api.Features;
 
-public sealed record LegalAction(string? RowVersion, string? Note = null, int[]? DocumentVersionIds = null, int? PersonId = null, string? Status = null);
+/// <summary>The body of a contract action: the page's row version plus whatever that action uses.</summary>
+public sealed record LegalAction(string? RowVersion, string? Note = null, int[]? DocumentVersionIds = null, int? PersonId = null, string? Status = null, DateOnly? EffectiveDate = null);
 
 /// <summary>
 /// Sending a contract on from Draft, and the Legal review back-and-forth (product-spec sections 4 and 5; D-09, D-55 to D-58).
@@ -19,7 +20,7 @@ public static class LegalEndpoints
         ["NotStarted"] = "Not started", ["Reviewing"] = "Reviewing", ["WaitingOnSupplier"] = "Waiting on supplier", ["WaitingOnOwner"] = "Waiting on owner",
     };
 
-    private const int MaxNote = 2000;
+    internal const int MaxNote = 2000;
     private const int MaxStatusNote = 500;
 
     // ---------------------------------------------------------------- What the contract page shows
@@ -50,6 +51,9 @@ public static class LegalEndpoints
                 actions.Add("assign");
             }
         }
+        if (c.Stage == "Signing" && me.IsContractOwner)
+            actions.AddRange(["sendForApproval", c.LegalClearedUtc is not null ? "sendBackToLegal" : "backToDraft"]);
+        if (c.Stage == "Approval" && me.IsApprover && !ApprovalEndpoints.IsInvolved(me, c)) actions.AddRange(["approve", "sendBack"]);
         return actions;
     }
 
@@ -166,14 +170,7 @@ public static class LegalEndpoints
                     $"{x.Me.Name} sent {c.Reference} to Legal" + (c.LegalPersonName is { } lp && !fromDraft ? $" ({lp})" : "") + Quote(note) + Stop(note),
                     new { note, documents = docs.Ids }, contractId: id);
 
-                // To the Legal person who has it, or to everyone in Legal while nobody has picked it up.
-                var recipients = await x.C.QueryAsync<Person>(
-                    "SELECT * FROM contracts.Person WHERE IsActive = 1 AND IsLegal = 1 AND (@legalPersonId IS NULL OR Id = @legalPersonId) AND Id <> @me",
-                    new { legalPersonId = c.LegalPersonId, me = x.Me.Id }, x.Tx);
-                foreach (var p in recipients)
-                    await EmailOutbox.QueueAsync(x.C, x.Tx, "legal-sent", p.Email, p.Name,
-                        EmailTemplates.SentToLegal(First(p.Name), x.Me.Name, c.Reference, c.Title, note, isNew: c.LegalPersonId is null, Link(settings, id)),
-                        personId: p.Id, contractId: id, dedupeKey: $"legal:{id}:{number}:{p.Id}");
+                await EmailLegalAsync(x, number, note, settings);
                 return null;
             }));
 
@@ -275,7 +272,7 @@ public static class LegalEndpoints
                 var number = await AddEntryAsync(x, "SentToOwner", "Owner", legalPersonId, "WaitingOnOwner", note, docs.Ids);
                 await audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "legal.sent-to-owner", "Contract", id,
                     $"{x.Me.Name} sent {c.Reference} back to the owner" + Quote(note) + Stop(note), new { note, documents = docs.Ids }, contractId: id);
-                await EmailOwnersAsync(x, number, "legal-back", p => EmailTemplates.BackFromLegal(First(p.Name), x.Me.Name, c.Reference, c.Title, note, Link(settings, id)));
+                await EmailOwnersAsync(x, $"legal:{id}:{number}", "legal-back", p => EmailTemplates.BackFromLegal(First(p.Name), x.Me.Name, c.Reference, c.Title, note, Link(settings, id)));
                 return null;
             }));
 
@@ -299,17 +296,17 @@ public static class LegalEndpoints
                 var number = await AddEntryAsync(x, "Cleared", null, legalPersonId, null, note, []);
                 await audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "legal.cleared", "Contract", id,
                     $"{x.Me.Name} cleared {c.Reference} (Legal)" + Quote(note) + Stop(note) + " It moves to Signing.", new { note }, contractId: id);
-                await EmailOwnersAsync(x, number, "legal-cleared", p => EmailTemplates.LegalCleared(First(p.Name), x.Me.Name, c.Reference, c.Title, note, Link(settings, id)));
+                await EmailOwnersAsync(x, $"legal:{id}:{number}", "legal-cleared", p => EmailTemplates.LegalCleared(First(p.Name), x.Me.Name, c.Reference, c.Title, note, Link(settings, id)));
                 return null;
             }));
     }
 
     // ---------------------------------------------------------------- Helpers
 
-    private sealed record Ctx(SqlConnection C, SqlTransaction Tx, Person Me, ContractRow Contract);
+    internal sealed record Ctx(SqlConnection C, SqlTransaction Tx, Person Me, ContractRow Contract);
 
     /// <summary>Loads and locks the contract, checks it can be seen and the page isn't stale, runs the action, and commits when it succeeds.</summary>
-    private static async Task<IResult> ActAsync(int id, LegalAction body, CurrentUser current, Db db, Func<Ctx, Task<IResult?>> action)
+    internal static async Task<IResult> ActAsync(int id, LegalAction body, CurrentUser current, Db db, Func<Ctx, Task<IResult?>> action)
     {
         var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
         if (refusal is not null) return refusal;
@@ -332,7 +329,7 @@ public static class LegalEndpoints
         : x.Contract.Stage != "LegalReview" ? ApiResults.NotAllowed($"It isn't in Legal review (it's in {ContractEndpoints.StageNames[x.Contract.Stage]}).")
         : null;
 
-    private static async Task<IResult?> RequiredProblemAsync(Ctx x, string when)
+    internal static async Task<IResult?> RequiredProblemAsync(Ctx x, string when)
     {
         var missing = await MissingRequiredAsync(x.C, x.Tx, x.Contract, await Fields.LoadAsync(x.C, x.Tx));
         if (missing.Count == 0) return null;
@@ -359,7 +356,7 @@ public static class LegalEndpoints
         await x.C.ExecuteAsync("UPDATE contracts.Contract SET LegalPersonId = @personId, LegalStatus = @status, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id",
             new { personId, status, me = x.Me.Id, id = x.Contract.Id }, x.Tx);
 
-    private static async Task<int> AddEntryAsync(Ctx x, string action, string? whoseTurn, int? legalPersonId, string? status, string? note, int[] documentVersionIds)
+    internal static async Task<int> AddEntryAsync(Ctx x, string action, string? whoseTurn, int? legalPersonId, string? status, string? note, int[] documentVersionIds)
     {
         var number = await x.C.ExecuteScalarAsync<int>("SELECT ISNULL(MAX(Number), 0) + 1 FROM contracts.LegalTurn WHERE ContractId = @id", new { id = x.Contract.Id }, x.Tx);
         var turnId = await x.C.ExecuteScalarAsync<int>("""
@@ -371,20 +368,33 @@ public static class LegalEndpoints
         return number;
     }
 
+    /// <summary>To the Legal person who has it, or to everyone in Legal while nobody has picked it up (D-57); never to whoever acted.</summary>
+    internal static async Task EmailLegalAsync(Ctx x, int number, string? note, AppSettings settings)
+    {
+        var c = x.Contract;
+        var recipients = await x.C.QueryAsync<Person>(
+            "SELECT * FROM contracts.Person WHERE IsActive = 1 AND IsLegal = 1 AND (@legalPersonId IS NULL OR Id = @legalPersonId) AND Id <> @me",
+            new { legalPersonId = c.LegalPersonId, me = x.Me.Id }, x.Tx);
+        foreach (var p in recipients)
+            await EmailOutbox.QueueAsync(x.C, x.Tx, "legal-sent", p.Email, p.Name,
+                EmailTemplates.SentToLegal(First(p.Name), x.Me.Name, c.Reference, c.Title, note, isNew: c.LegalPersonId is null, Link(settings, c.Id)),
+                personId: p.Id, contractId: c.Id, dedupeKey: $"legal:{c.Id}:{number}:{p.Id}");
+    }
+
     /// <summary>The owner and backup (D-57), except whoever acted.</summary>
-    private static async Task EmailOwnersAsync(Ctx x, int number, string kind, Func<Person, (string, string, string)> content)
+    internal static async Task EmailOwnersAsync(Ctx x, string dedupe, string kind, Func<Person, (string, string, string)> content)
     {
         var people = await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1 AND Id IN (@owner, @backup) AND Id <> @me",
             new { owner = x.Contract.OwnerId, backup = x.Contract.BackupOwnerId ?? 0, me = x.Me.Id }, x.Tx);
         foreach (var p in people)
-            await EmailOutbox.QueueAsync(x.C, x.Tx, kind, p.Email, p.Name, content(p), personId: p.Id, contractId: x.Contract.Id, dedupeKey: $"legal:{x.Contract.Id}:{number}:{p.Id}");
+            await EmailOutbox.QueueAsync(x.C, x.Tx, kind, p.Email, p.Name, content(p), personId: p.Id, contractId: x.Contract.Id, dedupeKey: $"{dedupe}:{p.Id}");
     }
 
-    private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
-    private static string Quote(string? note) => note is null ? "" : $": \"{(note.Length > 200 ? note[..200] + "…" : note)}\"";
+    internal static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    internal static string Quote(string? note) => note is null ? "" : $": \"{(note.Length > 200 ? note[..200] + "…" : note)}\"";
     /// <summary>Ends the sentence, unless the quoted note already ended it (no doubled full stop).</summary>
-    private static string Stop(string? note) => note is not null && ".!?".Contains(note[^1]) ? "" : ".";
-    private static string First(string name) => name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? name;
-    private static string? Link(AppSettings s, int id) => s.SiteUrl is null ? null : $"{s.SiteUrl}/contracts/{id}";
-    private static IResult TooLong(string field, int max) => ApiResults.Invalid("That note is too long.", new() { [field] = $"Keep it under {max:N0} characters." });
+    internal static string Stop(string? note) => note is not null && ".!?".Contains(note[^1]) ? "" : ".";
+    internal static string First(string name) => name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? name;
+    internal static string? Link(AppSettings s, int id) => s.SiteUrl is null ? null : $"{s.SiteUrl}/contracts/{id}";
+    internal static IResult TooLong(string field, int max) => ApiResults.Invalid("That note is too long.", new() { [field] = $"Keep it under {max:N0} characters." });
 }

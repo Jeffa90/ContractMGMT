@@ -1,38 +1,18 @@
 // Where a contract is up to and what happens next, with the actions for the person looking (product-spec sections 4, 5 and 13.1),
 // and the Legal conversation: every hand-over, numbered, as it was.
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeftRight, CheckCircle2, MessagesSquare, Paperclip, Scale, Send, UserCheck, X } from 'lucide-react'
+import { ArrowLeftRight, BadgeCheck, CheckCircle2, Hourglass, Lock, MessagesSquare, Paperclip, Scale, Send, Undo2, UserCheck, X } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
-import { api, ApiError } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { errorText, useAction } from '@/lib/actions'
 import { uploadDocument, type ContractAction, type ContractDetail, type LegalEntry } from '@/lib/contracts'
-import { formatBytes, formatDateTime, timeAgo } from '@/lib/format'
+import { formatBytes, formatDate, formatDateTime, timeAgo } from '@/lib/format'
 import { Dialog } from './Dialog'
 import { Select, Textarea } from './form'
-import { Alert, Badge, Button, Card, Field } from './ui'
+import { Alert, Badge, Button, Card, Field, TextInput } from './ui'
 
-type Dialogs = 'sendToLegal' | 'sendToOwner' | 'clear' | 'status' | 'assign' | 'readyForSigning' | null
-
-/** Runs a contract action with the page's row version, then refreshes the contract and lists. */
-function useAction(data: ContractDetail, onDone?: () => void) {
-  const queryClient = useQueryClient()
-  const c = data.contract
-  return useMutation({
-    mutationFn: ({ path, body, rowVersion }: { path: string; body?: object; success: string; rowVersion?: string }) =>
-      api.post(`/api/contracts/${c.id}/${path}`, { ...body, rowVersion: rowVersion ?? c.rowVersion }),
-    onSuccess: (_, v) => {
-      queryClient.invalidateQueries({ queryKey: ['contract', c.id] })
-      queryClient.invalidateQueries({ queryKey: ['contracts'] })
-      toast.success(v.success)
-      onDone?.()
-    },
-  })
-}
-
-function errorText(e: unknown, field?: string) {
-  if (e instanceof ApiError) return (field && e.fields[field]) || e.message
-  return "That didn't work. Try again."
-}
+type Dialogs = 'sendToLegal' | 'sendToOwner' | 'clear' | 'status' | 'assign' | 'readyForSigning' | 'sendForApproval' | 'sendBackToLegal' | 'backToDraft' | 'approve' | 'sendBack' | null
 
 /** "Legal's turn" headline, status and what happens next. */
 function Situation({ data }: { data: ContractDetail }) {
@@ -88,9 +68,38 @@ function Situation({ data }: { data: ContractDetail }) {
           </p>
         )}
         <p className="text-sm">
-          <strong>Next:</strong> sign it in DocuSign, then add the signed copy under Documents (kind: Signed copy). After that it goes to the Group Head for approval.
+          <strong>Next:</strong> sign it in DocuSign, then Send for approval with the signed copy and the effective date. The Group Head confirms it and it becomes
+          Effective.
         </p>
       </div>
+    )
+  if (c.stage === 'Approval')
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="flex flex-wrap items-center gap-2">
+          <Badge tone="warning" icon={<Hourglass aria-hidden className="size-3.5" />}>
+            Waiting for approval
+          </Badge>
+          <span className="text-sm text-muted-foreground">
+            since {formatDateTime(c.stageSinceUtc)} ({timeAgo(c.stageSinceUtc)})
+          </span>
+        </p>
+        <p className="text-sm">
+          <strong>Next:</strong> the Group Head (or a backup approver) checks the signed copy and details, then approves it. It was already approved and signed in
+          DocuSign; this confirms it and puts it on the register. Effective from {formatDate(c.effectiveDate)}.
+        </p>
+        {data.cannotApproveReason && <p className="text-sm text-muted-foreground">{data.cannotApproveReason}</p>}
+      </div>
+    )
+  if (c.stage === 'Effective' && c.registeredUtc)
+    return (
+      <p className="flex flex-wrap items-center gap-2 text-sm">
+        <Lock aria-hidden className="size-4 text-muted-foreground" />
+        <span>
+          <strong>Effective and locked.</strong> Approved and registered by {c.registeredByName}
+          {c.registeredAsBackup ? ' (as a backup approver)' : ''} on {formatDateTime(c.registeredUtc)}.
+        </span>
+      </p>
     )
   return null
 }
@@ -101,7 +110,7 @@ export function ProgressPanel({ data, tracker }: { data: ContractDetail; tracker
   const has = (a: ContractAction) => data.actions.includes(a)
   const close = () => setOpen(null)
   // At most one primary button: the step that moves the contract on.
-  const primary: ContractAction | undefined = (['sendToLegal', 'readyForSigning', 'take', 'clear'] as const).find(has)
+  const primary: ContractAction | undefined = (['sendToLegal', 'readyForSigning', 'take', 'clear', 'sendForApproval', 'approve'] as const).find(has)
 
   return (
     <Card className="flex flex-col gap-5 p-5 md:p-6">
@@ -154,6 +163,29 @@ export function ProgressPanel({ data, tracker }: { data: ContractDetail; tracker
               Give to someone in Legal
             </Button>
           )}
+          {has('sendForApproval') && (
+            <Button variant="primary" icon={<Send aria-hidden className="size-4" />} onClick={() => setOpen('sendForApproval')}>
+              Send for approval
+            </Button>
+          )}
+          {has('sendBackToLegal') && (
+            <Button variant="ghost" icon={<Undo2 aria-hidden className="size-4" />} onClick={() => setOpen('sendBackToLegal')}>
+              Send back to Legal
+            </Button>
+          )}
+          {has('backToDraft') && (
+            <Button variant="ghost" icon={<Undo2 aria-hidden className="size-4" />} onClick={() => setOpen('backToDraft')}>
+              Back to draft
+            </Button>
+          )}
+          {has('approve') && (
+            <Link
+              to={`/contracts/${data.contract.id}/approve`}
+              className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
+            >
+              <BadgeCheck aria-hidden className="size-4" /> Review and approve
+            </Link>
+          )}
         </div>
       )}
       {open === 'sendToLegal' && (
@@ -190,6 +222,33 @@ export function ProgressPanel({ data, tracker }: { data: ContractDetail; tracker
       {open === 'status' && <StatusDialog data={data} onClose={close} />}
       {open === 'assign' && <AssignDialog data={data} onClose={close} />}
       {open === 'readyForSigning' && <ReadyForSigningDialog data={data} onClose={close} />}
+      {open === 'sendForApproval' && <SendForApprovalDialog data={data} onClose={close} />}
+      {open === 'sendBackToLegal' && (
+        <ReasonDialog
+          data={data}
+          onClose={close}
+          title="Send back to Legal"
+          description={`Its details are frozen in Signing. Legal${data.legal.legalPersonName ? ` (${data.legal.legalPersonName})` : ''} gets it back with your reason and clears it again.`}
+          label="What needs to change"
+          placeholder="For example: the supplier wants to change the start date."
+          path="send-back-to-legal"
+          submit="Send back to Legal"
+          success="Sent back to Legal."
+        />
+      )}
+      {open === 'backToDraft' && (
+        <ReasonDialog
+          data={data}
+          onClose={close}
+          title="Back to draft"
+          description="Its details are frozen in Signing. Taking it back to Draft lets you change them; then send it on again."
+          label="What needs to change"
+          placeholder="For example: the supplier changed the rates."
+          path="back-to-draft"
+          submit="Back to draft"
+          success="It's back in Draft."
+        />
+      )}
     </Card>
   )
 }
@@ -442,6 +501,118 @@ function ReadyForSigningDialog({ data, onClose }: { data: ContractDetail; onClos
       }
     >
       {error ? <Alert tone="danger" title={error} /> : <p className="text-sm">Next you'll sign it in DocuSign and add the signed copy.</p>}
+    </Dialog>
+  )
+}
+
+function SendForApprovalDialog({ data, onClose }: { data: ContractDetail; onClose: () => void }) {
+  const c = data.contract
+  // Required and never filled in for you (D-61): only what's already on the contract.
+  const [effectiveDate, setEffectiveDate] = useState(c.effectiveDate ?? '')
+  const [file, setFile] = useState<File | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [uploading, setUploading] = useState(false)
+  const action = useAction(data, onClose)
+  const send = async () => {
+    const problems: Record<string, string> = {}
+    if (!data.hasSignedCopy && !file) problems.signedCopy = 'Choose the signed copy (the PDF from DocuSign).'
+    if (!effectiveDate) problems.effectiveDate = 'Enter the date the contract takes effect.'
+    setErrors(problems)
+    if (Object.keys(problems).length > 0) return
+    let rowVersion: string | undefined
+    if (file) {
+      setUploading(true)
+      try {
+        rowVersion = (await uploadDocument(c.id, file, 'SignedCopy')).rowVersion
+      } catch (e) {
+        setUploading(false)
+        return setErrors({ signedCopy: errorText(e) })
+      }
+      setUploading(false)
+    }
+    action.mutate(
+      { path: 'send-for-approval', body: { effectiveDate }, rowVersion, success: 'Sent for approval. The Group Head has been emailed.' },
+      { onError: (e) => setErrors(e instanceof ApiError && Object.keys(e.fields).length > 0 ? e.fields : { form: errorText(e) }) },
+    )
+  }
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="Send for approval"
+      description="The Group Head checks the signed copy and details, then approves it to make it Effective."
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={uploading || action.isPending} onClick={send}>
+            Send for approval
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {errors.form && <Alert tone="danger" title={errors.form} />}
+        {data.hasSignedCopy ? (
+          <p className="flex items-center gap-2 text-sm">
+            <CheckCircle2 aria-hidden className="size-4 text-success" /> The signed copy is on the contract.
+          </p>
+        ) : (
+          <Field label="Signed copy" required error={errors.signedCopy} help="The signed PDF from DocuSign. It's added to the contract's Documents.">
+            {(p) => <TextInput {...p} type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className="py-2" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />}
+          </Field>
+        )}
+        <Field label="Effective date" required error={errors.effectiveDate} help="The date the contract takes effect, as signed.">
+          {(p) => <TextInput {...p} type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className="max-w-56" />}
+        </Field>
+      </div>
+    </Dialog>
+  )
+}
+
+/** A step that needs a reason in a sentence (send back, back to draft). */
+export function ReasonDialog(props: {
+  data: ContractDetail
+  onClose: () => void
+  title: string
+  description: string
+  label: string
+  placeholder: string
+  path: string
+  submit: string
+  success: string
+  onDone?: () => void
+}) {
+  const [note, setNote] = useState('')
+  const [error, setError] = useState<string | undefined>()
+  const action = useAction(props.data, () => {
+    props.onClose()
+    props.onDone?.()
+  })
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && props.onClose()}
+      title={props.title}
+      description={props.description}
+      footer={
+        <>
+          <Button onClick={props.onClose}>Cancel</Button>
+          <Button
+            variant="primary"
+            loading={action.isPending}
+            onClick={() => {
+              if (!note.trim()) return setError('Add a reason.')
+              action.mutate({ path: props.path, body: { note }, success: props.success }, { onError: (e) => setError(errorText(e, 'note')) })
+            }}
+          >
+            {props.submit}
+          </Button>
+        </>
+      }
+    >
+      <Field label={props.label} required error={error}>
+        {(p) => <Textarea {...p} autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder={props.placeholder} maxLength={2000} />}
+      </Field>
     </Dialog>
   )
 }

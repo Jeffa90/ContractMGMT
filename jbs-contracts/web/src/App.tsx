@@ -6,6 +6,7 @@ import { Skeleton } from './components/ui'
 import { api, ApiError, type Me } from './lib/api'
 import { MeProvider } from './lib/me'
 import { HomePage } from './pages/Home'
+import { ApprovePage } from './pages/Approve'
 import { ContractDetailPage } from './pages/ContractDetail'
 import { ContractFieldsPage } from './pages/ContractFields'
 import { ContractFormPage } from './pages/ContractForm'
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { path: 'contracts/new', element: <ContractFormPage /> },
       { path: 'contracts/:id', element: <ContractDetailPage /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage /> },
+      { path: 'contracts/:id/approve', element: <ApprovePage /> },
       { path: 'suppliers', element: <SuppliersPage /> },
       { path: 'admin/people', element: <PeoplePage /> },
       { path: 'admin/lists', element: <ListsPage /> },

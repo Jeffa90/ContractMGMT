@@ -15,7 +15,7 @@ import { daysUntil, formatDate, waited } from '@/lib/format'
 import { useMe } from '@/lib/me'
 import { help } from '@/help'
 
-type View = 'mine' | 'all' | 'legal' | 'drafts' | 'closed'
+type View = 'mine' | 'all' | 'legal' | 'approval' | 'drafts' | 'closed'
 
 /** During Legal review: whose turn and for how long, e.g. "Legal's turn · Sam Lee · 6 days". */
 function Turn({ c }: { c: ContractListItem }) {
@@ -126,6 +126,7 @@ export function ContractsPage() {
               ...(person.roles.contractOwner ? [{ value: 'mine' as View, label: 'My contracts' }] : []),
               { value: 'all', label: 'All' },
               { value: 'legal', label: 'With Legal' },
+              ...(person.roles.approver ? [{ value: 'approval' as View, label: 'To approve' }] : []),
               { value: 'drafts', label: 'Drafts' },
               { value: 'closed', label: 'Closed' },
             ]}
@@ -177,6 +178,8 @@ export function ContractsPage() {
                   ? "You don't own any contracts yet. Contracts you add, or are made owner or backup of, appear here."
                   : view === 'legal'
                     ? 'Nothing is with Legal right now.'
+                    : view === 'approval'
+                    ? 'Nothing is waiting for approval.'
                     : view === 'drafts'
                     ? 'No drafts right now.'
                     : view === 'closed'

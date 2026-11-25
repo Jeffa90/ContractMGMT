@@ -29,7 +29,7 @@ public sealed class EmailTests(AppFixture app)
         var id = (await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Ct)).GetProperty("id").GetInt32();
 
         await using var db = await app.OpenAsync();
-        var queued = await db.QuerySingleAsync("SELECT Id, Kind, ToAddress, Subject, BodyText, BodyHtml, SentUtc FROM contracts.EmailOutbox WHERE PersonId = @id", new { id });
+        var queued = await db.QuerySingleAsync("SELECT Id, Kind, ToAddress, Subject, BodyText, BodyHtml, SentUtc FROM contracts.EmailOutbox WHERE PersonId = @id AND Kind = 'access-granted'", new { id });
         Assert.Equal("access-granted", (string)queued.Kind);
         Assert.Equal("You've been given access to JBS Contracts", (string)queued.Subject);
         Assert.Contains("Contract owner, Legal", (string)queued.BodyText);
@@ -41,7 +41,7 @@ public sealed class EmailTests(AppFixture app)
         var capture = app.Factory.Services.GetRequiredService<CaptureEmailSender>();
         Assert.Equal(1, await dispatcher.SendDueAsync(Ct, (long)queued.Id));
         Assert.Contains(capture.Sent, e => e.ToAddress == (string)queued.ToAddress);
-        Assert.NotNull(await db.ExecuteScalarAsync<DateTime?>("SELECT SentUtc FROM contracts.EmailOutbox WHERE PersonId = @id", new { id }));
+        Assert.NotNull(await db.ExecuteScalarAsync<DateTime?>("SELECT SentUtc FROM contracts.EmailOutbox WHERE PersonId = @id AND Kind = 'access-granted'", new { id }));
 
         // Sending again sends nothing more.
         var before = capture.Sent.Count(e => e.ToAddress == (string)queued.ToAddress);
@@ -61,10 +61,10 @@ public sealed class EmailTests(AppFixture app)
         var person = await app.AddPersonAsync(user, "Fay Fail", AppFixture.NoRoles);
         var id = person.GetProperty("id").GetInt32();
         await using var db = await app.OpenAsync();
-        var emailId = await db.ExecuteScalarAsync<long>("SELECT Id FROM contracts.EmailOutbox WHERE PersonId = @id", new { id });
+        var emailId = await db.ExecuteScalarAsync<long>("SELECT Id FROM contracts.EmailOutbox WHERE PersonId = @id AND Kind = 'access-granted'", new { id });
         var failing = new EmailDispatcher(app.Factory.Services.GetRequiredService<Db>(), new FailingSender(), app.Factory.Services.GetRequiredService<AppSettings>(), NullLogger<EmailDispatcher>.Instance);
         Assert.Equal(0, await failing.SendDueAsync(Ct, emailId));
-        var row = await db.QuerySingleAsync("SELECT Attempts, LastError, SentUtc, FailedUtc, NextTryUtc, CreatedUtc, SYSUTCDATETIME() AS NowUtc FROM contracts.EmailOutbox WHERE PersonId = @id", new { id });
+        var row = await db.QuerySingleAsync("SELECT Attempts, LastError, SentUtc, FailedUtc, NextTryUtc, CreatedUtc, SYSUTCDATETIME() AS NowUtc FROM contracts.EmailOutbox WHERE PersonId = @id AND Kind = 'access-granted'", new { id });
         Assert.True((int)row.Attempts == 1, $"attempts {row.Attempts}, sent {row.SentUtc}, next {row.NextTryUtc:O}, created {row.CreatedUtc:O}, now {row.NowUtc:O}");
         Assert.Equal("Relay unreachable", (string)row.LastError);
         Assert.Null((DateTime?)row.SentUtc);

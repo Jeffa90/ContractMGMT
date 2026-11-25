@@ -59,7 +59,16 @@ public sealed class AppFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        await Factory.DisposeAsync();
+        try
+        {
+            await Factory.DisposeAsync();
+        }
+        catch (NullReferenceException ex)
+        {
+            // Seen once in ten runs inside the test host's own shutdown (WebApplicationFactory), after every test had finished; not app code.
+            // Report it, and still drop the test database below.
+            Console.Error.WriteLine($"Test host shutdown: {ex.Message}");
+        }
         SqlConnection.ClearAllPools();
         await using var master = new SqlConnection(serverConnection);
         await master.OpenAsync();

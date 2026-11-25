@@ -41,6 +41,9 @@ public sealed class ContractRow
     public string? LegalOutcome { get; set; }
     public DateTime? LegalClearedUtc { get; set; }
     public int? LegalClearedById { get; set; }
+    public DateTime? RegisteredUtc { get; set; }
+    public int? RegisteredById { get; set; }
+    public bool? RegisteredAsBackup { get; set; }
     public DateTime CreatedUtc { get; set; }
     public int CreatedById { get; set; }
     public DateTime UpdatedUtc { get; set; }
@@ -57,6 +60,7 @@ public sealed class ContractRow
     public string CreatedByName { get; set; } = "";
     public string? LegalPersonName { get; set; }
     public string? LegalClearedByName { get; set; }
+    public string? RegisteredByName { get; set; }
 
     /// <summary>The last day to give notice: end date (or, for an evergreen contract, review date) minus the notice period.</summary>
     public DateTime? NoticeDeadline => NoticePeriodDays is not { } days ? null
@@ -84,7 +88,7 @@ public static class ContractEndpoints
     private const string SelectContract = """
         SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName,
-               o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName
+               o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName, rb.Name AS RegisteredByName
         FROM contracts.Contract k
         LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
         LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId
@@ -97,6 +101,7 @@ public static class ContractEndpoints
         JOIN contracts.Person cr ON cr.Id = k.CreatedById
         LEFT JOIN contracts.Person lp ON lp.Id = k.LegalPersonId
         LEFT JOIN contracts.Person lc ON lc.Id = k.LegalClearedById
+        LEFT JOIN contracts.Person rb ON rb.Id = k.RegisteredById
         """;
 
     public static void MapContractEndpoints(this IEndpointRouteBuilder app)
@@ -113,6 +118,7 @@ public static class ContractEndpoints
                 case "mine": where.Add("(k.OwnerId = @meId OR k.BackupOwnerId = @meId) AND k.Stage NOT IN (N'Withdrawn', N'Archived')"); break;
                 case "drafts": where.Add("k.Stage = N'Draft'"); break;
                 case "legal": where.Add("k.Stage = N'LegalReview'"); break;
+                case "approval": where.Add("k.Stage = N'Approval'"); break;
                 case "closed": where.Add("k.Stage IN (N'Ended', N'Archived', N'Withdrawn')"); break;
                 default: where.Add("k.Stage NOT IN (N'Withdrawn', N'Archived')"); break;
             }
@@ -151,6 +157,11 @@ public static class ContractEndpoints
                 legal = LegalEndpoints.View(row),
                 conversation = await LegalEndpoints.ConversationAsync(c, id),
                 actions = LegalEndpoints.Actions(me!, row),
+                approvals = await ApprovalEndpoints.HistoryAsync(c, id),
+                sentBack = await ApprovalEndpoints.SentBackAsync(c, row),
+                cannotApproveReason = row.Stage == "Approval" && me!.IsApprover && ApprovalEndpoints.IsInvolved(me, row)
+                    ? "You can't approve this one because you raised it, own it or are its backup. Another approver can." : null,
+                hasSignedCopy = await c.ExecuteScalarAsync<bool>("SELECT CASE WHEN EXISTS (SELECT 1 FROM contracts.Document WHERE ContractId = @id AND Kind = N'SignedCopy' AND IsRemoved = 0) THEN 1 ELSE 0 END", new { id }),
                 missingRequired = row.Stage == "Draft" ? (await LegalEndpoints.MissingRequiredAsync(c, null, row, definitions)).Select(m => m.Label) : [],
                 legalPeople = me!.IsLegal ? await c.QueryAsync("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 AND IsLegal = 1 ORDER BY Name") : [],
                 canEdit = ContractAccess.CanEdit(me!, row),
@@ -341,6 +352,7 @@ public static class ContractEndpoints
         r.Value, r.CurrencyCode, r.SapOutlineAgreement, StartDate = D(r.StartDate), EffectiveDate = D(r.EffectiveDate), EndDate = D(r.EndDate), r.IsEvergreen,
         r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
         StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc), r.IsLocked, r.WithdrawnReason,
+        RegisteredUtc = Utc(r.RegisteredUtc), r.RegisteredByName, r.RegisteredAsBackup,
         CreatedUtc = DateTime.SpecifyKind(r.CreatedUtc, DateTimeKind.Utc), r.CreatedByName, RowVersion = Convert.ToBase64String(r.RowVersion),
     };
 

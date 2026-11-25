@@ -214,7 +214,8 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-[var(--radius-control)] border border-border bg-card p-1">
+    // Scrolls sideways on narrow screens rather than cutting options off.
+    <div role="radiogroup" aria-label={label} className="inline-flex max-w-full overflow-x-auto rounded-[var(--radius-control)] border border-border bg-card p-1 [scrollbar-width:none]">
       {options.map((o) => (
         <button
           key={o.value}
@@ -223,7 +224,7 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'min-h-9 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors',
+            'min-h-9 shrink-0 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors',
             value === o.value ? 'bg-primary-soft text-primary-soft-foreground' : 'text-muted-foreground hover:text-foreground',
           )}
         >

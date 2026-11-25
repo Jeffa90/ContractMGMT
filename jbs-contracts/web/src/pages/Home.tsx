@@ -36,7 +36,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { api, ApiError, type Person } from "@/lib/api";
-import type { ContractListItem, Lists } from "@/lib/contracts";
+import type { Lists } from "@/lib/contracts";
 import { firstName, formatDate, formatLongDate, greeting } from "@/lib/format";
 import {
   groupTitles,
@@ -464,15 +464,10 @@ export function HomePage() {
     queryFn: () => api.get<Lists>("/api/lists"),
     enabled: isAdmin,
   });
-  const contracts = useQuery({
-    queryKey: ["contracts", "all", ""],
-    queryFn: () => api.get<ContractListItem[]>("/api/contracts?view=all&q="),
-    enabled: isAdmin,
-  });
 
   // First-run checklist for admins, shown until each step is done.
   const steps =
-    isAdmin && people.data && lists.data && contracts.data
+    isAdmin && people.data && lists.data && home.data
       ? [
           {
             done: people.data.filter((p) => p.isActive).length > 1,
@@ -491,7 +486,7 @@ export function HomePage() {
               "Add your categories (and any agreement types, business units and sites) so contracts can be sorted.",
           },
           {
-            done: contracts.data.length > 0,
+            done: home.data.hasContracts,
             to: "/contracts/new",
             icon: <FilePlus2 aria-hidden className="size-5" />,
             title: "Add a contract",

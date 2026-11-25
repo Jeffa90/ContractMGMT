@@ -53,6 +53,7 @@ public sealed class ContractRow
     public DateTime? UnlockExpiresUtc { get; set; }
     public string? UnlockByName { get; set; }
     public int? OpenVariationId { get; set; }
+    public string? OpenVariationStage { get; set; }
     public string? RenewalDecision { get; set; }
     public DateTime? RenewalDecisionUtc { get; set; }
     public int? RenewalDecisionById { get; set; }
@@ -115,7 +116,7 @@ public static class ContractEndpoints
         SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName,
                o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName, rb.Name AS RegisteredByName,
-               ul.UnlockId, ul.UnlockReason, ul.UnlockExpiresUtc, ul.UnlockByName, ovr.OpenVariationId,
+               ul.UnlockId, ul.UnlockReason, ul.UnlockExpiresUtc, ul.UnlockByName, ovr.OpenVariationId, ovr.OpenVariationStage,
                rd.Name AS RenewalDecisionByName, eb.Name AS EndedByName, ren.Reference AS RenewsReference, rn.RenewedById, rn.RenewedByReference, rn.RenewedByStage
         FROM contracts.Contract k
         LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
@@ -136,7 +137,7 @@ public static class ContractEndpoints
         OUTER APPLY (SELECT TOP (1) u.Id AS UnlockId, u.Reason AS UnlockReason, u.ExpiresUtc AS UnlockExpiresUtc, up.Name AS UnlockByName
                      FROM contracts.Unlock u JOIN contracts.Person up ON up.Id = u.ById
                      WHERE u.ContractId = k.Id AND u.ClosedUtc IS NULL AND u.ExpiresUtc > SYSUTCDATETIME() ORDER BY u.Id DESC) ul
-        OUTER APPLY (SELECT TOP (1) ov.Id AS OpenVariationId FROM contracts.Variation ov WHERE ov.ContractId = k.Id AND ov.Stage IN (N'Draft', N'LegalReview', N'Approval')) ovr
+        OUTER APPLY (SELECT TOP (1) ov.Id AS OpenVariationId, ov.Stage AS OpenVariationStage FROM contracts.Variation ov WHERE ov.ContractId = k.Id AND ov.Stage IN (N'Draft', N'LegalReview', N'Approval')) ovr
         OUTER APPLY (SELECT TOP (1) r2.Id AS RenewedById, r2.Reference AS RenewedByReference, r2.Stage AS RenewedByStage FROM contracts.Contract r2
                      WHERE r2.RenewsContractId = k.Id AND r2.Stage <> N'Withdrawn' ORDER BY r2.Id DESC) rn
         """;
@@ -276,6 +277,25 @@ public static class ContractEndpoints
                 """,
                 new { reason, me = me.Id, id }, tx);
             await audit.WriteAsync(c, tx, me.AsActor(), "contract.withdrawn", "Contract", id, $"{me.Name} withdrew {before.Reference}: {reason}", new { reason }, contractId: id);
+            // A withdrawn renewal: the contract it was renewing needs a decision again, or its reminders would stay off and it could lapse unnoticed.
+            if (before.RenewsContractId is { } renewed)
+            {
+                var old = await c.QuerySingleOrDefaultAsync<(string Reference, string? Decision)>(
+                    "SELECT Reference, RenewalDecision FROM contracts.Contract WITH (UPDLOCK) WHERE Id = @renewed AND Stage = N'Effective'", new { renewed }, tx);
+                var otherRenewal = await c.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM contracts.Contract WHERE RenewsContractId = @renewed AND Id <> @id AND Stage NOT IN (N'Withdrawn', N'Archived')", new { renewed, id }, tx);
+                if (old.Decision == "Renew" && otherRenewal == 0)
+                {
+                    await c.ExecuteAsync("""
+                        UPDATE contracts.Contract SET RenewalDecision = NULL, RenewalDecisionNote = NULL, RenewalDecisionUtc = NULL, RenewalDecisionById = NULL,
+                            UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                        WHERE Id = @renewed
+                        """, new { renewed, me = me.Id }, tx);
+                    await audit.WriteAsync(c, tx, me.AsActor(), "contract.renewal-decision-cleared", "Contract", renewed,
+                        $"The renewal {before.Reference} was withdrawn, so {old.Reference} needs a renewal decision again. Its reminders are back on.",
+                        new { withdrawnRenewal = id }, contractId: renewed);
+                }
+            }
             await tx.CommitAsync();
             return Results.Ok(new { id });
         });

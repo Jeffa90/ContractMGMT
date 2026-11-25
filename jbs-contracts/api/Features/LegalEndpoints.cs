@@ -354,16 +354,22 @@ public static class LegalEndpoints
         return ApiResults.Invalid($"Fill in {list} before {when}.", missing.ToDictionary(m => $"required.{m.Key}", m => $"{m.Label} is required before {when}."));
     }
 
-    /// <summary>Documents attached to a hand-over must be versions on this contract (uploaded first, then linked).</summary>
-    private static async Task<(int[] Ids, IResult? Problem)> CheckDocumentsAsync(Ctx x, int[]? ids)
+    /// <summary>
+    /// Documents attached to a hand-over must be versions on this contract (uploaded first, then linked), and, for a Variation,
+    /// on that Variation. Otherwise the conversation would show the titles of documents the person can't see.
+    /// </summary>
+    private static Task<(int[] Ids, IResult? Problem)> CheckDocumentsAsync(Ctx x, int[]? ids) => CheckDocumentsAsync(x.C, x.Tx, x.Contract.Id, null, ids);
+
+    internal static async Task<(int[] Ids, IResult? Problem)> CheckDocumentsAsync(SqlConnection c, SqlTransaction tx, int contractId, int? variationId, int[]? ids)
     {
         var distinct = (ids ?? []).Distinct().ToArray();
         if (distinct.Length == 0) return ([], null);
         if (distinct.Length > 20) return ([], ApiResults.Invalid("Attach up to 20 documents.", new() { ["documents"] = "Attach up to 20 documents." }));
-        var found = await x.C.ExecuteScalarAsync<int>("""
+        var found = await c.ExecuteScalarAsync<int>("""
             SELECT COUNT(*) FROM contracts.DocumentVersion v JOIN contracts.Document d ON d.Id = v.DocumentId
             WHERE d.ContractId = @contractId AND d.IsRemoved = 0 AND v.Id IN (SELECT value FROM OPENJSON(@ids))
-            """, new { contractId = x.Contract.Id, ids = JsonSerializer.Serialize(distinct) }, x.Tx);
+              AND ((@variationId IS NULL AND d.VariationId IS NULL) OR d.VariationId = @variationId)
+            """, new { contractId, variationId, ids = JsonSerializer.Serialize(distinct) }, tx);
         return found == distinct.Length ? (distinct, null)
             : ([], ApiResults.Invalid("One of the attached documents isn't on this contract.", new() { ["documents"] = "Reload the page and attach the documents again." }));
     }
@@ -404,6 +410,35 @@ public static class LegalEndpoints
                 await EmailWording.RenderAsync(x.C, x.Tx, c.LegalPersonId is null ? "LegalNew" : "LegalReturned",
                     With(With(EmailWording.For(p.Name, c), "Sent by", x.Me.Name), "Note", note), Link(settings, c.Id)),
                 personId: p.Id, contractId: c.Id, dedupeKey: $"legal:{c.Id}:{number}:{p.Id}");
+    }
+
+    /// <summary>
+    /// Someone who leaves Legal (or whose access is switched off) gives back the Legal reviews they had, contracts and Variations, so the
+    /// reviews show under "New to pick up" and go to everyone in Legal next time, instead of waiting on someone who can't act.
+    /// </summary>
+    internal static async Task ReleaseReviewsAsync(SqlConnection c, SqlTransaction tx, AuditLog audit, AuditLog.Actor actor, int personId, string personName)
+    {
+        var contracts = await c.QueryAsync<(int Id, string Reference)>(
+            "SELECT Id, Reference FROM contracts.Contract WITH (UPDLOCK) WHERE LegalPersonId = @personId AND Stage = N'LegalReview'", new { personId }, tx);
+        foreach (var (id, reference) in contracts)
+        {
+            await c.ExecuteAsync("""
+                UPDATE contracts.Contract SET LegalPersonId = NULL, LegalStatus = CASE WHEN WhoseTurn = N'Legal' THEN N'NotStarted' ELSE LegalStatus END, UpdatedUtc = SYSUTCDATETIME()
+                WHERE Id = @id
+                """, new { id }, tx);
+            await audit.WriteAsync(c, tx, actor, "contract.legal-released", "Contract", id,
+                $"{personName} is no longer in Legal, so the Legal review of {reference} is back with Legal for someone to pick up.", new { personId }, contractId: id);
+        }
+        var variations = await c.QueryAsync<(int Id, int ContractId, int Number, string Reference)>("""
+            SELECT v.Id, v.ContractId, v.Number, k.Reference FROM contracts.Variation v WITH (UPDLOCK) JOIN contracts.Contract k ON k.Id = v.ContractId
+            WHERE v.LegalPersonId = @personId AND v.Stage = N'LegalReview'
+            """, new { personId }, tx);
+        foreach (var (vid, contractId, number, reference) in variations)
+        {
+            await c.ExecuteAsync("UPDATE contracts.Variation SET LegalPersonId = NULL, UpdatedUtc = SYSUTCDATETIME() WHERE Id = @vid", new { vid }, tx);
+            await audit.WriteAsync(c, tx, actor, "variation.legal-released", "Variation", vid,
+                $"{personName} is no longer in Legal, so the Legal review of Variation {number} of {reference} is back with Legal for someone to pick up.", new { personId }, contractId: contractId);
+        }
     }
 
     /// <summary>The owner and backup (D-57), except whoever acted.</summary>

@@ -1,6 +1,7 @@
 // Where a contract is up to and what happens next, with the actions for the person looking (product-spec sections 4, 5 and 13.1),
 // and the Legal conversation: every hand-over, numbered, as it was.
 import { ArrowLeftRight, BadgeCheck, CheckCircle2, Hourglass, Lock, MessagesSquare, Paperclip, Scale, Send, Undo2, UserCheck, X } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -283,28 +284,33 @@ function HandOverDialog(props: {
   const [uploading, setUploading] = useState(false)
   const input = useRef<HTMLInputElement>(null)
   const action = useAction(data, onClose)
+  const queryClient = useQueryClient()
+  // Files already uploaded on an earlier try (and the contract's row version since), so trying again doesn't add them twice.
+  const uploaded = useRef(new Map<File, number>())
+  const rowVersion = useRef<string | undefined>(undefined)
 
   const send = async () => {
     setError(undefined)
     if (props.noteRequired && !note.trim()) return setError(`Add a note: ${props.noteLabel.toLowerCase()}.`)
-    const documentVersionIds: number[] = []
-    let rowVersion: string | undefined
-    if (files.length > 0) {
+    const waiting = files.filter((f) => !uploaded.current.has(f))
+    if (waiting.length > 0) {
       setUploading(true)
       try {
         // Uploaded first, one at a time (they stay on the contract), then linked to this hand-over.
-        for (const f of files) {
-          const uploaded = await uploadDocument(data.contract.id, f, props.documentKind)
-          documentVersionIds.push(uploaded.versionId)
-          rowVersion = uploaded.rowVersion
+        for (const f of waiting) {
+          const done = await uploadDocument(data.contract.id, f, props.documentKind)
+          uploaded.current.set(f, done.versionId)
+          rowVersion.current = done.rowVersion
         }
       } catch (e) {
-        setUploading(false)
         return setError(errorText(e))
+      } finally {
+        setUploading(false)
+        void queryClient.invalidateQueries({ queryKey: ['contract', data.contract.id] })
       }
-      setUploading(false)
     }
-    action.mutate({ path: props.path, body: { note, documentVersionIds }, rowVersion, success: props.success }, { onError: (e) => setError(errorText(e, 'note')) })
+    const documentVersionIds = files.map((f) => uploaded.current.get(f)!)
+    action.mutate({ path: props.path, body: { note, documentVersionIds }, rowVersion: rowVersion.current, success: props.success }, { onError: (e) => setError(errorText(e, 'note')) })
   }
 
   return (
@@ -523,25 +529,28 @@ function SendForApprovalDialog({ data, onClose }: { data: ContractDetail; onClos
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [uploading, setUploading] = useState(false)
   const action = useAction(data, onClose)
+  const queryClient = useQueryClient()
+  // The signed copy already uploaded on an earlier try, so fixing the date and trying again doesn't add a second one.
+  const uploaded = useRef<{ file: File; rowVersion: string } | null>(null)
   const send = async () => {
     const problems: Record<string, string> = {}
     if (!data.hasSignedCopy && !file) problems.signedCopy = 'Choose the signed copy (the PDF from DocuSign).'
     if (!effectiveDate) problems.effectiveDate = 'Enter the date the contract takes effect.'
     setErrors(problems)
     if (Object.keys(problems).length > 0) return
-    let rowVersion: string | undefined
-    if (file) {
+    if (file && uploaded.current?.file !== file) {
       setUploading(true)
       try {
-        rowVersion = (await uploadDocument(c.id, file, 'SignedCopy')).rowVersion
+        uploaded.current = { file, rowVersion: (await uploadDocument(c.id, file, 'SignedCopy')).rowVersion }
       } catch (e) {
-        setUploading(false)
         return setErrors({ signedCopy: errorText(e) })
+      } finally {
+        setUploading(false)
+        void queryClient.invalidateQueries({ queryKey: ['contract', c.id] })
       }
-      setUploading(false)
     }
     action.mutate(
-      { path: 'send-for-approval', body: { effectiveDate }, rowVersion, success: 'Sent for approval. The Group Head has been emailed.' },
+      { path: 'send-for-approval', body: { effectiveDate }, rowVersion: uploaded.current?.rowVersion, success: 'Sent for approval. The Group Head has been emailed.' },
       { onError: (e) => setErrors(e instanceof ApiError && Object.keys(e.fields).length > 0 ? e.fields : { form: errorText(e) }) },
     )
   }

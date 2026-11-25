@@ -385,7 +385,9 @@ public static class VariationEndpoints
                         WhoseTurn = N'Legal', TurnSinceUtc = SYSUTCDATETIME(), LegalOutcome = NULL, LegalClearedUtc = NULL, LegalClearedById = NULL, UpdatedUtc = SYSUTCDATETIME()
                     WHERE Id = @vid
                     """, new { vid }, x.Tx);
-                var number = await AddEntryAsync(x.C, x.Tx, x.Me, id, vid, "SentToLegal", "Legal", v.LegalPersonId, v.LegalPersonId is null ? "NotStarted" : "Reviewing", note, body.DocumentVersionIds ?? []);
+                var (docs, docProblem) = await LegalEndpoints.CheckDocumentsAsync(x.C, x.Tx, id, vid, body.DocumentVersionIds);
+                if (docProblem is not null) return docProblem;
+                var number = await AddEntryAsync(x.C, x.Tx, x.Me, id, vid, "SentToLegal", "Legal", v.LegalPersonId, v.LegalPersonId is null ? "NotStarted" : "Reviewing", note, docs);
                 await x.Log("variation.sent-to-legal", $"{x.Me.Name} sent {Name(v)} of {c.Reference} to Legal" + Quote(note) + Stop(note), new { note });
                 var recipients = await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1 AND IsLegal = 1 AND (@lp IS NULL OR Id = @lp) AND Id <> @me",
                     new { lp = v.LegalPersonId, me = x.Me.Id }, x.Tx);
@@ -418,7 +420,9 @@ public static class VariationEndpoints
                 if (note.Length > MaxNote) return TooLong("note", MaxNote);
                 await x.C.ExecuteAsync("UPDATE contracts.Variation SET WhoseTurn = N'Owner', TurnSinceUtc = SYSUTCDATETIME(), LegalPersonId = ISNULL(LegalPersonId, @me), UpdatedUtc = SYSUTCDATETIME() WHERE Id = @vid",
                     new { me = x.Me.Id, vid }, x.Tx);
-                var number = await AddEntryAsync(x.C, x.Tx, x.Me, id, vid, "SentToOwner", "Owner", v.LegalPersonId ?? x.Me.Id, "WaitingOnOwner", note, body.DocumentVersionIds ?? []);
+                var (docs, docProblem) = await LegalEndpoints.CheckDocumentsAsync(x.C, x.Tx, id, vid, body.DocumentVersionIds);
+                if (docProblem is not null) return docProblem;
+                var number = await AddEntryAsync(x.C, x.Tx, x.Me, id, vid, "SentToOwner", "Owner", v.LegalPersonId ?? x.Me.Id, "WaitingOnOwner", note, docs);
                 await x.Log("variation.sent-to-owner", $"{x.Me.Name} sent {Name(v)} of {c.Reference} back to the owner" + Quote(note) + Stop(note), new { note });
                 await EmailOwnersAsync(new Ctx(x.C, x.Tx, x.Me, c), $"variation-legal:{vid}:{number}", "legal-back", p => EmailWording.RenderAsync(x.C, x.Tx, "BackFromLegal",
                     With(With(With(EmailWording.For(p.Name, c), "Reference", Ref(c, v)), "Legal person", x.Me.Name), "Note", note), VariationLink(settings, id, vid)));

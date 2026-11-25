@@ -17,14 +17,16 @@ public static class WebSecurity
     {
         var request = context.Request;
         var changes = !(HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method));
-        if (changes && request.Path.StartsWithSegments("/api"))
+        if (request.Path.StartsWithSegments("/api"))
         {
             var site = request.Headers["Sec-Fetch-Site"].ToString();
             var crossSite = site.Length > 0 && site is not ("same-origin" or "none");
-            if (crossSite || request.Headers[RequestHeader].ToString() != "1")
+            // Reads too: another website must not start a download (the full export, the documents ZIP) with someone's Windows sign-in.
+            // Typing the address or following a link from an email is "none", so that still works.
+            if (crossSite || (changes && request.Headers[RequestHeader].ToString() != "1"))
             {
                 await ApiResults.Problem(StatusCodes.Status403Forbidden, "blocked",
-                    "This change was blocked to keep your account safe. Refresh the page and try again.").ExecuteAsync(context);
+                    changes ? "This change was blocked to keep your account safe. Refresh the page and try again." : "This was blocked to keep your account safe. Open JBS Contracts and try again from there.").ExecuteAsync(context);
                 return;
             }
         }
@@ -44,6 +46,14 @@ public static class WebSecurity
             try
             {
                 await next();
+                return;
+            }
+            catch (Exception ex) when ((ex is BusyException || ex is Microsoft.Data.SqlClient.SqlException { Number: -2 }) && !context.Response.HasStarted)
+            {
+                // Waited too long for another change to finish (or the database didn't answer in time): say so plainly; nothing was saved.
+                context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Busy").LogWarning(ex, "Request {Path} timed out waiting for the database.", context.Request.Path);
+                await ApiResults.Problem(StatusCodes.Status503ServiceUnavailable, "busy",
+                    "JBS Contracts is busy finishing another change, such as a large import. Nothing was saved. Wait a minute and try again.").ExecuteAsync(context);
                 return;
             }
             catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 1205 && attempt < 3 && !context.Response.HasStarted)

@@ -4,7 +4,7 @@ import { Archive, BellRing, CalendarCheck, CalendarX2, RefreshCw } from 'lucide-
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { errorText, useAction } from '@/lib/actions'
+import { errorText, fieldErrors, useAction } from '@/lib/actions'
 import { ApiError } from '@/lib/api'
 import type { ContractDetail, RenewalDecision } from '@/lib/contracts'
 import { formatDate, formatDateTime } from '@/lib/format'
@@ -240,7 +240,7 @@ function EndDialog({ data, onClose }: { data: ContractDetail; onClose: () => voi
               if (!date) problems.date = 'Enter the date it ends.'
               setErrors(problems)
               if (Object.keys(problems).length > 0) return
-              action.mutate({ path: 'end', body: { note: reason, date }, success: 'Saved.' }, { onError: (e) => setErrors(e instanceof ApiError ? e.fields : { note: errorText(e) }) })
+              action.mutate({ path: 'end', body: { note: reason, date }, success: 'Saved.' }, { onError: (e) => setErrors(fieldErrors(e, 'note')) })
             }}
           >
             End it

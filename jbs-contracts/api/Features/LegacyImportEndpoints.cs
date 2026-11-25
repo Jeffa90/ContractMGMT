@@ -47,7 +47,22 @@ public static class LegacyImportEndpoints
     ];
 
     private static readonly string[] EndedWords = ["expired", "ended", "terminated", "cancelled", "canceled", "inactive", "closed", "archived", "lapsed"];
-    private static readonly string[] CurrentWords = ["active", "current", "live", "effective", "in force", "valid", "open", "renewed"];
+    private static readonly string[] CurrentWords = ["active", "current", "live", "effective", "valid", "open", "renewed"];
+    private static readonly string[] NotWords = ["not", "no", "non", "un", "never", "pending", "draft"];
+
+    /// <summary>
+    /// True for ended, false for current, null when the status isn't clear. Whole words only, so "Invalid" isn't read as "valid",
+    /// and a negative ("Not renewed", "Not active") or anything with words for both is left for a person to decide.
+    /// </summary>
+    internal static bool? StatusSays(string status)
+    {
+        var words = System.Text.RegularExpressions.Regex.Split(status.ToLowerInvariant(), "[^a-z]+").Where(w => w.Length > 0).ToList();
+        var text = string.Join(' ', words);
+        if (words.Any(NotWords.Contains)) return null;
+        var isEnded = words.Any(EndedWords.Contains);
+        var isCurrent = words.Any(CurrentWords.Contains) || text.Contains("in force");
+        return isEnded == isCurrent ? null : isEnded;
+    }
 
     private static async Task<List<Target>> TargetsAsync(SqlConnection c, SqlTransaction? tx) =>
         [.. BuiltIn, .. (await Fields.LoadAsync(c, tx)).Where(f => !f.IsBuiltIn && !f.IsHidden)
@@ -232,11 +247,11 @@ public static class LegacyImportEndpoints
             if (evergreen) end = null;
 
             // Current or ended: the status column if there is one, otherwise the end date.
-            var status = Text(row, "status")?.ToLowerInvariant();
+            var status = Text(row, "status");
             bool ended;
-            if (status is not null && EndedWords.Any(w => status.Contains(w))) ended = true;
-            else if (status is not null && CurrentWords.Any(w => status.Contains(w))) ended = false;
-            else if (status is not null) { problems.Add($"Status: \"{Text(row, "status")}\" isn't a current or ended contract (only those are imported)."); ended = false; }
+            var said = status is null ? null : StatusSays(status);
+            if (said is { } s) ended = s;
+            else if (status is not null) { problems.Add($"Status: \"{status}\" isn't clearly a current or ended contract (only those are imported). Change it to, for example, Active or Expired."); ended = false; }
             else ended = end is { } e && e < today;
 
             // Added fields: a blank cell leaves it empty.
@@ -264,7 +279,8 @@ public static class LegacyImportEndpoints
             r.Outcome = ended ? "Ended" : "Effective";
             r.EffectiveOn = effectiveOn!.Value;
             r.RegisteredOn = registered ?? effectiveOn.Value;
-            r.EndedOn = ended ? end ?? today : null;
+            // It ended on its end date, unless that's still to come (for example terminated early): then it ended by today.
+            r.EndedOn = ended ? (end is { } ce && ce < today ? ce : today) : null;
             if (r.NewSupplier is not null) r.Notes.Add($"Adds the supplier {r.NewSupplier}.");
             if (notice is null && !ended) r.Notes.Add("No notice period, so no notice-deadline reminders.");
             if (!ended && end is { } past && past < today) r.Notes.Add($"Its end date ({past:d MMM yyyy}) has passed but the status says it's current.");

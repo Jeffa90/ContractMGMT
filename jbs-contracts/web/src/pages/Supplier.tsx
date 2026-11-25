@@ -41,7 +41,7 @@ import {
   TextInput,
   type Tone,
 } from "@/components/ui";
-import { errorText } from "@/lib/actions";
+import { errorText, fieldErrors } from "@/lib/actions";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import type { Lists, Supplier } from "@/lib/contracts";
@@ -352,7 +352,7 @@ function ContactDialog({
       onClose();
     },
     onError: (e) =>
-      setErrors(e instanceof ApiError ? e.fields : { name: errorText(e) }),
+      setErrors(fieldErrors(e, 'name')),
   });
   const field = (
     key: keyof typeof form,
@@ -1375,7 +1375,7 @@ function AddActionDialog({
       onClose();
     },
     onError: (e) =>
-      setErrors(e instanceof ApiError ? e.fields : { text: errorText(e) }),
+      setErrors(fieldErrors(e, 'text')),
   });
   return (
     <Dialog

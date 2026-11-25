@@ -116,7 +116,7 @@ public static class ApprovalEndpoints
                     if (old.Stage == "Effective")
                     {
                         await x.C.ExecuteAsync("""
-                            UPDATE contracts.Contract SET Stage = N'Ended', StageSinceUtc = SYSUTCDATETIME(), EndedOn = CAST(SYSUTCDATETIME() AS DATE), EndedReason = @reason,
+                            UPDATE contracts.Contract SET Stage = N'Ended', StageSinceUtc = SYSUTCDATETIME(), EndedOn = CAST(SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE 'E. Australia Standard Time' AS DATE), EndedReason = @reason,
                                 EndedById = @me, PlannedEndDate = NULL, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
                             WHERE Id = @oldId
                             """, new { reason = $"Renewed by {c.Reference}.", me = x.Me.Id, oldId }, x.Tx);

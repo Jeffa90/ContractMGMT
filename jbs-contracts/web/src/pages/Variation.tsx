@@ -11,7 +11,7 @@ import { Textarea } from '@/components/form'
 import { PageHeader } from '@/components/Help'
 import { ConversationCard } from '@/components/LegalReview'
 import { Alert, Badge, Button, Card, Checkbox, EmptyState, Field, Skeleton } from '@/components/ui'
-import { errorText } from '@/lib/actions'
+import { errorText, fieldErrors } from '@/lib/actions'
 import { api, ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { uploadDocument, type ContractDetail, type VariationAction, type VariationDetail } from '@/lib/contracts'
@@ -220,7 +220,7 @@ function ChangesEditor({ data }: { data: VariationDetail }) {
       queryClient.invalidateQueries({ queryKey: ['variation', v.id] })
       toast.success('Changes saved. Nothing changes on the contract until it is approved.')
     },
-    onError: (e) => setErrors(e instanceof ApiError ? e.fields : { form: errorText(e) }),
+    onError: (e) => setErrors(fieldErrors(e, 'form')),
   })
 
   if (!editable)

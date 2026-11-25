@@ -107,7 +107,7 @@ public sealed class ImportTests(AppFixture app)
         Assert.Contains("No notice period", byRow[4].GetProperty("notes")[1].GetString());
         Assert.Contains("isn't an active contract owner", byRow[5].GetProperty("problems")[0].GetString());
         Assert.Contains("there's no category called", byRow[6].GetProperty("problems")[0].GetString());
-        Assert.Contains("isn't a current or ended contract", byRow[7].GetProperty("problems")[0].GetString());
+        Assert.Contains("isn't clearly a current or ended contract", byRow[7].GetProperty("problems")[0].GetString());
         Assert.Contains("more than once", byRow[8].GetProperty("problems")[0].GetString());
         Assert.Equal([$"New Vendor {u}"], plan.GetProperty("newSuppliers").EnumerateArray().Select(s => s.GetString()));
         await using var db = await app.OpenAsync();

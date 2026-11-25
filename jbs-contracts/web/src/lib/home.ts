@@ -9,6 +9,8 @@ export type UrgentItem = { kind: 'Notice' | 'Ended'; id: number; reference: stri
 export type SupplierItem = { kind: 'Action' | 'ReviewDue' | 'Expiring'; supplierId: number; supplierName: string; what: string; due: string; days: number }
 
 export type HomeData = {
+  /** Admins only: whether any contract exists yet (for the first-run checklist). */
+  hasContracts: boolean
   tiles: Tile[]
   urgent: UrgentItem[]
   suppliers: SupplierItem[]

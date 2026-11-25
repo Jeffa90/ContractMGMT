@@ -5,8 +5,8 @@ import { FilePen, Lock, LockOpen, ShieldAlert, UserRoundCog } from 'lucide-react
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { errorText, useAction } from '@/lib/actions'
-import { api, ApiError } from '@/lib/api'
+import { errorText, fieldErrors, useAction } from '@/lib/actions'
+import { api } from '@/lib/api'
 import type { ContractDetail, Lists } from '@/lib/contracts'
 import { formatDateTime } from '@/lib/format'
 import type { FieldValue, Layout, LayoutField } from '@/lib/layout'
@@ -203,7 +203,7 @@ function HandOverDialog({ data, onClose }: { data: ContractDetail; onClose: () =
             onClick={() =>
               action.mutate(
                 { path: 'hand-over', body: { ownerId: Number(owner), backupOwnerId: backup ? Number(backup) : null }, success: 'Handed over.' },
-                { onError: (e) => setErrors(e instanceof ApiError ? e.fields : { ownerId: errorText(e) }) },
+                { onError: (e) => setErrors(fieldErrors(e, 'ownerId')) },
               )
             }
           >
@@ -296,7 +296,7 @@ function AnyTimeDialog({ data, layout, onClose }: { data: ContractDetail; layout
           <Button
             variant="primary"
             loading={action.isPending}
-            onClick={() => action.mutate({ path: 'any-time-fields', body: { fields: values }, success: 'Saved.' }, { onError: (e) => setErrors(e instanceof ApiError ? e.fields : {}) })}
+            onClick={() => action.mutate({ path: 'any-time-fields', body: { fields: values }, success: 'Saved.' }, { onError: (e) => setErrors(fieldErrors(e, 'form')) })}
           >
             Save
           </Button>
@@ -304,6 +304,7 @@ function AnyTimeDialog({ data, layout, onClose }: { data: ContractDetail; layout
       }
     >
       <div className="flex flex-col gap-4">
+        {errors.form && <Alert tone="danger" title={errors.form} />}
         {fields.map((f: LayoutField) => (
           <FieldInput
             key={f.key}

@@ -10,6 +10,43 @@ namespace JbsContracts.Api.Infrastructure;
 public static class Excel
 {
     public const long MaxBytes = 5 * 1024 * 1024;
+    /// <summary>A workbook is a ZIP. Real ones expand a few times over; one built to expand to gigabytes would take the app down.</summary>
+    private const long MaxExpandedBytes = 200L * 1024 * 1024;
+
+    /// <summary>Opens a workbook after checking how big it unpacks to. Null when it can't be used (problem says why, or null for "not a workbook").</summary>
+    private static XLWorkbook? Open(Stream stream, out string? problem)
+    {
+        problem = null;
+        try
+        {
+            if (!stream.CanSeek)
+            {
+                var copy = new MemoryStream();
+                stream.CopyTo(copy);
+                stream = copy;
+            }
+            stream.Position = 0;
+            using (var zip = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: true))
+            {
+                long total = 0;
+                foreach (var entry in zip.Entries)
+                {
+                    total += entry.Length;
+                    if (total > MaxExpandedBytes)
+                    {
+                        problem = "That workbook is too big to read. Split it into smaller files, or save it as CSV, and try again.";
+                        return null;
+                    }
+                }
+            }
+            stream.Position = 0;
+            return new XLWorkbook(stream);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
     public const int MaxRows = 5000;
     private static readonly CultureInfo AU = CultureInfo.GetCultureInfo("en-AU");
 
@@ -166,9 +203,8 @@ public static class Excel
     /// </summary>
     public static (List<Row> Rows, List<string> Ignored, string? Problem) Read(Stream stream, IReadOnlyCollection<string> knownHeaders, IReadOnlyCollection<string> requiredHeaders)
     {
-        XLWorkbook book;
-        try { book = new XLWorkbook(stream); }
-        catch (Exception) { return ([], [], "That file couldn't be opened as an Excel workbook. Save it as .xlsx and try again."); }
+        var book = Open(stream, out var openProblem);
+        if (book is null) return ([], [], openProblem ?? "That file couldn't be opened as an Excel workbook. Save it as .xlsx and try again.");
         using (book)
         {
             var sheet = book.Worksheets.FirstOrDefault();
@@ -208,9 +244,8 @@ public static class Excel
     /// </summary>
     public static (List<(string Header, List<string> Examples)> Columns, int Rows, string? Problem) Headers(Stream stream)
     {
-        XLWorkbook book;
-        try { book = new XLWorkbook(stream); }
-        catch (Exception) { return ([], 0, "That file couldn't be opened. Use an Excel workbook (.xlsx) or a CSV file."); }
+        var book = Open(stream, out var openProblem);
+        if (book is null) return ([], 0, openProblem ?? "That file couldn't be opened. Use an Excel workbook (.xlsx) or a CSV file.");
         using (book)
         {
             var sheet = book.Worksheets.FirstOrDefault();

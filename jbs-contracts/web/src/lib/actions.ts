@@ -24,3 +24,9 @@ export function errorText(e: unknown, field?: string) {
   if (e instanceof ApiError) return (field && e.fields[field]) || e.message
   return "That didn't work. Try again."
 }
+
+/** The errors to show in a form: by field when the server named fields, otherwise the message under the given key (so it's never silent). */
+export function fieldErrors(e: unknown, key: string): Record<string, string> {
+  if (e instanceof ApiError && Object.keys(e.fields).length > 0) return e.fields
+  return { [key]: errorText(e) }
+}

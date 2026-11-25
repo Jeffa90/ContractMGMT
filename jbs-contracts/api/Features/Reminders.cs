@@ -115,6 +115,10 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
                     {
                         var result = await RunAsync(today, stoppingToken);
                         logger.LogInformation("Daily reminders for {Today}: {Sent} reminders, {Ended} contracts ended.", today, result.Reminders, result.Ended);
+                        // A copy of the audit trail's latest link, kept outside the database (D-93): rewriting history and its hashes
+                        // afterwards no longer matches these log lines.
+                        var tip = await c.QuerySingleOrDefaultAsync<(long Id, string Hash)>("SELECT TOP (1) Id, Hash FROM contracts.AuditEvent ORDER BY Id DESC");
+                        logger.LogInformation("Audit trail on {Today}: latest event {AuditId}, hash {AuditHash}.", today, tip.Id, tip.Hash);
                     }
                 }
             }

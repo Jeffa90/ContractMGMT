@@ -78,7 +78,7 @@ public static class RenewalEndpoints
                 p.Add("plannedEnd", plannedEnd?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
                 await x.C.ExecuteAsync("""
                     UPDATE contracts.Contract SET RenewalDecision = @decision, RenewalDecisionNote = @note, RenewalDecisionUtc = SYSUTCDATETIME(), RenewalDecisionById = @me,
-                        PlannedEndDate = @plannedEnd, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                        PlannedEndDate = @plannedEnd, EndedReason = NULL, EndedById = NULL, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
                     WHERE Id = @id
                     """, p, x.Tx);
                 var what = decision switch

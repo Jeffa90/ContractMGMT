@@ -24,8 +24,13 @@ public sealed class Db(AppSettings settings)
     public static async Task<SqlTransaction> BeginWriteAsync(SqlConnection c)
     {
         var tx = c.BeginTransaction();
-        await c.ExecuteAsync("EXEC sp_getapplock @Resource = N'contracts.write', @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 60000",
-            transaction: tx);
+        // The command waits longer than the lock does, so a long wait ends as "busy" (below), not as a timeout error.
+        var result = await c.ExecuteScalarAsync<int>("""
+            DECLARE @r INT;
+            EXEC @r = sp_getapplock @Resource = N'contracts.write', @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 60000;
+            SELECT @r;
+            """, transaction: tx, commandTimeout: 90);
+        if (result < 0) throw new BusyException();
         return tx;
     }
 
@@ -37,6 +42,9 @@ public sealed class Db(AppSettings settings)
         return connection;
     }
 }
+
+/// <summary>Another change (for example a large import) held the write turn for over a minute. Shown as "busy, try again".</summary>
+public sealed class BusyException() : Exception("Another change held the database for over a minute.");
 
 /// <summary>
 /// Applies database/*.sql in name order, once each, recording them in dbo.SchemaVersions exactly as

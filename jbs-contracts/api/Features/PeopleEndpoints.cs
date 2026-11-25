@@ -141,6 +141,8 @@ public static class PeopleEndpoints
             else summary = changes.Count == 0 ? $"{me.Name} saved {input.Name} with no changes." : $"{me.Name} changed {input.Name}: {string.Join("; ", changes)}.";
             await audit.WriteAsync(connection, tx, me.AsActor(), "person.changed", "Person", id, summary,
                 new { before = new { beforeView.Account, beforeView.Name, beforeView.Email, beforeView.Roles, beforeView.IsActive }, after = new { input.Account, input.Name, input.Email, input.Roles, IsActive = active } });
+            if (before.IsLegal && before.IsActive && !(input.Roles.Legal && active))
+                await LegalEndpoints.ReleaseReviewsAsync(connection, tx, audit, me.AsActor(), id, input.Name);
             if (previousHead is not null)
                 await audit.WriteAsync(connection, tx, me.AsActor(), "person.group-head-moved", "Person", previousHead.Id,
                     $"{me.Name} made {input.Name} the Group Head in place of {previousHead.Name}, who stays an approver (backup).");

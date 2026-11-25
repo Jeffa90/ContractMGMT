@@ -235,6 +235,8 @@ public static class ExcelEndpoints
                                 IsAuditor = @au, IsProcurement = @pr, IsActive = @act, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id
                             """, args, x.Tx);
                         await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "person.changed", "Person", b.Id, $"{x.Me.Name} changed {n}: {string.Join("; ", r.Notes).Replace("Change: ", "")}".TrimEnd('.') + $"{Via}.", args);
+                        if (b.IsLegal && b.IsActive && !(ro["Legal"] && act))
+                            await LegalEndpoints.ReleaseReviewsAsync(x.C, x.Tx, x.Audit, x.Me.AsActor(), b.Id, n);
                     }
                 };
             }

@@ -19,7 +19,8 @@ public static class LockedChangeEndpoints
     {
         var actions = new List<string>();
         var open = c.Stage is not ("Withdrawn" or "Archived");
-        if (me.IsContractOwner && open && c.IsLocked) actions.Add("handOver");
+        // Not while a Variation waits for approval: the approver can't be the owner or backup, so the owners stay put until it's decided.
+        if (me.IsContractOwner && open && c.IsLocked && c.OpenVariationStage != "Approval") actions.Add("handOver");
         if (me.IsAdmin && open && c.IsLocked) actions.Add("confidential");
         if (me.IsContractOwner && c.Stage == "Effective" && hasAnyTimeFields) actions.Add("anyTimeFields");
         if (me.IsAdmin && c.Stage is "Effective" or "Ended") actions.Add(c.UnlockId is null ? "unlock" : "closeUnlock");
@@ -38,6 +39,8 @@ public static class LockedChangeEndpoints
                 var c = x.Contract;
                 if (!x.Me.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can hand a contract over.");
                 if (c.Stage is "Withdrawn" or "Archived") return ApiResults.NotAllowed($"It's {ContractEndpoints.StageNames[c.Stage]}, so it can't be handed over.");
+                if (c.OpenVariationStage == "Approval")
+                    return ApiResults.NotAllowed("A Variation is waiting for approval, so it can't be handed over yet. Hand it over once the Variation is approved or sent back.");
                 var problems = new Dictionary<string, string>();
                 async Task<Person?> OwnerAsync(int? pid) => pid is null ? null
                     : await x.C.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WHERE Id = @pid AND IsActive = 1 AND IsContractOwner = 1", new { pid }, x.Tx);

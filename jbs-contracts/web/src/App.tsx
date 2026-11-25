@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { Toaster } from 'sonner'
 import { Shell } from './components/Shell'
@@ -24,7 +24,15 @@ import { SuppliersPage } from './pages/Suppliers'
 import { VariationPage } from './pages/Variation'
 import { NoAccessPage, NotFoundPage, SignInProblemPage } from './pages/StatusPages'
 
-const queryClient = new QueryClient({
+// After any change, the screens that sum things up (Home tiles, Renewals, Team, Reports, lists, the open contract) are refreshed,
+// so nobody sees a count or a list from before what they just did. Only screens on show refetch; the rest refresh when opened.
+const summaries = ['home', 'renewals', 'team', 'report', 'search', 'contracts', 'contract', 'variation', 'suppliers']
+const queryClient: QueryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      for (const key of summaries) void queryClient.invalidateQueries({ queryKey: [key] })
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

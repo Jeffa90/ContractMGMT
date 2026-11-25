@@ -144,8 +144,11 @@ public static class HomeEndpoints
             var pref = await c.QuerySingleOrDefaultAsync<PreferenceRow>("SELECT HiddenTiles, FirstGroup FROM contracts.HomePreference WHERE PersonId = @id", new { id = me.Id })
                 ?? new PreferenceRow();
             var today = DateOnly.FromDateTime(Today(clock));
+            // Admins' first-run checklist only needs to know whether any contract exists yet.
+            var hasContracts = me!.IsAdmin && await c.ExecuteScalarAsync<bool>("SELECT CASE WHEN EXISTS (SELECT 1 FROM contracts.Contract) THEN 1 ELSE 0 END");
             return Results.Ok(new
             {
+                hasContracts,
                 tiles = mine.Select(t => new { t.Key, t.Group, t.Label, t.Help, Count = counts.GetValueOrDefault(t.Key) }),
                 urgent = urgent.Select(u =>
                 {

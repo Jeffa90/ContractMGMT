@@ -199,7 +199,12 @@ public static class DocumentEndpoints
                 string title;
                 if (documentId is { } existing)
                 {
-                    var doc = await c.QuerySingleOrDefaultAsync<DocRow>("SELECT Id, Kind, Title, CurrentVersion FROM contracts.Document WITH (UPDLOCK) WHERE Id = @existing AND ContractId = @id AND IsRemoved = 0", new { existing, id }, tx);
+                    var doc = await c.QuerySingleOrDefaultAsync<DocRow>("""
+                        SELECT Id, Kind, Title, CurrentVersion FROM contracts.Document WITH (UPDLOCK)
+                        WHERE Id = @existing AND ContractId = @id AND IsRemoved = 0
+                          -- A new version stays where the document is: a Variation's upload can't touch the locked contract's own documents.
+                          AND ((@variationId IS NULL AND VariationId IS NULL) OR VariationId = @variationId)
+                        """, new { existing, id, variationId }, tx);
                     if (doc is null) { File.Delete(path); return ApiResults.NotFound("We couldn't find that document on this contract."); }
                     version = doc.CurrentVersion + 1;
                     title = doc.Title;

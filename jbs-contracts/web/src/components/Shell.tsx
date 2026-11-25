@@ -4,6 +4,7 @@ import {
   BellRing,
   Building2,
   ChartColumn,
+  LifeBuoy,
   UsersRound,
   CalendarClock,
   ChevronsLeft,
@@ -166,6 +167,10 @@ function NavLinks({
           {admin.map(link)}
         </>
       )}
+      {/* Help for everyone, set apart from the work screens. */}
+      <div className="mt-4">
+        {link({ to: "/help", label: "Help", icon: <LifeBuoy aria-hidden className="size-5" /> })}
+      </div>
     </nav>
   );
 }

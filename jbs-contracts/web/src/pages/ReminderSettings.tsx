@@ -44,17 +44,18 @@ type Data = {
   lastRunUtc: string | null;
 };
 
+// Made-up sample values for the preview (no real people).
 const sample: Record<string, string> = {
-  "First name": "Jeff",
+  "First name": "Chris",
   "Contract title": "Linehaul freight Brisbane to Sydney",
   Reference: "JBSAUS-0142",
   Supplier: "Southern Cross Freight",
-  Owner: "Jeff Judd",
+  Owner: "Chris Taylor",
   "Due date": "Mon 12 Jan 2027",
   Days: "30",
   "Added by": "Alex Admin",
   Roles: "Contract owner, Legal",
-  "Windows logon": "AMH\\jjudd",
+  "Windows logon": "DEMO\\ctaylor",
   "Sent by": "Priya Patel",
   "Assigned by": "Sam Nguyen",
   "Legal person": "Leah Brooks",

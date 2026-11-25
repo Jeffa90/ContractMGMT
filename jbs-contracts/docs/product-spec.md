@@ -338,7 +338,7 @@ The new app replaces the old one on QA from slice 0. QA has no real data (confir
 | 1c | Email foundation and "You've been given access" email (JBS relay) | Adds a person and they get an email | Built and tested (queue, background sender with retries, real SMTP conversation tested); deploying to QA |
 | 9 | Import: spreadsheet (for example a Medius export) with column mapping, dry run, error report; ZIP of files matched by agreement reference; legacy Effective contracts loaded locked with their original registered date | Loads a fictional sample | Not started |
 
-Help ("?") ships with each screen, not as a slice of its own.
+Help ("?") ships with each screen, not as a slice of its own. The **help centre** (D-89) adds step-by-step guides with short silent videos; when a screen changes, update its guide and re-record its video (web/help-videos/record.cjs).
 
 ## 18. Planned for later
 

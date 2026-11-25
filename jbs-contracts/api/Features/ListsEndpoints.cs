@@ -42,7 +42,7 @@ public static class ListsEndpoints
             await using var c = await db.OpenAsync();
             var items = await c.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem ORDER BY ListName, SortOrder, Value");
             var categories = await c.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category ORDER BY SortOrder, Name");
-            var owners = await c.QueryAsync("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 AND IsContractOwner = 1 ORDER BY Name");
+            var owners = await c.QueryAsync<IdName>("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 AND IsContractOwner = 1 ORDER BY Name");
             return Results.Ok(new { items, categories, owners });
         });
 

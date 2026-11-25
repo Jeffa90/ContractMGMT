@@ -1,0 +1,17 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:02.351
+1. Go to Contract fields and click Add field under the right section.
+
+2
+00:00:02.351 --> 00:00:09.729
+2. Type the Label, choose the Kind of field, and add help if it's useful.
+
+3
+00:00:09.729 --> 00:00:13.270
+3. Choose where it shows (the Contracts list, Excel) and whether it changes only through a Variation.
+
+4
+00:00:13.270 --> 00:00:20.741
+4. Click Add field, check the preview, then Save changes. Nothing changes for anyone until you save.

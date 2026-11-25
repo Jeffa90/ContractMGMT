@@ -16,6 +16,7 @@ import { ReminderSettingsPage } from './pages/ReminderSettings'
 import { RenewalsPage } from './pages/Renewals'
 import { ReportsPage } from './pages/Reports'
 import { TeamPage } from './pages/Team'
+import { GuidePage, HelpCentrePage } from './helpcentre/HelpCentre'
 import { PeoplePage } from './pages/People'
 import { SuppliersPage } from './pages/Suppliers'
 import { VariationPage } from './pages/Variation'
@@ -44,6 +45,8 @@ const router = createBrowserRouter([
       { path: 'renewals', element: <RenewalsPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'team', element: <TeamPage /> },
+      { path: 'help', element: <HelpCentrePage /> },
+      { path: 'help/:id', element: <GuidePage /> },
       { path: 'suppliers', element: <SuppliersPage /> },
       { path: 'admin/people', element: <PeoplePage /> },
       { path: 'admin/lists', element: <ListsPage /> },

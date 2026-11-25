@@ -1,0 +1,331 @@
+{
+  "groups": [
+    { "id": "start", "title": "Getting started" },
+    { "id": "contracts", "title": "Raising contracts" },
+    { "id": "legal", "title": "Legal review" },
+    { "id": "signing", "title": "Signing and approval" },
+    { "id": "renewals", "title": "Renewals" },
+    { "id": "changes", "title": "Changing an Effective contract" },
+    { "id": "reports", "title": "Reports and your team" },
+    { "id": "admin", "title": "Admin" }
+  ],
+  "guides": [
+    {
+      "id": "find-your-way",
+      "group": "start",
+      "title": "Find your way around",
+      "summary": "Home, search, the menu and help.",
+      "who": ["everyone"],
+      "screens": ["home"],
+      "video": true,
+      "steps": [
+        "**Home** is your to-do list. Each tile shows contracts waiting for you; click one to open them.",
+        "**Urgent** lists notice deadlines that have passed or are due within a week, each with what to do.",
+        "Click **Search** or press Ctrl+K to find any contract or supplier by name, reference or SAP number.",
+        "Use the menu to move around: **Contracts**, **Renewals** and **Suppliers**.",
+        "Click **?** beside any page title for help with that screen, or open **Help** from the menu."
+      ]
+    },
+    {
+      "id": "raise-contract",
+      "group": "contracts",
+      "title": "Raise a contract",
+      "summary": "Start a draft with just a title, and fill in the rest as you go.",
+      "who": ["contractOwner"],
+      "screens": ["contracts", "contract"],
+      "video": true,
+      "steps": [
+        "Go to **Contracts** and click **Add contract**.",
+        "Type a **Title**, for example \"Linen hire 2027\".",
+        "Choose the **Supplier** and **Category**. Supplier not there yet? Click **Add new supplier**.",
+        "Add the value, dates and notice period if you know them. Only a title is needed for a draft; the rest is checked when you send it on.",
+        "Leave **Needs Legal review** ticked unless Legal has agreed it doesn't need one.",
+        "Click **Save draft**. The contract gets its reference, for example JBSAUS-0016."
+      ]
+    },
+    {
+      "id": "add-document",
+      "group": "contracts",
+      "title": "Add a document or a new version",
+      "summary": "Attach drafts, mark-ups and signed copies; replace a file without losing the old one.",
+      "who": ["contractOwner", "legal"],
+      "screens": ["contract"],
+      "video": true,
+      "steps": [
+        "Open the contract and scroll down to **Documents**.",
+        "Choose the **Kind**, for example Draft or Signed copy.",
+        "Click **Add document** and choose the file: PDF, Word, Excel, Outlook email, text or an image, up to 25 MB.",
+        "To replace a document but keep the earlier one, click the **new version** button beside it. Every version stays in the history."
+      ]
+    },
+    {
+      "id": "find-a-contract",
+      "group": "contracts",
+      "title": "Find a contract",
+      "summary": "Search, filters and the key date.",
+      "who": ["everyone"],
+      "screens": ["contracts"],
+      "video": false,
+      "steps": [
+        "Go to **Contracts**. **My contracts** shows the ones you own or back up; **All** shows every contract you can see.",
+        "Type in the search box: a title, a reference such as JBSAUS-0012, a supplier or an SAP number.",
+        "Click **Filters** to narrow the list, for example to one site or supplier.",
+        "The **Key date** is the notice deadline if there is one, otherwise the end date. It turns amber within 30 days and red once it has passed."
+      ]
+    },
+    {
+      "id": "withdraw",
+      "group": "contracts",
+      "title": "Withdraw a contract that isn't going ahead",
+      "summary": "Close it off with a reason. Nothing is deleted.",
+      "who": ["contractOwner"],
+      "screens": ["contract"],
+      "video": false,
+      "steps": [
+        "Open the contract. You can withdraw it from Draft, Legal review or Signing.",
+        "Scroll to the bottom and click **Withdraw this contract**.",
+        "Say why it isn't going ahead, then confirm. It moves to Closed and keeps its history."
+      ]
+    },
+    {
+      "id": "send-to-legal",
+      "group": "legal",
+      "title": "Send a contract to Legal",
+      "summary": "Hand it over, then pick it up again when Legal sends it back.",
+      "who": ["contractOwner"],
+      "screens": ["contract"],
+      "video": true,
+      "steps": [
+        "Open your draft and click **Send to Legal**.",
+        "Add a note for Legal if it helps, and attach the files they should look at.",
+        "Click **Send to Legal**. Legal is emailed, and the progress bar shows it's Legal's turn.",
+        "When Legal sends it back, it shows on your Home under **Back from Legal**. Make the changes, then send it to Legal again."
+      ]
+    },
+    {
+      "id": "legal-review",
+      "group": "legal",
+      "title": "Review a contract (Legal)",
+      "summary": "Pick it up, go back and forth with the owner, and clear it.",
+      "who": ["legal"],
+      "screens": ["contract", "home"],
+      "video": true,
+      "steps": [
+        "On Home, **New to pick up** lists contracts waiting for Legal. Open one.",
+        "Click **I'll take it**. It's yours now, and the owner can see who has it.",
+        "Click **Update status** to show you're reviewing it or waiting on the supplier.",
+        "Need something from the owner? Click **Send to owner** and say what's needed.",
+        "When you're happy, click **Legal cleared** and write a short outcome. It moves to Signing."
+      ]
+    },
+    {
+      "id": "send-for-approval",
+      "group": "signing",
+      "title": "Send a signed contract for approval",
+      "summary": "Attach the signed copy and the effective date.",
+      "who": ["contractOwner"],
+      "screens": ["contract"],
+      "video": true,
+      "steps": [
+        "Sign the contract in DocuSign as usual. In JBS Contracts it shows as Signing.",
+        "Open the contract and click **Send for approval**.",
+        "Attach the **Signed copy** and enter the **Effective date**. The date is required and never filled in for you.",
+        "Click **Send for approval**. The Group Head and approvers are emailed."
+      ]
+    },
+    {
+      "id": "approve",
+      "group": "signing",
+      "title": "Approve a contract (on your phone or computer)",
+      "summary": "Check the signed copy matches, then approve and register it.",
+      "who": ["approver", "groupHead"],
+      "screens": ["approve"],
+      "video": true,
+      "phone": true,
+      "steps": [
+        "Open the link in the email, or **To approve** on Home, and choose the contract.",
+        "Check the details, then open the signed copy and check it matches.",
+        "Something not right? Click **Send back** and say what needs fixing. It goes back to the owner.",
+        "All good? Click **Approve and register**. The contract becomes Effective and is locked."
+      ]
+    },
+    {
+      "id": "renewal-decision",
+      "group": "renewals",
+      "title": "Record a renewal decision",
+      "summary": "Renew, let it end or renegotiate, before the notice deadline.",
+      "who": ["contractOwner"],
+      "screens": ["renewals", "contract"],
+      "video": true,
+      "steps": [
+        "Go to **Renewals**. Overdue notice deadlines are at the top.",
+        "Click **Record decision** on a contract.",
+        "Choose **Renew**, **Let it end** or **Renegotiate**, and add a short note.",
+        "Click **Save decision**. The reminder emails for it stop. Renew starts a new draft linked to this contract."
+      ]
+    },
+    {
+      "id": "review-done",
+      "group": "renewals",
+      "title": "Mark a review done",
+      "summary": "For contracts with a review date, such as evergreen ones.",
+      "who": ["contractOwner"],
+      "screens": ["contract"],
+      "video": false,
+      "steps": [
+        "Open the Effective contract and click **Review done**.",
+        "Add a short note and, if it needs another review, the next review date.",
+        "Click **Save**. Review reminders start again from the new date."
+      ]
+    },
+    {
+      "id": "variation",
+      "group": "changes",
+      "title": "Change an Effective contract with a Variation",
+      "summary": "Dates, value and more change only once the Variation is approved.",
+      "who": ["contractOwner"],
+      "screens": ["contract", "variation"],
+      "video": true,
+      "steps": [
+        "Open the Effective contract and click **Start a Variation**.",
+        "Say why it's changing, then click **Start**.",
+        "Change what's needed: now and new sit side by side. Click **Save changes**.",
+        "Send it to Legal if it needs a review, then **Send for approval**. Nothing changes on the contract until it's approved."
+      ]
+    },
+    {
+      "id": "hand-over",
+      "group": "changes",
+      "title": "Hand over a contract",
+      "summary": "Change the owner or backup at any time.",
+      "who": ["contractOwner"],
+      "screens": ["contract"],
+      "video": true,
+      "steps": [
+        "Open the contract and click **Hand over**.",
+        "Choose the new **Owner** and, if you like, a **Backup**.",
+        "Click **Hand over**. They're emailed, and it's recorded in Activity."
+      ]
+    },
+    {
+      "id": "emergency-unlock",
+      "group": "changes",
+      "title": "Fix a mistake on a locked contract (admins)",
+      "summary": "An emergency unlock of up to 4 hours, for what a Variation can't fix.",
+      "who": ["admin"],
+      "screens": ["contract"],
+      "video": false,
+      "steps": [
+        "Use this only for a mistake, such as a mistyped supplier name. Real changes go through a Variation.",
+        "Open the contract and click **Emergency unlock**.",
+        "Say why, choose how long (1 to 4 hours), and confirm. A banner shows while it's unlocked, and only admins can edit.",
+        "Fix the mistake, then click **Lock it again now**. Every edit records the unlock and its reason."
+      ]
+    },
+    {
+      "id": "register",
+      "group": "reports",
+      "title": "Print or download the register",
+      "summary": "Choose your columns and filters, then print to PDF or download Excel.",
+      "who": ["admin", "auditor"],
+      "screens": ["reports"],
+      "video": true,
+      "steps": [
+        "Go to **Reports**. The **Register** lists every Effective contract.",
+        "Click **Columns** and tick what you want to see. Your choice is kept for next time.",
+        "Click **Filters** to narrow it down, for example to one business unit.",
+        "Click **Print or save as PDF** for a clean printout, or **Download Excel** for every column."
+      ]
+    },
+    {
+      "id": "team",
+      "group": "reports",
+      "title": "See what your team has coming up",
+      "summary": "Who has what overdue, coming up and on their turn.",
+      "who": ["admin", "auditor", "groupHead"],
+      "screens": ["team"],
+      "video": true,
+      "steps": [
+        "Go to **Team**. Each person shows what's overdue, coming up, on their turn and waiting on others.",
+        "Choose how far ahead to look: 30, 60, 90 or 180 days.",
+        "Click a person to see each contract, how long it has waited and its supplier and value.",
+        "Click a contract to open it."
+      ]
+    },
+    {
+      "id": "download-everything",
+      "group": "reports",
+      "title": "Download everything",
+      "summary": "A full copy of the records in one Excel workbook, and every document as a ZIP.",
+      "who": ["admin", "auditor"],
+      "screens": ["reports"],
+      "video": false,
+      "steps": [
+        "Go to **Reports** and choose **Download everything**.",
+        "Click **Download everything** for one workbook with a sheet each for contracts, documents, Legal review, approvals, Variations, reminders, suppliers, people and lists.",
+        "Admins can also click **Download all documents** for a ZIP of every file, in a folder per contract.",
+        "Both downloads are recorded in the audit trail. Keep the files somewhere safe."
+      ]
+    },
+    {
+      "id": "add-person",
+      "group": "admin",
+      "title": "Give someone access",
+      "summary": "Add a person and tick what they can do.",
+      "who": ["admin"],
+      "screens": ["people"],
+      "video": true,
+      "steps": [
+        "Go to **People** and click **Add person**.",
+        "Type their **Windows logon**; the domain is filled in for you.",
+        "Add their name and work email. Reminders and approvals go there.",
+        "Tick what they can do, then click **Add person**. They're emailed a welcome."
+      ]
+    },
+    {
+      "id": "add-field",
+      "group": "admin",
+      "title": "Add a contract field",
+      "summary": "Ask for something new on every contract, without any code.",
+      "who": ["admin"],
+      "screens": ["fields"],
+      "video": true,
+      "steps": [
+        "Go to **Contract fields** and click **Add field** under the right section.",
+        "Type the **Label**, choose the **Kind of field**, and add help if it's useful.",
+        "Choose where it shows (the Contracts list, Excel) and whether it changes only through a Variation.",
+        "Click **Add field**, check the preview, then **Save changes**. Nothing changes for anyone until you save."
+      ]
+    },
+    {
+      "id": "change-email",
+      "group": "admin",
+      "title": "Change a reminder or email",
+      "summary": "Wording and days, with a live preview and history.",
+      "who": ["admin"],
+      "screens": ["reminders"],
+      "video": true,
+      "steps": [
+        "Go to **Emails and reminders** and open the email to change.",
+        "For a reminder, set the **Days before** and click **Save days**.",
+        "Change the subject or wording. Click a placeholder such as {Reference} to add it.",
+        "Check the preview, then click **Save wording**. Every change is kept in the history."
+      ]
+    },
+    {
+      "id": "excel-import",
+      "group": "admin",
+      "title": "Add or change many at once with Excel",
+      "summary": "People, lists, suppliers and contracts, previewed before anything changes.",
+      "who": ["admin", "contractOwner"],
+      "screens": ["people", "suppliers", "lists", "contracts"],
+      "video": false,
+      "steps": [
+        "Click **Export to Excel** on the page. The file is also the template for importing.",
+        "Change or add rows in Excel. Blank cells leave what's there; nothing is deleted.",
+        "Click **Import from Excel** and choose the file.",
+        "Check what will be added, changed or not imported (and why), then click **Import** (it says how many rows)."
+      ]
+    }
+  ]
+}

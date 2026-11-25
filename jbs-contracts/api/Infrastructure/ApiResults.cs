@@ -33,3 +33,6 @@ public static class ApiResults
             "You don't have access to JBS Contracts yet. Ask your admin to add you.", new { account = current.Account, admins }));
     }
 }
+
+/// <summary>A person or thing for a pick list, typed so it reaches the browser as { id, name } (untyped Dapper rows keep the database's capitals).</summary>
+public sealed record IdName(int Id, string Name);

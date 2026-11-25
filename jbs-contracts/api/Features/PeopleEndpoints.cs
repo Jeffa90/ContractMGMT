@@ -50,7 +50,7 @@ public static class PeopleEndpoints
             var (_, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
             await using var connection = await db.OpenAsync();
-            return Results.Ok(await connection.QueryAsync("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 ORDER BY Name"));
+            return Results.Ok(await connection.QueryAsync<IdName>("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 ORDER BY Name"));
         });
 
         people.MapPost("/", async (SavePerson body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>

@@ -1,7 +1,7 @@
 // Help for each screen, shown by the "?" beside the title. Update it whenever the screen changes (definition of done).
 import type { HelpTopic } from '@/components/Help'
 
-export const help = {
+const topics = {
   home: {
     title: 'Your Home',
     body: (
@@ -317,3 +317,6 @@ export const help = {
     ),
   },
 } satisfies Record<string, HelpTopic>
+
+/** Each screen's help, with its key as its id (the guides list the screens they belong to). */
+export const help = Object.fromEntries(Object.entries(topics).map(([id, topic]) => [id, { ...topic, id }])) as { [K in keyof typeof topics]: HelpTopic }

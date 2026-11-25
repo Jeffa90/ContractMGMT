@@ -44,11 +44,14 @@ catch (Exception ex)
 
 app.UseSecurityHeaders();
 app.UseDefaultFiles();
+var staticTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+staticTypes.Mappings[".vtt"] = "text/vtt"; // the help videos' captions (D-89)
 app.UseStaticFiles(new StaticFileOptions
 {
-    // index.html must always be fetched fresh so a new deploy shows straight away; hashed assets can be cached.
+    ContentTypeProvider = staticTypes,
+    // index.html and the help videos (same names when re-recorded) are checked each time; hashed assets can be cached.
     OnPrepareResponse = c => c.Context.Response.Headers.CacheControl =
-        c.File.Name == "index.html" ? "no-cache" : "public, max-age=31536000, immutable",
+        c.File.Name == "index.html" || c.Context.Request.Path.StartsWithSegments("/help-videos") ? "no-cache" : "public, max-age=31536000, immutable",
 });
 app.UseBrandFonts(settings);
 app.UseAuthentication();

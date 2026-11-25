@@ -5,11 +5,14 @@
 
 .DESCRIPTION
     Safe by design (decision D-20):
-      - Does NOTHING once JBS Contracts is installed (the "contracts" schema exists). Leaving the variable set by
+      - The old app is recognised by its Entity Framework history tables (__EFMigrationsHistory, one per old schema).
+        JBS Contracts never creates such a table. (A schema name is NOT a reliable sign: the old app also used a
+        "contracts" schema, which hid it from the first version of this script.)
+      - Does NOTHING when no old-app table is present, so once the old app is gone, leaving the variable set by
         mistake can never wipe JBS Contracts.
-      - Does NOTHING to an empty database.
-      - Otherwise (old tables present, JBS Contracts not installed) it stops the deploy, before anything changes,
-        unless -Confirm equals the database name. Set the QA environment variable RESET_DATABASE_CONFIRM to the
+      - Otherwise it stops the deploy, before anything changes, unless -Confirm equals the database name.
+        When confirmed it removes everything, including any JBS Contracts tables installed alongside the old ones;
+        the JBS Contracts scripts then run again on the empty database. Set the QA environment variable RESET_DATABASE_CONFIRM to the
         database name (JBSContracts) for one deploy, then delete the variable.
     When confirmed it drops, in this order: security policies, foreign keys, views, procedures, functions, tables,
     sequences, synonyms and user types in every user schema, then the empty non-dbo user schemas. Then it removes
@@ -49,15 +52,12 @@ $connection = New-Object System.Data.SqlClient.SqlConnection $ConnectionString
 $connection.add_InfoMessage({ param($sender, $e) Write-Host "      $($e.Message)" })
 $connection.Open()
 try {
-    if ([int](Invoke-Scalar $connection "SELECT COUNT(*) FROM sys.schemas WHERE name = N'contracts'") -gt 0) {
-        Write-Host "==> JBS Contracts is already installed in $database. No reset needed."
+    $oldApp = [int](Invoke-Scalar $connection "SELECT COUNT(*) FROM sys.tables WHERE name = N'__EFMigrationsHistory'")
+    if ($oldApp -eq 0) {
+        Write-Host "==> No tables from the old app in $database. No reset needed."
         return
     }
     $tables = [int](Invoke-Scalar $connection "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped = 0")
-    if ($tables -eq 0) {
-        Write-Host "==> $database is empty. No reset needed."
-        return
-    }
     if ($Confirm -ne $database) {
         throw "The database $database still holds the old app ($tables tables). To replace it with JBS Contracts, set the QA environment variable RESET_DATABASE_CONFIRM to $database, run the deploy again, then delete the variable. Nothing has been changed."
     }

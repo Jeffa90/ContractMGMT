@@ -87,4 +87,7 @@ export type Me = {
   defaultDomain: string | null
   /** Admins on QA: whether fictional demo data can be loaded, or already is. */
   demoData: 'available' | 'loaded' | null
+  /** QA only: admins can try the app as someone else (D-81). */
+  canTryAs: boolean
+  tryingAs: { realName: string } | null
 }

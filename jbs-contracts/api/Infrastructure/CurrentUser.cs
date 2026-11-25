@@ -18,17 +18,31 @@ public sealed class Person
     public DateTime? LastSignInUtc { get; set; }
     public byte[] RowVersion { get; set; } = [];
 
-    public AuditLog.Actor AsActor() => new(Id, Name);
+    /// <summary>On QA, the admin who is trying the app as this person ("Try as", D-81). Null normally.</summary>
+    public int? TriedById { get; set; }
+    public string? TriedByName { get; set; }
+
+    /// <summary>Who did something, for the audit: when an admin is trying the app as someone, the admin, plainly marked.</summary>
+    public AuditLog.Actor AsActor() => TriedById is null ? new(Id, Name) : new(TriedById, Name);
 
     /// <summary>Legal, approvers, admins and auditors see every contract, including Confidential ones.</summary>
     public bool SeesAllConfidential => IsLegal || IsApprover || IsAdmin || IsAuditor;
 }
 
-/// <summary>The signed-in person for this request: the Windows account, matched to someone an admin has added.</summary>
-public sealed class CurrentUser(IHttpContextAccessor http, Db db, TimeProvider clock)
+/// <summary>
+/// The signed-in person for this request: the Windows account, matched to someone an admin has added. On QA only (AllowDemoData), an
+/// admin can "Try as" another person: the app then treats the request as that person, and their name carries "[tried by ...]" so every
+/// audit line and message shows who really did it (D-81).
+/// </summary>
+public sealed class CurrentUser(IHttpContextAccessor http, Db db, TimeProvider clock, AppSettings settings)
 {
+    public const string TryAsCookie = "jbs-contracts-try-as";
+
     private Person? person;
     private bool loaded;
+
+    /// <summary>The admin's own record while they try the app as someone else; otherwise the same as the person.</summary>
+    public Person? Real { get; private set; }
 
     public string? Account => http.HttpContext?.User.Identity is { IsAuthenticated: true } id ? id.Name : null;
 
@@ -45,6 +59,19 @@ public sealed class CurrentUser(IHttpContextAccessor http, Db db, TimeProvider c
         {
             // Last seen, at most every 15 minutes. Not audited: it is not a change anyone made.
             await connection.ExecuteAsync("UPDATE contracts.Person SET LastSignInUtc = SYSUTCDATETIME() WHERE Id = @id", new { id = person.Id });
+        }
+        Real = person;
+        if (person is { IsAdmin: true } && settings.AllowDemoData
+            && int.TryParse(http.HttpContext?.Request.Cookies[TryAsCookie], out var tryAs) && tryAs != person.Id)
+        {
+            var target = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WHERE Id = @tryAs AND IsActive = 1", new { tryAs });
+            if (target is not null)
+            {
+                target.TriedById = person.Id;
+                target.TriedByName = person.Name;
+                target.Name = $"{target.Name} [tried by {person.Name}]";
+                person = target;
+            }
         }
         return person;
     }

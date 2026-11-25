@@ -65,6 +65,7 @@ app.MapLegalEndpoints();
 app.MapApprovalEndpoints();
 app.MapHomeEndpoints();
 app.MapDemoDataEndpoints();
+app.MapTryAsEndpoints();
 app.MapRenewalEndpoints();
 app.MapReminderAdminEndpoints();
 app.MapLockedChangeEndpoints();

@@ -35,6 +35,9 @@ public static class SystemEndpoints
                 person = PersonView.From(person!),
                 defaultDomain = settings.DefaultDomain,
                 demoData = person!.IsAdmin && settings.AllowDemoData ? await DemoData.IsLoadedAsync(db) ? "loaded" : "available" : null,
+                // QA only: admins can try the app as someone else (D-81).
+                canTryAs = current.Real is { IsAdmin: true } && settings.AllowDemoData,
+                tryingAs = person.TriedById is null ? null : new { realName = person.TriedByName },
             });
         });
     }

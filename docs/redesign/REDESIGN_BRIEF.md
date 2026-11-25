@@ -73,6 +73,8 @@ Keep the care platform's rule: charts only where they help someone decide or act
 ## 7. How to carry this into a new session
 
 - Start a **new Claude Code session** for the redesign planning and build. It gets a clean context while this repository and these notes keep everything learned so far.
-- Put the new app in a **new GitHub repository** (for example `jbs-contracts`), so the old code doesn't steer the new one. Copy `STYLE_GUIDE.md` and this brief into it on day one, plus a short `CLAUDE.md` in the care platform's style (purpose, non-negotiables, stack, definition of done).
-- Bring across the proven deployment pieces from this repository (`.github/workflows/deploy.yml`, `iis-deploy.yml`, `scripts/ci/*.ps1`, the GitHub environment variables list) and adapt them, rather than writing new ones.
+- **Build the new app in this repository (ContractMGMT), not a new one.** The QA runner on AUQLDDC01QA2WI is registered to this repository, and the GitHub QA environment (its variables, branch rule and the Production reviewer) belongs to it. A new repository would need IT to register the runner again and every variable re-entered. Work on a branch (for example `redesign`) in a new top-level folder, with its own `CLAUDE.md` in the care platform's style and the style guide copied in as its design system. The old app keeps deploying from `main` meanwhile.
+- When the new app is ready: tag the old code (for example `legacy-ecp-final`), point the deploy at the new app, and merge. Same server, same site, same runner, same variables; the old code stays in git history.
+- Reuse the proven deployment pieces (`.github/workflows/deploy.yml`, `iis-deploy.yml`, `scripts/ci/*.ps1`) and adapt them, rather than writing new ones.
+- Database: decide in planning whether the new app uses a fresh database (simplest, if no real data is in QA yet) or moves data across; the DBA grants stay the same either way.
 - Keep the current app running on QA until the new one does what JBS needs.

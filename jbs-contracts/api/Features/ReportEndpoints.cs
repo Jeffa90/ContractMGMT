@@ -70,6 +70,7 @@ public static class ReportEndpoints
         public DateTime? EndedOn { get; set; }
         public string? EndedReason { get; set; }
         public string? LegalOutcome { get; set; }
+        public string? LegacyReference { get; set; }
 
         public DateTime? NoticeDeadline => NoticePeriodDays is not { } n ? null : (IsEvergreen ? ReviewDate : EndDate) is { } a ? a.AddDays(-n) : null;
         public string? Category => CategoryName is null ? null : ParentCategoryName is null ? CategoryName : $"{ParentCategoryName} > {CategoryName}";
@@ -114,7 +115,7 @@ public static class ReportEndpoints
         }
         foreach (var (key, label, type) in new[]
         {
-            ("stage", "Stage", "text"), ("noticeDeadline", "Notice deadline", "date"), ("registered", "Registered", "date"), ("registeredBy", "Registered by", "text"),
+            ("stage", "Stage", "text"), ("legacyReference", "Old reference", "text"), ("noticeDeadline", "Notice deadline", "date"), ("registered", "Registered", "date"), ("registeredBy", "Registered by", "text"),
             ("renewalDecision", "Renewal decision", "text"), ("endedOn", "Ended on", "date"), ("endedReason", "Why it ended", "text"), ("legalOutcome", "Legal outcome", "text"),
         })
             columns.Add(new(key, Unique(label, key), "Register", type));
@@ -130,7 +131,7 @@ public static class ReportEndpoints
         "needsLegalReview" => r.NeedsLegalReview, "stage" => ContractEndpoints.StageNames[r.Stage], "noticeDeadline" => D(r.NoticeDeadline),
         "registered" => r.RegisteredUtc is { } ru ? DateOnly.FromDateTime(Local(ru)) : null, "registeredBy" => r.RegisteredByName,
         "renewalDecision" => r.RenewalDecision is { } d ? RenewalEndpoints.DecisionNames[d] : null, "endedOn" => D(r.EndedOn), "endedReason" => r.EndedReason,
-        "legalOutcome" => r.LegalOutcome,
+        "legalOutcome" => r.LegalOutcome, "legacyReference" => r.LegacyReference,
         _ => null,
     };
 
@@ -150,7 +151,7 @@ public static class ReportEndpoints
             SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, s.VendorNumber AS SupplierVendorNumber, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                    at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName, o.Name AS OwnerName, b.Name AS BackupOwnerName,
                    k.IsConfidential, k.NeedsLegalReview, k.Value, k.CurrencyCode, k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate, k.IsEvergreen,
-                   k.NoticePeriodDays, k.ReviewDate, k.RegisteredUtc, rb.Name AS RegisteredByName, k.RenewalDecision, k.EndedOn, k.EndedReason, k.LegalOutcome
+                   k.NoticePeriodDays, k.ReviewDate, k.RegisteredUtc, rb.Name AS RegisteredByName, k.RenewalDecision, k.EndedOn, k.EndedReason, k.LegalOutcome, k.LegacyReference
             FROM contracts.Contract k
             LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
             LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId

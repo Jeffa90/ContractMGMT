@@ -202,4 +202,89 @@ public static class Excel
             return (rows, ignored, null);
         }
     }
+
+    /// <summary>
+    /// The first sheet's column headings, each with up to three example values from the rows under it (for matching columns on an import).
+    /// </summary>
+    public static (List<(string Header, List<string> Examples)> Columns, int Rows, string? Problem) Headers(Stream stream)
+    {
+        XLWorkbook book;
+        try { book = new XLWorkbook(stream); }
+        catch (Exception) { return ([], 0, "That file couldn't be opened. Use an Excel workbook (.xlsx) or a CSV file."); }
+        using (book)
+        {
+            var sheet = book.Worksheets.FirstOrDefault();
+            var used = sheet?.RangeUsed();
+            if (sheet is null || used is null) return ([], 0, "The sheet is empty. Put the column headings in row 1 and the data underneath.");
+            var lastRow = used.LastRow().RowNumber();
+            var columns = new List<(string, List<string>)>();
+            var seen = new HashSet<string>();
+            for (var col = 1; col <= used.LastColumn().ColumnNumber(); col++)
+            {
+                var header = sheet.Cell(1, col).GetFormattedString().Trim();
+                if (header.Length == 0 || !seen.Add(Normalise(header))) continue;
+                var examples = new List<string>();
+                for (var r = 2; r <= lastRow && examples.Count < 3; r++)
+                {
+                    var text = sheet.Cell(r, col).GetFormattedString().Trim();
+                    if (text.Length > 0) examples.Add(text.Length > 60 ? text[..60] + "…" : text);
+                }
+                columns.Add((header, examples));
+            }
+            if (columns.Count == 0) return ([], 0, "Row 1 has no column headings.");
+            return (columns, Math.Max(0, lastRow - 1), null);
+        }
+    }
+
+    /// <summary>
+    /// A CSV file (comma separated, "quoted" values may hold commas, quotes and line breaks) as an Excel workbook, so it reads the same way.
+    /// Every value is kept as text; dates and numbers are understood when the import reads them. UTF-8, falling back to Windows-1252.
+    /// </summary>
+    public static MemoryStream FromCsv(Stream csv)
+    {
+        using var buffer = new MemoryStream();
+        csv.CopyTo(buffer);
+        var bytes = buffer.ToArray();
+        string text;
+        try { text = new System.Text.UTF8Encoding(false, true).GetString(bytes); }
+        catch (System.Text.DecoderFallbackException) { text = System.Text.Encoding.Latin1.GetString(bytes); }
+        text = text.TrimStart('\uFEFF');
+        using var book = new XLWorkbook();
+        var sheet = book.Worksheets.Add("Data");
+        int row = 1, col = 1;
+        var field = new System.Text.StringBuilder();
+        var quoted = false;
+        void Put()
+        {
+            var value = field.ToString();
+            if (value.Length > 0) sheet.Cell(row, col).SetValue(value);
+            field.Clear();
+        }
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (quoted)
+            {
+                if (ch == '"' && i + 1 < text.Length && text[i + 1] == '"') { field.Append('"'); i++; }
+                else if (ch == '"') quoted = false;
+                else field.Append(ch);
+            }
+            else if (ch == '"' && field.Length == 0) quoted = true;
+            else if (ch == ',') { Put(); col++; }
+            else if (ch == '\n' || ch == '\r')
+            {
+                if (ch == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                Put();
+                row++;
+                col = 1;
+                if (row - 1 > MaxRows + 1) break;
+            }
+            else field.Append(ch);
+        }
+        Put();
+        var output = new MemoryStream();
+        book.SaveAs(output);
+        output.Position = 0;
+        return output;
+    }
 }

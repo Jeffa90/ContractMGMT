@@ -53,13 +53,23 @@ public static class DocumentEndpoints
     /// </summary>
     public static async Task<StoredFile> StoreAsync(string root, IFormFile file)
     {
-        var extension = System.IO.Path.GetExtension(file.FileName);
-        var fileName = System.IO.Path.GetFileName(file.FileName.Replace('\\', '/'));
+        await using var input = file.OpenReadStream();
+        return await StoreStreamAsync(root, input, file.FileName);
+    }
+
+    /// <summary>Whether a file of this name can be stored (by its type).</summary>
+    public static bool AllowedType(string fileName) => Types.ContainsKey(System.IO.Path.GetExtension(fileName));
+
+    /// <summary>As <see cref="StoreAsync"/>, from any stream (for example a file inside a ZIP).</summary>
+    public static async Task<StoredFile> StoreStreamAsync(string root, Stream input, string originalName)
+    {
+        var extension = System.IO.Path.GetExtension(originalName);
+        var fileName = System.IO.Path.GetFileName(originalName.Replace('\\', '/'));
         if (fileName.Length > 255) fileName = fileName[^255..];
         var stored = $"{DateTime.UtcNow:yyyy}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
         var path = System.IO.Path.Combine(root, stored.Replace('/', System.IO.Path.DirectorySeparatorChar));
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-        await using var input = file.OpenReadStream();
+        long size = 0;
         await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true);
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var buffer = new byte[81920];
@@ -68,8 +78,9 @@ public static class DocumentEndpoints
         {
             hash.AppendData(buffer, 0, read);
             await output.WriteAsync(buffer.AsMemory(0, read));
+            size += read;
         }
-        return new StoredFile(fileName, Types[extension], file.Length, Convert.ToHexString(hash.GetHashAndReset()), stored, path);
+        return new StoredFile(fileName, Types[extension], size, Convert.ToHexString(hash.GetHashAndReset()), stored, path);
     }
 
     /// <summary>Contract owners add documents until a contract is approved; during a Legal review, Legal can too (mark-ups), on either side's turn.</summary>

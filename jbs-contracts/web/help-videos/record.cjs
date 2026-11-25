@@ -391,6 +391,36 @@ const videos = {
       await s.upload(p.getByRole('button', { name: 'Attach a file' }), pdf('Quarterly review deck.pdf'), 2200)
     }),
 
+  'import-old-contracts': (b) =>
+    record(b, 'import-old-contracts', { start: '/admin/import' }, async (s) => {
+      const p = s.page
+      // A small, fictional Medius-style export that matches the demo data, and a ZIP of its files (made with Python).
+      const csv = path.join(WORK, 'medius-export.csv')
+      fs.writeFileSync(csv, [
+        'Agreement No,Agreement Name,Vendor,Category,Contract Owner,Start Date,Expiry Date,Notice Period,Status',
+        'MED-1001,Linen hire,Harbourside Cleaning (demo),Facilities > Cleaning,Priya Patel (demo),1/07/2025,30/06/2027,60,Active',
+        'MED-1002,Refrigerated trailers,Coastal Cold Storage (demo),Freight > Cold chain,Alex Morgan (demo),1/03/2023,28/02/2025,30,Expired',
+        'MED-1003,Courier services,Swift Couriers (demo),Freight > Linehaul,Priya Patel (demo),1/01/2026,31/12/2027,30,Active',
+        'MED-1004,Uniform laundering,Redgum Uniforms (demo),Facilities > Laundry,Alex Morgan (demo),1/02/2026,31/01/2028,30,Active',
+      ].join('\r\n'))
+      const zip = path.join(WORK, 'medius-files.zip')
+      execFileSync('python3', ['-c', "import zipfile,sys\nz=zipfile.ZipFile(sys.argv[1],'w')\nz.writestr('MED-1001 Linen hire signed.pdf','%PDF-1.4 fictional')\nz.writestr('MED-1003/Courier agreement signed.pdf','%PDF-1.4 fictional courier')\nz.close()", zip])
+      await s.step(1)
+      await s.upload(p.getByRole('button', { name: 'Choose the spreadsheet' }), csv, 1800)
+      await s.step(2)
+      await s.point(p.getByRole('list', { name: 'Needed fields' }), 1200)
+      await s.point(p.getByLabel('Where Expiry Date goes'), 1200)
+      await s.step(3)
+      await s.click(p.getByRole('button', { name: /^Check/ }), 1800)
+      await s.click(p.getByRole('radio', { name: /All rows/ }), 2200)
+      await s.step(4)
+      await s.click(p.getByRole('button', { name: /^Import \d+ contracts/ }), 900)
+      await s.click(p.getByRole('dialog').getByRole('button', { name: /^Import \d+/ }), 2200)
+      await s.step(5)
+      await s.upload(p.getByRole('button', { name: 'Choose a ZIP' }), zip, 2000)
+      await s.click(p.getByRole('button', { name: /^Add \d+ files?/ }), 2200)
+    }),
+
   register: (b) =>
     record(b, 'register', { start: '/reports' }, async (s) => {
       const p = s.page

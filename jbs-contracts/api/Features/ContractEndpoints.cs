@@ -42,6 +42,9 @@ public sealed class ContractRow
     public DateTime? LegalClearedUtc { get; set; }
     public int? LegalClearedById { get; set; }
     public DateTime? RegisteredUtc { get; set; }
+    public string? LegacyReference { get; set; }
+    public DateTime? ImportedUtc { get; set; }
+    public string? ImportedFrom { get; set; }
     public int? RegisteredById { get; set; }
     public bool? RegisteredAsBackup { get; set; }
     // The emergency unlock open now, if any (D-79), and the open Variation, if any.
@@ -158,7 +161,7 @@ public static class ContractEndpoints
             }
             var search = (q ?? "").Trim();
             if (search.Length > 0)
-                where.Add("(k.Reference LIKE @like OR k.Title LIKE @like OR s.Name LIKE @like OR k.SapOutlineAgreement LIKE @like OR s.VendorNumber LIKE @like)");
+                where.Add("(k.Reference LIKE @like OR k.Title LIKE @like OR s.Name LIKE @like OR k.SapOutlineAgreement LIKE @like OR s.VendorNumber LIKE @like OR k.LegacyReference LIKE @like)");
             await using var c = await db.OpenAsync();
             var definitions = await Fields.LoadAsync(c);
             var parameters = ContractAccess.Params(me!, new { like = $"%{EscapeLike(search)}%", today = HomeEndpoints.Today(clock) });
@@ -394,6 +397,7 @@ public static class ContractEndpoints
         r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
         StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc), r.IsLocked, r.WithdrawnReason,
         RegisteredUtc = Utc(r.RegisteredUtc), r.RegisteredByName, r.RegisteredAsBackup,
+        r.LegacyReference, ImportedUtc = Utc(r.ImportedUtc), r.ImportedFrom,
         Unlock = r.UnlockId is null ? null : new { Id = r.UnlockId, Reason = r.UnlockReason, ExpiresUtc = Utc(r.UnlockExpiresUtc), ByName = r.UnlockByName },
         r.OpenVariationId,
         r.RenewsContractId, r.RenewsReference, r.RenewedById, r.RenewedByReference, RenewedByStageName = r.RenewedByStage is { } rs ? StageNames[rs] : null,

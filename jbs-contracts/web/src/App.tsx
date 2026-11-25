@@ -17,6 +17,7 @@ import { RenewalsPage } from './pages/Renewals'
 import { ReportsPage } from './pages/Reports'
 import { TeamPage } from './pages/Team'
 import { SupplierPage } from './pages/Supplier'
+import { ImportPage } from './pages/Import'
 import { GuidePage, HelpCentrePage } from './helpcentre/HelpCentre'
 import { PeoplePage } from './pages/People'
 import { SuppliersPage } from './pages/Suppliers'
@@ -54,6 +55,7 @@ const router = createBrowserRouter([
       { path: 'admin/lists', element: <ListsPage /> },
       { path: 'admin/fields', element: <ContractFieldsPage /> },
       { path: 'admin/reminders', element: <ReminderSettingsPage /> },
+      { path: 'admin/import', element: <ImportPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

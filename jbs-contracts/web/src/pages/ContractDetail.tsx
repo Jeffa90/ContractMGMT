@@ -155,7 +155,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
               <HelpButton topic={help.contract} />
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-muted-foreground">
-              <span>{c.reference}</span>
+              <span>{c.reference}{c.legacyReference ? ` · old reference ${c.legacyReference}` : ""}</span>
               {c.renewsContractId && (
                 <Link to={`/contracts/${c.renewsContractId}`} className="text-primary hover:underline">
                   Renews {c.renewsReference}

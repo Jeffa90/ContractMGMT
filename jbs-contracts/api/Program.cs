@@ -73,6 +73,7 @@ app.MapReportEndpoints();
 app.MapTeamEndpoints();
 app.MapFullExportEndpoints();
 app.MapSupplierPageEndpoints();
+app.MapLegacyImportEndpoints();
 app.MapRenewalEndpoints();
 app.MapReminderAdminEndpoints();
 app.MapLockedChangeEndpoints();

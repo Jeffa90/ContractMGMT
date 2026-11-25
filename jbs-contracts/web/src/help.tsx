@@ -242,6 +242,36 @@ const topics = {
       </>
     ),
   },
+  import: {
+    title: 'Importing old contracts',
+    body: (
+      <>
+        <p>Bring contracts across from the old system (for example an export from Medius), then their files. Admins only. Try it on QA first.</p>
+        <ol>
+          <li>
+            <strong>Choose the spreadsheet</strong>: an Excel workbook (.xlsx) or a CSV, one contract per row, headings in row 1.
+          </li>
+          <li>
+            <strong>Match the columns</strong>: for each column in the file, choose where it goes. Old reference, title, supplier, category and owner are needed (you
+            can choose a default owner and category for rows without one). Your matching is remembered for next time.
+          </li>
+          <li>
+            <strong>Check</strong>: the dry run shows each row: imported as Effective (current, locked, with its original dates), as Ended (expired), already
+            imported, or can't be imported and why. Nothing changes yet. Fix problems in the file (or add missing people and categories) and check again.
+          </li>
+          <li>
+            <strong>Import</strong>: the ready rows go in, in one step. Suppliers that aren't in JBS Contracts yet are added. Each contract keeps its old reference,
+            shown on the contract and searchable, so importing the same file again skips the ones already there.
+          </li>
+          <li>
+            <strong>Files</strong>: put the files in ZIPs (up to 25 MB each) with the old reference in each file's name or folder, choose what they are, check, then
+            add them. A file already on its contract is skipped.
+          </li>
+        </ol>
+        <p>Every contract and file is recorded in its Activity and the audit trail, with the file it came from.</p>
+      </>
+    ),
+  },
   lists: {
     title: 'Lists',
     body: (

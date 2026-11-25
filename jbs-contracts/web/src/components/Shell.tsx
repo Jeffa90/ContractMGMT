@@ -4,6 +4,7 @@ import {
   BellRing,
   Building2,
   ChartColumn,
+  FileInput,
   LifeBuoy,
   UsersRound,
   CalendarClock,
@@ -94,6 +95,11 @@ function useNav(): { main: NavItem[]; admin: NavItem[] } {
             to: "/admin/reminders",
             label: "Emails and reminders",
             icon: <BellRing aria-hidden className="size-5" />,
+          },
+          {
+            to: "/admin/import",
+            label: "Import old contracts",
+            icon: <FileInput aria-hidden className="size-5" />,
           },
         ]
       : [],

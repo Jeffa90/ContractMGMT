@@ -43,8 +43,12 @@
       "group": "start",
       "title": "Find your way around",
       "summary": "Home, search, the menu and help.",
-      "who": ["everyone"],
-      "screens": ["home"],
+      "who": [
+        "everyone"
+      ],
+      "screens": [
+        "home"
+      ],
       "video": true,
       "steps": [
         "**Home** is your to-do list. Each tile shows contracts waiting for you; click one to open them.",
@@ -59,8 +63,13 @@
       "group": "contracts",
       "title": "Raise a contract",
       "summary": "Start a draft with just a title, and fill in the rest as you go.",
-      "who": ["contractOwner"],
-      "screens": ["contracts", "contract"],
+      "who": [
+        "contractOwner"
+      ],
+      "screens": [
+        "contracts",
+        "contract"
+      ],
       "video": true,
       "steps": [
         "Go to **Contracts** and click **Add contract**.",
@@ -76,8 +85,13 @@
       "group": "contracts",
       "title": "Add a document or a new version",
       "summary": "Attach drafts, mark-ups and signed copies; replace a file without losing the old one.",
-      "who": ["contractOwner", "legal"],
-      "screens": ["contract"],
+      "who": [
+        "contractOwner",
+        "legal"
+      ],
+      "screens": [
+        "contract"
+      ],
       "video": true,
       "steps": [
         "Open the contract and scroll down to **Documents**.",
@@ -91,8 +105,12 @@
       "group": "contracts",
       "title": "Find a contract",
       "summary": "Search, filters and the key date.",
-      "who": ["everyone"],
-      "screens": ["contracts"],
+      "who": [
+        "everyone"
+      ],
+      "screens": [
+        "contracts"
+      ],
       "video": false,
       "steps": [
         "Go to **Contracts**. **My contracts** shows the ones you own or back up; **All** shows every contract you can see.",
@@ -106,8 +124,12 @@
       "group": "contracts",
       "title": "Withdraw a contract that isn't going ahead",
       "summary": "Close it off with a reason. Nothing is deleted.",
-      "who": ["contractOwner"],
-      "screens": ["contract"],
+      "who": [
+        "contractOwner"
+      ],
+      "screens": [
+        "contract"
+      ],
       "video": false,
       "steps": [
         "Open the contract. You can withdraw it from Draft, Legal review or Signing.",
@@ -120,8 +142,12 @@
       "group": "legal",
       "title": "Send a contract to Legal",
       "summary": "Hand it over, then pick it up again when Legal sends it back.",
-      "who": ["contractOwner"],
-      "screens": ["contract"],
+      "who": [
+        "contractOwner"
+      ],
+      "screens": [
+        "contract"
+      ],
       "video": true,
       "steps": [
         "Open your draft and click **Send to Legal**.",
@@ -135,8 +161,13 @@
       "group": "legal",
       "title": "Review a contract (Legal)",
       "summary": "Pick it up, go back and forth with the owner, and clear it.",
-      "who": ["legal"],
-      "screens": ["contract", "home"],
+      "who": [
+        "legal"
+      ],
+      "screens": [
+        "contract",
+        "home"
+      ],
       "video": true,
       "steps": [
         "On Home, **New to pick up** lists contracts waiting for Legal. Open one.",
@@ -151,8 +182,12 @@
       "group": "signing",
       "title": "Send a signed contract for approval",
       "summary": "Attach the signed copy and the effective date.",
-      "who": ["contractOwner"],
-      "screens": ["contract"],
+      "who": [
+        "contractOwner"
+      ],
+      "screens": [
+        "contract"
+      ],
       "video": true,
       "steps": [
         "Sign the contract in DocuSign as usual. In JBS Contracts it shows as Signing.",
@@ -166,8 +201,13 @@
       "group": "signing",
       "title": "Approve a contract (on your phone or computer)",
       "summary": "Check the signed copy matches, then approve and register it.",
-      "who": ["approver", "groupHead"],
-      "screens": ["approve"],
+      "who": [
+        "approver",
+        "groupHead"
+      ],
+      "screens": [
+        "approve"
+      ],
       "video": true,
       "phone": true,
       "steps": [
@@ -182,8 +222,13 @@
       "group": "renewals",
       "title": "Record a renewal decision",
       "summary": "Renew, let it end or renegotiate, before the notice deadline.",
-      "who": ["contractOwner"],
-      "screens": ["renewals", "contract"],
+      "who": [
+        "contractOwner"
+      ],
+      "screens": [
+        "renewals",
+        "contract"
+      ],
       "video": true,
       "steps": [
         "Go to **Renewals**. Overdue notice deadlines are at the top.",
@@ -197,8 +242,12 @@
       "group": "renewals",
       "title": "Mark a review done",
       "summary": "For contracts with a review date, such as evergreen ones.",
-      "who": ["contractOwner"],
-      "screens": ["contract"],
+      "who": [
+        "contractOwner"
+      ],
+      "screens": [
+        "contract"
+      ],
       "video": false,
       "steps": [
         "Open the Effective contract and click **Review done**.",
@@ -211,8 +260,13 @@
       "group": "changes",
       "title": "Change an Effective contract with a Variation",
       "summary": "Dates, value and more change only once the Variation is approved.",
-      "who": ["contractOwner"],
-      "screens": ["contract", "variation"],
+      "who": [
+        "contractOwner"
+      ],
+      "screens": [
+        "contract",
+        "variation"
+      ],
       "video": true,
       "steps": [
         "Open the Effective contract and click **Start a Variation**.",
@@ -226,8 +280,12 @@
       "group": "changes",
       "title": "Hand over a contract",
       "summary": "Change the owner or backup at any time.",
-      "who": ["contractOwner"],
-      "screens": ["contract"],
+      "who": [
+        "contractOwner"
+      ],
+      "screens": [
+        "contract"
+      ],
       "video": true,
       "steps": [
         "Open the contract and click **Hand over**.",
@@ -240,8 +298,12 @@
       "group": "changes",
       "title": "Fix a mistake on a locked contract (admins)",
       "summary": "An emergency unlock of up to 4 hours, for what a Variation can't fix.",
-      "who": ["admin"],
-      "screens": ["contract"],
+      "who": [
+        "admin"
+      ],
+      "screens": [
+        "contract"
+      ],
       "video": false,
       "steps": [
         "Use this only for a mistake, such as a mistyped supplier name. Real changes go through a Variation.",
@@ -255,8 +317,14 @@
       "group": "suppliers",
       "title": "Set up a supplier's details",
       "summary": "Relationship owner, tier, risk, next business review and contacts.",
-      "who": ["procurement", "admin"],
-      "screens": ["supplier", "suppliers"],
+      "who": [
+        "procurement",
+        "admin"
+      ],
+      "screens": [
+        "supplier",
+        "suppliers"
+      ],
       "video": true,
       "steps": [
         "Go to **Suppliers** and click the supplier's name.",
@@ -270,8 +338,13 @@
       "group": "suppliers",
       "title": "Add a supplier document",
       "summary": "Insurance, certificates and the like, with an expiry date and an optional reminder.",
-      "who": ["procurement", "admin"],
-      "screens": ["supplier"],
+      "who": [
+        "procurement",
+        "admin"
+      ],
+      "screens": [
+        "supplier"
+      ],
       "video": true,
       "steps": [
         "Open the supplier and choose **Documents**, then **Add document**.",
@@ -285,8 +358,14 @@
       "group": "suppliers",
       "title": "Record a business review",
       "summary": "Who attended, a summary, ratings, the actions agreed and the deck.",
-      "who": ["procurement", "admin", "contractOwner"],
-      "screens": ["supplier"],
+      "who": [
+        "procurement",
+        "admin",
+        "contractOwner"
+      ],
+      "screens": [
+        "supplier"
+      ],
       "video": true,
       "steps": [
         "Open the supplier and choose **Business reviews**, then **Add business review**. Procurement, admins and the supplier's relationship owner can.",
@@ -301,8 +380,13 @@
       "group": "reports",
       "title": "Print or download the register",
       "summary": "Choose your columns and filters, then print to PDF or download Excel.",
-      "who": ["admin", "auditor"],
-      "screens": ["reports"],
+      "who": [
+        "admin",
+        "auditor"
+      ],
+      "screens": [
+        "reports"
+      ],
       "video": true,
       "steps": [
         "Go to **Reports**. The **Register** lists every Effective contract.",
@@ -316,8 +400,14 @@
       "group": "reports",
       "title": "See what your team has coming up",
       "summary": "Who has what overdue, coming up and on their turn.",
-      "who": ["admin", "auditor", "groupHead"],
-      "screens": ["team"],
+      "who": [
+        "admin",
+        "auditor",
+        "groupHead"
+      ],
+      "screens": [
+        "team"
+      ],
       "video": true,
       "steps": [
         "Go to **Team**. Each person shows what's overdue, coming up, on their turn and waiting on others.",
@@ -331,8 +421,13 @@
       "group": "reports",
       "title": "Download everything",
       "summary": "A full copy of the records in one Excel workbook, and every document as a ZIP.",
-      "who": ["admin", "auditor"],
-      "screens": ["reports"],
+      "who": [
+        "admin",
+        "auditor"
+      ],
+      "screens": [
+        "reports"
+      ],
       "video": false,
       "steps": [
         "Go to **Reports** and choose **Download everything**.",
@@ -346,8 +441,12 @@
       "group": "admin",
       "title": "Give someone access",
       "summary": "Add a person and tick what they can do.",
-      "who": ["admin"],
-      "screens": ["people"],
+      "who": [
+        "admin"
+      ],
+      "screens": [
+        "people"
+      ],
       "video": true,
       "steps": [
         "Go to **People** and click **Add person**.",
@@ -361,8 +460,12 @@
       "group": "admin",
       "title": "Add a contract field",
       "summary": "Ask for something new on every contract, without any code.",
-      "who": ["admin"],
-      "screens": ["fields"],
+      "who": [
+        "admin"
+      ],
+      "screens": [
+        "fields"
+      ],
       "video": true,
       "steps": [
         "Go to **Contract fields** and click **Add field** under the right section.",
@@ -376,8 +479,12 @@
       "group": "admin",
       "title": "Change a reminder or email",
       "summary": "Wording and days, with a live preview and history.",
-      "who": ["admin"],
-      "screens": ["reminders"],
+      "who": [
+        "admin"
+      ],
+      "screens": [
+        "reminders"
+      ],
       "video": true,
       "steps": [
         "Go to **Emails and reminders** and open the email to change.",
@@ -387,12 +494,40 @@
       ]
     },
     {
+      "id": "import-old-contracts",
+      "group": "admin",
+      "title": "Import old contracts and their files",
+      "summary": "From a Medius export or any spreadsheet: match the columns, check, import, then add the files from ZIPs.",
+      "who": [
+        "admin"
+      ],
+      "screens": [
+        "import"
+      ],
+      "video": true,
+      "steps": [
+        "Go to **Import old contracts** under Admin and click **Choose the spreadsheet**: Excel or CSV, one contract per row.",
+        "Check where each column goes. Old reference, title, supplier, category and owner are needed; you can choose a default owner and category for rows without one.",
+        "Click **Check (nothing changes yet)**. Each row shows whether it goes in as Effective or Ended, is already there, or can't be imported and why.",
+        "Click **Import** and confirm. Current contracts become Effective and locked with their original dates; expired ones Ended.",
+        "Then add their files: choose what they are, choose a ZIP with the old reference in each file's name or folder, check the matches and click **Add files**."
+      ]
+    },
+    {
       "id": "excel-import",
       "group": "admin",
       "title": "Add or change many at once with Excel",
       "summary": "People, lists, suppliers and contracts, previewed before anything changes.",
-      "who": ["admin", "contractOwner"],
-      "screens": ["people", "suppliers", "lists", "contracts"],
+      "who": [
+        "admin",
+        "contractOwner"
+      ],
+      "screens": [
+        "people",
+        "suppliers",
+        "lists",
+        "contracts"
+      ],
       "video": false,
       "steps": [
         "Click **Export to Excel** on the page. The file is also the template for importing.",

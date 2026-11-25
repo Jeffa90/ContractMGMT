@@ -1,6 +1,6 @@
 import { ApiError } from './api'
 
-export type ListItem = { id: number; listName: 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency'; value: string; sortOrder: number; isActive: boolean }
+export type ListItem = { id: number; listName: 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier'; value: string; sortOrder: number; isActive: boolean }
 export type Category = { id: number; parentId: number | null; name: string; sortOrder: number; isActive: boolean }
 export type Lists = { items: ListItem[]; categories: Category[]; owners: { id: number; name: string }[] }
 
@@ -86,6 +86,9 @@ export type Contract = {
   registeredUtc: string | null
   registeredByName: string | null
   registeredAsBackup: boolean | null
+  legacyReference: string | null
+  importedUtc: string | null
+  importedFrom: string | null
   renewsContractId: number | null
   renewsReference: string | null
   renewedById: number | null

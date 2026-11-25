@@ -91,6 +91,16 @@ function Situation({ data }: { data: ContractDetail }) {
         {data.cannotApproveReason && <p className="text-sm text-muted-foreground">{data.cannotApproveReason}</p>}
       </div>
     )
+  if (c.stage === 'Effective' && c.importedUtc)
+    return (
+      <p className="flex flex-wrap items-center gap-2 text-sm">
+        <Lock aria-hidden className="size-4 text-muted-foreground" />
+        <span>
+          <strong>Effective and locked.</strong> Imported from {c.importedFrom} on {formatDateTime(c.importedUtc)}
+          {c.legacyReference ? ` (old reference ${c.legacyReference})` : ''}; registered {c.registeredUtc ? formatDateTime(c.registeredUtc) : 'before then'}.
+        </span>
+      </p>
+    )
   if (c.stage === 'Effective' && c.registeredUtc)
     return (
       <p className="flex flex-wrap items-center gap-2 text-sm">

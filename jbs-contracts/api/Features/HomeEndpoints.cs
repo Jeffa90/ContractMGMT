@@ -191,7 +191,7 @@ public static class HomeEndpoints
             var contracts = await c.QueryAsync($"""
                 SELECT TOP (8) k.Id, k.Reference, k.Title, k.Stage, s.Name AS SupplierName FROM contracts.Contract k
                 LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
-                WHERE {ContractAccess.VisibleSql("k")} AND (k.Reference LIKE @like OR k.Title LIKE @like OR s.Name LIKE @like OR k.SapOutlineAgreement LIKE @like)
+                WHERE {ContractAccess.VisibleSql("k")} AND (k.Reference LIKE @like OR k.Title LIKE @like OR s.Name LIKE @like OR k.SapOutlineAgreement LIKE @like OR k.LegacyReference LIKE @like)
                 ORDER BY CASE WHEN k.Reference = @text THEN 0 WHEN k.Stage IN (N'Withdrawn', N'Archived') THEN 2 ELSE 1 END, k.UpdatedUtc DESC
                 """, ContractAccess.Params(me!, new { like, text }));
             var suppliers = await c.QueryAsync("SELECT TOP (5) Id, Name FROM contracts.Supplier WHERE IsActive = 1 AND (Name LIKE @like OR VendorNumber LIKE @like) ORDER BY Name", new { like });

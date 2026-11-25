@@ -75,6 +75,7 @@ const screenRoles: Record<string, Role[]> = {
   fields: ["admin"],
   lists: ["admin"],
   reminders: ["admin"],
+  import: ["admin"],
   reports: ["admin", "auditor"],
   team: ["admin", "auditor", "groupHead"],
   approve: ["approver", "groupHead"],

@@ -324,8 +324,8 @@ The new app replaces the old one on QA from slice 0. QA has no real data (confir
 
 | # | Slice | Jeff tries | Status |
 |---|---|---|---|
-| 0 | Switch-over; app shell (sidebar, JBS brand, light and dark); Windows sign-in; People admin; no-access page; audit table | Opens QA, is greeted by name, adds a person and ticks roles | Built and tested locally (22 API tests on SQL Server 2025, browser checked at 375px and 1280px, light and dark); first QA deploy pending |
-| 1 | Suppliers; lists; add and edit contract with built-in fields; documents; Contracts list and search; contract page; Confidential | Raises a contract with documents and finds it again | Not started |
+| 0 | Switch-over; app shell (sidebar, JBS brand, light and dark); Windows sign-in; People admin; no-access page; audit table | Opens QA, is greeted by name, adds a person and ticks roles | On QA (deployed 25 Nov 2026) |
+| 1 | Suppliers; lists; add and edit contract with built-in fields; documents; Contracts list and search; contract page; Confidential | Raises a contract with documents and finds it again | Built and tested (35 API tests on SQL Server; browser walkthrough at 375px and 1280px, light and dark); deploying to QA |
 | 2 | Contract fields and sections (add, move, rename, hide, require, preview, history, put back, after-Effective rule); added fields in forms, list columns, filters and CSV | Adds "Insurance expiry" and "Site contact" fields and sees them on contracts | Not started |
 | 3 | Legal back-and-forth; progress tracker; Activity; hand-over emails | Sends to Legal, gets it back, always sees whose turn it is | Not started |
 | 4 | Signing; approval and register; lock; phone approve page | Approves from a phone; the contract locks | Not started |

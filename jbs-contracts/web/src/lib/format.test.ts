@@ -1,4 +1,18 @@
-import { firstName, formatDateTime, formatLongDate, greeting, initials, timeAgo } from './format'
+import { daysUntil, firstName, formatBytes, formatDate, formatDateTime, formatLongDate, formatMoney, greeting, initials, timeAgo } from './format'
+
+describe('dates, money and sizes', () => {
+  it('shows date-only values without shifting the day', () => {
+    expect(formatDate('2027-12-31')).toBe('31 Dec 2027')
+    expect(daysUntil('2026-12-05', new Date('2026-11-25T02:00:00Z'))).toBe(10)
+    expect(daysUntil('2026-11-20', new Date('2026-11-25T02:00:00Z'))).toBe(-5)
+  })
+  it('formats money the Australian way', () => {
+    expect(formatMoney(1200000)).toBe('$1,200,000.00 AUD')
+    expect(formatMoney(1200000, 'AUD', true)).toBe('$1.2m')
+    expect(formatMoney(250, 'USD', true)).toBe('$250 USD')
+    expect(formatBytes(2_500_000)).toBe('2.4 MB')
+  })
+})
 
 describe('dates are shown in Brisbane time, Australian style', () => {
   it('formats a UTC time as "Tue 4 Nov, 3:00pm" in Brisbane (UTC+10, no daylight saving)', () => {

@@ -44,4 +44,58 @@ export const help = {
       </>
     ),
   },
+  contracts: {
+    title: 'Finding contracts',
+    body: (
+      <>
+        <p>
+          <strong>My contracts</strong> shows the contracts you own or are the backup for. <strong>All</strong> shows every contract you can see.
+        </p>
+        <p>Type in the search box to find a contract by its title, reference (for example JBSAUS-0012), supplier or SAP number.</p>
+        <p>The <strong>Key date</strong> is the notice deadline if there is one, otherwise the end date. It turns amber within 30 days and red once it has passed.</p>
+        <p>Contracts marked Confidential only show for their owner and backup, Legal, approvers, admins and auditors.</p>
+      </>
+    ),
+  },
+  contract: {
+    title: 'Working on a contract',
+    body: (
+      <>
+        <p>The top of the page shows where the contract is up to: Draft, Legal review, Signing, Approval, then Effective.</p>
+        <p>
+          <strong>While it is a draft</strong>, click <strong>Edit details</strong> to fill in or change anything. Only a title is needed to start; the rest can wait.
+        </p>
+        <p>
+          <strong>Documents</strong>: choose the kind, then <strong>Add document</strong>. Use <strong>New version</strong> to replace a document while keeping the earlier ones.
+          Files can be PDF, Word, Excel, Outlook email, text or images, up to 25 MB.
+        </p>
+        <p>
+          <strong>Activity</strong> lists everything that has happened to the contract, newest first. It can't be changed.
+        </p>
+        <p>If a draft isn't going ahead, use <strong>Withdraw this draft</strong> at the bottom and say why. Nothing is deleted.</p>
+      </>
+    ),
+  },
+  suppliers: {
+    title: 'Suppliers',
+    body: (
+      <>
+        <p>Every contract is with a supplier. Add a supplier here, or straight from a contract with <strong>Add new supplier</strong>.</p>
+        <p>The ABN is checked for typing mistakes (it doesn't look anything up). The SAP vendor number is optional.</p>
+        <p>Click a supplier's contract count to see their contracts.</p>
+      </>
+    ),
+  },
+  lists: {
+    title: 'Lists',
+    body: (
+      <>
+        <p>These are the choices people pick from on a contract: categories (with subcategories), agreement types, business units, sites and currencies.</p>
+        <p>
+          <strong>Hide</strong> takes something out of the choices without changing contracts that already use it. You can show it again at any time. Nothing is deleted.
+        </p>
+        <p>Every change is recorded with who made it and when.</p>
+      </>
+    ),
+  },
 } satisfies Record<string, HelpTopic>

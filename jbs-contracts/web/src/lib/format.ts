@@ -55,3 +55,33 @@ export function initials(name: string): string {
 export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name
 }
+
+const dateOnly = new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' })
+
+/** A date-only value ("2027-12-31") as "31 Dec 2027". Date-only values have no time zone. */
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return ''
+  return dateOnly.format(new Date(`${value}T00:00:00Z`))
+}
+
+/** Whole days from today (Brisbane) to a date-only value; negative when it has passed. */
+export function daysUntil(value: string, now = new Date()): number {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(now) // yyyy-mm-dd
+  return Math.round((Date.parse(`${value}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000)
+}
+
+/** "$1,200,000.00 AUD" in detail; "$1.2m" when short. */
+export function formatMoney(value: number | null | undefined, currency = 'AUD', short = false): string {
+  if (value === null || value === undefined) return ''
+  if (short) {
+    const compact = new Intl.NumberFormat('en-AU', { notation: 'compact', maximumFractionDigits: 1 }).format(value).toLowerCase()
+    return `$${compact}${currency === 'AUD' ? '' : ` ${currency}`}`
+  }
+  return `$${new Intl.NumberFormat('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} ${currency}`
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} bytes`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}

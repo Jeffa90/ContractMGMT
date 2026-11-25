@@ -6,7 +6,12 @@ import { Skeleton } from './components/ui'
 import { api, ApiError, type Me } from './lib/api'
 import { MeProvider } from './lib/me'
 import { HomePage } from './pages/Home'
+import { ContractDetailPage } from './pages/ContractDetail'
+import { ContractFormPage } from './pages/ContractForm'
+import { ContractsPage } from './pages/Contracts'
+import { ListsPage } from './pages/Lists'
 import { PeoplePage } from './pages/People'
+import { SuppliersPage } from './pages/Suppliers'
 import { NoAccessPage, NotFoundPage, SignInProblemPage } from './pages/StatusPages'
 
 const queryClient = new QueryClient({
@@ -23,7 +28,13 @@ const router = createBrowserRouter([
     element: <Shell />,
     children: [
       { index: true, element: <HomePage /> },
+      { path: 'contracts', element: <ContractsPage /> },
+      { path: 'contracts/new', element: <ContractFormPage /> },
+      { path: 'contracts/:id', element: <ContractDetailPage /> },
+      { path: 'contracts/:id/edit', element: <ContractFormPage /> },
+      { path: 'suppliers', element: <SuppliersPage /> },
       { path: 'admin/people', element: <PeoplePage /> },
+      { path: 'admin/lists', element: <ListsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

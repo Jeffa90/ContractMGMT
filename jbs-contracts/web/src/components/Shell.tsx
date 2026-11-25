@@ -1,6 +1,6 @@
 // Left sidebar (collapsible) on desktop, top bar with a menu on phones (design-system.md section 2).
 import * as Menu from '@radix-ui/react-dropdown-menu'
-import { ChevronsLeft, ChevronsRight, Home, Menu as MenuIcon, Monitor, Moon, Sun, Users, X } from 'lucide-react'
+import { Building2, ChevronsLeft, ChevronsRight, FileText, Home, ListChecks, Menu as MenuIcon, Monitor, Moon, Sun, Users, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import logo from '@/assets/jbs-logo.webp'
@@ -15,9 +15,18 @@ type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean }
 function useNav(): { main: NavItem[]; admin: NavItem[] } {
   const { person } = useMe()
   return {
-    main: [{ to: '/', label: 'Home', icon: <Home aria-hidden className="size-5" />, end: true }],
+    main: [
+      { to: '/', label: 'Home', icon: <Home aria-hidden className="size-5" />, end: true },
+      { to: '/contracts', label: 'Contracts', icon: <FileText aria-hidden className="size-5" /> },
+      { to: '/suppliers', label: 'Suppliers', icon: <Building2 aria-hidden className="size-5" /> },
+    ],
     // Features not built yet are hidden, never greyed out.
-    admin: person.roles.admin ? [{ to: '/admin/people', label: 'People', icon: <Users aria-hidden className="size-5" /> }] : [],
+    admin: person.roles.admin
+      ? [
+          { to: '/admin/people', label: 'People', icon: <Users aria-hidden className="size-5" /> },
+          { to: '/admin/lists', label: 'Lists', icon: <ListChecks aria-hidden className="size-5" /> },
+        ]
+      : [],
   }
 }
 

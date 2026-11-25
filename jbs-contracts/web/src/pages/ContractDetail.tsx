@@ -1,0 +1,405 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check, ChevronLeft, Download, FileText, History, Lock, Pencil, Trash2, Upload } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
+import { toast } from 'sonner'
+import { Dialog } from '@/components/Dialog'
+import { Select, StageBadge, Textarea } from '@/components/form'
+import { HelpButton } from '@/components/Help'
+import { Alert, Button, Card, EmptyState, Field, Skeleton } from '@/components/ui'
+import { api, ApiError } from '@/lib/api'
+import { cn } from '@/lib/cn'
+import { documentKinds, journey, uploadDocument, type Contract, type ContractDetail, type ContractDocument } from '@/lib/contracts'
+import { daysUntil, formatBytes, formatDate, formatDateTime, formatMoney, timeAgo } from '@/lib/format'
+import { help } from '@/help'
+
+function Tracker({ c }: { c: Contract }) {
+  const current = journey.findIndex((j) => j.stage === c.stage)
+  return (
+    <ol className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-0" aria-label="Where this contract is up to">
+      {journey.map((j, i) => {
+        const done = current >= 0 && i < current
+        const here = i === current
+        return (
+          <li key={j.stage} className="flex items-center sm:flex-1" aria-current={here ? 'step' : undefined}>
+            <span
+              className={cn(
+                'inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
+                done && 'border-primary bg-primary text-primary-foreground',
+                here && 'border-primary bg-primary-soft text-primary-soft-foreground',
+                !done && !here && 'border-border text-muted-foreground',
+              )}
+            >
+              {done ? <Check aria-hidden className="size-4" /> : i + 1}
+            </span>
+            <span className={cn('ml-2 text-sm', here ? 'font-semibold' : 'text-muted-foreground')}>
+              {j.label}
+              {here && <span className="sr-only"> (current)</span>}
+              {done && <span className="sr-only"> (done)</span>}
+            </span>
+            {i < journey.length - 1 && <span aria-hidden className="mx-3 hidden h-px flex-1 bg-border sm:block" />}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 py-2 sm:flex-row sm:gap-4">
+      <dt className="text-sm text-muted-foreground sm:w-56 sm:shrink-0">{label}</dt>
+      <dd className="text-sm">{children || <span className="text-muted-foreground">Not filled in</span>}</dd>
+    </div>
+  )
+}
+
+function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Card className="p-5 md:p-6">
+      <h2 className="font-display text-lg font-semibold">{title}</h2>
+      <dl className="mt-2 divide-y divide-border">{children}</dl>
+    </Card>
+  )
+}
+
+export function ContractDetailPage() {
+  const { id } = useParams()
+  const contractId = Number(id)
+  const detail = useQuery({ queryKey: ['contract', contractId], queryFn: () => api.get<ContractDetail>(`/api/contracts/${contractId}`) })
+
+  if (detail.isPending) {
+    return (
+      <div className="flex flex-col gap-4" aria-busy="true">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-8 w-80" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    )
+  }
+  if (detail.isError) {
+    const error = detail.error as ApiError
+    return (
+      <div className="flex flex-col gap-4">
+        <Link to="/contracts" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+          <ChevronLeft aria-hidden className="size-4" /> Contracts
+        </Link>
+        <Alert tone={error.status === 404 ? 'warning' : 'danger'} title={error.message} />
+      </div>
+    )
+  }
+  return <Detail data={detail.data} />
+}
+
+function Detail({ data }: { data: ContractDetail }) {
+  const c = data.contract
+  const navigate = useNavigate()
+  const [withdrawing, setWithdrawing] = useState(false)
+  const notice = c.noticeDeadline ? daysUntil(c.noticeDeadline) : null
+
+  return (
+    <>
+      <button type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/contracts'))} className="inline-flex items-center gap-1 self-start text-sm font-medium text-primary hover:underline">
+        <ChevronLeft aria-hidden className="size-4" /> Back
+      </button>
+
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-display text-xl font-semibold md:text-2xl">{c.title}</h1>
+              <HelpButton topic={help.contract} />
+            </div>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-muted-foreground">
+              <span>{c.reference}</span>
+              {c.isConfidential && (
+                <span className="inline-flex items-center gap-1">
+                  <Lock aria-hidden className="size-4" /> Confidential
+                </span>
+              )}
+            </p>
+          </div>
+          {data.canEdit && (
+            <Link to={`/contracts/${c.id}/edit`} className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-primary px-4 font-medium text-primary-foreground hover:bg-primary-hover">
+              <Pencil aria-hidden className="size-4" /> Edit details
+            </Link>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <StageBadge stage={c.stage} name={c.stageName} />
+          <span className="text-muted-foreground">
+            since {formatDateTime(c.stageSinceUtc)} ({timeAgo(c.stageSinceUtc)})
+          </span>
+        </div>
+      </header>
+
+      {c.stage === 'Withdrawn' && <Alert tone="info" title="This contract was withdrawn.">{c.withdrawnReason}</Alert>}
+      {notice !== null && c.stage === 'Effective' && notice <= 30 && (
+        <Alert tone={notice < 0 ? 'danger' : 'warning'} title={notice < 0 ? `The notice deadline passed ${-notice} days ago (${formatDate(c.noticeDeadline)}).` : `The notice deadline is in ${notice} days (${formatDate(c.noticeDeadline)}).`} />
+      )}
+
+      {c.stage !== 'Withdrawn' && (
+        <Card className="p-5 md:p-6">
+          <Tracker c={c} />
+        </Card>
+      )}
+
+      <Card className="p-5 md:p-6">
+        <h2 className="sr-only">Essentials</h2>
+        <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-xs text-muted-foreground">Supplier</dt>
+            <dd className="font-medium">{c.supplierName ?? 'Not chosen'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Owner</dt>
+            <dd className="font-medium">
+              {c.ownerName}
+              {c.backupOwnerName && <span className="block text-xs font-normal text-muted-foreground">Backup: {c.backupOwnerName}</span>}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Value</dt>
+            <dd className="tabular font-medium">{c.value !== null ? formatMoney(c.value, c.currencyCode) : 'Not filled in'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Key dates</dt>
+            <dd className="tabular font-medium">
+              {c.isEvergreen ? 'Evergreen' : c.endDate ? `Ends ${formatDate(c.endDate)}` : 'No end date yet'}
+              {c.noticeDeadline && <span className="block text-xs font-normal text-muted-foreground">Notice by {formatDate(c.noticeDeadline)}</span>}
+            </dd>
+          </div>
+        </dl>
+      </Card>
+
+      <DocumentsCard data={data} />
+
+      <DetailSection title="Basics">
+        <Row label="Category">{c.categoryDisplay}</Row>
+        <Row label="Agreement type">{c.agreementTypeName}</Row>
+        <Row label="Description">{c.description && <span className="whitespace-pre-wrap">{c.description}</span>}</Row>
+      </DetailSection>
+      <DetailSection title="Owner and access">
+        <Row label="Owner">{c.ownerName}</Row>
+        <Row label="Backup owner">{c.backupOwnerName}</Row>
+        <Row label="Confidential">{c.isConfidential ? 'Yes: only the owner and backup, Legal, approvers, admins and auditors see it' : 'No'}</Row>
+        <Row label="Business unit">{c.businessUnitName}</Row>
+        <Row label="Site">{c.siteName}</Row>
+      </DetailSection>
+      <DetailSection title="Value">
+        <Row label="Value">{c.value !== null && <span className="tabular">{formatMoney(c.value, c.currencyCode)}</span>}</Row>
+        <Row label="SAP outline agreement number">{c.sapOutlineAgreement}</Row>
+      </DetailSection>
+      <DetailSection title="Dates and notice">
+        <Row label="Start date">{formatDate(c.startDate)}</Row>
+        <Row label="Effective date">{formatDate(c.effectiveDate)}</Row>
+        <Row label="End date">{c.isEvergreen ? 'Evergreen (no end date)' : formatDate(c.endDate)}</Row>
+        <Row label="Review date">{formatDate(c.reviewDate)}</Row>
+        <Row label="Notice period">{c.noticePeriodDays !== null ? `${c.noticePeriodDays} days` : ''}</Row>
+        <Row label="Notice deadline">{formatDate(c.noticeDeadline)}</Row>
+      </DetailSection>
+      <DetailSection title="Legal">
+        <Row label="Needs Legal review">{c.needsLegalReview ? 'Yes' : 'No'}</Row>
+      </DetailSection>
+
+      <ActivityCard data={data} />
+
+      {data.canWithdraw && (
+        <div>
+          <Button variant="ghost" className="text-danger" icon={<Trash2 aria-hidden className="size-4" />} onClick={() => setWithdrawing(true)}>
+            Withdraw this draft
+          </Button>
+        </div>
+      )}
+      {withdrawing && <WithdrawDialog c={c} onClose={() => setWithdrawing(false)} />}
+    </>
+  )
+}
+
+function DocumentsCard({ data }: { data: ContractDetail }) {
+  const c = data.contract
+  const queryClient = useQueryClient()
+  const input = useRef<HTMLInputElement>(null)
+  const [kind, setKind] = useState('Draft')
+  const [newVersionOf, setNewVersionOf] = useState<ContractDocument | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const upload = useMutation({
+    mutationFn: (file: File) => uploadDocument(c.id, file, kind, newVersionOf?.id),
+    onSuccess: (result) => {
+      setError(null)
+      queryClient.invalidateQueries({ queryKey: ['contract', c.id] })
+      toast.success(result.version > 1 ? `Version ${result.version} added.` : 'Document added.')
+    },
+    onError: (e) => setError(e instanceof ApiError ? (Object.values(e.fields)[0] ?? e.message) : 'The upload failed. Try again.'),
+    onSettled: () => {
+      setNewVersionOf(null)
+      if (input.current) input.current.value = ''
+    },
+  })
+  const remove = useMutation({
+    mutationFn: (doc: ContractDocument) => api.post(`/api/contracts/${c.id}/documents/${doc.id}/remove`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract', c.id] })
+      toast.success('Document removed. Its file and history are kept.')
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'That didn\'t work. Try again.'),
+  })
+  const pick = (doc: ContractDocument | null) => {
+    setNewVersionOf(doc)
+    input.current?.click()
+  }
+
+  return (
+    <Card className="p-5 md:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 className="font-display text-lg font-semibold">Documents</h2>
+        {data.canUpload && (
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Kind">
+              {(p) => (
+                <Select {...p} value={kind} onChange={(e) => setKind(e.target.value)} className="min-w-52">
+                  {documentKinds.map((k) => (
+                    <option key={k.value} value={k.value}>
+                      {k.label}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Button variant="secondary" icon={<Upload aria-hidden className="size-4" />} onClick={() => pick(null)} loading={upload.isPending && !newVersionOf}>
+              Add document
+            </Button>
+          </div>
+        )}
+      </div>
+      <input
+        ref={input}
+        type="file"
+        hidden
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.msg,.eml,.txt,.csv,.png,.jpg,.jpeg"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) upload.mutate(file)
+        }}
+      />
+      {error && (
+        <div className="mt-3">
+          <Alert tone="danger" title={error} />
+        </div>
+      )}
+      {data.documents.length === 0 ? (
+        <EmptyState icon={<FileText />} title={data.canUpload ? 'No documents yet. Add the draft agreement and anything else that goes with it. PDF, Word, Excel, email or images up to 25 MB.' : 'No documents yet.'} />
+      ) : (
+        <ul className="mt-4 divide-y divide-border">
+          {data.documents.map((d) => {
+            const latest = d.versions[0]
+            return (
+              <li key={d.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <a href={`/api/documents/${latest.id}/file`} className="font-medium text-primary hover:underline">
+                    {d.title}
+                  </a>
+                  <p className="text-xs text-muted-foreground">
+                    {d.kindName} · version {d.currentVersion} · {formatBytes(latest.sizeBytes)} · {latest.uploadedByName}, {formatDateTime(latest.uploadedUtc)}
+                  </p>
+                  {d.versions.length > 1 && (
+                    <details className="mt-1 text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">Earlier versions ({d.versions.length - 1})</summary>
+                      <ul className="mt-1 flex flex-col gap-1">
+                        {d.versions.slice(1).map((v) => (
+                          <li key={v.id}>
+                            <a href={`/api/documents/${v.id}/file`} className="text-primary hover:underline">
+                              Version {v.versionNumber}: {v.fileName}
+                            </a>{' '}
+                            <span className="text-muted-foreground">({v.uploadedByName}, {formatDateTime(v.uploadedUtc)})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <a href={`/api/documents/${latest.id}/file`} className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm font-medium hover:bg-muted" aria-label={`Download ${d.title}`}>
+                    <Download aria-hidden className="size-4" /> Download
+                  </a>
+                  {data.canUpload && (
+                    <>
+                      <Button variant="ghost" onClick={() => pick(d)} loading={upload.isPending && newVersionOf?.id === d.id} aria-label={`Upload a new version of ${d.title}`}>
+                        New version
+                      </Button>
+                      <Button variant="ghost" className="text-danger" onClick={() => remove.mutate(d)} aria-label={`Remove ${d.title}`}>
+                        Remove
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function ActivityCard({ data }: { data: ContractDetail }) {
+  const [showAll, setShowAll] = useState(false)
+  const items = showAll ? data.activity : data.activity.slice(0, 8)
+  return (
+    <Card className="p-5 md:p-6">
+      <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+        <History aria-hidden className="size-5" /> Activity
+      </h2>
+      <ol className="mt-3 flex flex-col gap-3">
+        {items.map((a) => (
+          <li key={a.id} className="flex flex-col border-l-2 border-border pl-3">
+            <span className="text-sm">{a.summary}</span>
+            <span className="text-xs text-muted-foreground">{formatDateTime(a.occurredUtc)}</span>
+          </li>
+        ))}
+      </ol>
+      {data.activity.length > 8 && !showAll && (
+        <Button variant="link" className="mt-3" onClick={() => setShowAll(true)}>
+          Show all ({data.activity.length})
+        </Button>
+      )}
+    </Card>
+  )
+}
+
+function WithdrawDialog({ c, onClose }: { c: Contract; onClose: () => void }) {
+  const queryClient = useQueryClient()
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | undefined>()
+  const withdraw = useMutation({
+    mutationFn: () => api.post(`/api/contracts/${c.id}/withdraw`, { reason, rowVersion: c.rowVersion }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract', c.id] })
+      queryClient.invalidateQueries({ queryKey: ['contracts'] })
+      toast.success('Contract withdrawn.')
+      onClose()
+    },
+    onError: (e) => setError(e instanceof ApiError ? (e.fields.reason ?? e.message) : 'That didn\'t work. Try again.'),
+  })
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={`Withdraw ${c.title}?`}
+      description="It stops here and can't be sent on. Its documents and history are kept."
+      footer={
+        <>
+          <Button onClick={onClose}>Keep it</Button>
+          <Button variant="danger" loading={withdraw.isPending} onClick={() => withdraw.mutate()}>
+            Withdraw
+          </Button>
+        </>
+      }
+    >
+      <Field label="Why is it being withdrawn?" required error={error}>
+        {(p) => <Textarea {...p} autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="For example: the supplier pulled out" />}
+      </Field>
+    </Dialog>
+  )
+}

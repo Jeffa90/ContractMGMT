@@ -22,6 +22,7 @@ public sealed class AppFixture : IAsyncLifetime
 
     private readonly string serverConnection;
     private readonly string databaseName = $"JbsContractsTest_{Guid.NewGuid():N}";
+    public string DataDirectory { get; } = Path.Combine(Path.GetTempPath(), $"jbs-contracts-test-{Guid.NewGuid():N}");
     public string ConnectionString { get; }
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
@@ -45,6 +46,7 @@ public sealed class AppFixture : IAsyncLifetime
             b.UseSetting("Database:ConnectionString", ConnectionString);
             b.UseSetting("Contracts:AuthMode", "Header");
             b.UseSetting("Contracts:ApplyDatabaseScripts", "true");
+            b.UseSetting("Contracts:DataDirectory", DataDirectory);
             // The old app's variable names, as on the GitHub QA environment (decision D-36).
             b.UseSetting("Ecp:Security:FailsafeAdmins:0:Account", AdminAccount);
             b.UseSetting("Ecp:Security:FailsafeAdmins:0:DisplayName", AdminName);
@@ -60,6 +62,7 @@ public sealed class AppFixture : IAsyncLifetime
         await using var master = new SqlConnection(serverConnection);
         await master.OpenAsync();
         await master.ExecuteAsync($"ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{databaseName}];");
+        if (Directory.Exists(DataDirectory)) Directory.Delete(DataDirectory, recursive: true);
     }
 
     /// <summary>A browser-like client signed in as the given Windows account, sending the request-forgery header on changes.</summary>

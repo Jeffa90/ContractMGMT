@@ -31,6 +31,30 @@ public static class WebSecurity
         await next();
     });
 
+    /// <summary>
+    /// If SQL Server cancels a request as a deadlock victim (error 1205, usually a page read meeting a change), run the request again,
+    /// up to 3 tries. Safe because every change is one all-or-nothing transaction: a cancelled one leaves nothing behind.
+    /// </summary>
+    public static IApplicationBuilder UseDeadlockRetry(this IApplicationBuilder app) => app.Use(async (context, next) =>
+    {
+        if (!context.Request.Path.StartsWithSegments("/api")) { await next(); return; }
+        context.Request.EnableBuffering();
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await next();
+                return;
+            }
+            catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 1205 && attempt < 3 && !context.Response.HasStarted)
+            {
+                context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Deadlock").LogWarning("Request {Path} was a deadlock victim; trying again ({Attempt}).", context.Request.Path, attempt);
+                context.Request.Body.Position = 0;
+                await Task.Delay(25 * attempt);
+            }
+        }
+    });
+
     public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app) => app.Use(async (context, next) =>
     {
         context.Response.OnStarting(() =>

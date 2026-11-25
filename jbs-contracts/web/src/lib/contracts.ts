@@ -36,6 +36,8 @@ export type ContractListItem = {
   isEvergreen: boolean
   noticeDeadline: string | null
   updatedUtc: string
+  /** Added fields offered as list columns: plain words by field key. */
+  fields: Record<string, string>
 }
 
 export type Contract = {
@@ -84,6 +86,8 @@ export type ContractDocument = { id: number; kind: string; kindName: string; tit
 export type Activity = { id: number; occurredUtc: string; actorName: string; action: string; summary: string }
 export type ContractDetail = {
   contract: Contract
+  /** Added fields: the value for the form and plain words for display. */
+  fieldValues: Record<string, { value: string | number | boolean | string[] | null; display: string }>
   canEdit: boolean
   canWithdraw: boolean
   canUpload: boolean

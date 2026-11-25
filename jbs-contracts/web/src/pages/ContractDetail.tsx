@@ -11,6 +11,7 @@ import { api, ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { documentKinds, journey, uploadDocument, type Contract, type ContractDetail, type ContractDocument } from '@/lib/contracts'
 import { daysUntil, formatBytes, formatDate, formatDateTime, formatMoney, timeAgo } from '@/lib/format'
+import { arrange, type Layout, type LayoutField } from '@/lib/layout'
 import { help } from '@/help'
 
 function Tracker({ c }: { c: Contract }) {
@@ -54,6 +55,39 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+/** Plain words for a built-in field on the contract page. */
+function builtInDisplay(key: string, c: Contract): ReactNode {
+  switch (key) {
+    case 'title': return c.title
+    case 'supplier': return c.supplierName
+    case 'category': return c.categoryDisplay
+    case 'agreementType': return c.agreementTypeName
+    case 'description': return c.description && <span className="whitespace-pre-wrap">{c.description}</span>
+    case 'owner': return c.ownerName
+    case 'backupOwner': return c.backupOwnerName
+    case 'confidential': return c.isConfidential ? 'Yes: only the owner and backup, Legal, approvers, admins and auditors see it' : 'No'
+    case 'businessUnit': return c.businessUnitName
+    case 'site': return c.siteName
+    case 'value': return c.value !== null && <span className="tabular">{formatMoney(c.value, c.currencyCode)}</span>
+    case 'sapOutlineAgreement': return c.sapOutlineAgreement
+    case 'startDate': return formatDate(c.startDate)
+    case 'effectiveDate': return formatDate(c.effectiveDate)
+    case 'endDate': return c.isEvergreen ? 'Evergreen (no end date)' : formatDate(c.endDate)
+    case 'evergreen': return c.isEvergreen ? 'Yes' : 'No'
+    case 'noticePeriodDays': return c.noticePeriodDays !== null ? `${c.noticePeriodDays} days${c.noticeDeadline ? ` (notice by ${formatDate(c.noticeDeadline)})` : ''}` : ''
+    case 'reviewDate': return formatDate(c.reviewDate)
+    case 'needsLegalReview': return c.needsLegalReview ? 'Yes' : 'No'
+    default: return null
+  }
+}
+
+function FieldDisplay({ field, display }: { field: LayoutField; display: string }) {
+  if (field.kind === 'Link') return <a href={display} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">{display}</a>
+  if (field.kind === 'Email') return <a href={`mailto:${display}`} className="text-primary hover:underline">{display}</a>
+  if (field.kind === 'LongText') return <span className="whitespace-pre-wrap">{display}</span>
+  return <>{display}</>
+}
+
 function DetailSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card className="p-5 md:p-6">
@@ -67,6 +101,7 @@ export function ContractDetailPage() {
   const { id } = useParams()
   const contractId = Number(id)
   const detail = useQuery({ queryKey: ['contract', contractId], queryFn: () => api.get<ContractDetail>(`/api/contracts/${contractId}`) })
+  const layout = useQuery({ queryKey: ['layout'], queryFn: () => api.get<Layout>('/api/layout') })
 
   if (detail.isPending) {
     return (
@@ -89,10 +124,11 @@ export function ContractDetailPage() {
       </div>
     )
   }
-  return <Detail data={detail.data} />
+  if (layout.isPending) return <Skeleton className="h-64 w-full" />
+  return <Detail data={detail.data} layout={layout.data ?? { versionId: 0, sections: [], fields: [] }} />
 }
 
-function Detail({ data }: { data: ContractDetail }) {
+function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
   const c = data.contract
   const navigate = useNavigate()
   const [withdrawing, setWithdrawing] = useState(false)
@@ -175,33 +211,15 @@ function Detail({ data }: { data: ContractDetail }) {
 
       <DocumentsCard data={data} />
 
-      <DetailSection title="Basics">
-        <Row label="Category">{c.categoryDisplay}</Row>
-        <Row label="Agreement type">{c.agreementTypeName}</Row>
-        <Row label="Description">{c.description && <span className="whitespace-pre-wrap">{c.description}</span>}</Row>
-      </DetailSection>
-      <DetailSection title="Owner and access">
-        <Row label="Owner">{c.ownerName}</Row>
-        <Row label="Backup owner">{c.backupOwnerName}</Row>
-        <Row label="Confidential">{c.isConfidential ? 'Yes: only the owner and backup, Legal, approvers, admins and auditors see it' : 'No'}</Row>
-        <Row label="Business unit">{c.businessUnitName}</Row>
-        <Row label="Site">{c.siteName}</Row>
-      </DetailSection>
-      <DetailSection title="Value">
-        <Row label="Value">{c.value !== null && <span className="tabular">{formatMoney(c.value, c.currencyCode)}</span>}</Row>
-        <Row label="SAP outline agreement number">{c.sapOutlineAgreement}</Row>
-      </DetailSection>
-      <DetailSection title="Dates and notice">
-        <Row label="Start date">{formatDate(c.startDate)}</Row>
-        <Row label="Effective date">{formatDate(c.effectiveDate)}</Row>
-        <Row label="End date">{c.isEvergreen ? 'Evergreen (no end date)' : formatDate(c.endDate)}</Row>
-        <Row label="Review date">{formatDate(c.reviewDate)}</Row>
-        <Row label="Notice period">{c.noticePeriodDays !== null ? `${c.noticePeriodDays} days` : ''}</Row>
-        <Row label="Notice deadline">{formatDate(c.noticeDeadline)}</Row>
-      </DetailSection>
-      <DetailSection title="Legal">
-        <Row label="Needs Legal review">{c.needsLegalReview ? 'Yes' : 'No'}</Row>
-      </DetailSection>
+      {arrange(layout).map(({ section, fields }) => (
+        <DetailSection key={section.key} title={section.title}>
+          {fields.map((f) => (
+            <Row key={f.key} label={f.label}>
+              {f.isBuiltIn ? builtInDisplay(f.key, c) : data.fieldValues[f.key]?.display ? <FieldDisplay field={f} display={data.fieldValues[f.key].display} /> : null}
+            </Row>
+          ))}
+        </DetailSection>
+      ))}
 
       <ActivityCard data={data} />
 

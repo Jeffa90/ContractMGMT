@@ -118,4 +118,26 @@ export const help = {
       </>
     ),
   },
+  fields: {
+    title: 'Arranging the contract fields',
+    body: (
+      <>
+        <p>This is what people fill in on a contract, and where it appears. The preview shows the Add contract form as people will see it.</p>
+        <ul>
+          <li>
+            <strong>Add field</strong> under a section: choose its kind (text, number, money, date, yes/no, a list of options, a person, a supplier, a link or an email).
+          </li>
+          <li>Use the arrows to move fields and sections, and the pencil to rename them or change their help.</li>
+          <li>
+            <strong>Remove</strong> hides a field. Values already entered are kept and you can bring it back. Fields the contract rules need (like Title and End date) can be renamed and
+            moved but not removed.
+          </li>
+          <li>
+            Nothing changes for anyone until you click <strong>Save changes</strong>. <strong>History</strong> keeps every saved version, and you can put any of them back.
+          </li>
+        </ul>
+        <p>A field's kind can't change once contracts have values in it. Add a new field instead and remove the old one.</p>
+      </>
+    ),
+  },
 } satisfies Record<string, HelpTopic>

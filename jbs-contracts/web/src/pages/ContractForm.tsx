@@ -1,15 +1,18 @@
-// Add a contract, or edit a draft: one column, short titled sections (product-spec section 10), a sticky save bar.
-// Slice 2 will draw these sections and fields from the admin's field layout; the built-in fields here are its starting point.
+// Add a contract, or edit a draft: one column, short titled sections, a sticky save bar.
+// Sections and fields come from the layout an admin arranges (Admin, Contract fields): built-in fields keep their own controls
+// but take their label, help, section, order and visibility from it; added fields are drawn by FieldInput.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
+import { FieldInput } from '@/components/FieldInput'
 import { Select, Textarea } from '@/components/form'
 import { Alert, Button, Card, Checkbox, Field, Skeleton, TextInput } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
 import type { ContractDetail, Lists, Supplier } from '@/lib/contracts'
+import { arrange, type FieldValue, type Layout, type LayoutField } from '@/lib/layout'
 import { useMe } from '@/lib/me'
 
 type FormState = {
@@ -38,11 +41,10 @@ type FormState = {
 const toId = (v: string) => (v ? Number(v) : null)
 const toText = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v))
 
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card className="p-5 md:p-6">
       <h2 className="font-display text-lg font-semibold">{title}</h2>
-      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       <div className="mt-4 flex flex-col gap-4">{children}</div>
     </Card>
   )
@@ -53,9 +55,11 @@ export function ContractFormPage() {
   const editing = id !== undefined
   const lists = useQuery({ queryKey: ['lists'], queryFn: () => api.get<Lists>('/api/lists') })
   const suppliers = useQuery({ queryKey: ['suppliers'], queryFn: () => api.get<Supplier[]>('/api/suppliers') })
+  const layout = useQuery({ queryKey: ['layout'], queryFn: () => api.get<Layout>('/api/layout') })
+  const people = useQuery({ queryKey: ['people-picker'], queryFn: () => api.get<{ id: number; name: string }[]>('/api/people/picker') })
   const detail = useQuery({ queryKey: ['contract', Number(id)], queryFn: () => api.get<ContractDetail>(`/api/contracts/${id}`), enabled: editing })
 
-  if (lists.isPending || suppliers.isPending || (editing && detail.isPending)) {
+  if (lists.isPending || suppliers.isPending || layout.isPending || people.isPending || (editing && detail.isPending)) {
     return (
       <div className="flex flex-col gap-4" aria-busy="true">
         <Skeleton className="h-8 w-64" />
@@ -63,14 +67,27 @@ export function ContractFormPage() {
       </div>
     )
   }
-  if (lists.isError || suppliers.isError || detail.isError) {
-    const error = (lists.error ?? suppliers.error ?? detail.error) as Error
-    return <Alert tone="danger" title="We couldn't open the form.">{error.message}</Alert>
-  }
-  return <ContractForm lists={lists.data} suppliers={suppliers.data} detail={editing ? detail.data! : null} />
+  const error = lists.error ?? suppliers.error ?? layout.error ?? people.error ?? detail.error
+  if (error) return <Alert tone="danger" title="We couldn't open the form.">{(error as Error).message}</Alert>
+  return <ContractForm lists={lists.data!} suppliers={suppliers.data!} layout={layout.data!} people={people.data!} detail={editing ? detail.data! : null} />
 }
 
-function ContractForm({ lists, suppliers, detail }: { lists: Lists; suppliers: Supplier[]; detail: ContractDetail | null }) {
+export function ContractForm({
+  lists,
+  suppliers,
+  layout,
+  people,
+  detail,
+  preview,
+}: {
+  lists: Lists
+  suppliers: Supplier[]
+  layout: Layout
+  people: { id: number; name: string }[]
+  detail: ContractDetail | null
+  /** Admin, Contract fields: shows the form as people will see it; nothing is saved. */
+  preview?: boolean
+}) {
   const { person } = useMe()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -97,10 +114,18 @@ function ContractForm({ lists, suppliers, detail }: { lists: Lists; suppliers: S
     reviewDate: c?.reviewDate ?? '',
     needsLegalReview: c?.needsLegalReview ?? true,
   }))
+  const [extra, setExtra] = useState<Record<string, FieldValue>>(() =>
+    Object.fromEntries(Object.entries(detail?.fieldValues ?? {}).map(([k, v]) => [k, v.value])),
+  )
+  const [touched, setTouched] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [problem, setProblem] = useState<string | null>(null)
   const [addingSupplier, setAddingSupplier] = useState(false)
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
+  const setField = (key: string, value: FieldValue) => {
+    setExtra((x) => ({ ...x, [key]: value }))
+    setTouched((t) => new Set(t).add(key))
+  }
 
   // Pickers offer items in use, plus whatever this contract already has (a hidden item stays on contracts that use it).
   const keep = (id: number, current: string) => String(id) === current
@@ -114,6 +139,8 @@ function ContractForm({ lists, suppliers, detail }: { lists: Lists; suppliers: S
 
   const save = useMutation({
     mutationFn: () => {
+      // Only added fields someone changed are sent, so a hidden field's value is never touched.
+      const fields = Object.fromEntries([...touched].map((k) => [k, extra[k] === '' ? null : extra[k]]))
       const body = {
         title: form.title,
         description: form.description || null,
@@ -136,6 +163,7 @@ function ContractForm({ lists, suppliers, detail }: { lists: Lists; suppliers: S
         reviewDate: form.reviewDate || null,
         needsLegalReview: form.needsLegalReview,
         rowVersion: c?.rowVersion,
+        fields,
       }
       return c ? api.put<{ id: number }>(`/api/contracts/${c.id}`, body) : api.post<{ id: number; reference: string }>('/api/contracts', body)
     },
@@ -154,10 +182,10 @@ function ContractForm({ lists, suppliers, detail }: { lists: Lists; suppliers: S
     },
   })
 
-  const listSelect = (key: 'agreementTypeId' | 'businessUnitId' | 'siteId', listName: string, label: string, empty: string) => {
+  const listSelect = (key: 'agreementTypeId' | 'businessUnitId' | 'siteId', listName: string, f: LayoutField, empty: string) => {
     const items = options(listName, form[key])
     return (
-      <Field label={label} error={errors[key]} help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : undefined}>
+      <Field label={f.label} required={f.isRequired} error={errors[key]} help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : (f.help ?? undefined)}>
         {(p) => (
           <Select {...p} value={form[key]} onChange={(e) => set(key, e.target.value)} disabled={items.length === 0}>
             <option value="">Not chosen</option>
@@ -172,6 +200,181 @@ function ContractForm({ lists, suppliers, detail }: { lists: Lists; suppliers: S
       </Field>
     )
   }
+
+  /** The control for a built-in field, labelled from the layout. */
+  const builtIn = (f: LayoutField): ReactNode => {
+    const help = f.help ?? undefined
+    switch (f.key) {
+      case 'title':
+        return (
+          <Field label={f.label} required error={errors.title} help={help}>
+            {(p) => <TextInput {...p} value={form.title} onChange={(e) => set('title', e.target.value)} maxLength={200} autoFocus={!c && !preview} />}
+          </Field>
+        )
+      case 'supplier':
+        return (
+          <Field label={f.label} required={f.isRequired} error={errors.supplierId} help={help}>
+            {(p) => (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Select {...p} value={form.supplierId} onChange={(e) => set('supplierId', e.target.value)}>
+                  <option value="">Not chosen</option>
+                  {activeSuppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </Select>
+                <Button type="button" icon={<Plus aria-hidden className="size-4" />} onClick={() => setAddingSupplier(true)} className="shrink-0" disabled={preview}>
+                  Add new supplier
+                </Button>
+              </div>
+            )}
+          </Field>
+        )
+      case 'category':
+        return (
+          <Field label={f.label} required={f.isRequired} error={errors.categoryId} help={categories.length === 0 ? 'No categories yet. An admin adds them under Admin, Lists.' : help}>
+            {(p) => (
+              <Select {...p} value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)} disabled={categories.length === 0}>
+                <option value="">Not chosen</option>
+                {categories.map(({ top, subs }) => (
+                  <optgroup key={top.id} label={top.name}>
+                    <option value={top.id}>{top.name} (all)</option>
+                    {subs.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {top.name} › {s.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </Select>
+            )}
+          </Field>
+        )
+      case 'agreementType':
+        return listSelect('agreementTypeId', 'AgreementType', f, 'No agreement types yet.')
+      case 'businessUnit':
+        return listSelect('businessUnitId', 'BusinessUnit', f, 'No business units yet.')
+      case 'site':
+        return listSelect('siteId', 'Site', f, 'No sites yet.')
+      case 'description':
+        return (
+          <Field label={f.label} required={f.isRequired} error={errors.description} help={help}>
+            {(p) => <Textarea {...p} value={form.description} onChange={(e) => set('description', e.target.value)} maxLength={4000} />}
+          </Field>
+        )
+      case 'owner':
+        return (
+          <Field label={f.label} required error={errors.ownerId} help={help ?? 'The owner and backup get the reminders and see it under My contracts. Any contract owner can still edit it.'}>
+            {(p) => (
+              <Select {...p} value={form.ownerId} onChange={(e) => set('ownerId', e.target.value)}>
+                {owners.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        )
+      case 'backupOwner':
+        return (
+          <Field label={f.label} required={f.isRequired} error={errors.backupOwnerId} help={help}>
+            {(p) => (
+              <Select {...p} value={form.backupOwnerId} onChange={(e) => set('backupOwnerId', e.target.value)}>
+                <option value="">No backup</option>
+                {owners
+                  .filter((o) => String(o.id) !== form.ownerId)
+                  .map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+              </Select>
+            )}
+          </Field>
+        )
+      case 'confidential':
+        return <Checkbox label={f.label} description={help} checked={form.isConfidential} onChange={(v) => set('isConfidential', v)} />
+      case 'value':
+        return (
+          <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+            <Field label={f.label} required={f.isRequired} error={errors.value} help={help ?? 'Numbers only.'}>
+              {(p) => <TextInput {...p} inputMode="decimal" className="tabular" value={form.value} onChange={(e) => set('value', e.target.value)} />}
+            </Field>
+            <Field label="Currency" error={errors.currencyCode}>
+              {(p) => (
+                <Select {...p} value={form.currencyCode} onChange={(e) => set('currencyCode', e.target.value)}>
+                  {options('Currency', form.currencyCode).map((i) => (
+                    <option key={i.id} value={i.value}>
+                      {i.value}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          </div>
+        )
+      case 'sapOutlineAgreement':
+        return (
+          <Field label={f.label} required={f.isRequired} error={errors.sapOutlineAgreement} help={help}>
+            {(p) => <TextInput {...p} value={form.sapOutlineAgreement} onChange={(e) => set('sapOutlineAgreement', e.target.value)} maxLength={50} />}
+          </Field>
+        )
+      case 'startDate':
+      case 'effectiveDate':
+      case 'reviewDate': {
+        const k = f.key as 'startDate' | 'effectiveDate' | 'reviewDate'
+        return (
+          <Field label={f.label} required={f.isRequired} error={errors[k]} help={help}>
+            {(p) => <TextInput {...p} type="date" className="sm:w-60" value={form[k]} onChange={(e) => set(k, e.target.value)} />}
+          </Field>
+        )
+      }
+      case 'endDate':
+        return (
+          <Field label={f.label} required={f.isRequired} error={errors.endDate} help={form.isEvergreen ? 'Evergreen contracts have no end date.' : help}>
+            {(p) => <TextInput {...p} type="date" className="sm:w-60" value={form.isEvergreen ? '' : form.endDate} disabled={form.isEvergreen} onChange={(e) => set('endDate', e.target.value)} />}
+          </Field>
+        )
+      case 'evergreen':
+        return <Checkbox label={f.label} description={help} checked={form.isEvergreen} onChange={(v) => set('isEvergreen', v)} />
+      case 'noticePeriodDays':
+        return (
+          <Field label={f.label} required={f.isRequired} error={errors.noticePeriodDays} help={help}>
+            {(p) => <TextInput {...p} inputMode="numeric" className="tabular sm:w-40" value={form.noticePeriodDays} onChange={(e) => set('noticePeriodDays', e.target.value.replace(/\D/g, ''))} />}
+          </Field>
+        )
+      case 'needsLegalReview':
+        return <Checkbox label={f.label} description={help} checked={form.needsLegalReview} onChange={(v) => set('needsLegalReview', v)} />
+      default:
+        return null
+    }
+  }
+
+  const picks = { people, suppliers: activeSuppliers.map((s) => ({ id: s.id, name: s.name })) }
+  const groups = arrange(layout)
+
+  const body = (
+    <>
+      {problem && <Alert tone="danger" title={problem} />}
+      {groups.map(({ section, fields }) => (
+        <Section key={section.key} title={section.title}>
+          {fields.map((f) => (
+            <div key={f.key}>
+              {f.isBuiltIn ? (
+                builtIn(f)
+              ) : (
+                <FieldInput field={f} value={extra[f.key] ?? null} onChange={(v) => setField(f.key, v)} error={errors[`field.${f.key}`]} picks={picks} />
+              )}
+            </div>
+          ))}
+        </Section>
+      ))}
+    </>
+  )
+
+  if (preview) return <div className="flex flex-col gap-5">{body}</div>
 
   return (
     <form
@@ -190,139 +393,7 @@ function ContractForm({ lists, suppliers, detail }: { lists: Lists; suppliers: S
           {c ? 'Change the details while it is a draft.' : 'Only a title is needed to save a draft. Fill in the rest as you go.'}
         </p>
       </header>
-      {problem && <Alert tone="danger" title={problem} />}
-
-      <Section title="Basics">
-        <Field label="Title" required error={errors.title} help='For example "Freight services 2026".'>
-          {(p) => <TextInput {...p} value={form.title} onChange={(e) => set('title', e.target.value)} maxLength={200} autoFocus={!c} />}
-        </Field>
-        <Field label="Supplier" error={errors.supplierId}>
-          {(p) => (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Select {...p} value={form.supplierId} onChange={(e) => set('supplierId', e.target.value)}>
-                <option value="">Not chosen</option>
-                {activeSuppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </Select>
-              <Button type="button" icon={<Plus aria-hidden className="size-4" />} onClick={() => setAddingSupplier(true)} className="shrink-0">
-                Add new supplier
-              </Button>
-            </div>
-          )}
-        </Field>
-        <Field label="Category" error={errors.categoryId} help={categories.length === 0 ? 'No categories yet. An admin adds them under Admin, Lists.' : undefined}>
-          {(p) => (
-            <Select {...p} value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)} disabled={categories.length === 0}>
-              <option value="">Not chosen</option>
-              {categories.map(({ top, subs }) => (
-                <optgroup key={top.id} label={top.name}>
-                  <option value={top.id}>{top.name} (all)</option>
-                  {subs.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {top.name} › {s.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </Select>
-          )}
-        </Field>
-        {listSelect('agreementTypeId', 'AgreementType', 'Agreement type', 'No agreement types yet.')}
-        <Field label="Description" error={errors.description}>
-          {(p) => <Textarea {...p} value={form.description} onChange={(e) => set('description', e.target.value)} maxLength={4000} />}
-        </Field>
-      </Section>
-
-      <Section title="Owner and access" description="The owner and backup get the reminders and see it under My contracts. Any contract owner can still edit it.">
-        <Field label="Owner" required error={errors.ownerId}>
-          {(p) => (
-            <Select {...p} value={form.ownerId} onChange={(e) => set('ownerId', e.target.value)}>
-              {owners.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label="Backup owner" error={errors.backupOwnerId}>
-          {(p) => (
-            <Select {...p} value={form.backupOwnerId} onChange={(e) => set('backupOwnerId', e.target.value)}>
-              <option value="">No backup</option>
-              {owners
-                .filter((o) => String(o.id) !== form.ownerId)
-                .map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-            </Select>
-          )}
-        </Field>
-        <Checkbox
-          label="Confidential"
-          description="Only the owner and backup, Legal, approvers, admins and auditors can see it."
-          checked={form.isConfidential}
-          onChange={(v) => set('isConfidential', v)}
-        />
-        {listSelect('businessUnitId', 'BusinessUnit', 'Business unit', 'No business units yet.')}
-        {listSelect('siteId', 'Site', 'Site', 'No sites yet.')}
-      </Section>
-
-      <Section title="Value">
-        <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
-          <Field label="Value" error={errors.value} help="The estimated total value. Numbers only.">
-            {(p) => <TextInput {...p} inputMode="decimal" className="tabular" value={form.value} onChange={(e) => set('value', e.target.value)} />}
-          </Field>
-          <Field label="Currency" error={errors.currencyCode}>
-            {(p) => (
-              <Select {...p} value={form.currencyCode} onChange={(e) => set('currencyCode', e.target.value)}>
-                {options('Currency', form.currencyCode).map((i) => (
-                  <option key={i.id} value={i.value}>
-                    {i.value}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        </div>
-        <Field label="SAP outline agreement number" error={errors.sapOutlineAgreement}>
-          {(p) => <TextInput {...p} value={form.sapOutlineAgreement} onChange={(e) => set('sapOutlineAgreement', e.target.value)} maxLength={50} />}
-        </Field>
-      </Section>
-
-      <Section title="Dates and notice" description="The notice deadline is worked out for you: the end date (or review date, if evergreen) minus the notice period.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Start date" error={errors.startDate}>
-            {(p) => <TextInput {...p} type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} />}
-          </Field>
-          <Field label="Effective date" error={errors.effectiveDate}>
-            {(p) => <TextInput {...p} type="date" value={form.effectiveDate} onChange={(e) => set('effectiveDate', e.target.value)} />}
-          </Field>
-          <Field label="End date" error={errors.endDate} help={form.isEvergreen ? 'Evergreen contracts have no end date.' : undefined}>
-            {(p) => <TextInput {...p} type="date" value={form.isEvergreen ? '' : form.endDate} disabled={form.isEvergreen} onChange={(e) => set('endDate', e.target.value)} />}
-          </Field>
-          <Field label="Review date" error={errors.reviewDate}>
-            {(p) => <TextInput {...p} type="date" value={form.reviewDate} onChange={(e) => set('reviewDate', e.target.value)} />}
-          </Field>
-        </div>
-        <Checkbox label="Evergreen (no end date)" description="It carries on until someone ends it." checked={form.isEvergreen} onChange={(v) => set('isEvergreen', v)} />
-        <Field label="Notice period (days)" error={errors.noticePeriodDays} help="How many days' notice must be given before it ends or renews.">
-          {(p) => <TextInput {...p} inputMode="numeric" className="tabular sm:w-40" value={form.noticePeriodDays} onChange={(e) => set('noticePeriodDays', e.target.value.replace(/\D/g, ''))} />}
-        </Field>
-      </Section>
-
-      <Section title="Legal">
-        <Checkbox
-          label="Needs Legal review"
-          description="On by default. Untick only if Legal has agreed it doesn't need a review."
-          checked={form.needsLegalReview}
-          onChange={(v) => set('needsLegalReview', v)}
-        />
-      </Section>
+      {body}
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur md:left-auto md:w-[calc(100%-16rem)]">
         <div className="mx-auto flex max-w-3xl justify-end gap-2">

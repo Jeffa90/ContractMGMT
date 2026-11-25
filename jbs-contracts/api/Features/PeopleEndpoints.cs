@@ -44,6 +44,15 @@ public static class PeopleEndpoints
             return Results.Ok(rows.Select(PersonView.From));
         });
 
+        // Names only, for "Person" fields on contracts: anyone signed in.
+        people.MapGet("/picker", async (CurrentUser current, Db db) =>
+        {
+            var (_, refusal) = await ApiResults.RequirePersonAsync(current, db);
+            if (refusal is not null) return refusal;
+            await using var connection = await db.OpenAsync();
+            return Results.Ok(await connection.QueryAsync("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 ORDER BY Name"));
+        });
+
         people.MapPost("/", async (SavePerson body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
         {
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);

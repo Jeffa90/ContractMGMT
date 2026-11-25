@@ -9,10 +9,12 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'
 export const Button = forwardRef<
   HTMLButtonElement,
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: 'md' | 'lg'; loading?: boolean; icon?: ReactNode }
->(function Button({ variant = 'secondary', size = 'md', loading, icon, className, children, disabled, ...props }, ref) {
+>(function Button({ variant = 'secondary', size = 'md', loading, icon, className, children, disabled, type = 'button', ...props }, ref) {
   return (
     <button
       ref={ref}
+      // Never submit a surrounding form by accident: only buttons marked type="submit" do.
+      type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(

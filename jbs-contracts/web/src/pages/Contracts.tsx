@@ -7,6 +7,7 @@ import { StageBadge } from '@/components/form'
 import { PageHeader } from '@/components/Help'
 import { Alert, Card, EmptyState, Segmented, Skeleton, TextInput } from '@/components/ui'
 import { api } from '@/lib/api'
+import type { Layout } from '@/lib/layout'
 import type { ContractListItem } from '@/lib/contracts'
 import { daysUntil, formatDate } from '@/lib/format'
 import { useMe } from '@/lib/me'
@@ -50,6 +51,9 @@ export function ContractsPage() {
     placeholderData: (previous) => previous,
   })
   const rows = contracts.data ?? []
+  // Added fields an admin offered as list columns (Admin, Contract fields).
+  const layout = useQuery({ queryKey: ['layout'], queryFn: () => api.get<Layout>('/api/layout') })
+  const extraColumns = (layout.data?.fields ?? []).filter((f) => !f.isBuiltIn && f.showInList && !f.isHidden)
 
   return (
     <>
@@ -138,6 +142,11 @@ export function ContractsPage() {
                   <th scope="col" className="px-4 py-3 font-medium">Stage</th>
                   <th scope="col" className="px-4 py-3 font-medium">Owner</th>
                   <th scope="col" className="px-4 py-3 font-medium">Key date</th>
+                  {extraColumns.map((f) => (
+                    <th key={f.key} scope="col" className="px-4 py-3 font-medium">
+                      {f.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -165,6 +174,11 @@ export function ContractsPage() {
                     <td className="tabular px-4 py-3">
                       <KeyDate c={c} />
                     </td>
+                    {extraColumns.map((f) => (
+                      <td key={f.key} className="px-4 py-3">
+                        {c.fields[f.key] ?? ''}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

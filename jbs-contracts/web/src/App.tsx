@@ -7,6 +7,7 @@ import { api, ApiError, type Me } from './lib/api'
 import { MeProvider } from './lib/me'
 import { HomePage } from './pages/Home'
 import { ContractDetailPage } from './pages/ContractDetail'
+import { ContractFieldsPage } from './pages/ContractFields'
 import { ContractFormPage } from './pages/ContractForm'
 import { ContractsPage } from './pages/Contracts'
 import { ListsPage } from './pages/Lists'
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
       { path: 'suppliers', element: <SuppliersPage /> },
       { path: 'admin/people', element: <PeoplePage /> },
       { path: 'admin/lists', element: <ListsPage /> },
+      { path: 'admin/fields', element: <ContractFieldsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

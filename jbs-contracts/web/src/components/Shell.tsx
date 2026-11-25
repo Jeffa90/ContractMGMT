@@ -1,6 +1,6 @@
 // Left sidebar (collapsible) on desktop, top bar with a menu on phones (design-system.md section 2).
 import * as Menu from '@radix-ui/react-dropdown-menu'
-import { Building2, ChevronsLeft, ChevronsRight, FileText, Home, ListChecks, Menu as MenuIcon, Monitor, Moon, Sun, Users, X } from 'lucide-react'
+import { Building2, ChevronsLeft, ChevronsRight, FileText, Home, LayoutList, ListChecks, Menu as MenuIcon, Monitor, Moon, Sun, Users, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import logo from '@/assets/jbs-logo.webp'
@@ -25,6 +25,7 @@ function useNav(): { main: NavItem[]; admin: NavItem[] } {
       ? [
           { to: '/admin/people', label: 'People', icon: <Users aria-hidden className="size-5" /> },
           { to: '/admin/lists', label: 'Lists', icon: <ListChecks aria-hidden className="size-5" /> },
+          { to: '/admin/fields', label: 'Contract fields', icon: <LayoutList aria-hidden className="size-5" /> },
         ]
       : [],
   }

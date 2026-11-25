@@ -52,6 +52,7 @@ app.UseBrandFonts(settings);
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRequestForgeryGuard();
+app.UseDeadlockRetry();
 
 app.MapSystemEndpoints();
 app.MapPeopleEndpoints();

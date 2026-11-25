@@ -44,6 +44,7 @@ public static class ReportEndpoints
         public string Stage { get; set; } = "";
         public string? Description { get; set; }
         public string? SupplierName { get; set; }
+        public string? SupplierVendorNumber { get; set; }
         public string? CategoryName { get; set; }
         public string? ParentCategoryName { get; set; }
         public string? AgreementTypeName { get; set; }
@@ -105,6 +106,8 @@ public static class ReportEndpoints
             if (f.IsBuiltIn)
             {
                 if (BuiltInTypes.TryGetValue(f.Key, out var type)) columns.Add(new(f.Key, Unique(f.Label, f.Key), group, type));
+                // The supplier's SAP vendor number lives on the supplier; it sits next to the supplier (Jeff, 25 Nov).
+                if (f.Key == "supplier") columns.Add(new("supplierVendorNumber", Unique("Supplier SAP vendor number", "supplierVendorNumber"), group, "text"));
             }
             else columns.Add(new(f.Key, Unique(f.Label, f.Key), group, "text") { Added = f });
         }
@@ -119,7 +122,7 @@ public static class ReportEndpoints
 
     private static object? BuiltInValue(RegisterRow r, string key) => key switch
     {
-        "title" => r.Title, "supplier" => r.SupplierName, "category" => r.Category, "agreementType" => r.AgreementTypeName, "description" => r.Description,
+        "title" => r.Title, "supplier" => r.SupplierName, "supplierVendorNumber" => r.SupplierVendorNumber, "category" => r.Category, "agreementType" => r.AgreementTypeName, "description" => r.Description,
         "owner" => r.OwnerName, "backupOwner" => r.BackupOwnerName, "confidential" => r.IsConfidential, "businessUnit" => r.BusinessUnitName, "site" => r.SiteName,
         "value" => r.Value, "sapOutlineAgreement" => r.SapOutlineAgreement, "startDate" => D(r.StartDate), "effectiveDate" => D(r.EffectiveDate),
         "endDate" => D(r.EndDate), "evergreen" => r.IsEvergreen, "noticePeriodDays" => r.NoticePeriodDays, "reviewDate" => D(r.ReviewDate),
@@ -140,7 +143,7 @@ public static class ReportEndpoints
         // The same filters as the Contracts list: f.{field key}={value}, for the fields an admin made filterable.
         var filters = Fields.FilterSql(fields, request.Query.Where(x => x.Key.StartsWith("f.", StringComparison.Ordinal)).Select(x => KeyValuePair.Create(x.Key[2..], x.Value.ToString())), p);
         var rows = (await c.QueryAsync<RegisterRow>($"""
-            SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
+            SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, s.VendorNumber AS SupplierVendorNumber, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                    at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName, o.Name AS OwnerName, b.Name AS BackupOwnerName,
                    k.IsConfidential, k.NeedsLegalReview, k.Value, k.CurrencyCode, k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate, k.IsEvergreen,
                    k.NoticePeriodDays, k.ReviewDate, k.RegisteredUtc, rb.Name AS RegisteredByName, k.RenewalDecision, k.EndedOn, k.EndedReason, k.LegalOutcome

@@ -44,7 +44,7 @@ public sealed class ReportsTests(AppFixture app)
     {
         using var admin = app.ClientFor(AppFixture.AdminAccount);
         var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat") }, Ct));
-        var supplier = await ReadAsync(await owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier ") }, Ct));
+        var supplier = await ReadAsync(await owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier "), vendorNumber = "4000123" }, Ct));
         var body = JsonSerializer.SerializeToNode(fields)!.AsObject();
         body["title"] ??= Unique("Contract ");
         body["supplierId"] = supplier.GetProperty("id").GetInt32();
@@ -100,6 +100,7 @@ public sealed class ReportsTests(AppFixture app)
         Assert.Equal(approverName, values.GetProperty("registeredBy").GetString());
         Assert.Equal(250000m, values.GetProperty("value").GetDecimal());
         Assert.Equal("Effective", values.GetProperty("stage").GetString());
+        Assert.Equal("4000123", values.GetProperty("supplierVendorNumber").GetString());
         Assert.True(Row(register.GetProperty("rows"), "id", confidential).GetProperty("isConfidential").GetBoolean());
         Assert.DoesNotContain(register.GetProperty("rows").EnumerateArray(), r => r.GetProperty("id").GetInt32() == draft);
         var keys = register.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("key").GetString()!).ToList();
@@ -132,6 +133,8 @@ public sealed class ReportsTests(AppFixture app)
             Assert.Contains("Description", headers);
             Assert.Contains("Registered by", headers);
             Assert.Contains("Currency", headers);
+            Assert.Equal(headers.IndexOf("Supplier") + 1, headers.IndexOf("Supplier SAP vendor number")); // right after the supplier
+            Assert.Contains(sheet.RowsUsed(), r => r.Cell(headers.IndexOf("Supplier SAP vendor number") + 1).GetString() == "4000123");
             var ownerColumn = headers.IndexOf("Owner") + 1;
             Assert.Equal(3, sheet.RowsUsed().Count()); // the heading and this owner's two contracts
             Assert.Contains(sheet.RowsUsed(), r => r.Cell(1).GetString() == reference && r.Cell(ownerColumn).GetString() == ownerName);

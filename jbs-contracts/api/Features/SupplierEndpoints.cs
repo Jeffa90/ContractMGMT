@@ -44,6 +44,7 @@ public static class SupplierEndpoints
             if (invalid is not null) return invalid;
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
+            await Db.LockAsync(c, tx, "suppliers");
             var clash = await c.QuerySingleOrDefaultAsync<SupplierRow>("SELECT Id, Name, IsActive FROM contracts.Supplier WITH (UPDLOCK, HOLDLOCK) WHERE NameKey = UPPER(LTRIM(RTRIM(@Name)))", new { input.Name }, tx);
             if (clash is not null) return ApiResults.Invalid("That supplier is already here.", new() { ["name"] = clash.IsActive ? $"{clash.Name} is already a supplier. Choose it from the list." : $"{clash.Name} is already here but hidden. An admin can show it again." });
             var id = await c.ExecuteScalarAsync<int>("""
@@ -65,6 +66,7 @@ public static class SupplierEndpoints
             if (invalid is not null) return invalid;
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
+            await Db.LockAsync(c, tx, "suppliers");
             var before = await c.QuerySingleOrDefaultAsync<SupplierRow>("SELECT *, 0 AS ContractCount FROM contracts.Supplier WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that supplier.");
             if (Convert.ToBase64String(before.RowVersion) != body.RowVersion)

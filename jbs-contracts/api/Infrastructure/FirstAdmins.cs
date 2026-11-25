@@ -20,6 +20,7 @@ public static class FirstAdmins
             }
             await using var connection = await db.OpenAsync();
             await using var tx = connection.BeginTransaction();
+            await Db.LockAsync(connection, tx, "people");
             var existing = await connection.QuerySingleOrDefaultAsync<Person>(
                 "SELECT * FROM contracts.Person WITH (UPDLOCK, HOLDLOCK) WHERE AccountKey = @key", new { key = WindowsAccount.Key(account) }, tx);
             if (existing is null)

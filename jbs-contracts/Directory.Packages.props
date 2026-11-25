@@ -4,6 +4,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="ClosedXML" Version="0.105.1" />
     <PackageVersion Include="Dapper" Version="2.1.100" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.2" />
     <PackageVersion Include="Serilog.AspNetCore" Version="11.0.0" />

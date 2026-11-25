@@ -333,11 +333,17 @@ The new app replaces the old one on QA from slice 0. QA has no real data (confir
 | 6 | Reminders job and emails; escalation; renewal radar; renewal decisions; Renew; End; Archive | Gets a reminder email and records a decision | Not started |
 | 7 | Variations; emergency unlock | Changes an end date the proper way | Not started |
 | 8 | Reports: register CSV and PDF, pipeline, approvals, audit export | Exports the register | Not started |
+| 1b | Excel import and export (Jeff, 25 Nov): People, Lists, Suppliers and Contracts (details only, no files). Preview before anything changes; new rows added, existing rows updated, nothing deleted; blank cells leave existing values unchanged; every row audited | Loads people, lists and suppliers from a spreadsheet, exports them, edits and re-imports | In progress |
+| 1c | Email foundation and "You've been given access" email (JBS relay) | Adds a person and they get an email | Not started |
 | 9 | Import: spreadsheet (for example a Medius export) with column mapping, dry run, error report; ZIP of files matched by agreement reference; legacy Effective contracts loaded locked with their original registered date | Loads a fictional sample | Not started |
 
 Help ("?") ships with each screen, not as a slice of its own.
 
-## 18. Not in version 1
+## 18. Planned for later
+
+- **In-app Feedback** button and page, shared with other JBS apps: see features/feedback.md.
+
+## 18a. Not in version 1
 
 DocuSign connection (designed for, D-10); SAP or other system links; limits by business unit or site (D-05); value and turnaround charts; deleting anything; multiple companies, packs or terminology layers.
 

@@ -55,6 +55,7 @@ public static class PeopleEndpoints
 
             await using var connection = await db.OpenAsync();
             await using var tx = connection.BeginTransaction();
+            await Db.LockAsync(connection, tx, "people");
             var clash = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WITH (UPDLOCK, HOLDLOCK) WHERE AccountKey = @key",
                 new { key = WindowsAccount.Key(input.Account) }, tx);
             if (clash is not null)
@@ -90,6 +91,7 @@ public static class PeopleEndpoints
 
             await using var connection = await db.OpenAsync();
             await using var tx = connection.BeginTransaction();
+            await Db.LockAsync(connection, tx, "people");
             var before = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that person.");
             if (Convert.ToBase64String(before.RowVersion) != input.RowVersion)

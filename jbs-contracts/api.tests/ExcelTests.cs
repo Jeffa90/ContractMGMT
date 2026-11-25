@@ -1,0 +1,172 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using ClosedXML.Excel;
+using Dapper;
+using JbsContracts.Api.Infrastructure;
+
+namespace JbsContracts.Api.Tests;
+
+public sealed class ExcelTests(AppFixture app)
+{
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+    private static string Unique(string prefix) => $"{prefix}{Guid.NewGuid():N}"[..16];
+
+    private static byte[] Sheet(string[] headers, params object?[][] rows)
+    {
+        using var book = new XLWorkbook();
+        var s = book.Worksheets.Add("Sheet1");
+        for (var i = 0; i < headers.Length; i++) s.Cell(1, i + 1).Value = headers[i];
+        for (var r = 0; r < rows.Length; r++)
+            for (var c = 0; c < rows[r].Length; c++)
+                switch (rows[r][c])
+                {
+                    case null: break;
+                    case DateTime d: s.Cell(r + 2, c + 1).Value = d; break;
+                    case int n: s.Cell(r + 2, c + 1).Value = n; break;
+                    case double n: s.Cell(r + 2, c + 1).Value = n; break;
+                    default: s.Cell(r + 2, c + 1).Value = rows[r][c]!.ToString(); break;
+                }
+        using var ms = new MemoryStream();
+        book.SaveAs(ms);
+        return ms.ToArray();
+    }
+
+    private static async Task<(HttpStatusCode Status, JsonElement Body)> PostAsync(HttpClient client, string kind, string step, byte[] file, string name = "import.xlsx")
+    {
+        using var form = new MultipartFormDataContent();
+        var content = new ByteArrayContent(file);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        form.Add(content, "file", name);
+        var response = await client.PostAsync($"/api/excel/{kind}/{step}", form, Ct);
+        var text = await response.Content.ReadAsStringAsync(Ct);
+        return (response.StatusCode, JsonDocument.Parse(text).RootElement);
+    }
+
+    private static int Count(JsonElement body, string what) => body.GetProperty("counts").GetProperty(what).GetInt32();
+
+    [Fact]
+    public async Task People_preview_changes_nothing_then_import_adds_and_updates_and_refuses_bad_rows()
+    {
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var (a, b) = (Unique("xa"), Unique("xb"));
+        await app.AddPersonAsync(b, "Bea Before", AppFixture.NoRoles);
+        var file = Sheet(["Windows logon", "Name", "Email", "Contract owner", "Legal", "Active"],
+            [a, "Ann Imported", "ann.imported@example.com", "Yes", "No", null],
+            [$@"test\{b}", null, null, null, "Yes", null],                       // existing: only Legal changes; blanks keep
+            ["bad logon here", "X", "x@example.com", null, null, null],
+            [Unique("xc"), "No Email", null, "Yes", null, null]);
+
+        var (status, preview) = await PostAsync(admin, "people", "preview", file);
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.False(preview.GetProperty("applied").GetBoolean());
+        Assert.Equal((1, 1, 2), (Count(preview, "added"), Count(preview, "updated"), Count(preview, "refused")));
+        await using var db = await app.OpenAsync();
+        Assert.Equal(0, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Person WHERE Name = 'Ann Imported'"));
+
+        var (_, result) = await PostAsync(admin, "people", "import", file);
+        Assert.True(result.GetProperty("applied").GetBoolean());
+        var ann = await db.QuerySingleAsync<Person>("SELECT * FROM contracts.Person WHERE Name = 'Ann Imported'");
+        Assert.Equal($@"TEST\{a}", ann.WindowsAccount);
+        Assert.True(ann.IsContractOwner);
+        var bea = await db.QuerySingleAsync<Person>("SELECT * FROM contracts.Person WHERE AccountKey = @k", new { k = $@"TEST\{b}".ToUpperInvariant() });
+        Assert.Equal("Bea Before", bea.Name); // blank Name kept the existing value
+        Assert.True(bea.IsLegal);
+        Assert.Contains("(from Excel)", await db.QuerySingleAsync<string>("SELECT TOP 1 Summary FROM contracts.AuditEvent WHERE SubjectType = 'Person' AND SubjectId = @id ORDER BY Id DESC", new { id = ann.Id }));
+        Assert.Null(await AuditLog.VerifyAsync(db));
+    }
+
+    [Fact]
+    public async Task Only_admins_import_people_and_a_bad_file_gets_a_plain_message()
+    {
+        var user = Unique("own");
+        await app.AddPersonAsync(user, "Oscar Owner", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        using var owner = app.ClientFor($@"TEST\{user}");
+        var file = Sheet(["Windows logon", "Name", "Email"], [Unique("z"), "Z", "z@example.com"]);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostAsync(owner, "people", "import", file)).Status);
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.GetAsync("/api/excel/people", Ct)).StatusCode);
+
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var (status, body) = await PostAsync(admin, "people", "preview", "not a workbook"u8.ToArray());
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("couldn't be opened", body.GetProperty("message").GetString());
+        var (status2, body2) = await PostAsync(admin, "people", "preview", Sheet(["Name"], ["Someone"]));
+        Assert.Equal(HttpStatusCode.BadRequest, status2);
+        Assert.Contains("Windows logon", body2.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task Lists_import_adds_categories_with_subcategories_in_the_same_sheet_and_exports_round_trip()
+    {
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var top = Unique("Cat");
+        var file = Sheet(["List", "Name", "Parent category", "Active"],
+            ["Category", "Linehaul", top, null],   // subcategory before its parent in the sheet
+            ["Category", top, null, null],
+            ["Agreement type", Unique("Type"), null, null],
+            ["Currency", "jpy", null, null],
+            ["Planet", "Mars", null, null]);
+        var (_, result) = await PostAsync(admin, "lists", "import", file);
+        Assert.Equal((4, 1), (Count(result, "added"), Count(result, "refused")));
+        await using var db = await app.OpenAsync();
+        Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Category s JOIN contracts.Category p ON p.Id = s.ParentId WHERE p.Name = @top AND s.Name = 'Linehaul'", new { top }));
+        Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.ListItem WHERE ListName = 'Currency' AND Value = 'JPY'"));
+
+        // Export, then import the export unchanged: nothing changes.
+        var export = await admin.GetAsync("/api/excel/lists", Ct);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", export.Content.Headers.ContentType?.MediaType);
+        var (_, again) = await PostAsync(admin, "lists", "preview", await export.Content.ReadAsByteArrayAsync(Ct));
+        Assert.Equal((0, 0, 0), (Count(again, "added"), Count(again, "updated"), Count(again, "refused")));
+    }
+
+    [Fact]
+    public async Task Suppliers_import_checks_ABNs_and_only_admins_hide_suppliers()
+    {
+        var user = Unique("sup");
+        await app.AddPersonAsync(user, "Sid Supplier", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        using var owner = app.ClientFor($@"TEST\{user}");
+        var (good, bad, hide) = (Unique("Good "), Unique("Bad "), Unique("Hide "));
+        var (_, first) = await PostAsync(owner, "suppliers", "import", Sheet(["Name", "ABN"], [good, "51 824 753 556"], [bad, "12345678901"], [hide, null]));
+        Assert.Equal((2, 1), (Count(first, "added"), Count(first, "refused")));
+        var (_, second) = await PostAsync(owner, "suppliers", "preview", Sheet(["Name", "Active"], [hide, "No"]));
+        Assert.Equal(1, Count(second, "refused"));
+    }
+
+    [Fact]
+    public async Task Contracts_import_adds_drafts_with_lookups_updates_drafts_and_refuses_unknown_values()
+    {
+        var user = Unique("con");
+        await app.AddPersonAsync(user, "Connie Contracts", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        using var owner = app.ClientFor($@"TEST\{user}");
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var cat = Unique("Freight");
+        await PostAsync(admin, "lists", "import", Sheet(["List", "Name", "Parent category"], ["Category", cat, null], ["Category", "Road", cat]));
+        var supplier = Unique("Linfox ");
+        var headers = new[] { "Reference", "Title", "Supplier", "Category", "Owner", "Value", "End date", "Notice period (days)", "Evergreen" };
+        var (_, result) = await PostAsync(owner, "contracts", "import", Sheet(headers,
+            [null, "Road freight 2027", supplier, $"{cat} > Road", user, "$1,200,000", new DateTime(2027, 12, 31), 90, "No"],
+            [null, "Evergreen cleaning", null, null, null, 5000, "31/12/2027", null, "Yes"],
+            [null, "Bad category", null, "Nonsense", null, null, null, null, null],
+            [null, null, null, null, null, null, null, null, null, ]));
+        Assert.Equal((1, 2), (Count(result, "added"), Count(result, "refused"))); // evergreen with an end date, and an unknown category, are refused
+
+        await using var db = await app.OpenAsync();
+        var row = await db.QuerySingleAsync("SELECT k.Id, k.Reference, k.Value, k.EndDate, s.Name AS SupplierName FROM contracts.Contract k LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId WHERE k.Title = 'Road freight 2027'");
+        Assert.Equal(supplier, (string)row.SupplierName); // the new supplier was added
+        Assert.Equal(1200000m, (decimal)row.Value);
+        Assert.Equal(new DateTime(2027, 12, 31), (DateTime)row.EndDate);
+
+        // Update the draft by reference; a blank cell keeps the existing value.
+        var (_, update) = await PostAsync(owner, "contracts", "import", Sheet(["Reference", "Title", "Value"], [(string)row.Reference, "Road freight 2027-28", null]));
+        Assert.Equal(1, Count(update, "updated"));
+        Assert.Equal(1200000m, await db.ExecuteScalarAsync<decimal>("SELECT Value FROM contracts.Contract WHERE Id = @id", new { id = (int)row.Id }));
+        Assert.Contains("(from Excel)", await db.QuerySingleAsync<string>("SELECT TOP 1 Summary FROM contracts.AuditEvent WHERE ContractId = @id ORDER BY Id DESC", new { id = (int)row.Id }));
+
+        // The export lists it, and importing the export changes nothing.
+        var export = await (await owner.GetAsync("/api/excel/contracts", Ct)).Content.ReadAsByteArrayAsync(Ct);
+        var (_, again) = await PostAsync(owner, "contracts", "preview", export);
+        Assert.Equal((0, 0, 0), (Count(again, "added"), Count(again, "updated"), Count(again, "refused")));
+        Assert.Null(await AuditLog.VerifyAsync(db));
+    }
+}

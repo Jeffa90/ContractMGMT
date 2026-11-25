@@ -141,23 +141,8 @@ public static class ContractEndpoints
             if (!me!.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can add contracts. Ask your admin if you need to.");
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
-            var (input, invalid) = await ValidateAsync(c, tx, body with { OwnerId = body.OwnerId ?? me.Id }, before: null);
-            if (invalid is not null) return invalid;
-            var number = await c.ExecuteScalarAsync<int>("SELECT NEXT VALUE FOR contracts.ContractNumber", transaction: tx);
-            var reference = $"JBSAUS-{number.ToString("0000", CultureInfo.InvariantCulture)}";
-            var id = await c.ExecuteScalarAsync<int>("""
-                INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,
-                    IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, EffectiveDate, EndDate, IsEvergreen, NoticePeriodDays, ReviewDate, NeedsLegalReview,
-                    CreatedById, UpdatedById)
-                OUTPUT INSERTED.Id
-                VALUES (@reference, @Title, @Description, @SupplierId, @CategoryId, @AgreementTypeId, @BusinessUnitId, @SiteId, @OwnerId, @BackupOwnerId,
-                    @IsConfidential, @Value, @CurrencyCode, @SapOutlineAgreement, @StartDate, @EffectiveDate, @EndDate, @IsEvergreen, @NoticePeriodDays, @ReviewDate, @NeedsLegalReview,
-                    @me, @me)
-                """, Params(input, new { reference, me = me.Id }), tx);
-            var saved = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
-            await audit.WriteAsync(c, tx, me.AsActor(), "contract.created", "Contract", id,
-                $"{me.Name} started the draft {reference} {saved.Title}" + (saved.OwnerId != me.Id ? $", owned by {saved.OwnerName}." : "."),
-                Snapshot(saved), contractId: id);
+            var (id, reference, errors) = await CreateDraftAsync(c, tx, audit, me, body);
+            if (errors is not null) return ApiResults.Invalid("Check the highlighted details.", errors);
             await tx.CommitAsync();
             return Results.Created($"/api/contracts/{id}", new { id, reference });
         });
@@ -178,27 +163,10 @@ public static class ContractEndpoints
                     : $"You can't change this contract while it's in {StageNames[before.Stage]}.");
             if (Convert.ToBase64String(before.RowVersion) != body.RowVersion)
                 return ApiResults.Changed("Someone else changed this contract while you were editing. Your changes weren't saved. Reload to see the latest, then make your changes again.");
-            var (input, invalid) = await ValidateAsync(c, tx, body, before);
-            if (invalid is not null) return invalid;
-            await c.ExecuteAsync("""
-                UPDATE contracts.Contract SET Title = @Title, Description = @Description, SupplierId = @SupplierId, CategoryId = @CategoryId,
-                    AgreementTypeId = @AgreementTypeId, BusinessUnitId = @BusinessUnitId, SiteId = @SiteId, OwnerId = @OwnerId, BackupOwnerId = @BackupOwnerId,
-                    IsConfidential = @IsConfidential, Value = @Value, CurrencyCode = @CurrencyCode, SapOutlineAgreement = @SapOutlineAgreement,
-                    StartDate = @StartDate, EffectiveDate = @EffectiveDate, EndDate = @EndDate, IsEvergreen = @IsEvergreen, NoticePeriodDays = @NoticePeriodDays,
-                    ReviewDate = @ReviewDate, NeedsLegalReview = @NeedsLegalReview, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
-                WHERE Id = @id
-                """, Params(input, new { id, me = me.Id }), tx);
-            var after = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
-            var (oldValues, newValues) = (Snapshot(before), Snapshot(after));
-            var changed = oldValues.Keys.Where(k => oldValues[k] != newValues[k]).ToList();
-            if (changed.Count > 0)
-            {
-                var described = changed.Select(k => newValues[k] is null ? $"cleared {k}" : oldValues[k] is null ? $"set {k} to {newValues[k]}" : $"{k} from {oldValues[k]} to {newValues[k]}");
-                await audit.WriteAsync(c, tx, me.AsActor(), "contract.changed", "Contract", id, $"{me.Name} changed {string.Join("; ", described)}.",
-                    new { before = changed.ToDictionary(k => k, k => oldValues[k]), after = changed.ToDictionary(k => k, k => newValues[k]) }, contractId: id);
-            }
+            var (errors2, after) = await UpdateDraftAsync(c, tx, audit, me, before, body);
+            if (errors2 is not null) return ApiResults.Invalid("Check the highlighted details.", errors2);
             await tx.CommitAsync();
-            return Results.Ok(new { id, rowVersion = Convert.ToBase64String(after.RowVersion) });
+            return Results.Ok(new { id, rowVersion = Convert.ToBase64String(after!.RowVersion) });
         });
 
         contracts.MapPost("/{id:int}/withdraw", async (int id, WithdrawContract body, CurrentUser current, Db db, AuditLog audit) =>
@@ -224,6 +192,85 @@ public static class ContractEndpoints
             return Results.Ok(new { id });
         });
     }
+
+
+    /// <summary>Creates a draft (from the form or an Excel import). Returns the errors by field when the details don't pass.</summary>
+    public static async Task<(int Id, string Reference, Dictionary<string, string>? Errors)> CreateDraftAsync(SqlConnection c, SqlTransaction tx, AuditLog audit, Person me, SaveContract body, string via = "")
+    {
+        var (input, errors) = await ValidateAsync(c, tx, body with { OwnerId = body.OwnerId ?? me.Id }, before: null);
+        if (errors is not null) return (0, "", errors);
+        var number = await c.ExecuteScalarAsync<int>("SELECT NEXT VALUE FOR contracts.ContractNumber", transaction: tx);
+        var reference = $"JBSAUS-{number.ToString("0000", CultureInfo.InvariantCulture)}";
+        var id = await c.ExecuteScalarAsync<int>("""
+            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, EffectiveDate, EndDate, IsEvergreen, NoticePeriodDays, ReviewDate, NeedsLegalReview,
+                CreatedById, UpdatedById)
+            OUTPUT INSERTED.Id
+            VALUES (@reference, @Title, @Description, @SupplierId, @CategoryId, @AgreementTypeId, @BusinessUnitId, @SiteId, @OwnerId, @BackupOwnerId,
+                @IsConfidential, @Value, @CurrencyCode, @SapOutlineAgreement, @StartDate, @EffectiveDate, @EndDate, @IsEvergreen, @NoticePeriodDays, @ReviewDate, @NeedsLegalReview,
+                @me, @me)
+            """, Params(input!, new { reference, me = me.Id }), tx);
+        var saved = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
+        await audit.WriteAsync(c, tx, me.AsActor(), "contract.created", "Contract", id,
+            $"{me.Name} started the draft {reference} {saved.Title}" + (saved.OwnerId != me.Id ? $", owned by {saved.OwnerName}" : "") + $"{via}.",
+            Snapshot(saved), contractId: id);
+        return (id, reference, null);
+    }
+
+    /// <summary>Updates a draft the caller may edit (from the form or an Excel import), auditing each changed field in plain words.</summary>
+    public static async Task<(Dictionary<string, string>? Errors, ContractRow? After)> UpdateDraftAsync(SqlConnection c, SqlTransaction tx, AuditLog audit, Person me, ContractRow before, SaveContract body, string via = "")
+    {
+        var id = before.Id;
+        var (input, errors) = await ValidateAsync(c, tx, body, before);
+        if (errors is not null) return (errors, null);
+        await c.ExecuteAsync("""
+            UPDATE contracts.Contract SET Title = @Title, Description = @Description, SupplierId = @SupplierId, CategoryId = @CategoryId,
+                AgreementTypeId = @AgreementTypeId, BusinessUnitId = @BusinessUnitId, SiteId = @SiteId, OwnerId = @OwnerId, BackupOwnerId = @BackupOwnerId,
+                IsConfidential = @IsConfidential, Value = @Value, CurrencyCode = @CurrencyCode, SapOutlineAgreement = @SapOutlineAgreement,
+                StartDate = @StartDate, EffectiveDate = @EffectiveDate, EndDate = @EndDate, IsEvergreen = @IsEvergreen, NoticePeriodDays = @NoticePeriodDays,
+                ReviewDate = @ReviewDate, NeedsLegalReview = @NeedsLegalReview, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+            WHERE Id = @id
+            """, Params(input!, new { id, me = me.Id }), tx);
+        var after = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
+        var (oldValues, newValues) = (Snapshot(before), Snapshot(after));
+        var changed = oldValues.Keys.Where(k => oldValues[k] != newValues[k]).ToList();
+        if (changed.Count > 0)
+        {
+            var described = changed.Select(k => newValues[k] is null ? $"cleared {k}" : oldValues[k] is null ? $"set {k} to {newValues[k]}" : $"{k} from {oldValues[k]} to {newValues[k]}");
+            await audit.WriteAsync(c, tx, me.AsActor(), "contract.changed", "Contract", id, $"{me.Name} changed {string.Join("; ", described)}{via}.",
+                new { before = changed.ToDictionary(k => k, k => oldValues[k]), after = changed.ToDictionary(k => k, k => newValues[k]) }, contractId: id);
+        }
+        return (null, after);
+    }
+
+    /// <summary>The fields that would change, by label (for import previews).</summary>
+    public static async Task<(List<string> Changed, Dictionary<string, string>? Errors)> PreviewChangesAsync(SqlConnection c, SqlTransaction tx, ContractRow before, SaveContract body)
+    {
+        var (input, errors) = await ValidateAsync(c, tx, body, before);
+        if (errors is not null) return ([], errors);
+        var i = input!;
+        var changed = new List<string>();
+        void Check(string label, object? a, object? b) { if (!Equals(a, b)) changed.Add(label); }
+        Check("title", before.Title, i.Title); Check("description", before.Description, i.Description); Check("supplier", before.SupplierId, i.SupplierId);
+        Check("category", before.CategoryId, i.CategoryId); Check("agreement type", before.AgreementTypeId, i.AgreementTypeId);
+        Check("business unit", before.BusinessUnitId, i.BusinessUnitId); Check("site", before.SiteId, i.SiteId); Check("owner", before.OwnerId, i.OwnerId);
+        Check("backup owner", before.BackupOwnerId, i.BackupOwnerId); Check("Confidential", before.IsConfidential, i.IsConfidential);
+        Check("value", before.Value, i.Value); Check("currency", before.CurrencyCode, i.CurrencyCode); Check("SAP outline agreement number", before.SapOutlineAgreement, i.SapOutlineAgreement);
+        Check("start date", D(before.StartDate), i.StartDate); Check("effective date", D(before.EffectiveDate), i.EffectiveDate); Check("end date", D(before.EndDate), i.EndDate);
+        Check("evergreen", before.IsEvergreen, i.IsEvergreen); Check("notice period", before.NoticePeriodDays, i.NoticePeriodDays); Check("review date", D(before.ReviewDate), i.ReviewDate);
+        Check("needs Legal review", before.NeedsLegalReview, i.NeedsLegalReview);
+        return (changed, null);
+    }
+
+    /// <summary>Checks a contract's details without saving (import previews). Null when they pass.</summary>
+    public static async Task<Dictionary<string, string>?> CheckAsync(SqlConnection c, SqlTransaction tx, SaveContract body, ContractRow? before) =>
+        (await ValidateAsync(c, tx, body, before)).Errors;
+
+    public static async Task<ContractRow?> LoadByReferenceAsync(SqlConnection c, SqlTransaction tx, string reference) =>
+        await c.QuerySingleOrDefaultAsync<ContractRow>($"{SelectContract} WHERE k.Reference = @reference", new { reference }, tx);
+
+    public static async Task<IEnumerable<ContractRow>> ListVisibleAsync(SqlConnection c, SqlTransaction tx, Person me) =>
+        await c.QueryAsync<ContractRow>($"{SelectContract} WHERE {ContractAccess.VisibleSql("k")} ORDER BY k.Reference", ContractAccess.Params(me), tx);
 
     /// <summary>Locks the contract row for this transaction (so two people can't change it at once), then reads it with its names.</summary>
     public static async Task<ContractRow?> LoadForUpdateAsync(SqlConnection c, SqlTransaction tx, int id)
@@ -304,7 +351,7 @@ public static class ContractEndpoints
     /// Checks a draft's details. Drafts may be incomplete (only a title is needed); what's required to leave Draft is checked when it is sent on.
     /// Picked items must exist and be in use, unless the contract already had them (a hidden list value stays on contracts that use it).
     /// </summary>
-    private static async Task<(Input Input, IResult? Invalid)> ValidateAsync(SqlConnection c, SqlTransaction tx, SaveContract b, ContractRow? before)
+    private static async Task<(Input? Input, Dictionary<string, string>? Errors)> ValidateAsync(SqlConnection c, SqlTransaction tx, SaveContract b, ContractRow? before)
     {
         var f = new Dictionary<string, string>();
         var title = (b.Title ?? "").Trim();
@@ -346,7 +393,7 @@ public static class ContractEndpoints
         if (b.StartDate is { } s && b.EndDate is { } e && e < s) f["endDate"] = "The end date is before the start date.";
         if (b.NoticePeriodDays is < 0 or > 3650) f["noticePeriodDays"] = "Use a number of days between 0 and 3,650.";
 
-        if (f.Count > 0) return (null!, ApiResults.Invalid("Check the highlighted details.", f));
+        if (f.Count > 0) return (null, f);
         return (new Input(title, description, b.SupplierId, b.CategoryId, b.AgreementTypeId, b.BusinessUnitId, b.SiteId, ownerId!.Value, b.BackupOwnerId,
             b.IsConfidential ?? false, b.Value, currency, sap, b.StartDate, b.EffectiveDate, b.EndDate, evergreen, b.NoticePeriodDays, b.ReviewDate,
             b.NeedsLegalReview ?? true), null);

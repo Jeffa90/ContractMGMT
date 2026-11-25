@@ -58,6 +58,7 @@ public static class ListsEndpoints
             if (body.ListName == "Currency") value = value.ToUpperInvariant();
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
+            await Db.LockAsync(c, tx, "lists");
             var clash = await c.QuerySingleOrDefaultAsync<ListItemRow>("SELECT * FROM contracts.ListItem WITH (UPDLOCK, HOLDLOCK) WHERE ListName = @ListName AND ValueKey = UPPER(@value)", new { body.ListName, value }, tx);
             if (clash is not null)
                 return ApiResults.Invalid("That's already in the list.", new() { ["value"] = clash.IsActive ? $"{clash.Value} is already in the list." : $"{clash.Value} is in the list but hidden. Show it again instead." });
@@ -75,6 +76,7 @@ public static class ListsEndpoints
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
+            await Db.LockAsync(c, tx, "lists");
             var before = await c.QuerySingleOrDefaultAsync<ListItemRow>("SELECT * FROM contracts.ListItem WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that list item.");
             var value = (body.Value ?? before.Value).Trim();
@@ -101,6 +103,7 @@ public static class ListsEndpoints
             if (name.Length == 0 || name.Length > 100) return ApiResults.Invalid("Check the name.", new() { ["name"] = name.Length == 0 ? "Type a name." : "Keep it under 100 characters." });
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
+            await Db.LockAsync(c, tx, "lists");
             string? parentName = null;
             if (body.ParentId is { } parentId)
             {
@@ -126,6 +129,7 @@ public static class ListsEndpoints
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
+            await Db.LockAsync(c, tx, "lists");
             var before = await c.QuerySingleOrDefaultAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that category.");
             var name = (body.Name ?? before.Name).Trim();

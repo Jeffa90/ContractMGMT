@@ -16,6 +16,13 @@ public sealed class Db(AppSettings settings)
         SqlMapper.AddTypeMap(typeof(DateTime?), System.Data.DbType.DateTime2);
     }
 
+    /// <summary>
+    /// Takes turns on one area (people, lists, suppliers) for the rest of the transaction. Every change to an area takes its lock first,
+    /// so two changes to the same area queue for a moment instead of deadlocking. The audit lock is always taken after it.
+    /// </summary>
+    public static Task LockAsync(SqlConnection c, SqlTransaction tx, string area) =>
+        c.ExecuteAsync("EXEC sp_getapplock @Resource = @area, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 30000", new { area = $"contracts.{area}" }, tx);
+
     public async Task<SqlConnection> OpenAsync(CancellationToken ct = default)
     {
         var builder = new SqlConnectionStringBuilder(settings.ConnectionString) { ApplicationName = "JBS Contracts" };

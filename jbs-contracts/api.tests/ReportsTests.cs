@@ -74,7 +74,7 @@ public sealed class ReportsTests(AppFixture app)
     [Fact]
     public async Task Reports_are_for_admins_and_auditors_and_show_the_register_approvals_and_audit()
     {
-        var (owner, _, ownerName) = await PersonAsync("Rory Report", Roles(owner: true));
+        var (owner, ownerId, ownerName) = await PersonAsync("Rory Report", Roles(owner: true));
         var (approver, _, approverName) = await PersonAsync("Anna Approve", Roles(approver: true));
         var (auditor, _, _) = await PersonAsync("Audrey Audit", Roles(auditor: true));
         using var admin = app.ClientFor(AppFixture.AdminAccount);
@@ -90,23 +90,51 @@ public sealed class ReportsTests(AppFixture app)
             Assert.Equal(HttpStatusCode.Forbidden, (await approver.GetAsync($"/api/reports/{url}", Ct)).StatusCode);
         }
 
-        // Register: Effective contracts, Confidential included and marked; Drafts are not in it.
+        // Register: Effective contracts, Confidential included and marked; Drafts are not in it. Every column's value is there.
         var register = await GetAsync(auditor, "/api/reports/register");
         var row = Row(register.GetProperty("rows"), "id", effective);
+        var values = row.GetProperty("values");
         Assert.Equal(reference, row.GetProperty("reference").GetString());
-        Assert.Equal(ownerName, row.GetProperty("ownerName").GetString());
-        Assert.Equal(D(340), row.GetProperty("noticeDeadline").GetString());
-        Assert.Equal(approverName, row.GetProperty("registeredByName").GetString());
+        Assert.Equal(ownerName, values.GetProperty("owner").GetString());
+        Assert.Equal(D(340), values.GetProperty("noticeDeadline").GetString());
+        Assert.Equal(approverName, values.GetProperty("registeredBy").GetString());
+        Assert.Equal(250000m, values.GetProperty("value").GetDecimal());
+        Assert.Equal("Effective", values.GetProperty("stage").GetString());
         Assert.True(Row(register.GetProperty("rows"), "id", confidential).GetProperty("isConfidential").GetBoolean());
         Assert.DoesNotContain(register.GetProperty("rows").EnumerateArray(), r => r.GetProperty("id").GetInt32() == draft);
+        var keys = register.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("key").GetString()!).ToList();
+        Assert.Contains("description", keys);
+        Assert.Contains("sapOutlineAgreement", keys);
+        Assert.Contains("registeredBy", keys);
 
-        // The Excel register has the same contract.
-        var bytes = await (await admin.GetAsync("/api/reports/register.xlsx?scope=all", Ct)).Content.ReadAsByteArrayAsync(Ct);
+        // Each person chooses their columns; unknown ones are refused; only admins and auditors.
+        Assert.Equal(["title", "supplier", "owner", "value", "effectiveDate", "endDate", "noticeDeadline", "registered"],
+            register.GetProperty("chosen").EnumerateArray().Select(c => c.GetString()!));
+        Assert.Equal(HttpStatusCode.BadRequest, (await auditor.PutAsJsonAsync("/api/reports/register/columns", new { columns = new[] { "title", "nonsense" } }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await auditor.PutAsJsonAsync("/api/reports/register/columns", new { columns = Array.Empty<string>() }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.PutAsJsonAsync("/api/reports/register/columns", new { columns = new[] { "title" } }, Ct)).StatusCode);
+        await ReadAsync(await auditor.PutAsJsonAsync("/api/reports/register/columns", new { columns = new[] { "site", "title", "sapOutlineAgreement" } }, Ct));
+        Assert.Equal(["site", "title", "sapOutlineAgreement"], (await GetAsync(auditor, "/api/reports/register")).GetProperty("chosen").EnumerateArray().Select(c => c.GetString()!));
+        Assert.Equal("title", (await GetAsync(admin, "/api/reports/register")).GetProperty("chosen")[0].GetString()); // the admin's own choice is untouched
+
+        // Filters, as on the Contracts list: this owner's contracts only.
+        var mine = await GetAsync(auditor, $"/api/reports/register?f.owner={ownerId}");
+        Assert.True(mine.GetProperty("filtered").GetBoolean());
+        Assert.Equal([effective, confidential], mine.GetProperty("rows").EnumerateArray().Select(r => r.GetProperty("id").GetInt32()).Order());
+
+        // The Excel register has every column, and follows the filters.
+        var bytes = await (await admin.GetAsync($"/api/reports/register.xlsx?scope=all&f.owner={ownerId}", Ct)).Content.ReadAsByteArrayAsync(Ct);
         using (var book = new XLWorkbook(new MemoryStream(bytes)))
         {
             var sheet = book.Worksheet(1);
-            Assert.Equal("Reference", sheet.Cell(1, 1).GetString());
-            Assert.Contains(sheet.RowsUsed(), r => r.Cell(1).GetString() == reference && r.Cell(9).GetString() == ownerName);
+            var headers = sheet.Row(1).CellsUsed().Select(c => c.GetString()).ToList();
+            Assert.Equal("Reference", headers[0]);
+            Assert.Contains("Description", headers);
+            Assert.Contains("Registered by", headers);
+            Assert.Contains("Currency", headers);
+            var ownerColumn = headers.IndexOf("Owner") + 1;
+            Assert.Equal(3, sheet.RowsUsed().Count()); // the heading and this owner's two contracts
+            Assert.Contains(sheet.RowsUsed(), r => r.Cell(1).GetString() == reference && r.Cell(ownerColumn).GetString() == ownerName);
         }
 
         // Pipeline counts the Draft.
@@ -165,6 +193,8 @@ public sealed class ReportsTests(AppFixture app)
         Assert.Equal("Overdue", items[0].GetProperty("what").GetString());
         Assert.Equal(overdue, items[0].GetProperty("contractId").GetInt32());
         Assert.Equal("Notice", items[0].GetProperty("kind").GetString());
+        Assert.StartsWith("Supplier ", items[0].GetProperty("supplierName").GetString());
+        Assert.Equal(D(20), items[0].GetProperty("endDate").GetString());
         Assert.Equal(-10, items[0].GetProperty("days").GetInt32());
         Assert.Contains(items, i => i.GetProperty("contractId").GetInt32() == soon && i.GetProperty("what").GetString() == "ComingUp");
         Assert.Contains(items, i => i.GetProperty("contractId").GetInt32() == draft && i.GetProperty("what").GetString() == "Draft");

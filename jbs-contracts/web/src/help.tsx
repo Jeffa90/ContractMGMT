@@ -261,9 +261,10 @@ export const help = {
         <p>Reports are for admins and auditors. Each one can be downloaded to Excel. Confidential contracts are included and marked.</p>
         <ul>
           <li>
-            <strong>Register</strong>: every Effective contract, with its dates, value and who registered it. Choose whether to include ended and archived ones.{' '}
-            <strong>Print or save as PDF</strong> gives a clean printout; in the print window, choose <em>Save as PDF</em> as the printer to keep a copy. The Excel
-            download also has every added field.
+            <strong>Register</strong>: every Effective contract. Choose whether to include ended and archived ones. <strong>Columns</strong> lets you tick
+            which fields to show, including the added ones; your choice is kept for next time and the printout uses it too. <strong>Filters</strong> narrow it
+            down, as on the Contracts list. <strong>Print or save as PDF</strong> gives a clean landscape printout; in the print window, choose{' '}
+            <em>Save as PDF</em> as the printer to keep a copy. <strong>Download Excel</strong> always has every column and follows your filters.
           </li>
           <li>
             <strong>Pipeline</strong>: how many contracts are in Draft, Legal review, Signing and Approval, how long they've been there, and which have waited longest.
@@ -306,7 +307,7 @@ export const help = {
             <strong>Waiting on others</strong>: their contracts that are with Legal or waiting for approval. Nothing for them to do, but worth knowing.
           </li>
         </ul>
-        <p>Click a person to see each contract, with how long it has waited, and open it. Confidential contracts are counted only if you can see them.</p>
+        <p>Click a person to see each contract with its supplier, value, category and end date, and how long it has waited. Click one to open it. Confidential contracts are counted only if you can see them.</p>
       </>
     ),
   },

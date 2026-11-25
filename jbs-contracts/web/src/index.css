@@ -164,3 +164,14 @@
 :root:not([data-theme="dark"]) [data-logo="dark"] {
   display: none;
 }
+
+/* Printing (the Register, D-82): landscape so wide tables fit, and no pop-up messages on paper. */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+}

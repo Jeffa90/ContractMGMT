@@ -7,7 +7,8 @@ namespace JbsContracts.Api.Features;
 
 /// <summary>
 /// Reports for admins and auditors (product-spec sections 11 and 13; D-82 to D-84): the register, the pipeline, approvals and the audit
-/// trail, each on screen and as an Excel download. The register also prints cleanly to PDF from the browser (D-82). Auditors only read.
+/// trail, each on screen and as an Excel download. The register also prints cleanly to PDF from the browser (D-82), with each person's
+/// choice of columns and the Contracts list's filters (D-86). Auditors only read.
 /// </summary>
 public static class ReportEndpoints
 {
@@ -41,6 +42,7 @@ public static class ReportEndpoints
         public string Reference { get; set; } = "";
         public string Title { get; set; } = "";
         public string Stage { get; set; } = "";
+        public string? Description { get; set; }
         public string? SupplierName { get; set; }
         public string? CategoryName { get; set; }
         public string? ParentCategoryName { get; set; }
@@ -50,6 +52,7 @@ public static class ReportEndpoints
         public string OwnerName { get; set; } = "";
         public string? BackupOwnerName { get; set; }
         public bool IsConfidential { get; set; }
+        public bool NeedsLegalReview { get; set; }
         public decimal? Value { get; set; }
         public string CurrencyCode { get; set; } = "AUD";
         public string? SapOutlineAgreement { get; set; }
@@ -63,42 +66,106 @@ public static class ReportEndpoints
         public string? RegisteredByName { get; set; }
         public string? RenewalDecision { get; set; }
         public DateTime? EndedOn { get; set; }
+        public string? EndedReason { get; set; }
+        public string? LegalOutcome { get; set; }
 
         public DateTime? NoticeDeadline => NoticePeriodDays is not { } n ? null : (IsEvergreen ? ReviewDate : EndDate) is { } a ? a.AddDays(-n) : null;
         public string? Category => CategoryName is null ? null : ParentCategoryName is null ? CategoryName : $"{ParentCategoryName} > {CategoryName}";
     }
 
-    private static async Task<(List<RegisterRow> Rows, List<Fields.ExcelField> Added, Dictionary<int, Dictionary<string, (object? Value, string Display)>> Values)> RegisterAsync(
-        SqlConnection c, Person me, string? scope)
+    /// <summary>
+    /// A column the register can show (D-86): every built-in and added field as the admin has named and arranged them, then the register's
+    /// own details. Type tells the screen how to show it: text, date, money, number or yesno.
+    /// </summary>
+    public sealed record RegisterColumn(string Key, string Label, string Group, string Type)
     {
+        internal FieldRow? Added { get; init; }
+    }
+
+    private static readonly string[] DefaultColumns = ["title", "supplier", "owner", "value", "effectiveDate", "endDate", "noticeDeadline", "registered"];
+
+    private static readonly Dictionary<string, string> BuiltInTypes = new()
+    {
+        ["title"] = "text", ["supplier"] = "text", ["category"] = "text", ["agreementType"] = "text", ["description"] = "text", ["owner"] = "text",
+        ["backupOwner"] = "text", ["confidential"] = "yesno", ["businessUnit"] = "text", ["site"] = "text", ["value"] = "money",
+        ["sapOutlineAgreement"] = "text", ["startDate"] = "date", ["effectiveDate"] = "date", ["endDate"] = "date", ["evergreen"] = "yesno",
+        ["noticePeriodDays"] = "number", ["reviewDate"] = "date", ["needsLegalReview"] = "yesno",
+    };
+
+    private static List<RegisterColumn> RegisterColumnsFor(List<FieldRow> fields, List<SectionRow> sections)
+    {
+        var titles = sections.ToDictionary(x => x.Key, x => x.Title);
+        var hiddenSections = sections.Where(x => x.IsHidden).Select(x => x.Key).ToHashSet();
+        var columns = new List<RegisterColumn>();
+        var labels = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Reference" };
+        string Unique(string label, string key) => labels.Add(label) ? label : labels.Add($"{label} ({key})") ? $"{label} ({key})" : $"{label} ({key}) ";
+        foreach (var f in fields.Where(f => !f.IsHidden && !hiddenSections.Contains(f.SectionKey)))
+        {
+            var group = titles.GetValueOrDefault(f.SectionKey, "Other");
+            if (f.IsBuiltIn)
+            {
+                if (BuiltInTypes.TryGetValue(f.Key, out var type)) columns.Add(new(f.Key, Unique(f.Label, f.Key), group, type));
+            }
+            else columns.Add(new(f.Key, Unique(f.Label, f.Key), group, "text") { Added = f });
+        }
+        foreach (var (key, label, type) in new[]
+        {
+            ("stage", "Stage", "text"), ("noticeDeadline", "Notice deadline", "date"), ("registered", "Registered", "date"), ("registeredBy", "Registered by", "text"),
+            ("renewalDecision", "Renewal decision", "text"), ("endedOn", "Ended on", "date"), ("endedReason", "Why it ended", "text"), ("legalOutcome", "Legal outcome", "text"),
+        })
+            columns.Add(new(key, Unique(label, key), "Register", type));
+        return columns;
+    }
+
+    private static object? BuiltInValue(RegisterRow r, string key) => key switch
+    {
+        "title" => r.Title, "supplier" => r.SupplierName, "category" => r.Category, "agreementType" => r.AgreementTypeName, "description" => r.Description,
+        "owner" => r.OwnerName, "backupOwner" => r.BackupOwnerName, "confidential" => r.IsConfidential, "businessUnit" => r.BusinessUnitName, "site" => r.SiteName,
+        "value" => r.Value, "sapOutlineAgreement" => r.SapOutlineAgreement, "startDate" => D(r.StartDate), "effectiveDate" => D(r.EffectiveDate),
+        "endDate" => D(r.EndDate), "evergreen" => r.IsEvergreen, "noticePeriodDays" => r.NoticePeriodDays, "reviewDate" => D(r.ReviewDate),
+        "needsLegalReview" => r.NeedsLegalReview, "stage" => ContractEndpoints.StageNames[r.Stage], "noticeDeadline" => D(r.NoticeDeadline),
+        "registered" => r.RegisteredUtc is { } ru ? DateOnly.FromDateTime(Local(ru)) : null, "registeredBy" => r.RegisteredByName,
+        "renewalDecision" => r.RenewalDecision is { } d ? RenewalEndpoints.DecisionNames[d] : null, "endedOn" => D(r.EndedOn), "endedReason" => r.EndedReason,
+        "legalOutcome" => r.LegalOutcome,
+        _ => null,
+    };
+
+    private sealed record Register(List<RegisterRow> Rows, List<RegisterColumn> Columns, Dictionary<int, Dictionary<string, (object? Value, string Display)>> Added, bool Filtered);
+
+    private static async Task<Register> RegisterAsync(SqlConnection c, Person me, string? scope, HttpRequest request)
+    {
+        var fields = await Fields.LoadAsync(c);
+        var columns = RegisterColumnsFor(fields, await Fields.LoadSectionsAsync(c));
+        var p = ContractAccess.Params(me);
+        // The same filters as the Contracts list: f.{field key}={value}, for the fields an admin made filterable.
+        var filters = Fields.FilterSql(fields, request.Query.Where(x => x.Key.StartsWith("f.", StringComparison.Ordinal)).Select(x => KeyValuePair.Create(x.Key[2..], x.Value.ToString())), p);
         var rows = (await c.QueryAsync<RegisterRow>($"""
-            SELECT k.Id, k.Reference, k.Title, k.Stage, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName, at.Value AS AgreementTypeName,
-                   bu.Value AS BusinessUnitName, site.Value AS SiteName, o.Name AS OwnerName, b.Name AS BackupOwnerName, k.IsConfidential, k.Value, k.CurrencyCode,
-                   k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate, k.IsEvergreen, k.NoticePeriodDays, k.ReviewDate, k.RegisteredUtc, rb.Name AS RegisteredByName,
-                   k.RenewalDecision, k.EndedOn
+            SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
+                   at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName, o.Name AS OwnerName, b.Name AS BackupOwnerName,
+                   k.IsConfidential, k.NeedsLegalReview, k.Value, k.CurrencyCode, k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate, k.IsEvergreen,
+                   k.NoticePeriodDays, k.ReviewDate, k.RegisteredUtc, rb.Name AS RegisteredByName, k.RenewalDecision, k.EndedOn, k.EndedReason, k.LegalOutcome
             FROM contracts.Contract k
             LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
             LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
             LEFT JOIN contracts.ListItem at ON at.Id = k.AgreementTypeId LEFT JOIN contracts.ListItem bu ON bu.Id = k.BusinessUnitId LEFT JOIN contracts.ListItem site ON site.Id = k.SiteId
             JOIN contracts.Person o ON o.Id = k.OwnerId LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId LEFT JOIN contracts.Person rb ON rb.Id = k.RegisteredById
-            WHERE k.Stage IN ({StagesFor(scope)}) AND {ContractAccess.VisibleSql("k")}
+            WHERE k.Stage IN ({StagesFor(scope)}) AND {ContractAccess.VisibleSql("k")}{string.Concat(filters.Select(f => $" AND {f}"))}
             ORDER BY k.Reference
-            """, ContractAccess.Params(me))).ToList();
-        var defs = await Fields.LoadAsync(c);
-        var added = Fields.ExcelFields(defs, Headers);
-        var values = await Fields.ReadAsync(c, null, rows.Select(r => r.Id), added.Select(a => a.Field).ToList());
-        return (rows, added, values);
+            """, p)).ToList();
+        var added = columns.Where(x => x.Added is not null).Select(x => x.Added!).ToList();
+        var values = await Fields.ReadAsync(c, null, rows.Select(r => r.Id), added);
+        return new(rows, columns, values, filters.Count > 0);
     }
 
-    private static readonly Excel.Column[] RegisterColumns =
-    [
-        new("Reference", null, 16), new("Title", null, 34), new("Stage", null, 11), new("Supplier", null, 28), new("Category", null, 24), new("Agreement type", null, 18),
-        new("Business unit", null, 16), new("Site", null, 16), new("Owner", null, 20), new("Backup owner", null, 20), new("Confidential", null, 12),
-        new("Value", null, 16), new("Currency", null, 10), new("SAP outline agreement number", null, 18), new("Start date", null, 13), new("Effective date", null, 13),
-        new("End date", null, 13), new("Evergreen", null, 11), new("Notice period (days)", null, 12), new("Notice deadline", null, 13), new("Review date", null, 13),
-        new("Registered", null, 13), new("Registered by", null, 20), new("Renewal decision", null, 15), new("Ended on", null, 13),
-    ];
-    private static readonly string[] Headers = RegisterColumns.Select(c => c.Header).ToArray();
+    private static async Task<List<string>> ChosenAsync(SqlConnection c, Person me, List<RegisterColumn> columns)
+    {
+        var json = await c.ExecuteScalarAsync<string?>("SELECT ColumnsJson FROM contracts.ReportPreference WHERE PersonId = @id AND Report = N'register'", new { id = me.Id });
+        var keys = columns.Select(x => x.Key).ToHashSet();
+        var chosen = (json is null ? DefaultColumns : System.Text.Json.JsonSerializer.Deserialize<string[]>(json) ?? DefaultColumns).Where(keys.Contains).Distinct().ToList();
+        return chosen.Count > 0 ? chosen : DefaultColumns.Where(keys.Contains).ToList();
+    }
+
+    public sealed record ColumnsInput(List<string>? Columns);
 
     // ---------------------------------------------------------------- Endpoints
 
@@ -106,46 +173,77 @@ public static class ReportEndpoints
     {
         var group = app.MapGroup("/api/reports");
 
-        group.MapGet("/register", async (string? scope, CurrentUser current, Db db) =>
+        group.MapGet("/register", async (string? scope, HttpRequest request, CurrentUser current, Db db) =>
         {
             var (me, refusal) = await RequireAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            var (rows, added, values) = await RegisterAsync(c, me!, scope);
+            var register = await RegisterAsync(c, me!, scope, request);
             return Results.Ok(new
             {
-                columns = added.Select(a => new { a.Field.Key, Label = a.Header }),
-                rows = rows.Select(r => new
+                columns = register.Columns.Select(x => new { x.Key, x.Label, x.Group, x.Type }),
+                chosen = await ChosenAsync(c, me!, register.Columns),
+                defaults = DefaultColumns,
+                filtered = register.Filtered,
+                rows = register.Rows.Select(r => new
                 {
-                    r.Id, r.Reference, r.Title, r.Stage, StageName = ContractEndpoints.StageNames[r.Stage], r.SupplierName, r.Category, r.OwnerName, r.IsConfidential,
-                    r.Value, r.CurrencyCode, EffectiveDate = D(r.EffectiveDate), EndDate = D(r.EndDate), r.IsEvergreen, NoticeDeadline = D(r.NoticeDeadline),
-                    RegisteredUtc = ContractEndpoints.Utc(r.RegisteredUtc), r.RegisteredByName, r.BusinessUnitName, r.SiteName,
-                    RenewalDecision = r.RenewalDecision is { } d ? RenewalEndpoints.DecisionNames[d] : null,
-                    Fields = values[r.Id].ToDictionary(v => v.Key, v => v.Value.Display),
+                    r.Id, r.Reference, r.IsConfidential, r.CurrencyCode,
+                    Values = register.Columns.ToDictionary(x => x.Key, x => x.Added is { } f
+                        ? (register.Added[r.Id].TryGetValue(f.Key, out var v) && v.Display != "" ? v.Display : null)
+                        : BuiltInValue(r, x.Key)),
                 }),
                 totals = new
                 {
-                    count = rows.Count,
-                    value = rows.Where(r => r.Value is not null).GroupBy(r => r.CurrencyCode).Select(g => new { currency = g.Key, total = g.Sum(r => r.Value!.Value) }),
+                    count = register.Rows.Count,
+                    value = register.Rows.Where(r => r.Value is not null).GroupBy(r => r.CurrencyCode).Select(g => new { currency = g.Key, total = g.Sum(r => r.Value!.Value) }),
                 },
             });
         });
 
-        group.MapGet("/register.xlsx", async (string? scope, CurrentUser current, Db db, TimeProvider clock) =>
+        // Each person's own choice of columns. Only their own view, so not audited (like Home's "Choose what I see").
+        group.MapPut("/register/columns", async (ColumnsInput body, CurrentUser current, Db db) =>
         {
             var (me, refusal) = await RequireAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            var (rows, added, values) = await RegisterAsync(c, me!, scope);
+            var keys = RegisterColumnsFor(await Fields.LoadAsync(c), await Fields.LoadSectionsAsync(c)).Select(x => x.Key).ToHashSet();
+            var chosen = (body.Columns ?? []).Distinct().ToList();
+            if (chosen.Count == 0) return ApiResults.Problem(StatusCodes.Status400BadRequest, "invalid", "Choose at least one column.");
+            if (chosen.FirstOrDefault(k => !keys.Contains(k)) is { } unknown) return ApiResults.Problem(StatusCodes.Status400BadRequest, "invalid", $"There's no column called \"{unknown}\". Refresh the page and try again.");
+            await c.ExecuteAsync("""
+                MERGE contracts.ReportPreference AS t USING (SELECT @id AS PersonId, N'register' AS Report) AS s ON t.PersonId = s.PersonId AND t.Report = s.Report
+                WHEN MATCHED THEN UPDATE SET ColumnsJson = @json, UpdatedUtc = SYSUTCDATETIME()
+                WHEN NOT MATCHED THEN INSERT (PersonId, Report, ColumnsJson) VALUES (@id, N'register', @json);
+                """, new { id = me!.Id, json = System.Text.Json.JsonSerializer.Serialize(chosen) });
+            return Results.Ok(new { chosen });
+        });
+
+        // Excel has every column, whatever is chosen on screen, and follows the filters.
+        group.MapGet("/register.xlsx", async (string? scope, HttpRequest request, CurrentUser current, Db db, TimeProvider clock) =>
+        {
+            var (me, refusal) = await RequireAsync(current, db);
+            if (refusal is not null) return refusal;
+            await using var c = await db.OpenAsync();
+            var register = await RegisterAsync(c, me!, scope, request);
             var people = (await c.QueryAsync<Person>("SELECT * FROM contracts.Person")).ToDictionary(p => p.Id);
-            var columns = RegisterColumns.Concat(added.Select(a => new Excel.Column(a.Header, null, a.Field.Kind == "LongText" ? 40 : 20))).ToList();
-            var data = rows.Select(r => new object?[]
+            var columns = new List<Excel.Column> { new("Reference", null, 16) };
+            foreach (var x in register.Columns)
             {
-                r.Reference, r.Title, ContractEndpoints.StageNames[r.Stage], r.SupplierName, r.Category, r.AgreementTypeName, r.BusinessUnitName, r.SiteName,
-                r.OwnerName, r.BackupOwnerName, r.IsConfidential, r.Value, r.CurrencyCode, r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate),
-                r.IsEvergreen, r.NoticePeriodDays, D(r.NoticeDeadline), r.RegisteredUtc is { } ru ? DateOnly.FromDateTime(Local(ru)) : null, r.RegisteredByName,
-                r.RenewalDecision is { } dn ? RenewalEndpoints.DecisionNames[dn] : null, D(r.EndedOn),
-            }.Concat(added.Select(a => values[r.Id].TryGetValue(a.Field.Key, out var v) ? Fields.ExcelValue(a.Field, v, id => people.GetValueOrDefault(id)?.WindowsAccount) : null)).ToArray());
+                columns.Add(new(x.Label, null, x.Type is "date" or "yesno" or "number" ? 14 : x.Key is "title" or "description" or "endedReason" or "legalOutcome" ? 36 : 22));
+                if (x.Key == "value") columns.Add(new("Currency", null, 10));
+            }
+            var data = register.Rows.Select(r =>
+            {
+                var row = new List<object?> { r.Reference };
+                foreach (var x in register.Columns)
+                {
+                    row.Add(x.Added is { } f
+                        ? register.Added[r.Id].TryGetValue(f.Key, out var v) ? Fields.ExcelValue(f, v, id => people.GetValueOrDefault(id)?.WindowsAccount) : null
+                        : BuiltInValue(r, x.Key));
+                    if (x.Key == "value") row.Add(r.CurrencyCode);
+                }
+                return row.ToArray();
+            });
             return File(Excel.Write("Register", columns, data), "register", clock);
         });
 

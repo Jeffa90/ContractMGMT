@@ -1,9 +1,11 @@
 // Reports for admins and auditors (slice 8; product-spec sections 11 and 13; D-82 to D-84): the register, the pipeline, approvals and the audit trail.
 // Each can be downloaded to Excel; the register also prints cleanly (or saves as PDF) from the browser.
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
+  Columns3,
   FileDown,
+  ListFilter,
   Lock,
   Printer,
   Search,
@@ -11,19 +13,26 @@ import {
   Undo2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useSearchParams } from "react-router";
+import { toast } from "sonner";
+import { ContractFilters } from "@/components/ContractFilters";
+import { Dialog } from "@/components/Dialog";
 import { PageHeader } from "@/components/Help";
 import {
   Alert,
   Badge,
   Button,
   Card,
+  Checkbox,
   EmptyState,
   Segmented,
   Skeleton,
   TextInput,
 } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { chosenFilters, filterFields, filterPrefix } from "@/lib/filters";
+import type { Layout } from "@/lib/layout";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { useMe } from "@/lib/me";
@@ -113,27 +122,25 @@ const dayText = (d: number) =>
 
 // ------------------------------------------------------------------ Register
 
+type ColumnType = "text" | "date" | "money" | "number" | "yesno";
+type RegisterColumn = {
+  key: string;
+  label: string;
+  group: string;
+  type: ColumnType;
+};
 type RegisterRow = {
   id: number;
   reference: string;
-  title: string;
-  stage: string;
-  stageName: string;
-  supplierName: string | null;
-  category: string | null;
-  ownerName: string;
   isConfidential: boolean;
-  value: number | null;
   currencyCode: string;
-  effectiveDate: string | null;
-  endDate: string | null;
-  isEvergreen: boolean;
-  noticeDeadline: string | null;
-  registeredUtc: string | null;
-  registeredByName: string | null;
-  renewalDecision: string | null;
+  values: Record<string, string | number | boolean | null>;
 };
 type Register = {
+  columns: RegisterColumn[];
+  chosen: string[];
+  defaults: string[];
+  filtered: boolean;
   rows: RegisterRow[];
   totals: { count: number; value: { currency: string; total: number }[] };
 };
@@ -155,10 +162,13 @@ type Scope = (typeof scopes)[number]["value"];
 
 /** Prints in the light theme whatever the screen uses, so paper and PDFs are always black on white. */
 function usePrintLight() {
+  // When it was printed, for the "Printed ... by ..." line; set as printing starts.
+  const [printedAt, setPrintedAt] = useState(() => new Date());
   useEffect(() => {
     const root = document.documentElement;
     let saved: string | null = null;
     const before = () => {
+      flushSync(() => setPrintedAt(new Date())); // drawn before the page is captured
       saved = root.getAttribute("data-theme");
       root.setAttribute("data-theme", "light");
     };
@@ -173,35 +183,211 @@ function usePrintLight() {
       window.removeEventListener("afterprint", after);
     };
   }, []);
+  return printedAt;
+}
+
+/** A value as the screen and printout show it. */
+function cellText(column: RegisterColumn, row: RegisterRow): string {
+  const v = row.values[column.key];
+  if (v === null || v === undefined || v === "") return "";
+  switch (column.type) {
+    case "date":
+      return formatDate(String(v));
+    case "money":
+      return formatMoney(Number(v), row.currencyCode, true);
+    case "yesno":
+      return v ? "Yes" : "No";
+    case "number":
+      return Number(v).toLocaleString("en-AU");
+    default:
+      return String(v);
+  }
+}
+
+function ColumnsDialog({
+  register,
+  onClose,
+}: {
+  register: Register;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [picked, setPicked] = useState<string[]>(register.chosen);
+  const groups = [...new Set(register.columns.map((c) => c.group))];
+  const save = useMutation({
+    mutationFn: (columns: string[]) =>
+      api.put<{ chosen: string[] }>("/api/reports/register/columns", {
+        columns,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["report", "register"] });
+      toast.success("Columns saved. They're kept for next time.");
+      onClose();
+    },
+    onError: (e) =>
+      toast.error(
+        e instanceof ApiError ? e.message : "That didn't save. Try again.",
+      ),
+  });
+  // Keep the columns in the order the fields are arranged, so the table always reads the same way.
+  const ordered = register.columns
+    .map((c) => c.key)
+    .filter((k) => picked.includes(k));
+  const toggle = (key: string, on: boolean) =>
+    setPicked((p) => (on ? [...p, key] : p.filter((k) => k !== key)));
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="Choose columns"
+      description="Tick what to show and print. Reference is always first. The Excel download always has every column."
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => setPicked(register.defaults)}>
+            Back to the usual columns
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => save.mutate(ordered)}
+            disabled={ordered.length === 0 || save.isPending}
+          >
+            {ordered.length === 0
+              ? "Tick at least one"
+              : `Show ${ordered.length} ${ordered.length === 1 ? "column" : "columns"}`}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {groups.map((g) => (
+          <fieldset key={g}>
+            <legend className="text-sm font-semibold">{g}</legend>
+            <div className="mt-1 grid sm:grid-cols-2 sm:gap-x-4">
+              {register.columns
+                .filter((c) => c.group === g)
+                .map((c) => (
+                  <Checkbox
+                    key={c.key}
+                    label={c.label}
+                    checked={picked.includes(c.key)}
+                    onChange={(on) => toggle(c.key, on)}
+                  />
+                ))}
+            </div>
+          </fieldset>
+        ))}
+      </div>
+    </Dialog>
+  );
 }
 
 function RegisterReport() {
   const { person } = useMe();
+  const [params, setParams] = useSearchParams();
   const [scope, setScope] = useParam<Scope>(
     "scope",
     scopes.map((s) => s.value),
     "effective",
   );
+  // Filters: the same as the Contracts list (fields an admin made filterable), kept in the address.
+  const layout = useQuery({
+    queryKey: ["layout"],
+    queryFn: () => api.get<Layout>("/api/layout"),
+  });
+  const filterList = filterFields(layout.data?.fields);
+  const chosenFilter = Object.fromEntries(
+    Object.entries(chosenFilters(params)).filter(([k]) =>
+      filterList.some((f) => f.key === k),
+    ),
+  );
+  const filterCount = Object.keys(chosenFilter).length;
+  const filterQuery = Object.entries(chosenFilter)
+    .map(
+      ([k, v]) =>
+        `&${encodeURIComponent(filterPrefix + k)}=${encodeURIComponent(v)}`,
+    )
+    .join("");
+  const [showFilters, setShowFilters] = useState(
+    () => Object.keys(chosenFilters(params)).length > 0,
+  );
+  const setFilter = (key: string, value: string) =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        if (value) n.set(filterPrefix + key, value);
+        else n.delete(filterPrefix + key);
+        return n;
+      },
+      { replace: true },
+    );
+  const clearFilters = () =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        for (const key of [...n.keys()])
+          if (key.startsWith(filterPrefix)) n.delete(key);
+        return n;
+      },
+      { replace: true },
+    );
+  const [choosing, setChoosing] = useState(false);
+
   const data = useQuery({
-    queryKey: ["report", "register", scope],
-    queryFn: () => api.get<Register>(`/api/reports/register?scope=${scope}`),
+    queryKey: ["report", "register", scope, filterQuery],
+    queryFn: () =>
+      api.get<Register>(`/api/reports/register?scope=${scope}${filterQuery}`),
     placeholderData: (p) => p,
   });
-  usePrintLight();
+  const printedAt = usePrintLight();
   const rows = data.data?.rows ?? [];
+  const columns = (data.data?.chosen ?? [])
+    .map((k) => data.data!.columns.find((c) => c.key === k))
+    .filter((c): c is RegisterColumn => c !== undefined);
   const scopeName = scopes.find((s) => s.value === scope)!.print;
+  const filterWords = Object.entries(chosenFilter)
+    .map(([k]) => filterList.find((f) => f.key === k)?.label)
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <section aria-label="Register" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 print:hidden lg:flex-row lg:items-center lg:justify-between">
-        <Segmented
-          label="Which contracts"
-          value={scope}
-          onChange={setScope}
-          options={scopes.map((s) => ({ value: s.value, label: s.label }))}
-        />
+      <div className="flex flex-col gap-3 print:hidden lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <Segmented
+            label="Which contracts"
+            value={scope}
+            onChange={setScope}
+            options={scopes.map((s) => ({ value: s.value, label: s.label }))}
+          />
+          <div className="flex flex-wrap gap-2">
+            {filterList.length > 0 && (
+              <Button
+                aria-expanded={showFilters}
+                aria-controls="register-filters"
+                icon={<ListFilter aria-hidden className="size-5" />}
+                onClick={() => setShowFilters((v) => !v)}
+              >
+                Filters
+                {filterCount > 0 && (
+                  <span className="tabular rounded-full bg-primary px-2 text-xs text-primary-foreground">
+                    {filterCount}
+                  </span>
+                )}
+              </Button>
+            )}
+            <Button
+              icon={<Columns3 aria-hidden className="size-5" />}
+              onClick={() => setChoosing(true)}
+              disabled={!data.data}
+            >
+              Columns
+            </Button>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-1">
-          <Download href={`/api/reports/register.xlsx?scope=${scope}`} />
+          <Download
+            href={`/api/reports/register.xlsx?scope=${scope}${filterQuery}`}
+          />
           <Button
             variant="ghost"
             icon={<Printer aria-hidden className="size-5" />}
@@ -213,14 +399,26 @@ function RegisterReport() {
         </div>
       </div>
 
+      {showFilters && filterList.length > 0 && (
+        <div id="register-filters" className="print:hidden">
+          <ContractFilters
+            fields={filterList}
+            chosen={chosenFilter}
+            onChange={setFilter}
+            onClear={clearFilters}
+          />
+        </div>
+      )}
+
       {/* Only on paper: what this is, when and who. */}
       <div className="hidden print:block">
         <h2 className="font-display text-xl font-semibold">
           JBS Contracts register: {scopeName.toLowerCase()}
         </h2>
         <p className="text-sm">
-          Printed {formatDateTime(new Date())} by {person.name}.{" "}
-          {plural(rows.length, "contract")}.
+          Printed {formatDateTime(printedAt)} by {person.name}.{" "}
+          {plural(rows.length, "contract")}
+          {filterWords && `, filtered by ${filterWords}`}.
         </p>
       </div>
 
@@ -232,36 +430,36 @@ function RegisterReport() {
         <Card>
           <EmptyState
             icon={<BadgeCheck />}
-            title="No contracts to show yet. They appear here once the Group Head approves them."
+            title={
+              data.data.filtered
+                ? "No contracts match these filters."
+                : "No contracts to show yet. They appear here once the Group Head approves them."
+            }
+            action={
+              data.data.filtered ? (
+                <Button onClick={clearFilters}>Clear filters</Button>
+              ) : undefined
+            }
           />
         </Card>
       ) : (
         <>
           <p className="text-sm text-muted-foreground print:hidden">
-            {plural(data.data!.totals.count, "contract")}
-            {data.data!.totals.value.length > 0 &&
-              `, worth ${data.data!.totals.value.map((v) => formatMoney(v.total, v.currency, true)).join(" and ")} in total`}
+            {plural(data.data.totals.count, "contract")}
+            {data.data.totals.value.length > 0 &&
+              `, worth ${data.data.totals.value.map((v) => formatMoney(v.total, v.currency, true)).join(" and ")} in total`}
             . Confidential contracts are included and marked. The Excel download
-            also has every added field.
+            has every column.
           </p>
           <Card className="overflow-x-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none">
-            <table className="w-full min-w-[56rem] text-left text-sm print:min-w-0 print:text-[9pt]">
-              <thead className="border-b border-border text-xs text-muted-foreground print:text-[8pt]">
+            <table className="w-full text-left text-sm print:text-[8pt]">
+              <thead className="border-b border-border text-xs text-muted-foreground print:text-[7pt]">
                 <tr>
-                  {[
-                    "Reference",
-                    "Contract",
-                    "Owner",
-                    "Value",
-                    "Effective",
-                    "Ends",
-                    "Notice deadline",
-                    "Registered",
-                  ].map((h) => (
+                  {["Reference", ...columns.map((c) => c.label)].map((h) => (
                     <th
                       key={h}
                       scope="col"
-                      className="px-3 py-2 font-medium whitespace-nowrap first:pl-5 last:pr-5"
+                      className="px-3 py-2 align-bottom font-medium first:pl-5 last:pr-5"
                     >
                       {h}
                     </th>
@@ -270,7 +468,7 @@ function RegisterReport() {
               </thead>
               <tbody className="divide-y divide-border">
                 {rows.map((r) => (
-                  <tr key={r.id} className="align-top break-inside-avoid">
+                  <tr key={r.id} className="break-inside-avoid align-top">
                     <td className="px-3 py-2 pl-5 whitespace-nowrap">
                       <Link
                         to={`/contracts/${r.id}`}
@@ -278,60 +476,38 @@ function RegisterReport() {
                       >
                         {r.reference}
                       </Link>
-                      {r.stage !== "Effective" && (
-                        <span className="block text-xs text-muted-foreground">
-                          {r.stageName}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="font-medium">{r.title}</span>
                       {r.isConfidential && (
-                        <span className="ml-1 inline-flex items-center gap-0.5 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                           <Lock aria-hidden className="size-3" /> Confidential
                         </span>
                       )}
-                      <span className="block text-xs text-muted-foreground">
-                        {[r.supplierName ?? "No supplier", r.category]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
                     </td>
-                    <td className="px-3 py-2">{r.ownerName}</td>
-                    <td className="tabular px-3 py-2 whitespace-nowrap">
-                      {r.value === null
-                        ? ""
-                        : formatMoney(r.value, r.currencyCode, true)}
-                    </td>
-                    <td className="tabular px-3 py-2 whitespace-nowrap">
-                      {formatDate(r.effectiveDate)}
-                    </td>
-                    <td className="tabular px-3 py-2 whitespace-nowrap">
-                      {r.isEvergreen ? "Evergreen" : formatDate(r.endDate)}
-                    </td>
-                    <td className="tabular px-3 py-2 whitespace-nowrap">
-                      {formatDate(r.noticeDeadline)}
-                      {r.renewalDecision && (
-                        <span className="block text-xs text-muted-foreground">
-                          {r.renewalDecision}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 pr-5 whitespace-nowrap">
-                      {r.registeredUtc &&
-                        formatDate(r.registeredUtc.slice(0, 10))}
-                      {r.registeredByName && (
-                        <span className="block text-xs text-muted-foreground">
-                          {r.registeredByName}
-                        </span>
-                      )}
-                    </td>
+                    {columns.map((c) => (
+                      <td
+                        key={c.key}
+                        className={cn(
+                          "px-3 py-2 last:pr-5",
+                          c.type === "text"
+                            ? "min-w-36"
+                            : "tabular whitespace-nowrap",
+                          c.key === "description" && "min-w-64",
+                        )}
+                      >
+                        {cellText(c, r)}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </Card>
         </>
+      )}
+      {choosing && data.data && (
+        <ColumnsDialog
+          register={data.data}
+          onClose={() => setChoosing(false)}
+        />
       )}
     </section>
   );

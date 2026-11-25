@@ -38,6 +38,17 @@ public static class TeamEndpoints
         public int? VariationNumber { get; set; }
     }
 
+    private sealed class Detail
+    {
+        public int Id { get; set; }
+        public string? SupplierName { get; set; }
+        public decimal? Value { get; set; }
+        public string CurrencyCode { get; set; } = "AUD";
+        public string? Category { get; set; }
+        public DateTime? EndDate { get; set; }
+        public bool IsEvergreen { get; set; }
+    }
+
     private sealed record Item(int PersonId, int ContractId, string Reference, string Title, string What, DateOnly? Date, int? Days, int? VariationId, int? VariationNumber, string? Kind = null);
 
     public static void MapTeamEndpoints(this IEndpointRouteBuilder app)
@@ -100,6 +111,15 @@ public static class TeamEndpoints
                 }
             }
 
+            // Each contract's supplier, value, category and end date, so a lead can see what it is at a glance.
+            var ids = items.Select(i => i.ContractId).Distinct().ToList();
+            var details = ids.Count == 0 ? [] : (await c.QueryAsync<Detail>("""
+                SELECT k.Id, s.Name AS SupplierName, k.Value, k.CurrencyCode, CASE WHEN parent.Name IS NULL THEN cat.Name ELSE parent.Name + N' > ' + cat.Name END AS Category,
+                       k.EndDate, k.IsEvergreen
+                FROM contracts.Contract k LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
+                LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
+                WHERE k.Id IN (SELECT value FROM OPENJSON(@ids))
+                """, new { ids = System.Text.Json.JsonSerializer.Serialize(ids) })).ToDictionary(d => d.Id);
             var byPerson = items.ToLookup(i => i.PersonId);
             int Count(int id, string what) => byPerson[id].Count(i => i.What == what);
             var rows = people
@@ -116,7 +136,16 @@ public static class TeamEndpoints
                     Items = byPerson[person.Id]
                         .OrderBy(i => i.What switch { What.Overdue => 0, What.ComingUp => 1, What.LegalTurn => 2, What.WithLegal or What.InApproval => 4, _ => 3 })
                         .ThenBy(i => i.What is What.Overdue or What.ComingUp ? i.Days : -i.Days)
-                        .Select(i => new { i.ContractId, i.Reference, i.Title, i.What, i.Kind, i.Date, i.Days, i.VariationId, i.VariationNumber }),
+                        .Select(i =>
+                        {
+                            var d = details.GetValueOrDefault(i.ContractId);
+                            return new
+                            {
+                                i.ContractId, i.Reference, i.Title, i.What, i.Kind, i.Date, i.Days, i.VariationId, i.VariationNumber,
+                                d?.SupplierName, d?.Value, CurrencyCode = d?.CurrencyCode ?? "AUD", d?.Category,
+                                EndDate = d?.EndDate is { } e ? DateOnly.FromDateTime(e) : (DateOnly?)null, IsEvergreen = d?.IsEvergreen ?? false,
+                            };
+                        }),
                 })
                 // Only people with something to show: contract owners, Legal, and anyone who still owns or has work.
                 .Where(r => r.IsContractOwner || r.IsLegal || r.Owns > 0 || r.BacksUp > 0 || r.Items.Any())

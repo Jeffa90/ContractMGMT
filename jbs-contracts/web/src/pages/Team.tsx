@@ -15,7 +15,7 @@ import {
 } from "@/components/ui";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { help } from "@/help";
 
@@ -39,6 +39,12 @@ type Item = {
   days: number | null;
   variationId: number | null;
   variationNumber: number | null;
+  supplierName: string | null;
+  value: number | null;
+  currencyCode: string;
+  category: string | null;
+  endDate: string | null;
+  isEvergreen: boolean;
 };
 type Person = {
   id: number;
@@ -207,7 +213,7 @@ function PersonCard({ p }: { p: Person }) {
                     ({list.length})
                   </span>
                 </h2>
-                <ul className="mt-1 flex flex-col gap-1">
+                <ul className="mt-1 flex flex-col gap-2">
                   {list.map((i) => (
                     <li
                       key={`${i.what}-${i.contractId}-${i.variationId ?? 0}`}
@@ -230,6 +236,19 @@ function PersonCard({ p }: { p: Person }) {
                         >
                           {describe(i)}
                         </span>
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {[
+                          i.supplierName ?? "No supplier",
+                          i.value !== null &&
+                            formatMoney(i.value, i.currencyCode, true),
+                          i.category,
+                          i.isEvergreen
+                            ? "Evergreen"
+                            : i.endDate && `Ends ${formatDate(i.endDate)}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     </li>
                   ))}

@@ -27,7 +27,7 @@ import {
 } from "@/components/ui";
 import { errorText } from "@/lib/actions";
 import { api, ApiError } from "@/lib/api";
-import { allDocumentKinds, type Lists } from "@/lib/contracts";
+import { allDocumentKinds, withAddedKinds, type Lists } from "@/lib/contracts";
 import { formatBytes } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { help } from "@/help";
@@ -636,10 +636,13 @@ function ContractsStep() {
 
 // ------------------------------------------------------------------ Step 2: files
 
-const kinds = allDocumentKinds;
-const kindLabel = (k: string) => kinds.find((x) => x.value === k)?.label ?? k;
-
 function FilesStep() {
+  const lists = useQuery({
+    queryKey: ["lists"],
+    queryFn: () => api.get<Lists>("/api/lists"),
+  });
+  const kinds = withAddedKinds(allDocumentKinds, lists.data);
+  const kindLabel = (k: string) => kinds.find((x) => x.value === k)?.label ?? k;
   const [file, setFile] = useState<File | null>(null);
   const [kind, setKind] = useState("Supporting");
   // The admin's own choice of kind for a file (by its path in the ZIP), over what was worked out from its name.

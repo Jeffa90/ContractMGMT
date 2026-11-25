@@ -63,7 +63,10 @@ export type SupplierPageData = {
     relationshipOwnerName: string | null;
     tierId: number | null;
     tierName: string | null;
-    riskRating: Risk | null;
+    /** Low, Medium, High, or L and the id of a level an admin added (D-98). */
+    riskRating: string | null;
+    /** What to show: Low, Medium, High or the added level's name. */
+    riskName: string | null;
     riskReason: string | null;
     nextReviewDue: string | null;
     rowVersion: string;

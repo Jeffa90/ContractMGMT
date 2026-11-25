@@ -428,6 +428,7 @@ public static class LegacyImportEndpoints
             await using var c = await db.OpenAsync();
             using (zip)
             {
+                if (await KindsProblemAsync(c, null, zip!) is { } kindProblem) return ApiResults.Invalid(kindProblem, new() { ["kind"] = kindProblem });
                 var plan = await PlanFilesAsync(c, null, zip!);
                 return Results.Ok(FilesSummary(plan));
             }
@@ -443,6 +444,7 @@ public static class LegacyImportEndpoints
             {
                 await using var c = await db.OpenAsync();
                 await using var tx = await Db.BeginWriteAsync(c);
+                if (await KindsProblemAsync(c, tx, zip!) is { } kindProblem) return ApiResults.Invalid(kindProblem, new() { ["kind"] = kindProblem });
                 var plan = await PlanFilesAsync(c, tx, zip!);
                 var saved = new List<string>();
                 try
@@ -494,7 +496,7 @@ public static class LegacyImportEndpoints
         public string? Title { get; set; }
         public string? Reason { get; set; }
         public string Kind { get; set; } = "";
-        public string KindName => DocumentEndpoints.Kinds.GetValueOrDefault(Kind, Kind);
+        public string KindName { get; set; } = "";
         public string? KindWhy { get; set; }
         internal int ContractId { get; set; }
         internal ZipArchiveEntry? Entry { get; set; }
@@ -512,13 +514,13 @@ public static class LegacyImportEndpoints
         var form = await request.ReadFormAsync();
         var file = form.Files.GetFile("file");
         var kind = form["kind"].ToString();
-        if (!DocumentEndpoints.Kinds.ContainsKey(kind)) return (null, "Choose what kind of document a file is when its name doesn't say.");
+        if (kind.Length == 0) return (null, "Choose what kind of document a file is when its name doesn't say.");
         Dictionary<string, string> chosen = [];
         if (form["kinds"].ToString() is { Length: > 0 } json)
         {
             try { chosen = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? []; }
             catch (JsonException) { return (null, "The kinds chosen for the files couldn't be read. Check the files again."); }
-            if (chosen.Values.Any(v => !DocumentEndpoints.Kinds.ContainsKey(v))) return (null, "One of the kinds chosen isn't a document kind. Check the files again.");
+
         }
         if (file is null || file.Length == 0) return (null, "Choose a ZIP file.");
         if (!System.IO.Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase)) return (null, "Choose a .zip file.");
@@ -528,6 +530,15 @@ public static class LegacyImportEndpoints
         memory.Position = 0;
         try { return (new ZipUpload(new ZipArchive(memory, ZipArchiveMode.Read), kind, chosen), null); }
         catch (InvalidDataException) { return (null, "That file isn't a ZIP that can be opened."); }
+    }
+
+    /// <summary>The default and chosen kinds must be built-in, or added by an admin and not hidden (D-98).</summary>
+    private static async Task<string?> KindsProblemAsync(SqlConnection c, SqlTransaction? tx, ZipUpload upload)
+    {
+        if (!await DocumentEndpoints.IsChoosableKindAsync(c, tx, upload.DefaultKind)) return "Choose what kind of document a file is when its name doesn't say.";
+        foreach (var kind in upload.Chosen.Values.Distinct())
+            if (!await DocumentEndpoints.IsChoosableKindAsync(c, tx, kind)) return "One of the kinds chosen isn't a document kind any more. Check the files again.";
+        return null;
     }
 
     // What a file is, from words in its folders or name (D-95). Checked in this order, so a "signed variation" is a Variation and a
@@ -575,6 +586,7 @@ public static class LegacyImportEndpoints
     private static async Task<List<FilePlan>> PlanFilesAsync(SqlConnection c, SqlTransaction? tx, ZipUpload upload)
     {
         var zip = upload.Zip;
+        var kindNames = await DocumentEndpoints.KindNamesAsync(c, tx);
         var contracts = (await c.QueryAsync<(int Id, string Reference, string? LegacyReference, string Title)>(
             "SELECT Id, Reference, LegacyReference, Title FROM contracts.Contract WHERE Stage <> N'Withdrawn'", transaction: tx)).ToList();
         // Every reference a file could carry, longest first so "MED-1001" beats "MED-100".
@@ -603,7 +615,7 @@ public static class LegacyImportEndpoints
             var name = System.IO.Path.GetFileName(entry.FullName.Replace('\\', '/'));
             if (name.StartsWith('.') || entry.FullName.StartsWith("__MACOSX/", StringComparison.Ordinal) || name.Equals("Thumbs.db", StringComparison.OrdinalIgnoreCase)) continue;
             var (kind, why) = KindFor(entry.FullName, upload.DefaultKind, upload.Chosen);
-            var f = new FilePlan { Path = entry.FullName, FileName = name, Size = entry.Length, Entry = entry, Kind = kind, KindWhy = why };
+            var f = new FilePlan { Path = entry.FullName, FileName = name, Size = entry.Length, Entry = entry, Kind = kind, KindName = kindNames.GetValueOrDefault(kind, kind), KindWhy = why };
             plan.Add(f);
             if (plan.Count > MaxEntries) { f.Outcome = "Refused"; f.Reason = $"More than {MaxEntries:N0} files in one ZIP; split it."; continue; }
             unpacked += entry.Length;

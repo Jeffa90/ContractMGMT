@@ -278,7 +278,14 @@ const topics = {
     title: 'Lists',
     body: (
       <>
-        <p>These are the choices people pick from on a contract: categories (with subcategories), agreement types, business units, sites and currencies.</p>
+        <p>
+          These are the choices people pick from: categories (with subcategories), agreement types, business units, sites and currencies on a contract; supplier
+          document types, tiers and risk levels on a supplier; and the kinds of contract document.
+        </p>
+        <p>
+          <strong>Contract document kinds</strong> and <strong>supplier risk levels</strong> have built-in choices the app relies on (for example Signed copy, which
+          approval needs, and Low, Medium and High). Those are always there and aren't shown in the list; add your own alongside them.
+        </p>
         <p>
           <strong>Hide</strong> takes something out of the choices without changing contracts that already use it. You can show it again at any time. Nothing is deleted.
         </p>

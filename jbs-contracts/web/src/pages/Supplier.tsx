@@ -67,11 +67,13 @@ import { SupplierDialog } from "./ContractForm";
 
 const tabs = ["overview", "documents", "reviews", "contracts"] as const;
 type Tab = (typeof tabs)[number];
-const riskTone: Record<Risk, Tone> = {
+const riskTones: Record<Risk, Tone> = {
   Low: "success",
   Medium: "warning",
   High: "danger",
 };
+/** Levels an admin added (D-98) show as a warning, like Medium. */
+const riskTone = (risk: string): Tone => riskTones[risk as Risk] ?? "warning";
 const ratingTone: Record<Rating, Tone> = {
   Good: "success",
   NeedsImprovement: "warning",
@@ -162,13 +164,14 @@ function RelationshipDialog({
   const s = data.supplier;
   const people = usePeople();
   const tiers = useListItems("SupplierTier");
+  const addedRisks = useListItems("SupplierRisk");
   const refresh = useSave(s.id);
   const [form, setForm] = useState({
     relationshipOwnerId: s.relationshipOwnerId
       ? String(s.relationshipOwnerId)
       : "",
     tierId: s.tierId ? String(s.tierId) : "",
-    riskRating: (s.riskRating ?? "None") as Risk | "None",
+    riskRating: s.riskRating ?? "None",
     riskReason: s.riskReason ?? "",
     nextReviewDue: s.nextReviewDue ?? "",
   });
@@ -272,6 +275,11 @@ function RelationshipDialog({
                 { value: "Low", label: "Low" },
                 { value: "Medium", label: "Medium" },
                 { value: "High", label: "High" },
+                ...addedRisks.map((r) => ({ value: `L${r.id}`, label: r.value })),
+                // A level that has since been hidden stays shown while it's chosen.
+                ...(s.riskRating?.startsWith("L") && !addedRisks.some((r) => `L${r.id}` === s.riskRating)
+                  ? [{ value: s.riskRating, label: s.riskName ?? "Other" }]
+                  : []),
               ]}
             />
           </div>
@@ -446,10 +454,10 @@ function Overview({ data }: { data: SupplierPageData }) {
               <span className="flex flex-col gap-1">
                 <span>
                   <Badge
-                    tone={riskTone[s.riskRating]}
+                    tone={riskTone(s.riskRating)}
                     icon={<ShieldAlert aria-hidden className="size-3.5" />}
                   >
-                    {s.riskRating}
+                    {s.riskName ?? s.riskRating}
                   </Badge>
                 </span>
                 {s.riskReason && (
@@ -1850,10 +1858,10 @@ export function SupplierPage() {
         )}
         {s.riskRating && (
           <Badge
-            tone={riskTone[s.riskRating]}
+            tone={riskTone(s.riskRating)}
             icon={<ShieldAlert aria-hidden className="size-3.5" />}
           >
-            {s.riskRating} risk
+            {s.riskName ?? s.riskRating} risk
           </Badge>
         )}
         {s.relationshipOwnerName && (

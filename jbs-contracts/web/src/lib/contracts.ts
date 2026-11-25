@@ -1,6 +1,12 @@
 import { ApiError } from './api'
 
-export type ListItem = { id: number; listName: 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier'; value: string; sortOrder: number; isActive: boolean }
+export type ListItem = {
+  id: number
+  listName: 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier' | 'DocumentKind' | 'SupplierRisk'
+  value: string
+  sortOrder: number
+  isActive: boolean
+}
 export type Category = { id: number; parentId: number | null; name: string; sortOrder: number; isActive: boolean }
 export type Lists = { items: ListItem[]; categories: Category[]; owners: { id: number; name: string }[] }
 
@@ -212,6 +218,12 @@ export const documentKinds: { value: string; label: string }[] = [
 
 /** Every kind, including Variation (added on a Variation's page, or to old variations by the import). */
 export const allDocumentKinds: { value: string; label: string }[] = [...documentKinds, { value: 'Variation', label: 'Variation' }]
+
+/** The built-in kinds plus the ones an admin added under Admin, Lists (D-98); hidden ones aren't offered. */
+export function withAddedKinds(builtIn: { value: string; label: string }[], lists: Lists | undefined) {
+  const added = (lists?.items ?? []).filter((i) => i.listName === 'DocumentKind' && i.isActive).map((i) => ({ value: `L${i.id}`, label: i.value }))
+  return [...builtIn, ...added]
+}
 
 export const journey: { stage: Stage; label: string }[] = [
   { stage: 'Draft', label: 'Draft' },

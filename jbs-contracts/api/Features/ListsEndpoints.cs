@@ -30,6 +30,15 @@ public static class ListsEndpoints
     public static readonly Dictionary<string, string> ListLabels = new()
     {
         ["AgreementType"] = "agreement type", ["BusinessUnit"] = "business unit", ["Site"] = "site", ["Currency"] = "currency", ["SupplierDocumentType"] = "supplier document type", ["SupplierTier"] = "supplier tier",
+        ["DocumentKind"] = "contract document kind", ["SupplierRisk"] = "supplier risk level",
+    };
+
+    /// <summary>The built-in document kinds and risk levels aren't in these lists (D-98), so an added one can't take their name.</summary>
+    private static string? BuiltInClash(string listName, string value) => listName switch
+    {
+        "DocumentKind" => DocumentEndpoints.Kinds.Values.FirstOrDefault(k => string.Equals(k, value, StringComparison.OrdinalIgnoreCase)),
+        "SupplierRisk" => new[] { "Low", "Medium", "High" }.FirstOrDefault(k => string.Equals(k, value, StringComparison.OrdinalIgnoreCase)),
+        _ => null,
     };
 
     public static void MapListsEndpoints(this IEndpointRouteBuilder app)
@@ -56,6 +65,8 @@ public static class ListsEndpoints
             if (body.ListName == "Currency" && !System.Text.RegularExpressions.Regex.IsMatch(value, "^[A-Za-z]{3}$"))
                 return ApiResults.Invalid("Check the currency.", new() { ["value"] = "Use the three-letter code, for example AUD." });
             if (body.ListName == "Currency") value = value.ToUpperInvariant();
+            if (BuiltInClash(body.ListName, value) is { } builtIn)
+                return ApiResults.Invalid("That one's built in.", new() { ["value"] = $"{builtIn} is already there for everyone; it isn't shown in this list. Choose another name." });
             await using var c = await db.OpenAsync();
             await using var tx = await Db.BeginWriteAsync(c);
             var clash = await c.QuerySingleOrDefaultAsync<ListItemRow>("SELECT * FROM contracts.ListItem WITH (UPDLOCK, HOLDLOCK) WHERE ListName = @ListName AND ValueKey = UPPER(@value)", new { body.ListName, value }, tx);
@@ -80,6 +91,8 @@ public static class ListsEndpoints
             var value = (body.Value ?? before.Value).Trim();
             if (before.ListName == "Currency") value = value.ToUpperInvariant();
             if (value.Length == 0 || value.Length > 100) return ApiResults.Invalid("Check the name.", new() { ["value"] = "Type a name under 100 characters." });
+            if (BuiltInClash(before.ListName, value) is { } builtIn)
+                return ApiResults.Invalid("That one's built in.", new() { ["value"] = $"{builtIn} is already there for everyone; it isn't shown in this list. Choose another name." });
             var clash = await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.ListItem WITH (UPDLOCK, HOLDLOCK) WHERE ListName = @ListName AND ValueKey = UPPER(@value) AND Id <> @id", new { before.ListName, value, id }, tx);
             if (clash > 0) return ApiResults.Invalid("That's already in the list.", new() { ["value"] = $"{value} is already in the list." });
             var active = body.IsActive ?? before.IsActive;

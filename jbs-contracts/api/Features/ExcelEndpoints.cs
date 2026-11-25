@@ -251,6 +251,7 @@ public static class ExcelEndpoints
         ["category"] = ("Category", "Category"), ["agreementtype"] = ("AgreementType", "Agreement type"), ["businessunit"] = ("BusinessUnit", "Business unit"),
         ["site"] = ("Site", "Site"), ["currency"] = ("Currency", "Currency"),
         ["supplierdocumenttype"] = ("SupplierDocumentType", "Supplier document type"), ["suppliertier"] = ("SupplierTier", "Supplier tier"),
+        ["contractdocumentkind"] = ("DocumentKind", "Contract document kind"), ["supplierrisklevel"] = ("SupplierRisk", "Supplier risk level"),
     };
 
     private static Kind Lists() => new(

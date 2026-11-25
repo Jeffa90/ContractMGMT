@@ -1,4 +1,5 @@
-// Admin, Lists: categories (with subcategories), agreement types, business units, sites and currencies.
+// Admin, Lists: the choices on contracts (categories with subcategories, agreement types, business units, sites, currencies, document
+// kinds) and on suppliers (document types, tiers, risk levels).
 // Nothing is deleted: an item is hidden and stays on contracts that already use it.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff, Pencil, Plus } from 'lucide-react'
@@ -7,21 +8,37 @@ import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { ExcelButtons } from '@/components/ExcelImport'
 import { PageHeader } from '@/components/Help'
-import { Alert, Badge, Button, Card, Field, Segmented, Skeleton, TextInput } from '@/components/ui'
+import { Select } from '@/components/form'
+import { Alert, Badge, Button, Card, Field, Skeleton, TextInput } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import type { Category, ListItem, Lists } from '@/lib/contracts'
 import { useMe } from '@/lib/me'
 import { help } from '@/help'
 
-type Tab = 'Category' | 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier'
-const tabs: { value: Tab; label: string; single: string }[] = [
-  { value: 'Category', label: 'Categories', single: 'category' },
-  { value: 'AgreementType', label: 'Agreement types', single: 'agreement type' },
-  { value: 'BusinessUnit', label: 'Business units', single: 'business unit' },
-  { value: 'Site', label: 'Sites', single: 'site' },
-  { value: 'Currency', label: 'Currencies', single: 'currency' },
-  { value: 'SupplierDocumentType', label: 'Supplier document types', single: 'supplier document type' },
-  { value: 'SupplierTier', label: 'Supplier tiers', single: 'supplier tier' },
+type Tab = 'Category' | 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier' | 'DocumentKind' | 'SupplierRisk'
+const tabs: { value: Tab; label: string; single: string; group: 'Contracts' | 'Suppliers'; note?: string }[] = [
+  { value: 'Category', group: 'Contracts', label: 'Categories', single: 'category' },
+  { value: 'AgreementType', group: 'Contracts', label: 'Agreement types', single: 'agreement type' },
+  { value: 'BusinessUnit', group: 'Contracts', label: 'Business units', single: 'business unit' },
+  { value: 'Site', group: 'Contracts', label: 'Sites', single: 'site' },
+  { value: 'Currency', group: 'Contracts', label: 'Currencies', single: 'currency' },
+  { value: 'SupplierDocumentType', group: 'Suppliers', label: 'Supplier document types', single: 'supplier document type' },
+  { value: 'SupplierTier', group: 'Suppliers', label: 'Supplier tiers', single: 'supplier tier' },
+  {
+    value: 'DocumentKind',
+    group: 'Contracts',
+    label: 'Contract document kinds',
+    single: 'document kind',
+    note: 'Draft, Final agreement, Signed copy, Schedule, Legal mark-up, Variation, Correspondence, Supporting document and Internal sign-off are always there (the app relies on them), so they aren\'t shown here. Add your own, for example Insurance certificate or Quote.',
+  },
+  {
+    value: 'SupplierRisk',
+    group: 'Suppliers',
+    label: 'Supplier risk levels',
+    single: 'risk level',
+    note: 'Low, Medium and High are always there, so they aren\'t shown here. Add your own, for example Critical. Every level except Low asks for a reason.',
+  },
 ]
 
 type Editing = { kind: 'add'; parent: Category | null } | { kind: 'rename'; item: ListItem | Category }
@@ -66,13 +83,51 @@ export function ListsPage() {
     <>
       <PageHeader
         title="Lists"
-        description="The choices people pick from on a contract."
+        description="The choices people pick from on contracts and suppliers."
         help={help.lists}
         action={<ExcelButtons kind="lists" canImport invalidate={[['lists']]} />}
       />
-      <div className="overflow-x-auto">
-        <Segmented label="List" value={tab} onChange={setTab} options={tabs.map((t) => ({ value: t.value, label: t.label }))} />
+      <div className="flex flex-col gap-4 md:flex-row md:items-start">
+      {/* Which list: a short menu beside it on wider screens, a drop-down on a phone. */}
+      <div className="md:hidden">
+        <Field label="List">
+          {(p) => (
+            <Select {...p} value={tab} onChange={(e) => setTab(e.target.value as Tab)}>
+              {(['Contracts', 'Suppliers'] as const).map((g) => (
+                <optgroup key={g} label={g}>
+                  {tabs.filter((t) => t.group === g).map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </Select>
+          )}
+        </Field>
       </div>
+      <nav aria-label="Lists" className="hidden w-60 shrink-0 flex-col gap-4 md:flex">
+        {(['Contracts', 'Suppliers'] as const).map((g) => (
+          <div key={g} className="flex flex-col gap-1">
+            <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{g}</p>
+            {tabs.filter((t) => t.group === g).map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                aria-current={tab === t.value ? 'true' : undefined}
+                onClick={() => setTab(t.value)}
+                className={cn(
+                  'min-h-11 rounded-[var(--radius-control)] px-3 text-left hover:bg-muted',
+                  tab === t.value && 'bg-primary-soft font-medium text-primary-soft-foreground hover:bg-primary-soft',
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        ))}
+      </nav>
+      <div className="min-w-0 flex-1">
 
       {lists.isPending ? (
         <Skeleton className="h-48 w-full" />
@@ -86,6 +141,7 @@ export function ListsPage() {
               Add {current.single}
             </Button>
           </div>
+          {current.note && <p className="mt-2 text-sm text-muted-foreground">{current.note}</p>}
           {tab === 'Category' ? (
             <ul className="mt-4 divide-y divide-border">
               {lists.data.categories.filter((c) => c.parentId === null).length === 0 && <li className="py-6 text-muted-foreground">No categories yet. Add your first one, for example Freight.</li>}
@@ -136,6 +192,8 @@ export function ListsPage() {
           )}
         </Card>
       )}
+      </div>
+      </div>
       {editing && <ListItemDialog tab={tab} single={current.single} editing={editing} onClose={() => setEditing(null)} />}
     </>
   )

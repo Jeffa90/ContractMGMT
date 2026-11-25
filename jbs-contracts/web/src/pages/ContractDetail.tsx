@@ -12,7 +12,7 @@ import { RenewalCard } from '@/components/Renewal'
 import { Alert, Button, Card, EmptyState, Field, Skeleton } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { documentKinds, journey, uploadDocument, type Contract, type ContractDetail, type ContractDocument } from '@/lib/contracts'
+import { documentKinds, journey, uploadDocument, withAddedKinds, type Contract, type ContractDetail, type ContractDocument, type Lists } from '@/lib/contracts'
 import { daysUntil, formatBytes, formatDate, formatDateTime, formatMoney, timeAgo } from '@/lib/format'
 import { arrange, type Layout, type LayoutField } from '@/lib/layout'
 import { useMe } from '@/lib/me'
@@ -261,6 +261,8 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
 }
 
 function DocumentsCard({ data }: { data: ContractDetail }) {
+  const lists = useQuery({ queryKey: ['lists'], queryFn: () => api.get<Lists>('/api/lists') })
+  const kinds = withAddedKinds(documentKinds, lists.data)
   const c = data.contract
   const queryClient = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
@@ -304,7 +306,7 @@ function DocumentsCard({ data }: { data: ContractDetail }) {
             <Field label="Kind">
               {(p) => (
                 <Select {...p} value={kind} onChange={(e) => setKind(e.target.value)} className="min-w-52">
-                  {documentKinds.map((k) => (
+                  {kinds.map((k) => (
                     <option key={k.value} value={k.value}>
                       {k.label}
                     </option>

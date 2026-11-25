@@ -21,6 +21,27 @@ public static class DocumentEndpoints
         ["InternalSignOff"] = "Internal sign-off (cover page)",
     };
 
+    /// <summary>
+    /// SQL that names a document's kind: the built-in code (named in C# by <see cref="Kinds"/>), or the name of a kind an admin added
+    /// under Admin, Lists (stored as L and the list item's Id, D-98). Use as COALESCE(dk.Value, d.Kind) with this join.
+    /// </summary>
+    public const string KindJoin = "LEFT JOIN contracts.ListItem dk ON dk.ListName = N'DocumentKind' AND d.Kind = N'L' + CAST(dk.Id AS NVARCHAR(10))";
+
+    /// <summary>The name of a kind: built-in, or added by an admin (hidden ones included, so older documents keep their name).</summary>
+    public static async Task<Dictionary<string, string>> KindNamesAsync(SqlConnection c, SqlTransaction? tx = null)
+    {
+        var names = new Dictionary<string, string>(Kinds);
+        foreach (var (id, value) in await c.QueryAsync<(int Id, string Value)>("SELECT Id, Value FROM contracts.ListItem WHERE ListName = N'DocumentKind'", transaction: tx))
+            names[$"L{id}"] = value;
+        return names;
+    }
+
+    /// <summary>Whether a new document can be given this kind: a built-in one, or an added one that isn't hidden.</summary>
+    public static async Task<bool> IsChoosableKindAsync(SqlConnection c, SqlTransaction? tx, string kind) =>
+        Kinds.ContainsKey(kind)
+        || (kind.Length > 1 && kind[0] == 'L' && int.TryParse(kind[1..], out var itemId)
+            && await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @itemId AND ListName = N'DocumentKind' AND IsActive = 1", new { itemId }, tx) > 0);
+
     private static readonly Dictionary<string, string> Types = new(StringComparer.OrdinalIgnoreCase)
     {
         [".pdf"] = "application/pdf",
@@ -99,6 +120,7 @@ public static class DocumentEndpoints
     {
         public int Id { get; set; }
         public string Kind { get; set; } = "";
+        public string? KindItemName { get; set; }
         public string Title { get; set; } = "";
         public int CurrentVersion { get; set; }
         public int VersionId { get; set; }
@@ -114,13 +136,14 @@ public static class DocumentEndpoints
     /// <summary>The contract's documents (each Variation's included, marked with its number), or only one Variation's.</summary>
     public static async Task<object> ListAsync(SqlConnection c, int contractId, int? variationId = null)
     {
-        var rows = (await c.QueryAsync<DocRow>("""
-            SELECT d.Id, d.Kind, d.Title, d.CurrentVersion, v.Id AS VersionId, v.VersionNumber, v.FileName, v.SizeBytes, v.UploadedUtc, p.Name AS UploadedByName,
+        var rows = (await c.QueryAsync<DocRow>($"""
+            SELECT d.Id, d.Kind, dk.Value AS KindItemName, d.Title, d.CurrentVersion, v.Id AS VersionId, v.VersionNumber, v.FileName, v.SizeBytes, v.UploadedUtc, p.Name AS UploadedByName,
                    d.VariationId, vr.Number AS VariationNumber
             FROM contracts.Document d
             JOIN contracts.DocumentVersion v ON v.DocumentId = d.Id
             JOIN contracts.Person p ON p.Id = v.UploadedById
             LEFT JOIN contracts.Variation vr ON vr.Id = d.VariationId
+            {KindJoin}
             WHERE d.ContractId = @contractId AND d.IsRemoved = 0 AND (@variationId IS NULL OR d.VariationId = @variationId)
             ORDER BY d.Id, v.VersionNumber DESC
             """, new { contractId, variationId })).ToList();
@@ -129,7 +152,7 @@ public static class DocumentEndpoints
             var first = g.First();
             return new
             {
-                first.Id, first.Kind, KindName = Kinds[first.Kind], first.Title, first.CurrentVersion, first.VariationId, first.VariationNumber,
+                first.Id, first.Kind, KindName = first.KindItemName ?? Kinds.GetValueOrDefault(first.Kind, first.Kind), first.Title, first.CurrentVersion, first.VariationId, first.VariationNumber,
                 Versions = g.Select(v => new { Id = v.VersionId, v.VersionNumber, v.FileName, v.SizeBytes, UploadedUtc = DateTime.SpecifyKind(v.UploadedUtc, DateTimeKind.Utc), v.UploadedByName }),
             };
         }).ToList();
@@ -154,11 +177,13 @@ public static class DocumentEndpoints
             else if (file.Length > MaxBytes) fields["file"] = "That file is over 25 MB. Make it smaller (for example, save it as a PDF) and try again.";
             var extension = Path.GetExtension(file?.FileName ?? "");
             if (file is not null && !Types.ContainsKey(extension)) fields["file"] = "That kind of file can't be added. Use PDF, Word, Excel, Outlook email, text, CSV, PNG or JPG.";
-            if (documentId is null && !Kinds.ContainsKey(kind)) fields["kind"] = "Choose what kind of document this is.";
+            if (documentId is null && kind.Length == 0) fields["kind"] = "Choose what kind of document this is.";
             if (fields.Count > 0) return ApiResults.Invalid("Check the file.", fields);
 
             await using var c = await db.OpenAsync();
             await using var tx = await Db.BeginWriteAsync(c);
+            if (documentId is null && !await IsChoosableKindAsync(c, tx, kind))
+                return ApiResults.Invalid("Check the file.", new() { ["kind"] = "Choose what kind of document this is." });
             var contract = await ContractEndpoints.LoadForUpdateAsync(c, tx, id);
             if (contract is null || !ContractAccess.CanSee(me!, contract.IsConfidential, contract.OwnerId, contract.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
@@ -225,8 +250,9 @@ public static class DocumentEndpoints
                     INSERT INTO contracts.DocumentVersion (DocumentId, VersionNumber, FileName, ContentType, SizeBytes, Sha256, StoredName, UploadedById)
                     OUTPUT INSERTED.Id VALUES (@documentId, @version, @fileName, @type, @size, @sha, @stored, @me)
                     """, new { documentId, version, fileName, type = Types[extension], size = file.Length, sha, stored, me = me!.Id }, tx);
+                var kindName = (await KindNamesAsync(c, tx)).GetValueOrDefault(kind, kind);
                 await audit.WriteAsync(c, tx, me.AsActor(), version == 1 ? "document.added" : "document.version-added", "Document", documentId,
-                    version == 1 ? $"{me.Name} added the {Kinds[kind].ToLowerInvariant()} {fileName}." : $"{me.Name} added version {version} of {title} ({fileName}).",
+                    version == 1 ? $"{me.Name} added the {kindName.ToLowerInvariant()} {fileName}." : $"{me.Name} added version {version} of {title} ({fileName}).",
                     new { fileName, kind, version, sizeBytes = file.Length, sha256 = sha }, contractId: id);
                 // The contract's row version changes too; it's returned so the page can carry on (for example, attach then hand over).
                 var rowVersion = await c.ExecuteScalarAsync<byte[]>(

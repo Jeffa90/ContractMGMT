@@ -35,6 +35,8 @@ public static class SupplierPageEndpoints
         public int? TierId { get; set; }
         public string? TierName { get; set; }
         public string? RiskRating { get; set; }
+        /// <summary>Low, Medium, High, or the name of a level an admin added (D-98).</summary>
+        public string? RiskName { get; set; }
         public string? RiskReason { get; set; }
         public DateTime? NextReviewDue { get; set; }
         public byte[] RowVersion { get; set; } = [];
@@ -43,9 +45,10 @@ public static class SupplierPageEndpoints
     private static Task<SupplierInfo?> LoadAsync(SqlConnection c, SqlTransaction? tx, int id, bool forUpdate = false) =>
         c.QuerySingleOrDefaultAsync<SupplierInfo>($"""
             SELECT s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, ro.Name AS RelationshipOwnerName, s.TierId, t.Value AS TierName,
-                   s.RiskRating, s.RiskReason, s.NextReviewDue, s.RowVersion
+                   s.RiskRating, COALESCE(rk.Value, s.RiskRating) AS RiskName, s.RiskReason, s.NextReviewDue, s.RowVersion
             FROM contracts.Supplier s {(forUpdate ? "WITH (UPDLOCK, HOLDLOCK)" : "")}
             LEFT JOIN contracts.Person ro ON ro.Id = s.RelationshipOwnerId LEFT JOIN contracts.ListItem t ON t.Id = s.TierId
+            LEFT JOIN contracts.ListItem rk ON rk.ListName = N'SupplierRisk' AND s.RiskRating = N'L' + CAST(rk.Id AS NVARCHAR(10))
             WHERE s.Id = @id
             """, new { id }, tx);
 
@@ -168,9 +171,10 @@ public static class SupplierPageEndpoints
                 ORDER BY d.Id, v.VersionNumber DESC
                 """, new { id, me = me!.Id })).ToList();
             var contractDocs = await c.QueryAsync<ContractDocRow>($"""
-                SELECT k.Id AS ContractId, k.Reference, k.Title AS ContractTitle, d.Kind, d.Title, v.Id AS VersionId, v.VersionNumber, v.FileName, v.UploadedUtc, u.Name AS UploadedByName
+                SELECT k.Id AS ContractId, k.Reference, k.Title AS ContractTitle, COALESCE(dk.Value, d.Kind) AS Kind, d.Title, v.Id AS VersionId, v.VersionNumber, v.FileName, v.UploadedUtc, u.Name AS UploadedByName
                 FROM contracts.Document d JOIN contracts.Contract k ON k.Id = d.ContractId
                 JOIN contracts.DocumentVersion v ON v.DocumentId = d.Id AND v.VersionNumber = d.CurrentVersion JOIN contracts.Person u ON u.Id = v.UploadedById
+                {DocumentEndpoints.KindJoin}
                 WHERE k.SupplierId = @id AND d.IsRemoved = 0 AND {ContractAccess.VisibleSql("k")}
                 ORDER BY v.UploadedUtc DESC
                 """, p);
@@ -204,7 +208,7 @@ public static class SupplierPageEndpoints
             {
                 supplier = new
                 {
-                    s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, s.RelationshipOwnerName, s.TierId, s.TierName, s.RiskRating, s.RiskReason,
+                    s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, s.RelationshipOwnerName, s.TierId, s.TierName, s.RiskRating, s.RiskName, s.RiskReason,
                     NextReviewDue = D(s.NextReviewDue), RowVersion = Convert.ToBase64String(s.RowVersion),
                 },
                 can = new { manage = canManage, review = canReview },
@@ -250,9 +254,12 @@ public static class SupplierPageEndpoints
             var errors = new Dictionary<string, string>();
             if (body.RelationshipOwnerId is { } ro && !await ActivePersonAsync(c, tx, ro)) errors["relationshipOwnerId"] = "Choose someone who has access to JBS Contracts.";
             await CheckListItemAsync(c, tx, body.TierId, "SupplierTier", "tierId", "Choose a tier from the list.", errors);
-            if (body.RiskRating is not (null or "Low" or "Medium" or "High")) errors["riskRating"] = "Choose Low, Medium or High.";
+            // Low, Medium, High, or a level an admin added (not hidden). Every level but Low asks why.
+            var addedRisk = body.RiskRating is { Length: > 1 } code && code[0] == 'L' && int.TryParse(code[1..], out var riskItem)
+                && await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @riskItem AND ListName = N'SupplierRisk' AND IsActive = 1", new { riskItem }, tx) > 0;
+            if (body.RiskRating is not (null or "Low" or "Medium" or "High") && !addedRisk) errors["riskRating"] = "Choose a risk level from the list.";
             var reason = Clean(body.RiskReason, 500);
-            if (body.RiskRating is "Medium" or "High" && reason is null) errors["riskReason"] = "Say briefly why the risk is Medium or High.";
+            if (body.RiskRating is not (null or "Low") && reason is null) errors["riskReason"] = "Say briefly why the risk is at this level.";
             if (errors.Count > 0) return ApiResults.Invalid("Check the details.", errors);
 
             await c.ExecuteAsync("""
@@ -264,12 +271,12 @@ public static class SupplierPageEndpoints
             var changes = new List<string>();
             if (before.RelationshipOwnerName != after!.RelationshipOwnerName) changes.Add($"relationship owner to {after.RelationshipOwnerName ?? "nobody"}");
             if (before.TierName != after.TierName) changes.Add($"tier to {after.TierName ?? "none"}");
-            if (before.RiskRating != after.RiskRating || before.RiskReason != after.RiskReason) changes.Add($"risk to {after.RiskRating ?? "not rated"}{(after.RiskReason is { } r ? $" (\"{r}\")" : "")}");
+            if (before.RiskRating != after.RiskRating || before.RiskReason != after.RiskReason) changes.Add($"risk to {after.RiskName ?? "not rated"}{(after.RiskReason is { } r ? $" (\"{r}\")" : "")}");
             if (before.NextReviewDue != after.NextReviewDue) changes.Add($"next business review due to {(after.NextReviewDue is { } n ? Day(n) : "not set")}");
             if (changes.Count > 0)
                 await audit.WriteAsync(c, tx, me.AsActor(), "supplier.relationship-changed", "Supplier", id, $"{me.Name} changed {after.Name}'s {string.Join(", ", changes)}.",
-                    new { before = new { before.RelationshipOwnerName, before.TierName, before.RiskRating, before.RiskReason, NextReviewDue = D(before.NextReviewDue) },
-                          after = new { after.RelationshipOwnerName, after.TierName, after.RiskRating, after.RiskReason, NextReviewDue = D(after.NextReviewDue) } });
+                    new { before = new { before.RelationshipOwnerName, before.TierName, before.RiskName, before.RiskReason, NextReviewDue = D(before.NextReviewDue) },
+                          after = new { after.RelationshipOwnerName, after.TierName, after.RiskName, after.RiskReason, NextReviewDue = D(after.NextReviewDue) } });
             await tx.CommitAsync();
             return Results.Ok(new { rowVersion = Convert.ToBase64String(after.RowVersion) });
         });

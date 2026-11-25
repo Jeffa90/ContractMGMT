@@ -64,10 +64,11 @@ public static class FullExportEndpoints
 
     private static async Task<List<DocumentRow>> DocumentsAsync(SqlConnection c, Person me) =>
         (await c.QueryAsync<DocumentRow>($"""
-            SELECT k.Id AS ContractId, k.Reference, var.Number AS VariationNumber, d.Title, d.Kind, v.VersionNumber, d.CurrentVersion, d.IsRemoved,
+            SELECT k.Id AS ContractId, k.Reference, var.Number AS VariationNumber, d.Title, COALESCE(dk.Value, d.Kind) AS Kind, v.VersionNumber, d.CurrentVersion, d.IsRemoved,
                    v.FileName, v.ContentType, v.SizeBytes, v.Sha256, v.StoredName, u.Name AS UploadedByName, v.UploadedUtc
             FROM contracts.DocumentVersion v JOIN contracts.Document d ON d.Id = v.DocumentId JOIN contracts.Contract k ON k.Id = d.ContractId
             JOIN contracts.Person u ON u.Id = v.UploadedById LEFT JOIN contracts.Variation var ON var.Id = d.VariationId
+            {DocumentEndpoints.KindJoin}
             WHERE {ContractAccess.VisibleSql("k")}
             ORDER BY k.Reference, d.Id, v.VersionNumber
             """, ContractAccess.Params(me))).ToList();
@@ -245,9 +246,10 @@ public static class FullExportEndpoints
 
             // 7. Suppliers, people and lists.
             var suppliers = await c.QueryAsync("""
-                SELECT s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, ro.Name AS RelationshipOwner, t.Value AS Tier, s.RiskRating, s.RiskReason, s.NextReviewDue,
+                SELECT s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, ro.Name AS RelationshipOwner, t.Value AS Tier, COALESCE(rk.Value, s.RiskRating) AS RiskRating, s.RiskReason, s.NextReviewDue,
                        (SELECT COUNT(*) FROM contracts.Contract k WHERE k.SupplierId = s.Id) AS Contracts
                 FROM contracts.Supplier s LEFT JOIN contracts.Person ro ON ro.Id = s.RelationshipOwnerId LEFT JOIN contracts.ListItem t ON t.Id = s.TierId
+                LEFT JOIN contracts.ListItem rk ON rk.ListName = N'SupplierRisk' AND s.RiskRating = N'L' + CAST(rk.Id AS NVARCHAR(10))
                 ORDER BY s.Name
                 """);
             sheets.Add(new("Suppliers",

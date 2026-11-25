@@ -80,6 +80,8 @@ public sealed class AppSettings
                 From = Read("Email:From") ?? "no-reply@jbssa.com.au",
                 FromName = Read("Email:FromName") ?? "JBS Contracts",
                 PollSeconds = int.TryParse(Read("Email:PollSeconds"), out var poll) && poll > 0 ? poll : 30,
+                // Tests send emails themselves; on the servers the background sender always runs.
+                SendInBackground = !(localOnly && string.Equals(Read("Email:SendInBackground"), "false", StringComparison.OrdinalIgnoreCase)),
             },
             ApplyDatabaseScripts = applyScripts,
         };
@@ -93,6 +95,7 @@ public sealed class EmailSettings
     public string From { get; init; } = "no-reply@jbssa.com.au";
     public string FromName { get; init; } = "JBS Contracts";
     public int PollSeconds { get; init; } = 30;
+    public bool SendInBackground { get; init; } = true;
 }
 
 public sealed record FirstAdmin(string Account, string Name, string Email);

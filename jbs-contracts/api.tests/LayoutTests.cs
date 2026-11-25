@@ -132,4 +132,75 @@ public sealed class LayoutTests(AppFixture app)
         Assert.False(restored["fields"]!.AsArray().First(f => f!["key"]!.GetValue<string>() == keyA)!["isHidden"]!.GetValue<bool>());
         Assert.Null(await AuditLog.VerifyAsync(db));
     }
+
+    [Fact]
+    public async Task Added_fields_are_columns_in_the_Excel_export_and_import_by_label()
+    {
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var save = ToSave(await LayoutAsync(admin));
+        var (cover, sites, checker, renewal, bond, hiddenOne) = (Unique("Cover"), Unique("Sites"), Unique("Checker"), Unique("Renewal"), Unique("Bond"), Unique("Gone"));
+        JsonObject Added(string kind, string label, JsonArray? choices = null, bool inExport = true) => new()
+        {
+            ["kind"] = kind, ["label"] = label, ["sectionKey"] = "value", ["isRequired"] = false, ["isHidden"] = false, ["showInList"] = false,
+            ["filterable"] = false, ["inExport"] = inExport, ["choices"] = choices ?? [],
+        };
+        save["fields"]!.AsArray().Add(Added("Choice", cover, [new JsonObject { ["label"] = "Public liability" }, new JsonObject { ["label"] = "Product liability" }]));
+        save["fields"]!.AsArray().Add(Added("MultiChoice", sites, [new JsonObject { ["label"] = "Dinmore" }, new JsonObject { ["label"] = "Riverina" }, new JsonObject { ["label"] = "Beef City" }]));
+        save["fields"]!.AsArray().Add(Added("Person", checker));
+        save["fields"]!.AsArray().Add(Added("Date", renewal));
+        save["fields"]!.AsArray().Add(Added("Money", bond));
+        save["fields"]!.AsArray().Add(Added("ShortText", hiddenOne, inExport: false));
+        var (status, saved) = await SaveAsync(admin, save);
+        Assert.True(status == HttpStatusCode.OK, saved.ToJsonString());
+
+        var user = Unique("xl");
+        await app.AddPersonAsync(user, "Xavier Excel", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        using var owner = app.ClientFor($@"TEST\{user}");
+
+        // The template has a column per added field offered in Excel, by label, and the information-only columns at the end.
+        using (var book = new ClosedXML.Excel.XLWorkbook(new MemoryStream(await (await owner.GetAsync("/api/excel/contracts", Ct)).Content.ReadAsByteArrayAsync(Ct))))
+        {
+            var headings = book.Worksheet(1).Row(1).CellsUsed().Select(c => c.GetString()).ToList();
+            foreach (var h in new[] { cover, sites, checker, renewal, bond }) Assert.Contains(h, headings);
+            Assert.DoesNotContain(hiddenOne, headings);
+            Assert.Equal(["Stage", "Notice deadline"], headings[^2..]);
+        }
+
+        var title = Unique("Cold store");
+        string[] headers = ["Title", cover, sites, checker, renewal, bond];
+        var (_, result) = await ExcelTests.PostAsync(owner, "contracts", "import", ExcelTests.Sheet(headers,
+            [title, "product liability", "Dinmore, Beef City", user, "30/06/2027", "$25,000"],
+            [Unique("Bad"), "Asbestos", null, "nobody-here", null, "lots"]));
+        Assert.Equal((1, 1), (ExcelTests.Count(result, "added"), ExcelTests.Count(result, "refused")));
+        var refused = result.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("action").GetString() == "refused").GetProperty("notes")[0].GetString()!;
+        Assert.Contains($"{cover}: \"Asbestos\" isn't one of the options", refused);
+        Assert.Contains($"{checker}: \"nobody-here\"", refused);
+        Assert.Contains($"{bond}: \"lots\" isn't a number", refused);
+
+        await using var db = await app.OpenAsync();
+        var id = await db.QuerySingleAsync<int>("SELECT Id FROM contracts.Contract WHERE Title = @title", new { title });
+        var values = (await owner.GetFromJsonAsync<JsonElement>($"/api/contracts/{id}", Ct)).GetProperty("fieldValues");
+        string Shown(string label) => values.GetProperty(saved["fields"]!.AsArray().First(f => f!["label"]!.GetValue<string>() == label)!["key"]!.GetValue<string>()).GetProperty("display").GetString()!;
+        Assert.Equal("Product liability", Shown(cover));
+        Assert.Equal("Dinmore, Beef City", Shown(sites));
+        Assert.Equal("Xavier Excel", Shown(checker));
+        Assert.Equal("30 Jun 2027", Shown(renewal));
+        Assert.Equal("$25,000.00", Shown(bond));
+
+        // Importing the export changes nothing for this contract; changing one cell changes only that field.
+        var export = await (await owner.GetAsync("/api/excel/contracts", Ct)).Content.ReadAsByteArrayAsync(Ct);
+        var (_, again) = await ExcelTests.PostAsync(owner, "contracts", "preview", export);
+        var reference = await db.QuerySingleAsync<string>("SELECT Reference FROM contracts.Contract WHERE Id = @id", new { id });
+        var mine = again.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("label").GetString()!.StartsWith(reference));
+        Assert.True(mine.GetProperty("action").GetString() == "same", mine.ToString());
+
+        var (_, update) = await ExcelTests.PostAsync(owner, "contracts", "import", ExcelTests.Sheet(["Reference", cover, bond], [reference, "Public liability", null]));
+        var changed = update.GetProperty("rows")[0];
+        Assert.Equal("update", changed.GetProperty("action").GetString());
+        Assert.Equal($"Change: {cover}.", changed.GetProperty("notes")[0].GetString());
+        var summary = await db.QuerySingleAsync<string>("SELECT TOP 1 Summary FROM contracts.AuditEvent WHERE ContractId = @id ORDER BY Id DESC", new { id });
+        Assert.Contains($"{cover} from Product liability to Public liability", summary);
+        Assert.Contains("(from Excel)", summary);
+        Assert.Null(await AuditLog.VerifyAsync(db));
+    }
 }

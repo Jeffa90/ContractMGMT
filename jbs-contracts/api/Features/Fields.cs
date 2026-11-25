@@ -275,4 +275,136 @@ public static partial class Fields
         }
         return changes;
     }
+
+    // ---------------------------------------------------------------- Excel (decision D-44)
+
+    public sealed record ExcelField(FieldRow Field, string Header);
+
+    /// <summary>
+    /// Added fields an admin offers in Excel, as columns headed by their label. A label that matches one of the sheet's own headings
+    /// (or another field's, ignoring spaces and case) gets the field's key added, so every column is unambiguous.
+    /// </summary>
+    public static List<ExcelField> ExcelFields(List<FieldRow> fields, IEnumerable<string> fixedHeaders)
+    {
+        var used = fixedHeaders.Select(Excel.Normalise).ToHashSet();
+        var result = new List<ExcelField>();
+        foreach (var f in fields.Where(f => !f.IsBuiltIn && !f.IsHidden && f.InExport))
+        {
+            var header = f.Label;
+            if (!used.Add(Excel.Normalise(header)))
+            {
+                header = $"{f.Label} ({f.Key})";
+                if (!used.Add(Excel.Normalise(header))) continue;
+            }
+            result.Add(new ExcelField(f, header));
+        }
+        return result;
+    }
+
+    private static IEnumerable<string> OfferedLabels(FieldRow f) => f.Choices.Where(c => !c.Hidden).Select(c => c.Label);
+
+    /// <summary>The note on the column heading: what to type.</summary>
+    public static string? ExcelNote(FieldRow f) => f.Kind switch
+    {
+        "WholeNumber" => "Whole number",
+        "Decimal" or "Money" => "Numbers only",
+        "Date" => "Day/month/year",
+        "YesNo" => "Yes or No",
+        "Choice" => $"One of: {string.Join(", ", OfferedLabels(f))}",
+        "MultiChoice" => $"Any of: {string.Join(", ", OfferedLabels(f))}. Separate them with commas.",
+        "Person" => "Windows logon or full name of someone who uses JBS Contracts",
+        "Supplier" => "The supplier's name, as it is under Suppliers",
+        "Link" => "A full web link starting with https://",
+        "Email" => "An email address",
+        _ => f.Help,
+    };
+
+    /// <summary>A value as an Excel cell: numbers, dates and Yes/No keep their type; a person is their Windows logon (like Owner).</summary>
+    public static object? ExcelValue(FieldRow f, (object? Value, string Display) v, Func<int, string?> windowsAccount) => f.Kind switch
+    {
+        "WholeNumber" => v.Value is int n ? n : null,
+        "Decimal" or "Money" => v.Value is decimal m ? m : null,
+        "Date" => v.Value is string d ? DateOnly.ParseExact(d, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
+        "YesNo" => v.Value is bool b ? b : null,
+        "Person" => v.Value is int id ? windowsAccount(id) : null,
+        _ => v.Display.Length == 0 ? null : v.Display,
+    };
+
+    /// <summary>
+    /// Reads one added field's cell into the value the contract form would send. Null when the cell is blank (the value is left as it is).
+    /// Options are matched by label, people by Windows logon or name, suppliers by name.
+    /// </summary>
+    public static (JsonElement? Value, string? Problem) FromExcel(FieldRow f, Excel.Row row, string header, List<Person> people, Dictionary<string, int> supplierIds, string? defaultDomain)
+    {
+        static string K(string s) => s.Trim().ToUpperInvariant();
+        static JsonElement J<T>(T value) => JsonSerializer.SerializeToElement(value);
+        string? p;
+        switch (f.Kind)
+        {
+            case "WholeNumber" or "Decimal" or "Money":
+                var n = row.Money(header, out p);
+                return (n is null ? null : J(n.Value), p);
+            case "Date":
+                var d = row.Date(header, out p);
+                return (d is null ? null : J(d.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), p);
+            case "YesNo":
+                var b = row.YesNo(header, out p);
+                return (b is null ? null : J(b.Value), p);
+        }
+        var text = row.Text(header);
+        if (text is null) return (null, null);
+        switch (f.Kind)
+        {
+            case "Choice":
+            {
+                var match = f.Choices.FirstOrDefault(c => !c.Hidden && K(c.Label) == K(text));
+                return match is null ? (null, $"{header}: \"{text}\" isn't one of the options ({string.Join(", ", OfferedLabels(f))}).") : (J(match.Key), null);
+            }
+            case "MultiChoice":
+            {
+                var keys = new List<string>();
+                foreach (var part in text.Split([',', ';'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var match = f.Choices.FirstOrDefault(c => !c.Hidden && K(c.Label) == K(part));
+                    if (match is null) return (null, $"{header}: \"{part}\" isn't one of the options ({string.Join(", ", OfferedLabels(f))}).");
+                    if (!keys.Contains(match.Key)) keys.Add(match.Key);
+                }
+                return (J(keys), null);
+            }
+            case "Person":
+            {
+                var byAccount = WindowsAccount.TryNormalise(text, defaultDomain, out var account)
+                    ? people.FirstOrDefault(x => WindowsAccount.Key(x.WindowsAccount) == WindowsAccount.Key(account)) : null;
+                var byName = people.Where(x => K(x.Name) == K(text)).ToList();
+                var person = byAccount ?? (byName.Count == 1 ? byName[0] : null);
+                return person is null ? (null, $"{header}: \"{text}\" isn't someone who uses JBS Contracts (use their Windows logon or full name).") : (J(person.Id), null);
+            }
+            case "Supplier":
+                return supplierIds.TryGetValue(K(text), out var id) ? (J(id), null) : (null, $"{header}: there's no supplier called \"{text}\". Add it under Suppliers first.");
+            default:
+                return (J(text), null);
+        }
+    }
+
+    /// <summary>The labels of added fields whose value these parsed values would change (for import previews).</summary>
+    public static async Task<List<string>> ChangedAsync(SqlConnection c, SqlTransaction tx, int contractId, List<Parsed> values, List<FieldRow> fields)
+    {
+        if (values.Count == 0) return [];
+        var before = (await ReadAsync(c, tx, [contractId], fields))[contractId];
+        return values.Where(v => Canonical(v) != (before.TryGetValue(v.Field.Key, out var b) ? Canonical(b.Value) : null)).Select(v => v.Field.Label).ToList();
+    }
+
+    private static string? Canonical(Parsed v) => v.IsEmpty ? null
+        : v.Text ?? (v.Number is { } n ? Canonical(n) : null) ?? v.Date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+          ?? (v.Bool is { } b ? Canonical(b) : null) ?? v.PersonId?.ToString(CultureInfo.InvariantCulture) ?? v.SupplierId?.ToString(CultureInfo.InvariantCulture);
+
+    private static string? Canonical(object? value) => value switch
+    {
+        null => null,
+        decimal d => d.ToString("0.############", CultureInfo.InvariantCulture),
+        int i => i.ToString(CultureInfo.InvariantCulture),
+        bool b => b ? "true" : "false",
+        string[] keys => JsonSerializer.Serialize(keys),
+        _ => Convert.ToString(value, CultureInfo.InvariantCulture),
+    };
 }

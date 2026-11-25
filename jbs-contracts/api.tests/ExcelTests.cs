@@ -13,7 +13,7 @@ public sealed class ExcelTests(AppFixture app)
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     private static string Unique(string prefix) => $"{prefix}{Guid.NewGuid():N}"[..16];
 
-    private static byte[] Sheet(string[] headers, params object?[][] rows)
+    internal static byte[] Sheet(string[] headers, params object?[][] rows)
     {
         using var book = new XLWorkbook();
         var s = book.Worksheets.Add("Sheet1");
@@ -33,7 +33,7 @@ public sealed class ExcelTests(AppFixture app)
         return ms.ToArray();
     }
 
-    private static async Task<(HttpStatusCode Status, JsonElement Body)> PostAsync(HttpClient client, string kind, string step, byte[] file, string name = "import.xlsx")
+    internal static async Task<(HttpStatusCode Status, JsonElement Body)> PostAsync(HttpClient client, string kind, string step, byte[] file, string name = "import.xlsx")
     {
         using var form = new MultipartFormDataContent();
         var content = new ByteArrayContent(file);
@@ -44,7 +44,7 @@ public sealed class ExcelTests(AppFixture app)
         return (response.StatusCode, JsonDocument.Parse(text).RootElement);
     }
 
-    private static int Count(JsonElement body, string what) => body.GetProperty("counts").GetProperty(what).GetInt32();
+    internal static int Count(JsonElement body, string what) => body.GetProperty("counts").GetProperty(what).GetInt32();
 
     [Fact]
     public async Task People_preview_changes_nothing_then_import_adds_and_updates_and_refuses_bad_rows()
@@ -117,7 +117,11 @@ public sealed class ExcelTests(AppFixture app)
         var export = await admin.GetAsync("/api/excel/lists", Ct);
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", export.Content.Headers.ContentType?.MediaType);
         var (_, again) = await PostAsync(admin, "lists", "preview", await export.Content.ReadAsByteArrayAsync(Ct));
-        Assert.Equal((0, 0, 0), (Count(again, "added"), Count(again, "updated"), Count(again, "refused")));
+        Assert.Equal((0, 0), (Count(again, "added"), Count(again, "refused")));
+        // Other tests hide and show their own list entries in parallel, so check this test's rows.
+        var mine = again.GetProperty("rows").EnumerateArray().Where(r => r.GetProperty("label").GetString()!.Contains(top)).ToList();
+        Assert.Equal(2, mine.Count);
+        Assert.All(mine, r => Assert.Equal("same", r.GetProperty("action").GetString()));
     }
 
     [Fact]
@@ -166,10 +170,21 @@ public sealed class ExcelTests(AppFixture app)
         // The export lists it, and importing the export changes nothing.
         var export = await (await owner.GetAsync("/api/excel/contracts", Ct)).Content.ReadAsByteArrayAsync(Ct);
         var (_, again) = await PostAsync(owner, "contracts", "preview", export);
-        Assert.Equal((0, 0), (Count(again, "added"), Count(again, "refused")));
+        Assert.True((Count(again, "added"), Count(again, "refused")) == (0, 0),
+            string.Join(" | ", again.GetProperty("rows").EnumerateArray().Where(r => r.GetProperty("action").GetString() is "refused" or "add").Select(r => r.ToString())));
         // Other tests change their own contracts in parallel, so check this contract's row: re-importing the export changes nothing.
         var mine = again.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("label").GetString()!.StartsWith((string)row.Reference));
         Assert.Equal("same", mine.GetProperty("action").GetString());
+
+        // Once a contract has moved past Draft, an unchanged row is fine and a change is refused.
+        var rowVersion = (await owner.GetFromJsonAsync<JsonElement>($"/api/contracts/{(int)row.Id}", Ct)).GetProperty("contract").GetProperty("rowVersion").GetString();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync($"/api/contracts/{(int)row.Id}/withdraw", new { reason = "Supplier pulled out", rowVersion }, Ct)).StatusCode);
+        var (_, unchanged) = await PostAsync(owner, "contracts", "preview", Sheet(["Reference", "Title"], [(string)row.Reference, "Road freight 2027-28"]));
+        Assert.Equal("same", unchanged.GetProperty("rows")[0].GetProperty("action").GetString());
+        var (_, changedLater) = await PostAsync(owner, "contracts", "preview", Sheet(["Reference", "Title"], [(string)row.Reference, "Road freight 2029"]));
+        var refusedRow = changedLater.GetProperty("rows")[0];
+        Assert.Equal("refused", refusedRow.GetProperty("action").GetString());
+        Assert.Contains("only drafts can be changed by import. This row would change: title.", refusedRow.GetProperty("notes")[0].GetString());
         Assert.Null(await AuditLog.VerifyAsync(db));
     }
 }

@@ -64,6 +64,10 @@ export const help = {
           <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
           cells leave what's there.
         </p>
+        <p>
+          Fields your admin added have their own columns. For a pick-from-a-list field, type the option as it's shown (several are separated by commas); for a person,
+          their Windows logon or full name. Only drafts can be changed by import; rows for other contracts are fine as long as they change nothing.
+        </p>
       </>
     ),
   },

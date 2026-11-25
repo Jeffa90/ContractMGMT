@@ -31,7 +31,8 @@ public static class ExcelEndpoints
     private sealed record Kind(
         string Name, string Label, string Sheet, Excel.Column[] Columns, string[] Required, string[] ExportOnly,
         Func<Person, bool> CanExport, Func<Person, bool> CanImport, string Refusal,
-        Func<Ctx, Task<IEnumerable<object?[]>>> Export, Func<Ctx, List<Excel.Row>, Task<List<PlannedRow>>> Plan);
+        Func<Ctx, Task<IEnumerable<object?[]>>> Export, Func<Ctx, List<Excel.Row>, Task<List<PlannedRow>>> Plan,
+        Func<SqlConnection, SqlTransaction?, Task<List<Excel.Column>>>? ExtraColumns = null);
 
     private const string Via = " (from Excel)";
 
@@ -48,9 +49,12 @@ public static class ExcelEndpoints
             await using var c = await db.OpenAsync();
             await using var tx = c.BeginTransaction();
             var rows = await k.Export(new Ctx(c, tx, me!, audit, settings));
+            // Columns to fill in, then any added contract fields, then columns that are for information only (not imported).
+            var columns = k.Columns.Concat(k.ExtraColumns is null ? [] : await k.ExtraColumns(c, tx))
+                .Concat(k.ExportOnly.Select(h => new Excel.Column(h, "For information only. Changes here aren't imported.", 16))).ToList();
             await tx.CommitAsync();
             var date = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), Brisbane).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var bytes = Excel.Write(k.Sheet, k.Columns, rows);
+            var bytes = Excel.Write(k.Sheet, columns, rows);
             return Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"jbs-contracts-{k.Name}-{date}.xlsx");
         });
 
@@ -79,11 +83,12 @@ public static class ExcelEndpoints
         using var buffer = new MemoryStream();
         await file.CopyToAsync(buffer);
         buffer.Position = 0;
-        var known = k.Columns.Select(x => x.Header).Concat(k.ExportOnly).ToList();
+        await using var c = await db.OpenAsync();
+        var extra = k.ExtraColumns is null ? [] : await k.ExtraColumns(c, null);
+        var known = k.Columns.Concat(extra).Select(x => x.Header).Concat(k.ExportOnly).ToList();
         var (rows, ignored, problem) = Excel.Read(buffer, known, k.Required);
         if (problem is not null) return ApiResults.Invalid(problem, new() { ["file"] = problem });
 
-        await using var c = await db.OpenAsync();
         await using var tx = await Db.BeginWriteAsync(c);
         var ctx = new Ctx(c, tx, me!, audit, settings);
         var plan = await k.Plan(ctx, rows);
@@ -443,6 +448,9 @@ public static class ExcelEndpoints
         ["value"] = "Value", ["sapOutlineAgreement"] = "SAP outline agreement number", ["endDate"] = "End date", ["noticePeriodDays"] = "Notice period (days)",
     };
 
+    /// <summary>The contract sheet's own headings (added fields whose label matches one get their key added, so no two columns share a heading).</summary>
+    private static IEnumerable<string> ContractHeaders() => Kinds["contracts"].Columns.Select(c => c.Header).Concat(Kinds["contracts"].ExportOnly);
+
     private static Kind Contracts() => new(
         "contracts", "contracts", "Contracts",
         [
@@ -456,20 +464,24 @@ public static class ExcelEndpoints
             new("Evergreen", "Yes or No", 11), new("Notice period (days)", "Whole number", 14), new("Review date", "Day/month/year", 13),
             new("Needs Legal review", "Yes or No (Yes if blank for a new contract)", 15), new("Description", null, 40),
         ],
-        [], ["Stage", "Notice deadline", "Registered date"],
+        [], ["Stage", "Notice deadline"],
         me => true, me => me.IsContractOwner, "Only contract owners can import contracts.",
         async x =>
         {
-            var rows = await ContractEndpoints.ListVisibleAsync(x.C, x.Tx, x.Me);
+            var rows = (await ContractEndpoints.ListVisibleAsync(x.C, x.Tx, x.Me)).Where(r => r.Stage != "Withdrawn").ToList();
             var people = (await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person", transaction: x.Tx)).ToDictionary(p => p.Id);
+            var added = Fields.ExcelFields(await Fields.LoadAsync(x.C, x.Tx), ContractHeaders());
+            var values = await Fields.ReadAsync(x.C, x.Tx, rows.Select(r => r.Id), added.Select(a => a.Field).ToList());
             static DateOnly? D(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
-            return rows.Where(r => r.Stage != "Withdrawn").Select(r => new object?[]
+            return rows.Select(r => new object?[]
             {
                 r.Reference, r.Title, r.SupplierName, r.CategoryDisplay, r.AgreementTypeName, people[r.OwnerId].WindowsAccount,
                 r.BackupOwnerId is { } b ? people[b].WindowsAccount : null, r.IsConfidential, r.BusinessUnitName, r.SiteName, r.Value, r.CurrencyCode,
                 r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.NoticePeriodDays, D(r.ReviewDate), r.NeedsLegalReview,
-                r.Description, ContractEndpoints.StageNames[r.Stage], D(r.NoticeDeadline),
-            });
+                r.Description,
+            }
+            .Concat(added.Select(a => values[r.Id].TryGetValue(a.Field.Key, out var v) ? Fields.ExcelValue(a.Field, v, id => people.GetValueOrDefault(id)?.WindowsAccount) : null))
+            .Concat([ContractEndpoints.StageNames[r.Stage], D(r.NoticeDeadline)]).ToArray());
         },
         async (x, rows) =>
         {
@@ -478,6 +490,10 @@ public static class ExcelEndpoints
             var cats = (await x.C.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category", transaction: x.Tx)).ToList();
             var items = (await x.C.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem", transaction: x.Tx)).ToList();
             var owners = (await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1 AND IsContractOwner = 1", transaction: x.Tx)).ToList();
+            var activePeople = (await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1", transaction: x.Tx)).ToList();
+            var definitions = await Fields.LoadAsync(x.C, x.Tx);
+            var added = Fields.ExcelFields(definitions, ContractHeaders());
+            var supplierIds = suppliers.Values.ToDictionary(s => K(s.Name), s => s.Id);
             var newSuppliers = new Dictionary<string, string>();
             var seen = new HashSet<string>();
             var plan = new List<PlannedRow>();
@@ -485,7 +501,8 @@ public static class ExcelEndpoints
             int? FindOwner(string text, List<string> problems, string header)
             {
                 var byAccount = WindowsAccount.TryNormalise(text, x.Settings.DefaultDomain, out var acc) ? owners.FirstOrDefault(o => WindowsAccount.Key(o.WindowsAccount) == WindowsAccount.Key(acc)) : null;
-                var match = byAccount ?? owners.SingleOrDefault(o => K(o.Name) == K(text));
+                var byName = owners.Where(o => K(o.Name) == K(text)).ToList();
+                var match = byAccount ?? (byName.Count == 1 ? byName[0] : null);
                 if (match is null) problems.Add($"{header}: \"{text}\" isn't an active contract owner (use their Windows logon or full name).");
                 return match?.Id;
             }
@@ -528,13 +545,14 @@ public static class ExcelEndpoints
                 if (reference is not null && !seen.Add(K(reference))) { r.Refuse("This reference is in the sheet more than once; only the first row is used."); continue; }
 
                 ContractRow? before = null;
+                string? onlyDrafts = null; // set when the contract has moved past Draft: an unchanged row is fine, a change is refused
                 if (reference is not null)
                 {
                     before = await ContractEndpoints.LoadByReferenceAsync(x.C, x.Tx, reference);
                     if (before is null || !ContractAccess.CanSee(x.Me, before.IsConfidential, before.OwnerId, before.BackupOwnerId))
                     { r.Refuse($"Reference: there's no contract {reference}. Leave Reference blank to add a new contract."); continue; }
                     if (!ContractAccess.CanEdit(x.Me, before.Stage, before.IsLocked))
-                    { r.Refuse($"{reference} is in {ContractEndpoints.StageNames[before.Stage]}; only drafts can be changed by import."); continue; }
+                        onlyDrafts = $"{before.Reference} is in {ContractEndpoints.StageNames[before.Stage]}; only drafts can be changed by import.";
                     r.Label = $"{before.Reference} {before.Title}";
                 }
 
@@ -571,12 +589,25 @@ public static class ExcelEndpoints
                 var review = row.Date("Review date", out p) ?? DO(before?.ReviewDate); if (p is not null) problems.Add(p);
                 var legal = row.YesNo("Needs Legal review", out p) ?? before?.NeedsLegalReview ?? true; if (p is not null) problems.Add(p);
                 var description = Clean(row.Text("Description")) ?? before?.Description;
+                // Added fields: a blank cell leaves the value as it is.
+                var fieldValues = new Dictionary<string, System.Text.Json.JsonElement>();
+                foreach (var a in added.Where(a => row.Has(a.Header)))
+                {
+                    var (json, problem) = Fields.FromExcel(a.Field, row, a.Header, activePeople, supplierIds, x.Settings.DefaultDomain);
+                    if (problem is not null) problems.Add(problem);
+                    else if (json is { } j) fieldValues[a.Field.Key] = j;
+                }
                 if (problems.Count > 0) { r.Refuse(string.Join(" ", problems)); continue; }
 
                 var body = new SaveContract(title, description, supplierId, categoryId, agreementTypeId, businessUnitId, siteId, ownerId, backupId, confidential,
-                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null);
+                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues);
                 var errors = await ContractEndpoints.CheckAsync(x.C, x.Tx, body, before);
-                if (errors is not null) { r.Refuse(string.Join(" ", errors.Select(e => $"{FieldLabels.GetValueOrDefault(e.Key, e.Key)}: {e.Value}"))); continue; }
+                var (parsed, fieldErrors) = await Fields.ParseAsync(x.C, x.Tx, fieldValues, definitions);
+                var labels = added.ToDictionary(a => $"field.{a.Field.Key}", a => a.Header);
+                var allErrors = (errors ?? []).Concat(fieldErrors).ToList();
+                if (allErrors.Count > 0 && onlyDrafts is not null) { r.Refuse(onlyDrafts); continue; }
+                if (allErrors.Count > 0)
+                { r.Refuse(string.Join(" ", allErrors.Select(e => $"{FieldLabels.GetValueOrDefault(e.Key) ?? labels.GetValueOrDefault(e.Key, e.Key)}: {e.Value}"))); continue; }
 
                 if (before is null)
                 {
@@ -587,8 +618,10 @@ public static class ExcelEndpoints
                 else
                 {
                     var (changed, _) = await ContractEndpoints.PreviewChangesAsync(x.C, x.Tx, before, body);
+                    changed.AddRange(await Fields.ChangedAsync(x.C, x.Tx, before.Id, parsed, definitions));
                     if (addSupplier is not null && !changed.Contains("supplier")) changed.Add("supplier");
                     if (changed.Count == 0) { r.Action = "same"; continue; }
+                    if (onlyDrafts is not null) { r.Refuse($"{onlyDrafts} This row would change: {string.Join(", ", changed)}."); continue; }
                     r.Action = "update";
                     r.Notes.Add($"Change: {string.Join(", ", changed)}." + (addSupplier is not null ? $" Also adds the supplier {addSupplier}." : ""));
                 }
@@ -620,5 +653,7 @@ public static class ExcelEndpoints
                 };
             }
             return plan;
-        });
+        },
+        async (c, tx) => Fields.ExcelFields(await Fields.LoadAsync(c, tx), ContractHeaders())
+            .Select(a => new Excel.Column(a.Header, Fields.ExcelNote(a.Field), a.Field.Kind == "LongText" ? 40 : 20)).ToList());
 }

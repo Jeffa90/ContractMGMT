@@ -48,7 +48,7 @@ public sealed class AppFixture : IAsyncLifetime
             b.UseSetting("Contracts:ApplyDatabaseScripts", "true");
             b.UseSetting("Contracts:DataDirectory", DataDirectory);
             b.UseSetting("Contracts:SiteUrl", "https://contracts.example.com");
-            b.UseSetting("Contracts:Email:PollSeconds", "3600"); // tests send emails themselves (EmailDispatcher.SendDueAsync)
+            b.UseSetting("Contracts:Email:SendInBackground", "false"); // tests send emails themselves (EmailDispatcher.SendDueAsync)
             // The old app's variable names, as on the GitHub QA environment (decision D-36).
             b.UseSetting("Ecp:Security:FailsafeAdmins:0:Account", AdminAccount);
             b.UseSetting("Ecp:Security:FailsafeAdmins:0:DisplayName", AdminName);

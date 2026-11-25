@@ -72,6 +72,7 @@ public sealed class EmailDispatcher(Db db, IEmailSender sender, AppSettings sett
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!settings.Email.SendInBackground) return;
         while (!stoppingToken.IsCancellationRequested)
         {
             try { await SendDueAsync(stoppingToken); }

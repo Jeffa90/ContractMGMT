@@ -3,6 +3,8 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import {
   BellRing,
   Building2,
+  ChartColumn,
+  UsersRound,
   CalendarClock,
   ChevronsLeft,
   ChevronsRight,
@@ -62,6 +64,12 @@ function useNav(): { main: NavItem[]; admin: NavItem[] } {
         label: "Suppliers",
         icon: <Building2 aria-hidden className="size-5" />,
       },
+      ...(person.roles.admin || person.roles.auditor || person.roles.groupHead
+        ? [{ to: "/team", label: "Team", icon: <UsersRound aria-hidden className="size-5" /> }]
+        : []),
+      ...(person.roles.admin || person.roles.auditor
+        ? [{ to: "/reports", label: "Reports", icon: <ChartColumn aria-hidden className="size-5" /> }]
+        : []),
     ],
     // Features not built yet are hidden, never greyed out.
     admin: person.roles.admin
@@ -281,7 +289,7 @@ export function Shell() {
         {/* Desktop sidebar */}
         <aside
           className={cn(
-            "sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border bg-card p-3 md:flex",
+            "sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border bg-card p-3 md:flex print:hidden",
             collapsed ? "w-20" : "w-64",
           )}
         >
@@ -337,7 +345,7 @@ export function Shell() {
         </aside>
 
         {/* Phone top bar */}
-        <div className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden print:hidden">
           <Logo />
           <div className="flex items-center gap-1">
             <button
@@ -363,7 +371,7 @@ export function Shell() {
               )}
             </button>
           </div>
-        </div>
+        </header>
         {mobileOpen && (
           <div
             id="mobile-menu"
@@ -378,8 +386,8 @@ export function Shell() {
 
         <SearchPalette />
 
-        <main id="main" className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
-          <div className="mx-auto flex max-w-6xl flex-col gap-6">
+        <main id="main" className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8 print:p-0">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6 print:max-w-none">
             <Outlet />
           </div>
         </main>

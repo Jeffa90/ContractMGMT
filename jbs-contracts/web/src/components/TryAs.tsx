@@ -25,7 +25,7 @@ export function TryAsBanner() {
   if (!me.tryingAs) return null
   const name = me.person.name.replace(/ \[tried by .*\]$/, '')
   return (
-    <div role="status" className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-warning px-4 py-2 text-sm font-medium text-white">
+    <div role="status" className="sticky top-0 z-40 print:hidden flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-warning px-4 py-2 text-sm font-medium text-white">
       <span>
         QA: you're trying JBS Contracts as <strong>{name}</strong>. Everything you do is recorded as {me.tryingAs.realName} trying it.
       </span>

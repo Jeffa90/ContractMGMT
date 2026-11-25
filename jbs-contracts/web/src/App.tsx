@@ -14,6 +14,8 @@ import { ContractsPage } from './pages/Contracts'
 import { ListsPage } from './pages/Lists'
 import { ReminderSettingsPage } from './pages/ReminderSettings'
 import { RenewalsPage } from './pages/Renewals'
+import { ReportsPage } from './pages/Reports'
+import { TeamPage } from './pages/Team'
 import { PeoplePage } from './pages/People'
 import { SuppliersPage } from './pages/Suppliers'
 import { VariationPage } from './pages/Variation'
@@ -40,6 +42,8 @@ const router = createBrowserRouter([
       { path: 'contracts/:id/approve', element: <ApprovePage /> },
       { path: 'contracts/:id/variations/:vid', element: <VariationPage /> },
       { path: 'renewals', element: <RenewalsPage /> },
+      { path: 'reports', element: <ReportsPage /> },
+      { path: 'team', element: <TeamPage /> },
       { path: 'suppliers', element: <SuppliersPage /> },
       { path: 'admin/people', element: <PeoplePage /> },
       { path: 'admin/lists', element: <ListsPage /> },

@@ -254,4 +254,60 @@ export const help = {
       </>
     ),
   },
+  reports: {
+    title: 'Reports',
+    body: (
+      <>
+        <p>Reports are for admins and auditors. Each one can be downloaded to Excel. Confidential contracts are included and marked.</p>
+        <ul>
+          <li>
+            <strong>Register</strong>: every Effective contract, with its dates, value and who registered it. Choose whether to include ended and archived ones.{' '}
+            <strong>Print or save as PDF</strong> gives a clean printout; in the print window, choose <em>Save as PDF</em> as the printer to keep a copy. The Excel
+            download also has every added field.
+          </li>
+          <li>
+            <strong>Pipeline</strong>: how many contracts are in Draft, Legal review, Signing and Approval, how long they've been there, and which have waited longest.
+          </li>
+          <li>
+            <strong>Approvals</strong>: what was approved or sent back, by whom, and how long each waited from <em>Send for approval</em> to the decision.
+          </li>
+          <li>
+            <strong>Audit trail</strong>: everything that happened, newest first. Search by person, reference or words. The check at the top confirms no event has
+            been changed or removed since it was recorded. The Excel download includes old and new values, and downloading it is itself recorded.
+          </li>
+        </ul>
+      </>
+    ),
+  },
+  team: {
+    title: 'The Team page',
+    body: (
+      <>
+        <p>
+          See at a glance who has what on their plate, so you can help people focus. It's for admins, auditors and Group Heads, and it only shows: nothing is
+          changed or sent from here. The daily reminders already email owners.
+        </p>
+        <ul>
+          <li>
+            <strong>Overdue</strong>: an Effective contract whose notice deadline (or end date) has passed with no renewal decision recorded.
+          </li>
+          <li>
+            <strong>Coming up</strong>: a notice deadline or end date in the period you choose (30 to 180 days), still with no decision. Once the owner records a
+            decision it drops off.
+          </li>
+          <li>
+            <strong>Their turn</strong>: Drafts to finish, contracts back from Legal, signed copies to attach and Variations waiting on them.
+          </li>
+          <li>
+            <strong>Legal reviews</strong>: for Legal people, reviews they've picked up that are on Legal's turn. The With Legal total also counts ones nobody has picked
+            up yet.
+          </li>
+          <li>
+            <strong>Waiting on others</strong>: their contracts that are with Legal or waiting for approval. Nothing for them to do, but worth knowing.
+          </li>
+        </ul>
+        <p>Click a person to see each contract, with how long it has waited, and open it. Confidential contracts are counted only if you can see them.</p>
+      </>
+    ),
+  },
 } satisfies Record<string, HelpTopic>

@@ -42,6 +42,8 @@ describe('names', () => {
   it('makes initials and first names', () => {
     expect(initials('Jeff Judd')).toBe('JJ')
     expect(initials('Ann Marie Ho')).toBe('AH')
+    expect(initials('Sam Nguyen (demo)')).toBe('SN')
+    expect(initials('Jeff Judd [tried by Ann Ho]')).toBe('JJ')
     expect(initials('Cher')).toBe('C')
     expect(firstName('Jeff Judd')).toBe('Jeff')
   })

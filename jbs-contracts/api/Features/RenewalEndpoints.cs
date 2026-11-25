@@ -219,7 +219,7 @@ public static class RenewalEndpoints
     }
 
     /// <summary>The date that matters for renewing: a planned end date, else the notice deadline, else the end date.</summary>
-    private static (string Kind, DateOnly? Date) KeyDate(RenewalRow r)
+    internal static (string Kind, DateOnly? Date) KeyDate(RenewalRow r)
     {
         if (r.PlannedEndDate is { } planned) return ("Ends", DateOnly.FromDateTime(planned));
         var anchor = r.IsEvergreen ? r.ReviewDate : r.EndDate;

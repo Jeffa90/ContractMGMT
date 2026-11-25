@@ -17,6 +17,8 @@ public sealed class AppSettings
     public string AuthMode { get; init; } = "Windows";
     /// <summary>Apply database/*.sql at start-up. Local development and tests only; on the servers the deploy applies them.</summary>
     public bool ApplyDatabaseScripts { get; init; }
+    /// <summary>Admins may load fictional demo data (Home, "Load demo data"). QA and local only; never in Production.</summary>
+    public bool AllowDemoData { get; init; }
 
     /// <summary>The address people open, used for links in emails (e.g. https://jbs-contracts-qa.jbssa.com.au).</summary>
     public string? SiteUrl { get; init; }
@@ -84,6 +86,7 @@ public sealed class AppSettings
                 SendInBackground = !(localOnly && string.Equals(Read("Email:SendInBackground"), "false", StringComparison.OrdinalIgnoreCase)),
             },
             ApplyDatabaseScripts = applyScripts,
+            AllowDemoData = !env.IsProduction() && (localOnly || string.Equals(Read("AllowDemoData"), "true", StringComparison.OrdinalIgnoreCase)),
         };
     }
 }

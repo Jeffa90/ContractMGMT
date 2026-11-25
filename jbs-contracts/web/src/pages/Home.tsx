@@ -15,6 +15,7 @@ import {
   ListChecks,
   Scale,
   Search,
+  Sparkles,
   SlidersHorizontal,
   Undo2,
   UserPlus,
@@ -26,7 +27,7 @@ import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { HelpButton } from '@/components/Help'
 import { Alert, Button, Card, Checkbox, EmptyState, Skeleton } from '@/components/ui'
-import { api, type Person } from '@/lib/api'
+import { api, ApiError, type Person } from '@/lib/api'
 import type { ContractListItem, Lists } from '@/lib/contracts'
 import { firstName, formatDate, formatLongDate, greeting } from '@/lib/format'
 import { groupTitles, type HomeData, type Tile, type TileGroup } from '@/lib/home'
@@ -114,6 +115,56 @@ function Urgent({ items }: { items: HomeData['urgent'] }) {
         </Button>
       )}
     </section>
+  )
+}
+
+/** QA only: one click fills the app with fictional data so every screen has something to show (D-66). */
+function DemoDataCard() {
+  const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState(false)
+  const load = useMutation({
+    mutationFn: () => api.post<{ contracts: number }>('/api/admin/demo-data', {}),
+    onSuccess: (r) => {
+      queryClient.invalidateQueries()
+      toast.success(`Demo data loaded: ${r.contracts} fictional contracts.`)
+      setConfirming(false)
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "That didn't work. Try again."),
+  })
+  return (
+    <Card className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between md:p-6">
+      <div className="flex items-start gap-3">
+        <Sparkles aria-hidden className="mt-0.5 size-5 shrink-0 text-primary" />
+        <div>
+          <h2 className="font-display text-lg font-semibold">Try it with demo data</h2>
+          <p className="text-sm text-muted-foreground">Fills QA with fictional contracts in every stage, so every screen has something to show.</p>
+        </div>
+      </div>
+      <Button onClick={() => setConfirming(true)}>Load demo data</Button>
+      {confirming && (
+        <Dialog
+          open
+          onOpenChange={(o) => !o && setConfirming(false)}
+          title="Load demo data?"
+          description="This is only offered on QA."
+          footer={
+            <>
+              <Button onClick={() => setConfirming(false)}>Cancel</Button>
+              <Button variant="primary" loading={load.isPending} onClick={() => load.mutate()}>
+                Load demo data
+              </Button>
+            </>
+          }
+        >
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+            <li>Adds 15 fictional contracts in every stage (drafts, with Legal, signing, approval, Effective), most owned by you so your Home fills up.</li>
+            <li>Adds fictional suppliers and four demo people (Legal, an approver and an owner), all marked "(demo)". They can't sign in.</li>
+            <li>Nothing you've already added is changed or removed, and no emails are sent.</li>
+            <li>It can't be taken out again afterwards (nothing in JBS Contracts is deleted), so it's for QA only.</li>
+          </ul>
+        </Dialog>
+      )}
+    </Card>
   )
 }
 
@@ -208,7 +259,8 @@ function Step({ done, to, icon, title, detail }: { done: boolean; to: string; ic
 }
 
 export function HomePage() {
-  const { person } = useMe()
+  const me = useMe()
+  const { person } = me
   const [now] = useState(() => new Date())
   const [choosing, setChoosing] = useState(false)
   const isAdmin = person.roles.admin
@@ -258,6 +310,8 @@ export function HomePage() {
           <kbd className="hidden rounded border border-border px-1.5 text-xs sm:inline">Ctrl K</kbd>
         </button>
       </header>
+
+      {isAdmin && me.demoData === 'available' && <DemoDataCard />}
 
       {showSteps && (
         <Card className="p-5 md:p-6">

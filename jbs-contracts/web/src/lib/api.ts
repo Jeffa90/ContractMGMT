@@ -82,4 +82,9 @@ export type Person = {
   rowVersion: string
 }
 
-export type Me = { person: Person; defaultDomain: string | null }
+export type Me = {
+  person: Person
+  defaultDomain: string | null
+  /** Admins on QA: whether fictional demo data can be loaded, or already is. */
+  demoData: 'available' | 'loaded' | null
+}

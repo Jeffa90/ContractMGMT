@@ -34,6 +34,7 @@ public static class SystemEndpoints
             {
                 person = PersonView.From(person!),
                 defaultDomain = settings.DefaultDomain,
+                demoData = person!.IsAdmin && settings.AllowDemoData ? await DemoData.IsLoadedAsync(db) ? "loaded" : "available" : null,
             });
         });
     }

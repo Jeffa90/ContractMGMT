@@ -1,8 +1,10 @@
 // Left sidebar (collapsible) on desktop, top bar with a menu on phones (design-system.md section 2).
 import * as Menu from '@radix-ui/react-dropdown-menu'
-import { Building2, ChevronsLeft, ChevronsRight, FileText, Home, LayoutList, ListChecks, Menu as MenuIcon, Monitor, Moon, Sun, Users, X } from 'lucide-react'
+import { Building2, ChevronsLeft, ChevronsRight, FileText, Home, LayoutList, ListChecks, Menu as MenuIcon, Monitor, Moon, Search as SearchIcon, Sun, Users, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
+import { openSearch } from '@/lib/search'
+import { SearchPalette } from './SearchPalette'
 import logo from '@/assets/jbs-logo.webp'
 import logoWhite from '@/assets/jbs-logo-white.webp'
 import { cn } from '@/lib/cn'
@@ -161,7 +163,19 @@ export function Shell() {
         <div className={cn('flex min-h-14 items-center px-2', collapsed && 'justify-center px-0')}>
           <Logo compact={collapsed} />
         </div>
-        <div className="mt-4 flex-1 overflow-y-auto">
+        <button
+          type="button"
+          onClick={openSearch}
+          className={cn(
+            'mt-4 flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] border border-border px-3 text-sm text-muted-foreground hover:bg-muted',
+            collapsed && 'justify-center',
+          )}
+        >
+          <SearchIcon aria-hidden className="size-5 shrink-0" />
+          <span className={cn('flex-1 text-left', collapsed && 'sr-only')}>Search</span>
+          {!collapsed && <kbd className="rounded border border-border px-1.5 text-xs">Ctrl K</kbd>}
+        </button>
+        <div className="mt-3 flex-1 overflow-y-auto">
           <NavLinks collapsed={collapsed} />
         </div>
         <div className="flex flex-col gap-1 border-t border-border pt-3">
@@ -180,6 +194,10 @@ export function Shell() {
       {/* Phone top bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden">
         <Logo />
+        <div className="flex items-center gap-1">
+        <button type="button" onClick={openSearch} aria-label="Search" className="inline-flex size-11 items-center justify-center rounded-[var(--radius-control)] hover:bg-muted">
+          <SearchIcon aria-hidden className="size-6" />
+        </button>
         <button
           type="button"
           onClick={() => setMobileOpen((o) => !o)}
@@ -190,6 +208,7 @@ export function Shell() {
         >
           {mobileOpen ? <X aria-hidden className="size-6" /> : <MenuIcon aria-hidden className="size-6" />}
         </button>
+        </div>
       </div>
       {mobileOpen && (
         <div id="mobile-menu" className="fixed inset-x-0 top-[61px] bottom-0 z-30 flex flex-col gap-4 overflow-y-auto bg-card p-4 md:hidden">
@@ -199,6 +218,8 @@ export function Shell() {
           </div>
         </div>
       )}
+
+      <SearchPalette />
 
       <main id="main" className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-6">

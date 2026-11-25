@@ -3,12 +3,23 @@ import type { HelpTopic } from '@/components/Help'
 
 export const help = {
   home: {
-    title: 'Your home page',
+    title: 'Your Home',
     body: (
       <>
-        <p>Home shows what needs you. When something is waiting for you, it appears here with a button to deal with it.</p>
-        <p>Use the menu on the left to move around. On a phone, the menu is behind the button at the top right.</p>
-        <p>To change between light and dark, click your name at the bottom of the menu.</p>
+        <p>
+          Home is your to-do list. <strong>Tiles</strong> show only while something is waiting for you, for example contracts back from Legal, waiting for your
+          approval, or with a notice deadline in the next 30 days. Click a tile to see those contracts.
+        </p>
+        <p>
+          <strong>Urgent</strong> lists your Effective contracts whose notice deadline has passed (while the contract is still running) or is within 7 days.
+        </p>
+        <p>
+          <strong>Choose what I see</strong> hides tiles you don't want and picks which group comes first. It only changes your own Home.
+        </p>
+        <p>
+          <strong>Search</strong> (or Ctrl+K, Cmd+K on a Mac, from any page) finds a contract by title, reference, supplier or SAP number, or a supplier. Use the
+          arrow keys and Enter, or click.
+        </p>
       </>
     ),
   },

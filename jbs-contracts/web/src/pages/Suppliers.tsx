@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Building2, Plus, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { ExcelButtons } from '@/components/ExcelImport'
 import { PageHeader } from '@/components/Help'
 import { Alert, Badge, Button, Card, EmptyState, Segmented, Skeleton, TextInput } from '@/components/ui'
@@ -16,7 +16,8 @@ const formatAbn = (abn: string | null) => (abn ? `${abn.slice(0, 2)} ${abn.slice
 export function SuppliersPage() {
   const { person } = useMe()
   const canChange = person.roles.contractOwner || person.roles.admin
-  const [search, setSearch] = useState('')
+  const [params] = useSearchParams()
+  const [search, setSearch] = useState(() => params.get('q') ?? '') // ?q= from search (Ctrl+K)
   const [show, setShow] = useState<'active' | 'hidden'>('active')
   const [editing, setEditing] = useState<Supplier | 'new' | null>(null)
   const suppliers = useQuery({ queryKey: ['suppliers'], queryFn: () => api.get<Supplier[]>('/api/suppliers') })

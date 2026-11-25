@@ -108,7 +108,7 @@ public static class ContractEndpoints
     {
         var contracts = app.MapGroup("/api/contracts");
 
-        contracts.MapGet("/", async (string? view, string? q, HttpRequest request, CurrentUser current, Db db) =>
+        contracts.MapGet("/", async (string? view, string? q, string? tile, HttpRequest request, CurrentUser current, Db db, TimeProvider clock) =>
         {
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
@@ -127,7 +127,9 @@ public static class ContractEndpoints
                 where.Add("(k.Reference LIKE @like OR k.Title LIKE @like OR s.Name LIKE @like OR k.SapOutlineAgreement LIKE @like OR s.VendorNumber LIKE @like)");
             await using var c = await db.OpenAsync();
             var definitions = await Fields.LoadAsync(c);
-            var parameters = ContractAccess.Params(me!, new { like = $"%{EscapeLike(search)}%" });
+            var parameters = ContractAccess.Params(me!, new { like = $"%{EscapeLike(search)}%", today = HomeEndpoints.Today(clock) });
+            // A Home tile's contracts (tile=...), only for a tile this person has.
+            if (HomeEndpoints.TileSql(tile, me!) is { } tileSql) where.Add($"({tileSql})");
             // Filters: f.{field key}={value}, for the fields an admin made filterable.
             where.AddRange(Fields.FilterSql(definitions,
                 request.Query.Where(x => x.Key.StartsWith("f.", StringComparison.Ordinal)).Select(x => KeyValuePair.Create(x.Key[2..], x.Value.ToString())), parameters));

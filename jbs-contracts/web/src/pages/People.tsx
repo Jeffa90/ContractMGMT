@@ -43,7 +43,7 @@ function RoleBadges({ roles }: { roles: Roles }) {
 export function PeoplePage() {
   const { person: me } = useMe()
   const [params, setParams] = useSearchParams()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => params.get('q') ?? '') // ?q= from search (Ctrl+K)
   const [show, setShow] = useState<'active' | 'off'>('active')
   const [editing, setEditing] = useState<Person | 'new' | null>(params.get('add') === '1' ? 'new' : null)
   const people = useQuery({ queryKey: ['people'], queryFn: () => api.get<Person[]>('/api/people') })

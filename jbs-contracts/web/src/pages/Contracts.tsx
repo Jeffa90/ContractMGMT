@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { FilePlus2, FileText, ListFilter, Lock, Search } from 'lucide-react'
+import { FilePlus2, FileText, ListFilter, Lock, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { ContractFilters } from '@/components/ContractFilters'
@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/Help'
 import { Alert, Button, Card, EmptyState, Segmented, Skeleton, TextInput } from '@/components/ui'
 import { api } from '@/lib/api'
 import { chosenFilters, filterFields, filterPrefix } from '@/lib/filters'
+import type { HomeData } from '@/lib/home'
 import type { Layout } from '@/lib/layout'
 import type { ContractListItem } from '@/lib/contracts'
 import { daysUntil, formatDate, waited } from '@/lib/format'
@@ -83,9 +84,20 @@ export function ContractsPage() {
       return n
     }, { replace: true })
 
+  // From a Home tile: just that tile's contracts.
+  const tile = params.get('tile')
+  const home = useQuery({ queryKey: ['home'], queryFn: () => api.get<HomeData>('/api/home'), enabled: tile !== null })
+  const tileLabel = home.data?.tiles.find((t) => t.key === tile)?.label
+  const clearTile = () =>
+    setParams((p) => {
+      const n = new URLSearchParams(p)
+      n.delete('tile')
+      return n
+    })
+
   const contracts = useQuery({
-    queryKey: ['contracts', view, q, filterQuery],
-    queryFn: () => api.get<ContractListItem[]>(`/api/contracts?view=${view}&q=${encodeURIComponent(q)}${filterQuery}`),
+    queryKey: ['contracts', view, q, filterQuery, tile],
+    queryFn: () => api.get<ContractListItem[]>(`/api/contracts?view=${view}&q=${encodeURIComponent(q)}${filterQuery}${tile ? `&tile=${encodeURIComponent(tile)}` : ''}`),
     placeholderData: (previous) => previous,
   })
   const rows = contracts.data ?? []
@@ -145,6 +157,19 @@ export function ContractsPage() {
         <ExcelButtons kind="contracts" canImport={person.roles.contractOwner} invalidate={[['contracts'], ['suppliers'], ['contract']]} />
       </div>
 
+      {tile && tileLabel && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Showing</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft py-1 pr-1 pl-3 font-medium text-primary-soft-foreground">
+            {tileLabel}
+            <button type="button" onClick={clearTile} aria-label={`Stop showing only ${tileLabel}`} className="inline-flex size-7 items-center justify-center rounded-full hover:bg-card">
+              <X aria-hidden className="size-4" />
+            </button>
+          </span>
+          <span className="text-muted-foreground">from your Home</span>
+        </div>
+      )}
+
       {showFilters && filters.length > 0 && (
         <div id="contract-filters">
           <ContractFilters fields={filters} chosen={chosen} onChange={setFilter} onClear={clearFilters} />
@@ -168,7 +193,9 @@ export function ContractsPage() {
           <EmptyState
             icon={<FileText />}
             title={
-              filterCount > 0
+              tile
+                ? 'Nothing here any more. It may have moved on since you opened your Home.'
+                : filterCount > 0
                 ? q
                   ? `No contracts match "${q}" with these filters.`
                   : 'No contracts match these filters.'

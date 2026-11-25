@@ -15,10 +15,23 @@ public static class Excel
 
     public sealed record Column(string Header, string? Note = null, double Width = 22);
 
+    public sealed record Sheet(string Name, IReadOnlyList<Column> Columns, IEnumerable<object?[]> Rows);
+
     /// <summary>One sheet with a bold header row, frozen, with notes on the header cells that explain what to type.</summary>
-    public static byte[] Write(string sheetName, IReadOnlyList<Column> columns, IEnumerable<object?[]> rows)
+    public static byte[] Write(string sheetName, IReadOnlyList<Column> columns, IEnumerable<object?[]> rows) => WriteBook([new Sheet(sheetName, columns, rows)]);
+
+    /// <summary>A workbook of several sheets, each laid out as <see cref="Write"/> does.</summary>
+    public static byte[] WriteBook(IEnumerable<Sheet> sheets)
     {
         using var book = new XLWorkbook();
+        foreach (var s in sheets) AddSheet(book, s.Name, s.Columns, s.Rows);
+        using var stream = new MemoryStream();
+        book.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    private static void AddSheet(XLWorkbook book, string sheetName, IReadOnlyList<Column> columns, IEnumerable<object?[]> rows)
+    {
         var sheet = book.Worksheets.Add(sheetName);
         for (var i = 0; i < columns.Count; i++)
         {
@@ -42,6 +55,8 @@ public static class Excel
                     case DateTime t: cell.Value = t; cell.Style.DateFormat.Format = "d/mm/yyyy h:mm AM/PM"; break;
                     case decimal m: cell.Value = m; cell.Style.NumberFormat.Format = "#,##0.00"; break;
                     case int n: cell.Value = n; break;
+                    case long n: cell.Value = n; break;
+                    case double n: cell.Value = n; break;
                     case bool b: cell.Value = b ? "Yes" : "No"; break;
                     default: cell.Value = row[i]!.ToString(); break;
                 }
@@ -50,9 +65,6 @@ public static class Excel
         }
         sheet.SheetView.FreezeRows(1);
         sheet.Range(1, 1, Math.Max(1, r - 1), columns.Count).SetAutoFilter();
-        using var stream = new MemoryStream();
-        book.SaveAs(stream);
-        return stream.ToArray();
     }
 
     /// <summary>A copy of one cell's value, taken while the workbook is open (rows outlive the workbook).</summary>

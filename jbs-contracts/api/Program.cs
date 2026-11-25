@@ -68,6 +68,7 @@ app.MapDemoDataEndpoints();
 app.MapTryAsEndpoints();
 app.MapReportEndpoints();
 app.MapTeamEndpoints();
+app.MapFullExportEndpoints();
 app.MapRenewalEndpoints();
 app.MapReminderAdminEndpoints();
 app.MapLockedChangeEndpoints();

@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Columns3,
   FileDown,
+  FolderArchive,
   ListFilter,
   Lock,
   Printer,
@@ -43,6 +44,7 @@ const tabs = [
   { value: "pipeline", label: "Pipeline" },
   { value: "approvals", label: "Approvals" },
   { value: "audit", label: "Audit trail" },
+  { value: "everything", label: "Download everything" },
 ] as const;
 type Tab = (typeof tabs)[number]["value"];
 
@@ -960,6 +962,67 @@ function AuditReport() {
   );
 }
 
+// ------------------------------------------------------------------ Download everything
+
+function EverythingDownloads() {
+  const { person } = useMe();
+  const sheets = [
+    "Contracts: every stage, every field, and Legal, renewal and withdrawal details",
+    "Documents: each file version, who uploaded it and when (not the files)",
+    "Legal review: every hand-over with its note and documents",
+    "Approvals: every decision, by whom and why",
+    "Variations: why, where they are and what they change",
+    "Reminders sent by the daily job",
+    "Suppliers, people and their roles, and lists",
+  ];
+  return (
+    <section aria-label="Download everything" className="flex flex-col gap-4">
+      <Card className="flex flex-col gap-3 p-5">
+        <h2 className="font-display text-lg font-semibold">
+          Everything, in one Excel workbook
+        </h2>
+        <p className="text-muted-foreground">
+          A complete copy of what JBS Contracts records, one sheet each. Every
+          row carries the contract reference, so you can match sheets up.
+          Confidential contracts are included.
+        </p>
+        <ul className="list-disc pl-5 text-sm">
+          {sheets.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+        <div>
+          <a href="/api/reports/everything.xlsx" className={downloadClass}>
+            <FileDown aria-hidden className="size-5" /> Download everything
+          </a>
+        </div>
+      </Card>
+      {person.roles.admin && (
+        <Card className="flex flex-col gap-3 p-5">
+          <h2 className="font-display text-lg font-semibold">
+            All documents, as a ZIP
+          </h2>
+          <p className="text-muted-foreground">
+            Every version of every file, in a folder per contract reference,
+            with an index that says which file is which. It can be large and
+            take a few minutes. Admins only.
+          </p>
+          <div>
+            <a href="/api/reports/documents.zip" className={downloadClass}>
+              <FolderArchive aria-hidden className="size-5" /> Download all
+              documents
+            </a>
+          </div>
+        </Card>
+      )}
+      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+        <ShieldCheck aria-hidden className="size-4" /> Each download is recorded
+        in the audit trail. Keep the files somewhere safe; they hold everything.
+      </p>
+    </section>
+  );
+}
+
 // ------------------------------------------------------------------ Page
 
 export function ReportsPage() {
@@ -1000,6 +1063,7 @@ export function ReportsPage() {
       {tab === "pipeline" && <PipelineReport />}
       {tab === "approvals" && <ApprovalsReport />}
       {tab === "audit" && <AuditReport />}
+      {tab === "everything" && <EverythingDownloads />}
       {tab === "audit" && (
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
           <ShieldCheck aria-hidden className="size-4" /> Downloading the audit

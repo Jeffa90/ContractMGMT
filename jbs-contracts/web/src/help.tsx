@@ -276,6 +276,11 @@ export const help = {
             <strong>Audit trail</strong>: everything that happened, newest first. Search by person, reference or words. The check at the top confirms no event has
             been changed or removed since it was recorded. The Excel download includes old and new values, and downloading it is itself recorded.
           </li>
+          <li>
+            <strong>Download everything</strong>: one Excel workbook with a sheet for each kind of record: contracts in every stage with every field,
+            documents (details, not the files), Legal review, approvals, Variations, reminders sent, suppliers, people and lists. Admins can also download every
+            document as a ZIP, a folder per contract, with an index. Both downloads are recorded in the audit trail.
+          </li>
         </ul>
       </>
     ),

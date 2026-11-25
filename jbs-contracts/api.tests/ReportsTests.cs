@@ -166,6 +166,52 @@ public sealed class ReportsTests(AppFixture app)
     }
 
     [Fact]
+    public async Task Download_everything_and_all_documents()
+    {
+        var (owner, _, _) = await PersonAsync("Elle Export", Roles(owner: true));
+        var (approver, _, _) = await PersonAsync("Evan Approve", Roles(approver: true));
+        var (auditor, _, _) = await PersonAsync("Eve Audit", Roles(auditor: true));
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var (effective, reference) = await EffectiveAsync(owner, approver, new { endDate = D(400) });
+        var (draft, draftReference) = await DraftAsync(owner, new { });
+
+        // Admins and auditors only.
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.GetAsync("/api/reports/everything.xlsx", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await approver.GetAsync("/api/reports/everything.xlsx", Ct)).StatusCode);
+        var response = await auditor.GetAsync("/api/reports/everything.xlsx", Ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using (var book = new XLWorkbook(new MemoryStream(await response.Content.ReadAsByteArrayAsync(Ct))))
+        {
+            Assert.Equal(["Contracts", "Documents", "Legal review", "Approvals", "Variations", "Reminders sent", "Suppliers", "People", "Lists"],
+                book.Worksheets.Select(w => w.Name));
+            var contracts = book.Worksheet("Contracts");
+            var stage = contracts.Row(1).CellsUsed().First(c => c.GetString() == "Stage").Address.ColumnNumber;
+            Assert.Contains(contracts.RowsUsed(), r => r.Cell(1).GetString() == reference && r.Cell(stage).GetString() == "Effective");
+            Assert.Contains(contracts.RowsUsed(), r => r.Cell(1).GetString() == draftReference && r.Cell(stage).GetString() == "Draft"); // every stage
+            Assert.Contains(book.Worksheet("Documents").RowsUsed(), r => r.Cell(1).GetString() == reference && r.Cell(8).GetString() == "signed.pdf");
+            Assert.Contains(book.Worksheet("Approvals").RowsUsed(), r => r.Cell(1).GetString() == reference && r.Cell(3).GetString() == "Approved");
+        }
+
+        // All documents: admins only; a folder per contract, with an index.
+        Assert.Equal(HttpStatusCode.Forbidden, (await auditor.GetAsync("/api/reports/documents.zip", Ct)).StatusCode);
+        var zipResponse = await admin.GetAsync("/api/reports/documents.zip", Ct);
+        Assert.Equal(HttpStatusCode.OK, zipResponse.StatusCode);
+        using (var zip = new System.IO.Compression.ZipArchive(new MemoryStream(await zipResponse.Content.ReadAsByteArrayAsync(Ct))))
+        {
+            var entry = Assert.Single(zip.Entries, e => e.FullName.StartsWith($"{reference}/", StringComparison.Ordinal));
+            Assert.EndsWith("v1 - signed.pdf", entry.FullName);
+            using (var reader = new StreamReader(entry.Open())) Assert.Equal("%PDF signed", await reader.ReadToEndAsync(Ct));
+            Assert.Contains(zip.Entries, e => e.FullName == "Index of documents.xlsx");
+        }
+
+        // Both downloads are recorded.
+        var audit = await GetAsync(admin, "/api/reports/audit?days=7&q=downloaded");
+        Assert.Contains(audit.GetProperty("rows").EnumerateArray(), e => e.GetProperty("action").GetString() == "report.everything-downloaded" && e.GetProperty("summary").GetString()!.StartsWith("Eve Audit", StringComparison.Ordinal));
+        Assert.Contains(audit.GetProperty("rows").EnumerateArray(), e => e.GetProperty("action").GetString() == "report.documents-downloaded");
+        _ = (effective, draft);
+    }
+
+    [Fact]
     public async Task Team_page_shows_what_each_person_has_coming_up_and_outstanding()
     {
         var (owner, ownerId, _) = await PersonAsync("Tess Team", Roles(owner: true));

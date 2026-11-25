@@ -13,17 +13,17 @@ namespace JbsContracts.Api.Features;
 public static class ReportEndpoints
 {
     private static readonly TimeZoneInfo Brisbane = TimeZoneInfo.FindSystemTimeZoneById("Australia/Brisbane");
-    private static DateOnly? D(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
-    private static DateTime Local(DateTime utc) => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Brisbane);
+    internal static DateOnly? D(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
+    internal static DateTime Local(DateTime utc) => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Brisbane);
 
-    private static async Task<(Person? Me, IResult? Refusal)> RequireAsync(CurrentUser current, Db db)
+    internal static async Task<(Person? Me, IResult? Refusal)> RequireAsync(CurrentUser current, Db db)
     {
         var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
         if (refusal is not null) return (null, refusal);
         return me!.IsAdmin || me.IsAuditor ? (me, null) : (null, ApiResults.NotAllowed("Reports are for admins and auditors."));
     }
 
-    private static IResult File(byte[] bytes, string name, TimeProvider clock) =>
+    internal static IResult File(byte[] bytes, string name, TimeProvider clock) =>
         Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             $"jbs-contracts-{name}-{TimeZoneInfo.ConvertTime(clock.GetUtcNow(), Brisbane):yyyy-MM-dd}.xlsx");
 
@@ -33,10 +33,11 @@ public static class ReportEndpoints
     {
         "ended" => "N'Effective', N'Ended'",
         "all" => "N'Effective', N'Ended', N'Archived'",
+        "everything" => "N'Draft', N'LegalReview', N'Signing', N'Approval', N'Effective', N'Ended', N'Archived', N'Withdrawn'",
         _ => "N'Effective'",
     };
 
-    private sealed class RegisterRow
+    internal sealed class RegisterRow
     {
         public int Id { get; set; }
         public string Reference { get; set; } = "";
@@ -93,7 +94,7 @@ public static class ReportEndpoints
         ["noticePeriodDays"] = "number", ["reviewDate"] = "date", ["needsLegalReview"] = "yesno",
     };
 
-    private static List<RegisterColumn> RegisterColumnsFor(List<FieldRow> fields, List<SectionRow> sections)
+    internal static List<RegisterColumn> RegisterColumnsFor(List<FieldRow> fields, List<SectionRow> sections)
     {
         var titles = sections.ToDictionary(x => x.Key, x => x.Title);
         var hiddenSections = sections.Where(x => x.IsHidden).Select(x => x.Key).ToHashSet();
@@ -120,7 +121,7 @@ public static class ReportEndpoints
         return columns;
     }
 
-    private static object? BuiltInValue(RegisterRow r, string key) => key switch
+    internal static object? BuiltInValue(RegisterRow r, string key) => key switch
     {
         "title" => r.Title, "supplier" => r.SupplierName, "supplierVendorNumber" => r.SupplierVendorNumber, "category" => r.Category, "agreementType" => r.AgreementTypeName, "description" => r.Description,
         "owner" => r.OwnerName, "backupOwner" => r.BackupOwnerName, "confidential" => r.IsConfidential, "businessUnit" => r.BusinessUnitName, "site" => r.SiteName,
@@ -133,15 +134,18 @@ public static class ReportEndpoints
         _ => null,
     };
 
-    private sealed record Register(List<RegisterRow> Rows, List<RegisterColumn> Columns, Dictionary<int, Dictionary<string, (object? Value, string Display)>> Added, bool Filtered);
+    internal sealed record Register(List<RegisterRow> Rows, List<RegisterColumn> Columns, Dictionary<int, Dictionary<string, (object? Value, string Display)>> Added, bool Filtered);
 
-    private static async Task<Register> RegisterAsync(SqlConnection c, Person me, string? scope, HttpRequest request)
+    private static Task<Register> RegisterAsync(SqlConnection c, Person me, string? scope, HttpRequest request) =>
+        RegisterAsync(c, me, scope, request.Query.Where(x => x.Key.StartsWith("f.", StringComparison.Ordinal)).Select(x => KeyValuePair.Create(x.Key[2..], x.Value.ToString())));
+
+    internal static async Task<Register> RegisterAsync(SqlConnection c, Person me, string? scope, IEnumerable<KeyValuePair<string, string>> filterValues)
     {
         var fields = await Fields.LoadAsync(c);
         var columns = RegisterColumnsFor(fields, await Fields.LoadSectionsAsync(c));
         var p = ContractAccess.Params(me);
         // The same filters as the Contracts list: f.{field key}={value}, for the fields an admin made filterable.
-        var filters = Fields.FilterSql(fields, request.Query.Where(x => x.Key.StartsWith("f.", StringComparison.Ordinal)).Select(x => KeyValuePair.Create(x.Key[2..], x.Value.ToString())), p);
+        var filters = Fields.FilterSql(fields, filterValues, p);
         var rows = (await c.QueryAsync<RegisterRow>($"""
             SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, s.VendorNumber AS SupplierVendorNumber, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                    at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName, o.Name AS OwnerName, b.Name AS BackupOwnerName,

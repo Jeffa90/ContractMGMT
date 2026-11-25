@@ -108,3 +108,21 @@ test('Drag documents onto a contract', async ({ page, api }, info) => {
   await card.dispatchEvent('drop', { dataTransfer: transfer })
   await expect(page.getByText(name.replace('.pdf', '')).first()).toBeVisible()
 })
+
+test('Back goes to where you were, not up a level', async ({ page }) => {
+  // Renewals › a contract › Back: Renewals again (not the Contracts list).
+  await page.goto('/renewals')
+  await settled(page)
+  await page.locator('main a[href^="/contracts/"]').first().click()
+  await settled(page)
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page).toHaveURL(/\/renewals$/)
+  // Opened straight from a link (nothing to go back to): the page above.
+  await page.goto('/suppliers')
+  await settled(page)
+  const href = await page.locator('main a[href^="/suppliers/"]').first().getAttribute('href')
+  await page.goto(href!)
+  await settled(page)
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page).toHaveURL(/\/suppliers$/)
+})

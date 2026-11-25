@@ -2,9 +2,10 @@
 // Sections and fields come from the layout an admin arranges (Admin, Contract fields): built-in fields keep their own controls
 // but take their label, help, section, order and visibility from it; added fields are drawn by FieldInput.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Plus } from 'lucide-react'
+import { BackLink } from '@/components/BackLink'
+import { Plus } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { FieldInput } from '@/components/FieldInput'
@@ -90,6 +91,7 @@ export function ContractForm({
 }) {
   const { person } = useMe()
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const c = detail?.contract
   const [form, setForm] = useState<FormState>(() => ({
@@ -171,7 +173,9 @@ export function ContractForm({
       queryClient.invalidateQueries({ queryKey: ['contracts'] })
       queryClient.invalidateQueries({ queryKey: ['contract', saved.id] })
       toast.success(c ? 'Changes saved.' : 'Draft saved. Add documents next.')
-      navigate(`/contracts/${saved.id}`)
+      // Back from the contract shouldn't open the form again: an edit returns to where it came from; a new draft replaces the form.
+      if (c && location.key !== 'default') navigate(-1)
+      else navigate(`/contracts/${saved.id}`, { replace: true })
     },
     onError: (error) => {
       if (error instanceof ApiError) {
@@ -384,9 +388,7 @@ export function ContractForm({
         save.mutate()
       }}
     >
-      <Link to={c ? `/contracts/${c.id}` : '/contracts'} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-        <ChevronLeft aria-hidden className="size-4" /> {c ? c.title : 'Contracts'}
-      </Link>
+      <BackLink fallback={c ? `/contracts/${c.id}` : '/contracts'} />
       <header>
         <h1 className="font-display text-xl font-semibold md:text-2xl">{c ? `Edit ${c.reference}` : 'Add a contract'}</h1>
         <p className="mt-1 text-muted-foreground">

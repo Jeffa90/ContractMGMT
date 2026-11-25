@@ -1,9 +1,10 @@
 // A Variation of an Effective contract (product-spec section 7): what changes, old and new side by side, its Legal back-and-forth and
 // its approval. Nothing changes on the contract until it's approved.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeftRight, BadgeCheck, Check, ChevronLeft, FileText, Paperclip, Send, Undo2, Upload, UserCheck, X } from 'lucide-react'
+import { BackLink } from '@/components/BackLink'
+import { ArrowLeftRight, BadgeCheck, Check, FileText, Paperclip, Send, Undo2, Upload, UserCheck, X } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { DropTarget } from '@/components/DropZone'
@@ -65,9 +66,7 @@ function Variation({ data }: { data: VariationDetail }) {
 
   return (
     <>
-      <Link to={`/contracts/${c.id}`} className="inline-flex items-center gap-1 self-start text-sm font-medium text-primary hover:underline">
-        <ChevronLeft aria-hidden className="size-4" /> {c.reference} {c.title}
-      </Link>
+      <BackLink fallback={`/contracts/${c.id}`} />
       <PageHeader title={`Variation ${v.number}`} description={`${c.title} · ${c.supplierName ?? 'No supplier'} · owner ${c.ownerName}`} help={help.variation} />
 
       {v.stage === 'Withdrawn' && <Alert tone="info" title="This Variation was withdrawn. Nothing changed on the contract.">{v.closedReason}</Alert>}

@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ChevronLeft, Download, FileText, History, Lock, Pencil, Sparkles, Trash2, Upload } from 'lucide-react'
+import { BackLink } from '@/components/BackLink'
+import { Check, Download, FileText, History, Lock, Pencil, Sparkles, Trash2, Upload } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { DropTarget } from '@/components/DropZone'
@@ -122,9 +123,7 @@ export function ContractDetailPage() {
     const error = detail.error as ApiError
     return (
       <div className="flex flex-col gap-4">
-        <Link to="/contracts" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-          <ChevronLeft aria-hidden className="size-4" /> Contracts
-        </Link>
+        <BackLink fallback="/contracts" />
         <Alert tone={error.status === 404 ? 'warning' : 'danger'} title={error.message} />
       </div>
     )
@@ -135,7 +134,6 @@ export function ContractDetailPage() {
 
 function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
   const c = data.contract
-  const navigate = useNavigate()
   // From the Renewals page: open the decision straight away.
   const [params] = useSearchParams()
   const openDecision = params.get('decide') === '1'
@@ -144,9 +142,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
 
   return (
     <>
-      <button type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/contracts'))} className="inline-flex items-center gap-1 self-start text-sm font-medium text-primary hover:underline">
-        <ChevronLeft aria-hidden className="size-4" /> Back
-      </button>
+      <BackLink fallback="/contracts" />
 
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">

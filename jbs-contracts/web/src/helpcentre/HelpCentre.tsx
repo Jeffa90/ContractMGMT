@@ -1,8 +1,8 @@
 // The help centre (D-89): step-by-step guides grouped by what you're doing, the ones for your roles first, each with a short silent video
 // (fictional demo data) whose captions are the steps. "About each screen" holds the same help as the "?" beside each page title.
+import { BackLink } from "@/components/BackLink";
 import {
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   LifeBuoy,
   PlayCircle,
@@ -377,15 +377,7 @@ export function GuidePage() {
       <PageHeader
         title={guide.title}
         description={guide.summary}
-        back={
-          <Link
-            to="/help"
-            className="inline-flex min-h-11 items-center gap-1 self-start text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft aria-hidden className="size-4" /> Help
-            {group && `: ${group.title}`}
-          </Link>
-        }
+        back={<BackLink fallback="/help" />}
       />
       <div className="flex flex-wrap gap-1.5" aria-label="Who this is for">
         {guide.who.map((w) => (

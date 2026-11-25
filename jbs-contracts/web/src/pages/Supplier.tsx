@@ -1,13 +1,13 @@
 // The supplier page (D-88, D-90): details, contacts, documents (its own and from its contracts), business reviews and contracts in one place.
 // Everyone reads it. Procurement and admins change details, contacts and documents; reviews also by the relationship owner.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BackLink } from "@/components/BackLink";
 import {
   AlertTriangle,
   BellRing,
   Building2,
   CalendarClock,
   CheckCircle2,
-  ChevronLeft,
   Download,
   FilePlus2,
   FileText,
@@ -1770,14 +1770,7 @@ export function SupplierPage() {
     queryFn: () => api.get<SupplierPageData>(`/api/suppliers/${supplierId}`),
     enabled: supplierId > 0,
   });
-  const back = (
-    <Link
-      to="/suppliers"
-      className="inline-flex min-h-11 items-center gap-1 self-start text-sm font-medium text-muted-foreground hover:text-foreground"
-    >
-      <ChevronLeft aria-hidden className="size-4" /> Suppliers
-    </Link>
-  );
+  const back = <BackLink fallback="/suppliers" />;
   if (data.isPending) return <Skeleton className="h-96 w-full" />;
   if (data.isError)
     return (

@@ -26,6 +26,8 @@ import { useRef, useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { Dialog } from "@/components/Dialog";
+import { DropZone } from "@/components/DropZone";
+import { documentExtensions, documentWhat } from "@/lib/files";
 import { PageHeader } from "@/components/Help";
 import { Select, Textarea } from "@/components/form";
 import {
@@ -590,7 +592,6 @@ function DocumentDialog({
 }) {
   const refresh = useSave(supplierId);
   const types = useListItems("SupplierDocumentType");
-  const fileInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [typeId, setTypeId] = useState(document ? String(document.typeId) : "");
   const [title, setTitle] = useState(document?.title ?? "");
@@ -713,31 +714,14 @@ function DocumentDialog({
             error={errors.file}
             help="PDF, Word, Excel, Outlook email, text or an image, up to 25 MB."
           >
-            {(p) => (
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  ref={fileInput}
-                  id={p.id}
-                  type="file"
-                  hidden
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.msg,.eml,.txt,.csv,.png,.jpg,.jpeg"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
-                {/* The button keeps its own name ("Choose file"); the label points at the file input. */}
-                <Button
-                  aria-describedby={p["aria-describedby"]}
-                  aria-invalid={p["aria-invalid"]}
-                  icon={<Upload aria-hidden className="size-4" />}
-                  onClick={() => fileInput.current?.click()}
-                >
-                  Choose file
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  {file
-                    ? `${file.name} (${formatBytes(file.size)})`
-                    : "No file chosen"}
-                </span>
-              </div>
+            {() => (
+              <DropZone
+                extensions={documentExtensions}
+                what={documentWhat}
+                label="Choose file"
+                file={file}
+                onFile={setFile}
+              />
             )}
           </Field>
         )}

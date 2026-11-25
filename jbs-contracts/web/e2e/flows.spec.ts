@@ -87,3 +87,24 @@ test('Drag an Excel file onto the import box', async ({ page, api }, info) => {
   await expect(dialog.getByText('No change')).toBeVisible()
   await expectAccessible(page)
 })
+
+test('Drag documents onto a contract', async ({ page, api }, info) => {
+  test.skip(info.project.use.hasTouch === true, 'Dragging files is for desktop')
+  type Row = { id: number; stage: string; ownerName: string }
+  const drafts: Row[] = await (await api.get('/api/contracts?view=drafts')).json()
+  const draft = drafts.find((d) => d.stage === 'Draft')
+  test.skip(!draft, 'No draft to add documents to')
+  await page.goto(`/contracts/${draft!.id}`)
+  await settled(page)
+  const card = page.getByRole('heading', { name: 'Documents', exact: true }).locator('xpath=ancestor::div[contains(@class,"relative")][1]')
+  const name = `Dropped ${info.project.name} ${Date.now()}.pdf`
+  const transfer = await page.evaluateHandle((name) => {
+    const t = new DataTransfer()
+    t.items.add(new File(['%PDF-1.4 dropped'], name, { type: 'application/pdf' }))
+    return t
+  }, name)
+  await card.dispatchEvent('dragenter', { dataTransfer: transfer })
+  await expect(page.getByText(/Drop to add as/)).toBeVisible()
+  await card.dispatchEvent('drop', { dataTransfer: transfer })
+  await expect(page.getByText(name.replace('.pdf', '')).first()).toBeVisible()
+})

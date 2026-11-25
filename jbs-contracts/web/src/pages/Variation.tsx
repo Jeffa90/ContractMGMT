@@ -6,6 +6,7 @@ import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
+import { DropTarget } from '@/components/DropZone'
 import { FieldInput } from '@/components/FieldInput'
 import { Textarea } from '@/components/form'
 import { PageHeader } from '@/components/Help'
@@ -318,10 +319,23 @@ function DocumentsCard({ data }: { data: VariationDetail }) {
     },
     onError: (e) => toast.error(e instanceof ApiError ? (Object.values(e.fields)[0] ?? e.message) : 'The upload failed. Try again.'),
   })
+  const addDropped = async (files: File[]) => {
+    for (const f of files) {
+      try {
+        await upload.mutateAsync(f)
+      } catch {
+        return // the error is shown
+      }
+    }
+  }
   return (
+    <DropTarget enabled={canUpload} message="Drop to add to this Variation" onFiles={(f) => void addDropped(f)}>
     <Card className="p-5 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-lg font-semibold">Documents</h2>
+        <div>
+          <h2 className="font-display text-lg font-semibold">Documents</h2>
+          {canUpload && <p className="hidden text-sm text-muted-foreground md:block">You can also drag files onto this card.</p>}
+        </div>
         {canUpload && (
           <Button icon={<Upload aria-hidden className="size-4" />} loading={upload.isPending} onClick={() => input.current?.click()}>
             Add the signed variation (or other document)
@@ -356,6 +370,7 @@ function DocumentsCard({ data }: { data: VariationDetail }) {
         </ul>
       )}
     </Card>
+    </DropTarget>
   )
 }
 

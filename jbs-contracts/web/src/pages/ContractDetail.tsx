@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
+import { DropTarget } from '@/components/DropZone'
 import { Select, StageBadge, Textarea } from '@/components/form'
 import { HelpButton } from '@/components/Help'
 import { ConversationCard, ProgressPanel } from '@/components/LegalReview'
@@ -296,11 +297,27 @@ function DocumentsCard({ data }: { data: ContractDetail }) {
     setNewVersionOf(doc)
     input.current?.click()
   }
+  // Files dragged onto the card go in one after another, as the kind chosen (D-96).
+  const addDropped = async (files: File[]) => {
+    setNewVersionOf(null)
+    for (const f of files) {
+      try {
+        await upload.mutateAsync(f)
+      } catch {
+        return // the error is shown on the card
+      }
+    }
+  }
+  const kindName = kinds.find((k) => k.value === kind)?.label ?? 'a document'
 
   return (
+    <DropTarget enabled={data.canUpload} message={`Drop to add as ${kindName}`} onFiles={(f) => void addDropped(f)}>
     <Card className="p-5 md:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 className="font-display text-lg font-semibold">Documents</h2>
+        <div>
+          <h2 className="font-display text-lg font-semibold">Documents</h2>
+          {data.canUpload && <p className="hidden text-sm text-muted-foreground md:block">You can also drag files onto this card.</p>}
+        </div>
         {data.canUpload && (
           <div className="flex flex-wrap items-end gap-2">
             <Field label="Kind">
@@ -387,6 +404,7 @@ function DocumentsCard({ data }: { data: ContractDetail }) {
         </ul>
       )}
     </Card>
+    </DropTarget>
   )
 }
 

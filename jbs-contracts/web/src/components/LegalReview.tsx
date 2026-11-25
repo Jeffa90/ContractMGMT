@@ -10,6 +10,8 @@ import { errorText, useAction } from '@/lib/actions'
 import { uploadDocument, type ContractAction, type ContractDetail, type LegalEntry } from '@/lib/contracts'
 import { formatBytes, formatDate, formatDateTime, timeAgo } from '@/lib/format'
 import { Dialog } from './Dialog'
+import { DropZone } from './DropZone'
+import { documentExtensions } from '@/lib/files'
 import { Select, Textarea } from './form'
 import { Alert, Badge, Button, Card, Field, TextInput } from './ui'
 
@@ -282,7 +284,6 @@ function HandOverDialog(props: {
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState<string | undefined>()
   const [uploading, setUploading] = useState(false)
-  const input = useRef<HTMLInputElement>(null)
   const action = useAction(data, onClose)
   const queryClient = useQueryClient()
   // Files already uploaded on an earlier try (and the contract's row version since), so trying again doesn't add them twice.
@@ -348,21 +349,14 @@ function HandOverDialog(props: {
               ))}
             </ul>
           )}
-          <div>
-            <Button variant="secondary" icon={<Paperclip aria-hidden className="size-4" />} onClick={() => input.current?.click()}>
-              Attach files
-            </Button>
-          </div>
-          <input
-            ref={input}
-            type="file"
+          <DropZone
             multiple
-            hidden
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.msg,.eml,.txt,.csv,.png,.jpg,.jpeg"
-            onChange={(e) => {
-              setFiles([...files, ...Array.from(e.target.files ?? [])])
-              e.target.value = ''
-            }}
+            extensions={documentExtensions}
+            what="files"
+            label="Attach files"
+            files={files}
+            icon={<Paperclip aria-hidden className="size-4" />}
+            onFiles={(more) => setFiles([...files, ...more])}
           />
           <p className="text-xs text-muted-foreground">They're added to the contract's Documents and linked to this hand-over.</p>
         </div>
@@ -577,7 +571,9 @@ function SendForApprovalDialog({ data, onClose }: { data: ContractDetail; onClos
           </p>
         ) : (
           <Field label="Signed copy" required error={errors.signedCopy} help="The signed PDF from DocuSign. It's added to the contract's Documents.">
-            {(p) => <TextInput {...p} type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className="py-2" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />}
+            {() => (
+              <DropZone extensions={['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg']} what="the signed copy (PDF, Word or image)" label="Choose the signed copy" file={file} onFile={setFile} />
+            )}
           </Field>
         )}
         <Field label="Effective date" required error={errors.effectiveDate} help="The date the contract takes effect, as signed.">

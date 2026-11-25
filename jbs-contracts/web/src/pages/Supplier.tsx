@@ -1839,7 +1839,7 @@ export function SupplierPage() {
           ) : undefined
         }
       />
-      <div className="flex flex-wrap gap-2" aria-label="At a glance">
+      <div role="group" className="flex flex-wrap gap-2" aria-label="At a glance">
         {s.tierName && (
           <Badge
             tone="brand"

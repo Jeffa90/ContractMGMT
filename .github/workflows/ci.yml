@@ -68,6 +68,79 @@ jobs:
       - name: Test (real SQL Server; never skipped)
         run: dotnet test --solution JbsContracts.sln -c Release --no-build
 
+  e2e:
+    name: Browser tests (phone and desktop, light and dark, axe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: jbs-contracts
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start a throwaway SQL Server 2025 (generated password, masked)
+        run: |
+          set -euo pipefail
+          pw="Aa1!$(openssl rand -hex 16)"
+          echo "::add-mask::$pw"
+          docker run -d --name sql -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=$pw" -p 1433:1433 mcr.microsoft.com/mssql/server:2025-latest >/dev/null
+          ready=no
+          for i in $(seq 1 60); do
+            if docker exec sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$pw" -Q "CREATE DATABASE E2E" > /dev/null 2>&1; then ready=yes; break; fi
+            sleep 2
+          done
+          if [ "$ready" != yes ]; then echo "::error::SQL Server did not start."; exit 1; fi
+          echo "E2E_SQL=Server=localhost,1433;Database=E2E;User Id=sa;Password=$pw;TrustServerCertificate=True;Encrypt=True" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: jbs-contracts/global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: jbs-contracts/web/package-lock.json
+      - name: Build the front end and the API
+        run: |
+          set -euo pipefail
+          (cd web && npm ci && npm run build)
+          dotnet restore api --locked-mode
+          dotnet build api -c Release --no-restore
+      - name: Start JBS Contracts (test mode, fictional people only)
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+          ASPNETCORE_URLS: http://localhost:5091
+          Contracts__AuthMode: Header
+          Contracts__ApplyDatabaseScripts: "true"
+          Contracts__FirstAdmins__0__Account: DEMO\amorgan
+          Contracts__FirstAdmins__0__DisplayName: Alex Morgan (demo)
+          Contracts__FirstAdmins__0__Email: alex.morgan@example.com
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/data"
+          Database__ConnectionString="$E2E_SQL" Contracts__DataDirectory="$RUNNER_TEMP/data" \
+            nohup dotnet run --project api -c Release --no-build --no-launch-profile > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:5091/health/live > /dev/null 2>&1; then exit 0; fi
+            sleep 2
+          done
+          tail -40 "$RUNNER_TEMP/api.log"; echo "::error::JBS Contracts did not start."; exit 1
+      - name: Install the browser
+        working-directory: jbs-contracts/web
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        working-directory: jbs-contracts/web
+        env:
+          E2E_BASE_URL: http://localhost:5091
+        run: npm run e2e
+      - name: Keep the report when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-report
+          path: |
+            jbs-contracts/web/playwright-report
+            ${{ runner.temp }}/api.log
+          retention-days: 7
+
   checks:
     name: Repository checks (links, manifest, secrets, ASCII scripts)
     runs-on: ubuntu-latest

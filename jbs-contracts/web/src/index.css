@@ -165,6 +165,26 @@
   display: none;
 }
 
+/* Pop-up messages (sonner) use the app's own colours, so they follow light and dark and keep readable contrast.
+   Sonner sets its own colours per theme on [data-sonner-theme], so this needs to be more specific. */
+:root [data-sonner-toaster][data-sonner-theme] {
+  --normal-bg: var(--card);
+  --normal-text: var(--foreground);
+  --normal-border: var(--border);
+  --success-bg: var(--success-soft);
+  --success-text: var(--success);
+  --success-border: var(--success);
+  --error-bg: var(--danger-soft);
+  --error-text: var(--danger);
+  --error-border: var(--danger);
+  --warning-bg: var(--warning-soft);
+  --warning-text: var(--warning);
+  --warning-border: var(--warning);
+  --info-bg: var(--info-soft);
+  --info-text: var(--info);
+  --info-border: var(--info);
+}
+
 /* Printing (the Register, D-82): landscape so wide tables fit, and no pop-up messages on paper. */
 @media print {
   @page {

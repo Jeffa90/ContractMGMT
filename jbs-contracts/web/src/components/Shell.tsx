@@ -200,7 +200,8 @@ function PersonMenu({ collapsed }: { collapsed?: boolean }) {
             "flex w-full min-h-11 items-center gap-3 rounded-[var(--radius-control)] p-2 text-left hover:bg-muted",
             collapsed && "justify-center",
           )}
-          aria-label={`${person.name}, your settings`}
+          // Collapsed it shows only initials, so it needs a name; open, its visible words are its name (WCAG 2.5.3).
+          aria-label={collapsed ? `${person.name}, your settings` : undefined}
         >
           <Avatar name={person.name} />
           {!collapsed && (
@@ -208,6 +209,7 @@ function PersonMenu({ collapsed }: { collapsed?: boolean }) {
               <span className="block truncate font-medium">{person.name}</span>
               <span className="block truncate text-xs text-muted-foreground">
                 {roleSummary(person.roles)}
+                <span className="sr-only">, your settings</span>
               </span>
             </span>
           )}

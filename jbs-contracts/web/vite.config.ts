@@ -18,5 +18,5 @@ export default defineConfig({
       '/fonts': 'http://localhost:5080',
     },
   },
-  test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
+  test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'], include: ['src/**/*.test.{ts,tsx}'] },
 })

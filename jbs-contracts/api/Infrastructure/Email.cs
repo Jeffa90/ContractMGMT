@@ -137,88 +137,13 @@ public static class EmailTemplates
         </div></body></html>
         """;
 
-    public static (string Subject, string Text, string Html) AccessGranted(string firstName, string addedBy, string roles, string account, string? siteUrl)
-    {
-        const string subject = "You've been given access to JBS Contracts";
-        var paragraphs = new[]
-        {
-            $"Hi {firstName},",
-            $"{addedBy} has added you to JBS Contracts, where JBS raises, reviews, approves and keeps track of supplier contracts.",
-            $"What you can do: {roles}.",
-            $"You sign in automatically with your Windows account ({account}). There's no password to remember.",
-        };
-        var text = string.Join("\n\n", paragraphs) + (siteUrl is not null ? $"\n\nOpen JBS Contracts: {siteUrl}" : "") + "\n\nThis email was sent by JBS Contracts. Please don't reply to it.";
-        return (subject, text, Html("Welcome to JBS Contracts", paragraphs, siteUrl is null ? null : "Open JBS Contracts", siteUrl));
-    }
-
-    private static (string Subject, string Text, string Html) Contract(string subject, string heading, string[] paragraphs, string? link)
-    {
-        var text = string.Join("\n\n", paragraphs) + (link is not null ? $"\n\nOpen the contract: {link}" : "") + "\n\nThis email was sent by JBS Contracts. Please don't reply to it.";
-        return (subject, text, Html(heading, paragraphs, link is null ? null : "Open the contract", link));
-    }
-
-    private static string Said(string who, string? note) => note is null ? "" : $"{who} wrote: \u201c{note}\u201d";
-
-    public static (string Subject, string Text, string Html) SentToLegal(string firstName, string sentBy, string reference, string title, string? note, bool isNew, string? link) =>
-        Contract($"{reference} {title} is with Legal", isNew ? "A contract needs a Legal review" : "A contract is back with you", [
-            $"Hi {firstName},",
-            isNew
-                ? $"{sentBy} has sent {reference} {title} to Legal. Nobody in Legal has picked it up yet: open it and choose I'll take it."
-                : $"{sentBy} has sent {reference} {title} back to you. It's Legal's turn.",
-            .. note is null ? Array.Empty<string>() : [Said(sentBy, note)],
-        ], link);
-
-    public static (string Subject, string Text, string Html) LegalAssigned(string firstName, string assignedBy, string reference, string title, bool legalsTurn, string? link) =>
-        Contract($"{reference} {title}: the Legal review is yours", "You have a Legal review", [
-            $"Hi {firstName},",
-            $"{assignedBy} has given you the Legal review of {reference} {title}.",
-            legalsTurn ? "It's Legal's turn now." : "It's with the owner at the moment. You'll get an email when it comes back to Legal.",
-        ], link);
-
-    public static (string Subject, string Text, string Html) BackFromLegal(string firstName, string legalName, string reference, string title, string note, string? link) =>
-        Contract($"{reference} {title} is back with you from Legal", "Legal has sent a contract back to you", [
-            $"Hi {firstName},",
-            $"{legalName} (Legal) has sent {reference} {title} back to the owner. It's your turn.",
-            Said(legalName, note),
-            "When you're ready, open the contract, make any changes and choose Send to Legal.",
-        ], link);
-
-    public static (string Subject, string Text, string Html) LegalCleared(string firstName, string legalName, string reference, string title, string outcome, string? link) =>
-        Contract($"{reference} {title} has been cleared by Legal", "Legal has cleared a contract", [
-            $"Hi {firstName},",
-            $"{legalName} (Legal) has cleared {reference} {title}. It has moved to Signing.",
-            $"Outcome: \u201c{outcome}\u201d",
-            "Next: sign it in DocuSign, then upload the signed copy on the contract page.",
-        ], link);
-
-    public static (string Subject, string Text, string Html) WaitingForApproval(string firstName, string sentBy, string reference, string title, string? link) =>
-        Contract($"{reference} {title} is waiting for your approval", "A contract is ready to approve", [
-            $"Hi {firstName},",
-            $"{sentBy} has sent {reference} {title} for approval. It has been signed in DocuSign and the signed copy is attached to the contract.",
-            "Check the signed copy and details. Approve and register makes it Effective; if something isn't right, send it back with a reason.",
-        ], link);
-
-    public static (string Subject, string Text, string Html) Approved(string firstName, string approver, string reference, string title, string? link) =>
-        Contract($"{reference} {title} is approved and Effective", "Your contract is Effective", [
-            $"Hi {firstName},",
-            $"{approver} has approved and registered {reference} {title}. It is now Effective and locked.",
-        ], link);
-
-    public static (string Subject, string Text, string Html) SentBackByApprover(string firstName, string approver, string reference, string title, string reason, string? link) =>
-        Contract($"{reference} {title} was sent back from approval", "A contract was sent back from approval", [
-            $"Hi {firstName},",
-            $"{approver} sent {reference} {title} back to Signing.",
-            Said(approver, reason),
-            "Fix what's needed (for example, add the right signed copy), then choose Send for approval again.",
-        ], link);
-
     /// <summary>
     /// An email from wording an admin wrote (reminders): the subject is the heading, blank lines separate paragraphs. Everything is
     /// treated as plain text and HTML-encoded, so wording can never add HTML, links or code.
     /// </summary>
-    public static (string Subject, string Text, string Html) FromWording(string subject, string body, string? link)
+    public static (string Subject, string Text, string Html) FromWording(string subject, string[] paragraphs, string? link, string button)
     {
-        var paragraphs = body.Replace("\r\n", "\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return Contract(subject, subject, paragraphs, link);
+        var text = string.Join("\n\n", paragraphs) + (link is not null ? $"\n\n{button}: {link}" : "") + "\n\nThis email was sent by JBS Contracts. Please don't reply to it.";
+        return (subject, text, Html(subject, paragraphs, link is null ? null : button, link));
     }
 }

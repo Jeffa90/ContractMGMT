@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text;
 using Dapper;
+using JbsContracts.Api.Features;
 using JbsContracts.Api.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -81,7 +82,8 @@ public sealed class EmailTests(AppFixture app)
             ConnectionString = "unused",
             Email = new EmailSettings { Host = "127.0.0.1", Port = server.Port, From = "no-reply@jbssa.com.au", FromName = "JBS Contracts" },
         };
-        var content = EmailTemplates.AccessGranted("Sam", "Jeff Judd", "Legal", @"AMH\slee", "https://jbs-contracts-qa.jbssa.com.au");
+        var content = EmailWording.Compose("AccessGranted", "You've been given access to JBS Contracts", "Hi {First name},\n\n{Added by} has added you.",
+            new Dictionary<string, string?> { ["First name"] = "Sam", ["Added by"] = "Jeff Judd" }, "https://jbs-contracts-qa.jbssa.com.au");
         await new SmtpEmailSender(settings).SendAsync(new OutgoingEmail(1, "sam.lee@example.com", "Sam Lee", content.Subject, content.Text, content.Html), Ct);
         var received = await server.Received.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
         Assert.Contains("MAIL FROM:<no-reply@jbssa.com.au>", received);

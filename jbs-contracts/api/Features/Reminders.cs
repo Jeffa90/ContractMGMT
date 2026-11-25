@@ -6,35 +6,74 @@ using Microsoft.Data.SqlClient;
 
 namespace JbsContracts.Api.Features;
 
-/// <summary>Reminder kinds, their default days and their wording with a fixed list of placeholders (D-13, D-32, D-70).</summary>
-public static partial class ReminderWording
+/// <summary>
+/// Every email's wording (D-70, D-73): plain text an admin can change, with a fixed list of {placeholders} per email. A paragraph
+/// whose placeholder has nothing to fill (for example no note) is left out. Values are plain text, HTML-encoded in the email.
+/// </summary>
+public static partial class EmailWording
 {
-    public static readonly string[] Kinds = ["Notice", "Escalation", "End", "Review"];
+    public sealed record Kind(string Key, string Name, string Group, string When, string[] Placeholders, bool HasDays = false, string Button = "Open the contract");
 
-    public static readonly Dictionary<string, string> KindNames = new()
-    {
-        ["Notice"] = "Notice deadline", ["Escalation"] = "Escalation to the Group Head", ["End"] = "End date", ["Review"] = "Review date",
-    };
+    private static readonly string[] ContractFields = ["First name", "Contract title", "Reference", "Supplier", "Owner"];
 
-    /// <summary>The only placeholders wording may use. Values are always plain text (HTML-encoded in the email).</summary>
-    public static readonly string[] Placeholders = ["First name", "Contract title", "Reference", "Supplier", "Owner", "Due date", "Days"];
+    public static readonly Kind[] Kinds =
+    [
+        new("Notice", "Notice deadline reminder", "Reminders", "Before the notice deadline, to the owner and backup, until a renewal decision is recorded.", [.. ContractFields, "Due date", "Days"], HasDays: true),
+        new("Escalation", "Escalation to the Group Head", "Reminders", "Before the notice deadline with no decision, to the Group Head (the owner and backup are copied).", [.. ContractFields, "Due date", "Days"], HasDays: true),
+        new("End", "End date reminder", "Reminders", "Before the end date, to the owner and backup, until a renewal decision is recorded.", [.. ContractFields, "Due date", "Days"], HasDays: true),
+        new("Review", "Review date reminder", "Reminders", "Before the review date, to the owner and backup, until the review is done.", [.. ContractFields, "Due date", "Days"], HasDays: true),
+        new("AccessGranted", "You've been given access", "People", "When an admin adds someone (on screen or from Excel).", ["First name", "Added by", "Roles", "Windows logon"], Button: "Open JBS Contracts"),
+        new("LegalNew", "Sent to Legal (new)", "Legal review", "To everyone in Legal, when a contract is sent to Legal and nobody has picked it up.", [.. ContractFields, "Sent by", "Note"]),
+        new("LegalReturned", "Back with Legal", "Legal review", "To the Legal person who has it, when the owner sends it back to Legal.", [.. ContractFields, "Sent by", "Note"]),
+        new("LegalAssigned", "Legal review given to you", "Legal review", "To a Legal person when a colleague gives them the review.", [.. ContractFields, "Assigned by"]),
+        new("BackFromLegal", "Back with the owner from Legal", "Legal review", "To the owner and backup when Legal sends it back.", [.. ContractFields, "Legal person", "Note"]),
+        new("LegalCleared", "Cleared by Legal", "Legal review", "To the owner and backup when Legal clears it.", [.. ContractFields, "Legal person", "Outcome"]),
+        new("ApprovalWaiting", "Waiting for approval", "Approval", "To the Group Head when a contract is sent for approval.", [.. ContractFields, "Sent by", "Effective date"]),
+        new("Approved", "Approved and Effective", "Approval", "To the owner and backup when it's approved.", [.. ContractFields, "Approver"]),
+        new("ApprovalSentBack", "Sent back from approval", "Approval", "To the owner and backup when an approver sends it back.", [.. ContractFields, "Approver", "Reason"]),
+    ];
+
+    public static readonly Dictionary<string, Kind> ByKey = Kinds.ToDictionary(k => k.Key);
+    public static readonly string[] ReminderKinds = Kinds.Where(k => k.HasDays).Select(k => k.Key).ToArray();
 
     [GeneratedRegex(@"\{([^{}]*)\}")]
     private static partial Regex Token();
 
-    /// <summary>Null when the wording only uses known placeholders and its braces match; otherwise a plain-words problem.</summary>
-    public static string? Check(string text)
+    /// <summary>Null when the wording only uses this email's placeholders and its braces match; otherwise a plain-words problem.</summary>
+    public static string? Check(string kind, string text)
     {
+        var allowed = ByKey[kind].Placeholders;
         foreach (Match m in Token().Matches(text))
-            if (!Placeholders.Contains(m.Groups[1].Value))
-                return $"{{{m.Groups[1].Value}}} isn't a placeholder you can use. Use one of: {string.Join(", ", Placeholders.Select(p => $"{{{p}}}"))}.";
+            if (!allowed.Contains(m.Groups[1].Value))
+                return $"{{{m.Groups[1].Value}}} isn't a placeholder this email can use. Use one of: {string.Join(", ", allowed.Select(p => $"{{{p}}}"))}.";
         var stripped = Token().Replace(text, "");
         if (stripped.Contains('{') || stripped.Contains('}')) return "A { or } doesn't match up. Placeholders look like {Reference}.";
         return null;
     }
 
-    public static string Fill(string text, IReadOnlyDictionary<string, string> values) =>
-        Token().Replace(text, m => values.TryGetValue(m.Groups[1].Value, out var v) ? v : m.Value);
+    /// <summary>The email from this kind's saved wording, filled in. Paragraphs whose placeholders are empty are left out.</summary>
+    public static async Task<(string Subject, string Text, string Html)> RenderAsync(SqlConnection c, SqlTransaction tx, string kind, IReadOnlyDictionary<string, string?> values, string? link)
+    {
+        var t = await c.QuerySingleAsync<(string Subject, string Body)>("SELECT Subject, Body FROM contracts.EmailTemplate WHERE Kind = @kind", new { kind }, tx);
+        return Compose(kind, t.Subject, t.Body, values, link);
+    }
+
+    public static (string Subject, string Text, string Html) Compose(string kind, string subject, string body, IReadOnlyDictionary<string, string?> values, string? link)
+    {
+        bool Has(Match m) => values.TryGetValue(m.Groups[1].Value, out var v) && !string.IsNullOrWhiteSpace(v);
+        string Fill(string text) => Token().Replace(text, m => Has(m) ? values[m.Groups[1].Value]! : "");
+        var paragraphs = body.Replace("\r\n", "\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(para => Token().Matches(para).All(Has))
+            .Select(Fill).ToArray();
+        return EmailTemplates.FromWording(Fill(subject).Trim(), paragraphs, link, ByKey[kind].Button);
+    }
+
+    /// <summary>The placeholders every contract email shares.</summary>
+    public static Dictionary<string, string?> For(string recipientName, ContractRow c) => new()
+    {
+        ["First name"] = LegalEndpoints.First(recipientName), ["Contract title"] = c.Title, ["Reference"] = c.Reference,
+        ["Supplier"] = c.SupplierName ?? "the supplier", ["Owner"] = c.OwnerName,
+    };
 }
 
 /// <summary>
@@ -195,14 +234,14 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
         var w = wording[kind];
         foreach (var person in recipients)
         {
-            var values = new Dictionary<string, string>
+            var values = new Dictionary<string, string?>
             {
                 ["First name"] = LegalEndpoints.First(person.Name), ["Contract title"] = k.Title, ["Reference"] = k.Reference, ["Supplier"] = k.SupplierName ?? "the supplier",
                 ["Owner"] = k.OwnerName, ["Due date"] = due.ToString("ddd d MMM yyyy", CultureInfo.InvariantCulture), ["Days"] = left.ToString(CultureInfo.InvariantCulture),
             };
             var link = settings.SiteUrl is null ? null : $"{settings.SiteUrl}/contracts/{k.Id}";
             await EmailOutbox.QueueAsync(c, tx, $"reminder-{kind.ToLowerInvariant()}", person.Email, person.Name,
-                EmailTemplates.FromWording(ReminderWording.Fill(w.Subject, values), ReminderWording.Fill(w.Body, values), link),
+                EmailWording.Compose(kind, w.Subject, w.Body, values, link),
                 personId: person.Id, contractId: k.Id, dedupeKey: $"reminder:{k.Id}:{kind}:{due:yyyy-MM-dd}:{step}:{person.Id}");
         }
         return 1;

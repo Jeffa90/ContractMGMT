@@ -82,7 +82,8 @@ public static class ApprovalEndpoints
                 var stamp = Convert.ToBase64String(c.RowVersion);
                 foreach (var a in head.Count > 0 ? head : approvers)
                     await EmailOutbox.QueueAsync(x.C, x.Tx, "approval-waiting", a.Email, a.Name,
-                        EmailTemplates.WaitingForApproval(First(a.Name), x.Me.Name, c.Reference, c.Title, ApproveLink(settings, id)),
+                        await EmailWording.RenderAsync(x.C, x.Tx, "ApprovalWaiting",
+                            With(With(EmailWording.For(a.Name, c), "Sent by", x.Me.Name), "Effective date", body.EffectiveDate!.Value.ToString("ddd d MMM yyyy", CultureInfo.InvariantCulture)), ApproveLink(settings, id)),
                         personId: a.Id, contractId: id, dedupeKey: $"approval-waiting:{id}:{stamp}:{a.Id}");
                 return null;
             }));
@@ -106,7 +107,7 @@ public static class ApprovalEndpoints
                     $"{x.Me.Name} approved and registered {c.Reference}" + (groupHead is not null ? $" (as backup for {groupHead.Name})" : "") + ". It is Effective and locked.",
                     new { asBackupFor = groupHead?.Id }, contractId: id);
                 await EmailOwnersAsync(x, $"approval:{id}:{approvalId}", "approved",
-                    p => EmailTemplates.Approved(First(p.Name), x.Me.Name, c.Reference, c.Title, Link(settings, id)));
+                    p => EmailWording.RenderAsync(x.C, x.Tx, "Approved", With(EmailWording.For(p.Name, c), "Approver", x.Me.Name), Link(settings, id)));
 
                 // A renewal: the contract it renews ends now (D-12), "Ended, renewed by ...".
                 if (c.RenewsContractId is { } oldId)
@@ -144,7 +145,7 @@ public static class ApprovalEndpoints
                 await audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "contract.sent-back", "Contract", id,
                     $"{x.Me.Name} sent {c.Reference} back to Signing" + Quote(reason) + Stop(reason), new { reason }, contractId: id);
                 await EmailOwnersAsync(x, $"approval:{id}:{approvalId}", "approval-sent-back",
-                    p => EmailTemplates.SentBackByApprover(First(p.Name), x.Me.Name, c.Reference, c.Title, reason, Link(settings, id)));
+                    p => EmailWording.RenderAsync(x.C, x.Tx, "ApprovalSentBack", With(With(EmailWording.For(p.Name, c), "Approver", x.Me.Name), "Reason", reason), Link(settings, id)));
                 return null;
             }));
 

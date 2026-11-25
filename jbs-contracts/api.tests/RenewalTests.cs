@@ -219,7 +219,7 @@ public sealed class RenewalTests(AppFixture app)
         var (approver, _, _) = await PersonAsync("Al Approver", Roles(approver: true));
         Assert.Equal(HttpStatusCode.Forbidden, (await owner.GetAsync("/api/admin/reminders", Ct)).StatusCode);
         var start = await admin.GetFromJsonAsync<JsonElement>("/api/admin/reminders", Ct);
-        var review = start.GetProperty("kinds").EnumerateArray().Single(k => k.GetProperty("kind").GetString() == "Review");
+        var review = start.GetProperty("emails").EnumerateArray().Single(k => k.GetProperty("kind").GetString() == "Review");
         var (oldSubject, oldBody) = (review.GetProperty("subject").GetString()!, review.GetProperty("body").GetString()!);
         try
         {
@@ -254,5 +254,51 @@ public sealed class RenewalTests(AppFixture app)
             await admin.PutAsJsonAsync("/api/admin/reminders/days", new { kind = "Review", days = new[] { 90, 60, 30 } }, Ct);
             await admin.PutAsJsonAsync("/api/admin/reminders/wording", new { kind = "Review", subject = oldSubject, body = oldBody }, Ct);
         }
+    }
+
+    [Fact]
+    public async Task Every_email_is_editable_with_its_own_placeholders_and_empty_paragraphs_are_left_out()
+    {
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var all = await admin.GetFromJsonAsync<JsonElement>("/api/admin/reminders", Ct);
+        var kinds = all.GetProperty("emails").EnumerateArray().Select(e => e.GetProperty("kind").GetString()!).ToArray();
+        Assert.Superset(new HashSet<string> { "AccessGranted", "LegalNew", "BackFromLegal", "LegalCleared", "ApprovalWaiting", "Approved", "ApprovalSentBack", "Notice" }, kinds.ToHashSet());
+        var approved = all.GetProperty("emails").EnumerateArray().Single(e => e.GetProperty("kind").GetString() == "Approved");
+        var (subject, body) = (approved.GetProperty("subject").GetString()!, approved.GetProperty("body").GetString()!);
+        try
+        {
+            // Placeholders are per email: the welcome email has no contract, so {Reference} is refused there.
+            var wrong = await admin.PutAsJsonAsync("/api/admin/reminders/wording", new { kind = "AccessGranted", subject = "Welcome", body = "Hi {First name}, see {Reference}." }, Ct);
+            Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+            Assert.Contains("{Reference} isn't a placeholder this email can use", (await ReadAsync(wrong)).GetProperty("message").GetString());
+            Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync("/api/admin/reminders/wording", new
+            {
+                kind = "Approved", subject = "Good news: {Reference} is live", body = "G'day {First name},\n\n{Approver} approved {Contract title}.",
+            }, Ct)).StatusCode);
+            var (owner, ownerId, _) = await PersonAsync("Nina Newcomer", Roles(owner: true));
+            var (approver, _, approverName) = await PersonAsync("Ollie Okay", Roles(approver: true));
+            var id = await EffectiveAsync(owner, approver, new { title = "Wording test", endDate = D(400) });
+            await using var db = await app.OpenAsync();
+            var email = await db.QuerySingleAsync<(string Subject, string BodyText)>("SELECT Subject, BodyText FROM contracts.EmailOutbox WHERE ContractId = @id AND Kind = 'approved' AND PersonId = @ownerId", new { id, ownerId });
+            Assert.StartsWith("Good news: JBSAUS-", email.Subject);
+            Assert.StartsWith($"G'day Nina,\n\n{approverName} approved Wording test.", email.BodyText);
+        }
+        finally
+        {
+            await admin.PutAsJsonAsync("/api/admin/reminders/wording", new { kind = "Approved", subject, body }, Ct);
+        }
+
+        // A paragraph whose placeholder is empty (no note) is left out; values are never treated as HTML.
+        var withNote = EmailWording.Compose("LegalNew", "{Reference}", "Hi {First name},\n\nSent.\n\n{Sent by} wrote: \"{Note}\"", new Dictionary<string, string?>
+        {
+            ["First name"] = "Sam", ["Reference"] = "JBSAUS-0001", ["Sent by"] = "<Jo>", ["Note"] = "Please check clause 12.",
+        }, null);
+        Assert.Contains("&lt;Jo&gt; wrote", withNote.Html);
+        var noNote = EmailWording.Compose("LegalNew", "{Reference}", "Hi {First name},\n\nSent.\n\n{Sent by} wrote: \"{Note}\"", new Dictionary<string, string?>
+        {
+            ["First name"] = "Sam", ["Reference"] = "JBSAUS-0001", ["Sent by"] = "Jo", ["Note"] = null,
+        }, null);
+        Assert.DoesNotContain("wrote", noNote.Text);
+        Assert.StartsWith("Hi Sam,\n\nSent.", noNote.Text);
     }
 }

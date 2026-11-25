@@ -29,7 +29,7 @@ function useNav(): { main: NavItem[]; admin: NavItem[] } {
           { to: '/admin/people', label: 'People', icon: <Users aria-hidden className="size-5" /> },
           { to: '/admin/lists', label: 'Lists', icon: <ListChecks aria-hidden className="size-5" /> },
           { to: '/admin/fields', label: 'Contract fields', icon: <LayoutList aria-hidden className="size-5" /> },
-          { to: '/admin/reminders', label: 'Reminders', icon: <BellRing aria-hidden className="size-5" /> },
+          { to: '/admin/reminders', label: 'Emails and reminders', icon: <BellRing aria-hidden className="size-5" /> },
         ]
       : [],
   }

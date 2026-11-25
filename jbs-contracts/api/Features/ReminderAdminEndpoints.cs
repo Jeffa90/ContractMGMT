@@ -7,7 +7,7 @@ public sealed record SaveReminderDays(string? Kind, int[]? Days);
 public sealed record SaveReminderWording(string? Kind, string? Subject, string? Body);
 
 /// <summary>
-/// Admin, Reminders: the days each reminder is sent and its email wording (D-13, D-70). Closed choices only: whole days, and plain text
+/// Admin, Emails and reminders: the days each reminder is sent, and every email's wording (D-13, D-70, D-73). Closed choices only: whole days, and plain text
 /// with a fixed list of {placeholders}. Every saved change is kept in the history and audited.
 /// </summary>
 public static class ReminderAdminEndpoints
@@ -30,16 +30,15 @@ public static class ReminderAdminEndpoints
             var lastRun = await c.QuerySingleOrDefaultAsync<DateTime?>("SELECT LastRunUtc FROM contracts.JobRun WHERE Name = N'Reminders'");
             return Results.Ok(new
             {
-                kinds = ReminderWording.Kinds.Select(k => new
+                emails = EmailWording.Kinds.Select(k => new
                 {
-                    kind = k, name = ReminderWording.KindNames[k],
-                    days = days[k].Split(',').Select(int.Parse).OrderByDescending(d => d),
-                    subject = wording[k].Subject, body = wording[k].Body,
+                    kind = k.Key, name = k.Name, group = k.Group, when = k.When, placeholders = k.Placeholders, button = k.Button,
+                    days = k.HasDays ? days[k.Key].Split(',').Select(int.Parse).OrderByDescending(d => d).ToArray() : null,
+                    subject = wording[k.Key].Subject, body = wording[k.Key].Body,
                 }),
-                placeholders = ReminderWording.Placeholders,
                 history = history.Select(h => new
                 {
-                    id = (int)h.Id, kind = (string)h.Kind, kindName = ReminderWording.KindNames[(string)h.Kind], what = (string)h.What,
+                    id = (int)h.Id, kind = (string)h.Kind, kindName = EmailWording.ByKey.TryGetValue((string)h.Kind, out var hk) ? hk.Name : (string)h.Kind, what = (string)h.What,
                     before = (string)h.OldValue, after = (string)h.NewValue, byName = (string)h.ByName, atUtc = DateTime.SpecifyKind((DateTime)h.AtUtc, DateTimeKind.Utc),
                 }),
                 lastRunUtc = lastRun is { } l ? DateTime.SpecifyKind(l, DateTimeKind.Utc) : (DateTime?)null,
@@ -50,7 +49,7 @@ public static class ReminderAdminEndpoints
         {
             var (me, refusal) = await RequireAdminAsync(current, db);
             if (refusal is not null) return refusal;
-            if (body.Kind is not { } kind || !ReminderWording.Kinds.Contains(kind)) return ApiResults.Invalid("Choose a reminder.", new() { ["kind"] = "Choose a reminder." });
+            if (body.Kind is not { } kind || !EmailWording.ReminderKinds.Contains(kind)) return ApiResults.Invalid("Choose a reminder.", new() { ["kind"] = "Choose a reminder." });
             var days = (body.Days ?? []).Distinct().OrderByDescending(d => d).ToArray();
             if (days.Length == 0) return ApiResults.Invalid("Add at least one day.", new() { ["days"] = "Add at least one day, for example 30." });
             if (days.Length > 8) return ApiResults.Invalid("Use up to 8 days.", new() { ["days"] = "Use up to 8 reminders." });
@@ -63,7 +62,7 @@ public static class ReminderAdminEndpoints
             await c.ExecuteAsync("UPDATE contracts.ReminderSetting SET Days = @after, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Kind = @kind", new { after, me = me!.Id, kind }, tx);
             await c.ExecuteAsync("INSERT INTO contracts.ReminderChange (Kind, What, OldValue, NewValue, ById) VALUES (@kind, N'Days', @before, @after, @me)", new { kind, before, after, me = me.Id }, tx);
             await audit.WriteAsync(c, tx, me.AsActor(), "reminders.days", "ReminderSetting", null,
-                $"{me.Name} changed the {ReminderWording.KindNames[kind].ToLowerInvariant()} reminders from {List(before)} to {List(after)} days before.", new { kind, before, after });
+                $"{me.Name} changed the {EmailWording.ByKey[kind].Name.ToLowerInvariant()} days from {List(before)} to {List(after)} days before.", new { kind, before, after });
             await tx.CommitAsync();
             return Results.Ok(new { changed = true });
         });
@@ -72,17 +71,17 @@ public static class ReminderAdminEndpoints
         {
             var (me, refusal) = await RequireAdminAsync(current, db);
             if (refusal is not null) return refusal;
-            if (body.Kind is not { } kind || !ReminderWording.Kinds.Contains(kind)) return ApiResults.Invalid("Choose a reminder.", new() { ["kind"] = "Choose a reminder." });
+            if (body.Kind is not { } kind || !EmailWording.ByKey.ContainsKey(kind)) return ApiResults.Invalid("Choose an email.", new() { ["kind"] = "Choose an email." });
             var subject = (body.Subject ?? "").Trim();
             var text = (body.Body ?? "").Replace("\r\n", "\n").Trim();
             var problems = new Dictionary<string, string>();
             if (subject.Length == 0) problems["subject"] = "Add a subject line.";
             else if (subject.Length > 200) problems["subject"] = "Keep the subject under 200 characters.";
             else if (subject.Contains('\n')) problems["subject"] = "Keep the subject on one line.";
-            else if (ReminderWording.Check(subject) is { } sp) problems["subject"] = sp;
+            else if (EmailWording.Check(kind, subject) is { } sp) problems["subject"] = sp;
             if (text.Length == 0) problems["body"] = "Add the email's wording.";
             else if (text.Length > 4000) problems["body"] = "Keep it under 4,000 characters.";
-            else if (ReminderWording.Check(text) is { } bp) problems["body"] = bp;
+            else if (EmailWording.Check(kind, text) is { } bp) problems["body"] = bp;
             if (problems.Count > 0) return ApiResults.Invalid(problems.Values.First(), problems);
             await using var c = await db.OpenAsync();
             await using var tx = await Db.BeginWriteAsync(c);
@@ -93,7 +92,7 @@ public static class ReminderAdminEndpoints
             await c.ExecuteAsync("INSERT INTO contracts.ReminderChange (Kind, What, OldValue, NewValue, ById) VALUES (@kind, N'Wording', @before, @after, @me)",
                 new { kind, before = $"{before.Subject}\n\n{before.Body}", after = $"{subject}\n\n{text}", me = me.Id }, tx);
             await audit.WriteAsync(c, tx, me.AsActor(), "reminders.wording", "EmailTemplate", null,
-                $"{me.Name} changed the wording of the {ReminderWording.KindNames[kind].ToLowerInvariant()} reminder email.",
+                $"{me.Name} changed the wording of the \"{EmailWording.ByKey[kind].Name}\" email.",
                 new { kind, before = new { before.Subject, before.Body }, after = new { subject, body = text } });
             await tx.CommitAsync();
             return Results.Ok(new { changed = true });
@@ -106,6 +105,6 @@ public static class ReminderAdminEndpoints
     {
         var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
         if (refusal is not null) return (null, refusal);
-        return me!.IsAdmin ? (me, null) : (null, ApiResults.NotAllowed("Only admins can change reminders."));
+        return me!.IsAdmin ? (me, null) : (null, ApiResults.NotAllowed("Only admins can change emails and reminders."));
     }
 }

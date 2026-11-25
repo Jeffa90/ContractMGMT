@@ -151,9 +151,12 @@ public static class PeopleEndpoints
     }
 
     /// <summary>"You've been given access" email, queued with the change (sent by the background sender).</summary>
-    public static Task QueueWelcomeAsync(SqlConnection c, SqlTransaction tx, int personId, string name, string email, string account, string roles, string addedBy, AppSettings settings) =>
-        EmailOutbox.QueueAsync(c, tx, "access-granted", email, name,
-            EmailTemplates.AccessGranted(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? name, addedBy, roles, account, settings.SiteUrl),
+    public static async Task QueueWelcomeAsync(SqlConnection c, SqlTransaction tx, int personId, string name, string email, string account, string roles, string addedBy, AppSettings settings) =>
+        await EmailOutbox.QueueAsync(c, tx, "access-granted", email, name,
+            await EmailWording.RenderAsync(c, tx, "AccessGranted", new Dictionary<string, string?>
+            {
+                ["First name"] = LegalEndpoints.First(name), ["Added by"] = addedBy, ["Roles"] = roles, ["Windows logon"] = account,
+            }, settings.SiteUrl),
             personId: personId, dedupeKey: $"access-granted:{personId}");
 
     private sealed record Input(string Account, string Name, string Email, Roles Roles, bool? IsActive, string? RowVersion);

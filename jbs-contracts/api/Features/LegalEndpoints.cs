@@ -225,7 +225,7 @@ public static class LegalEndpoints
                     new { personId = person.Id }, contractId: id);
                 if (person.Id != x.Me.Id)
                     await EmailOutbox.QueueAsync(x.C, x.Tx, "legal-assigned", person.Email, person.Name,
-                        EmailTemplates.LegalAssigned(First(person.Name), x.Me.Name, c.Reference, c.Title, c.WhoseTurn == "Legal", Link(settings, id)),
+                        await EmailWording.RenderAsync(x.C, x.Tx, "LegalAssigned", With(EmailWording.For(person.Name, c), "Assigned by", x.Me.Name), Link(settings, id)),
                         personId: person.Id, contractId: id, dedupeKey: $"legal:{id}:{number}:{person.Id}");
                 return null;
             }));
@@ -273,7 +273,8 @@ public static class LegalEndpoints
                 var number = await AddEntryAsync(x, "SentToOwner", "Owner", legalPersonId, "WaitingOnOwner", note, docs.Ids);
                 await audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "legal.sent-to-owner", "Contract", id,
                     $"{x.Me.Name} sent {c.Reference} back to the owner" + Quote(note) + Stop(note), new { note, documents = docs.Ids }, contractId: id);
-                await EmailOwnersAsync(x, $"legal:{id}:{number}", "legal-back", p => EmailTemplates.BackFromLegal(First(p.Name), x.Me.Name, c.Reference, c.Title, note, Link(settings, id)));
+                await EmailOwnersAsync(x, $"legal:{id}:{number}", "legal-back", p => EmailWording.RenderAsync(x.C, x.Tx, "BackFromLegal",
+                    With(With(EmailWording.For(p.Name, c), "Legal person", x.Me.Name), "Note", note), Link(settings, id)));
                 return null;
             }));
 
@@ -297,7 +298,8 @@ public static class LegalEndpoints
                 var number = await AddEntryAsync(x, "Cleared", null, legalPersonId, null, note, []);
                 await audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "legal.cleared", "Contract", id,
                     $"{x.Me.Name} cleared {c.Reference} (Legal)" + Quote(note) + Stop(note) + " It moves to Signing.", new { note }, contractId: id);
-                await EmailOwnersAsync(x, $"legal:{id}:{number}", "legal-cleared", p => EmailTemplates.LegalCleared(First(p.Name), x.Me.Name, c.Reference, c.Title, note, Link(settings, id)));
+                await EmailOwnersAsync(x, $"legal:{id}:{number}", "legal-cleared", p => EmailWording.RenderAsync(x.C, x.Tx, "LegalCleared",
+                    With(With(EmailWording.For(p.Name, c), "Legal person", x.Me.Name), "Outcome", note), Link(settings, id)));
                 return null;
             }));
     }
@@ -390,17 +392,25 @@ public static class LegalEndpoints
             new { legalPersonId = c.LegalPersonId, me = x.Me.Id }, x.Tx);
         foreach (var p in recipients)
             await EmailOutbox.QueueAsync(x.C, x.Tx, "legal-sent", p.Email, p.Name,
-                EmailTemplates.SentToLegal(First(p.Name), x.Me.Name, c.Reference, c.Title, note, isNew: c.LegalPersonId is null, Link(settings, c.Id)),
+                await EmailWording.RenderAsync(x.C, x.Tx, c.LegalPersonId is null ? "LegalNew" : "LegalReturned",
+                    With(With(EmailWording.For(p.Name, c), "Sent by", x.Me.Name), "Note", note), Link(settings, c.Id)),
                 personId: p.Id, contractId: c.Id, dedupeKey: $"legal:{c.Id}:{number}:{p.Id}");
     }
 
     /// <summary>The owner and backup (D-57), except whoever acted.</summary>
-    internal static async Task EmailOwnersAsync(Ctx x, string dedupe, string kind, Func<Person, (string, string, string)> content)
+    internal static async Task EmailOwnersAsync(Ctx x, string dedupe, string kind, Func<Person, Task<(string, string, string)>> content)
     {
         var people = await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1 AND Id IN (@owner, @backup) AND Id <> @me",
             new { owner = x.Contract.OwnerId, backup = x.Contract.BackupOwnerId ?? 0, me = x.Me.Id }, x.Tx);
         foreach (var p in people)
-            await EmailOutbox.QueueAsync(x.C, x.Tx, kind, p.Email, p.Name, content(p), personId: p.Id, contractId: x.Contract.Id, dedupeKey: $"{dedupe}:{p.Id}");
+            await EmailOutbox.QueueAsync(x.C, x.Tx, kind, p.Email, p.Name, await content(p), personId: p.Id, contractId: x.Contract.Id, dedupeKey: $"{dedupe}:{p.Id}");
+    }
+
+    /// <summary>The same placeholders with one more filled in.</summary>
+    internal static Dictionary<string, string?> With(Dictionary<string, string?> values, string key, string? value)
+    {
+        values[key] = value;
+        return values;
     }
 
     internal static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

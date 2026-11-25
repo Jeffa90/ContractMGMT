@@ -143,17 +143,20 @@ export const help = {
     ),
   },
   reminders: {
-    title: 'Reminders',
+    title: 'Emails and reminders',
     body: (
       <>
-        <p>Reminders are checked every morning at 7:00am Brisbane time. A missed morning catches up the next day, and no reminder is ever sent twice.</p>
         <p>
-          <strong>Days before</strong>: when each reminder goes out, for example 90, 60, 30, 14 and 7 days before the notice deadline. If a contract is added
-          late, only the most recent reminder is sent, not all the earlier ones.
+          Every email JBS Contracts sends is here, grouped: reminders, the welcome email, Legal review hand-overs and approvals. Open one to change its wording.
         </p>
         <p>
-          <strong>Wording</strong>: plain text with placeholders such as {'{Reference}'} and {'{Due date}'}, filled in for each contract. Use the buttons to add
-          them. Anything else in braces is refused, and text is never treated as code or formatting. The preview shows it with a sample contract.
+          <strong>Wording</strong> is plain text with placeholders such as {'{Reference}'}, filled in for each email. Each email has its own list (the welcome
+          email has no contract, for example); use the buttons to add them. A paragraph whose placeholder has nothing to fill, such as a note nobody wrote, is
+          left out. Text is never treated as code or formatting. The preview shows it with a sample contract.
+        </p>
+        <p>
+          <strong>Reminders</strong> are checked every morning at 7:00am Brisbane time; a missed morning catches up the next day and no reminder is sent twice.{' '}
+          <strong>Days before</strong> sets when each one goes out. If a contract is added late, only the most recent reminder is sent.
         </p>
         <p>Every saved change is kept in the History, with who made it and when.</p>
       </>

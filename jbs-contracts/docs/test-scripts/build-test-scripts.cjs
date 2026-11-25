@@ -1,6 +1,6 @@
 // Builds the user-testing scripts for JBS Contracts as Word documents, one per role (Jeff, 26 Nov).
 // Run from this folder with the docx npm package available:  node build-test-scripts.cjs
-// Plain English, no training needed: each section points at the in-app help, and the steps say what to do and what you should see.
+// Short and plain (Jeff, 26 Nov): each person tests their own role on practice contracts; each section points at the in-app help.
 // Everything on QA is made up; never put real contract data in QA.
 const fs = require('fs')
 const path = require('path')
@@ -103,10 +103,11 @@ function section(number, title, why, learn, list) {
   return [
     h1(`${number}. ${title}`),
     p(why),
-    p(`**Learn it in the app:** ${learn}`, { run: { color: '1F4E8C' } }),
+    p(`**Help:** ${learn}`, { run: { color: '1F4E8C' } }),
     steps(list),
     new Paragraph({ spacing: { after: 120 }, children: [] }),
-    notes(),
+    notes('Notes:', 1),
+    new Paragraph({ spacing: { after: 200 }, children: [] }),
   ]
 }
 
@@ -124,35 +125,29 @@ function fillIn(rows) {
 function intro(role) {
   return [
     new Paragraph({ children: [new TextRun({ text: 'JBS Contracts', font: FONT, size: 28, color: NAVY, bold: true })], spacing: { after: 40 } }),
-    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: `Test script: ${role.title}`, font: FONT })] }),
+    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: `Testing: ${role.title}`, font: FONT })] }),
     p(role.who, { run: { color: '5B6280' } }),
-    h2('How this works'),
-    bullet(`Open **JBS Contracts on QA**: ${QA} (it signs you in with your Windows logon).`),
-    bullet('**There is no training.** The app should teach you as you go. On every screen, click the **?** beside the page title for help, and open **Help** in the menu for short step-by-step guides, most with a silent video. Use them: whether they helped is part of the test.'),
-    bullet('Work through the sections in order. Each step says what to do and what you should see. Tick **Works** or **Problem**.'),
-    bullet('If something goes wrong, looks odd, or you can\'t work out what to do, tick **Problem** and write down what happened in the notes. A screenshot helps: press **Windows key + Shift + S**, then paste it into this document or an email.'),
-    bullet('**Everything on QA is made up.** Never use real contracts, suppliers or people\'s details. Contracts marked **Demo (no emails)** are practice ones for everyone; do what you like with them.'),
-    bullet('Some steps need another tester (a **HAND-OVER** or **WAIT** row). Agree who you\'re working with before you start, and message them (Teams is fine) when you hand something over.'),
-    bullet(`It takes about ${role.time}. You don't have to do it in one go.`),
-    h2('About you and who you\'re testing with'),
-    fillIn(role.fillIn),
+    bullet(`Open ${QA} (it signs you in automatically).`),
+    bullet('There\'s no training: if you\'re not sure how to do something, click the **?** next to the page title, or **Help** in the menu.'),
+    bullet('Tick **Works** or **Problem** for each step. Jot down anything confusing.'),
+    bullet('It\'s all made-up test data, so you can\'t break anything. Use the practice contracts marked **Demo (no emails)**.'),
+    bullet(`Takes about ${role.time}.`),
     new Paragraph({ spacing: { after: 120 }, children: [] }),
-    box(role.tips),
+    fillIn(['Your name', 'Date']),
   ]
 }
 
 function feedback() {
   const qs = [
-    'How easy was it to find what you needed? (1 = very hard, 5 = very easy)',
-    'How useful were the ? help and the Help guides? (1 = no help, 5 = all I needed)',
-    'How confident would you be using it for real contracts? (1 = not at all, 5 = completely)',
-    'How does it compare with how you manage contracts today? (1 = worse, 5 = much better)',
+    'Easy to find your way around?',
+    'Was the ? help enough?',
+    'Would you be happy using it for real?',
   ]
   const w = [CONTENT - 2600, 2600]
   return [
     pageBreak(),
-    h1('Last: how did it feel?'),
-    p('Circle a number for each, then tell us anything else. Honest answers help most.'),
+    h1('Last: how was it?'),
+    p('Circle one (1 = not at all, 5 = definitely).'),
     new Table({
       width: { size: CONTENT, type: WidthType.DXA },
       columnWidths: w,
@@ -160,21 +155,17 @@ function feedback() {
       rows: qs.map((q) => new TableRow({ children: [cell([cellText(q)], w[0]), cell([cellText('1    2    3    4    5')], w[1])] })),
     }),
     new Paragraph({ spacing: { after: 120 }, children: [] }),
-    notes('The best thing about it:', 2),
+    notes('Anything else? What you liked, what bugged you, what\'s missing:', 4),
     new Paragraph({ spacing: { after: 120 }, children: [] }),
-    notes('The thing that most needs fixing:', 2),
-    new Paragraph({ spacing: { after: 120 }, children: [] }),
-    notes('Anything you expected to be able to do but couldn\'t find:', 2),
-    new Paragraph({ spacing: { after: 120 }, children: [] }),
-    p('**When you\'re finished**, save this document and send it back to whoever gave it to you. Thank you!'),
+    p('Send this back when you\'re done. Thanks!'),
   ]
 }
 
 function build(role, file) {
-  const children = [...intro(role), ...role.sections.flatMap((s, i) => [pageBreak(), ...section(i + 1, ...s)]), ...feedback()]
+  const children = [...intro(role), new Paragraph({ spacing: { after: 200 }, children: [] }), ...role.sections.flatMap((s, i) => section(i + 1, ...s)), ...feedback()]
   const doc = new Document({
     creator: 'JBS Contracts',
-    title: `JBS Contracts test script: ${role.title}`,
+    title: `JBS Contracts testing: ${role.title}`,
     styles: {
       default: { document: { run: { font: FONT, size: 21 } } },
       paragraphStyles: [
@@ -190,7 +181,7 @@ function build(role, file) {
         default: new Footer({
           children: [new Paragraph({
             alignment: AlignmentType.RIGHT,
-            children: [new TextRun({ text: `JBS Contracts test script: ${role.title}   ·   Page `, font: FONT, size: 16, color: '5B6280' }),
+            children: [new TextRun({ text: `JBS Contracts testing: ${role.title}   ·   Page `, font: FONT, size: 16, color: '5B6280' }),
               new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 16, color: '5B6280' })],
           })],
         }),
@@ -201,276 +192,154 @@ function build(role, file) {
   return Packer.toBuffer(doc).then((buf) => fs.writeFileSync(path.join(__dirname, file), buf))
 }
 
-// ---------------------------------------------------------------- the shared journey
-// One real (made-up) contract goes all the way round: Contract owner -> Legal -> owner -> Legal -> owner -> Approver -> owner -> Approver,
-// then a Variation goes owner -> Legal -> owner -> Approver. Each script has its side of it, with the same step names.
-
-const journeyNote = [
-  '**The shared journey.** You and your partners take one made-up contract all the way round:',
-  'Contract owner raises it  →  Legal reviews and sends it back with a question  →  owner answers  →  Legal clears it  →  owner sends it for approval  →  approver sends it back once  →  owner fixes it  →  approver approves it.',
-  'Then the owner changes it with a Variation, which goes to Legal and the approver too. Each script has its side of the journey, so you\'ll wait for each other at the hand-overs.',
-]
-
-// ---------------------------------------------------------------- Contract owner and Procurement
+// ---------------------------------------------------------------- the scripts (each person tests their own role, on practice contracts)
 
 const owner = {
   title: 'Contract owner and Procurement',
-  who: 'For people who raise and look after contracts, and who look after suppliers (Procurement). You\'ll test both.',
-  time: '90 minutes, plus waiting for your partners',
-  fillIn: ['Your name', 'Date', 'Your Legal partner', 'Your Approver partner', 'Your test contract\'s reference (you\'ll get it in section 2): JBSAUS-'],
-  tips: [...journeyNote, '**Before you start**, check you can see **Contracts**, **Renewals** and **Suppliers** in the menu. If you can\'t sign in, or you can\'t see them, tell your admin: they give you access and roles.'],
+  who: 'Raising and looking after contracts, and looking after suppliers.',
+  time: '45 minutes',
   sections: [
-    ['Find your way around', 'Home is your to-do list. This section is about getting comfortable before you do anything.', 'Help centre › "Find your way around".', [
-      ['Open JBS Contracts. Look at **Home**.', 'You\'re greeted by name. Tiles show what\'s waiting for you (for example **Your drafts**, **Back from Legal**). If there\'s nothing, ask your admin to refresh the demo data.'],
-      ['Click the **?** beside "Good morning" (or afternoon).', 'A help panel explains Home. Close it.'],
-      ['Click a tile, for example **Your drafts**.', 'The Contracts list opens, showing just those contracts.'],
-      ['Go back to Home. Under **Urgent** (if shown), read one item.', 'It says what\'s due, when, and what to do about it.'],
-      ['Click **Search** (or press Ctrl+K) and type part of a supplier\'s name, for example "Coastal".', 'Matching contracts and suppliers appear as you type. Click one to open it.'],
-      ['Open **Help** in the menu. Play the video in **Find your way around**.', 'A short silent video with captions plays.'],
-      ['Click your name at the bottom of the menu. Try **Dark**, then **Match my device**.', 'The colours change straight away and are remembered.'],
-      ['In the same menu, look at **Email reminders**.', 'You can choose **As they happen**, **One email a day** or **One email a week**. One is marked (default). Choose the one you\'d like.'],
+    ['Get started', 'Home is your to-do list.', 'Help › "Find your way around".', [
+      ['Look at **Home** and click a tile.', 'The contracts behind it.'],
+      ['Click the **?** next to the greeting.', 'Help for that page.'],
+      ['Click **Search** and type "Coastal".', 'Matching contracts and suppliers.'],
+      ['Click your name (bottom left) › **Email reminders** and pick one.', 'Saved.'],
     ]],
-    ['Raise a contract (the shared journey starts)', 'Raise the contract you\'ll take all the way round with your partners.', 'Help centre › "Raise a contract", and the ? on the Add contract screen.', [
-      ['Go to **Contracts** and click **Add contract**.', 'A short form opens. It says only a title is needed to save a draft.'],
-      ['Click **Save draft** without typing anything.', 'It doesn\'t save. A message under Title says what\'s missing.'],
-      ['Type a made-up **Title**, for example "Test linehaul freight [your initials]". For **Supplier**, click **Add new supplier** and add a made-up one, for example "Test Freight Co [your initials]".', 'The new supplier is chosen for you.'],
-      ['Choose a **Category**, a value (for example 250000), a start date next month, an end date two years later and a notice period of 60 days. Leave **Needs Legal review** ticked.', 'Fields accept the values. Help text under each field explains it.'],
-      ['Click **Save draft**.', 'The contract page opens with a reference like JBSAUS-0123. **Write the reference in the box on page 1.** The progress bar shows Draft.'],
-      ['Scroll to **Documents**. Choose Kind **Draft**, then drag any small PDF or Word file from your desktop onto the Documents card (or click **Add document**).', 'While you drag, the card says "Drop to add as Draft". The file appears with your name and the time.'],
-      ['Click **Edit details**, change the value, and save.', 'The new value shows. **Activity** at the bottom lists what you changed.'],
+    ['Raise a contract', 'Start a new contract.', 'Help › "Raise a contract".', [
+      ['**Contracts** › **Add contract**. Give it a title and add a new made-up supplier.', 'The supplier is filled in for you.'],
+      ['Fill in a category, value and dates, then **Save draft**.', 'It gets a reference like JBSAUS-0123.'],
+      ['Drag any file onto the **Documents** box.', 'The file is added.'],
     ]],
-    ['Send it to Legal', 'Hand the contract to Legal and see whose turn it is.', 'Help centre › "Send a contract to Legal".', [
-      ['On your contract, click **Send to Legal**. Add a note, for example "Please check the liability clause", and attach your draft.', 'A dialog lets you add a note and files (you can drag files in).'],
-      ['Click **Send to Legal**.', 'The progress bar shows it\'s Legal\'s turn and for how long. The Legal conversation shows your note.'],
-      { handover: 'Tell your **Legal partner** your contract reference. They\'ll pick it up and send it back to you with a question.' },
-      { wait: 'until your Legal partner says they\'ve sent it back to you. Meanwhile, try sections 6 and 7 with the demo contracts.' },
-      ['On Home, open **Back from Legal**.', 'Your contract is there. Its page shows Legal\'s note, any mark-up they attached, and that it\'s your turn.'],
-      ['Open the mark-up Legal attached (if any).', 'It downloads and opens.'],
-      ['Click **Send to Legal** again, with a note answering their question.', 'It\'s Legal\'s turn again. The conversation shows the back-and-forth in order.'],
-      { handover: 'Tell your **Legal partner** you\'ve answered. They\'ll clear it.' },
+    ['Work with Legal', 'Send contracts to Legal and get them back.', 'Help › "Send a contract to Legal".', [
+      ['On your new contract, click **Send to Legal** with a short note.', 'It shows it\'s Legal\'s turn.'],
+      ['On Home, open a demo contract under **Back from Legal**.', 'Legal\'s note and any mark-up.'],
+      ['Click **Send to Legal** again with a reply.', 'It\'s back with Legal.'],
     ]],
-    ['Signing and approval', 'Once Legal clears it, it\'s signed (in DocuSign, as today) and goes to an approver to register.', 'Help centre › "Send a signed contract for approval".', [
-      { wait: 'until your Legal partner says it\'s cleared.' },
-      ['Open your contract.', 'It\'s in **Signing**. Legal\'s outcome is shown. A message says what to do next.'],
-      ['Click **Send for approval**. For the **Signed copy**, drag in any PDF (pretend it\'s signed). Leave the **Effective date** empty and try to send.', 'It asks for the effective date. It\'s never filled in for you.'],
-      ['Enter an **Effective date** and click **Send for approval**.', 'It moves to **Approval**. The signed copy is in Documents.'],
-      { handover: 'Tell your **Approver partner** your contract reference. They\'ll send it back once, on purpose.' },
-      { wait: 'until your Approver partner says they\'ve sent it back.' },
-      ['Open your contract.', 'It\'s back in **Signing**, with the approver\'s reason shown clearly.'],
-      ['Fix what they asked (for example add another document), then **Send for approval** again.', 'It\'s in Approval again. You don\'t need to attach the signed copy again.'],
-      { handover: 'Tell your **Approver partner** it\'s ready again.' },
-      { wait: 'until your Approver partner says they\'ve approved it.' },
-      ['Open your contract.', 'It\'s **Effective** and shows a lock. **Edit details** is gone: it can only change through a Variation now.'],
-      ['Look at **Activity**.', 'Every step is listed: who did what, and when.'],
+    ['Get it approved', 'Once signed, it goes to an approver.', 'Help › "Send a signed contract for approval".', [
+      ['Raise another quick contract, untick **Needs Legal review**, save, then click **Ready for signing**.', 'It moves to Signing.'],
+      ['Click **Send for approval**. Attach any PDF as the signed copy and pick an effective date.', 'It moves to Approval.'],
     ]],
-    ['Change it with a Variation (the shared journey continues)', 'An Effective contract only changes through an approved Variation.', 'Help centre › "Change an Effective contract with a Variation".', [
-      ['On your Effective contract, click **Start a Variation**. Say why (for example "Extending by a year") and click **Start**.', 'The Variation page opens, showing the current value and the new value side by side.'],
-      ['Change the **End date** to a year later and click **Save changes**.', 'Only the change is listed, old and new. The contract itself hasn\'t changed yet.'],
-      ['Click **Send to Legal** with a short note.', 'It\'s Legal\'s turn on the Variation.'],
-      { handover: 'Tell your **Legal partner** the Variation is with them.' },
-      { wait: 'until Legal says the Variation is cleared.' },
-      ['Open the Variation (from the contract, or **Variations to finish** on Home) and click **Send for approval**.', 'It\'s waiting for approval.'],
-      { handover: 'Tell your **Approver partner** the Variation is waiting.' },
-      { wait: 'until the approver says it\'s approved.' },
-      ['Open your contract.', 'The end date is now the new one. The Variation is listed as Approved, with what changed.'],
+    ['Renewals', 'Decide what happens before the notice date.', 'Help › "Record a renewal decision".', [
+      ['Open **Renewals**.', 'Most urgent at the top.'],
+      ['On a demo contract, **Record decision** › **Let it end**.', 'The decision shows.'],
+      ['On another, choose **Renew**.', 'A new renewal draft opens.'],
     ]],
-    ['Renewals and endings (practise on demo contracts)', 'Never miss a notice date: decide in good time whether to renew, let it end or renegotiate.', 'Help centre › "Record a renewal decision" and "Mark a review done".', [
-      ['Go to **Renewals**.', 'Contracts with notice deadlines or end dates coming up, most urgent first. Overdue ones are at the top in red.'],
-      ['On a demo contract, click **Record decision**, choose **Let it end** and add a note. Save.', 'It shows the decision. Its reminders stop. It will end on its end date.'],
-      ['On another demo contract, record **Renew**.', 'A new draft "(renewal)" opens, linked to the old one, with the same details.'],
-      ['Open a demo contract with a review date (an evergreen one) and click **Review done**. Set a next review date.', 'The review is recorded and reminders follow the new date.'],
-      ['On a demo draft you don\'t need, scroll to the bottom and click **Withdraw this contract**, with a reason.', 'It moves to Closed. Nothing is deleted; its history stays.'],
-      ['On one of your demo contracts, click **Hand over** and choose a **Backup** (another tester).', 'They\'re now the backup. It\'s recorded in Activity.'],
+    ['Change a live contract', 'Live (Effective) contracts change through a Variation.', 'Help › "Change an Effective contract with a Variation".', [
+      ['Open an Effective demo contract › **Start a Variation**, give a reason.', 'The Variation page opens.'],
+      ['Change the end date › **Save changes**.', 'Old and new side by side.'],
+      ['Send it to Legal or for approval.', 'It shows whose turn it is.'],
     ]],
-    ['Find contracts', 'Get to any contract quickly.', 'Help centre › "Find a contract".', [
-      ['Go to **Contracts**. Switch between **My contracts** and **All**.', 'My contracts shows the ones you own or back up.'],
-      ['Type a reference, a supplier or a title in the search box.', 'The list narrows as you type.'],
-      ['Click **Filters** and narrow to one site or supplier. Then clear the filters.', 'The list follows the filters; clearing brings everything back.'],
-      ['Look at the **Key date** column.', 'Amber within 30 days, red once passed.'],
-      ['Click **Export to Excel**.', 'An Excel file downloads with the contracts you can see.'],
+    ['Suppliers', 'Everything about a supplier in one place.', 'Help › "Set up a supplier\'s details" and "Add a supplier document".', [
+      ['**Suppliers** › open one › **Edit**. Make yourself relationship owner, set a risk and reason.', 'Saved, with a risk badge.'],
+      ['**Documents** › **Add document**. Pick a kind, drag a file in, set an expiry date, tick **Remind me**.', 'Listed with its expiry date.'],
+      ['**Business reviews** › **Add business review**, with one action for you.', 'The action shows on your Home.'],
+      ['Tick the action done.', 'It leaves your Home.'],
     ]],
-    ['Suppliers (Procurement)', 'Everything about a supplier in one place: its contracts, its documents, the relationship and business reviews.', 'Help centre › "Set up a supplier\'s details", "Add a supplier document" and "Record a business review".', [
-      ['Go to **Suppliers** and open the supplier you made in section 2.', 'Overview, Documents, Business reviews and Contracts. Your contract is under Contracts.'],
-      ['On **Overview**, click **Edit**. Make yourself the **Relationship owner**, choose a **Tier**, set **Risk** to Medium without a reason and save.', 'It asks why the risk is Medium.'],
-      ['Add a reason, set the **Next business review** to next month, and save.', 'The details show, with a coloured risk badge.'],
-      ['Click **Add contact** and add a made-up person (for example "Sam Example", Account manager, sam@example.com).', 'The contact is listed.'],
-      ['Choose **Documents**, then **Add document**. Kind **Insurance certificate**, drag in any PDF, expiry date in 3 weeks. Tick **Remind me before it expires**.', 'The document shows with its expiry date and that you\'ll be reminded.'],
-      ['Click **New version** on it and give a later expiry date.', 'The new version replaces it; the earlier one is kept in its history.'],
-      ['Choose **Business reviews** › **Add business review**. Held last week, you as an attendee, a short summary, a rating and scores. Add an action for yourself due next week. Click **Add review**.', 'The review shows with its scores and the action. Home shows the action under Suppliers.'],
-      ['Click **Attach a file** on the review and add a "deck" (any file).', 'It\'s linked to the review.'],
-      ['Tick the action done.', 'It\'s marked done with your name. It leaves your Home.'],
-      ['Choose **Contracts** on the supplier page.', 'Every contract with this supplier, and their documents, are listed.'],
+    ['Find things', 'Get to any contract fast.', 'Help › "Find a contract".', [
+      ['**Contracts**: switch **My contracts** / **All**, then search.', 'The list narrows as you type.'],
+      ['Click **Filters** and pick a site.', 'Only that site.'],
+      ['Click **Export to Excel**.', 'An Excel file downloads.'],
     ]],
   ],
 }
-
-// ---------------------------------------------------------------- Legal
 
 const legal = {
   title: 'Legal',
-  who: 'For Legal: picking up contracts, the back-and-forth with the owner, and clearing contracts and Variations.',
-  time: '60 minutes, plus waiting for your partners',
-  fillIn: ['Your name', 'Date', 'Your Contract owner partner', 'Their test contract\'s reference: JBSAUS-'],
-  tips: [...journeyNote, '**Before you start**, check you can sign in and see **Contracts**. If you can\'t, tell your admin: they give you access and the Legal role.'],
+  who: 'Reviewing contracts and Variations.',
+  time: '30 minutes',
   sections: [
-    ['Find your way around', 'Home shows what\'s waiting for Legal, so nothing sits unnoticed.', 'Help centre › "Find your way around" and "Review a contract (Legal)".', [
-      ['Open JBS Contracts. Look at **Home**.', 'Tiles such as **Your turn (Legal)**, **New to pick up**, **Variations for Legal** and **Waiting on the owner** (demo contracts fill them).'],
-      ['Click the **?** beside the greeting.', 'A help panel explains Home for you.'],
-      ['Click **New to pick up**.', 'Contracts sent to Legal that nobody has taken yet.'],
-      ['Open **Help** in the menu. Watch **Review a contract (Legal)**.', 'A short silent video with captions.'],
-      ['Click your name at the bottom of the menu and look at **Email reminders**.', 'Choose how your reminder emails come. Emails that hand you a contract always come straight away.'],
+    ['Get started', 'Home shows what\'s waiting for Legal.', 'Help › "Find your way around".', [
+      ['Look at **Home** and click **New to pick up**.', 'Contracts waiting for Legal.'],
+      ['Click the **?** next to the greeting.', 'Help for that page.'],
+      ['Click your name (bottom left) › **Email reminders** and pick one.', 'Saved.'],
     ]],
-    ['Practise on a demo contract', 'Try every Legal action on made-up contracts first.', 'The ? on the contract page.', [
-      ['Open a contract from **New to pick up** and click **I\'ll take it**.', 'It\'s yours: your name shows as the Legal person, and it moves to **Your turn (Legal)**.'],
-      ['Click **Update status** and choose **Waiting on supplier**, with a note such as "Insurance certificate requested".', 'The status shows on the contract, so the owner can see where it\'s up to without asking.'],
-      ['Click **Give to someone in Legal** (if there\'s another Legal tester) and choose them.', 'They\'re now the Legal person and get an email. Whose turn it is doesn\'t change.'],
-      ['On another demo contract, add a document with Kind **Legal mark-up** (drag a file onto the Documents card).', 'It\'s added with your name.'],
-      ['Open a demo contract marked **Confidential** (for example "Executive recruitment services").', 'You can see it. (Most people can\'t; Legal can.)'],
+    ['Review a contract', 'Pick it up, go back and forth with the owner, clear it.', 'Help › "Review a contract (Legal)".', [
+      ['Open a demo contract from **New to pick up** › **I\'ll take it**.', 'Your name shows as the Legal person.'],
+      ['**Update status** › **Waiting on supplier**, with a note.', 'The status shows on the contract.'],
+      ['**Send to owner** with a question, and attach any file.', 'It moves to Waiting on the owner.'],
+      ['Open one from **Your turn (Legal)** › **Legal cleared**, with a short outcome.', 'It moves to Signing.'],
     ]],
-    ['The shared journey: review the contract', 'Your Contract owner partner sends you their test contract.', 'Help centre › "Review a contract (Legal)".', [
-      { wait: 'until your Contract owner partner tells you their contract is with Legal. Write its reference on page 1.' },
-      ['On Home, open **New to pick up** and find their contract.', 'It\'s there, with their note and attachments in the Legal conversation.'],
-      ['Click **I\'ll take it**, then **Update status** › **Reviewing**.', 'It\'s yours and shows as Reviewing.'],
-      ['Click **Send to owner**. Ask a question (for example "Can the supplier cap liability at $2m?") and attach a "mark-up" (any file).', 'It goes back to the owner. It moves to **Waiting on the owner** on your Home.'],
-      { handover: 'Tell your **Contract owner partner** it\'s back with them.' },
-      { wait: 'until they tell you they\'ve answered.' },
-      ['Open the contract.', 'It\'s your turn again. The conversation shows every turn in order, with any files.'],
-      ['Click **Legal cleared** and write a short outcome (for example "Cleared. Liability cap agreed at $2m.").', 'It moves to **Signing**. The owner and backup are emailed.'],
-      { handover: 'Tell your **Contract owner partner** it\'s cleared.' },
+    ['Review a Variation', 'Changes to live contracts come to Legal too.', 'The ? on the Variation page.', [
+      ['Open one from **Variations for Legal** and take it.', 'Old and new values side by side.'],
+      ['Click **Legal cleared** with an outcome.', 'It goes back to the owner.'],
     ]],
-    ['The shared journey: the Variation', 'Later, the owner changes the approved contract with a Variation and sends it to you.', 'The ? on the Variation page.', [
-      { wait: 'until the owner tells you the Variation is with Legal.' },
-      ['On Home, open **Variations for Legal** and open it.', 'Old and new values side by side, with the owner\'s reason.'],
-      ['Take it, then click **Legal cleared** with an outcome.', 'It goes back to the owner to send for approval.'],
-      { handover: 'Tell your **Contract owner partner** the Variation is cleared.' },
-    ]],
-    ['Find contracts', 'Get to anything quickly.', 'Help centre › "Find a contract".', [
-      ['Go to **Contracts** and choose **With Legal**.', 'Everything with Legal, showing whose turn it is and for how long.'],
-      ['Search for a supplier name.', 'The list narrows as you type.'],
-      ['Press **Ctrl+K** from any page and type a reference.', 'You can jump straight to it.'],
+    ['Find things', 'Get to anything fast.', 'Help › "Find a contract".', [
+      ['**Contracts** › **With Legal**.', 'Everything with Legal and whose turn it is.'],
+      ['Press **Ctrl+K** and type a reference.', 'Jump straight to it.'],
     ]],
   ],
 }
-
-// ---------------------------------------------------------------- Approver and Group Head
 
 const approver = {
   title: 'Approver and Group Head',
-  who: 'For approvers and the Group Head: checking signed contracts and Variations and approving them into the register, and (Group Head) seeing what the team has coming up.',
-  time: '45 minutes, plus waiting for your partners',
-  fillIn: ['Your name', 'Date', 'Your Contract owner partner', 'Their test contract\'s reference: JBSAUS-'],
-  tips: [...journeyNote, '**Nobody approves their own contract.** If you raised, own or back up a contract, you\'ll see why you can\'t approve it, and another approver can.', '**Before you start**, check you can sign in. If you can\'t, tell your admin.'],
+  who: 'Approving contracts and Variations, and (Group Head) seeing the team\'s workload.',
+  time: '20 minutes',
   sections: [
-    ['Find your way around', 'Home shows what\'s waiting for your approval.', 'Help centre › "Find your way around" and "Approve a contract".', [
-      ['Open JBS Contracts. Look at **Home**.', 'Tiles such as **To approve** and **Variations to approve** (demo contracts fill them).'],
-      ['Click the **?** beside the greeting.', 'Help explains Home for you.'],
-      ['Open **Help** in the menu. Watch **Approve a contract (on your phone or computer)**.', 'A short silent video with captions.'],
-      ['Click your name at the bottom of the menu and look at **Email reminders**.', 'Choose how your reminder emails come. Approval requests always come straight away.'],
+    ['Get started', 'Home shows what\'s waiting for you.', 'Help › "Approve a contract".', [
+      ['Look at **Home** and click **To approve**.', 'Contracts waiting for approval.'],
+      ['Click your name (bottom left) › **Email reminders** and pick one.', 'Saved.'],
     ]],
-    ['Practise on demo contracts', 'Try approving and sending back on made-up contracts first.', 'The ? on the approval screen.', [
-      ['Click **To approve** and open a demo contract.', 'A clear page: the key details, Legal\'s outcome and the signed copy.'],
-      ['Open the signed copy.', 'It opens. You\'d check it matches the details.'],
-      ['Click **Send back** without a reason.', 'It asks you to say what needs fixing.'],
-      ['Add a reason and send it back.', 'It goes back to the owner, in Signing, with your reason.'],
-      ['Open another demo contract to approve and click **Approve and register**.', 'It becomes **Effective** and locked.'],
-      ['If you have a phone that can reach QA, open the approval email or JBS Contracts on it and open one to approve.', 'The approval page fits the phone and is easy to use with a thumb.'],
-      ['Open **Variations to approve** and open one.', 'Each change is shown as old and new. **Approve** applies them all at once.'],
+    ['Approve contracts', 'Check the signed copy matches, then approve.', 'Help › "Approve a contract".', [
+      ['Open a demo contract and open its signed copy.', 'The details and the file.'],
+      ['Click **Send back** with a reason.', 'It goes back to the owner.'],
+      ['Open another › **Approve and register**.', 'It becomes Effective and locked.'],
+      ['Optional: try it on your phone.', 'Easy to use on a small screen.'],
     ]],
-    ['The shared journey: approve the contract', 'Your Contract owner partner sends you their signed contract.', 'Help centre › "Approve a contract".', [
-      { wait: 'until your Contract owner partner tells you their contract is waiting for approval. Write its reference on page 1.' },
-      ['Open it from **To approve**.', 'The details, Legal\'s outcome and the signed copy are shown.'],
-      ['Click **Send back**, with a reason (for example "Please add the schedule of rates").', 'It goes back to the owner.'],
-      { handover: 'Tell your **Contract owner partner** you\'ve sent it back.' },
-      { wait: 'until they tell you it\'s ready again.' },
-      ['Open it again and click **Approve and register**.', 'It\'s **Effective** and locked. It now appears on the register.'],
-      { handover: 'Tell your **Contract owner partner** it\'s approved.' },
+    ['Approve a Variation', 'Changes to live contracts need approval too.', 'The ? on the Variation page.', [
+      ['Open one from **Variations to approve**.', 'Old and new values side by side.'],
+      ['Click **Approve**.', 'The contract shows the new values.'],
     ]],
-    ['The shared journey: approve the Variation', 'Later, the owner changes the contract with a Variation.', 'The ? on the Variation page.', [
-      { wait: 'until the owner tells you the Variation is waiting.' },
-      ['Open **Variations to approve** and open it.', 'The change (for example a later end date) is shown old and new, with Legal\'s outcome.'],
-      ['Click **Approve**.', 'It says the changes now apply. The contract shows the new end date.'],
-      { handover: 'Tell your **Contract owner partner** the Variation is approved.' },
-    ]],
-    ['Group Head: see the team (Group Head only)', 'See who has what overdue and coming up, so you can help them focus.', 'Help centre › "See what your team has coming up".', [
-      ['Go to **Team**.', 'Each person with what\'s overdue, coming up, on their turn and waiting on others.'],
-      ['Change how far ahead to look: 30, 60, 90 and 180 days.', 'The numbers change.'],
-      ['Click a person.', 'Their contracts, how long each has waited, the supplier and value.'],
-      ['Click a contract.', 'It opens.'],
+    ['Team (Group Head only)', 'See who has what coming up.', 'Help › "See what your team has coming up".', [
+      ['Open **Team** and try 30, 90 and 180 days.', 'Each person\'s overdue and upcoming work.'],
+      ['Click a person, then a contract.', 'Their contracts, then the contract itself.'],
     ]],
   ],
 }
 
-// ---------------------------------------------------------------- Admin
-
 const admin = {
   title: 'Admin',
-  who: 'For admins: people and roles, lists, contract fields, emails and reminders, reports, importing old contracts and fixing mistakes.',
-  time: '90 minutes',
-  fillIn: ['Your name', 'Date', 'Testers you set up'],
-  tips: ['**Do section 1 first**, before the other testers start: it gives them access and fills QA with practice contracts for everyone.', 'Admin changes affect everyone on QA. That\'s fine for testing, but tell the other testers before you change something big (like switching a reminder off).'],
+  who: 'People, lists, fields, emails and reminders, reports and importing old contracts.',
+  time: '45 minutes',
   sections: [
-    ['Set up the testers', 'Give each tester access and the right roles, and fill QA with practice contracts for everyone.', 'Help centre › "Give someone access", and the ? on People.', [
-      ['Go to **People**.', 'Everyone with access, their roles, and whether they\'re active.'],
-      ['Click **Add person** for a tester who isn\'t there yet. Type their Windows logon (the domain is added for you), name and work email. Tick their roles. Contract owner and Procurement testers get both ticks.', 'They\'re listed and get a welcome email.'],
-      ['Open an existing tester and change their roles if needed.', 'The change is saved and recorded.'],
-      ['Click your name at the bottom of the menu and choose **Refresh demo data (QA)**. Read the dialog, then confirm.', 'A message says how many demo contracts were loaded and for how many people. Old demo contracts are archived, not deleted.'],
-      ['Click your name › **Try as someone else (QA)** and choose a Legal tester.', 'A banner shows you\'re trying the app as them. Their Home has Legal work on it.'],
-      ['On the banner, click **Stop and go back to** your name.', 'You\'re back as yourself.'],
-      ['On **People**, click **Export to Excel**.', 'A workbook of everyone and their roles downloads.'],
+    ['Set up the testers (do this first)', 'Give testers access and practice data.', 'Help › "Give someone access".', [
+      ['**People** › **Add person** (or open one). Tick their roles.', 'Saved. New people get a welcome email.'],
+      ['Click your name › **Refresh demo data (QA)**.', 'Everyone now has practice contracts.'],
+      ['Your name › **Try as someone else (QA)** › pick a tester. Then stop from the banner.', 'You see their Home, then yours again.'],
     ]],
-    ['Lists', 'The choices people pick from, changed without any code.', 'The ? on Lists.', [
-      ['Go to **Lists**. Look at the list menu.', 'Lists grouped under Contracts and Suppliers.'],
-      ['Open **Contract document kinds** and click **Add document kind**. Add "Test certificate".', 'It\'s added. The note explains the built-in kinds are always there.'],
-      ['Try adding "Signed copy".', 'It\'s refused: that one is built in.'],
-      ['Open a contract and add a document: check the Kind list.', '"Test certificate" is offered.'],
-      ['Back on Lists, **Rename** it to "Test certificate (renamed)", then **Hide** it.', 'Renamed everywhere. Hidden: no longer offered, but documents that use it keep the name.'],
-      ['Open **Supplier risk levels** and add "Critical". Then hide it again.', 'Added, then hidden.'],
-      ['Open **Categories** and add a subcategory under one of them.', 'It\'s shown under its category.'],
+    ['Lists', 'The choices in drop-downs.', 'The ? on Lists.', [
+      ['**Lists** › **Contract document kinds** › add "Test kind".', 'Added.'],
+      ['Open a contract and add a document.', '"Test kind" is in the Kind list.'],
+      ['Rename it, then **Hide** it.', 'Renamed, then gone from the list.'],
     ]],
-    ['Contract fields', 'Ask for something new on every contract, without code.', 'Help centre › "Add a contract field".', [
-      ['Go to **Contract fields**.', 'The fields in their sections, with a live preview of the Add contract form.'],
-      ['Click **Add field** in a section. Label "Test field", Kind Text, some help text. Click **Add field**.', 'The preview shows the new field. Nothing changes for anyone until you save.'],
-      ['Click **Save changes**. Open **Add contract**.', 'The new field is on the form.'],
-      ['Back on Contract fields, hide "Test field" and save. Use **History** to see the versions.', 'It\'s gone from the form. History lists each saved version, which you can put back.'],
+    ['Contract fields', 'Ask for something new on every contract.', 'Help › "Add a contract field".', [
+      ['**Contract fields** › **Add field** › "Test field" › **Save changes**.', 'It appears on Add contract.'],
+      ['Hide it and save.', 'It\'s gone again.'],
     ]],
-    ['Emails and reminders', 'When reminders go out, how they come, and what every email says.', 'Help centre › "Change a reminder or email", and the ? on the page.', [
-      ['Go to **Emails and reminders**. Read **How reminder emails come**.', 'As they happen, one email a day or one a week. This is the default for anyone who hasn\'t chosen their own.'],
-      ['Open **End date reminder**. Untick **Send this reminder**.', 'It shows **Off**. Nobody gets it until it\'s switched back on.'],
-      ['Tick it again.', 'It\'s back on.'],
-      ['Open **Notice deadline reminder**. Change **Days before** to 60, 30, 14 and click **Save days**.', 'Saved. (Put it back to 90, 60, 30, 14, 7 afterwards.)'],
-      ['Change a word in its wording. Click a placeholder button such as **{Reference}** to add it.', 'The preview updates with a sample contract.'],
-      ['Click **Save wording**, then look at **History**.', 'Each change is listed with who and when. Put the wording back the same way.'],
+    ['Emails and reminders', 'When reminders go and how they come.', 'Help › "Change a reminder or email".', [
+      ['Read **How reminder emails come** and try the three options.', 'Each one saves.'],
+      ['Open a reminder, untick **Send this reminder**, then tick it again.', 'Shows Off, then on again.'],
+      ['Change a word in an email and check the preview.', 'The preview updates. (Put it back.)'],
     ]],
-    ['Fix a mistake on a locked contract', 'An emergency unlock for mistakes a Variation can\'t fix, like a typo in an approved contract.', 'Help centre › "Fix a mistake on a locked contract (admins)".', [
-      ['Open an Effective demo contract. Click **Emergency unlock**. Give a reason and choose 1 hour.', 'A banner shows it\'s unlocked, until when, and why.'],
-      ['Click **Edit details**, change the title slightly and save.', 'Saved. Activity records the change with the unlock and its reason.'],
-      ['Click **Lock it again now**.', 'It\'s locked again.'],
-      ['On a locked contract, change **Confidential** (with a reason).', 'It changes, and it\'s recorded.'],
+    ['Fix a mistake on a locked contract', 'For typos a Variation can\'t fix.', 'Help › "Fix a mistake on a locked contract".', [
+      ['Open an Effective demo contract › **Emergency unlock** for 1 hour, with a reason.', 'A banner shows it\'s unlocked.'],
+      ['**Edit details**, change something, save. Then **Lock it again now**.', 'Saved, then locked again.'],
     ]],
-    ['Reports and downloads', 'The register, the pipeline, approvals, the audit trail, and a full copy of everything.', 'Help centre › "Print or download the register" and "Download everything".', [
-      ['Go to **Reports**. On **Register**, click **Columns** and add the supplier\'s SAP vendor number.', 'The column appears, and your choice is kept for next time.'],
-      ['Click **Filters** and narrow to one business unit. Click **Print or save as PDF**.', 'A clean printout of just those contracts.'],
-      ['Click **Download Excel**.', 'Every column, in Excel.'],
-      ['Look at **Pipeline** and **Approvals**.', 'What\'s on the way, and how long approvals took.'],
-      ['Open **Audit trail**.', 'Every change, newest first, and a message that the audit trail is intact.'],
-      ['Open **Download everything** and download the workbook.', 'One workbook with a sheet for each part of the system.'],
-      ['Go to **Team**.', 'Who has what overdue and coming up.'],
+    ['Reports', 'The register and downloads.', 'Help › "Print or download the register".', [
+      ['**Reports** › **Register** › **Columns**: add a column.', 'The column appears.'],
+      ['**Download Excel** and **Print or save as PDF**.', 'Both work.'],
+      ['Open **Audit trail**.', 'It says the trail is intact.'],
     ]],
-    ['Import old contracts', 'Bring in contracts from the old system (for example a Medius export) and their files.', 'Help centre › "Import old contracts and their files".', [
-      ['In Excel, make a small sheet with headings: Agreement No, Agreement Name, Vendor, Category, Contract Owner, Start Date, Expiry Date, Notice Period, Status. Add three made-up rows (for example TEST-001 to TEST-003). Give one an expiry date last year and one a category that doesn\'t exist. Use your own name as owner.', 'A small test spreadsheet.'],
-      ['Go to **Import old contracts**. Drag the spreadsheet onto the box (or click **Choose the spreadsheet**).', 'Each column is matched to a field, with examples.'],
-      ['Click **Check (nothing changes yet)**.', 'Each row shows Effective, Ended, or can\'t be imported and why (the unknown category).'],
-      ['Click **Import** and confirm.', 'The good rows are imported. Open one: it\'s Effective and locked, and says where it came from with its old reference.'],
-      ['Make a ZIP with three small files: "TEST-001 signed.pdf", "TEST-001 draft.docx" and "TEST-001 cover page sign off.pdf". Drag it onto the files box.', 'Each file matched to TEST-001, with its kind worked out: Signed copy, Draft, Internal sign-off.'],
-      ['Change one file\'s kind using its drop-down, then click **Add files**.', 'The files are on the contract with the kinds shown.'],
-      ['Import the same spreadsheet again and check.', 'Everything shows as already imported. Nothing is doubled.'],
+    ['Import old contracts', 'Bring in contracts from the old system.', 'Help › "Import old contracts and their files".', [
+      ['Make a small Excel sheet: Agreement No, Agreement Name, Vendor, Category, Contract Owner, Start Date, Expiry Date, Status, with 3 made-up rows.', 'Ready to import.'],
+      ['**Import old contracts**: drag it in › **Check** › **Import**.', 'Rows go in, or say why they can\'t.'],
+      ['Zip a couple of files named like "TEST-001 signed.pdf" and drag the ZIP in › **Add files**.', 'Files land on the right contract.'],
     ]],
   ],
 }
 
 Promise.all([
-  build(owner, 'JBS Contracts test script - Contract owner and Procurement.docx'),
-  build(legal, 'JBS Contracts test script - Legal.docx'),
-  build(approver, 'JBS Contracts test script - Approver and Group Head.docx'),
-  build(admin, 'JBS Contracts test script - Admin.docx'),
-]).then(() => console.log('Built 4 test scripts.'))
+  build(owner, 'JBS Contracts testing - Contract owner and Procurement.docx'),
+  build(legal, 'JBS Contracts testing - Legal.docx'),
+  build(approver, 'JBS Contracts testing - Approver and Group Head.docx'),
+  build(admin, 'JBS Contracts testing - Admin.docx'),
+]).then(() => console.log('Built 4 testing documents.'))

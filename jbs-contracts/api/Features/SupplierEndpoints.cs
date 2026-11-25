@@ -43,8 +43,8 @@ public static class SupplierEndpoints
             var (input, invalid) = Validate(body);
             if (invalid is not null) return invalid;
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction(System.Data.IsolationLevel.Serializable);
-            var clash = await c.QuerySingleOrDefaultAsync<SupplierRow>("SELECT Id, Name, IsActive FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@Name)))", new { input.Name }, tx);
+            await using var tx = c.BeginTransaction();
+            var clash = await c.QuerySingleOrDefaultAsync<SupplierRow>("SELECT Id, Name, IsActive FROM contracts.Supplier WITH (UPDLOCK, HOLDLOCK) WHERE NameKey = UPPER(LTRIM(RTRIM(@Name)))", new { input.Name }, tx);
             if (clash is not null) return ApiResults.Invalid("That supplier is already here.", new() { ["name"] = clash.IsActive ? $"{clash.Name} is already a supplier. Choose it from the list." : $"{clash.Name} is already here but hidden. An admin can show it again." });
             var id = await c.ExecuteScalarAsync<int>("""
                 INSERT INTO contracts.Supplier (Name, Abn, VendorNumber, Notes, CreatedById, UpdatedById) OUTPUT INSERTED.Id
@@ -64,14 +64,14 @@ public static class SupplierEndpoints
             var (input, invalid) = Validate(body);
             if (invalid is not null) return invalid;
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction(System.Data.IsolationLevel.Serializable);
+            await using var tx = c.BeginTransaction();
             var before = await c.QuerySingleOrDefaultAsync<SupplierRow>("SELECT *, 0 AS ContractCount FROM contracts.Supplier WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that supplier.");
             if (Convert.ToBase64String(before.RowVersion) != body.RowVersion)
                 return ApiResults.Changed($"Someone else changed {before.Name} while you were editing. Your changes weren't saved. Close this and open it again to see the latest.");
             var active = body.IsActive ?? before.IsActive;
             if (active != before.IsActive && !me.IsAdmin) return ApiResults.NotAllowed("Only admins can hide or show suppliers.");
-            var clash = await c.QuerySingleOrDefaultAsync<string>("SELECT Name FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@Name))) AND Id <> @id", new { input.Name, id }, tx);
+            var clash = await c.QuerySingleOrDefaultAsync<string>("SELECT Name FROM contracts.Supplier WITH (UPDLOCK, HOLDLOCK) WHERE NameKey = UPPER(LTRIM(RTRIM(@Name))) AND Id <> @id", new { input.Name, id }, tx);
             if (clash is not null) return ApiResults.Invalid("Another supplier has that name.", new() { ["name"] = $"{clash} is already a supplier." });
             await c.ExecuteAsync("""
                 UPDATE contracts.Supplier SET Name = @Name, Abn = @Abn, VendorNumber = @VendorNumber, Notes = @Notes, IsActive = @active,

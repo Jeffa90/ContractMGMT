@@ -169,6 +169,17 @@ public sealed class PeopleTests(AppFixture app)
     }
 
     [Fact]
+    public async Task Ten_people_added_at_the_same_moment_all_succeed()
+    {
+        // Two admins adding people at once must queue, never deadlock (found by CI on 25 Nov 2026).
+        var adds = Enumerable.Range(0, 10).Select(i => app.AddPersonAsync(Unique($"burst{i}"), $"Burst Person {i}", AppFixture.NoRoles));
+        var people = await Task.WhenAll(adds);
+        Assert.Equal(10, people.Select(p => p.GetProperty("id").GetInt32()).Distinct().Count());
+        await using var db = await app.OpenAsync();
+        Assert.Null(await AuditLog.VerifyAsync(db));
+    }
+
+    [Fact]
     public async Task Audit_events_cannot_be_changed_or_deleted()
     {
         await app.AddPersonAsync(Unique("aud"), "Audrey Audit", AppFixture.NoRoles);

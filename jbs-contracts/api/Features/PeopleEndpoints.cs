@@ -54,8 +54,8 @@ public static class PeopleEndpoints
             if (invalid is not null) return invalid;
 
             await using var connection = await db.OpenAsync();
-            await using var tx = connection.BeginTransaction(System.Data.IsolationLevel.Serializable);
-            var clash = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WHERE AccountKey = @key",
+            await using var tx = connection.BeginTransaction();
+            var clash = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WITH (UPDLOCK, HOLDLOCK) WHERE AccountKey = @key",
                 new { key = WindowsAccount.Key(input.Account) }, tx);
             if (clash is not null)
                 return ApiResults.Invalid("This person is already added.", new()
@@ -89,7 +89,7 @@ public static class PeopleEndpoints
             if (invalid is not null) return invalid;
 
             await using var connection = await db.OpenAsync();
-            await using var tx = connection.BeginTransaction(System.Data.IsolationLevel.Serializable);
+            await using var tx = connection.BeginTransaction();
             var before = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that person.");
             if (Convert.ToBase64String(before.RowVersion) != input.RowVersion)
@@ -98,13 +98,13 @@ public static class PeopleEndpoints
             var active = input.IsActive ?? before.IsActive;
             if (id == me.Id && (!input.Roles.Admin || !active))
                 return ApiResults.NotAllowed("You can't remove your own admin access or switch yourself off. Ask another admin to do it.");
-            var clash = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WHERE AccountKey = @key AND Id <> @id",
+            var clash = await connection.QuerySingleOrDefaultAsync<Person>("SELECT * FROM contracts.Person WITH (UPDLOCK, HOLDLOCK) WHERE AccountKey = @key AND Id <> @id",
                 new { key = WindowsAccount.Key(input.Account), id }, tx);
             if (clash is not null)
                 return ApiResults.Invalid("That Windows logon belongs to someone else.", new() { ["account"] = $"{clash.Name} already uses {clash.WindowsAccount}." });
             if (before.IsAdmin && before.IsActive && (!input.Roles.Admin || !active))
             {
-                var otherAdmins = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Person WHERE IsAdmin = 1 AND IsActive = 1 AND Id <> @id", new { id }, tx);
+                var otherAdmins = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Person WITH (UPDLOCK, HOLDLOCK) WHERE IsAdmin = 1 AND IsActive = 1 AND Id <> @id", new { id }, tx);
                 if (otherAdmins == 0) return ApiResults.NotAllowed("JBS Contracts needs at least one admin. Make someone else an admin first.");
             }
 
@@ -169,7 +169,7 @@ public static class PeopleEndpoints
     private static async Task<Person?> ClearGroupHeadAsync(SqlConnection connection, SqlTransaction tx, int? exceptId)
     {
         var previous = await connection.QuerySingleOrDefaultAsync<Person>(
-            "SELECT * FROM contracts.Person WITH (UPDLOCK) WHERE IsGroupHead = 1 AND (@exceptId IS NULL OR Id <> @exceptId)", new { exceptId }, tx);
+            "SELECT * FROM contracts.Person WITH (UPDLOCK, HOLDLOCK) WHERE IsGroupHead = 1 AND (@exceptId IS NULL OR Id <> @exceptId)", new { exceptId }, tx);
         if (previous is not null)
             await connection.ExecuteAsync("UPDATE contracts.Person SET IsGroupHead = 0, UpdatedUtc = SYSUTCDATETIME() WHERE Id = @id", new { id = previous.Id }, tx);
         return previous;

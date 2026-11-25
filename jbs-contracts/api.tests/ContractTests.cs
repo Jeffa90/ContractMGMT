@@ -244,6 +244,17 @@ public sealed class ContractTests(AppFixture app)
         Assert.Null(await AuditLog.VerifyAsync(db));
     }
 
+    [Fact]
+    public async Task Suppliers_and_list_items_added_at_the_same_moment_all_succeed()
+    {
+        var (owner, _) = await NewOwnerAsync("Paula Parallel");
+        var suppliers = await Task.WhenAll(Enumerable.Range(0, 8).Select(i => owner.PostAsJsonAsync("/api/suppliers", new { name = Unique($"Parallel {i} ") }, Ct)));
+        Assert.All(suppliers, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var items = await Task.WhenAll(Enumerable.Range(0, 8).Select(i => admin.PostAsJsonAsync("/api/lists/items", new { listName = "Site", value = Unique($"Site {i} ") }, Ct)));
+        Assert.All(items, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
+    }
+
     [Theory]
     [InlineData("51824753556", true)]
     [InlineData("53004085616", true)]

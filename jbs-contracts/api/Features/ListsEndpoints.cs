@@ -57,8 +57,8 @@ public static class ListsEndpoints
                 return ApiResults.Invalid("Check the currency.", new() { ["value"] = "Use the three-letter code, for example AUD." });
             if (body.ListName == "Currency") value = value.ToUpperInvariant();
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction(System.Data.IsolationLevel.Serializable);
-            var clash = await c.QuerySingleOrDefaultAsync<ListItemRow>("SELECT * FROM contracts.ListItem WHERE ListName = @ListName AND ValueKey = UPPER(@value)", new { body.ListName, value }, tx);
+            await using var tx = c.BeginTransaction();
+            var clash = await c.QuerySingleOrDefaultAsync<ListItemRow>("SELECT * FROM contracts.ListItem WITH (UPDLOCK, HOLDLOCK) WHERE ListName = @ListName AND ValueKey = UPPER(@value)", new { body.ListName, value }, tx);
             if (clash is not null)
                 return ApiResults.Invalid("That's already in the list.", new() { ["value"] = clash.IsActive ? $"{clash.Value} is already in the list." : $"{clash.Value} is in the list but hidden. Show it again instead." });
             var order = await c.ExecuteScalarAsync<int>("SELECT ISNULL(MAX(SortOrder), -1) + 1 FROM contracts.ListItem WHERE ListName = @ListName", new { body.ListName }, tx);
@@ -74,13 +74,13 @@ public static class ListsEndpoints
             var (me, refusal) = await RequireAdminAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction(System.Data.IsolationLevel.Serializable);
+            await using var tx = c.BeginTransaction();
             var before = await c.QuerySingleOrDefaultAsync<ListItemRow>("SELECT * FROM contracts.ListItem WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that list item.");
             var value = (body.Value ?? before.Value).Trim();
             if (before.ListName == "Currency") value = value.ToUpperInvariant();
             if (value.Length == 0 || value.Length > 100) return ApiResults.Invalid("Check the name.", new() { ["value"] = "Type a name under 100 characters." });
-            var clash = await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.ListItem WHERE ListName = @ListName AND ValueKey = UPPER(@value) AND Id <> @id", new { before.ListName, value, id }, tx);
+            var clash = await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.ListItem WITH (UPDLOCK, HOLDLOCK) WHERE ListName = @ListName AND ValueKey = UPPER(@value) AND Id <> @id", new { before.ListName, value, id }, tx);
             if (clash > 0) return ApiResults.Invalid("That's already in the list.", new() { ["value"] = $"{value} is already in the list." });
             var active = body.IsActive ?? before.IsActive;
             await c.ExecuteAsync("UPDATE contracts.ListItem SET Value = @value, IsActive = @active WHERE Id = @id", new { value, active, id }, tx);
@@ -100,7 +100,7 @@ public static class ListsEndpoints
             var name = (body.Name ?? "").Trim();
             if (name.Length == 0 || name.Length > 100) return ApiResults.Invalid("Check the name.", new() { ["name"] = name.Length == 0 ? "Type a name." : "Keep it under 100 characters." });
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction(System.Data.IsolationLevel.Serializable);
+            await using var tx = c.BeginTransaction();
             string? parentName = null;
             if (body.ParentId is { } parentId)
             {
@@ -109,7 +109,7 @@ public static class ListsEndpoints
                 if (parent.ParentId is not null) return ApiResults.Invalid("Subcategories go one level deep.", new() { ["parentId"] = "Choose a top-level category." });
                 parentName = parent.Name;
             }
-            var clash = await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Category WHERE ParentKey = ISNULL(@ParentId, 0) AND NameKey = UPPER(@name)", new { body.ParentId, name }, tx);
+            var clash = await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Category WITH (UPDLOCK, HOLDLOCK) WHERE ParentKey = ISNULL(@ParentId, 0) AND NameKey = UPPER(@name)", new { body.ParentId, name }, tx);
             if (clash > 0) return ApiResults.Invalid("That's already there.", new() { ["name"] = $"{name} is already there." });
             var order = await c.ExecuteScalarAsync<int>("SELECT ISNULL(MAX(SortOrder), -1) + 1 FROM contracts.Category WHERE ParentKey = ISNULL(@ParentId, 0)", new { body.ParentId }, tx);
             var id = await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Category (ParentId, Name, SortOrder) OUTPUT INSERTED.Id VALUES (@ParentId, @name, @order)",
@@ -125,12 +125,12 @@ public static class ListsEndpoints
             var (me, refusal) = await RequireAdminAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            await using var tx = c.BeginTransaction(System.Data.IsolationLevel.Serializable);
+            await using var tx = c.BeginTransaction();
             var before = await c.QuerySingleOrDefaultAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category WITH (UPDLOCK) WHERE Id = @id", new { id }, tx);
             if (before is null) return ApiResults.NotFound("We couldn't find that category.");
             var name = (body.Name ?? before.Name).Trim();
             if (name.Length == 0 || name.Length > 100) return ApiResults.Invalid("Check the name.", new() { ["name"] = "Type a name under 100 characters." });
-            var clash = await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Category WHERE ParentKey = ISNULL(@ParentId, 0) AND NameKey = UPPER(@name) AND Id <> @id", new { before.ParentId, name, id }, tx);
+            var clash = await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Category WITH (UPDLOCK, HOLDLOCK) WHERE ParentKey = ISNULL(@ParentId, 0) AND NameKey = UPPER(@name) AND Id <> @id", new { before.ParentId, name, id }, tx);
             if (clash > 0) return ApiResults.Invalid("That's already there.", new() { ["name"] = $"{name} is already there." });
             var active = body.IsActive ?? before.IsActive;
             await c.ExecuteAsync("UPDATE contracts.Category SET Name = @name, IsActive = @active WHERE Id = @id", new { name, active, id }, tx);

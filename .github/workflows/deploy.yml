@@ -1,6 +1,7 @@
 # Enterprise Contract Platform: once CI is green on the commit, build and deploy it to QA on the
-# QA server's runner, then build the same commit and deploy it to Production on the Production
-# server's runner after approval (the Production environment's Required reviewers). Each deploy
+# QA server's runner. Production runs only when someone starts this workflow by hand with
+# promote-to-production ticked (owner decision 2026-11-25; a push never starts it), and then only
+# after approval (the Production environment's Required reviewers). Each deploy
 # job builds and deploys in one step (iis-deploy.yml); no workflow artifacts are stored.
 # Pull-request / branch checks stay in ci.yml. Setup: docs/DEPLOYMENT.md.
 #
@@ -22,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       promote-to-production:
-        description: Also promote to Production after QA succeeds (still needs the Production environment's required reviewer). Production is only ever deployed from main.
+        description: Also deploy to Production after QA succeeds (still needs the Production environment's required reviewer). Production is only deployed from main, and only from a manual run with this ticked.
         type: boolean
         default: false
 
@@ -64,10 +65,11 @@ jobs:
       preserve-folders: logs
     secrets: inherit
 
-  # The same commit, built again on the Production runner (lock files pin every package version). Production only from main, only when the push (or the manual run asked for it), and only after the Production environment's required reviewer approves.
+  # The same commit, built again on the Production runner (lock files pin every package version). Production only from main, only from a manual run that
+  # asked for it (a push to main deploys QA only), and only after the Production environment's required reviewer approves.
   deploy-prod:
     needs: deploy-qa
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.promote-to-production)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.promote-to-production
     uses: ./.github/workflows/iis-deploy.yml
     with:
       environment: Production

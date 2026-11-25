@@ -1,6 +1,7 @@
 {
-  "_about": "JBS QA answers for `dotnet Ecp.Host.dll setup-apply --answers <this file>` (ADR-0045). Run by the deploy pipeline after every QA deploy until setup is complete. Fields left out take the wizard's own defaults (pack defaults for locale, currency, branding, classification). The administrator comes from Ecp:Security:FailsafeAdmins on the GitHub environment, never from this file. No personal data and no secrets here: SMTP credentials are env:/file: references resolved on the server.",
-  "_toConfirm": "tenantName (assumed). SMTP from, port, TLS and the two credential references (docs/JBS_IIS_IMPLEMENTATION_STATUS.md: not confirmed). Readiness warnings that fire on QA need an acknowledgement here as \"ack.<check id>\": \"<reason>\".",
+  "_about": "JBS QA answers for `dotnet Ecp.Host.dll setup-apply --answers <this file>` (ADR-0045). Run by the deploy pipeline after every QA deploy until setup is complete. Fields left out take the wizard's own defaults (pack defaults for locale, currency, branding, classification). The administrator comes from Ecp:Security:FailsafeAdmins on the GitHub environment, never from this file. No personal data and no secrets here. SMTP is an anonymous relay (no credentials).",
+  "_confirmed": "SMTP (owner, 2026-11-25): email.jbssa.com.au port 25 with STARTTLS, anonymous relay from AUQLDDC01QA2WI tested, sender no-reply@jbssa.com.au. Port 25 offers no login, so there are no credential references.",
+  "_toConfirm": "Readiness warnings that fire on QA need an acknowledgement here as \"ack.<check id>\": \"<reason>\".",
   "stages": {
     "mode": { "deployment": "IIS", "tenancyMode": "SingleOrganisation" },
     "tenant": { "tenantName": "JBS Australia" },
@@ -13,9 +14,7 @@
       "host": "email.jbssa.com.au",
       "port": "25",
       "useTls": true,
-      "from": "",
-      "userRef": "env:ECP_SMTP_USER",
-      "passwordRef": "env:ECP_SMTP_PASSWORD"
+      "from": "no-reply@jbssa.com.au"
     },
     "access": { "confirm": true },
     "readiness": {

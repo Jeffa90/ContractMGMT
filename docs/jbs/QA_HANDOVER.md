@@ -36,10 +36,7 @@ Since ADR-0047 the shipped packs are trusted without a signature, so there is no
 ### 4. Confirm the values in `docs/jbs/setup-answers.qa.json`
 - **Tenant name:** currently "JBS Australia" (an assumption). Change it now if it's wrong. It's hard to change once setup has created the tenant.
 - **Organisation:** the name, time zone (Australia/Brisbane) and currency (`AUD`).
-- **Email (SMTP):** this is the main open item, because Production mode won't finish setup without a working, tested mail server. Get these from IT for `email.jbssa.com.au`:
-  - the sender address (fill in `from`),
-  - the port and whether TLS is used (`port`, `useTls`),
-  - the SMTP username and password. Ask IT to set them as **system environment variables on the web server**, named `ECP_SMTP_USER` and `ECP_SMTP_PASSWORD`. The answers file only refers to those names and never holds the values.
+- **Email (SMTP): confirmed 2026-11-25.** `email.jbssa.com.au`, port 25 with TLS (STARTTLS), anonymous relay from AUQLDDC01QA2WI (tested; port 25 offers no login), sender `no-reply@jbssa.com.au`. No SMTP username or password and no server environment variables.
 - The setup test email goes to the first failsafe admin's email address.
 
 ### 5. Ask IT to check the server

@@ -19,6 +19,7 @@
     "access": { "confirm": true },
     "readiness": {
       "ack.R-ADM-02": "Installation administrator named through Ecp:Security:FailsafeAdmins.",
+      "ack.R-OPS-01": "QA only, owner decision 2026-11-25: R-DOC-01: JBS scans files before upload (ADR-0049). R-DB-02: QA runtime and deploy share svc_jbsai_qa, so it can change the schema (separate runner account agreed for Prod); TrustServerCertificate=True is IT's QA setting until a trusted certificate is issued.",
       "ack.R-NOT-02": "Owner decision 2026-11-25 (ADR-0048): email.jbssa.com.au relays for AUQLDDC01QA2WI on port 25 with TLS and offers no login; relaying is restricted by the mail server."
     }
   }

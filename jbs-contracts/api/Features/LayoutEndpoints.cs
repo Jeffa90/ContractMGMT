@@ -44,7 +44,7 @@ public static partial class LayoutEndpoints
             fields = fields.Select(f => new
             {
                 f.Key, f.IsBuiltIn, f.IsRuleField, f.Kind, KindName = Fields.KindNames[f.Kind], f.Label, f.Help, f.SectionKey, f.IsRequired, f.IsHidden,
-                f.ShowInList, f.Filterable, f.InExport, f.AfterEffective, f.Choices, f.MaxLength, f.MinValue, f.MaxValue, f.HasValues,
+                f.ShowInList, f.Filterable, CanFilter = Fields.CanFilter(f), f.InExport, f.AfterEffective, f.Choices, f.MaxLength, f.MinValue, f.MaxValue, f.HasValues,
             }),
         };
     }

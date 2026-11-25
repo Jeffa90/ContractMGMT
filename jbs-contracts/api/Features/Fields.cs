@@ -407,4 +407,77 @@ public static partial class Fields
         string[] keys => JsonSerializer.Serialize(keys),
         _ => Convert.ToString(value, CultureInfo.InvariantCulture),
     };
+
+    // ---------------------------------------------------------------- Filters on the Contracts list
+
+    /// <summary>Built-in fields that can be picked from to filter the list. Text, numbers and dates are found with the search box instead.</summary>
+    private static readonly HashSet<string> FilterableBuiltIns = ["supplier", "category", "agreementType", "owner", "backupOwner", "businessUnit", "site", "confidential", "evergreen", "needsLegalReview"];
+
+    public static bool CanFilter(FieldRow f) => f.IsBuiltIn ? FilterableBuiltIns.Contains(f.Key) : f.Kind is "Choice" or "MultiChoice" or "YesNo" or "Person" or "Supplier";
+
+    /// <summary>
+    /// SQL conditions (for contract alias k) for the list's filters, given as field key to value ("f.site=12", "f.f-cover=public-liability", "f.confidential=yes").
+    /// Only fields the admin made filterable, and that are still shown, are honoured; anything else is ignored. Values are always parameters.
+    /// </summary>
+    public static List<string> FilterSql(List<FieldRow> fields, IEnumerable<KeyValuePair<string, string>> filters, DynamicParameters p)
+    {
+        var sql = new List<string>();
+        var byKey = fields.Where(f => f.Filterable && !f.IsHidden && CanFilter(f)).ToDictionary(f => f.Key);
+        var n = 0;
+        foreach (var (key, raw) in filters)
+        {
+            if (!byKey.TryGetValue(key, out var f) || string.IsNullOrWhiteSpace(raw)) continue;
+            var value = raw.Trim();
+            var name = $"filter{n++}";
+            bool? yes = value.ToLowerInvariant() switch { "yes" => true, "no" => false, _ => null };
+            int? id = int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var i) ? i : null;
+            if (f.IsBuiltIn)
+            {
+                string? column = f.Key switch
+                {
+                    "supplier" => "k.SupplierId", "agreementType" => "k.AgreementTypeId", "owner" => "k.OwnerId", "backupOwner" => "k.BackupOwnerId",
+                    "businessUnit" => "k.BusinessUnitId", "site" => "k.SiteId", _ => null,
+                };
+                if (column is not null && id is not null) { sql.Add($"{column} = @{name}"); p.Add(name, id); }
+                else if (f.Key == "category" && id is not null)
+                {
+                    // A category includes its subcategories.
+                    sql.Add($"(k.CategoryId = @{name} OR k.CategoryId IN (SELECT Id FROM contracts.Category WHERE ParentId = @{name}))");
+                    p.Add(name, id);
+                }
+                else if (yes is not null && f.Key is "confidential" or "evergreen" or "needsLegalReview")
+                {
+                    var bit = f.Key switch { "confidential" => "k.IsConfidential", "evergreen" => "k.IsEvergreen", _ => "k.NeedsLegalReview" };
+                    sql.Add($"{bit} = @{name}");
+                    p.Add(name, yes.Value);
+                }
+                continue;
+            }
+            var fieldId = $"{name}field";
+            p.Add(fieldId, f.Id);
+            const string Value = "contracts.ContractFieldValue v WHERE v.ContractId = k.Id AND v.FieldId = ";
+            switch (f.Kind)
+            {
+                case "Choice":
+                    sql.Add($"EXISTS (SELECT 1 FROM {Value}@{fieldId} AND v.TextValue = @{name})"); p.Add(name, value);
+                    break;
+                case "MultiChoice":
+                    sql.Add($"EXISTS (SELECT 1 FROM {Value}@{fieldId} AND ISJSON(v.TextValue) = 1 AND EXISTS (SELECT 1 FROM OPENJSON(v.TextValue) j WHERE j.value = @{name}))"); p.Add(name, value);
+                    break;
+                case "YesNo" when yes == true:
+                    sql.Add($"EXISTS (SELECT 1 FROM {Value}@{fieldId} AND v.BoolValue = 1)");
+                    break;
+                case "YesNo" when yes == false: // No includes contracts where it was never ticked
+                    sql.Add($"NOT EXISTS (SELECT 1 FROM {Value}@{fieldId} AND v.BoolValue = 1)");
+                    break;
+                case "Person" when id is not null:
+                    sql.Add($"EXISTS (SELECT 1 FROM {Value}@{fieldId} AND v.PersonId = @{name})"); p.Add(name, id);
+                    break;
+                case "Supplier" when id is not null:
+                    sql.Add($"EXISTS (SELECT 1 FROM {Value}@{fieldId} AND v.SupplierId = @{name})"); p.Add(name, id);
+                    break;
+            }
+        }
+        return sql;
+    }
 }

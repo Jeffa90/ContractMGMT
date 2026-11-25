@@ -11,7 +11,7 @@ import { Alert, Badge, Button, Card, Checkbox, Field, Segmented, Skeleton, TextI
 import { api, ApiError } from '@/lib/api'
 import type { Lists, Supplier } from '@/lib/contracts'
 import { formatDateTime } from '@/lib/format'
-import { addedKinds, type ChoiceOption, type FieldKind, type Layout, type LayoutField, type LayoutSection } from '@/lib/layout'
+import { addedKinds, canFilter, type ChoiceOption, type FieldKind, type Layout, type LayoutField, type LayoutSection } from '@/lib/layout'
 import { useMe } from '@/lib/me'
 import { help } from '@/help'
 import { ContractForm } from './ContractForm'
@@ -76,7 +76,7 @@ function Designer({ saved }: { saved: Layout }) {
           isRequired: f.isRequired,
           isHidden: f.isHidden,
           showInList: f.showInList,
-          filterable: f.filterable,
+          filterable: f.filterable && canFilter(f),
           inExport: f.inExport,
           afterEffective: f.afterEffective,
           choices: f.choices,
@@ -191,6 +191,7 @@ function Designer({ saved }: { saved: Layout }) {
                           {f.isRequired && <Badge tone="info">Required</Badge>}
                           {f.isRuleField && <Badge icon={<Lock aria-hidden className="size-3" />}>Needed by the rules</Badge>}
                           {f.showInList && <Badge>List column</Badge>}
+                          {f.filterable && canFilter(f) && <Badge>Filter</Badge>}
                           {f.isHidden && <Badge tone="warning">Removed</Badge>}
                         </span>
                       </span>
@@ -325,6 +326,7 @@ function FieldDialog({ draft, field, sectionKey, onClose, onSave }: { draft: Dra
         isHidden: false,
         showInList: false,
         filterable: false,
+        canFilter: false,
         inExport: true,
         afterEffective: 'Variation',
         choices: [],
@@ -443,7 +445,14 @@ function FieldDialog({ draft, field, sectionKey, onClose, onSave }: { draft: Dra
             onChange={(v) => set({ isRequired: v })}
           />
           <Checkbox label="Offer as a column in the Contracts list" checked={f.showInList} onChange={(v) => set({ showInList: v })} />
-          <Checkbox label="Can be used to filter contracts" checked={f.filterable} onChange={(v) => set({ filterable: v })} />
+          {canFilter(f) && (
+            <Checkbox
+              label="Can be used to filter contracts"
+              description="Adds it to Filters on the Contracts list."
+              checked={f.filterable}
+              onChange={(v) => set({ filterable: v })}
+            />
+          )}
           <Checkbox label="Include in Excel exports and imports" checked={f.inExport} onChange={(v) => set({ inExport: v })} />
         </fieldset>
         {!f.isBuiltIn && (

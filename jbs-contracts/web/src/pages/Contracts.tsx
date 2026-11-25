@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import { FilePlus2, FileText, Lock, Search } from 'lucide-react'
+import { FilePlus2, FileText, ListFilter, Lock, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
+import { ContractFilters } from '@/components/ContractFilters'
 import { ExcelButtons } from '@/components/ExcelImport'
 import { StageBadge } from '@/components/form'
 import { PageHeader } from '@/components/Help'
-import { Alert, Card, EmptyState, Segmented, Skeleton, TextInput } from '@/components/ui'
+import { Alert, Button, Card, EmptyState, Segmented, Skeleton, TextInput } from '@/components/ui'
 import { api } from '@/lib/api'
+import { chosenFilters, filterFields, filterPrefix } from '@/lib/filters'
 import type { Layout } from '@/lib/layout'
 import type { ContractListItem } from '@/lib/contracts'
 import { daysUntil, formatDate } from '@/lib/format'
@@ -45,14 +47,37 @@ export function ContractsPage() {
     return () => clearTimeout(t)
   }, [search, q, setParams])
 
+  // Filters: fields an admin made filterable (Admin, Contract fields), chosen values kept in the address.
+  const layout = useQuery({ queryKey: ['layout'], queryFn: () => api.get<Layout>('/api/layout') })
+  const filters = filterFields(layout.data?.fields)
+  const chosen = Object.fromEntries(Object.entries(chosenFilters(params)).filter(([k]) => filters.some((f) => f.key === k)))
+  const filterCount = Object.keys(chosen).length
+  const filterQuery = Object.entries(chosen)
+    .map(([k, v]) => `&${encodeURIComponent(filterPrefix + k)}=${encodeURIComponent(v)}`)
+    .join('')
+  // Open when the address already has filters (before the layout has loaded, so after a reload too).
+  const [showFilters, setShowFilters] = useState(() => Object.keys(chosenFilters(params)).length > 0)
+  const setFilter = (key: string, value: string) =>
+    setParams((p) => {
+      const n = new URLSearchParams(p)
+      if (value) n.set(filterPrefix + key, value)
+      else n.delete(filterPrefix + key)
+      return n
+    }, { replace: true })
+  const clearFilters = () =>
+    setParams((p) => {
+      const n = new URLSearchParams(p)
+      for (const key of [...n.keys()]) if (key.startsWith(filterPrefix)) n.delete(key)
+      return n
+    }, { replace: true })
+
   const contracts = useQuery({
-    queryKey: ['contracts', view, q],
-    queryFn: () => api.get<ContractListItem[]>(`/api/contracts?view=${view}&q=${encodeURIComponent(q)}`),
+    queryKey: ['contracts', view, q, filterQuery],
+    queryFn: () => api.get<ContractListItem[]>(`/api/contracts?view=${view}&q=${encodeURIComponent(q)}${filterQuery}`),
     placeholderData: (previous) => previous,
   })
   const rows = contracts.data ?? []
   // Added fields an admin offered as list columns (Admin, Contract fields).
-  const layout = useQuery({ queryKey: ['layout'], queryFn: () => api.get<Layout>('/api/layout') })
   const extraColumns = (layout.data?.fields ?? []).filter((f) => !f.isBuiltIn && f.showInList && !f.isHidden)
 
   return (
@@ -74,9 +99,10 @@ export function ContractsPage() {
         }
       />
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative md:w-80">
+      {/* Wraps onto a second line when there isn't room, so nothing overlaps at any width. */}
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+          <div className="relative md:w-64">
             <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted-foreground" />
             <TextInput type="search" aria-label="Find a contract" placeholder="Title, reference, supplier or SAP number" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
           </div>
@@ -91,9 +117,25 @@ export function ContractsPage() {
               { value: 'closed', label: 'Closed' },
             ]}
           />
+          {filters.length > 0 && (
+            <Button
+              aria-expanded={showFilters}
+              aria-controls="contract-filters"
+              icon={<ListFilter aria-hidden className="size-5" />}
+              onClick={() => setShowFilters((v) => !v)}
+            >
+              Filters{filterCount > 0 && <span className="tabular rounded-full bg-primary px-2 text-xs text-primary-foreground">{filterCount}</span>}
+            </Button>
+          )}
         </div>
         <ExcelButtons kind="contracts" canImport={person.roles.contractOwner} invalidate={[['contracts'], ['suppliers'], ['contract']]} />
       </div>
+
+      {showFilters && filters.length > 0 && (
+        <div id="contract-filters">
+          <ContractFilters fields={filters} chosen={chosen} onChange={setFilter} onClear={clearFilters} />
+        </div>
+      )}
 
       {contracts.isPending ? (
         <Card className="flex flex-col gap-4 p-4">
@@ -112,7 +154,11 @@ export function ContractsPage() {
           <EmptyState
             icon={<FileText />}
             title={
-              q
+              filterCount > 0
+                ? q
+                  ? `No contracts match "${q}" with these filters.`
+                  : 'No contracts match these filters.'
+                : q
                 ? `No contracts match "${q}".`
                 : view === 'mine'
                   ? "You don't own any contracts yet. Contracts you add, or are made owner or backup of, appear here."
@@ -123,7 +169,9 @@ export function ContractsPage() {
                       : 'No contracts yet. Contracts you add will appear here.'
             }
             action={
-              person.roles.contractOwner && !q && view !== 'closed' ? (
+              filterCount > 0 ? (
+                <Button onClick={clearFilters}>Clear filters</Button>
+              ) : person.roles.contractOwner && !q && view !== 'closed' ? (
                 <Link to="/contracts/new" className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-primary px-4 font-medium text-primary-foreground hover:bg-primary-hover">
                   Add contract
                 </Link>

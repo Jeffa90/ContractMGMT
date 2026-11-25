@@ -32,6 +32,8 @@ export type LayoutField = {
   isHidden: boolean
   showInList: boolean
   filterable: boolean
+  /** Whether this field can be picked from to filter the Contracts list (built-in pick fields and added Choice, Yes/No, Person, Supplier fields). */
+  canFilter: boolean
   inExport: boolean
   afterEffective: 'Variation' | 'AnyTime'
   choices: ChoiceOption[]
@@ -68,3 +70,8 @@ export function arrange(layout: Layout, includeHidden = false) {
 }
 
 export type FieldValue = string | number | boolean | string[] | null
+
+/** Added kinds that can filter the Contracts list (text, numbers and dates are found with the search box). */
+export const filterKinds: FieldKind[] = ['Choice', 'MultiChoice', 'YesNo', 'Person', 'Supplier']
+
+export const canFilter = (f: Pick<LayoutField, 'isBuiltIn' | 'canFilter' | 'kind'>) => (f.isBuiltIn ? f.canFilter : filterKinds.includes(f.kind))

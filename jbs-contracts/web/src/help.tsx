@@ -57,6 +57,10 @@ export const help = {
           <strong>My contracts</strong> shows the contracts you own or are the backup for. <strong>All</strong> shows every contract you can see.
         </p>
         <p>Type in the search box to find a contract by its title, reference (for example JBSAUS-0012), supplier or SAP number.</p>
+        <p>
+          <strong>Filters</strong> narrow the list, for example to one site or supplier. Choosing a category includes its subcategories. Your admin chooses which fields can
+          be used, under Admin, Contract fields.
+        </p>
         <p>The <strong>Key date</strong> is the notice deadline if there is one, otherwise the end date. It turns amber within 30 days and red once it has passed.</p>
         <p>Contracts marked Confidential only show for their owner and backup, Legal, approvers, admins and auditors.</p>
         <p>

@@ -68,7 +68,7 @@ public sealed class LayoutTests(AppFixture app)
         var choice = fields.First(f => f!["key"]!.GetValue<string>() == keyA)!["choices"]![1]!["key"]!.GetValue<string>();
 
         var user = Unique("fo");
-        await app.AddPersonAsync(user, "Fiona Fields", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        var fiona = await app.AddPersonAsync(user, "Fiona Fields", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
         using var owner = app.ClientFor($@"TEST\{user}");
         // Bad values get plain messages, by field.
         var bad = await owner.PostAsJsonAsync("/api/contracts", new { title = "Fielded", fields = new Dictionary<string, object> { [keyA] = "nope", [keyC] = "not a link" } }, Ct);
@@ -96,6 +96,17 @@ public sealed class LayoutTests(AppFixture app)
         var list = await owner.GetFromJsonAsync<JsonElement>("/api/contracts?view=mine", Ct);
         var row = list.EnumerateArray().Single(c => c.GetProperty("id").GetInt32() == id);
         Assert.Equal("Product liability", row.GetProperty("fields").GetProperty(keyA).GetString());
+
+        // Filters: by an added field the admin made filterable, and by built-in fields; values that don't match leave it out.
+        async Task<bool> Listed(string filters) =>
+            (await owner.GetFromJsonAsync<JsonElement>($"/api/contracts?view=all&{filters}", Ct)).EnumerateArray().Any(c => c.GetProperty("id").GetInt32() == id);
+        var ownerId = fiona.GetProperty("id").GetInt32();
+        var otherChoice = fields.First(f => f!["key"]!.GetValue<string>() == keyA)!["choices"]![0]!["key"]!.GetValue<string>();
+        Assert.True(await Listed($"f.{keyA}={choice}&f.owner={ownerId}&f.confidential=no"));
+        Assert.False(await Listed($"f.{keyA}={otherChoice}"));
+        Assert.False(await Listed($"f.owner={ownerId + 100000}"));
+        Assert.False(await Listed("f.confidential=yes"));
+        Assert.True(await Listed($"f.{keyC}=nonsense&f.title=nothing")); // not filterable: ignored
 
         // ---- Rules
         // Rule fields can't be hidden.

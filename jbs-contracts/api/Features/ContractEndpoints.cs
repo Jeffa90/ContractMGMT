@@ -91,7 +91,7 @@ public static class ContractEndpoints
     {
         var contracts = app.MapGroup("/api/contracts");
 
-        contracts.MapGet("/", async (string? view, string? q, CurrentUser current, Db db) =>
+        contracts.MapGet("/", async (string? view, string? q, HttpRequest request, CurrentUser current, Db db) =>
         {
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
@@ -107,10 +107,13 @@ public static class ContractEndpoints
             if (search.Length > 0)
                 where.Add("(k.Reference LIKE @like OR k.Title LIKE @like OR s.Name LIKE @like OR k.SapOutlineAgreement LIKE @like OR s.VendorNumber LIKE @like)");
             await using var c = await db.OpenAsync();
-            var rows = await c.QueryAsync<ContractRow>($"{SelectContract} WHERE {string.Join(" AND ", where)} ORDER BY k.UpdatedUtc DESC",
-                ContractAccess.Params(me!, new { like = $"%{EscapeLike(search)}%" }));
-            var list = rows.ToList();
             var definitions = await Fields.LoadAsync(c);
+            var parameters = ContractAccess.Params(me!, new { like = $"%{EscapeLike(search)}%" });
+            // Filters: f.{field key}={value}, for the fields an admin made filterable.
+            where.AddRange(Fields.FilterSql(definitions,
+                request.Query.Where(x => x.Key.StartsWith("f.", StringComparison.Ordinal)).Select(x => KeyValuePair.Create(x.Key[2..], x.Value.ToString())), parameters));
+            var rows = await c.QueryAsync<ContractRow>($"{SelectContract} WHERE {string.Join(" AND ", where)} ORDER BY k.UpdatedUtc DESC", parameters);
+            var list = rows.ToList();
             var values = await Fields.ReadAsync(c, null, list.Select(r => r.Id), definitions, f => f.ShowInList && !f.IsHidden);
             return Results.Ok(list.Select(r => ListView(r, values[r.Id].ToDictionary(v => v.Key, v => v.Value.Display))));
         });

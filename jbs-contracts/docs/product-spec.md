@@ -127,8 +127,9 @@ A daily job at 7:00am Brisbane time sends reminder emails and shows them on Home
 | Notice deadline (end date minus notice period; for evergreen contracts, review date minus notice period) | 90, 60, 30, 14 and 7 days before | Owner and backup |
 | Escalation | 7 days before the notice deadline with no renewal decision | Group Head (copy owner and backup) |
 | End date | 180, 90 and 30 days before | Owner and backup |
+| Review date | 90, 60 and 30 days before | Owner and backup |
 
-- Reminders stop once a renewal decision is recorded.
+- Notice, escalation and end-date reminders stop once a renewal decision is recorded. Review-date reminders stop when the review date is changed or marked done.
 - A reminder is never sent twice (each has a unique key), even after a restart or a missed day; a missed day catches up the next morning.
 - Changing a date through a Variation recalculates unsent reminders.
 - Admins can change the day offsets and the email wording; every change keeps history.
@@ -341,7 +342,4 @@ DocuSign connection (designed for, D-10); SAP or other system links; limits by b
 
 ## 19. Open questions
 
-1. Is there a reversed (white) JBS logo and an SVG version for dark mode and crisp display? Until then, the logo sits on a white tile in dark mode.
-2. Does JBS have a brand typeface? Until then, Inter.
-3. Should review dates also send reminders (for example 30 days before)? Not included until confirmed.
-4. PDF register export: the PDF library must have a licence that suits JBS (some are free only for small companies). Decide in slice 8.
+None at the moment. Resolved on 2026-11-25: logos (D-30), typeface (D-31), review-date reminders (D-32), PDF export licence (D-33).

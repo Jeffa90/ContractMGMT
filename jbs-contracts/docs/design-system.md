@@ -84,9 +84,17 @@ Neutrals are cool (a hint of navy) rather than the care platform's warm stone, s
 
 ## 6. Logo
 
-- File: brand/jbs-logo.webp (supplied by Jeff). Use it as supplied: never recolour, stretch, crop, rotate or add effects.
-- Sidebar: at the top, at least 32px high; collapsed sidebar shows the logo scaled down, never a made-up mark.
-- Only on white or very light backgrounds. In dark theme, until a reversed logo is supplied, it sits on a small white rounded tile (open question in product-spec.md).
+Three versions, supplied by Jeff, all on transparent backgrounds:
+
+| File | Use |
+|---|---|
+| brand/jbs-logo.webp | Full colour. Light theme: sidebar and anywhere on white or very light backgrounds |
+| brand/jbs-logo-white.webp | All white. Dark theme sidebar, and on navy or dark navy |
+| brand/jbs-logo-black.webp | All black. One-colour output only, such as printed or PDF register exports |
+
+- Use them as supplied: never recolour, stretch, crop, rotate or add effects.
+- Sidebar: at the top, at least 32px high; the collapsed sidebar shows the logo scaled down, never a made-up mark.
+- The app swaps full colour and white automatically with the theme.
 - Browser tab icon: made from the logo only once JBS supplies or approves one.
 
 ## 7. Type, shape, space, icons, motion

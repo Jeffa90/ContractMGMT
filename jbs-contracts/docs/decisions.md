@@ -34,7 +34,11 @@ Newest at the bottom. Each decision says what was decided, who decided it, and w
 | D-26 | **Existing contracts are imported** from a spreadsheet (for example a Medius export) with a ZIP of files matched automatically by agreement reference, as the last slice. Historical Effective contracts are loaded locked with their original registered date, and their source is recorded. | Jeff | Keeps the old migration rules in a smaller form |
 | D-27 | **No screens or features of the old app are kept.** Only the business rules and the deployment set-up carry over. | Jeff | |
 | D-28 | **Build order**: 0 switch-over, shell and people; 1 contracts; 2 contract fields; 3 Legal; 4 signing and approval; 5 Home; 6 reminders and renewals; 7 Variations; 8 reports; 9 import. Each slice deploys to QA for Jeff to try. | Jeff | |
-| D-29 | **This repository is public**, so the JBS brand-guideline images are not committed; their colour values and pairing rules are written into design-system.md instead. Only the logo (needed by the app) is committed. | Assumption | |
+| D-29 | **This repository is public**, so the JBS brand-guideline images are not committed; their colour values and pairing rules are written into design-system.md instead. Only the logos (needed by the app) are committed. The repository stays public because JBS IT contribute to it and it isn't under an organisation (Jeff). | Jeff (public); assumption (images left out) | |
+| D-30 | **Logos**: full colour for the light theme, all white for the dark theme, all black for one-colour output such as PDF exports. | Jeff | |
+| D-31 | **Typeface: Inter**, bundled with the app. Change only if JBS marketing names a brand typeface for screens. | Assumption (Jeff unsure; Inter is the care platform's font) | |
+| D-32 | **Review dates also send email reminders**: 90, 60 and 30 days before, to the owner and backup. Admins can change the offsets. | Jeff (yes to review reminders by email); assumption (the offsets, taken from the old placeholder defaults) | |
+| D-33 | **PDF register export uses only a free, openly licensed PDF component**, or none (print the page to PDF from the browser). Nothing that charges large companies a licence fee is used without asking Jeff first. Decided in slice 8. | Assumption | |
 
 ## Assumptions made to keep it simple (Jeff can overrule any of these)
 

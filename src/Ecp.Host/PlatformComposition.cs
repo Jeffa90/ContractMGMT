@@ -61,6 +61,8 @@ public static class PlatformComposition
         scannerOptions.Mode = resolved.Host.Mode;
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.Replace(services, ServiceDescriptor.Singleton(scannerOptions));
         if (resolved.Host.Mode != EcpMode.Production && scannerOptions.EffectiveProvider == "mock") services.AddSingleton<IMalwareScanner, MockMalwareScanner>();
+        // ADR-0049: files are scanned before they reach the platform; host configuration only (Documents:Scanner:Provider = external).
+        if (scannerOptions.IsExternal) services.AddSingleton<IMalwareScanner, ExternalScanningAttestation>();
         // The installation default solution pack applies only to an organisation that has none of its own; it is unset unless the installer sets it (docs/SETUP_AND_ONBOARDING.md).
         var installationDefaultPack = configuration["Ecp:DefaultPackId"];
         services.AddLifecycleModule(o => { o.Mode = resolved.Host.Mode; o.DefaultPackId = installationDefaultPack; });

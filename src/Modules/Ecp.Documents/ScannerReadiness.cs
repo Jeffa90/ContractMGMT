@@ -29,6 +29,24 @@ public sealed class ScannerProviderOptions
     public EcpMode Mode { get; set; } = EcpMode.Production;
 
     public string EffectiveProvider => string.IsNullOrWhiteSpace(Provider) ? (Mode == EcpMode.Demo ? "mock" : "none") : Provider.Trim().ToLowerInvariant();
+
+    /// <summary>ADR-0049: the provider key that says files are scanned before they reach the platform (host configuration only).</summary>
+    public const string External = "external";
+    public bool IsExternal => string.Equals(EffectiveProvider, External, StringComparison.Ordinal);
+}
+
+/// <summary>
+/// ADR-0049: the platform does not scan; the installation states (host configuration <c>Documents:Scanner:Provider = external</c>) that every file is scanned before it can be
+/// uploaded. Each file is released as Clean with this provider's name recorded in its scan history and audit, so nobody can read it as a scan done here. It is not
+/// protection by itself and is never counted as a verified scanner; readiness reports it as a warning that must be acknowledged.
+/// </summary>
+public sealed class ExternalScanningAttestation : IMalwareScanner
+{
+    public string Name => "scanned before upload (external, not by this platform)";
+    public string ProviderKey => ScannerProviderOptions.External;
+    public bool IsConnected => true;
+    public bool IsDemonstrationOnly => false;
+    public Task<ScanVerdict> ScanAsync(Stream content, CancellationToken ct = default) => Task.FromResult(ScanVerdict.Clean);
 }
 
 public enum ScannerState
@@ -44,6 +62,8 @@ public enum ScannerState
     Stale,
     /// <summary>The configuration asks for something this mode refuses (the demonstration scanner in Production).</summary>
     Refused,
+    /// <summary>ADR-0049: scanning is done before files reach the platform; nothing here scans. Never Verified.</summary>
+    External,
 }
 
 public sealed record ScannerTestResult(DateTime TestedUtc, string Provider, string Outcome, string Code, string Detail, string CorrelationId);
@@ -91,6 +111,8 @@ internal sealed class ScannerReadinessService(IMalwareScanner scanner, ScannerPr
             => new(state, scanner.Name, options.EffectiveProvider, summary, code, last, expires, scanner.IsDemonstrationOnly);
         var production = options.Mode == EcpMode.Production;
 
+        if (options.IsExternal) return Task.FromResult(Info(ScannerState.External,
+            "This platform does not scan uploaded files. They are released on the installation's statement that every file is scanned before it can be uploaded (Documents:Scanner:Provider = external).", "SCN-030"));
         if (production && scanner.IsDemonstrationOnly) return Task.FromResult(Info(ScannerState.Refused, "The demonstration scanner is connected in Production. It checks only for a standard test string and is not protection. Connect a real scanner provider.", "SCN-010"));
         if (production && string.Equals(options.EffectiveProvider, "mock", StringComparison.Ordinal)) return Task.FromResult(Info(ScannerState.Refused, "The configuration asks for the demonstration scanner, which Production refuses.", "SCN-010"));
         if (!scanner.IsConnected) return Task.FromResult(Info(ScannerState.NotConnected, production
@@ -110,7 +132,8 @@ internal sealed class ScannerReadinessService(IMalwareScanner scanner, ScannerPr
     public async Task<ScannerTestResult> RunSelfTestAsync(string by, CancellationToken ct = default)
     {
         string outcome = "Passed", code = "", detail = "The scanner responded correctly to a harmless sample and to the standard test file.";
-        if (!scanner.IsConnected) (outcome, code, detail) = ("NotVerified", "SCN-001", "No scanner is connected, so there is nothing to test.");
+        if (options.IsExternal) (outcome, code, detail) = ("NotVerified", "SCN-030", "Scanning is done before files reach this platform, so there is nothing here to test.");
+        else if (!scanner.IsConnected) (outcome, code, detail) = ("NotVerified", "SCN-001", "No scanner is connected, so there is nothing to test.");
         else
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);

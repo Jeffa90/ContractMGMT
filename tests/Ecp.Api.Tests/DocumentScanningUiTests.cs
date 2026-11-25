@@ -41,6 +41,36 @@ public sealed class DocumentScanningUiTests
         return new DocumentScanReadinessCheck(new StubReadiness(scanner, mode, selfTested), Options.Create(new DocumentsOptions { AllowSkippedScan = allowSkipped }), Facts(mode)).RunAsync(CancellationToken.None);
     }
 
+    private sealed class ExternalReadiness : IScannerReadiness
+    {
+        public Task<ScannerReadinessInfo> EvaluateAsync(CancellationToken ct = default)
+            => Task.FromResult(new ScannerReadinessInfo(ScannerState.External, "external", ScannerProviderOptions.External, "Scanned before upload.", "SCN-030", null, null, false));
+        public Task<ScannerTestResult> RunSelfTestAsync(string by, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    [Theory]
+    [InlineData(EcpMode.Production)]
+    [InlineData(EcpMode.Test)]
+    public async Task ADR_0049_external_scanning_is_a_warning_in_every_mode_never_healthy_or_blocking(EcpMode mode)
+    {
+        var result = await new DocumentScanReadinessCheck(new ExternalReadiness(), Options.Create(new DocumentsOptions()), Facts(mode)).RunAsync(CancellationToken.None);
+        Assert.Equal(ReadinessStatus.Degraded, result.Status);
+        Assert.Contains("SCN-030", result.Message);
+        // Allowing skipped scans in Production is still refused, external scanning or not.
+        Assert.Equal(ReadinessStatus.Unhealthy, (await new DocumentScanReadinessCheck(new ExternalReadiness(), Options.Create(new DocumentsOptions { AllowSkippedScan = true }), Facts(EcpMode.Production)).RunAsync(CancellationToken.None)).Status);
+    }
+
+    [Fact]
+    public async Task ADR_0049_the_external_attestation_releases_files_as_clean_under_its_own_name_and_is_not_a_demonstration_scanner()
+    {
+        IMalwareScanner scanner = new ExternalScanningAttestation();
+        Assert.Equal(ScanVerdict.Clean, await scanner.ScanAsync(new MemoryStream([1, 2, 3])));
+        Assert.True(scanner.IsConnected);
+        Assert.False(scanner.IsDemonstrationOnly);
+        Assert.Contains("not by this platform", scanner.Name);
+        Assert.Equal(ScannerProviderOptions.External, scanner.ProviderKey);
+    }
+
     [Fact]
     public async Task Production_is_not_ready_without_a_real_connected_scanner_and_trials_say_what_they_have()
     {

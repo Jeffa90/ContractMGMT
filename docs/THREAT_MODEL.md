@@ -173,7 +173,7 @@ Trust boundaries: TB1 Internet↔host; TB2 host↔database; TB3 host↔document 
 
 - The host OS, hypervisor, network and cloud control plane are trusted to the extent the operator secures them (R-DEP checks verify some settings but cannot prove the platform's security).
 - A database administrator with unrestricted access can alter data; audit hash chaining detects but does not prevent this. Separation of duties for DBA access is an operational control.
-- Malware detection quality depends on the configured scanner.
+- Malware detection quality depends on the configured scanner. With external scanning before upload (ADR-0049) the platform scans nothing and relies on the installation's own controls.
 - Identity-provider compromise compromises the platform for the users it asserts; step-up and short sessions limit blast radius.
 - Real e-signature and email providers (a live signature provider, SMTP, Microsoft Graph) are not exercised against live services; mocks are for Demo and Test only. Retention periods and legal holds are scaffolded, not enforced.
 - Penetration testing, formal security review and accreditation are external governance and not performed by this project.

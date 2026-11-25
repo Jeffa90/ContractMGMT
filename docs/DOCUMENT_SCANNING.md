@@ -230,6 +230,7 @@ Name: "Uploaded files are scanned before anyone can use them". It runs with the 
 | Demo | Demonstration scanner | **Healthy**: "The demonstration scanner is connected (trial only)." |
 | Test | Demonstration scanner | **Degraded** until an acceptance is recorded on the Scanner page; with one, the message names who accepted it, until when and for what scope. It is never presented as protection |
 | Production | Connected scanner that has not passed its self-test, or whose test is stale or failed | **Unhealthy**; only a Healthy scanner makes the check Healthy |
+| Any | `Documents:Scanner:Provider = external` (ADR-0049: files are scanned before upload, outside the platform) | **Degraded** (SCN-030): files are released as Clean under the name "scanned before upload (external, not by this platform)"; a warning to acknowledge, never Healthy |
 
 An Unhealthy check in Production does not stop the application. It stops attachments being usable, and it must be explained in go/no-go evidence.
 
@@ -258,6 +259,7 @@ Each event records the organisation, the classification, and a small JSON of out
 | `Notifications:JobIntervalSeconds` | 60 | Timer for all background jobs; 0 turns them off |
 | `Migration:RequireMalwareScan` | forced on in Production | Migration holds files it could not scan (`MIG-F014`) |
 | `Documents:Scanner:*` | see section 6A | Provider, endpoint, secret reference, timeout, size limit, retry backoff, self-test age |
+| `Documents:Scanner:Provider = external` | not set | ADR-0049: the installation scans files before upload; the platform scans nothing and releases files as Clean under an "external, not by this platform" name. Host configuration only |
 
 The default file `src/Ecp.Host/appsettings.json` sets `AllowSkippedScan` to false. Do not put a provider's credentials in a settings file; use the secret provider (`docs/OPERATIONS_RUNBOOK.md`).
 
@@ -282,7 +284,8 @@ The default file `src/Ecp.Host/appsettings.json` sets `AllowSkippedScan` to fals
 | Acceptance of the demonstration scanner for a masked-data rehearsal | **Implemented** (Test only) | Who, reason, scope, expiry (90 days at most), audited, revocable |
 | Release or delete of a quarantined file from the page | **Not provided** by design | Handle under your security policy |
 | Scanning of already-stored files in bulk when a scanner is first connected | **Implemented via the retry job** | Held files are picked up in batches, oldest first; not separately tested at scale (**Not Verified**) |
-| Production use of attachments | **Blocked until a real scanner is connected** | Or the organisation decides in writing not to use attachments (see `docs/PRODUCTION_READINESS_CHECKLIST.md`) |
+| External scanning before upload (ADR-0049) | **Implemented** | Host setting only; readiness warning SCN-030; protection depends on the installation's own controls |
+| Production use of attachments | **Blocked until a real scanner is connected**, or the installation selects external scanning (ADR-0049) | Or the organisation decides in writing not to use attachments (see `docs/PRODUCTION_READINESS_CHECKLIST.md`) |
 
 ---
 

@@ -60,6 +60,19 @@ public sealed class ScannerPageTests
     }
 
     [Fact]
+    public async Task ADR_0049_external_scanning_is_shown_as_external_never_healthy_and_its_self_test_has_nothing_to_test()
+    {
+        using var app = Start("Test", null, "external");
+        using var sys = await app.SignInAsync(SysAdmin);
+        var page = await PageAsync(sys);
+        Assert.Equal("External", State(page));
+        Assert.Contains("does not scan uploaded files", page);
+        Assert.Contains("not by this platform", page);                 // the provider name says so wherever it is shown or recorded
+        await Post(sys, "Test");
+        Assert.Equal("External", State(await PageAsync(sys)));          // a self-test cannot turn it into a verified scanner
+    }
+
+    [Fact]
     public async Task A_scanner_that_calls_the_standard_test_file_clean_fails_its_self_test_and_is_never_healthy()
     {
         using var app = Start("Test", new DoubleScanner(detects: false), "test-double");

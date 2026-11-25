@@ -85,6 +85,7 @@ BY_HAND=(
   "variable  SETUP_ANSWERS_FILE  Repository path of the setup answers file; with the FailsafeAdmins variables the deploy completes first-run setup"
   "variable  APPENV_Ecp__Security__FailsafeAdmins__N__Account / __DisplayName / __Email  Administrators from configuration (N = 0, 1, ...)"
   "variable  APPENV_Ecp__Email__AllowAnonymousRelay  true only where the mail server relays for the web server without a login (ADR-0048)"
+  "variable  APPENV_Documents__Scanner__Provider  external only where files are scanned before upload, outside the platform (ADR-0049)"
   "secret    PACK_SIGNING_KEY  Private key that signs the shipped packs at build time; with APPENV_Ecp__Packs__TrustedKeys__0__KeyId / __PublicKeyPem"
 )
 # Settings the script writes with fixed, safe values (not supplied by you): Production mode, no demonstration data, SQL Server, no automatic migration, recovery owned by the DBA.

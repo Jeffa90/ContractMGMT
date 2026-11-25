@@ -391,3 +391,4 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - JBS unattended first install and signed packs (ADR-0045, ADR-0046): `decisions/ADR-0045-unattended-first-install-and-failsafe-administrators.md`, `decisions/ADR-0046-shipped-packs-signed-by-the-deploy-pipeline.md`, `docs/jbs/QA_HANDOVER.md`, `docs/jbs/CLAUDE_SKILL_IIS_UNATTENDED_INSTALL.md`, `docs/jbs/setup-answers.qa.json`
 - Shipped packs trusted without a signature (ADR-0047): `decisions/ADR-0047-shipped-packs-trusted-without-a-signature.md`, `tests/Ecp.Integration.Tests/ShippedPackTrustScenarios.cs`
 - Anonymous SMTP relay by host setting (ADR-0048): `decisions/ADR-0048-anonymous-smtp-relay-allowed-by-host-setting.md`, `tests/Ecp.UnitTests/AnonymousRelayCheckTests.cs`
+- External scanning before upload (ADR-0049): `decisions/ADR-0049-external-scanning-before-upload.md`

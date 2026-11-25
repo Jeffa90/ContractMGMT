@@ -37,6 +37,7 @@ Since ADR-0047 the shipped packs are trusted without a signature, so there is no
 - **Tenant name:** currently "JBS Australia" (an assumption). Change it now if it's wrong. It's hard to change once setup has created the tenant.
 - **Organisation:** the name, time zone (Australia/Brisbane) and currency (`AUD`).
 - **Email (SMTP): confirmed 2026-11-25.** `email.jbssa.com.au`, port 25 with TLS (STARTTLS), anonymous relay from AUQLDDC01QA2WI (tested; port 25 offers no login), sender `no-reply@jbssa.com.au`. No SMTP username or password and no server environment variables. Production mode accepts this only with the GitHub QA variable `APPENV_Ecp__Email__AllowAnonymousRelay` = `true` (ADR-0048); readiness then shows warning R-NOT-02, acknowledged in the answers file.
+- **Malware scanning: done by JBS before upload (owner decision 2026-11-25, ADR-0049).** Set the GitHub QA variable `APPENV_Documents__Scanner__Provider` = `external`. The platform then scans nothing and readiness R-OPS-01 (which includes R-DOC-01) shows a warning to acknowledge.
 - The setup test email goes to the first failsafe admin's email address.
 
 ### 5. Ask IT to check the server

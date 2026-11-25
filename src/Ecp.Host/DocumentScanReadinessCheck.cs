@@ -23,6 +23,8 @@ public sealed class DocumentScanReadinessCheck(IScannerReadiness readiness, IOpt
         var code = info.Code is { Length: > 0 } c ? $" [{c}]" : "";
         if (production && options.Value.AllowSkippedScan)
             return Result(ReadinessStatus.Unhealthy, "Files whose scan was skipped are allowed to be used. Turn that off so that only files a scanner has called clean are released.");
+        // ADR-0049: scanning before upload is the installation's own control. It is a warning (to be acknowledged), never Healthy, in every mode.
+        if (info.State == ScannerState.External) return Result(ReadinessStatus.Degraded, $"{info.Summary}{code}");
         if (production)
             return info.State == ScannerState.Healthy ? Result(ReadinessStatus.Healthy, info.Summary)
                 : Result(ReadinessStatus.Unhealthy, $"{info.Summary}{code}");

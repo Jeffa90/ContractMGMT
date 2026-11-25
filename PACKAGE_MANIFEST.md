@@ -393,3 +393,4 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - Anonymous SMTP relay by host setting (ADR-0048): `decisions/ADR-0048-anonymous-smtp-relay-allowed-by-host-setting.md`, `tests/Ecp.UnitTests/AnonymousRelayCheckTests.cs`
 - External scanning before upload (ADR-0049): `decisions/ADR-0049-external-scanning-before-upload.md`
 - Redesign planning notes (not decided): `docs/redesign/REDESIGN_BRIEF.md`, `docs/redesign/STYLE_GUIDE.md`
+- JBS QA configuration record: `docs/jbs/QA_CONFIGURATION_RECORD.md`

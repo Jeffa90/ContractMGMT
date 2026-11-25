@@ -10,6 +10,8 @@ Status: planning notes, 2026-11-25. **Nothing here is decided.** Jeff is conside
 
 ## 2. What we know works at JBS (reuse, don't rediscover)
 
+The full record of every setting, variable and fix is `docs/jbs/QA_CONFIGURATION_RECORD.md`. Read it before any deployment work.
+
 | Area | What works today | Where it's written down |
 |---|---|---|
 | Server | IIS on AUQLDDC01QA2WI; site and pool `JbsContracts`; app `C:\inetpub\JbsContracts\app`, data `...\Data`, logs `...\logs`; https binding `jbs-contracts-qa.jbssa.com.au` with the IT-issued certificate | `docs/DEPLOYMENT.md`, `docs/jbs/jbs-github-environments.env` |

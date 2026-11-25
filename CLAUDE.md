@@ -1,5 +1,7 @@
 # Claude Code Repository Instructions
 
+> **Redesign:** work inside `jbs-contracts/` (the new JBS-only app) follows `jbs-contracts/CLAUDE.md` and its docs. The product principles below (reference configuration, portability, packs) apply to the old app only; the security and working rules still apply everywhere.
+
 ## Authority order
 1. This file's security and working rules
 2. `requirements/01-authoritative/MASTER_BUILD_INSTRUCTIONS.md`

@@ -1,0 +1,56 @@
+# JBS Contracts: decisions
+
+Newest at the bottom. Each decision says what was decided, who decided it, and what it replaces from the old app's `requirements/` where it differs. **Decided by Jeff** means Jeff chose it in planning; **assumption** means Claude proposed it to keep things simple and Jeff can overrule it. Change a decision by adding a new one that replaces it, never by editing history.
+
+## Decided in planning, 2026-11-25
+
+| # | Decision | By | Replaces or differs from |
+|---|---|---|---|
+| D-01 | Build a new, smaller app for JBS only in this repository, in the jbs-contracts folder on the `redesign` branch. This keeps the QA runner, the GitHub QA environment, its variables and the Production reviewer. | Jeff | |
+| D-02 | The app is **built for JBS, not as a product for many companies.** No solution packs, terminology layers, tenants, organisation scopes, setup wizard or multiple deployment types. The repository root `requirements/` folder is used only for contract rule detail this folder doesn't cover. | Jeff | The root `CLAUDE.md` principles "JBS is a shipped reference configuration" and portability; `requirements/01-authoritative/MASTER_BUILD_INSTRUCTIONS.md` |
+| D-03 | **Five roles as tick boxes**: Contract owner, Legal, Approver (one marked Group Head, the rest backups), Admin, Auditor. A person can hold several. People with no ticks can only look. | Jeff | The 12 roles with scopes in `requirements/01-authoritative/CONFIRMED_DECISIONS.md` (D1) |
+| D-04 | **Any contract owner can edit any contract that isn't locked.** Each contract names one responsible **owner** and an optional **backup**, used for "My contracts", Home tiles and reminders. Categories are labels and filters only. | Jeff | "Category owners edit contracts in their assigned categories" (confirmed rule in the old requirements) |
+| D-05 | **Everyone added sees every contract, except those ticked Confidential**, which only their owner and backup, Legal, approvers, admins and auditors see. Limiting by business unit or site is a later step. | Jeff | Classification ceilings and organisation, business unit and site scopes |
+| D-06 | **An admin adds each person**; anyone else sees a "no access yet" page. | Jeff | |
+| D-07 | **Journey**: Draft, Legal review (if ticked), Signing (DocuSign outside the app, signed copy uploaded), Approval by the Group Head or backup, then Effective and locked. A **rejected approval goes back to Signing** with the reason. | Jeff | Old states Awaiting Legal, In Legal Review, Legal Rework Required, Legal Cleared, Initial Creation, Out for Signature merged into Legal review and Signing; old rule sent a rejection to Initial Creation |
+| D-08 | "Needs Legal review" is a tick on each contract, **on by default**; the owner can untick it. | Jeff | |
+| D-09 | **Legal review is a back-and-forth** between Legal and the owner (Legal doesn't always negotiate with the supplier). The contract always shows whose turn it is, who has it, since when, a status (Not started, Reviewing, Waiting on supplier, Waiting on owner) and a note. Each hand-over is kept as a turn with its documents. | Jeff | Old "multi-round review" (rounds closed by Legal only) |
+| D-10 | **Signing: upload the signed copy in version 1.** The screens and data are shaped so a DocuSign connection can be added later as its own slice behind a "How contracts are signed" setting. No DocuSign code is written until it can be tested. | Jeff | |
+| D-11 | **Effective contracts change through a simple Variation** (reason, changed fields old and new, signed variation, optional Legal, Group Head or backup approves), plus an admin **emergency unlock** (reason, at most 4 hours, banner, audited). | Jeff | |
+| D-12 | **Renew creates a new linked contract** that goes through the normal journey; the old one ends when the new one becomes Effective. Extending the same contract is a Variation. | Jeff | Old "Renewal in Progress" state |
+| D-13 | **Reminder defaults**: notice deadline 90, 60, 30, 14 and 7 days before (owner and backup), escalating to the Group Head at 7 days with no renewal decision; end date 180, 90 and 30 days before. Reminders stop once a renewal decision is recorded. Admins can change offsets and wording. | Jeff | Placeholder offsets in `requirements/04-workflows/WORKFLOW_SPEC.md` section 6 |
+| D-14 | **Nothing is ever deleted** in version 1. Contracts are withdrawn (before Effective) or archived (after Ended); fields are hidden; people are deactivated. | Jeff (archive-before-delete); assumption for the details below | |
+| D-15 | **Admins add, move, rename, hide and require contract fields and sections without code**, as in the care platform. Kinds: short and long text, whole and decimal number, money, date, yes/no, pick from a list (one or several), person, supplier, link, email. Added fields appear on contract pages and forms, as Contracts list columns and filters, in CSV, reports and the register export, and in import mapping. No database change per field. | Jeff | Old field, form and rules designers (much larger) |
+| D-16 | **Built-in fields can also be renamed, moved, hidden and made required**, except rule fields (title, reference, supplier, category, owner, Confidential, effective date, end date, evergreen, notice period, needs Legal review), which can be renamed and moved but not hidden. | Jeff | |
+| D-17 | **After Effective, each added field is either "change only through a Variation" (default) or "can be updated any time"**, chosen by the admin per field. | Jeff | |
+| D-18 | **Removing a field hides it and keeps its values** in history and audit; it can be brought back. | Jeff | |
+| D-19 | **Database: reuse the existing `JBSContracts` database on the QA SQL Server, wiped.** QA holds no real data (confirmed by Jeff). The new app's tables live in a `contracts` schema. The DBA grants stay as they are. | Jeff | |
+| D-20 | **The new app replaces the old one on QA from slice 0.** `main` is tagged `legacy-ecp-final` and frozen for code while the new app is built; the `redesign` branch is added to the QA environment's deployment branches; the old tables are removed by a one-off, confirmation-guarded deploy step. | Jeff | The brief's "keep the current app running on QA until the new one does what JBS needs" |
+| D-21 | **Production deploys only from a manual run of Deploy on `main` with promote-to-production ticked**, then the Production reviewer approves. Unchanged from today. | Jeff | |
+| D-22 | **Stack**: React front end (care platform stack) served by a small ASP.NET Core (.NET 10) API on the same IIS site, Windows sign-in, SQL Server. Schema as numbered `.sql` files run by the existing `scripts/ci/Invoke-SqlMigrations.ps1`; data access with Dapper and parameterised SQL. | Jeff (stack, in the brief); assumption (SQL files and Dapper, chosen so the DBA can read every schema change; reversible) | The old app's Entity Framework migrations and `deploy-migrate` command |
+| D-23 | **Brand**: JBS navy `#232378` is the primary colour (cyan `#41CDF5` in dark theme), with cool neutrals; the JBS logo as supplied; Inter until a JBS typeface is named. Details and contrast checks in design-system.md. | Jeff (JBS colours and logo); assumption (cool neutrals, dark-theme choices) | The care platform's teal and stone |
+| D-24 | **Contract reference**: `JBSAUS-0001` style running number, set by the app. Imported contracts keep their original reference; new numbers continue after the highest. | Jeff | |
+| D-25 | **No links to other systems in version 1.** The SAP outline agreement number is a typed field. | Jeff | DocuSign adapter and ERP outbox in the old requirements |
+| D-26 | **Existing contracts are imported** from a spreadsheet (for example a Medius export) with a ZIP of files matched automatically by agreement reference, as the last slice. Historical Effective contracts are loaded locked with their original registered date, and their source is recorded. | Jeff | Keeps the old migration rules in a smaller form |
+| D-27 | **No screens or features of the old app are kept.** Only the business rules and the deployment set-up carry over. | Jeff | |
+| D-28 | **Build order**: 0 switch-over, shell and people; 1 contracts; 2 contract fields; 3 Legal; 4 signing and approval; 5 Home; 6 reminders and renewals; 7 Variations; 8 reports; 9 import. Each slice deploys to QA for Jeff to try. | Jeff | |
+| D-29 | **This repository is public**, so the JBS brand-guideline images are not committed; their colour values and pairing rules are written into design-system.md instead. Only the logo (needed by the app) is committed. | Assumption | |
+
+## Assumptions made to keep it simple (Jeff can overrule any of these)
+
+| # | Assumption | Why |
+|---|---|---|
+| A-01 | In **Signing**, details are frozen; if something must change, the owner sends it back to Legal with a reason. | Keeps what Legal cleared intact, as the old rules required |
+| A-02 | During Legal review, the **owner can edit fields on their turn**; on Legal's turn fields are frozen, but both sides can add documents and notes. | Fits the back-and-forth without losing what Legal is looking at |
+| A-03 | **Required fields are checked when a contract leaves Draft**, so drafts can be saved incomplete. | Autosaved drafts can't be blocked by required fields |
+| A-04 | The **Confidential** tick on an Effective contract can be changed by an admin only, with a reason. | Old rules let only an admin change a contract's classification after it was locked |
+| A-05 | **Owner and backup can be changed any time**, even on a locked contract, by any contract owner, and the change is audited. | Jeff agreed "handing over is one click"; the old data dictionary limited this to admin unlock |
+| A-06 | Approval requests go to the Group Head **and** all backups; whoever acts first decides, and the record shows who acted and "as backup" where so. | Approvals don't stall when the Group Head is away |
+| A-07 | **You can't approve a contract or Variation you raised or own.** | Old rule (submitter is not the approver) |
+| A-08 | A contract can be **withdrawn** with a reason from Draft, Legal review or Signing. | Abandoned contracts need an exit |
+| A-09 | **Emergency unlock needs one admin**, not a second person. | Simplicity; the old rules asked for a second person in Production by default. Easy to add back if JBS wants it |
+| A-10 | **Admins archive Ended contracts** without a separate disposition approval. | Simplicity; the old rules needed a disposition approver |
+| A-11 | Admin changes to fields and sections are made with a **live preview, then Save**, and every saved version is kept with **put back**. Other admin settings save directly with history. No separate draft, publish or second-person approval. | Simplicity; the old rules required draft, validation, simulation, publish and second-person publication |
+| A-12 | A field's **kind can't change once any contract has a value in it**; the admin adds a new field instead. | Prevents mangled data |
+| A-13 | The **reminder job runs daily at 7:00am Brisbane time** and catches up after a missed day. | |
+| A-14 | **Audit events are hash-chained** (each event includes the previous event's hash) so tampering shows. | The old "tamper-evident audit trail" rule, kept |

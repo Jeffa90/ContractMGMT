@@ -18,6 +18,7 @@ public static class DocumentEndpoints
     {
         ["Draft"] = "Draft", ["FinalAgreement"] = "Final agreement (for signing)", ["SignedCopy"] = "Signed copy", ["Schedule"] = "Schedule",
         ["LegalMarkup"] = "Legal mark-up", ["Variation"] = "Variation", ["Correspondence"] = "Correspondence", ["Supporting"] = "Supporting document",
+        ["InternalSignOff"] = "Internal sign-off (cover page)",
     };
 
     private static readonly Dictionary<string, string> Types = new(StringComparer.OrdinalIgnoreCase)

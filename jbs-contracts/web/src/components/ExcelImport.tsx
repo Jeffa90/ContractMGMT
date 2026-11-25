@@ -2,10 +2,11 @@
 // the person confirms, and the preview says, row by row, what will be added, changed or refused and why.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, CircleDashed, FileDown, FileSpreadsheet, FileUp, PencilLine, PlusCircle, XCircle } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api'
 import { Dialog } from './Dialog'
+import { DropZone } from './DropZone'
 import { Alert, Badge, Button, Segmented } from './ui'
 
 export type ExcelKind = 'people' | 'lists' | 'suppliers' | 'contracts'
@@ -65,7 +66,6 @@ export function ExcelButtons({ kind, canImport, invalidate }: { kind: ExcelKind;
 
 function ImportDialog({ kind, invalidate, onClose }: { kind: ExcelKind; invalidate: string[][]; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<Result | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -126,10 +126,15 @@ function ImportDialog({ kind, invalidate, onClose }: { kind: ExcelKind; invalida
           </a>{' '}
           to get a sheet with the right headings, then change or add rows.
         </p>
-        <input ref={input} type="file" hidden accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => choose(e.target.files?.[0])} />
-        <Button variant="secondary" icon={<FileSpreadsheet aria-hidden className="size-5" />} onClick={() => input.current?.click()} loading={check.isPending}>
-          {file ? `Choose another file (${file.name})` : 'Choose an Excel file'}
-        </Button>
+        <DropZone
+          extensions={['.xlsx']}
+          what="an Excel workbook (.xlsx)"
+          label={file ? 'Choose another file' : 'Choose an Excel file'}
+          file={file}
+          busy={check.isPending}
+          onFile={choose}
+          icon={<FileSpreadsheet aria-hidden className="size-5" />}
+        />
         {error && <Alert tone="danger" title={error} />}
         {preview && (
           <>

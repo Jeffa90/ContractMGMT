@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
 using Dapper;
+using JbsContracts.Api.Features;
 
 namespace JbsContracts.Api.Tests;
 
@@ -175,5 +176,54 @@ public sealed class ImportTests(AppFixture app)
         Assert.Equal([("SignedCopy", $"{Ref(1)} signed")], docs);
         // Importing the same ZIP again adds nothing.
         Assert.Equal(0, (await ReadAsync(await admin.PostAsync("/api/import/files/preview", ZipForm(), Ct))).GetProperty("matched").GetInt32());
+
+        // One ZIP with every kind mixed together (D-95): each file's kind from its folder or name, a default for the rest, and the admin's own choice.
+        byte[] Mixed()
+        {
+            using var stream = new MemoryStream();
+            using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, true))
+            {
+                void Add(string path, string content) { using var w = new StreamWriter(zip.CreateEntry(path).Open()); w.Write(content); }
+                Add($"{Ref(3)}/Signed/agreement.pdf", "%PDF pallet hire signed");
+                Add($"{Ref(3)}/Pallet hire DRAFT v2.docx", "draft two");
+                Add($"{Ref(3)} Deed of Variation (signed).pdf", "%PDF variation");
+                Add($"{Ref(3)} Cover page - sign off.pdf", "%PDF cover page");
+                Add($"{Ref(3)} pricing.xlsx", "pricing");
+                Add($"{Ref(3)} notes.txt", "notes");
+            }
+            return stream.ToArray();
+        }
+        var choices = JsonSerializer.Serialize(new Dictionary<string, string> { [$"{Ref(3)} notes.txt"] = "Correspondence" });
+        MultipartFormDataContent MixedForm() => new() { { new ByteArrayContent(Mixed()), "file", "mixed.zip" }, { new StringContent("Supporting"), "kind" }, { new StringContent(choices), "kinds" } };
+        var mixed = await ReadAsync(await admin.PostAsync("/api/import/files/preview", MixedForm(), Ct));
+        var kinds = mixed.GetProperty("files").EnumerateArray().ToDictionary(f => f.GetProperty("path").GetString()!, f => (Kind: f.GetProperty("kind").GetString(), Why: f.GetProperty("kindWhy").GetString()));
+        Assert.Equal(("SignedCopy", "folder \"Signed\""), kinds[$"{Ref(3)}/Signed/agreement.pdf"]);
+        Assert.Equal("Draft", kinds[$"{Ref(3)}/Pallet hire DRAFT v2.docx"].Kind);
+        Assert.Equal("Variation", kinds[$"{Ref(3)} Deed of Variation (signed).pdf"].Kind);
+        Assert.Equal("InternalSignOff", kinds[$"{Ref(3)} Cover page - sign off.pdf"].Kind);
+        Assert.Equal(("Supporting", "your default"), kinds[$"{Ref(3)} pricing.xlsx"]);
+        Assert.Equal(("Correspondence", "you chose"), kinds[$"{Ref(3)} notes.txt"]);
+        Assert.Equal(6, (await ReadAsync(await admin.PostAsync("/api/import/files/import", MixedForm(), Ct))).GetProperty("imported").GetInt32());
+        var saved = (await db.QueryAsync<(string Kind, string Title)>("SELECT Kind, Title FROM contracts.Document WHERE ContractId = @id", new { id = imported[Ref(3)].Id })).ToList();
+        Assert.Contains(("InternalSignOff", $"{Ref(3)} Cover page - sign off"), saved);
+        Assert.Contains(("Correspondence", $"{Ref(3)} notes"), saved);
+        Assert.Equal(6, saved.Count);
     }
+
+    [Theory]
+    [InlineData("MED-1/Signed/agreement.pdf", "SignedCopy")]
+    [InlineData("MED-1/Drafts/agreement v3.docx", "Draft")]
+    [InlineData("MED-1 executed agreement.pdf", "SignedCopy")]
+    [InlineData("MED-1 unsigned agreement.pdf", "Supporting")]
+    [InlineData("MED-1 Variation 2 signed.pdf", "Variation")]
+    [InlineData("MED-1 Amendment.pdf", "Variation")]
+    [InlineData("MED-1 Internal approval form.pdf", "InternalSignOff")]
+    [InlineData("MED-1 CoverSheet.pdf", "InternalSignOff")]
+    [InlineData("MED-1 signed off by GM.pdf", "InternalSignOff")]
+    [InlineData("MED-1 Schedule 2 rates.pdf", "Schedule")]
+    [InlineData("MED-1 redline.docx", "LegalMarkup")]
+    [InlineData("MED-1 from supplier.msg", "Correspondence")]
+    [InlineData("MED-1 SignedAgreement.pdf", "SignedCopy")]
+    public void A_files_kind_comes_from_its_folders_then_its_name_then_the_default(string path, string kind) =>
+        Assert.Equal(kind, LegacyImportEndpoints.KindFor(path, "Supporting", new Dictionary<string, string>()).Kind);
 }

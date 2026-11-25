@@ -52,3 +52,38 @@ test('Dialogs close with Escape and give focus back', async ({ page }, info) => 
   await expect(dialog).toHaveCount(0)
   await expect(add).toBeFocused()
 })
+
+test('Drag an Excel file onto the import box', async ({ page, api }, info) => {
+  test.skip(info.project.use.hasTouch === true, 'Dragging files is for desktop')
+  // An export is a ready-made import file.
+  const workbook = await (await api.get('/api/excel/suppliers')).body()
+  await page.goto('/suppliers')
+  await settled(page)
+  await page.getByRole('button', { name: 'Import from Excel' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('Drag an Excel workbook (.xlsx) here, or')).toBeVisible()
+
+  const drop = async (name: string, bytes: number[], type: string) => {
+    const transfer = await page.evaluateHandle(
+      ({ name, bytes, type }) => {
+        const t = new DataTransfer()
+        t.items.add(new File([new Uint8Array(bytes)], name, { type }))
+        return t
+      },
+      { name, bytes, type },
+    )
+    const box = dialog.getByText(/Drag an Excel workbook|Drop it here/).locator('..')
+    await box.dispatchEvent('dragenter', { dataTransfer: transfer })
+    await box.dispatchEvent('drop', { dataTransfer: transfer })
+  }
+
+  // The wrong kind of file is turned away, plainly.
+  await drop('notes.pdf', [37, 80, 68, 70], 'application/pdf')
+  await expect(dialog.getByRole('alert')).toHaveText('notes.pdf isn\'t an Excel workbook (.xlsx). Choose an Excel workbook (.xlsx).')
+
+  // The right one is checked straight away, as if chosen with the button.
+  await drop('suppliers.xlsx', [...workbook], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  await expect(dialog.getByText('suppliers.xlsx', { exact: false }).first()).toBeVisible()
+  await expect(dialog.getByText('No change')).toBeVisible()
+  await expectAccessible(page)
+})

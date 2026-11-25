@@ -404,7 +404,7 @@ const videos = {
         'MED-1004,Uniform laundering,Redgum Uniforms (demo),Facilities > Laundry,Alex Morgan (demo),1/02/2026,31/01/2028,30,Active',
       ].join('\r\n'))
       const zip = path.join(WORK, 'medius-files.zip')
-      execFileSync('python3', ['-c', "import zipfile,sys\nz=zipfile.ZipFile(sys.argv[1],'w')\nz.writestr('MED-1001 Linen hire signed.pdf','%PDF-1.4 fictional')\nz.writestr('MED-1003/Courier agreement signed.pdf','%PDF-1.4 fictional courier')\nz.close()", zip])
+      execFileSync('python3', ['-c', "import zipfile,sys\nz=zipfile.ZipFile(sys.argv[1],'w')\nz.writestr('MED-1001 Linen hire signed.pdf','%PDF-1.4 fictional')\nz.writestr('MED-1001 Linen hire draft v2.docx','fictional draft')\nz.writestr('MED-1001 Cover page - sign off.pdf','%PDF-1.4 fictional cover page')\nz.writestr('MED-1003/Signed/Courier agreement.pdf','%PDF-1.4 fictional courier')\nz.writestr('MED-1003/Variation 1 - rates.pdf','%PDF-1.4 fictional variation')\nz.close()", zip])
       await s.step(1)
       await s.upload(p.getByRole('button', { name: 'Choose the spreadsheet' }), csv, 1800)
       await s.step(2)
@@ -417,7 +417,9 @@ const videos = {
       await s.click(p.getByRole('button', { name: /^Import \d+ contracts/ }), 900)
       await s.click(p.getByRole('dialog').getByRole('button', { name: /^Import \d+/ }), 2200)
       await s.step(5)
-      await s.upload(p.getByRole('button', { name: 'Choose a ZIP' }), zip, 2000)
+      await s.upload(p.getByRole('button', { name: 'Choose a ZIP' }), zip, 1800)
+      await s.point(p.getByText('What the matched files are:'), 1600)
+      await s.point(p.getByLabel('What MED-1001 Cover page - sign off.pdf is'), 1400)
       await s.click(p.getByRole('button', { name: /^Add \d+ files?/ }), 2200)
     }),
 

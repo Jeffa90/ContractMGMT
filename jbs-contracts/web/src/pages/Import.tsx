@@ -7,13 +7,13 @@ import {
   FileArchive,
   FileSpreadsheet,
   MinusCircle,
-  Upload,
   XCircle,
 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Dialog } from "@/components/Dialog";
+import { DropZone } from "@/components/DropZone";
 import { PageHeader } from "@/components/Help";
 import { Select } from "@/components/form";
 import {
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui";
 import { errorText } from "@/lib/actions";
 import { api, ApiError } from "@/lib/api";
-import type { Lists } from "@/lib/contracts";
+import { allDocumentKinds, type Lists } from "@/lib/contracts";
 import { formatBytes } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { help } from "@/help";
@@ -77,6 +77,9 @@ type FilesPlan = {
     reference: string | null;
     title: string | null;
     reason: string | null;
+    kind: string;
+    kindName: string;
+    kindWhy: string | null;
   }[];
 };
 
@@ -157,40 +160,6 @@ function Stat({
       >
         {value}
       </p>
-    </div>
-  );
-}
-
-function FilePicker({
-  accept,
-  label,
-  file,
-  onFile,
-}: {
-  accept: string;
-  label: string;
-  file: File | null;
-  onFile: (f: File | null) => void;
-}) {
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <input
-        ref={input}
-        type="file"
-        hidden
-        accept={accept}
-        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-      />
-      <Button
-        icon={<Upload aria-hidden className="size-4" />}
-        onClick={() => input.current?.click()}
-      >
-        {label}
-      </Button>
-      <span className="text-sm text-muted-foreground">
-        {file ? `${file.name} (${formatBytes(file.size)})` : "No file chosen"}
-      </span>
     </div>
   );
 }
@@ -320,8 +289,9 @@ function ContractsStep() {
           </p>
         </div>
       </div>
-      <FilePicker
-        accept=".xlsx,.csv"
+      <DropZone
+        extensions={[".xlsx", ".csv"]}
+        what="an Excel workbook (.xlsx) or CSV"
         label="Choose the spreadsheet"
         file={file}
         onFile={choose}
@@ -666,19 +636,16 @@ function ContractsStep() {
 
 // ------------------------------------------------------------------ Step 2: files
 
-const kinds = [
-  { value: "SignedCopy", label: "Signed copy" },
-  { value: "FinalAgreement", label: "Final agreement (for signing)" },
-  { value: "Draft", label: "Draft" },
-  { value: "Schedule", label: "Schedule" },
-  { value: "Variation", label: "Variation" },
-  { value: "Correspondence", label: "Correspondence" },
-  { value: "Supporting", label: "Supporting document" },
-];
+const kinds = allDocumentKinds;
+const kindLabel = (k: string) => kinds.find((x) => x.value === k)?.label ?? k;
 
 function FilesStep() {
   const [file, setFile] = useState<File | null>(null);
-  const [kind, setKind] = useState("SignedCopy");
+  const [kind, setKind] = useState("Supporting");
+  // The admin's own choice of kind for a file (by its path in the ZIP), over what was worked out from its name.
+  const [chosen, setChosen] = useState<Record<string, string>>({});
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [plan, setPlan] = useState<FilesPlan | null>(null);
   const [show, setShow] = useState<"problems" | "matched" | "all">("matched");
   const [done, setDone] = useState<number | null>(null);
@@ -687,6 +654,7 @@ function FilesStep() {
     const data = new FormData();
     data.append("file", f);
     data.append("kind", kind);
+    data.append("kinds", JSON.stringify(chosen));
     return data;
   };
   const check = useMutation({
@@ -694,6 +662,7 @@ function FilesStep() {
       postForm<FilesPlan>("/api/import/files/preview", form(f)),
     onSuccess: (p) => {
       setPlan(p);
+      setChosen({});
       setDone(null);
       setError(null);
       setShow(p.unmatched + p.refused > 0 ? "problems" : "matched");
@@ -713,6 +682,18 @@ function FilesStep() {
     },
     onError: (e) => setError(errorText(e)),
   });
+  const kindOf = (f: FilesPlan["files"][number]) => chosen[f.path] ?? f.kind;
+  const matchedFiles = (plan?.files ?? []).filter((f) => f.outcome === "Match");
+  const kindCounts = kinds
+    .map((k) => ({ ...k, count: matchedFiles.filter((f) => kindOf(f) === k.value).length }))
+    .filter((k) => k.count > 0);
+  const changeAll = () => {
+    if (!from || !to || from === to) return;
+    const next = { ...chosen };
+    for (const f of matchedFiles) if (kindOf(f) === from) next[f.path] = to;
+    setChosen(next);
+    setFrom("");
+  };
   const files = (plan?.files ?? []).filter(
     (f) =>
       show === "all" ||
@@ -734,16 +715,19 @@ function FilesStep() {
           <p className="text-sm text-muted-foreground">
             Each file is matched to a contract by the old reference (or JBSAUS
             reference) in its name or folder, for example MED-1042 Signed.pdf or
-            MED-1042/agreement.pdf. Up to 25 MB per ZIP: use several ZIPs for
-            more. A file already on its contract is skipped, so a ZIP can be
-            imported twice safely.
+            MED-1042/agreement.pdf. One ZIP can mix signed copies, drafts,
+            variations, cover pages and other files: what each one is comes from
+            words in its folder or name, and you can change any of them before
+            adding. Up to 25 MB per ZIP: use several ZIPs for more. A file
+            already on its contract is skipped, so a ZIP can be imported twice
+            safely.
           </p>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
-          label="What these files are"
-          help="Applies to every file in this ZIP."
+          label="When a file's name doesn't say what it is"
+          help="Words like signed, executed, draft, variation, amendment, cover page or sign off in a file's folder or name decide its kind. Other files get this one."
         >
           {(p) => (
             <Select
@@ -763,10 +747,12 @@ function FilesStep() {
           )}
         </Field>
       </div>
-      <FilePicker
-        accept=".zip"
+      <DropZone
+        extensions={[".zip"]}
+        what="a ZIP"
         label="Choose a ZIP"
         file={file}
+        busy={check.isPending}
         onFile={(f) => {
           setFile(f);
           setPlan(null);
@@ -812,6 +798,41 @@ function FilesStep() {
               ]}
             />
           </div>
+          {done === null && kindCounts.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-[var(--radius-card)] bg-muted p-3 text-sm">
+              <p>
+                <span className="font-medium">What the matched files are: </span>
+                {kindCounts.map((k) => `${k.label} (${k.count})`).join(", ")}.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-1">
+                  <span>Change every</span>
+                  <Select value={from} onChange={(e) => setFrom(e.target.value)}>
+                    <option value="">Choose a kind</option>
+                    {kindCounts.map((k) => (
+                      <option key={k.value} value={k.value}>
+                        {k.label} ({k.count})
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span>to</span>
+                  <Select value={to} onChange={(e) => setTo(e.target.value)}>
+                    <option value="">Choose a kind</option>
+                    {kinds.map((k) => (
+                      <option key={k.value} value={k.value}>
+                        {k.label}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+                <Button disabled={!from || !to || from === to} onClick={changeAll}>
+                  Change
+                </Button>
+              </div>
+            </div>
+          )}
           {files.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing to show.</p>
           ) : (
@@ -829,11 +850,33 @@ function FilesStep() {
                       {f.reason && ` · ${f.reason}`}
                     </p>
                   </div>
-                  <span className="shrink-0">
+                  <div className="flex shrink-0 flex-col gap-1 sm:items-end">
                     <Badge tone={fileBadge[f.outcome].tone}>
                       {fileBadge[f.outcome].label}
                     </Badge>
-                  </span>
+                    {f.outcome === "Match" && done === null && (
+                      <>
+                        <Select
+                          aria-label={`What ${f.path.split("/").pop()} is`}
+                          value={kindOf(f)}
+                          onChange={(e) => setChosen({ ...chosen, [f.path]: e.target.value })}
+                          className="min-h-9 sm:w-72"
+                        >
+                          {kinds.map((k) => (
+                            <option key={k.value} value={k.value}>
+                              {k.label}
+                            </option>
+                          ))}
+                        </Select>
+                        <span className="text-xs text-muted-foreground">
+                          {chosen[f.path] ? "You chose" : `From ${f.kindWhy ?? "your default"}`}
+                        </span>
+                      </>
+                    )}
+                    {f.outcome === "Match" && done !== null && (
+                      <span className="text-xs text-muted-foreground">{kindLabel(kindOf(f))}</span>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

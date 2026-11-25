@@ -423,7 +423,7 @@ public static class LegacyImportEndpoints
         // Step 2: files from a ZIP, matched to contracts by the old (or JBSAUS) reference in the file's name or folders.
         app.MapPost("/api/import/files/preview", async (HttpRequest request, CurrentUser current, Db db) => await AdminAsync(current, db, async me =>
         {
-            var (zip, kind, problem) = await ZipAsync(request);
+            var (zip, problem) = await ZipAsync(request);
             if (problem is not null) return ApiResults.Invalid(problem, new() { ["file"] = problem });
             await using var c = await db.OpenAsync();
             using (zip)
@@ -437,7 +437,7 @@ public static class LegacyImportEndpoints
         {
             if (settings.DocumentsDirectory is not { } root)
                 return ApiResults.Problem(StatusCodes.Status503ServiceUnavailable, "no-storage", "Documents can't be saved yet because the server has no data folder set. Tell your admin.");
-            var (zip, kind, problem) = await ZipAsync(request);
+            var (zip, problem) = await ZipAsync(request);
             if (problem is not null) return ApiResults.Invalid(problem, new() { ["file"] = problem });
             using (zip)
             {
@@ -456,14 +456,14 @@ public static class LegacyImportEndpoints
                         if (title.Length == 0) title = "Document";
                         if (title.Length > 200) title = title[..200];
                         var documentId = await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Document (ContractId, Kind, Title, CreatedById) OUTPUT INSERTED.Id VALUES (@id, @kind, @title, @me)",
-                            new { id = f.ContractId, kind, title, me = me.Id }, tx);
+                            new { id = f.ContractId, kind = f.Kind, title, me = me.Id }, tx);
                         var versionId = await c.ExecuteScalarAsync<int>("""
                             INSERT INTO contracts.DocumentVersion (DocumentId, VersionNumber, FileName, ContentType, SizeBytes, Sha256, StoredName, UploadedById)
                             OUTPUT INSERTED.Id VALUES (@documentId, 1, @fileName, @type, @size, @sha, @stored, @me)
                             """, new { documentId, fileName = stored.FileName, type = stored.ContentType, size = stored.Size, sha = stored.Sha256, stored = stored.StoredName, me = me.Id }, tx);
                         await audit.WriteAsync(c, tx, me.AsActor(), "document.imported", "Document", documentId,
-                            $"{me.Name} imported \"{title}\" ({DocumentEndpoints.Kinds[kind!]}) to {f.Reference} from {f.Path}.",
-                            new { versionId, f.Path, stored.FileName, stored.Size, stored.Sha256 }, contractId: f.ContractId);
+                            $"{me.Name} imported \"{title}\" ({f.KindName}) to {f.Reference} from {f.Path}.",
+                            new { versionId, f.Path, stored.FileName, stored.Size, stored.Sha256, f.Kind, kindFrom = f.KindWhy }, contractId: f.ContractId);
                     }
                     await audit.WriteAsync(c, tx, me.AsActor(), "import.files", "Import", null,
                         $"{me.Name} imported {saved.Count:N0} files from a ZIP ({plan.Count(f => f.Outcome == "Unmatched"):N0} not matched, {plan.Count(f => f.Outcome == "Already"):N0} already there, {plan.Count(f => f.Outcome == "Refused"):N0} not allowed).");
@@ -493,29 +493,88 @@ public static class LegacyImportEndpoints
         public string? Reference { get; set; }
         public string? Title { get; set; }
         public string? Reason { get; set; }
+        public string Kind { get; set; } = "";
+        public string KindName => DocumentEndpoints.Kinds.GetValueOrDefault(Kind, Kind);
+        public string? KindWhy { get; set; }
         internal int ContractId { get; set; }
         internal ZipArchiveEntry? Entry { get; set; }
     }
 
-    private static async Task<(ZipArchive? Zip, string? Kind, string? Problem)> ZipAsync(HttpRequest request)
+    /// <summary>The ZIP, the kind for files whose kind can't be worked out, and the admin's own choices (file path to kind).</summary>
+    private sealed record ZipUpload(ZipArchive Zip, string DefaultKind, Dictionary<string, string> Chosen) : IDisposable
     {
-        if (!request.HasFormContentType) return (null, null, "Choose a ZIP file.");
+        public void Dispose() => Zip.Dispose();
+    }
+
+    private static async Task<(ZipUpload? Upload, string? Problem)> ZipAsync(HttpRequest request)
+    {
+        if (!request.HasFormContentType) return (null, "Choose a ZIP file.");
         var form = await request.ReadFormAsync();
         var file = form.Files.GetFile("file");
         var kind = form["kind"].ToString();
-        if (!DocumentEndpoints.Kinds.ContainsKey(kind)) return (null, null, "Choose what kind of documents these are.");
-        if (file is null || file.Length == 0) return (null, null, "Choose a ZIP file.");
-        if (!System.IO.Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase)) return (null, null, "Choose a .zip file.");
-        if (file.Length > DocumentEndpoints.MaxBytes) return (null, null, "That ZIP is over 25 MB. Split the files into several ZIPs and import them one after the other.");
+        if (!DocumentEndpoints.Kinds.ContainsKey(kind)) return (null, "Choose what kind of document a file is when its name doesn't say.");
+        Dictionary<string, string> chosen = [];
+        if (form["kinds"].ToString() is { Length: > 0 } json)
+        {
+            try { chosen = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? []; }
+            catch (JsonException) { return (null, "The kinds chosen for the files couldn't be read. Check the files again."); }
+            if (chosen.Values.Any(v => !DocumentEndpoints.Kinds.ContainsKey(v))) return (null, "One of the kinds chosen isn't a document kind. Check the files again.");
+        }
+        if (file is null || file.Length == 0) return (null, "Choose a ZIP file.");
+        if (!System.IO.Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase)) return (null, "Choose a .zip file.");
+        if (file.Length > DocumentEndpoints.MaxBytes) return (null, "That ZIP is over 25 MB. Split the files into several ZIPs and import them one after the other.");
         var memory = new MemoryStream();
         await file.CopyToAsync(memory);
         memory.Position = 0;
-        try { return (new ZipArchive(memory, ZipArchiveMode.Read), kind, null); }
-        catch (InvalidDataException) { return (null, null, "That file isn't a ZIP that can be opened."); }
+        try { return (new ZipUpload(new ZipArchive(memory, ZipArchiveMode.Read), kind, chosen), null); }
+        catch (InvalidDataException) { return (null, "That file isn't a ZIP that can be opened."); }
     }
 
-    private static async Task<List<FilePlan>> PlanFilesAsync(SqlConnection c, SqlTransaction? tx, ZipArchive zip)
+    // What a file is, from words in its folders or name (D-95). Checked in this order, so a "signed variation" is a Variation and a
+    // "signed off" cover page is an internal sign-off, not a signed copy. Whole words only ("unsigned" isn't "signed").
+    private static readonly (string Kind, string[] Words)[] KindWords =
+    [
+        ("InternalSignOff", ["cover page", "cover sheet", "coversheet", "sign off", "signoff", "signed off", "internal approval", "approval form", "sign off form"]),
+        ("Variation", ["variation", "variations", "amendment", "amendments", "addendum", "deed of variation"]),
+        ("Draft", ["draft", "drafts"]),
+        ("LegalMarkup", ["markup", "mark up", "marked up", "redline", "redlined", "tracked changes"]),
+        ("SignedCopy", ["signed", "executed", "fully executed", "countersigned", "counter signed"]),
+        ("Schedule", ["schedule", "schedules", "annexure", "annexures", "appendix", "attachment"]),
+        ("Correspondence", ["correspondence", "email", "emails", "letter", "letters"]),
+        ("Supporting", ["supporting", "support", "quote", "quotes", "invoice", "invoices", "certificate"]),
+    ];
+
+    /// <summary>Normalises "Deed_of-Variation(signed)" or "SignedAgreement" to " deed of variation signed agreement " for whole-word matching.</summary>
+    private static string Words(string text)
     {
+        var spaced = System.Text.RegularExpressions.Regex.Replace(text, "([a-z])([A-Z])", "$1 $2").ToLowerInvariant();
+        return " " + System.Text.RegularExpressions.Regex.Replace(spaced, "[^a-z0-9]+", " ").Trim() + " ";
+    }
+
+    private static string? KindFrom(string text)
+    {
+        var words = Words(text);
+        foreach (var (kind, list) in KindWords)
+            if (list.Any(w => words.Contains($" {w} ", StringComparison.Ordinal))) return kind;
+        return null;
+    }
+
+    /// <summary>The kind for one file: the admin's choice, else its folders (nearest first), else its name, else the default.</summary>
+    internal static (string Kind, string Why) KindFor(string path, string defaultKind, IReadOnlyDictionary<string, string> chosen)
+    {
+        if (chosen.TryGetValue(path, out var mine)) return (mine, "you chose");
+        var parts = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = parts.Length - 2; i >= 0; i--)
+            if (KindFrom(parts[i]) is { } fromFolder) return (fromFolder, $"folder \"{parts[i]}\"");
+        var name = parts.Length > 0 ? System.IO.Path.GetFileNameWithoutExtension(parts[^1]) : path;
+        if (KindFrom(name) is { } fromName) return (fromName, "its name");
+        if (System.IO.Path.GetExtension(path).Equals(".msg", StringComparison.OrdinalIgnoreCase)) return ("Correspondence", "an Outlook email");
+        return (defaultKind, "your default");
+    }
+
+    private static async Task<List<FilePlan>> PlanFilesAsync(SqlConnection c, SqlTransaction? tx, ZipUpload upload)
+    {
+        var zip = upload.Zip;
         var contracts = (await c.QueryAsync<(int Id, string Reference, string? LegacyReference, string Title)>(
             "SELECT Id, Reference, LegacyReference, Title FROM contracts.Contract WHERE Stage <> N'Withdrawn'", transaction: tx)).ToList();
         // Every reference a file could carry, longest first so "MED-1001" beats "MED-100".
@@ -543,7 +602,8 @@ public static class LegacyImportEndpoints
             if (entry.FullName.EndsWith('/') || entry.Length == 0) continue;
             var name = System.IO.Path.GetFileName(entry.FullName.Replace('\\', '/'));
             if (name.StartsWith('.') || entry.FullName.StartsWith("__MACOSX/", StringComparison.Ordinal) || name.Equals("Thumbs.db", StringComparison.OrdinalIgnoreCase)) continue;
-            var f = new FilePlan { Path = entry.FullName, FileName = name, Size = entry.Length, Entry = entry };
+            var (kind, why) = KindFor(entry.FullName, upload.DefaultKind, upload.Chosen);
+            var f = new FilePlan { Path = entry.FullName, FileName = name, Size = entry.Length, Entry = entry, Kind = kind, KindWhy = why };
             plan.Add(f);
             if (plan.Count > MaxEntries) { f.Outcome = "Refused"; f.Reason = $"More than {MaxEntries:N0} files in one ZIP; split it."; continue; }
             unpacked += entry.Length;
@@ -576,6 +636,6 @@ public static class LegacyImportEndpoints
         matched = plan.Count(f => f.Outcome == "Match"), already = plan.Count(f => f.Outcome == "Already"),
         unmatched = plan.Count(f => f.Outcome == "Unmatched"), refused = plan.Count(f => f.Outcome == "Refused"),
         contracts = plan.Where(f => f.Outcome == "Match").Select(f => f.Reference).Distinct().Count(),
-        files = plan.Select(f => new { f.Path, f.Size, f.Outcome, f.Reference, f.Title, f.Reason }),
+        files = plan.Select(f => new { f.Path, f.Size, f.Outcome, f.Reference, f.Title, f.Reason, f.Kind, f.KindName, f.KindWhy }),
     };
 }

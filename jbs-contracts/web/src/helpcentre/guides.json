@@ -506,11 +506,11 @@
       ],
       "video": true,
       "steps": [
-        "Go to **Import old contracts** under Admin and click **Choose the spreadsheet**: Excel or CSV, one contract per row.",
+        "Go to **Import old contracts** under Admin and click **Choose the spreadsheet** (or drag it onto the box): Excel or CSV, one contract per row.",
         "Check where each column goes. Old reference, title, supplier, category and owner are needed; you can choose a default owner and category for rows without one.",
         "Click **Check (nothing changes yet)**. Each row shows whether it goes in as Effective or Ended, is already there, or can't be imported and why.",
         "Click **Import** and confirm. Current contracts become Effective and locked with their original dates; expired ones Ended.",
-        "Then add their files: choose what they are, choose a ZIP with the old reference in each file's name or folder, check the matches and click **Add files**."
+        "Then add their files: choose (or drag in) a ZIP with the old reference in each file's name or folder. What each file is (signed copy, draft, variation, cover page) comes from words in its folder or name; change any that are wrong, then click **Add files**."
       ]
     },
     {

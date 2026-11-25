@@ -205,7 +205,11 @@ export const documentKinds: { value: string; label: string }[] = [
   { value: 'LegalMarkup', label: 'Legal mark-up' },
   { value: 'Correspondence', label: 'Correspondence' },
   { value: 'Supporting', label: 'Supporting document' },
+  { value: 'InternalSignOff', label: 'Internal sign-off (cover page)' },
 ]
+
+/** Every kind, including Variation (added on a Variation's page, or to old variations by the import). */
+export const allDocumentKinds: { value: string; label: string }[] = [...documentKinds, { value: 'Variation', label: 'Variation' }]
 
 export const journey: { stage: Stage; label: string }[] = [
   { stage: 'Draft', label: 'Draft' },

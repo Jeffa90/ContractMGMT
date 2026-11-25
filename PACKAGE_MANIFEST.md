@@ -392,3 +392,4 @@ Regenerated from the actual file tree (last regenerated at the end of the DR-202
 - Shipped packs trusted without a signature (ADR-0047): `decisions/ADR-0047-shipped-packs-trusted-without-a-signature.md`, `tests/Ecp.Integration.Tests/ShippedPackTrustScenarios.cs`
 - Anonymous SMTP relay by host setting (ADR-0048): `decisions/ADR-0048-anonymous-smtp-relay-allowed-by-host-setting.md`, `tests/Ecp.UnitTests/AnonymousRelayCheckTests.cs`
 - External scanning before upload (ADR-0049): `decisions/ADR-0049-external-scanning-before-upload.md`
+- Redesign planning notes (not decided): `docs/redesign/REDESIGN_BRIEF.md`, `docs/redesign/STYLE_GUIDE.md`

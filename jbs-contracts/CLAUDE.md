@@ -23,6 +23,7 @@ The repository root `CLAUDE.md` security rules still apply. Its product principl
 
 - **JBS data stays on JBS servers.** IIS, SQL Server and Windows sign-in only. No cloud services, CDNs, analytics or web fonts loaded at run time. Fonts and icons are bundled.
 - **Never commit secrets or real data.** This repository is public. Demo and test data are realistic and fictional. No real contract, supplier or person data, no passwords, no keys.
+- **Never commit JBS's font files** (JBS Text, JBS Display: "© JBS S/A, all rights reserved"). They live only on the server in the data folder's `fonts` subfolder; the code falls back to Inter (decision D-34).
 - **Every rule is checked on the server.** Role, Confidential, stage, whose turn and lock are enforced by the API on every request. Hiding a button is a courtesy, not security.
 - **Windows sign-in is sent automatically by browsers**, so every request that changes something needs the anti-forgery token. No exceptions.
 - **Effective contracts are locked.** They change only through an approved Variation or an admin's emergency unlock (reason, expiry, audited). A contract's stage changes only through its actions, never by editing.

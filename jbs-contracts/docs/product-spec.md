@@ -310,12 +310,13 @@ Facts (server, site, certificate, database, accounts, email relay, runner, varia
 The new app replaces the old one on QA from slice 0. QA has no real data (confirmed by Jeff), so the database is wiped.
 
 **Slice 0 steps:**
-1. **Jeff:** in GitHub > Settings > Environments > QA > Deployment branches, add `redesign`.
+1. **Jeff:** in GitHub > Settings > Environments > QA, set "Deployment branches and tags" to **Selected branches and tags**, then add rules for `main` and `redesign` (it was "No restriction", so any branch could deploy).
 2. Tag `main` as `legacy-ecp-final` (the old app stays in git history).
 3. On the `redesign` branch only, point `ci.yml` and `deploy.yml` at this folder, reusing `iis-deploy.yml`'s shape and the scripts in `scripts/ci/` (site and pool set-up, certificate, Always Running, the data-protection key permission fix, and the failure-log printing).
 4. A one-off step in the first deploy removes the old app's tables and old data sub-folders, and only runs when a QA variable `RESET_DATABASE_CONFIRM` equals `JBSContracts`. Jeff deletes the variable afterwards.
 5. New QA variables for the new app (first admins, email relay and sender, data folder, logs). The connection string, paths, binding and certificate stay the same. The old `APPENV_Ecp__` variables are removed at the end.
-6. **While building, `main` is frozen for code.** A code push to `main` would redeploy the old app over the new one. Docs-only pushes don't deploy.
+6. **Jeff or IT, once per server:** copy JBSVariableText.woff2 and JBSVariableDisplay.woff2 (from the JBS Webfonts pack) into `C:\inetpub\JbsContracts\Data\fonts`. They are never in the repository (D-34). Until they're there, the app shows Inter.
+7. **While building, `main` is frozen for code.** A code push to `main` would redeploy the old app over the new one. Docs-only pushes don't deploy.
 
 **When the new app is accepted:** merge `redesign` into `main`; set the QA deployment branch back to `main` only; remove the old app's code (still in history under the tag); set up Production as in section 7 of the configuration record. Production still deploys **only** from a manual run on `main` with promote-to-production ticked and the Production reviewer's approval.
 

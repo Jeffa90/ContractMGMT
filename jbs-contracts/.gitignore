@@ -1,0 +1,7 @@
+# JBS's own fonts (JBS Text, JBS Display) are "(c) JBS S/A, all rights reserved" and this repository is public.
+# They live only on the server (Data\fonts). Never commit font files here; Inter comes from npm (decision D-34).
+*.woff
+*.woff2
+*.eot
+*.ttf
+*.otf

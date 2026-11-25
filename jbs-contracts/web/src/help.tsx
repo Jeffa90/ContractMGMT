@@ -283,6 +283,22 @@ const topics = {
       </>
     ),
   },
+  feedback: {
+    title: 'Feedback',
+    body: (
+      <>
+        <p>
+          Use the <strong>Feedback</strong> button (bottom right of every screen; on a phone, on this page) to tell us about a problem, an idea or a
+          question. Choose what kind, say what
+          happened, and send. The screen you were on is sent with it.
+        </p>
+        <p>
+          This page lists your feedback, with any replies. You can reply, and change its status (Open, In progress, Done or Won't do). Admins see everyone's,
+          are emailed when new feedback comes in, and can archive items that are finished with. Nothing is deleted.
+        </p>
+      </>
+    ),
+  },
   lists: {
     title: 'Lists',
     body: (

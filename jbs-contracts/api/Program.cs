@@ -82,6 +82,7 @@ app.MapVariationEndpoints();
 app.MapDocumentEndpoints();
 app.MapExcelEndpoints();
 app.MapLayoutEndpoints();
+app.MapFeedbackEndpoints();
 
 // Unknown /api paths are a plain 404; every other path is a screen of the front end.
 app.Map("/api/{**rest}", () => ApiResults.NotFound("That isn't something JBS Contracts can do."));

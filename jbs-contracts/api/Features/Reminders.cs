@@ -42,6 +42,8 @@ public static partial class EmailWording
             ["First name", "Supplier", "Due date", "Days"], HasDays: true, Button: "Open the supplier"),
         new("ReviewAction", "Business review action given to you", "Suppliers", "To the person given an action at a business review (not when you give one to yourself).",
             ["First name", "Supplier", "Review date", "Due date", "Action"], Button: "Open the supplier"),
+        new("FeedbackNew", "New feedback", "Feedback", "To every admin when someone sends feedback (not to whoever sent it).",
+            ["First name", "Sent by", "Feedback type", "Screen", "Comment"], Button: "Open feedback"),
     ];
 
     public static readonly Dictionary<string, Kind> ByKey = Kinds.ToDictionary(k => k.Key);

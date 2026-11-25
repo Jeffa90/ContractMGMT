@@ -21,6 +21,7 @@ const fixed: [string, string][] = [
   ['Contract fields', '/admin/fields'],
   ['Reminders', '/admin/reminders'],
   ['Import old contracts', '/admin/import'],
+  ['Feedback', '/feedback'],
   ['Page not found', '/no-such-page'],
 ]
 

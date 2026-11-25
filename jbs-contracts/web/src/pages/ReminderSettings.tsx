@@ -74,6 +74,9 @@ const sample: Record<string, string> = {
   Approver: "Grant Wallace",
   Reason: "The signed copy is missing page 4.",
   "Effective date": "Tue 1 Dec 2026",
+  "Feedback type": "Improvement",
+  Screen: "Contracts",
+  Comment: "It would help to sort by supplier.",
 };
 
 const fill = (text: string) =>

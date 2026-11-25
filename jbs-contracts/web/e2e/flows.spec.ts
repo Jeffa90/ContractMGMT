@@ -126,3 +126,26 @@ test('Back goes to where you were, not up a level', async ({ page }) => {
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page).toHaveURL(/\/suppliers$/)
 })
+
+test('Send feedback from any screen and find it on the Feedback page', async ({ page }, info) => {
+  const words = `E2E feedback ${info.project.name} ${Date.now()}`
+  // Bottom right on a computer; on a phone, on the Feedback page.
+  const phone = info.project.use.hasTouch === true
+  await page.goto(phone ? '/feedback' : '/suppliers')
+  await settled(page)
+  await page.getByRole('button', { name: 'Feedback', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText(phone ? 'From: Feedback (/feedback)' : 'From: Suppliers (/suppliers)')).toBeVisible()
+  await dialog.getByRole('radio', { name: 'Improvement' }).click()
+  await dialog.getByLabel(/Tell us what happened/).fill(words)
+  await expectAccessible(page)
+  await dialog.getByRole('button', { name: 'Send feedback' }).click()
+  await expect(page.getByText('Thanks, your feedback has been recorded.')).toBeVisible()
+  await page.goto('/feedback')
+  await settled(page)
+  const item = page.getByText(words)
+  await expect(item).toBeVisible()
+  await item.click()
+  await expect(page.getByLabel('Reply')).toBeVisible()
+  await expectAccessible(page)
+})

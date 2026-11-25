@@ -6,6 +6,7 @@ import {
   ChartColumn,
   FileInput,
   LifeBuoy,
+  MessageSquareWarning,
   UsersRound,
   CalendarClock,
   ChevronsLeft,
@@ -33,6 +34,7 @@ import { openSearch } from "@/lib/search";
 import { SearchPalette } from "./SearchPalette";
 import { TryAsBanner, TryAsDialog } from "./TryAs";
 import { DemoDataDialog } from "./DemoDataDialog";
+import { FeedbackButton } from "./FeedbackButton";
 import logo from "@/assets/jbs-logo.webp";
 import logoWhite from "@/assets/jbs-logo-white.webp";
 import { cn } from "@/lib/cn";
@@ -181,6 +183,7 @@ function NavLinks({
       {/* Help for everyone, set apart from the work screens. */}
       <div className="mt-4">
         {link({ to: "/help", label: "Help", icon: <LifeBuoy aria-hidden className="size-5" /> })}
+        {link({ to: "/feedback", label: "Feedback", icon: <MessageSquareWarning aria-hidden className="size-5" /> })}
       </div>
     </nav>
   );
@@ -440,7 +443,8 @@ export function Shell() {
 
         <SearchPalette />
 
-        <main id="main" className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8 print:p-0">
+        <FeedbackButton />
+        <main id="main" className="min-w-0 flex-1 px-4 pt-6 pb-24 md:px-8 md:pt-8 md:pb-24 print:p-0">
           <div className="mx-auto flex max-w-6xl flex-col gap-6 print:max-w-none">
             <Outlet />
           </div>

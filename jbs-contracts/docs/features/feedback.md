@@ -1,6 +1,6 @@
 # Feature (later): in-app Feedback
 
-Status: **planned, not built**. Added at Jeff's request on 25 Nov 2026, from the JBS feedback feature reference (the version built for the JBS AI Initiatives app, in Vue). This page adapts it to JBS Contracts' stack (React) and design system. The rules, database and API stay the same as the reference, so every JBS app shares one feedback store.
+Status: **built in JBS Contracts' own database (D-101, 26 Nov)**; moving it to the shared JBSAppsCommon store below is still open. Added at Jeff's request on 25 Nov 2026, from the JBS feedback feature reference (the version built for the JBS AI Initiatives app, in Vue). This page adapts it to JBS Contracts' stack (React) and design system. The rules, database and API stay the same as the reference, so every JBS app shares one feedback store.
 
 ## What people get
 

@@ -18,6 +18,7 @@ import { ReportsPage } from './pages/Reports'
 import { TeamPage } from './pages/Team'
 import { SupplierPage } from './pages/Supplier'
 import { ImportPage } from './pages/Import'
+import { FeedbackPage } from './pages/Feedback'
 import { GuidePage, HelpCentrePage } from './helpcentre/HelpCentre'
 import { PeoplePage } from './pages/People'
 import { SuppliersPage } from './pages/Suppliers'
@@ -57,6 +58,7 @@ const router = createBrowserRouter([
       { path: 'team', element: <TeamPage /> },
       { path: 'help', element: <HelpCentrePage /> },
       { path: 'help/:id', element: <GuidePage /> },
+      { path: 'feedback', element: <FeedbackPage /> },
       { path: 'suppliers', element: <SuppliersPage /> },
       { path: 'suppliers/:id', element: <SupplierPage /> },
       { path: 'admin/people', element: <PeoplePage /> },

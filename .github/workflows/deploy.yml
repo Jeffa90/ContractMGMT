@@ -15,6 +15,7 @@ on:
       - "jbs-contracts/**"
       - "!jbs-contracts/docs/**"
       - "!**/*.md"
+      - ".github/workflows/ci.yml"
       - ".github/workflows/deploy.yml"
       - ".github/workflows/iis-deploy.yml"
       - "scripts/ci/**"

@@ -50,11 +50,13 @@ jobs:
           pw="Aa1!$(openssl rand -hex 16)"
           echo "::add-mask::$pw"
           docker run -d --name sql -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=$pw" -p 1433:1433 mcr.microsoft.com/mssql/server:2025-latest >/dev/null
+          ready=no
           for i in $(seq 1 60); do
-            if docker logs sql 2>&1 | grep -q "SQL Server is now ready for client connections"; then break; fi
+            # Ready means a real login works (the "ready" log line comes before system upgrade steps finish).
+            if docker exec sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$pw" -Q "SELECT 1" > /dev/null 2>&1; then ready=yes; break; fi
             sleep 2
           done
-          docker logs sql 2>&1 | grep -q "SQL Server is now ready for client connections" || { docker logs sql | tail -20; echo "::error::SQL Server did not start."; exit 1; }
+          if [ "$ready" != yes ]; then docker logs sql > "$RUNNER_TEMP/sql.log" 2>&1 || true; tail -20 "$RUNNER_TEMP/sql.log"; echo "::error::SQL Server did not start."; exit 1; fi
           echo "JBS_TEST_SQL=Server=localhost,1433;User Id=sa;Password=$pw;TrustServerCertificate=True;Encrypt=True" >> "$GITHUB_ENV"
       - uses: actions/setup-dotnet@v4
         with:

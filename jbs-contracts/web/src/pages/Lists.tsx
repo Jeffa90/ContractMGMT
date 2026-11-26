@@ -2,7 +2,8 @@
 // kinds) and on suppliers (document types, tiers, risk levels).
 // Nothing is deleted: an item is hidden and stays on contracts that already use it.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Eye, EyeOff, Pencil, Plus, Search } from 'lucide-react'
+import * as Menu from '@radix-ui/react-dropdown-menu'
+import { ChevronRight, Eye, EyeOff, MoreHorizontal, Pencil, Plus, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
@@ -102,11 +103,11 @@ export function ListsPage() {
   const tierPick = (cat: Category, parent: Category | null) => (
     <Select
       aria-label={`Supplier tier for ${cat.name}`}
-      className="h-9 min-h-9 w-44 text-sm"
+      className="h-9 min-h-9 w-auto max-w-full text-sm"
       value={cat.tierId ? String(cat.tierId) : ''}
       onChange={(e) => setTier.mutate({ cat, tierId: e.target.value ? Number(e.target.value) : null })}
     >
-      <option value="">{parent ? `Tier: as ${parent.name}` : 'Tier: none'}</option>
+      <option value="">{parent ? `Tier: same as ${parent.name}` : 'Tier: none'}</option>
       {tiers.map((t) => (
         <option key={t.id} value={t.id}>
           Tier: {t.value}
@@ -115,6 +116,37 @@ export function ListsPage() {
     </Select>
   )
 
+  // A family, category or subcategory's other actions, in one small menu so each row stays on one line (D-115).
+  const menuItem = 'flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 outline-none data-[highlighted]:bg-muted'
+  const categoryMenu = (node: Category, depth: number) => {
+    const child = levelName[Math.min(depth, 2)]
+    return (
+      <Menu.Root modal={false}>
+        <Menu.Trigger
+          aria-label={`More for ${node.name}`}
+          className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] hover:bg-muted"
+        >
+          <MoreHorizontal aria-hidden className="size-5" />
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Content align="end" sideOffset={4} collisionPadding={8} className="z-50 min-w-56 rounded-[var(--radius-card)] border border-border bg-card p-1 shadow-lg">
+            {depth < 3 && (
+              <Menu.Item className={menuItem} onSelect={() => setEditing({ kind: 'add', parent: node, level: child })}>
+                <Plus aria-hidden className="size-4" /> Add a {child}
+              </Menu.Item>
+            )}
+            <Menu.Item className={menuItem} onSelect={() => setEditing({ kind: 'rename', item: node })}>
+              <Pencil aria-hidden className="size-4" /> Rename
+            </Menu.Item>
+            <Menu.Item className={menuItem} onSelect={() => toggle.mutate({ item: node })}>
+              {node.isActive ? <EyeOff aria-hidden className="size-4" /> : <Eye aria-hidden className="size-4" />}
+              {node.isActive ? 'Hide' : 'Show again'}
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu.Root>
+    )
+  }
   const rowActions = (item: ListItem | Category, name: string) => (
     <span className="flex shrink-0 gap-1">
       <Button variant="ghost" icon={<Pencil aria-hidden className="size-4" />} onClick={() => setEditing({ kind: 'rename', item })} aria-label={`Rename ${name}`}>
@@ -201,7 +233,7 @@ export function ListsPage() {
                 <TextInput aria-label="Find a family, category or subcategory" placeholder="Find: type a word" className="pl-9" value={find} onChange={(e) => setFind(e.target.value)} />
               </div>
               {shown?.size === 0 && <p className="py-6 text-muted-foreground">Nothing matches "{find}".</p>}
-              <ul className="mt-2 divide-y divide-border">
+              <ul className="@container mt-2 divide-y divide-border">
                 {categories.filter((c) => c.parentId === null).length === 0 && (
                   <li className="py-6 text-muted-foreground">No categories yet. Add your first family, for example Packaging, or load a whole taxonomy with Import from Excel.</li>
                 )}
@@ -218,8 +250,7 @@ export function ListsPage() {
                       open={open}
                       setOpen={setOpen}
                       tierPick={tierPick}
-                      rowActions={rowActions}
-                      onAdd={(parent, level) => setEditing({ kind: 'add', parent, level })}
+                      menu={categoryMenu}
                     />
                   ))}
               </ul>
@@ -312,8 +343,7 @@ function CategoryNode({
   open,
   setOpen,
   tierPick,
-  rowActions,
-  onAdd,
+  menu,
 }: {
   node: Category
   parent: Category | null
@@ -323,15 +353,14 @@ function CategoryNode({
   open: Set<number>
   setOpen: (s: Set<number>) => void
   tierPick: (cat: Category, parent: Category | null) => React.ReactNode
-  rowActions: (item: Category, name: string) => React.ReactNode
-  onAdd: (parent: Category, level: string) => void
+  menu: (node: Category, depth: number) => React.ReactNode
 }) {
   const children = depth < 3 ? categories.filter((c) => c.parentId === node.id && (!shown || shown.has(c.id))) : []
   const isOpen = shown !== null || open.has(node.id)
-  const childLevel: string = levelName[Math.min(depth, 2)]
   return (
-    <li className={cn(depth === 1 ? 'py-3' : 'border-l border-border py-1 pl-3')}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <li className={cn(depth === 1 ? 'py-2' : 'border-l border-border pl-3')}>
+      {/* Each row keeps its controls with it: beside the name when there's room, else on their own line under it. */}
+      <div className="grid gap-1 rounded-lg px-1 py-1.5 hover:bg-muted/50 @xl:grid-cols-[minmax(0,1fr)_auto] @xl:items-center @xl:gap-3">
         <span className="flex min-w-0 items-center gap-1">
           {depth < 3 && (
             <Button
@@ -350,6 +379,7 @@ function CategoryNode({
               <ChevronRight aria-hidden className={cn('size-4 transition-transform', isOpen && 'rotate-90')} />
             </Button>
           )}
+          {depth === 3 && <span aria-hidden className="w-2 shrink-0" />}
           <span className={cn('min-w-0 break-words', depth === 1 && 'font-medium')}>
             {node.name} {!node.isActive && <Badge>Hidden</Badge>}
             {depth < 3 && (
@@ -360,14 +390,9 @@ function CategoryNode({
             )}
           </span>
         </span>
-        <span className="flex flex-wrap items-center gap-1">
+        <span className="flex min-w-0 items-center gap-1 pl-10 @xl:pl-0">
           {tierPick(node, parent)}
-          {depth < 3 && (
-            <Button variant="ghost" icon={<Plus aria-hidden className="size-4" />} onClick={() => onAdd(node, childLevel)} aria-label={`Add a ${childLevel} in ${node.name}`}>
-              {childLevel === 'category' ? 'Category' : 'Subcategory'}
-            </Button>
-          )}
-          {rowActions(node, node.name)}
+          {menu(node, depth)}
         </span>
       </div>
       {isOpen && children.length > 0 && (
@@ -383,8 +408,7 @@ function CategoryNode({
               open={open}
               setOpen={setOpen}
               tierPick={tierPick}
-              rowActions={rowActions}
-              onAdd={onAdd}
+              menu={menu}
             />
           ))}
         </ul>

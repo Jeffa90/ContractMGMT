@@ -10,8 +10,10 @@ namespace JbsContracts.Api.Tests;
 
 /// <summary>
 /// Slice 6: renewal decisions, renewing, ending, archiving, review done, the daily reminder job and the admin reminder settings.
-/// One class, so these run one after another: the job and the settings apply to every contract.
+/// One class, so these run one after another: the job and the settings apply to every contract. It also runs on its own (the
+/// non-parallel collection): running the job for future days would send other classes' reminders early.
 /// </summary>
+[Collection(nameof(DemoDataTests))]
 public sealed class RenewalTests(AppFixture app)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

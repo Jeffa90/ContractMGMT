@@ -12,7 +12,10 @@ namespace JbsContracts.Api.Tests;
 /// <summary>
 /// D-102, after comparing Medius's contract fields with Jeff: Entity and Function drop-downs, Renews automatically (the daily job moves
 /// the end date on), and contract numbers that carry on from Medius (imported contracts keep theirs).
+/// Runs on its own (the non-parallel collection): the daily job here moves end dates on, and another class running the job at the
+/// same time could move this class's contracts on between steps.
 /// </summary>
+[Collection(nameof(DemoDataTests))]
 public sealed class StandardFieldsTests(AppFixture app)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

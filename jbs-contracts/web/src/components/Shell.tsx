@@ -23,6 +23,7 @@ import {
   UserRoundSearch,
   Users,
   X,
+  Eraser,
   Sparkles,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -34,6 +35,7 @@ import { openSearch } from "@/lib/search";
 import { SearchPalette } from "./SearchPalette";
 import { TryAsBanner, TryAsDialog } from "./TryAs";
 import { DemoDataDialog } from "./DemoDataDialog";
+import { QaClearDialog } from "./QaClearDialog";
 import { FeedbackButton } from "./FeedbackButton";
 import logo from "@/assets/jbs-logo.webp";
 import logoWhite from "@/assets/jbs-logo-white.webp";
@@ -205,6 +207,7 @@ function PersonMenu({ collapsed }: { collapsed?: boolean }) {
   const deliveryLabel = (value: string, label: string) => (reminderDelivery === null && value === defaultReminderDelivery ? `${label} (default)` : label);
   const [tryAs, setTryAs] = useState(false);
   const [demo, setDemo] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(readThemeChoice);
   const choose = (choice: ThemeChoice) => {
     setTheme(choice);
@@ -216,6 +219,7 @@ function PersonMenu({ collapsed }: { collapsed?: boolean }) {
     <>
       {tryAs && <TryAsDialog onClose={() => setTryAs(false)} />}
       {demo && <DemoDataDialog refresh={demoData === "loaded"} onClose={() => setDemo(false)} />}
+      {clearing && <QaClearDialog onClose={() => setClearing(false)} />}
       <Menu.Root>
         <Menu.Trigger
           className={cn(
@@ -303,6 +307,11 @@ function PersonMenu({ collapsed }: { collapsed?: boolean }) {
               <Menu.Item className={item} onSelect={() => setDemo(true)}>
                 <Sparkles aria-hidden className="size-4" />
                 {demoData === "loaded" ? "Refresh demo data (QA)" : "Load demo data (QA)"}
+              </Menu.Item>
+            )}
+            {demoData && (
+              <Menu.Item className={item} onSelect={() => setClearing(true)}>
+                <Eraser aria-hidden className="size-4" /> Clear contracts and suppliers (QA)
               </Menu.Item>
             )}
           </Menu.Content>

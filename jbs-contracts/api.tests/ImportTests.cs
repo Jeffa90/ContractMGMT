@@ -226,4 +226,95 @@ public sealed class ImportTests(AppFixture app)
     [InlineData("MED-1 SignedAgreement.pdf", "SignedCopy")]
     public void A_files_kind_comes_from_its_folders_then_its_name_then_the_default(string path, string kind) =>
         Assert.Equal(kind, LegacyImportEndpoints.KindFor(path, "Supporting", new Dictionary<string, string>()).Kind);
+
+    [Fact]
+    public async Task A_Medius_export_matches_its_columns_lists_what_to_set_up_first_and_leaves_out_archived()
+    {
+        var u = Unique("x");
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var ownerUser = Unique("mo");
+        var ownerName = $"Morgan Medius {u}";
+        await app.AddPersonAsync(ownerUser, ownerName, new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        // The Export Search Results columns, in Medius's order (fictional values).
+        string[] headers = ["Save To Folder", "Agreement Header", "Entity Name", "Agreement Reference", "Agreement Status", "Vendor Name", "Vendor User", "Vendor Number",
+            "SAP Outline Agreement Number", "Agreement Information", "Title", "Description", "Business Unit", "Plant", "Agreement Type", "Function", "Agreement Owner",
+            "Legal Agreement", "Agreement Currency", "Estimated Agreement Value", "Agreement Dates", "Start Date", "Effective Date", "End Date", "Review Date",
+            "Extension Type", "Notice Period", "Approvals", "Approver", "Additional Information", "Team", "PORTFOLIO/CATEGORY", "SUB-CATEGORY"];
+        string Ref(int n) => $"MX{u}{n}";
+        object?[] Row(int n, string status, string category, string sub, string plant) =>
+        [
+            null, null, $"Fictional Entity {u}", Ref(n), status, $"Medius Vendor {u}", null, "1234567", n == 1 ? "4600001234" : null, null, $"Contract {n}", null, null, plant,
+            null, null, ownerName, null, "AUD", "150000", null, Today.AddDays(-200), Today.AddDays(-200), Today.AddDays(500), Today.AddDays(400),
+            "Manual", "3 Months", null, null, null, null, category, sub,
+        ];
+        using var book = new XLWorkbook();
+        var sheet = book.Worksheets.Add("Export");
+        for (var c = 0; c < headers.Length; c++) sheet.Cell(1, c + 1).Value = headers[c];
+        object?[][] rows = [Row(1, "Effective", $"Logistics/Freight {u}", "Linehaul", $"Plant {u}"), Row(2, "Approved", $"Logistics/Freight {u}", "Cold chain", $"Plant {u}"),
+            Row(3, "Archived", $"Old Category {u}", "Old sub", $"Old plant {u}")];
+        for (var r = 0; r < rows.Length; r++)
+            for (var c = 0; c < rows[r].Length; c++)
+                if (rows[r][c] is DateOnly d) sheet.Cell(r + 2, c + 1).Value = d.ToDateTime(TimeOnly.MinValue);
+                else if (rows[r][c] is { } v) sheet.Cell(r + 2, c + 1).Value = v.ToString();
+        using var stream = new MemoryStream();
+        book.SaveAs(stream);
+        var file = stream.ToArray();
+        MultipartFormDataContent F(Dictionary<string, string>? mapping = null, bool leaveOut = true, string? download = null)
+        {
+            var form = Form(file, "ContractsExport_All.xlsx", mapping);
+            if (leaveOut) form.Add(new StringContent("true"), "leaveOutArchived");
+            if (download is not null) form.Add(new StringContent(download), "download");
+            return form;
+        }
+
+        var columns = await ReadAsync(await admin.PostAsync("/api/import/legacy/columns", F(), Ct));
+        var suggested = columns.GetProperty("columns").EnumerateArray().ToDictionary(c => c.GetProperty("header").GetString()!, c => c.GetProperty("suggested").GetString());
+        Assert.Equal("legacyReference", suggested["Agreement Reference"]);
+        Assert.Equal("status", suggested["Agreement Status"]);
+        Assert.Equal("supplier", suggested["Vendor Name"]);
+        Assert.Equal("supplierVendorNumber", suggested["Vendor Number"]);
+        Assert.Equal("owner", suggested["Agreement Owner"]);
+        Assert.Equal("value", suggested["Estimated Agreement Value"]);
+        Assert.Equal("currency", suggested["Agreement Currency"]);
+        Assert.Equal("site", suggested["Plant"]);
+        Assert.Equal("category", suggested["PORTFOLIO/CATEGORY"]);
+        Assert.Equal("subcategory", suggested["SUB-CATEGORY"]);
+        Assert.Equal("autoRenews", suggested["Extension Type"]);
+        Assert.Equal("entity", suggested["Entity Name"]);
+        Assert.Null(suggested["Save To Folder"]);
+        var mapping = suggested.Where(s => s.Value is not null).ToDictionary(s => s.Key, s => s.Value!);
+
+        // The dry run lists what to add under Lists first (only from the rows that would come in) and leaves the archived one out.
+        var plan = await ReadAsync(await admin.PostAsync("/api/import/legacy/preview", F(mapping), Ct));
+        Assert.Equal(1, plan.GetProperty("leftOut").GetInt32());
+        Assert.Equal(2, plan.GetProperty("refused").GetInt32());
+        var missing = plan.GetProperty("missing").EnumerateArray().ToDictionary(m => m.GetProperty("list").GetString()!, m => m.GetProperty("names").EnumerateArray().Select(x => x.GetString()).ToList());
+        Assert.Equal([$"Logistics/Freight {u}", $"Logistics/Freight {u} > Cold chain", $"Logistics/Freight {u} > Linehaul"], missing["Category"].Order());
+        Assert.Equal([$"Plant {u}"], missing["Site"]);
+        Assert.Equal([$"Fictional Entity {u}"], missing["Entity"]);
+        Assert.DoesNotContain(missing["Category"], n => n!.StartsWith("Old Category"));
+
+        // The download is a Lists sheet that imports as it is.
+        var sheetBytes = await (await admin.PostAsync("/api/import/legacy/preview", F(mapping, download: "missing"), Ct)).Content.ReadAsByteArrayAsync(Ct);
+        var (_, listsResult) = await ExcelTests.PostAsync(admin, "lists", "import", sheetBytes);
+        Assert.Equal(5, ExcelTests.Count(listsResult, "added"));
+
+        // Now both rows are ready: Approved (signed, starting later) comes in as Effective; the vendor number is saved on the new supplier.
+        plan = await ReadAsync(await admin.PostAsync("/api/import/legacy/preview", F(mapping), Ct));
+        Assert.Equal(2, plan.GetProperty("effective").GetInt32());
+        Assert.Equal(0, plan.GetProperty("refused").GetInt32());
+        Assert.Empty(plan.GetProperty("missing").EnumerateArray());
+        await ReadAsync(await admin.PostAsync("/api/import/legacy/import", F(mapping), Ct));
+        await using var db = await app.OpenAsync();
+        Assert.Equal("1234567", await db.ExecuteScalarAsync<string>("SELECT VendorNumber FROM contracts.Supplier WHERE Name = @name", new { name = $"Medius Vendor {u}" }));
+        var imported = (await db.QueryAsync<(string Reference, string Category, string Parent, string Sap, int? Notice)>("""
+            SELECT k.Reference, c.Name, p.Name, k.SapOutlineAgreement, k.NoticePeriodDays FROM contracts.Contract k
+            JOIN contracts.Category c ON c.Id = k.CategoryId JOIN contracts.Category p ON p.Id = c.ParentId WHERE k.LegacyReference LIKE @like
+            """, new { like = $"MX{u}%" })).ToDictionary(x => x.Reference);
+        Assert.Equal(2, imported.Count);
+        Assert.Equal(("Linehaul", $"Logistics/Freight {u}"), (imported[Ref(1)].Category, imported[Ref(1)].Parent));
+        Assert.Equal("4600001234", imported[Ref(1)].Sap);
+        Assert.NotNull(imported[Ref(1)].Notice);
+        Assert.Equal(0, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Contract WHERE LegacyReference = @r", new { r = Ref(3) }));
+    }
 }

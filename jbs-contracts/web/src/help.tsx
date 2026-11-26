@@ -289,7 +289,9 @@ const topics = {
           </li>
           <li>
             <strong>Check</strong>: the dry run shows each row: imported as Effective (current, locked, with its original dates), as Ended (expired), already
-            imported, or can't be imported and why. Nothing changes yet. Fix problems in the file (or add missing people and categories) and check again.
+            imported, left out (archived, while <strong>Leave out archived contracts</strong> is ticked), or can't be imported and why. Nothing changes yet.
+            Categories, subcategories, sites and other list values that aren't in JBS Contracts yet are listed together: <strong>Download the lists to
+            add</strong>, check the sheet, import it under Lists, Import from Excel, then check again. Owners must be set up as people first.
           </li>
           <li>
             <strong>Import</strong>: the ready rows go in, in one step. Suppliers that aren't in JBS Contracts yet are added. Each contract keeps its old number (for example

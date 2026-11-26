@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileArchive,
+  FileDown,
   FileSpreadsheet,
   MinusCircle,
   XCircle,
@@ -21,6 +22,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Field,
   Segmented,
   type Tone,
@@ -46,13 +48,17 @@ type Columns = {
   columns: { header: string; examples: string[]; suggested: string | null }[];
   targets: Target[];
 };
-type Outcome = "Effective" | "Ended" | "Already" | "Refused";
+type Outcome = "Effective" | "Ended" | "Already" | "Refused" | "LeftOut";
 type Plan = {
   effective: number;
   ended: number;
   already: number;
   refused: number;
+  /** Archived in the old system, left out (D-109). */
+  leftOut: number;
   newSuppliers: string[];
+  /** List items to add under Admin, Lists first, by list. */
+  missing: { list: string; names: string[] }[];
   rows: {
     row: number;
     legacyReference: string | null;
@@ -135,7 +141,34 @@ const outcomeBadge: Record<
     label: "Can't import",
     icon: <XCircle aria-hidden className="size-3.5" />,
   },
+  LeftOut: {
+    tone: "neutral",
+    label: "Left out (archived)",
+    icon: <MinusCircle aria-hidden className="size-3.5" />,
+  },
 };
+
+/** The missing list items as a sheet for Admin, Lists, Import from Excel (D-109). */
+async function downloadMissing(form: FormData) {
+  form.append("download", "missing");
+  try {
+    const response = await fetch("/api/import/legacy/preview", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-JBS-Contracts": "1" },
+      body: form,
+    });
+    if (!response.ok) throw new Error();
+    const url = URL.createObjectURL(await response.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "jbs-contracts-lists-to-add.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error("That didn't download. Try again.");
+  }
+}
 const fileBadge: Record<FileOutcome, { tone: Tone; label: string }> = {
   Match: { tone: "success", label: "Matched" },
   Already: { tone: "info", label: "Already there" },
@@ -177,6 +210,7 @@ function ContractsStep() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [defaultOwnerId, setDefaultOwnerId] = useState("");
   const [defaultCategoryId, setDefaultCategoryId] = useState("");
+  const [leaveOutArchived, setLeaveOutArchived] = useState(true);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [show, setShow] = useState<"problems" | "ready" | "all">("problems");
   const [confirming, setConfirming] = useState(false);
@@ -193,6 +227,7 @@ function ContractsStep() {
     f.append("mapping", JSON.stringify(mapping));
     if (defaultOwnerId) f.append("defaultOwnerId", defaultOwnerId);
     if (defaultCategoryId) f.append("defaultCategoryId", defaultCategoryId);
+    if (leaveOutArchived) f.append("leaveOutArchived", "true");
     return f;
   };
   const read = useMutation({
@@ -453,6 +488,15 @@ function ContractsStep() {
               )}
             </Field>
           </div>
+          <Checkbox
+            label="Leave out archived contracts"
+            description="Rows whose status says Archived (Medius keeps these outside its main list). Untick to bring them in as Ended."
+            checked={leaveOutArchived}
+            onChange={(v) => {
+              setLeaveOutArchived(v);
+              setPlan(null);
+            }}
+          />
           <div>
             <Button
               variant={plan ? "secondary" : "primary"}
@@ -480,6 +524,37 @@ function ContractsStep() {
             <Stat label="Already imported" value={plan.already} />
             <Stat label="Can't import" value={plan.refused} tone="danger" />
           </div>
+          {plan.leftOut > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {plan.leftOut} archived {plan.leftOut === 1 ? "contract" : "contracts"} left out.
+            </p>
+          )}
+          {plan.missing.length > 0 && (
+            <Alert tone="warning" title="Add these under Admin, Lists first">
+              <div className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-1">
+                  {plan.missing.map((m) => (
+                    <li key={m.list}>
+                      <strong>
+                        {m.list === "Category" ? "Categories and subcategories" : m.list} ({m.names.length}):
+                      </strong>{" "}
+                      {m.names.slice(0, 8).join(", ")}
+                      {m.names.length > 8 ? ` and ${m.names.length - 8} more` : ""}
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  Download them as a sheet, check it, then use <Link to="/admin/lists" className="font-medium text-primary underline">Lists</Link>, Import from
+                  Excel. Then check again here.
+                </p>
+                <div>
+                  <Button icon={<FileDown aria-hidden className="size-4" />} onClick={() => void downloadMissing(form())}>
+                    Download the lists to add
+                  </Button>
+                </div>
+              </div>
+            </Alert>
+          )}
           {plan.newSuppliers.length > 0 && (
             <p className="text-sm">
               <strong>
@@ -621,10 +696,10 @@ function ContractsStep() {
                 added.
               </li>
             )}
-            {plan.already + plan.refused > 0 && (
+            {plan.already + plan.refused + plan.leftOut > 0 && (
               <li>
-                {plan.already + plan.refused}{" "}
-                {plan.already + plan.refused === 1 ? "row" : "rows"} left out.
+                {plan.already + plan.refused + plan.leftOut}{" "}
+                {plan.already + plan.refused + plan.leftOut === 1 ? "row" : "rows"} left out.
               </li>
             )}
           </ul>

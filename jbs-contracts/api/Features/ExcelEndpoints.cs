@@ -249,7 +249,7 @@ public static class ExcelEndpoints
     private static readonly Dictionary<string, (string ListName, string Label)> ListNames = new()
     {
         ["category"] = ("Category", "Category"), ["agreementtype"] = ("AgreementType", "Agreement type"), ["businessunit"] = ("BusinessUnit", "Business unit"),
-        ["site"] = ("Site", "Site"), ["currency"] = ("Currency", "Currency"),
+        ["site"] = ("Site", "Site"), ["entity"] = ("Entity", "Entity"), ["function"] = ("Function", "Function"), ["currency"] = ("Currency", "Currency"),
         ["supplierdocumenttype"] = ("SupplierDocumentType", "Supplier document type"), ["suppliertier"] = ("SupplierTier", "Supplier tier"),
         ["contractdocumentkind"] = ("DocumentKind", "Contract document kind"), ["supplierrisklevel"] = ("SupplierRisk", "Supplier risk level"),
     };
@@ -257,7 +257,7 @@ public static class ExcelEndpoints
     private static Kind Lists() => new(
         "lists", "lists", "Lists",
         [
-            new("List", "Required: Category, Agreement type, Business unit, Site, Currency, Supplier document type or Supplier tier.", 22),
+            new("List", "Required: Category, Agreement type, Business unit, Site, Entity, Function, Currency, Supplier document type or Supplier tier.", 22),
             new("Name", "Required. For a currency, the three-letter code (AUD).", 30),
             new("Parent category", "Only for subcategories: the category it sits under.", 24),
             new("Active", "Yes or No. No hides it from the choices; contracts that use it keep it.", 10),
@@ -292,7 +292,7 @@ public static class ExcelEndpoints
                 var name = Clean(row.Text("Name"));
                 var parent = Clean(row.Text("Parent category"));
                 r.Label = parent is null ? $"{listText}: {name}" : $"{listText}: {parent} > {name}";
-                if (!ListNames.TryGetValue(Excel.Normalise(listText), out var list)) { r.Refuse($"List: \"{listText}\" isn't one of Category, Agreement type, Business unit, Site, Currency, Supplier document type or Supplier tier."); continue; }
+                if (!ListNames.TryGetValue(Excel.Normalise(listText), out var list)) { r.Refuse($"List: \"{listText}\" isn't one of Category, Agreement type, Business unit, Site, Entity, Function, Currency, Supplier document type or Supplier tier."); continue; }
                 if (name is null) { r.Refuse("Name: add a name."); continue; }
                 if (name.Length > 100) { r.Refuse("Name: keep it under 100 characters."); continue; }
                 var active = row.YesNo("Active", out var ap);

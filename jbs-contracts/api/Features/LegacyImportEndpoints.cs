@@ -21,11 +21,15 @@ public static class LegacyImportEndpoints
     private static readonly Target[] BuiltIn =
     [
         new("legacyReference", "Old reference", "Needed", true, "The contract's number in the old system. It keeps this number in JBS Contracts. Also used to match its files, and so a second run skips it.",
-            ["old reference", "agreement number", "agreement no", "agreement id", "contract number", "contract no", "contract id", "reference", "ref", "id", "medius id"]),
+            ["old reference", "agreement reference", "agreement number", "agreement no", "agreement id", "contract number", "contract no", "contract id", "reference", "ref", "id", "medius id"]),
         new("title", "Title", "Needed", true, null, ["title", "contract title", "contract name", "agreement name", "name", "subject"]),
         new("supplier", "Supplier", "Needed", true, "A name that isn't in JBS Contracts yet adds the supplier.", ["supplier", "supplier name", "vendor", "vendor name", "counterparty", "party"]),
-        new("category", "Category", "Needed", true, "A category, or Category > Subcategory. Blank uses the default you choose below.", ["category", "contract category", "spend category"]),
-        new("owner", "Owner", "Needed", true, "Windows logon or full name of a contract owner. Blank uses the default you choose below.", ["owner", "contract owner", "responsible", "contract manager", "manager"]),
+        new("supplierVendorNumber", "Supplier's SAP vendor number", "Other", false, "Saved on a supplier that hasn't got one yet.",
+            ["vendor number", "sap vendor number", "supplier number", "vendor no", "vendor code"]),
+        new("category", "Category", "Needed", true, "A category, or Category > Subcategory. Blank uses the default you choose below.",
+            ["category", "contract category", "spend category", "portfolio/category", "portfolio category", "portfolio"]),
+        new("subcategory", "Subcategory", "Needed", false, "The subcategory under the category in its own column.", ["subcategory", "sub-category", "sub category"]),
+        new("owner", "Owner", "Needed", true, "Windows logon or full name of a contract owner. Blank uses the default you choose below.", ["owner", "contract owner", "agreement owner", "responsible", "contract manager", "manager"]),
         new("effectiveDate", "Effective date", "Dates", false, "Blank uses the start date, then the registered date.", ["effective date", "effective from"]),
         new("startDate", "Start date", "Dates", false, null, ["start date", "start", "commencement date", "commencement", "valid from"]),
         new("endDate", "End date", "Dates", false, "Blank needs Evergreen to be Yes.", ["end date", "end", "expiry date", "expiry", "expires", "valid to", "termination date"]),
@@ -38,23 +42,24 @@ public static class LegacyImportEndpoints
             ["notice period", "notice period days", "notice period months", "notice days", "notice"]),
         new("reviewDate", "Review date", "Dates", false, null, ["review date", "next review"]),
         new("registeredDate", "Registered date", "Dates", false, "When it was approved or registered. Blank uses the effective date.", ["registered date", "registered", "approved date", "approval date", "signed date", "date signed"]),
-        new("status", "Status", "Other", false, "Active, current or live loads it as Effective; expired, ended, terminated or cancelled as Ended. Blank: worked out from the end date.",
-            ["status", "contract status", "state"]),
+        new("status", "Status", "Other", false, "Active, current, effective or approved loads it as Effective; expired, ended, terminated or cancelled as Ended; archived is left out (if ticked below). Blank: worked out from the end date.",
+            ["status", "contract status", "agreement status", "state"]),
         new("agreementType", "Agreement type", "Other", false, null, ["agreement type", "contract type", "type"]),
         new("businessUnit", "Business unit", "Other", false, null, ["business unit", "bu", "division"]),
         new("site", "Site", "Other", false, null, ["site", "location", "plant"]),
         new("entity", "Entity", "Other", false, "The JBS company that signs it.", ["entity", "entity name", "legal entity", "jbs entity", "contracting entity", "company"]),
         new("function", "Function", "Other", false, null, ["function", "business function", "department"]),
         new("backupOwner", "Backup owner", "Other", false, null, ["backup owner", "backup", "deputy"]),
-        new("value", "Value", "Other", false, null, ["value", "contract value", "total value", "amount", "estimated value"]),
-        new("currency", "Currency", "Other", false, "Three letters, for example AUD. Blank is AUD.", ["currency", "currency code"]),
+        new("value", "Value", "Other", false, null, ["value", "contract value", "total value", "amount", "estimated value", "estimated agreement value", "estimated contract value"]),
+        new("currency", "Currency", "Other", false, "Three letters, for example AUD. Blank is AUD.", ["currency", "currency code", "agreement currency"]),
         new("sapOutlineAgreement", "SAP outline agreement number", "Other", false, null, ["sap outline agreement number", "sap outline agreement", "outline agreement", "sap number", "sap"]),
         new("confidential", "Confidential", "Other", false, "Yes or No", ["confidential"]),
         new("description", "Description", "Other", false, null, ["description", "notes", "comments", "summary", "scope"]),
     ];
 
     private static readonly string[] EndedWords = ["expired", "ended", "terminated", "cancelled", "canceled", "inactive", "closed", "archived", "lapsed"];
-    private static readonly string[] CurrentWords = ["active", "current", "live", "effective", "valid", "open", "renewed"];
+    // "Approved": signed in the old system but starting later (Medius), so current.
+    private static readonly string[] CurrentWords = ["active", "current", "live", "effective", "valid", "open", "renewed", "approved"];
     private static readonly string[] NotWords = ["not", "no", "non", "un", "never", "pending", "draft"];
 
     /// <summary>
@@ -148,7 +153,22 @@ public static class LegacyImportEndpoints
         internal string? Reference { get; set; }
     }
 
-    private sealed record Options(Dictionary<string, string> Mapping, int? DefaultOwnerId, int? DefaultCategoryId);
+    private sealed record Options(Dictionary<string, string> Mapping, int? DefaultOwnerId, int? DefaultCategoryId, bool LeaveOutArchived = false);
+
+    /// <summary>
+    /// What the plan found besides its rows: list items that aren't in JBS Contracts yet (as rows for the Lists import: list, name,
+    /// parent category), and SAP vendor numbers to save on suppliers that haven't got one (by supplier name).
+    /// </summary>
+    private sealed class PlanExtras
+    {
+        public SortedSet<(string List, string Name, string Parent)> Missing { get; } = [];
+        public Dictionary<string, string> VendorNumbers { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static readonly Dictionary<string, string> ListLabels = new()
+    {
+        ["AgreementType"] = "Agreement type", ["BusinessUnit"] = "Business unit", ["Site"] = "Site", ["Entity"] = "Entity", ["Function"] = "Function",
+    };
 
     private static Options ReadOptions(IFormCollection form)
     {
@@ -159,12 +179,14 @@ public static class LegacyImportEndpoints
             foreach (var (column, key) in raw) if (!string.IsNullOrWhiteSpace(key)) mapping[column] = key!;
         }
         catch (JsonException) { }
-        return new(mapping, int.TryParse(form["defaultOwnerId"], out var o) ? o : null, int.TryParse(form["defaultCategoryId"], out var cat) ? cat : null);
+        return new(mapping, int.TryParse(form["defaultOwnerId"], out var o) ? o : null, int.TryParse(form["defaultCategoryId"], out var cat) ? cat : null,
+            form["leaveOutArchived"] == "true");
     }
 
     private static async Task<(List<PlanRow> Rows, Dictionary<string, string> NewSuppliers, string? Problem)> PlanAsync(
-        SqlConnection c, SqlTransaction? tx, Person me, AppSettings settings, Stream book, Options o, DateOnly today)
+        SqlConnection c, SqlTransaction? tx, Person me, AppSettings settings, Stream book, Options o, DateOnly today, PlanExtras? extras = null)
     {
+        extras ??= new PlanExtras();
         var targets = await TargetsAsync(c, tx);
         // Source column for each field (the first column matched to it).
         var source = new Dictionary<string, string>();
@@ -178,7 +200,9 @@ public static class LegacyImportEndpoints
         if (problem is not null) return ([], [], problem);
 
         static string K(string s) => s.Trim().ToUpperInvariant();
-        var suppliers = (await c.QueryAsync<(int Id, string Name)>("SELECT Id, Name FROM contracts.Supplier", transaction: tx)).ToDictionary(s => K(s.Name), s => s.Id);
+        var supplierRows = (await c.QueryAsync<(int Id, string Name, string? VendorNumber)>("SELECT Id, Name, VendorNumber FROM contracts.Supplier", transaction: tx)).ToList();
+        var suppliers = supplierRows.ToDictionary(s => K(s.Name), s => s.Id);
+        var hasVendorNumber = supplierRows.Where(s => s.VendorNumber is not null).Select(s => K(s.Name)).ToHashSet();
         var cats = (await c.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category", transaction: tx)).ToList();
         var items = (await c.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem", transaction: tx)).ToList();
         var owners = (await c.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1 AND IsContractOwner = 1", transaction: tx)).ToList();
@@ -208,12 +232,31 @@ public static class LegacyImportEndpoints
         {
             if (text is null) return null;
             var match = items.FirstOrDefault(i => i.ListName == list && K(i.Value) == K(text));
-            if (match is null) problems.Add($"{label}: there's no {label.ToLowerInvariant()} called \"{text}\". Add it on the Lists page first.");
+            if (match is null)
+            {
+                problems.Add($"{label}: there's no {label.ToLowerInvariant()} called \"{text}\". Add it on the Lists page first.");
+                extras.Missing.Add((ListLabels[list], text, ""));
+            }
             return match?.Id;
         }
-        int? Category(string? text, List<string> problems)
+        int? Category(string? text, string? sub, List<string> problems)
         {
-            if (text is null) return o.DefaultCategoryId;
+            if (text is null && sub is null) return o.DefaultCategoryId;
+            if (text is not null && sub is not null)
+            {
+                // Category and subcategory in their own columns (Medius): names may contain "/" so they aren't split.
+                var parent = cats.FirstOrDefault(x => x.ParentId is null && K(x.Name) == K(text));
+                var child = parent is null ? null : cats.FirstOrDefault(x => x.ParentId == parent.Id && K(x.Name) == K(sub));
+                if (parent is null) extras.Missing.Add(("Category", text, ""));
+                if (child is null)
+                {
+                    extras.Missing.Add(("Category", sub, text));
+                    problems.Add(parent is null ? $"Category: there's no category called \"{text}\" (with the subcategory \"{sub}\"). Add them on the Lists page first."
+                        : $"Subcategory: there's no subcategory \"{sub}\" under {parent.Name}. Add it on the Lists page first.");
+                }
+                return child?.Id;
+            }
+            text ??= sub!;
             var parts = text.Split(['>', '›', '/'], 2, StringSplitOptions.TrimEntries);
             CategoryRow? match;
             if (parts.Length == 2)
@@ -231,7 +274,12 @@ public static class LegacyImportEndpoints
                     match = subs.SingleOrDefault();
                 }
             }
-            if (match is null) problems.Add($"Category: there's no category called \"{text}\". Add it on the Lists page first, or change the cell.");
+            if (match is null)
+            {
+                problems.Add($"Category: there's no category called \"{text}\". Add it on the Lists page first, or change the cell.");
+                if (parts.Length == 2) { extras.Missing.Add(("Category", parts[0], "")); extras.Missing.Add(("Category", parts[1], parts[0])); }
+                else extras.Missing.Add(("Category", text, ""));
+            }
             return match?.Id;
         }
 
@@ -246,6 +294,8 @@ public static class LegacyImportEndpoints
             if (legacy.Length > 100) { r.Outcome = "Refused"; r.Problems.Add("Old reference: keep it under 100 characters."); continue; }
             if (!seen.Add(K(legacy))) { r.Outcome = "Refused"; r.Problems.Add($"Old reference {legacy} is in the file more than once; only the first row is used."); continue; }
             if (already.TryGetValue(K(legacy), out var existing)) { r.Outcome = "Already"; r.ExistingReference = existing; r.Notes.Add($"Already imported as {existing}; skipped."); continue; }
+            if (o.LeaveOutArchived && Text(row, "status") is { } st && System.Text.RegularExpressions.Regex.IsMatch(st, @"\barchived\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            { r.Outcome = "LeftOut"; r.Notes.Add("Archived in the old system: left out. Untick \"Leave out archived contracts\" to bring it in as Ended."); continue; }
 
             if (title is null) problems.Add("Title: blank.");
             else if (title.Length > 200) problems.Add("Title: keep it under 200 characters.");
@@ -255,8 +305,13 @@ public static class LegacyImportEndpoints
             else if (supplierIds.TryGetValue(K(supplierName), out var sid)) supplierId = sid;
             else if (supplierName.Length > 200) problems.Add("Supplier: keep the name under 200 characters.");
             else r.NewSupplier = newSuppliers.TryGetValue(K(supplierName), out var first) ? first : newSuppliers[K(supplierName)] = supplierName;
-            var categoryId = Category(Text(row, "category"), problems);
-            if (categoryId is null && Text(row, "category") is null) problems.Add("Category: blank, and there's no default category.");
+            if (supplierName is not null && Text(row, "supplierVendorNumber") is { } vendor && !hasVendorNumber.Contains(K(supplierName)))
+            {
+                if (vendor.Length > 50) problems.Add("Supplier's SAP vendor number: keep it under 50 characters.");
+                else if (extras.VendorNumbers.TryAdd(supplierName.Trim(), vendor)) r.Notes.Add($"Saves SAP vendor number {vendor} on {supplierName.Trim()}.");
+            }
+            var categoryId = Category(Text(row, "category"), Text(row, "subcategory"), problems);
+            if (categoryId is null && Text(row, "category") is null && Text(row, "subcategory") is null) problems.Add("Category: blank, and there's no default category.");
             var ownerText = Text(row, "owner");
             var ownerId = ownerText is null ? o.DefaultOwnerId : Person_(ownerText, "Owner", problems);
             if (ownerId is null && ownerText is null) problems.Add("Owner: blank, and there's no default owner.");
@@ -376,11 +431,13 @@ public static class LegacyImportEndpoints
 
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
-    private static object Summary(List<PlanRow> plan, Dictionary<string, string> newSuppliers) => new
+    private static object Summary(List<PlanRow> plan, Dictionary<string, string> newSuppliers, PlanExtras extras) => new
     {
         effective = plan.Count(r => r.Outcome == "Effective"), ended = plan.Count(r => r.Outcome == "Ended"),
-        already = plan.Count(r => r.Outcome == "Already"), refused = plan.Count(r => r.Outcome == "Refused"),
+        already = plan.Count(r => r.Outcome == "Already"), refused = plan.Count(r => r.Outcome == "Refused"), leftOut = plan.Count(r => r.Outcome == "LeftOut"),
         newSuppliers = newSuppliers.Values.Order(),
+        // What to add under Admin, Lists first, grouped by list (the Lists sheet download has the same).
+        missing = extras.Missing.GroupBy(m => m.List).Select(g => new { list = g.Key, names = g.Select(m => m.Parent.Length > 0 ? $"{m.Parent} > {m.Name}" : m.Name) }),
         rows = plan.Select(r => new { r.Row, r.LegacyReference, r.Label, r.Outcome, r.Notes, r.Problems, r.ExistingReference }),
     };
 
@@ -427,10 +484,19 @@ public static class LegacyImportEndpoints
             if (problem is not null) return ApiResults.Invalid(problem, new() { ["file"] = problem });
             await using var c = await db.OpenAsync();
             await using var tx = await c.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
-            var (plan, newSuppliers, planProblem) = await PlanAsync(c, (SqlTransaction)tx, me, settings, book!, ReadOptions(form), DateOnly.FromDateTime(HomeEndpoints.Today(clock)));
+            var extras = new PlanExtras();
+            var (plan, newSuppliers, planProblem) = await PlanAsync(c, (SqlTransaction)tx, me, settings, book!, ReadOptions(form), DateOnly.FromDateTime(HomeEndpoints.Today(clock)), extras);
             await tx.RollbackAsync();
             if (planProblem is not null) return ApiResults.Invalid(planProblem, new() { ["mapping"] = planProblem });
-            return Results.Ok(Summary(plan, newSuppliers));
+            if (form["download"] == "missing")
+            {
+                // The missing list items as a sheet for Admin, Lists, Import from Excel: parents first.
+                var sheet = Excel.Write("Lists", [new("List", null, 22), new("Name", null, 34), new("Parent category", null, 28)],
+                    extras.Missing.OrderBy(m => m.List).ThenBy(m => m.Parent.Length > 0).ThenBy(m => m.Parent).ThenBy(m => m.Name)
+                        .Select(m => new object?[] { m.List, m.Name, m.Parent.Length > 0 ? m.Parent : null }));
+                return Results.File(sheet, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "jbs-contracts-lists-to-add.xlsx");
+            }
+            return Results.Ok(Summary(plan, newSuppliers, extras));
         }));
 
         // Step 1c: the import. The rows that are ready go in, in one step; refused and already-imported rows are left out.
@@ -443,7 +509,8 @@ public static class LegacyImportEndpoints
             var options = ReadOptions(form);
             await using var c = await db.OpenAsync();
             await using var tx = await Db.BeginWriteAsync(c);
-            var (plan, newSuppliers, planProblem) = await PlanAsync(c, tx, me, settings, book!, options, DateOnly.FromDateTime(HomeEndpoints.Today(clock)));
+            var extras = new PlanExtras();
+            var (plan, newSuppliers, planProblem) = await PlanAsync(c, tx, me, settings, book!, options, DateOnly.FromDateTime(HomeEndpoints.Today(clock)), extras);
             if (planProblem is not null) return ApiResults.Invalid(planProblem, new() { ["mapping"] = planProblem });
             var ready = plan.Where(r => r.Outcome is "Effective" or "Ended").ToList();
             if (ready.Count == 0) return ApiResults.Invalid("There's nothing ready to import. Check the dry run.", new() { ["file"] = "Nothing is ready to import." });
@@ -460,10 +527,21 @@ public static class LegacyImportEndpoints
             var supplierIds = new Dictionary<string, int>();
             foreach (var name in newSuppliers.Values)
             {
+                var vendor = extras.VendorNumbers.GetValueOrDefault(name.Trim());
                 var id = await c.ExecuteScalarAsync<int?>("SELECT Id FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@name)))", new { name }, tx)
-                    ?? await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Supplier (Name, CreatedById, UpdatedById) OUTPUT INSERTED.Id VALUES (@name, @me, @me)", new { name, me = me.Id }, tx);
-                await audit.WriteAsync(c, tx, me.AsActor(), "supplier.added", "Supplier", id, $"{me.Name} added the supplier {name}{via}.");
+                    ?? await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Supplier (Name, VendorNumber, CreatedById, UpdatedById) OUTPUT INSERTED.Id VALUES (@name, @vendor, @me, @me)",
+                        new { name, vendor, me = me.Id }, tx);
+                await audit.WriteAsync(c, tx, me.AsActor(), "supplier.added", "Supplier", id,
+                    $"{me.Name} added the supplier {name}{(vendor is null ? "" : $" (SAP vendor number {vendor})")}{via}.");
                 supplierIds[name.Trim().ToUpperInvariant()] = id;
+            }
+            // Existing suppliers without an SAP vendor number get the one from the file (D-109).
+            foreach (var (name, vendor) in extras.VendorNumbers.Where(v => !newSuppliers.ContainsKey(v.Key.ToUpperInvariant())))
+            {
+                var sid = await c.ExecuteScalarAsync<int?>("SELECT Id FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@name))) AND VendorNumber IS NULL", new { name }, tx);
+                if (sid is null) continue;
+                await c.ExecuteAsync("UPDATE contracts.Supplier SET VendorNumber = @vendor, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @sid", new { vendor, me = me.Id, sid }, tx);
+                await audit.WriteAsync(c, tx, me.AsActor(), "supplier.changed", "Supplier", sid, $"{me.Name} set {name}'s SAP vendor number to {vendor}{via}.");
             }
             var brisbane = TimeZoneInfo.FindSystemTimeZoneById("Australia/Brisbane");
             var created = new List<string>();
@@ -494,7 +572,7 @@ public static class LegacyImportEndpoints
                 $"{me.Name} imported {created.Count:N0} old contracts from {fileName} ({plan.Count(x => x.Outcome == "Effective"):N0} Effective, {plan.Count(x => x.Outcome == "Ended"):N0} Ended; " +
                 $"{plan.Count(x => x.Outcome == "Already"):N0} already there, {plan.Count(x => x.Outcome == "Refused"):N0} not imported; {newSuppliers.Count:N0} new suppliers).");
             await tx.CommitAsync();
-            return Results.Ok(new { imported = created.Count, first = created.FirstOrDefault(), last = created.LastOrDefault(), summary = Summary(plan, newSuppliers) });
+            return Results.Ok(new { imported = created.Count, first = created.FirstOrDefault(), last = created.LastOrDefault(), summary = Summary(plan, newSuppliers, extras) });
         }));
 
         // Step 2: files from a ZIP, matched to contracts by the old (or JBSAUS) reference in the file's name or folders.

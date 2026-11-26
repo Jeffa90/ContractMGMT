@@ -25,7 +25,7 @@ public sealed class QaClearTests(AppFixture app)
         var cat = (await (await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat ") }, Ct)).Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetInt32();
         var sid = (await (await owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier ") }, Ct)).Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetInt32();
         Assert.True((await admin.PostAsJsonAsync($"/api/suppliers/{sid}/contacts", new { name = "Casey Contact" }, Ct)).IsSuccessStatusCode);
-        var id = (await (await owner.PostAsJsonAsync("/api/contracts", new { title = "To be cleared", supplierId = sid, categoryId = cat, siteId = site }, Ct)).Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetInt32();
+        var id = (await (await owner.PostAsJsonAsync("/api/contracts", new { title = "To be cleared", supplierId = sid, categoryId = cat, siteIds = new[] { site } }, Ct)).Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetInt32();
         using (var form = new MultipartFormDataContent())
         {
             form.Add(new ByteArrayContent("%PDF clear me"u8.ToArray()), "file", "draft.pdf");

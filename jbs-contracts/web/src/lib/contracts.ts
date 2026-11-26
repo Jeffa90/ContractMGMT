@@ -82,13 +82,14 @@ export type Contract = {
   categoryDisplay: string | null
   agreementTypeId: number | null
   agreementTypeName: string | null
-  businessUnitId: number | null
+  /** Several each (D-114); the names joined for reading, or null when none. */
+  businessUnitIds: number[]
   businessUnitName: string | null
-  siteId: number | null
+  siteIds: number[]
   siteName: string | null
-  entityId: number | null
+  entityIds: number[]
   entityName: string | null
-  functionId: number | null
+  functionIds: number[]
   functionName: string | null
   ownerId: number
   ownerName: string

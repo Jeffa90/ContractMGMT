@@ -1,6 +1,7 @@
 // Draws any added contract field from its definition (design-system "Field renderer"). Forms never hand-code an added field.
 import type { FieldValue, LayoutField } from '@/lib/layout'
 import { Select, Textarea } from './form'
+import { MultiSelect } from './MultiSelect'
 import { Field, TextInput } from './ui'
 
 export type PickList = { people: { id: number; name: string }[]; suppliers: { id: number; name: string }[] }
@@ -38,26 +39,17 @@ export function FieldInput({
     const selected = Array.isArray(value) ? value : []
     const options = field.choices.filter((c) => !c.hidden || selected.includes(c.key))
     return (
-      <fieldset className="flex flex-col gap-1">
-        <legend className="mb-1 text-sm font-medium">
-          {field.label}
-          {field.isRequired && <span className="font-normal text-muted-foreground"> (required)</span>}
-        </legend>
-        {options.map((c) => (
-          <label key={c.key} className="flex min-h-11 items-center gap-3">
-            <input
-              type="checkbox"
-              disabled={disabled}
-              className="size-5 accent-[var(--primary)]"
-              checked={selected.includes(c.key)}
-              onChange={(e) => onChange(e.target.checked ? [...selected, c.key] : selected.filter((k) => k !== c.key))}
-            />
-            {c.label}
-          </label>
-        ))}
-        {help && <p className="text-xs text-muted-foreground">{help}</p>}
-        {error && <p className="text-xs font-medium text-danger">{error}</p>}
-      </fieldset>
+      <Field label={field.label} required={field.isRequired} help={help ?? 'Choose one or more.'} error={error}>
+        {(p) => (
+          <MultiSelect
+            {...p}
+            disabled={disabled}
+            options={options.map((c) => ({ id: c.key, label: c.label, hidden: c.hidden }))}
+            selected={selected}
+            onChange={(keys) => onChange(keys)}
+          />
+        )}
+      </Field>
     )
   }
   return (

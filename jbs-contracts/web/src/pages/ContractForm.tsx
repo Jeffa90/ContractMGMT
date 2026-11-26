@@ -9,6 +9,7 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { FieldInput } from '@/components/FieldInput'
+import { MultiSelect } from '@/components/MultiSelect'
 import { Select, Textarea } from '@/components/form'
 import { Alert, Button, Card, Checkbox, Field, Skeleton, TextInput } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
@@ -34,10 +35,10 @@ type FormState = {
   ownerId: string
   backupOwnerId: string
   isConfidential: boolean
-  businessUnitId: string
-  siteId: string
-  entityId: string
-  functionId: string
+  businessUnitIds: number[]
+  siteIds: number[]
+  entityIds: number[]
+  functionIds: number[]
   value: string
   currencyCode: string
   sapOutlineAgreement: string
@@ -118,10 +119,10 @@ export function ContractForm({
     ownerId: toText(c?.ownerId ?? person.id),
     backupOwnerId: toText(c?.backupOwnerId),
     isConfidential: c?.isConfidential ?? false,
-    businessUnitId: toText(c?.businessUnitId),
-    siteId: toText(c?.siteId),
-    entityId: toText(c?.entityId),
-    functionId: toText(c?.functionId),
+    businessUnitIds: c?.businessUnitIds ?? [],
+    siteIds: c?.siteIds ?? [],
+    entityIds: c?.entityIds ?? [],
+    functionIds: c?.functionIds ?? [],
     value: toText(c?.value),
     currencyCode: c?.currencyCode ?? 'AUD',
     sapOutlineAgreement: c?.sapOutlineAgreement ?? '',
@@ -172,10 +173,10 @@ export function ContractForm({
         ownerId: toId(form.ownerId),
         backupOwnerId: toId(form.backupOwnerId),
         isConfidential: form.isConfidential,
-        businessUnitId: toId(form.businessUnitId),
-        siteId: toId(form.siteId),
-        entityId: toId(form.entityId),
-        functionId: toId(form.functionId),
+        businessUnitIds: form.businessUnitIds,
+        siteIds: form.siteIds,
+        entityIds: form.entityIds,
+        functionIds: form.functionIds,
         value: form.value.trim() === '' ? null : Number(form.value.replace(/[$,\s]/g, '')),
         currencyCode: form.currencyCode,
         sapOutlineAgreement: form.sapOutlineAgreement || null,
@@ -211,7 +212,25 @@ export function ContractForm({
     },
   })
 
-  const listSelect = (key: 'agreementTypeId' | 'businessUnitId' | 'siteId' | 'entityId' | 'functionId', listName: string, f: LayoutField, empty: string) => {
+  // Several values each (D-114): a drop-down that stays open while you tick.
+  const listMulti = (key: 'businessUnitIds' | 'siteIds' | 'entityIds' | 'functionIds', listName: string, f: LayoutField, empty: string) => {
+    const items = lists.items.filter((i) => i.listName === listName && (i.isActive || form[key].includes(i.id)))
+    return (
+      <Field label={f.label} required={f.isRequired} error={errors[key]} help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : (f.help ?? 'Choose one or more.')}>
+        {(p) => (
+          <MultiSelect
+            {...p}
+            options={items.map((i) => ({ id: i.id, label: i.value, hidden: !i.isActive }))}
+            selected={form[key]}
+            onChange={(ids) => set(key, ids)}
+            disabled={items.length === 0}
+          />
+        )}
+      </Field>
+    )
+  }
+
+  const listSelect = (key: 'agreementTypeId', listName: string, f: LayoutField, empty: string) => {
     const items = options(listName, form[key])
     return (
       <Field label={f.label} required={f.isRequired} error={errors[key]} help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : (f.help ?? undefined)}>
@@ -283,13 +302,13 @@ export function ContractForm({
       case 'agreementType':
         return listSelect('agreementTypeId', 'AgreementType', f, 'No agreement types yet.')
       case 'businessUnit':
-        return listSelect('businessUnitId', 'BusinessUnit', f, 'No business units yet.')
+        return listMulti('businessUnitIds', 'BusinessUnit', f, 'No business units yet.')
       case 'site':
-        return listSelect('siteId', 'Site', f, 'No sites yet.')
+        return listMulti('siteIds', 'Site', f, 'No sites yet.')
       case 'entity':
-        return listSelect('entityId', 'Entity', f, 'No entities yet.')
+        return listMulti('entityIds', 'Entity', f, 'No entities yet.')
       case 'function':
-        return listSelect('functionId', 'Function', f, 'No functions yet.')
+        return listMulti('functionIds', 'Function', f, 'No functions yet.')
       case 'description':
         return (
           <Field label={f.label} required={f.isRequired} error={errors.description} help={help}>

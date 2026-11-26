@@ -51,6 +51,7 @@ public static class QaClearEndpoints
                     DELETE FROM contracts.Reminder;
                     DELETE FROM contracts.Unlock;
                     DELETE FROM contracts.ContractFieldValue;
+                    DELETE FROM contracts.ContractListValue;
                     DELETE FROM contracts.LegalTurnDocument;
                     DELETE FROM contracts.LegalTurn;
                     DELETE FROM contracts.Approval;

@@ -372,10 +372,18 @@ public static class LegacyImportEndpoints
             if (ownerId is null && ownerText is null) problems.Add("Owner: blank, and there's no default owner.");
             var backupId = Text(row, "backupOwner") is { } bo ? Person_(bo, "Backup owner", problems) : null;
             var agreementTypeId = Item("AgreementType", Tr("agreementType", Text(row, "agreementType")), "Agreement type", problems);
-            var businessUnitId = Item("BusinessUnit", Tr("businessUnit", Text(row, "businessUnit")), "Business unit", problems);
-            var siteId = Item("Site", Tr("site", Text(row, "site")), "Site", problems);
-            var entityId = Item("Entity", Tr("entity", Text(row, "entity")), "Entity", problems);
-            var functionId = Item("Function", Tr("function", Text(row, "function")), "Function", problems);
+            // Several values in one cell (D-114): each is translated and found on its own.
+            int[] Items(string list, string field, string label)
+            {
+                var ids = new List<int>();
+                foreach (var part in SplitCell(field, list, Text(row, field), items, o.Translations))
+                    if (Item(list, Tr(field, part), label, problems) is { } id && !ids.Contains(id)) ids.Add(id);
+                return [.. ids];
+            }
+            var businessUnitIds = Items("BusinessUnit", "businessUnit", "Business unit");
+            var siteIds = Items("Site", "site", "Site");
+            var entityIds = Items("Entity", "entity", "Entity");
+            var functionIds = Items("Function", "function", "Function");
 
             string? p = null;
             DateOnly? Date(string key) { if (!source.TryGetValue(key, out var col)) return null; var d = row.Date(col, out var pr); if (pr is not null) problems.Add(pr); return d; }
@@ -447,9 +455,9 @@ public static class LegacyImportEndpoints
 
             if (problems.Count > 0) { r.Outcome = "Refused"; r.Problems.AddRange(problems); continue; }
 
-            r.Body = new SaveContract(title, Text(row, "description"), supplierId, categoryId, agreementTypeId, businessUnitId, siteId, ownerId, backupId, confidential,
+            r.Body = new SaveContract(title, Text(row, "description"), supplierId, categoryId, agreementTypeId, businessUnitIds, siteIds, ownerId, backupId, confidential,
                 value, currency, Text(row, "sapOutlineAgreement"), start, effectiveOn, end, evergreen, notice, review, false, null, fieldValues,
-                entityId, functionId, autoRenews, term);
+                entityIds, functionIds, autoRenews, term);
             var errors = r.Body.SupplierId is null
                 ? await ContractEndpoints.CheckAsync(c, tx!, r.Body with { SupplierId = suppliers.Values.FirstOrDefault() }, null) // a new supplier is added on import
                 : await ContractEndpoints.CheckAsync(c, tx!, r.Body, null);
@@ -475,6 +483,21 @@ public static class LegacyImportEndpoints
 
     private const string LeaveBlank = "(leave blank)";
 
+    /// <summary>The fields whose cells can hold several values (D-114).</summary>
+    private static readonly HashSet<string> SeveralFields = ["businessUnit", "site", "entity", "function"];
+
+    /// <summary>
+    /// A cell's values: several for business unit, site, entity and function (D-114), else the cell as it is. A value with a comma
+    /// in it stays whole when it's already a list value or has a translation.
+    /// </summary>
+    private static List<string> SplitCell(string field, string list, string? cell, IEnumerable<ListItemRow> items, Translations? translations)
+    {
+        if (cell is null) return [];
+        if (!SeveralFields.Contains(field)) return [cell];
+        static string K(string s) => s.Trim().ToUpperInvariant();
+        return ListCells.Split(cell, t => items.Any(i => i.ListName == list && K(i.Value) == K(t)) || (translations?.TryGet(field, t, out _) ?? false));
+    }
+
     private static async Task<Dictionary<string, Dictionary<string, string>>?> SavedTranslationsAsync(SqlConnection c, SqlTransaction? tx) =>
         await c.ExecuteScalarAsync<string?>("SELECT MappingJson FROM contracts.ImportMapping WHERE Name = N'legacy-values'", transaction: tx) is { } json
             ? JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(json) : null;
@@ -488,7 +511,7 @@ public static class LegacyImportEndpoints
         var key = errorKey switch
         {
             "supplierId" => "supplier", "categoryId" => "category", "ownerId" => "owner", "backupOwnerId" => "backupOwner", "agreementTypeId" => "agreementType",
-            "businessUnitId" => "businessUnit", "siteId" => "site", "entityId" => "entity", "functionId" => "function", "currencyCode" => "currency",
+            "businessUnitIds" => "businessUnit", "siteIds" => "site", "entityIds" => "entity", "functionIds" => "function", "currencyCode" => "currency",
             "isEvergreen" => "evergreen", _ => errorKey,
         };
         return targets.FirstOrDefault(t => t.Key == key || t.Key == $"field.{key}")?.Label ?? errorKey;
@@ -603,10 +626,10 @@ public static class LegacyImportEndpoints
             foreach (var row in rows)
             {
                 if (options.LeaveOutArchived && Cell(row, "status") is { } st && System.Text.RegularExpressions.Regex.IsMatch(st, @"\barchived\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) continue;
-                foreach (var (key, _, _) in TranslatedFields)
+                foreach (var (key, list, _) in TranslatedFields)
                 {
                     var value = key == "category" ? (Cell(row, "category") ?? Cell(row, "subcategory")) is null ? null : CategoryKey(Cell(row, "category"), Cell(row, "subcategory")) : Cell(row, key);
-                    if (value is not null) counts[key][value] = counts[key].GetValueOrDefault(value) + 1;
+                    foreach (var part in SplitCell(key, list, value, items, saved)) counts[key][part] = counts[key].GetValueOrDefault(part) + 1;
                 }
             }
             return Results.Ok(new

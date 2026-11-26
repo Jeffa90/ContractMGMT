@@ -554,7 +554,7 @@ public static class ExcelEndpoints
     private static readonly Dictionary<string, string> FieldLabels = new()
     {
         ["title"] = "Title", ["description"] = "Description", ["supplierId"] = "Supplier", ["categoryId"] = "Category", ["agreementTypeId"] = "Agreement type",
-        ["businessUnitId"] = "Business unit", ["siteId"] = "Site", ["entityId"] = "Entity", ["functionId"] = "Function", ["ownerId"] = "Owner", ["backupOwnerId"] = "Backup owner", ["currencyCode"] = "Currency",
+        ["businessUnitIds"] = "Business unit", ["siteIds"] = "Site", ["entityIds"] = "Entity", ["functionIds"] = "Function", ["ownerId"] = "Owner", ["backupOwnerId"] = "Backup owner", ["currencyCode"] = "Currency",
         ["value"] = "Value", ["sapOutlineAgreement"] = "SAP outline agreement number", ["endDate"] = "End date", ["noticePeriodDays"] = "Notice period (days)",
         ["autoRenews"] = "Renews automatically", ["renewalTermMonths"] = "Renewal term (months)", ["reviewDate"] = "Review date",
     };
@@ -569,8 +569,8 @@ public static class ExcelEndpoints
             new("Title", "Required for a new contract.", 34), new("Supplier", "The supplier's name. A new name adds the supplier.", 28),
             new("Category", "A category, or Category > Subcategory.", 26), new("Agreement type", null, 20),
             new("Owner", "Windows logon or name of an active contract owner. Blank for a new contract: you.", 20), new("Backup owner", null, 20),
-            new("Confidential", "Yes or No", 13), new("Business unit", null, 18), new("Site", null, 16),
-            new("Entity", "The JBS company that signs it", 24), new("Function", null, 18),
+            new("Confidential", "Yes or No", 13), new("Business unit", "One or more. Separate several with ;", 18), new("Site", "One or more. Separate several with ;", 16),
+            new("Entity", "The JBS company that signs it. Separate several with ;", 24), new("Function", "One or more. Separate several with ;", 18),
             new("Value", "Numbers only", 16), new("Currency", "Three letters, for example AUD", 10), new("SAP outline agreement number", null, 22),
             new("Start date", "Day/month/year", 13), new("Effective date", "Day/month/year", 13), new("End date", "Day/month/year. Blank for evergreen.", 13),
             new("Evergreen", "Yes or No", 11),
@@ -589,10 +589,11 @@ public static class ExcelEndpoints
             var added = (x.ExtraColumns ?? []).Select(col => byHeader.GetValueOrDefault(col.Header)).ToList(); // null: that field changed meanwhile (blank cells)
             var values = await Fields.ReadAsync(x.C, x.Tx, rows.Select(r => r.Id), added.OfType<Fields.ExcelField>().Select(a => a.Field).ToList());
             static DateOnly? D(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
+            static string? Several(string[] names) => names.Length == 0 ? null : string.Join("; ", names); // read back by ListCells
             return rows.Select(r => new object?[]
             {
                 r.Reference, r.Title, r.SupplierName, r.CategoryDisplay, r.AgreementTypeName, people[r.OwnerId].WindowsAccount,
-                r.BackupOwnerId is { } b ? people[b].WindowsAccount : null, r.IsConfidential, r.BusinessUnitName, r.SiteName, r.EntityName, r.FunctionName,
+                r.BackupOwnerId is { } b ? people[b].WindowsAccount : null, r.IsConfidential, Several(r.BusinessUnitNames), Several(r.SiteNames), Several(r.EntityNames), Several(r.FunctionNames),
                 r.Value, r.CurrencyCode, r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, D(r.ReviewDate), r.ReviewMonthsBeforeEnd, r.NeedsLegalReview,
                 r.Description,
             }
@@ -628,6 +629,15 @@ public static class ExcelEndpoints
                 var match = items.FirstOrDefault(i => i.ListName == list && K(i.Value) == K(text));
                 if (match is null) problems.Add($"{header}: there's no {header.ToLowerInvariant()} called \"{text}\". Add it under Admin, Lists first.");
                 return match?.Id;
+            }
+            // Several values in one cell (D-114). Null for a blank cell (the contract keeps what it has).
+            int[]? FindItems(string list, string? text, string header, List<string> problems)
+            {
+                if (text is null) return null;
+                var ids = new List<int>();
+                foreach (var part in ListCells.Split(text, t => items.Any(i => i.ListName == list && K(i.Value) == K(t))))
+                    if (FindItem(list, part, header, problems) is { } id) ids.Add(id);
+                return [.. ids];
             }
             int? FindCategory(string? text, List<string> problems)
             {
@@ -686,10 +696,10 @@ public static class ExcelEndpoints
                 }
                 var categoryId = FindCategory(Clean(row.Text("Category")), problems) ?? before?.CategoryId;
                 var agreementTypeId = FindItem("AgreementType", Clean(row.Text("Agreement type")), "Agreement type", problems) ?? before?.AgreementTypeId;
-                var businessUnitId = FindItem("BusinessUnit", Clean(row.Text("Business unit")), "Business unit", problems) ?? before?.BusinessUnitId;
-                var siteId = FindItem("Site", Clean(row.Text("Site")), "Site", problems) ?? before?.SiteId;
-                var entityId = FindItem("Entity", Clean(row.Text("Entity")), "Entity", problems) ?? before?.EntityId;
-                var functionId = FindItem("Function", Clean(row.Text("Function")), "Function", problems) ?? before?.FunctionId;
+                var businessUnitIds = FindItems("BusinessUnit", Clean(row.Text("Business unit")), "Business unit", problems) ?? before?.BusinessUnitIds;
+                var siteIds = FindItems("Site", Clean(row.Text("Site")), "Site", problems) ?? before?.SiteIds;
+                var entityIds = FindItems("Entity", Clean(row.Text("Entity")), "Entity", problems) ?? before?.EntityIds;
+                var functionIds = FindItems("Function", Clean(row.Text("Function")), "Function", problems) ?? before?.FunctionIds;
                 var ownerId = Clean(row.Text("Owner")) is { } o ? FindOwner(o, problems, "Owner") : before?.OwnerId ?? x.Me.Id;
                 var backupId = Clean(row.Text("Backup owner")) is { } bo ? FindOwner(bo, problems, "Backup owner") : before?.BackupOwnerId;
                 string? p;
@@ -723,8 +733,8 @@ public static class ExcelEndpoints
                 }
                 if (problems.Count > 0) { r.Refuse(string.Join(" ", problems)); continue; }
 
-                var body = new SaveContract(title, description, supplierId, categoryId, agreementTypeId, businessUnitId, siteId, ownerId, backupId, confidential,
-                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityId, functionId, autoRenews, term, reviewMonths);
+                var body = new SaveContract(title, description, supplierId, categoryId, agreementTypeId, businessUnitIds, siteIds, ownerId, backupId, confidential,
+                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityIds, functionIds, autoRenews, term, reviewMonths);
                 var errors = await ContractEndpoints.CheckAsync(x.C, x.Tx, body, before);
                 var (parsed, fieldErrors) = await Fields.ParseAsync(x.C, x.Tx, fieldValues, definitions);
                 var labels = added.ToDictionary(a => $"field.{a.Field.Key}", a => a.Header);

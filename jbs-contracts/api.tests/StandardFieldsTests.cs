@@ -88,7 +88,7 @@ public sealed class StandardFieldsTests(AppFixture app)
 
         // Saved and shown by name; a new contract gets the next JBSAUS number (seven digits).
         var created = await OkAsync(owner.PostAsJsonAsync("/api/contracts",
-            new { title = $"Entity {u}", entityId = entity, functionId = function, endDate = D(300), autoRenews = true, renewalTermMonths = 12 }, Ct));
+            new { title = $"Entity {u}", entityIds = new[] { entity }, functionIds = new[] { function }, endDate = D(300), autoRenews = true, renewalTermMonths = 12 }, Ct));
         Assert.Matches(@"^JBSAUS\d{7}$", created.GetProperty("reference").GetString());
         var id = created.GetProperty("id").GetInt32();
         var c = (await OkAsync(owner.GetAsync($"/api/contracts/{id}", Ct))).GetProperty("contract");
@@ -98,10 +98,10 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.Equal(12, c.GetProperty("renewalTermMonths").GetInt32());
 
         // Only items from the right list; renewing needs a term and can't be evergreen.
-        var (s1, b1) = await SendAsync(owner.PostAsJsonAsync("/api/contracts", new { title = "Wrong list", entityId = site, functionId = entity }, Ct));
+        var (s1, b1) = await SendAsync(owner.PostAsJsonAsync("/api/contracts", new { title = "Wrong list", entityIds = new[] { site }, functionIds = new[] { entity } }, Ct));
         Assert.Equal(HttpStatusCode.BadRequest, s1);
-        Assert.True(b1.GetProperty("fields").TryGetProperty("entityId", out _));
-        Assert.True(b1.GetProperty("fields").TryGetProperty("functionId", out _));
+        Assert.True(b1.GetProperty("fields").TryGetProperty("entityIds", out _));
+        Assert.True(b1.GetProperty("fields").TryGetProperty("functionIds", out _));
         var (s2, b2) = await SendAsync(owner.PostAsJsonAsync("/api/contracts", new { title = "No term", endDate = D(300), autoRenews = true }, Ct));
         Assert.Equal(HttpStatusCode.BadRequest, s2);
         Assert.Contains("how many months", b2.GetProperty("fields").GetProperty("renewalTermMonths").GetString());
@@ -237,7 +237,7 @@ public sealed class StandardFieldsTests(AppFixture app)
         await using var db = await app.OpenAsync();
         var imported = (await db.QueryAsync<(string Reference, string LegacyReference, bool AutoRenews, int? RenewalTermMonths, int? NoticePeriodDays, string? Entity, DateTime EndDate)>("""
             SELECT k.Reference, k.LegacyReference, k.AutoRenews, k.RenewalTermMonths, k.NoticePeriodDays, e.Value, k.EndDate
-            FROM contracts.Contract k LEFT JOIN contracts.ListItem e ON e.Id = k.EntityId WHERE k.SupplierId = (SELECT Id FROM contracts.Supplier WHERE Name = @name)
+            FROM contracts.Contract k OUTER APPLY (SELECT TOP (1) li.Value FROM contracts.ContractListValue lv JOIN contracts.ListItem li ON li.Id = lv.ListItemId AND li.ListName = N'Entity' WHERE lv.ContractId = k.Id) e WHERE k.SupplierId = (SELECT Id FROM contracts.Supplier WHERE Name = @name)
             """, new { name = $"Vendor {u}" })).ToDictionary(x => x.LegacyReference);
         var first = imported[ContractNumbers.Format(n)];
         Assert.Equal(ContractNumbers.Format(n), first.Reference);

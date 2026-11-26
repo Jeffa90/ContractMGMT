@@ -98,10 +98,10 @@ public static class VariationEndpoints
         Add("reviewDate", "Date", "Review date");
         Add("value", "Money", "Value");
         Add("currencyCode", "Choice", "Currency", Options("Currency", byValue: true), shownWith: "value");
-        Add("businessUnit", "Choice", "Business unit", Options("BusinessUnit"));
-        Add("site", "Choice", "Site", Options("Site"));
-        Add("entity", "Choice", "Entity", Options("Entity"));
-        Add("function", "Choice", "Function", Options("Function"));
+        Add("businessUnit", "MultiChoice", "Business unit", Options("BusinessUnit"));
+        Add("site", "MultiChoice", "Site", Options("Site"));
+        Add("entity", "MultiChoice", "Entity", Options("Entity"));
+        Add("function", "MultiChoice", "Function", Options("Function"));
         result.AddRange(defs.Where(f => !f.IsBuiltIn && !f.IsHidden && f.AfterEffective == "Variation").Select(f => new Allowed(f.Key, f.Label, f.Kind, f.Choices, f)));
         return result;
     }
@@ -117,12 +117,36 @@ public static class VariationEndpoints
         "reviewDate" => c.ReviewDate is { } r ? DateOnly.FromDateTime(r).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
         "value" => c.Value,
         "currencyCode" => c.CurrencyCode,
-        "businessUnit" => c.BusinessUnitId?.ToString(CultureInfo.InvariantCulture),
-        "site" => c.SiteId?.ToString(CultureInfo.InvariantCulture),
-        "entity" => c.EntityId?.ToString(CultureInfo.InvariantCulture),
-        "function" => c.FunctionId?.ToString(CultureInfo.InvariantCulture),
+        "businessUnit" => Keys(c.BusinessUnitIds),
+        "site" => Keys(c.SiteIds),
+        "entity" => Keys(c.EntityIds),
+        "function" => Keys(c.FunctionIds),
         _ => null,
     };
+
+    /// <summary>The fields with several list values each (D-114).</summary>
+    private static readonly HashSet<string> ListKeys = ["businessUnit", "site", "entity", "function"];
+
+    private static string[] Keys(int[] ids) => [.. ids.Select(i => i.ToString(CultureInfo.InvariantCulture))];
+
+    /// <summary>
+    /// The ids picked for a list field: an array of ids (as text or numbers). A single id, as Variations saved before D-114, counts as
+    /// a list of one. Null when it isn't ids.
+    /// </summary>
+    private static int[]? ListIds(JsonElement j)
+    {
+        static int? One(JsonElement e) => e.ValueKind switch
+        {
+            JsonValueKind.Number when e.TryGetInt32(out var n) => n,
+            JsonValueKind.String when int.TryParse(e.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out var n) => n,
+            _ => null,
+        };
+        if (j.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return [];
+        if (j.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(j.GetString())) return [];
+        if (j.ValueKind != JsonValueKind.Array) return One(j) is { } single ? [single] : null;
+        var ids = j.EnumerateArray().Select(One).ToList();
+        return ids.Any(i => i is null) ? null : [.. ids.Select(i => i!.Value).Distinct().Order()];
+    }
 
     private static string Canon(object? v) => v switch
     {
@@ -155,6 +179,14 @@ public static class VariationEndpoints
         {
             if (!allowed.TryGetValue(key, out var a)) { errors[$"change.{key}"] = "This can't change through a Variation."; continue; }
             var current = a.Added is null ? Current(k, key) : addedValues.TryGetValue(key, out var cur) ? cur.Value : null;
+            if (ListKeys.Contains(key))
+            {
+                // Several values: the same set in any order is no change.
+                var ids = ListIds(json);
+                if (ids is null) errors[$"change.{key}"] = "That value doesn't fit this field.";
+                else if (string.Join(",", ids) != string.Join(",", ((string[])current!).Select(int.Parse).Order())) kept[key] = json;
+                continue;
+            }
             if (Canon(json) != Canon(current)) kept[key] = json;
         }
 
@@ -178,10 +210,11 @@ public static class VariationEndpoints
         var notice = kept.ContainsKey("noticePeriodDays") ? Get<int?>("noticePeriodDays", j => j.ValueKind == JsonValueKind.Number ? j.GetInt32() : int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.NoticePeriodDays;
         var value = kept.ContainsKey("value") ? Get<decimal?>("value", j => j.ValueKind == JsonValueKind.Number ? j.GetDecimal() : decimal.Parse(j.GetString()!.Replace("$", "").Replace(",", ""), CultureInfo.InvariantCulture), null) : k.Value;
         var currency = kept.ContainsKey("currencyCode") ? Get<string>("currencyCode", j => j.GetString(), null) ?? k.CurrencyCode : k.CurrencyCode;
-        var businessUnit = kept.ContainsKey("businessUnit") ? Get<int?>("businessUnit", j => int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.BusinessUnitId;
-        var site = kept.ContainsKey("site") ? Get<int?>("site", j => int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.SiteId;
-        var entity = kept.ContainsKey("entity") ? Get<int?>("entity", j => int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.EntityId;
-        var function = kept.ContainsKey("function") ? Get<int?>("function", j => int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.FunctionId;
+        int[] List(string key, int[] now) => kept.TryGetValue(key, out var j) ? ListIds(j) ?? [] : now;
+        var businessUnit = List("businessUnit", k.BusinessUnitIds);
+        var site = List("site", k.SiteIds);
+        var entity = List("entity", k.EntityIds);
+        var function = List("function", k.FunctionIds);
         var autoRenews = kept.ContainsKey("autoRenews") ? Get<bool?>("autoRenews", j => j.GetBoolean(), null) ?? false : k.AutoRenews;
         var term = kept.ContainsKey("renewalTermMonths") ? Get<int?>("renewalTermMonths", j => j.ValueKind == JsonValueKind.Number ? j.GetInt32() : int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.RenewalTermMonths;
         var addedChanges = kept.Where(p => !BuiltIns.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value);
@@ -192,7 +225,7 @@ public static class VariationEndpoints
             kept.ContainsKey("reviewDate") ? null : k.ReviewMonthsBeforeEnd); // a review date chosen here replaces a period; a period follows a new end date
         if (errors.Count == 0)
         {
-            var map = new Dictionary<string, string> { ["businessUnitId"] = "businessUnit", ["siteId"] = "site", ["entityId"] = "entity", ["functionId"] = "function" };
+            var map = new Dictionary<string, string> { ["businessUnitIds"] = "businessUnit", ["siteIds"] = "site", ["entityIds"] = "entity", ["functionIds"] = "function" };
             foreach (var (key, message) in await ContractEndpoints.CheckAsync(c, tx!, body, k) ?? [])
                 errors[$"change.{map.GetValueOrDefault(key, key)}"] = message;
         }
@@ -201,8 +234,11 @@ public static class VariationEndpoints
 
         // Plain words, old and new.
         var changes = new List<(string, string, string, string)>();
-        var names = (await c.QueryAsync<(int Id, string Value)>("SELECT Id, Value FROM contracts.ListItem", transaction: tx)).ToDictionary(i => i.Id, i => i.Value);
+        var listed = (await c.QueryAsync<(int Id, string Value)>("SELECT Id, Value FROM contracts.ListItem ORDER BY SortOrder, Value", transaction: tx)).ToList();
+        var names = listed.ToDictionary(i => i.Id, i => i.Value);
+        var place = listed.Select((i, n) => (i.Id, n)).ToDictionary(x => x.Id, x => x.n);
         string Day(DateOnly? d) => d?.ToString("d MMM yyyy", CultureInfo.InvariantCulture) ?? "none";
+        string Names(int[] ids) => ids.Length == 0 ? "none" : string.Join(", ", ids.OrderBy(i => place.GetValueOrDefault(i)).Select(i => names.GetValueOrDefault(i, "")));
         string Money(decimal? m, string cur) => m is { } v ? $"${v.ToString("N2", AU)} {cur}" : "none";
         foreach (var key in kept.Keys)
         {
@@ -217,10 +253,10 @@ public static class VariationEndpoints
                 "noticePeriodDays" => (k.NoticePeriodDays is { } o ? $"{o} days" : "none", notice is { } n ? $"{n} days" : "none"),
                 "value" => (Money(k.Value, k.CurrencyCode), Money(value, currency)),
                 "currencyCode" => (k.CurrencyCode, currency),
-                "businessUnit" => (k.BusinessUnitId is { } b ? names.GetValueOrDefault(b, "") : "none", businessUnit is { } nb ? names.GetValueOrDefault(nb, "") : "none"),
-                "site" => (k.SiteId is { } s ? names.GetValueOrDefault(s, "") : "none", site is { } ns ? names.GetValueOrDefault(ns, "") : "none"),
-                "entity" => (k.EntityId is { } oe ? names.GetValueOrDefault(oe, "") : "none", entity is { } ne ? names.GetValueOrDefault(ne, "") : "none"),
-                "function" => (k.FunctionId is { } of ? names.GetValueOrDefault(of, "") : "none", function is { } nf ? names.GetValueOrDefault(nf, "") : "none"),
+                "businessUnit" => (k.BusinessUnitName ?? "none", Names(businessUnit)),
+                "site" => (k.SiteName ?? "none", Names(site)),
+                "entity" => (k.EntityName ?? "none", Names(entity)),
+                "function" => (k.FunctionName ?? "none", Names(function)),
                 _ => (addedValues.TryGetValue(key, out var ov) && ov.Display.Length > 0 ? ov.Display : "none",
                       parsed.FirstOrDefault(p => p.Field.Key == key) is { } pv && !pv.IsEmpty ? await Fields.DisplayAsync(c, tx, pv) : "none"),
             };
@@ -313,7 +349,7 @@ public static class VariationEndpoints
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            var contract = await c.QuerySingleOrDefaultAsync<ContractRow>("SELECT k.*, o.Name AS OwnerName, b.Name AS BackupOwnerName, s.Name AS SupplierName FROM contracts.Contract k JOIN contracts.Person o ON o.Id = k.OwnerId LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId WHERE k.Id = @id", new { id });
+            var contract = await c.QuerySingleOrDefaultAsync<ContractRow>($"SELECT k.*, o.Name AS OwnerName, b.Name AS BackupOwnerName, s.Name AS SupplierName, lv.* FROM contracts.Contract k JOIN contracts.Person o ON o.Id = k.OwnerId LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId OUTER APPLY ({ContractEndpoints.ListValuesSql}) lv WHERE k.Id = @id", new { id });
             if (contract is null || !ContractAccess.CanSee(me!, contract.IsConfidential, contract.OwnerId, contract.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
             var v = await c.QuerySingleOrDefaultAsync<VariationRow>($"{SelectVariation} WHERE v.Id = @vid AND v.ContractId = @id", new { vid, id });
@@ -323,8 +359,6 @@ public static class VariationEndpoints
             var allowed = await AllowedAsync(c, tx, defs);
             var added = (await Fields.ReadAsync(c, tx, [id], defs))[id];
             var plan = await PlanAsync(c, tx, contract, v.Changes);
-            var builtInDisplay = await c.QueryAsync<(int Id, string Value)>("SELECT Id, Value FROM contracts.ListItem", transaction: tx);
-            var names = builtInDisplay.ToDictionary(i => i.Id.ToString(CultureInfo.InvariantCulture), i => i.Value);
             string Display(Allowed a)
             {
                 if (a.Added is not null) return added.TryGetValue(a.Key, out var x) ? x.Display : "";
@@ -336,7 +370,10 @@ public static class VariationEndpoints
                     "renewalTermMonths" => cur is int t ? ContractEndpoints.Months(t) : "",
                     "noticePeriodDays" => cur is int n ? $"{n} days" : "",
                     "value" => cur is decimal m ? $"${m.ToString("N2", AU)}" : "",
-                    "businessUnit" or "site" or "entity" or "function" => cur is string k ? names.GetValueOrDefault(k, "") : "",
+                    "businessUnit" => contract.BusinessUnitName ?? "",
+                    "site" => contract.SiteName ?? "",
+                    "entity" => contract.EntityName ?? "",
+                    "function" => contract.FunctionName ?? "",
                     _ => Convert.ToString(cur, CultureInfo.InvariantCulture) ?? "",
                 };
             }

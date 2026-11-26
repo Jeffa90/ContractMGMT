@@ -27,11 +27,25 @@ test('Raise a draft contract, then find it', async ({ page }, info) => {
   await page.getByLabel(/^Title/).fill(title)
   await page.getByLabel(/^Supplier/).selectOption({ label: 'Southern Cross Freight (demo)' })
   await page.getByLabel(/^Category/).selectOption({ label: 'Freight › Linehaul' })
+
+  // Sites: several can be ticked (D-114). Select all, untick one; the drop-down stays open until Done.
+  const sites = page.getByLabel(/^Site/)
+  await sites.click()
+  await page.getByRole('menuitem', { name: 'Select all' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Head office' }).click()
+  await expect(page.getByRole('menuitemcheckbox', { name: 'North plant' })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Head office' })).toHaveAttribute('aria-checked', 'false')
+  await expectAccessible(page)
+  await page.getByRole('menuitem', { name: 'Done' }).click()
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await expect(sites).toContainText('North plant, South plant')
+
   await page.getByRole('button', { name: 'Save draft' }).click()
 
   await expect(page).toHaveURL(/\/contracts\/\d+$/)
   await settled(page, title)
   await expect(page.getByText('Draft', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('North plant, South plant')).toBeVisible()
   await expectAccessible(page)
 
   await page.goto('/contracts?view=drafts')

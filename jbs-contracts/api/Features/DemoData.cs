@@ -541,12 +541,12 @@ public static class DemoData
         {
             var reference = await ContractNumbers.NextAsync(c, tx);
             var autoRenews = s.AutoRenewMonths is not null && !s.Evergreen && s.End is not null;
+            var entity = s.BusinessUnit == corporate ? foodsEntity : meatsEntity;
+            var function = s.Category == linehaul || s.Category == coldChain ? logisticsFn : s.Category == facilities || s.Category == cleaning ? operationsFn : procurementFn;
             var p = new DynamicParameters(new
             {
-                reference, title = s.Title, description = "Fictional demo contract for trying JBS Contracts on QA.", s.Supplier, s.Category, s.AgreementType, s.BusinessUnit, s.Site,
+                reference, title = s.Title, description = "Fictional demo contract for trying JBS Contracts on QA.", s.Supplier, s.Category, s.AgreementType,
                 s.Owner, s.Backup, s.Confidential, s.Value, s.Evergreen, s.Notice, s.Legal,
-                entity = s.BusinessUnit == corporate ? foodsEntity : meatsEntity,
-                function = s.Category == linehaul || s.Category == coldChain ? logisticsFn : s.Category == facilities || s.Category == cleaning ? operationsFn : procurementFn,
                 autoRenews, term = autoRenews ? s.AutoRenewMonths : null,
             });
             p.Add("start", s.Start, System.Data.DbType.Date);
@@ -554,13 +554,17 @@ public static class DemoData
             p.Add("review", s.Review, System.Data.DbType.Date);
             // Raised by its owner (as in real life), so approvers who aren't involved can approve it.
             var id = await c.ExecuteScalarAsync<int>("""
-                INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
+                INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, OwnerId, BackupOwnerId,
                     IsConfidential, Value, CurrencyCode, StartDate, EndDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewDate, NeedsLegalReview,
                     CreatedById, UpdatedById, IsDemo)
                 OUTPUT INSERTED.Id
-                VALUES (@reference, @title, @description, @Supplier, @Category, @AgreementType, @BusinessUnit, @Site, @entity, @function, @Owner, @Backup,
+                VALUES (@reference, @title, @description, @Supplier, @Category, @AgreementType, @Owner, @Backup,
                     @Confidential, @Value, N'AUD', @start, @end, @Evergreen, @autoRenews, @term, @Notice, @review, @Legal, @Owner, @Owner, 1)
                 """, p, tx);
+            // Business unit, site, entity and function (D-114): one each here; a contract can have several.
+            int?[] values = [s.BusinessUnit, s.Site, entity, function];
+            await c.ExecuteAsync("INSERT INTO contracts.ContractListValue (ContractId, ListItemId) VALUES (@id, @item)",
+                values.OfType<int>().Distinct().Select(item => new { id, item }), tx);
             await audit.WriteAsync(c, tx, me.AsActor(), "demo.contract", "Contract", id, $"{me.Name} loaded the demo contract {reference} {s.Title} (fictional; it never sends email).", contractId: id);
             Contracts++;
             return id;

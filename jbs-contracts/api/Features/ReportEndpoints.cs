@@ -161,15 +161,20 @@ public static class ReportEndpoints
         var filters = Fields.FilterSql(fields, filterValues, p);
         var rows = (await c.QueryAsync<RegisterRow>($"""
             SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, s.VendorNumber AS SupplierVendorNumber, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
-                   at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName, ent.Value AS EntityName, fn.Value AS FunctionName, o.Name AS OwnerName,
+                   at.Value AS AgreementTypeName, lv.BusinessUnitName, lv.SiteName, lv.EntityName, lv.FunctionName, o.Name AS OwnerName,
                    b.Name AS BackupOwnerName, k.IsConfidential, k.NeedsLegalReview, k.Value, k.CurrencyCode, k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate,
                    k.IsEvergreen, k.AutoRenews, k.RenewalTermMonths,
                    k.NoticePeriodDays, k.ReviewDate, k.RegisteredUtc, rb.Name AS RegisteredByName, k.RenewalDecision, k.EndedOn, k.EndedReason, k.LegalOutcome, k.LegacyReference
             FROM contracts.Contract k
             LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
             LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
-            LEFT JOIN contracts.ListItem at ON at.Id = k.AgreementTypeId LEFT JOIN contracts.ListItem bu ON bu.Id = k.BusinessUnitId LEFT JOIN contracts.ListItem site ON site.Id = k.SiteId
-            LEFT JOIN contracts.ListItem ent ON ent.Id = k.EntityId LEFT JOIN contracts.ListItem fn ON fn.Id = k.FunctionId
+            LEFT JOIN contracts.ListItem at ON at.Id = k.AgreementTypeId
+            OUTER APPLY (SELECT
+                    STRING_AGG(CASE WHEN li.ListName = N'BusinessUnit' THEN CAST(li.Value AS NVARCHAR(MAX)) END, N', ') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS BusinessUnitName,
+                    STRING_AGG(CASE WHEN li.ListName = N'Site' THEN CAST(li.Value AS NVARCHAR(MAX)) END, N', ') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS SiteName,
+                    STRING_AGG(CASE WHEN li.ListName = N'Entity' THEN CAST(li.Value AS NVARCHAR(MAX)) END, N', ') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS EntityName,
+                    STRING_AGG(CASE WHEN li.ListName = N'Function' THEN CAST(li.Value AS NVARCHAR(MAX)) END, N', ') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS FunctionName
+                FROM contracts.ContractListValue clv JOIN contracts.ListItem li ON li.Id = clv.ListItemId WHERE clv.ContractId = k.Id) lv
             JOIN contracts.Person o ON o.Id = k.OwnerId LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId LEFT JOIN contracts.Person rb ON rb.Id = k.RegisteredById
             WHERE k.Stage IN ({StagesFor(scope)}) AND {ContractAccess.VisibleSql("k")}{string.Concat(filters.Select(f => $" AND {f}"))}
             ORDER BY k.Reference

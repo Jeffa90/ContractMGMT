@@ -80,6 +80,10 @@ const topics = {
           Nothing is deleted, and blank cells leave what's there.
         </p>
         <p>
+          A contract can have several business units, sites, entities and functions. In Excel they share one cell, separated by semicolons (for example
+          Dinmore; Riverina). A blank cell leaves them as they are.
+        </p>
+        <p>
           Fields your admin added have their own columns. For a pick-from-a-list field, type the option as it's shown (several are separated by commas); for a person,
           their Windows logon or full name. Only contracts you could edit on screen (drafts, or ones back with the owner from Legal) can be changed by import; rows for other contracts are fine as long as they change nothing.
         </p>
@@ -94,6 +98,10 @@ const topics = {
         <p>
           <strong>While it is a draft</strong>, click <strong>Edit details</strong> to fill in or change anything. Only a title is needed to start; the rest can wait
           until you send it on, when the required fields are checked.
+        </p>
+        <p>
+          <strong>Business unit, site, entity and function</strong> can each have several. Open the drop-down and tick each one that applies; it stays open until
+          you click <strong>Done</strong>. <strong>Select all</strong> ticks everything, so you can then untick the few that don't apply.
         </p>
         <p>
           <strong>Legal review</strong> passes back and forth. <strong>Send to Legal</strong> hands it over; someone in Legal clicks <strong>I'll take it</strong>.

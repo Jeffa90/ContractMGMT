@@ -436,9 +436,15 @@ public static partial class Fields
                 string? column = f.Key switch
                 {
                     "supplier" => "k.SupplierId", "agreementType" => "k.AgreementTypeId", "owner" => "k.OwnerId", "backupOwner" => "k.BackupOwnerId",
-                    "businessUnit" => "k.BusinessUnitId", "site" => "k.SiteId", "entity" => "k.EntityId", "function" => "k.FunctionId", _ => null,
+                    _ => null,
                 };
                 if (column is not null && id is not null) { sql.Add($"{column} = @{name}"); p.Add(name, id); }
+                else if (f.Key is "businessUnit" or "site" or "entity" or "function" && id is not null)
+                {
+                    // Several values each (D-114): the contract has the one picked among them.
+                    sql.Add($"EXISTS (SELECT 1 FROM contracts.ContractListValue lv WHERE lv.ContractId = k.Id AND lv.ListItemId = @{name})");
+                    p.Add(name, id);
+                }
                 else if (f.Key == "category" && id is not null)
                 {
                     // A category includes its subcategories.

@@ -14,10 +14,33 @@ public sealed class ContractRow
     public int? SupplierId { get; set; }
     public int? CategoryId { get; set; }
     public int? AgreementTypeId { get; set; }
-    public int? BusinessUnitId { get; set; }
-    public int? SiteId { get; set; }
-    public int? EntityId { get; set; }
-    public int? FunctionId { get; set; }
+    // Business unit, site, entity and function can each have several values (D-114), kept in ContractListValue. Read as lists from
+    // SelectContract: ids comma-separated, names separated by a unit-separator character (names may contain commas).
+    public string? BusinessUnitIdList { get; set; }
+    public string? SiteIdList { get; set; }
+    public string? EntityIdList { get; set; }
+    public string? FunctionIdList { get; set; }
+    public string? BusinessUnitNameList { get; set; }
+    public string? SiteNameList { get; set; }
+    public string? EntityNameList { get; set; }
+    public string? FunctionNameList { get; set; }
+    public int[] BusinessUnitIds => Ids(BusinessUnitIdList);
+    public int[] SiteIds => Ids(SiteIdList);
+    public int[] EntityIds => Ids(EntityIdList);
+    public int[] FunctionIds => Ids(FunctionIdList);
+    public string[] BusinessUnitNames => Names(BusinessUnitNameList);
+    public string[] SiteNames => Names(SiteNameList);
+    public string[] EntityNames => Names(EntityNameList);
+    public string[] FunctionNames => Names(FunctionNameList);
+    /// <summary>The values joined for reading ("Dinmore, Riverina"), or null when there are none.</summary>
+    public string? BusinessUnitName => Joined(BusinessUnitNames);
+    public string? SiteName => Joined(SiteNames);
+    public string? EntityName => Joined(EntityNames);
+    public string? FunctionName => Joined(FunctionNames);
+    public const char NameSeparator = '\u001F';
+    private static int[] Ids(string? list) => string.IsNullOrEmpty(list) ? [] : [.. list.Split(',').Select(s => int.Parse(s, CultureInfo.InvariantCulture))];
+    private static string[] Names(string? list) => string.IsNullOrEmpty(list) ? [] : list.Split(NameSeparator);
+    private static string? Joined(string[] names) => names.Length == 0 ? null : string.Join(", ", names);
     public int OwnerId { get; set; }
     public int? BackupOwnerId { get; set; }
     public bool IsConfidential { get; set; }
@@ -81,10 +104,6 @@ public sealed class ContractRow
     public string? CategoryName { get; set; }
     public string? ParentCategoryName { get; set; }
     public string? AgreementTypeName { get; set; }
-    public string? BusinessUnitName { get; set; }
-    public string? SiteName { get; set; }
-    public string? EntityName { get; set; }
-    public string? FunctionName { get; set; }
     public string OwnerName { get; set; } = "";
     public string? BackupOwnerName { get; set; }
     public string CreatedByName { get; set; } = "";
@@ -106,11 +125,11 @@ public sealed class ContractRow
 }
 
 public sealed record SaveContract(
-    string? Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int? BusinessUnitId, int? SiteId,
+    string? Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int[]? BusinessUnitIds, int[]? SiteIds,
     int? OwnerId, int? BackupOwnerId, bool? IsConfidential, decimal? Value, string? CurrencyCode, string? SapOutlineAgreement,
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool? IsEvergreen, int? NoticePeriodDays, DateOnly? ReviewDate,
     bool? NeedsLegalReview, string? RowVersion, Dictionary<string, System.Text.Json.JsonElement>? Fields = null,
-    int? EntityId = null, int? FunctionId = null, bool? AutoRenews = null, int? RenewalTermMonths = null, int? ReviewMonthsBeforeEnd = null);
+    int[]? EntityIds = null, int[]? FunctionIds = null, bool? AutoRenews = null, int? RenewalTermMonths = null, int? ReviewMonthsBeforeEnd = null);
 
 public sealed record WithdrawContract(string? Reason, string? RowVersion);
 
@@ -122,10 +141,27 @@ public static class ContractEndpoints
         ["Effective"] = "Effective", ["Ended"] = "Ended", ["Archived"] = "Archived", ["Withdrawn"] = "Withdrawn",
     };
 
-    private const string SelectContract = """
+    /// <summary>
+    /// A contract's business units, sites, entities and functions (D-114), for alias k: four id lists (BusinessUnitIdList, ...) and
+    /// four name lists (BusinessUnitNameList, ...), in the lists' order. Used as OUTER APPLY (...) by everything that reads contracts.
+    /// </summary>
+    public const string ListValuesSql = """
+        SELECT
+            STRING_AGG(CASE WHEN li.ListName = N'BusinessUnit' THEN CAST(li.Id AS NVARCHAR(MAX)) END, N',') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS BusinessUnitIdList,
+            STRING_AGG(CASE WHEN li.ListName = N'Site' THEN CAST(li.Id AS NVARCHAR(MAX)) END, N',') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS SiteIdList,
+            STRING_AGG(CASE WHEN li.ListName = N'Entity' THEN CAST(li.Id AS NVARCHAR(MAX)) END, N',') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS EntityIdList,
+            STRING_AGG(CASE WHEN li.ListName = N'Function' THEN CAST(li.Id AS NVARCHAR(MAX)) END, N',') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS FunctionIdList,
+            STRING_AGG(CASE WHEN li.ListName = N'BusinessUnit' THEN CAST(li.Value AS NVARCHAR(MAX)) END, NCHAR(31)) WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS BusinessUnitNameList,
+            STRING_AGG(CASE WHEN li.ListName = N'Site' THEN CAST(li.Value AS NVARCHAR(MAX)) END, NCHAR(31)) WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS SiteNameList,
+            STRING_AGG(CASE WHEN li.ListName = N'Entity' THEN CAST(li.Value AS NVARCHAR(MAX)) END, NCHAR(31)) WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS EntityNameList,
+            STRING_AGG(CASE WHEN li.ListName = N'Function' THEN CAST(li.Value AS NVARCHAR(MAX)) END, NCHAR(31)) WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS FunctionNameList
+        FROM contracts.ContractListValue clv JOIN contracts.ListItem li ON li.Id = clv.ListItemId
+        WHERE clv.ContractId = k.Id
+        """;
+
+    private const string SelectContract = $"""
         SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
-               at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName,
-               ent.Value AS EntityName, fn.Value AS FunctionName,
+               at.Value AS AgreementTypeName, lv.*,
                o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName, rb.Name AS RegisteredByName,
                ul.UnlockId, ul.UnlockReason, ul.UnlockExpiresUtc, ul.UnlockByName, ovr.OpenVariationId, ovr.OpenVariationStage,
                rd.Name AS RenewalDecisionByName, eb.Name AS EndedByName, ren.Reference AS RenewsReference, rn.RenewedById, rn.RenewedByReference, rn.RenewedByStage
@@ -134,10 +170,7 @@ public static class ContractEndpoints
         LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId
         LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
         LEFT JOIN contracts.ListItem at ON at.Id = k.AgreementTypeId
-        LEFT JOIN contracts.ListItem bu ON bu.Id = k.BusinessUnitId
-        LEFT JOIN contracts.ListItem site ON site.Id = k.SiteId
-        LEFT JOIN contracts.ListItem ent ON ent.Id = k.EntityId
-        LEFT JOIN contracts.ListItem fn ON fn.Id = k.FunctionId
+        OUTER APPLY ({ListValuesSql}) lv
         JOIN contracts.Person o ON o.Id = k.OwnerId
         LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId
         JOIN contracts.Person cr ON cr.Id = k.CreatedById
@@ -328,14 +361,15 @@ public static class ContractEndpoints
         if (errors is not null || fieldErrors.Count > 0) return (0, "", (errors ?? []).Concat(fieldErrors).ToDictionary(e => e.Key, e => e.Value));
         reference ??= await ContractNumbers.NextAsync(c, tx);
         var id = await c.ExecuteScalarAsync<int>("""
-            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
+            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, OwnerId, BackupOwnerId,
                 IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, EffectiveDate, EndDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewDate,
                 ReviewMonthsBeforeEnd, NeedsLegalReview, CreatedById, UpdatedById)
             OUTPUT INSERTED.Id
-            VALUES (@reference, @Title, @Description, @SupplierId, @CategoryId, @AgreementTypeId, @BusinessUnitId, @SiteId, @EntityId, @FunctionId, @OwnerId, @BackupOwnerId,
+            VALUES (@reference, @Title, @Description, @SupplierId, @CategoryId, @AgreementTypeId, @OwnerId, @BackupOwnerId,
                 @IsConfidential, @Value, @CurrencyCode, @SapOutlineAgreement, @StartDate, @EffectiveDate, @EndDate, @IsEvergreen, @AutoRenews, @RenewalTermMonths, @NoticePeriodDays, @ReviewDate,
                 @ReviewMonthsBeforeEnd, @NeedsLegalReview, @me, @me)
             """, Params(input!, new { reference, me = me.Id }), tx);
+        await SaveListValuesAsync(c, tx, id, input!);
         var saved = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
         var added = await Fields.SaveAsync(c, tx, id, fieldValues, definitions);
         await audit.WriteAsync(c, tx, me.AsActor(), "contract.created", "Contract", id,
@@ -354,13 +388,14 @@ public static class ContractEndpoints
         if (errors is not null || fieldErrors.Count > 0) return ((errors ?? []).Concat(fieldErrors).ToDictionary(e => e.Key, e => e.Value), null);
         await c.ExecuteAsync("""
             UPDATE contracts.Contract SET Title = @Title, Description = @Description, SupplierId = @SupplierId, CategoryId = @CategoryId,
-                AgreementTypeId = @AgreementTypeId, BusinessUnitId = @BusinessUnitId, SiteId = @SiteId, EntityId = @EntityId, FunctionId = @FunctionId,
+                AgreementTypeId = @AgreementTypeId,
                 OwnerId = @OwnerId, BackupOwnerId = @BackupOwnerId,
                 IsConfidential = @IsConfidential, Value = @Value, CurrencyCode = @CurrencyCode, SapOutlineAgreement = @SapOutlineAgreement,
                 StartDate = @StartDate, EffectiveDate = @EffectiveDate, EndDate = @EndDate, IsEvergreen = @IsEvergreen, AutoRenews = @AutoRenews,
                 RenewalTermMonths = @RenewalTermMonths, NoticePeriodDays = @NoticePeriodDays, ReviewMonthsBeforeEnd = @ReviewMonthsBeforeEnd, ReviewDate = @ReviewDate, NeedsLegalReview = @NeedsLegalReview, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
             WHERE Id = @id
             """, Params(input!, new { id, me = me.Id }), tx);
+        await SaveListValuesAsync(c, tx, id, input!);
         var after = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
         var (oldValues, newValues) = (Snapshot(before), Snapshot(after));
         var changed = oldValues.Keys.Where(k => oldValues[k] != newValues[k]).ToList();
@@ -385,7 +420,8 @@ public static class ContractEndpoints
         void Check(string label, object? a, object? b) { if (!Equals(a, b)) changed.Add(label); }
         Check("title", before.Title, i.Title); Check("description", before.Description, i.Description); Check("supplier", before.SupplierId, i.SupplierId);
         Check("category", before.CategoryId, i.CategoryId); Check("agreement type", before.AgreementTypeId, i.AgreementTypeId);
-        Check("business unit", before.BusinessUnitId, i.BusinessUnitId); Check("site", before.SiteId, i.SiteId); Check("entity", before.EntityId, i.EntityId); Check("function", before.FunctionId, i.FunctionId);
+        Check("business unit", Key(before.BusinessUnitIds), Key(i.BusinessUnitIds)); Check("site", Key(before.SiteIds), Key(i.SiteIds));
+        Check("entity", Key(before.EntityIds), Key(i.EntityIds)); Check("function", Key(before.FunctionIds), Key(i.FunctionIds));
         Check("owner", before.OwnerId, i.OwnerId);
         Check("backup owner", before.BackupOwnerId, i.BackupOwnerId); Check("Confidential", before.IsConfidential, i.IsConfidential);
         Check("value", before.Value, i.Value); Check("currency", before.CurrencyCode, i.CurrencyCode); Check("SAP outline agreement number", before.SapOutlineAgreement, i.SapOutlineAgreement);
@@ -415,6 +451,20 @@ public static class ContractEndpoints
 
     private static string EscapeLike(string s) => s.Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]");
 
+    /// <summary>A set of ids as one comparable value.</summary>
+    private static string Key(int[] ids) => string.Join(",", ids.Order());
+
+    /// <summary>Saves the contract's business units, sites, entities and functions (D-114), replacing what it had.</summary>
+    private static async Task SaveListValuesAsync(SqlConnection c, SqlTransaction tx, int id, Input i)
+    {
+        var items = i.BusinessUnitIds.Concat(i.SiteIds).Concat(i.EntityIds).Concat(i.FunctionIds).Distinct().ToList();
+        await c.ExecuteAsync("DELETE FROM contracts.ContractListValue WHERE ContractId = @id AND ListItemId NOT IN @items", new { id, items }, tx);
+        await c.ExecuteAsync("""
+            INSERT INTO contracts.ContractListValue (ContractId, ListItemId)
+            SELECT @id, @item WHERE NOT EXISTS (SELECT 1 FROM contracts.ContractListValue WHERE ContractId = @id AND ListItemId = @item)
+            """, items.Select(item => new { id, item }), tx);
+    }
+
     private static DateOnly? D(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
 
     public static object ListView(ContractRow r, Dictionary<string, string>? fields = null) => new
@@ -431,7 +481,7 @@ public static class ContractEndpoints
     private static object DetailView(ContractRow r) => new
     {
         r.Id, r.Reference, r.Title, r.Description, r.SupplierId, r.SupplierName, r.CategoryId, r.CategoryDisplay, r.AgreementTypeId, r.AgreementTypeName,
-        r.BusinessUnitId, r.BusinessUnitName, r.SiteId, r.SiteName, r.EntityId, r.EntityName, r.FunctionId, r.FunctionName, r.OwnerId, r.OwnerName, r.BackupOwnerId, r.BackupOwnerName, r.IsConfidential,
+        r.BusinessUnitIds, r.BusinessUnitName, r.SiteIds, r.SiteName, r.EntityIds, r.EntityName, r.FunctionIds, r.FunctionName, r.OwnerId, r.OwnerName, r.BackupOwnerId, r.BackupOwnerName, r.IsConfidential,
         r.Value, r.CurrencyCode, r.SapOutlineAgreement, StartDate = D(r.StartDate), EffectiveDate = D(r.EffectiveDate), EndDate = D(r.EndDate), r.IsEvergreen,
         r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), r.ReviewMonthsBeforeEnd, NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
         StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc), r.IsLocked, r.WithdrawnReason,
@@ -479,8 +529,8 @@ public static class ContractEndpoints
     /// <summary>"12 months", "1 month".</summary>
     public static string Months(int n) => n == 1 ? "1 month" : $"{n} months";
 
-    private sealed record Input(string Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int? BusinessUnitId, int? SiteId,
-        int? EntityId, int? FunctionId, int OwnerId, int? BackupOwnerId, bool IsConfidential, decimal? Value, string CurrencyCode, string? SapOutlineAgreement,
+    private sealed record Input(string Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int[] BusinessUnitIds, int[] SiteIds,
+        int[] EntityIds, int[] FunctionIds, int OwnerId, int? BackupOwnerId, bool IsConfidential, decimal? Value, string CurrencyCode, string? SapOutlineAgreement,
         DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool IsEvergreen, bool AutoRenews, int? RenewalTermMonths, int? NoticePeriodDays,
         DateOnly? ReviewDate, int? ReviewMonthsBeforeEnd, bool NeedsLegalReview);
 
@@ -489,7 +539,7 @@ public static class ContractEndpoints
         var p = new DynamicParameters(extra);
         p.AddDynamicParams(new
         {
-            i.Title, i.Description, i.SupplierId, i.CategoryId, i.AgreementTypeId, i.BusinessUnitId, i.SiteId, i.EntityId, i.FunctionId, i.OwnerId, i.BackupOwnerId,
+            i.Title, i.Description, i.SupplierId, i.CategoryId, i.AgreementTypeId, i.OwnerId, i.BackupOwnerId,
             i.IsConfidential, i.Value, i.CurrencyCode, i.SapOutlineAgreement, i.IsEvergreen, i.AutoRenews, i.RenewalTermMonths, i.NoticePeriodDays, i.ReviewMonthsBeforeEnd, i.NeedsLegalReview,
         });
         p.Add("StartDate", i.StartDate?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
@@ -520,10 +570,20 @@ public static class ContractEndpoints
         await CheckAsync("supplierId", b.SupplierId, before?.SupplierId, "SELECT COUNT(*) FROM contracts.Supplier WHERE Id = @id AND IsActive = 1", "Choose a supplier from the list.");
         await CheckAsync("categoryId", b.CategoryId, before?.CategoryId, "SELECT COUNT(*) FROM contracts.Category WHERE Id = @id AND IsActive = 1", "Choose a category from the list.");
         await CheckAsync("agreementTypeId", b.AgreementTypeId, before?.AgreementTypeId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'AgreementType' AND IsActive = 1", "Choose an agreement type from the list.");
-        await CheckAsync("businessUnitId", b.BusinessUnitId, before?.BusinessUnitId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'BusinessUnit' AND IsActive = 1", "Choose a business unit from the list.");
-        await CheckAsync("siteId", b.SiteId, before?.SiteId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'Site' AND IsActive = 1", "Choose a site from the list.");
-        await CheckAsync("entityId", b.EntityId, before?.EntityId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'Entity' AND IsActive = 1", "Choose an entity from the list.");
-        await CheckAsync("functionId", b.FunctionId, before?.FunctionId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'Function' AND IsActive = 1", "Choose a function from the list.");
+        // Several values each (D-114). Each must be in its list and in use, unless the contract already had it.
+        async Task<int[]> ListAsync(string field, string list, int[]? ids, int[]? previous, string message)
+        {
+            var wanted = (ids ?? []).Distinct().ToArray();
+            if (wanted.Length == 0) return [];
+            var found = await c.QueryAsync<int>("SELECT Id FROM contracts.ListItem WHERE ListName = @list AND Id IN @wanted AND (IsActive = 1 OR Id IN @previous)",
+                new { list, wanted, previous = previous ?? [] }, tx);
+            if (found.Count() != wanted.Length) f[field] = message;
+            return wanted;
+        }
+        var businessUnits = await ListAsync("businessUnitIds", "BusinessUnit", b.BusinessUnitIds, before?.BusinessUnitIds, "Choose business units from the list.");
+        var sites = await ListAsync("siteIds", "Site", b.SiteIds, before?.SiteIds, "Choose sites from the list.");
+        var entities = await ListAsync("entityIds", "Entity", b.EntityIds, before?.EntityIds, "Choose entities from the list.");
+        var functions = await ListAsync("functionIds", "Function", b.FunctionIds, before?.FunctionIds, "Choose functions from the list.");
 
         var ownerId = b.OwnerId ?? before?.OwnerId;
         if (ownerId is null) f["ownerId"] = "Choose who owns this contract.";
@@ -564,7 +624,7 @@ public static class ContractEndpoints
         }
 
         if (f.Count > 0) return (null, f);
-        return (new Input(title, description, b.SupplierId, b.CategoryId, b.AgreementTypeId, b.BusinessUnitId, b.SiteId, b.EntityId, b.FunctionId, ownerId!.Value,
+        return (new Input(title, description, b.SupplierId, b.CategoryId, b.AgreementTypeId, businessUnits, sites, entities, functions, ownerId!.Value,
             b.BackupOwnerId, b.IsConfidential ?? false, b.Value, currency, sap, b.StartDate, b.EffectiveDate, b.EndDate, evergreen, autoRenews, term,
             b.NoticePeriodDays, reviewDate, reviewMonths, b.NeedsLegalReview ?? true), null);
     }

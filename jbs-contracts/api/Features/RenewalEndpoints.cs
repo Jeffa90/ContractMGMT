@@ -246,16 +246,18 @@ public static class RenewalEndpoints
         var p = new DynamicParameters(new { reference, title = $"{title} (renewal)", id = c.Id, me = x.Me.Id });
         p.Add("start", c.EndDate is { } end && !c.IsEvergreen ? end.AddDays(1) : (DateTime?)null, System.Data.DbType.Date);
         var newId = await x.C.ExecuteScalarAsync<int>("""
-            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
+            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, OwnerId, BackupOwnerId,
                 IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewMonthsBeforeEnd, NeedsLegalReview, RenewsContractId,
                 CreatedById, UpdatedById, IsDemo)
             OUTPUT INSERTED.Id
-            SELECT @reference, @title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
+            SELECT @reference, @title, Description, SupplierId, CategoryId, AgreementTypeId, OwnerId, BackupOwnerId,
                 IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewMonthsBeforeEnd, 1, Id,
                 @me, @me, IsDemo
             FROM contracts.Contract WHERE Id = @id
             """, p, x.Tx);
-        // Added fields come across too.
+        // Business units, sites, entities and functions (D-114) and added fields come across too.
+        await x.C.ExecuteAsync("INSERT INTO contracts.ContractListValue (ContractId, ListItemId) SELECT @newId, ListItemId FROM contracts.ContractListValue WHERE ContractId = @id",
+            new { newId, id = c.Id }, x.Tx);
         await x.C.ExecuteAsync("""
             INSERT INTO contracts.ContractFieldValue (ContractId, FieldId, TextValue, NumberValue, DateValue, BoolValue, PersonId, SupplierId)
             SELECT @newId, FieldId, TextValue, NumberValue, DateValue, BoolValue, PersonId, SupplierId FROM contracts.ContractFieldValue WHERE ContractId = @id

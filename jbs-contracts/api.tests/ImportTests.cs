@@ -390,7 +390,7 @@ public sealed class ImportTests(AppFixture app)
         await ReadAsync(await admin.PostAsync("/api/import/legacy/import", F(translations), Ct));
         await using var db = await app.OpenAsync();
         var imported = (await db.QueryAsync<(int CategoryId, int? SiteId, string Type, string Owner)>("""
-            SELECT k.CategoryId, k.SiteId, t.Value, o.Name FROM contracts.Contract k JOIN contracts.ListItem t ON t.Id = k.AgreementTypeId
+            SELECT k.CategoryId, (SELECT MIN(lv.ListItemId) FROM contracts.ContractListValue lv WHERE lv.ContractId = k.Id) AS SiteId, t.Value, o.Name FROM contracts.Contract k JOIN contracts.ListItem t ON t.Id = k.AgreementTypeId
             JOIN contracts.Person o ON o.Id = k.OwnerId WHERE k.LegacyReference LIKE @like
             """, new { like = $"T{u}%" })).ToList();
         Assert.Equal(2, imported.Count);

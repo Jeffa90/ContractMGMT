@@ -34,7 +34,7 @@ public static class LegacyImportEndpoints
         new("startDate", "Start date", "Dates", false, null, ["start date", "start", "commencement date", "commencement", "valid from"]),
         new("endDate", "End date", "Dates", false, "Blank needs Evergreen to be Yes.", ["end date", "end", "expiry date", "expiry", "expires", "valid to", "termination date"]),
         new("evergreen", "Evergreen", "Dates", false, "Yes or No: it carries on until someone ends it, with no end date.", ["evergreen", "perpetual", "no end date"]),
-        new("autoRenews", "Renews automatically", "Dates", false, "Yes or No (or Automatic, Manual): yes moves the end date on by the renewal term unless someone decides to let it end.",
+        new("autoRenews", "Renews automatically", "Dates", false, "Yes or No (or Automatic, Manual): yes moves the end date on by the renewal term unless someone decides to let it end. Medius's Extension Type goes here: In Full comes in as Evergreen, Monthly renews a month at a time.",
             ["renews automatically", "auto renew", "auto renews", "auto renewal", "automatic renewal", "extension type", "renewal type", "rolling"]),
         new("renewalTermMonths", "Renewal term (months)", "Dates", false, "How long each automatic renewal lasts: 12, 12 months or 1 year.",
             ["renewal term", "renewal term months", "renewal period", "extension period", "extension term", "extension length", "renewal length"]),
@@ -98,12 +98,26 @@ public static class LegacyImportEndpoints
     /// </summary>
     internal static bool? RenewsSays(string text)
     {
-        var words = System.Text.RegularExpressions.Regex.Split(text.ToLowerInvariant(), "[^a-z0-9]+").Where(w => w.Length > 0).ToList();
+        var words = WordList(text);
         if (words.Count == 0) return null;
         if (words.Count == 1 && words[0] is "yes" or "y" or "true" or "1" or "x") return true;
         if (words.Any(w => w is "no" or "n" or "not" or "non" or "never" or "false" or "0" or "none" or "manual" or "manually" or "fixed")) return false;
         if (words.Any(w => w.StartsWith("auto", StringComparison.Ordinal) || w is "rolling" or "rollover")) return true;
         return null;
+    }
+
+    /// <summary>A cell's words, lower case, with joined-up words split ("AutoExtensionFull" reads as auto, extension, full).</summary>
+    private static List<string> WordList(string text) =>
+        System.Text.RegularExpressions.Regex.Split(System.Text.RegularExpressions.Regex.Replace(text, "([a-z])([A-Z])", "$1 $2").ToLowerInvariant(), "[^a-z0-9]+")
+            .Where(w => w.Length > 0).ToList();
+
+    /// <summary>
+    /// Medius's "Auto Extension - In Full" (AutoExtensionFull): it carries on until a party ends it, so it's Evergreen (Jeff, 27 Nov).
+    /// </summary>
+    internal static bool MeansEvergreen(string text)
+    {
+        var words = WordList(text);
+        return words.Any(w => w.StartsWith("auto", StringComparison.Ordinal)) && words.Contains("full");
     }
 
     private static async Task<List<Target>> TargetsAsync(SqlConnection c, SqlTransaction? tx) =>
@@ -380,12 +394,18 @@ public static class LegacyImportEndpoints
             string? p = null;
             DateOnly? Date(string key) { if (!source.TryGetValue(key, out var col)) return null; var d = row.Date(col, out var pr); if (pr is not null) problems.Add(pr); return d; }
             bool? YesNo(string key) { if (!source.TryGetValue(key, out var col)) return null; var v = row.YesNo(col, out var pr); if (pr is not null) problems.Add(pr); return v; }
+            string Header(string key) => source.TryGetValue(key, out var col) ? col : key;
+            bool Fail(string problem) { problems.Add(problem); return false; }
             var start = Date("startDate");
             var effective = Date("effectiveDate");
             var end = Date("endDate");
             var review = Date("reviewDate");
             var registered = Date("registeredDate");
-            var evergreen = YesNo("evergreen") ?? false;
+            // Medius's Extension Type matched to Evergreen by mistake: say which field it belongs to.
+            var evergreenText = Text(row, "evergreen");
+            var evergreen = evergreenText is not null && WordList(evergreenText).Contains("extension")
+                ? Fail($"{Header("evergreen")}: this is Medius's renewal setting (\"{evergreenText}\"). On the column-matching step, choose Renews automatically for this column.")
+                : YesNo("evergreen") ?? false;
             var confidential = YesNo("confidential") ?? false;
             decimal? value = null;
             if (source.TryGetValue("value", out var vcol)) { value = row.Money(vcol, out p); if (p is not null) problems.Add(p); }
@@ -422,6 +442,15 @@ public static class LegacyImportEndpoints
             {
                 term = 1;
                 r.Notes.Add($"\"{monthly}\": renews a month at a time.");
+            }
+            // "In Full" carries on until someone ends it: Evergreen, with no end date to renew (Jeff, 27 Nov).
+            if (Text(row, "autoRenews") is { } full && MeansEvergreen(full))
+            {
+                autoRenews = false;
+                term = null;
+                if (!evergreen) r.Notes.Add($"\"{full}\": carries on until someone ends it, so Evergreen{(end is { } was ? $"; its end date ({was:d MMM yyyy}) isn't kept" : "")}.");
+                evergreen = true;
+                end = null;
             }
             if (autoRenews && evergreen) problems.Add("Renews automatically: it's also Evergreen. An evergreen contract has no end date to renew; change one of them.");
             if (autoRenews && term is null) problems.Add("Renewal term: blank, but it renews automatically. Fill in how many months each renewal lasts.");

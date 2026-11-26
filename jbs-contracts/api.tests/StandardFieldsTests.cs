@@ -187,6 +187,8 @@ public sealed class StandardFieldsTests(AppFixture app)
             [taken, "Clashing number", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), null, "Auto renewal", null, null, "Active"],
             [$"{u}-x", "Unclear renewal", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), null, "Option to extend", "12", null, "Active"],
             [$"{u}-m", "Monthly", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), null, "Auto Extension - Monthly", null, null, "Active"],
+            [$"{u}-f", "In full", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), null, "AutoExtensionFull", null, null, "Active"],
+            [$"{u}-n", "No extension", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), null, "NoExtension", null, null, "Active"],
         ];
         using var book = new XLWorkbook();
         var sheet = book.Worksheets.Add("Export");
@@ -222,6 +224,15 @@ public sealed class StandardFieldsTests(AppFixture app)
         // Medius's "Auto Extension - Monthly" with no period renews a month at a time.
         Assert.Equal("Effective", byRow[6].GetProperty("outcome").GetString());
         Assert.Contains(byRow[6].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("a month at a time"));
+        // "In Full" carries on until someone ends it: Evergreen, its end date not kept (Jeff, 27 Nov). "NoExtension" doesn't renew.
+        Assert.Equal("Effective", byRow[7].GetProperty("outcome").GetString());
+        Assert.Contains(byRow[7].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("so Evergreen") && x.GetString()!.Contains("isn't kept"));
+        Assert.Equal("Effective", byRow[8].GetProperty("outcome").GetString());
+        // Matched to Evergreen by mistake, the Extension Type says where it belongs.
+        var wrong = new Dictionary<string, string>(mapping) { ["Extension Type"] = "evergreen" };
+        var misplaced = await OkAsync(admin.PostAsync("/api/import/legacy/preview", Form(wrong), Ct));
+        var row7 = misplaced.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("row").GetInt32() == 7);
+        Assert.Contains(row7.GetProperty("problems").EnumerateArray(), x => x.GetString()!.Contains("choose Renews automatically"));
 
         // Fix the clash row's renewal so it imports: it keeps its old reference only as the old reference, as the number is taken.
         rows[2][8] = "No";
@@ -237,9 +248,9 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.Contains(byRow[4].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("already another contract's number"));
 
         var result = await OkAsync(admin.PostAsync("/api/import/legacy/import", Form(mapping), Ct));
-        Assert.Equal(4, result.GetProperty("imported").GetInt32());
+        Assert.Equal(6, result.GetProperty("imported").GetInt32());
         await using var db = await app.OpenAsync();
-        var imported = (await db.QueryAsync<(string Reference, string LegacyReference, bool AutoRenews, int? RenewalTermMonths, int? NoticePeriodDays, string? Entity, DateTime EndDate)>("""
+        var imported = (await db.QueryAsync<(string Reference, string LegacyReference, bool AutoRenews, int? RenewalTermMonths, int? NoticePeriodDays, string? Entity, DateTime? EndDate)>("""
             SELECT k.Reference, k.LegacyReference, k.AutoRenews, k.RenewalTermMonths, k.NoticePeriodDays, e.Value, k.EndDate
             FROM contracts.Contract k OUTER APPLY (SELECT TOP (1) li.Value FROM contracts.ContractListValue lv JOIN contracts.ListItem li ON li.Id = lv.ListItemId AND li.ListName = N'Entity' WHERE lv.ContractId = k.Id) e WHERE k.SupplierId = (SELECT Id FROM contracts.Supplier WHERE Name = @name)
             """, new { name = $"Vendor {u}" })).ToDictionary(x => x.LegacyReference);
@@ -248,7 +259,7 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.True(first.AutoRenews);
         Assert.Equal(12, first.RenewalTermMonths);
         Assert.Equal(entity, first.Entity);
-        var end = DateOnly.FromDateTime(first.EndDate);
+        var end = DateOnly.FromDateTime(first.EndDate!.Value);
         Assert.Equal(end.DayNumber - end.AddMonths(-3).DayNumber, first.NoticePeriodDays); // 3 months back from 30 June: 92 days
         Assert.Equal(92, first.NoticePeriodDays);
         Assert.False(imported[ContractNumbers.Format(n + 1)].AutoRenews);
@@ -256,6 +267,9 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.Matches(@"^JBSAUS\d{7}$", imported[taken].Reference);
         Assert.NotEqual(taken, imported[taken].Reference);
         Assert.Equal((true, (int?)1), (imported[$"{u}-m"].AutoRenews, imported[$"{u}-m"].RenewalTermMonths));
+        Assert.False(imported[$"{u}-f"].AutoRenews);
+        Assert.False(imported[$"{u}-n"].AutoRenews);
+        Assert.True(await db.ExecuteScalarAsync<bool>("SELECT IsEvergreen FROM contracts.Contract WHERE LegacyReference = @r AND EndDate IS NULL", new { r = $"{u}-f" }));
 
         // The next new contract carries on after the highest number.
         var next = (await OkAsync(owner.PostAsJsonAsync("/api/contracts", new { title = $"After import {u}" }, Ct))).GetProperty("reference").GetString()!;
@@ -315,6 +329,8 @@ public sealed class StandardFieldsTests(AppFixture app)
     [InlineData("Fixed term", false)]
     [InlineData("No auto renewal", false)]
     [InlineData("Option to extend", null)]
+    [InlineData("AutoExtensionMonthly", true)] // Medius writes its Extension Type as one word
+    [InlineData("NoExtension", false)]
     public void Renewal_settings_are_read_as_automatic_or_not(string text, bool? renews) =>
         Assert.Equal(renews, LegacyImportEndpoints.RenewsSays(text));
 }

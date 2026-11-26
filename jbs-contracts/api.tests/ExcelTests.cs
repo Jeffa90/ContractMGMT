@@ -229,7 +229,7 @@ public sealed class ExcelTests(AppFixture app)
         Assert.Equal(3, Count(first, "refused"));
         var notes = first.GetProperty("rows").EnumerateArray().ToDictionary(r => r.GetProperty("row").GetInt32(), r => string.Join(" ", r.GetProperty("notes").EnumerateArray().Select(n => n.GetString())));
         Assert.Contains("more than once", notes[5]);
-        Assert.Contains("there's no supplier called", notes[6]);
+        Assert.Contains("there's no supplier \"", notes[6]);
         Assert.Contains("doesn't look like an email", notes[7]);
         await using var db = await app.OpenAsync();
         var id = await db.ExecuteScalarAsync<int>("SELECT Id FROM contracts.Supplier WHERE Name = @supplier", new { supplier });

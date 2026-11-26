@@ -80,8 +80,13 @@ export type SupplierPageData = {
     riskName: string | null;
     riskReason: string | null;
     nextReviewDue: string | null;
+    /** The group it's in (D-116): its contracts cover this supplier too. */
+    parentSupplierId: number | null;
+    parentSupplierName: string | null;
     rowVersion: string;
   };
+  /** The suppliers in this supplier's group (D-116). */
+  members: { id: number; name: string; vendorNumber: string | null; isActive: boolean }[];
   can: { manage: boolean; review: boolean };
   contacts: {
     id: number;
@@ -102,6 +107,8 @@ export type SupplierPageData = {
     currencyCode: string;
     ownerName: string;
     isConfidential: boolean;
+    /** A contract of its group's, which covers this supplier (D-116). */
+    viaGroup: boolean;
   }[];
   documents: SupplierDocument[];
   contractDocuments: {

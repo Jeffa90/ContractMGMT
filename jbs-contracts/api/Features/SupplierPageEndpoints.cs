@@ -42,12 +42,15 @@ public static class SupplierPageEndpoints
         public string? RiskName { get; set; }
         public string? RiskReason { get; set; }
         public DateTime? NextReviewDue { get; set; }
+        /// <summary>The group it's in (D-116): the parent supplier, for example a franchise's head company.</summary>
+        public int? ParentSupplierId { get; set; }
+        public string? ParentSupplierName { get; set; }
         public byte[] RowVersion { get; set; } = [];
     }
 
     /// <summary>
     /// The tier from a supplier's contracts (alias s; gives AutoTierId and AutoTierName, D-108): the highest tier (nearest the top of
-    /// the Supplier tiers list) among the main categories of its current contracts. A category without a tier follows the one above it
+    /// the Supplier tiers list) among the main categories of its current contracts, and its group's (D-116). A category without a tier follows the one above it
     /// (subcategory, category, family; D-115).
     /// </summary>
     public const string AutoTier = """
@@ -55,7 +58,7 @@ public static class SupplierPageEndpoints
                      FROM contracts.Contract ak JOIN contracts.Category akc ON akc.Id = ak.CategoryId LEFT JOIN contracts.Category akp ON akp.Id = akc.ParentId
                      LEFT JOIN contracts.Category akf ON akf.Id = akp.ParentId
                      JOIN contracts.ListItem atl ON atl.Id = COALESCE(akc.TierId, akp.TierId, akf.TierId)
-                     WHERE ak.SupplierId = s.Id AND ak.Stage NOT IN (N'Withdrawn', N'Ended', N'Archived') AND atl.IsActive = 1
+                     WHERE (ak.SupplierId = s.Id OR ak.SupplierId = s.ParentSupplierId) AND ak.Stage NOT IN (N'Withdrawn', N'Ended', N'Archived') AND atl.IsActive = 1
                      ORDER BY atl.SortOrder, atl.Id) auto
         """;
 
@@ -63,8 +66,9 @@ public static class SupplierPageEndpoints
         c.QuerySingleOrDefaultAsync<SupplierInfo>($"""
             SELECT s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, ro.Name AS RelationshipOwnerName, s.TierId,
                    ISNULL(t.Value, auto.AutoTierName) AS TierName, auto.AutoTierName,
-                   s.RiskRating, COALESCE(rk.Value, s.RiskRating) AS RiskName, s.RiskReason, s.NextReviewDue, s.RowVersion
+                   s.RiskRating, COALESCE(rk.Value, s.RiskRating) AS RiskName, s.RiskReason, s.NextReviewDue, s.ParentSupplierId, ps.Name AS ParentSupplierName, s.RowVersion
             FROM contracts.Supplier s {(forUpdate ? "WITH (UPDLOCK, HOLDLOCK)" : "")}
+            LEFT JOIN contracts.Supplier ps ON ps.Id = s.ParentSupplierId
             LEFT JOIN contracts.Person ro ON ro.Id = s.RelationshipOwnerId LEFT JOIN contracts.ListItem t ON t.Id = s.TierId
             {AutoTier}
             LEFT JOIN contracts.ListItem rk ON rk.ListName = N'SupplierRisk' AND s.RiskRating = N'L' + CAST(rk.Id AS NVARCHAR(10))
@@ -136,6 +140,8 @@ public static class SupplierPageEndpoints
 
     // ---------------------------------------------------------------- Inputs
 
+    public sealed record GroupInput(string? RowVersion, int? ParentSupplierId);
+
     public sealed record RelationshipInput(string? RowVersion, int? RelationshipOwnerId, int? TierId, string? RiskRating, string? RiskReason, DateOnly? NextReviewDue);
     public sealed record ContactInput(string? Name, string? Role, string? Email, string? Phone);
     public sealed record DocumentInput(int? TypeId, string? Title, DateOnly? ExpiresOn, bool ClearExpiry = false);
@@ -174,12 +180,16 @@ public static class SupplierPageEndpoints
             var s = await LoadAsync(c, null, id);
             if (s is null) return NotFound();
             var p = ContractAccess.Params(me!, new { id });
+            var members = await c.QueryAsync<(int Id, string Name, string? VendorNumber, bool IsActive)>(
+                "SELECT Id, Name, VendorNumber, IsActive FROM contracts.Supplier WHERE ParentSupplierId = @id ORDER BY Name", new { id });
             var contacts = await c.QueryAsync<(int Id, string Name, string? Role, string? Email, string? Phone)>(
                 "SELECT Id, Name, Role, Email, Phone FROM contracts.SupplierContact WHERE SupplierId = @id AND IsRemoved = 0 ORDER BY Name", new { id });
-            var contracts = await c.QueryAsync<(int Id, string Reference, string Title, string Stage, DateTime? EndDate, bool IsEvergreen, decimal? Value, string CurrencyCode, string OwnerName, bool IsConfidential)>($"""
-                SELECT k.Id, k.Reference, k.Title, k.Stage, k.EndDate, k.IsEvergreen, k.Value, k.CurrencyCode, o.Name, k.IsConfidential
+            // Its own contracts, and its group's (D-116): a group's contracts cover its members.
+            var contracts = await c.QueryAsync<(int Id, string Reference, string Title, string Stage, DateTime? EndDate, bool IsEvergreen, decimal? Value, string CurrencyCode, string OwnerName, bool IsConfidential, bool ViaGroup)>($"""
+                SELECT k.Id, k.Reference, k.Title, k.Stage, k.EndDate, k.IsEvergreen, k.Value, k.CurrencyCode, o.Name, k.IsConfidential,
+                       CAST(CASE WHEN k.SupplierId = @id THEN 0 ELSE 1 END AS BIT) AS ViaGroup
                 FROM contracts.Contract k JOIN contracts.Person o ON o.Id = k.OwnerId
-                WHERE k.SupplierId = @id AND {ContractAccess.VisibleSql("k")}
+                WHERE (k.SupplierId = @id OR k.SupplierId = (SELECT ParentSupplierId FROM contracts.Supplier WHERE Id = @id)) AND {ContractAccess.VisibleSql("k")}
                 ORDER BY CASE k.Stage WHEN N'Effective' THEN 0 WHEN N'Ended' THEN 2 WHEN N'Archived' THEN 3 WHEN N'Withdrawn' THEN 4 ELSE 1 END, k.Reference DESC
                 """, p);
             var docs = (await c.QueryAsync<DocRow>("""
@@ -229,13 +239,15 @@ public static class SupplierPageEndpoints
                 {
                     s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, s.RelationshipOwnerName, s.TierId, s.TierName, s.AutoTierName,
                     TierSetByHand = s.TierId is not null, s.RiskRating, s.RiskName, s.RiskReason,
-                    NextReviewDue = D(s.NextReviewDue), RowVersion = Convert.ToBase64String(s.RowVersion),
+                    NextReviewDue = D(s.NextReviewDue), s.ParentSupplierId, s.ParentSupplierName, RowVersion = Convert.ToBase64String(s.RowVersion),
                 },
+                members = members.Select(m => new { m.Id, m.Name, m.VendorNumber, m.IsActive }),
                 can = new { manage = canManage, review = canReview },
                 contacts = contacts.Select(x => new { x.Id, x.Name, x.Role, x.Email, x.Phone }),
                 contracts = contracts.Select(k => new
                 {
                     k.Id, k.Reference, k.Title, k.Stage, StageName = ContractEndpoints.StageNames[k.Stage], EndDate = D(k.EndDate), k.IsEvergreen, k.Value, k.CurrencyCode, k.OwnerName, k.IsConfidential,
+                    k.ViaGroup,
                 }),
                 documents = docGroups.Where(g => g.First().ReviewId is null).Select(Doc),
                 contractDocuments = contractDocs.Select(d => new
@@ -301,6 +313,45 @@ public static class SupplierPageEndpoints
                           after = new { after.RelationshipOwnerName, after.TierName, after.RiskName, after.RiskReason, NextReviewDue = D(after.NextReviewDue) } });
             await tx.CommitAsync();
             return Results.Ok(new { rowVersion = Convert.ToBase64String(after.RowVersion) });
+        });
+
+        // ------------------------------------------------------------ Group (D-116)
+
+        // Put a supplier in a group (or take it out, with no parent). One level: a group isn't in another group.
+        app.MapPut("/api/suppliers/{id:int}/group", async (int id, GroupInput body, CurrentUser current, Db db, AuditLog audit) =>
+        {
+            var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
+            if (refusal is not null) return refusal;
+            if (!CanManage(me!)) return NotProcurement();
+            await using var c = await db.OpenAsync();
+            await using var tx = await Db.BeginWriteAsync(c);
+            var before = await LoadAsync(c, tx, id, forUpdate: true);
+            if (before is null) return NotFound();
+            if (body.RowVersion is not null && body.RowVersion != Convert.ToBase64String(before.RowVersion))
+                return ApiResults.Changed("Someone else changed this supplier just now. Refresh to see their changes, then try again.");
+            if (before.ParentSupplierId == body.ParentSupplierId) return Results.Ok(new { rowVersion = Convert.ToBase64String(before.RowVersion) });
+            string? parentName = null;
+            if (body.ParentSupplierId is { } parentId)
+            {
+                var parent = await LoadAsync(c, tx, parentId, forUpdate: true);
+                string? problem = parent is null || !parent.IsActive ? "Choose a supplier from the list."
+                    : parentId == id ? "A supplier can't be in its own group."
+                    : parent.ParentSupplierId is not null ? $"{parent.Name} is itself in {parent.ParentSupplierName}'s group. Groups go one level, so choose {parent.ParentSupplierName}."
+                    : await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Supplier WHERE ParentSupplierId = @id", new { id }, tx) > 0
+                        ? $"{before.Name} has its own group members, so it can't go into another group."
+                    : null;
+                if (problem is not null) return ApiResults.Invalid(problem, new() { ["parentSupplierId"] = problem });
+                parentName = parent!.Name;
+            }
+            await c.ExecuteAsync("UPDATE contracts.Supplier SET ParentSupplierId = @parent, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id",
+                new { parent = body.ParentSupplierId, me = me!.Id, id }, tx);
+            var summary = parentName is null ? $"{me.Name} took {before.Name} out of the group {before.ParentSupplierName}."
+                : before.ParentSupplierName is { } was ? $"{me.Name} moved {before.Name} from the group {was} to the group {parentName}."
+                : $"{me.Name} put {before.Name} in the group {parentName}.";
+            await audit.WriteAsync(c, tx, me.AsActor(), "supplier.group-changed", "Supplier", id, summary, new { before = before.ParentSupplierId, after = body.ParentSupplierId });
+            var after = await LoadAsync(c, tx, id);
+            await tx.CommitAsync();
+            return Results.Ok(new { rowVersion = Convert.ToBase64String(after!.RowVersion) });
         });
 
         // ------------------------------------------------------------ Contacts

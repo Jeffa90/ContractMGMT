@@ -214,3 +214,29 @@ test('Admin, Lists: categories fold by family and Find shows where one sits', as
   await expect(page.getByText('Packaging', { exact: true })).toHaveCount(0)
   await expectAccessible(page)
 })
+
+test('A franchise group: the head company lists its franchisees, and a franchisee shows its group', async ({ page, api }, info) => {
+  // Each run makes its own suppliers, as the screen sizes run side by side.
+  const tag = `${info.project.name} ${Date.now()}`
+  const make = async (name: string) => (await (await api.post('/api/suppliers', { data: { name } })).json()).id as number
+  const head = await make(`Franchise head ${tag}`)
+  await make(`Franchisee ${tag}`)
+  await page.goto(`/suppliers/${head}`)
+  await settled(page, `Franchise head ${tag}`)
+  await expect(page.getByText('Not in a group.')).toBeVisible()
+  // Add a franchisee to the group, found by typing (D-116).
+  await page.getByRole('button', { name: 'Add a supplier to this group' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('combobox', { name: /Supplier/ }).fill(`franchisee ${tag}`)
+  await dialog.getByRole('option', { name: `Franchisee ${tag}` }).click()
+  await expectAccessible(page)
+  await dialog.getByRole('button', { name: 'Add to the group' }).click()
+  await expect(page.getByRole('link', { name: `Franchisee ${tag}` })).toBeVisible()
+  // The franchisee's page says which group it's in; taking it out leaves the head with none.
+  await page.getByRole('link', { name: `Franchisee ${tag}` }).click()
+  await settled(page, `Franchisee ${tag}`)
+  await expect(page.getByText(`Part of Franchise head ${tag}`)).toBeVisible()
+  await expectAccessible(page)
+  await page.getByRole('button', { name: 'Take out of the group' }).click()
+  await expect(page.getByText('Not in a group.')).toBeVisible()
+})

@@ -12,6 +12,10 @@ public sealed class SupplierRow
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
     public int ContractCount { get; set; }
+    /// <summary>The group it's in, if any (D-116): the parent supplier, for example a franchise's head company.</summary>
+    public int? ParentSupplierId { get; set; }
+    public string? ParentSupplierName { get; set; }
+    public int MemberCount { get; set; }
     public byte[] RowVersion { get; set; } = [];
 }
 
@@ -28,9 +32,11 @@ public static class SupplierEndpoints
             await using var c = await db.OpenAsync();
             // Contract counts include only contracts this person can see (Confidential ones are not revealed).
             var rows = await c.QueryAsync<SupplierRow>($"""
-                SELECT s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RowVersion,
-                       (SELECT COUNT(*) FROM contracts.Contract k WHERE k.SupplierId = s.Id AND k.Stage <> N'Withdrawn' AND {ContractAccess.VisibleSql("k")}) AS ContractCount
-                FROM contracts.Supplier s ORDER BY s.Name
+                SELECT s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RowVersion, s.ParentSupplierId, ps.Name AS ParentSupplierName,
+                       (SELECT COUNT(*) FROM contracts.Supplier m WHERE m.ParentSupplierId = s.Id) AS MemberCount,
+                       -- A group member is covered by its group's contracts too (D-116).
+                       (SELECT COUNT(*) FROM contracts.Contract k WHERE (k.SupplierId = s.Id OR k.SupplierId = s.ParentSupplierId) AND k.Stage <> N'Withdrawn' AND {ContractAccess.VisibleSql("k")}) AS ContractCount
+                FROM contracts.Supplier s LEFT JOIN contracts.Supplier ps ON ps.Id = s.ParentSupplierId ORDER BY s.Name
                 """, ContractAccess.Params(me!));
             return Results.Ok(rows.Select(View));
         });
@@ -93,7 +99,10 @@ public static class SupplierEndpoints
         });
     }
 
-    private static object View(SupplierRow s) => new { s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.ContractCount, RowVersion = Convert.ToBase64String(s.RowVersion) };
+    private static object View(SupplierRow s) => new
+    {
+        s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.ContractCount, s.ParentSupplierId, s.ParentSupplierName, s.MemberCount, RowVersion = Convert.ToBase64String(s.RowVersion),
+    };
 
     private sealed record Input(string Name, string? Abn, string? VendorNumber, string? Notes);
 

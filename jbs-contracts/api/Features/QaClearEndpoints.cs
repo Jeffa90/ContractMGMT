@@ -72,6 +72,7 @@ public static class QaClearEndpoints
                     DELETE FROM contracts.BusinessReview;
                     DELETE FROM contracts.SupplierContact;
                     DELETE FROM contracts.SupplierReviewReminder;
+                    UPDATE contracts.Supplier SET ParentSupplierId = NULL WHERE ParentSupplierId IS NOT NULL;
                     DELETE FROM contracts.Supplier;
 
                     DELETE FROM contracts.Category WHERE ParentId IN (SELECT Id FROM contracts.Category WHERE ParentId IS NOT NULL);

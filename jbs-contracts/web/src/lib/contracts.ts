@@ -59,6 +59,10 @@ export type Supplier = {
   notes: string | null
   isActive: boolean
   contractCount: number
+  /** The group it's in (D-116), for example a franchise's head company; and how many suppliers are in its own group. */
+  parentSupplierId: number | null
+  parentSupplierName: string | null
+  memberCount: number
   rowVersion: string
 }
 

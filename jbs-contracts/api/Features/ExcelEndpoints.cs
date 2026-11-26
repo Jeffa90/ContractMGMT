@@ -390,72 +390,160 @@ public static class ExcelEndpoints
     private static Kind Suppliers() => new(
         "suppliers", "suppliers", "Suppliers",
         [
-            new("Name", "Required. Rows are matched to existing suppliers by name.", 34), new("ABN", "11 digits; spaces are fine.", 16),
-            new("SAP vendor number", null, 18), new("Notes", null, 40), new("Active", "Yes or No. Only admins can hide or show suppliers.", 10),
+            new("Name", "Required. Rows are matched to suppliers by SAP vendor number, then by name. A supplier found by its number keeps its name here.", 34),
+            new("ABN", "11 digits; spaces are fine.", 16),
+            new("SAP vendor number", null, 18),
+            new("Part of", "The group it's in, for example a franchise's head company: its name or SAP vendor number. Blank leaves it as it is.", 30),
+            new("Notes", null, 40), new("Active", "Yes or No. Only admins can hide or show suppliers.", 10),
         ],
         ["Name"], ["Contracts"],
         me => true, me => me.IsAdmin, "Only admins can import suppliers. You can still export them.",
         async x =>
         {
             var rows = await x.C.QueryAsync<SupplierRow>($"""
-                SELECT s.*, (SELECT COUNT(*) FROM contracts.Contract k WHERE k.SupplierId = s.Id AND k.Stage <> N'Withdrawn' AND {ContractAccess.VisibleSql("k")}) AS ContractCount
-                FROM contracts.Supplier s ORDER BY s.Name
+                SELECT s.*, ps.Name AS ParentSupplierName,
+                       (SELECT COUNT(*) FROM contracts.Contract k WHERE (k.SupplierId = s.Id OR k.SupplierId = s.ParentSupplierId) AND k.Stage <> N'Withdrawn' AND {ContractAccess.VisibleSql("k")}) AS ContractCount
+                FROM contracts.Supplier s LEFT JOIN contracts.Supplier ps ON ps.Id = s.ParentSupplierId ORDER BY s.Name
                 """, ContractAccess.Params(x.Me), x.Tx);
             var withCounts = x.Me is not null; // counts only include contracts this person can see
-            return rows.Select(s => new object?[] { s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, withCounts ? s.ContractCount : null });
+            return rows.Select(s => new object?[] { s.Name, s.Abn, s.VendorNumber, s.ParentSupplierName, s.Notes, s.IsActive, withCounts ? s.ContractCount : null });
         },
         async (x, rows) =>
         {
-            var existing = (await x.C.QueryAsync<SupplierRow>("SELECT *, 0 AS ContractCount FROM contracts.Supplier", transaction: x.Tx)).ToDictionary(s => s.Name.Trim().ToUpperInvariant());
-            var seen = new HashSet<string>();
-            var plan = new List<PlannedRow>();
-            foreach (var row in rows)
+            static string K(string s) => s.Trim().ToUpperInvariant();
+            var all = (await x.C.QueryAsync<SupplierRow>("SELECT *, 0 AS ContractCount FROM contracts.Supplier", transaction: x.Tx)).ToList();
+            var byName = all.ToDictionary(s => K(s.Name));
+            var byVendor = all.Where(s => s.VendorNumber is not null).ToLookup(s => K(s.VendorNumber!));
+            var hasMembers = all.Where(s => s.ParentSupplierId is not null).Select(s => s.ParentSupplierId!.Value).ToHashSet();
+
+            // First, which supplier each row is (D-116): by SAP vendor number, then by name; or a new one.
+            var rowsInfo = rows.Select(row => (Row: row, Name: Clean(row.Text("Name")), Vendor: Clean(row.Text("SAP vendor number")), PartOf: Clean(row.Text("Part of")))).ToList();
+            SupplierRow? Find(string? name, string? vendor, out string? clash)
             {
-                var name = Clean(row.Text("Name"));
-                var r = new PlannedRow { Row = row.Number, Label = name ?? "(no name)" };
+                clash = null;
+                SupplierRow? byNumber = null;
+                if (vendor is not null)
+                {
+                    var found = byVendor[K(vendor)].ToList();
+                    if (found.Count > 1) { clash = $"SAP vendor number: {found.Count} suppliers have {vendor} ({string.Join(", ", found.Select(f => f.Name))}). Fix them on their pages first."; return null; }
+                    byNumber = found.SingleOrDefault();
+                }
+                var named = name is null ? null : byName.GetValueOrDefault(K(name));
+                if (byNumber is not null && named is not null && byNumber.Id != named.Id)
+                { clash = $"SAP vendor number {vendor} is {byNumber.Name}'s, but the name is {named.Name}'s. Check which supplier this row is."; return null; }
+                return byNumber ?? named;
+            }
+            // Names and numbers of the suppliers this sheet adds, so a row can be "Part of" a group added in another row.
+            var adding = new Dictionary<string, string>(); // key (name or number) to the new supplier's name
+            foreach (var (_, name, vendor, _) in rowsInfo)
+            {
+                if (name is null || Find(name, vendor, out var c) is not null || c is not null) continue;
+                adding.TryAdd(K(name), name);
+                if (vendor is not null) adding.TryAdd(K(vendor), name);
+            }
+            // Rows that put themselves in a group, by name and number: a group in this sheet can't itself be in one.
+            var inGroupInSheet = rowsInfo.Where(i => i.PartOf is not null && i.Name is not null)
+                .SelectMany(i => new[] { K(i.Name!), i.Vendor is null ? null : K(i.Vendor) }).OfType<string>().ToHashSet();
+            var newRows = new Dictionary<string, PlannedRow>(); // a new supplier's row, by its name
+            var waiting = new List<(PlannedRow Row, string Parent)>(); // rows in a group this sheet adds
+
+            var seen = new HashSet<int>();
+            var seenNew = new HashSet<string>();
+            var plan = new List<PlannedRow>();
+            foreach (var (row, sheetName, sheetVendor, partOf) in rowsInfo)
+            {
+                var r = new PlannedRow { Row = row.Number, Label = sheetName ?? sheetVendor ?? "(no name)" };
                 plan.Add(r);
-                if (name is null) { r.Refuse("Name: add the supplier's name."); continue; }
-                if (name.Length > 200) { r.Refuse("Name: keep it under 200 characters."); continue; }
-                if (!seen.Add(name.ToUpperInvariant())) { r.Refuse("This supplier is in the sheet more than once; only the first row is used."); continue; }
-                existing.TryGetValue(name.ToUpperInvariant(), out var before);
+                if (sheetName is null) { r.Refuse("Name: add the supplier's name."); continue; }
+                if (sheetName.Length > 200) { r.Refuse("Name: keep it under 200 characters."); continue; }
+                var before = Find(sheetName, sheetVendor, out var clash);
+                if (clash is not null) { r.Refuse(clash); continue; }
+                if (before is not null ? !seen.Add(before.Id) : !seenNew.Add(K(sheetName))) { r.Refuse("This supplier is in the sheet more than once; only the first row is used."); continue; }
+                // Found by its number under another name: it keeps the name it has here (Jeff, 26 Nov).
+                var name = before?.Name ?? sheetName;
+                r.Label = name;
                 var problems = new List<string>();
+                if (before is not null && K(before.Name) != K(sheetName)) r.Notes.Add($"Found by SAP vendor number {sheetVendor}; the sheet calls it \"{sheetName}\" and it keeps the name {before.Name}.");
                 var abn = Clean(row.Text("ABN")) is { } a ? new string(a.Where(ch => !char.IsWhiteSpace(ch)).ToArray()) : before?.Abn;
                 if (abn is not null && abn != before?.Abn && !Abn.IsValid(abn)) problems.Add($"ABN: \"{row.Text("ABN")}\" doesn't check out. It has 11 digits.");
-                var vendor = Clean(row.Text("SAP vendor number")) ?? before?.VendorNumber;
+                var vendor = sheetVendor ?? before?.VendorNumber;
                 if (vendor is { Length: > 50 }) problems.Add("SAP vendor number: keep it under 50 characters.");
                 var notes = Clean(row.Text("Notes")) ?? before?.Notes;
                 if (notes is { Length: > 2000 }) problems.Add("Notes: keep them under 2,000 characters.");
                 var active = row.YesNo("Active", out var ap) ?? before?.IsActive ?? true;
                 if (ap is not null) problems.Add(ap);
                 if (before is not null && active != before.IsActive && !x.Me.IsAdmin) problems.Add("Active: only admins can hide or show suppliers.");
+
+                // Part of a group: an existing supplier or one this sheet adds; one level only.
+                int? parentId = before?.ParentSupplierId;
+                string? parentNew = null, parentName = null;
+                if (partOf is not null)
+                {
+                    var parent = Find(partOf, partOf, out _) ?? byVendor[K(partOf)].FirstOrDefault();
+                    if (parent is not null)
+                    {
+                        if (parent.Id == before?.Id) problems.Add("Part of: a supplier can't be in its own group.");
+                        else if (parent.ParentSupplierId is not null) problems.Add($"Part of: {parent.Name} is itself in a group. Groups go one level, so use the group's head supplier.");
+                        else { parentId = parent.Id; parentName = parent.Name; }
+                    }
+                    else if (adding.TryGetValue(K(partOf), out var newParent))
+                    {
+                        if (K(newParent) == K(name)) problems.Add("Part of: a supplier can't be in its own group.");
+                        else if (inGroupInSheet.Contains(K(partOf)) || inGroupInSheet.Contains(K(newParent)))
+                            problems.Add($"Part of: {newParent} is itself put in a group in this sheet. Groups go one level, so use the group's head supplier.");
+                        else { parentNew = newParent; parentName = newParent; parentId = null; }
+                    }
+                    else problems.Add($"Part of: there's no supplier \"{partOf}\" (by name or SAP vendor number). Add it in another row or on the Suppliers page.");
+                    if (before is not null && hasMembers.Contains(before.Id)) problems.Add($"Part of: {name} has its own group members, so it can't go into another group.");
+                }
                 if (problems.Count > 0) { r.Refuse(string.Join(" ", problems)); continue; }
+
                 var args = new { name, abn, vendor, notes, active, me = x.Me.Id, id = before?.Id };
+                async Task<int?> ParentIdAsync() => parentNew is null ? parentId
+                    : await x.C.ExecuteScalarAsync<int>("SELECT Id FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@parentNew)))", new { parentNew }, x.Tx);
+                r.Order = partOf is null ? 0 : 1; // groups first, so their members find them
+                if (parentNew is not null) waiting.Add((r, parentNew));
                 if (before is null)
                 {
+                    newRows[K(name)] = r;
                     r.Action = "add";
-                    r.Notes.Add("New supplier.");
+                    r.Notes.Add(parentName is null ? "New supplier." : $"New supplier in the group {parentName}.");
                     r.Apply = async () =>
                     {
-                        var id = await x.C.ExecuteScalarAsync<int>("INSERT INTO contracts.Supplier (Name, Abn, VendorNumber, Notes, IsActive, CreatedById, UpdatedById) OUTPUT INSERTED.Id VALUES (@name, @abn, @vendor, @notes, @active, @me, @me)", args, x.Tx);
-                        await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "supplier.added", "Supplier", id, $"{x.Me.Name} added the supplier {name}{Via}.", args);
+                        var parent = await ParentIdAsync();
+                        var id = await x.C.ExecuteScalarAsync<int>("""
+                            INSERT INTO contracts.Supplier (Name, Abn, VendorNumber, Notes, IsActive, ParentSupplierId, CreatedById, UpdatedById) OUTPUT INSERTED.Id
+                            VALUES (@name, @abn, @vendor, @notes, @active, @parent, @me, @me)
+                            """, new { args.name, args.abn, args.vendor, args.notes, args.active, parent, args.me }, x.Tx);
+                        await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "supplier.added", "Supplier", id,
+                            $"{x.Me.Name} added the supplier {name}{(parentName is null ? "" : $" in the group {parentName}")}{Via}.", args);
                     };
                     continue;
                 }
                 var changes = new List<string>();
-                if (before.Name != name) changes.Add($"name to {name}");
                 if (before.Abn != abn) changes.Add("ABN");
                 if (before.VendorNumber != vendor) changes.Add("SAP vendor number");
                 if (before.Notes != notes) changes.Add("notes");
                 if (before.IsActive != active) changes.Add(active ? "show again" : "hide");
+                var groupChanges = parentNew is not null || parentId != before.ParentSupplierId;
+                if (groupChanges) changes.Add($"into the group {parentName}");
                 if (changes.Count == 0) { r.Action = "same"; continue; }
                 r.Action = "update";
                 r.Notes.Add($"Change: {string.Join("; ", changes)}.");
                 r.Apply = async () =>
                 {
-                    await x.C.ExecuteAsync("UPDATE contracts.Supplier SET Name = @name, Abn = @abn, VendorNumber = @vendor, Notes = @notes, IsActive = @active, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id", args, x.Tx);
+                    var parent = await ParentIdAsync();
+                    await x.C.ExecuteAsync("""
+                        UPDATE contracts.Supplier SET Abn = @abn, VendorNumber = @vendor, Notes = @notes, IsActive = @active, ParentSupplierId = @parent,
+                            UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id
+                        """, new { args.abn, args.vendor, args.notes, args.active, parent, args.me, args.id }, x.Tx);
                     await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "supplier.changed", "Supplier", before.Id, $"{x.Me.Name} changed the supplier {name}: {string.Join("; ", changes)}{Via}.", args);
                 };
             }
+            // A row in a group this sheet adds waits for that group's row: if it isn't added, neither is this.
+            foreach (var (r, parent) in waiting)
+                if (!newRows.TryGetValue(K(parent), out var parentRow) || parentRow.Action == "refused")
+                    r.Refuse($"Part of: {parent} isn't being added (see its row), so this can't go in its group.");
             return plan;
         });
 
@@ -484,7 +572,7 @@ public static class ExcelEndpoints
     private static Kind SupplierContacts() => new(
         "contacts", "supplier contacts", "Contacts",
         [
-            new("Supplier", "Required. The supplier's name, as in JBS Contracts.", 32), new("Name", "Required. The contact's full name.", 26),
+            new("Supplier", "Required. The supplier's name as in JBS Contracts, or its SAP vendor number.", 32), new("Name", "Required. The contact's full name.", 26),
             new("Role", "For example Account manager", 24), new("Email", null, 32), new("Phone", null, 18),
         ],
         ["Supplier", "Name"], [],
@@ -494,7 +582,11 @@ public static class ExcelEndpoints
         async (x, rows) =>
         {
             static string K(string s) => s.Trim().ToUpperInvariant();
-            var suppliers = (await x.C.QueryAsync<(int Id, string Name)>("SELECT Id, Name FROM contracts.Supplier", transaction: x.Tx)).ToDictionary(s => K(s.Name));
+            var supplierRows = (await x.C.QueryAsync<(int Id, string Name, string? VendorNumber)>("SELECT Id, Name, VendorNumber FROM contracts.Supplier", transaction: x.Tx)).ToList();
+            var suppliers = supplierRows.ToDictionary(s => K(s.Name), s => (s.Id, s.Name));
+            // Or by SAP vendor number (D-116), where only one supplier has it.
+            foreach (var g in supplierRows.Where(s => s.VendorNumber is not null).GroupBy(s => K(s.VendorNumber!)).Where(g => g.Count() == 1))
+                suppliers.TryAdd(g.Key, (g.Single().Id, g.Single().Name));
             var contacts = (await x.C.QueryAsync<ContactRow>(SelectContacts, transaction: x.Tx)).ToList();
             var seen = new HashSet<string>();
             var plan = new List<PlannedRow>();
@@ -506,7 +598,7 @@ public static class ExcelEndpoints
                 plan.Add(r);
                 if (supplierName is null) { r.Refuse("Supplier: add the supplier's name."); continue; }
                 if (!suppliers.TryGetValue(K(supplierName), out var supplier))
-                { r.Refuse($"Supplier: there's no supplier called \"{supplierName}\". Add the supplier first (the suppliers sheet, or Add supplier)."); continue; }
+                { r.Refuse($"Supplier: there's no supplier \"{supplierName}\" (by name or SAP vendor number). Add the supplier first (the suppliers sheet, or Add supplier)."); continue; }
                 r.Label = $"{name ?? "(no name)"}, {supplier.Name}";
                 var problems = new List<string>();
                 if (name is null) problems.Add("Name: add the contact's name.");

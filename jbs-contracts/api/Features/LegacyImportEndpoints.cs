@@ -248,6 +248,8 @@ public static class LegacyImportEndpoints
         var supplierRows = (await c.QueryAsync<(int Id, string Name, string? VendorNumber)>("SELECT Id, Name, VendorNumber FROM contracts.Supplier", transaction: tx)).ToList();
         var suppliers = supplierRows.ToDictionary(s => K(s.Name), s => s.Id);
         var hasVendorNumber = supplierRows.Where(s => s.VendorNumber is not null).Select(s => K(s.Name)).ToHashSet();
+        // A supplier is found by its SAP vendor number first (D-116), where only one supplier has it.
+        var byVendor = supplierRows.Where(s => s.VendorNumber is not null).GroupBy(s => K(s.VendorNumber!)).Where(g => g.Count() == 1).ToDictionary(g => g.Key, g => g.Single());
         var cats = (await c.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category", transaction: tx)).ToList();
         var items = (await c.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem", transaction: tx)).ToList();
         var owners = (await c.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1 AND IsContractOwner = 1", transaction: tx)).ToList();
@@ -331,7 +333,13 @@ public static class LegacyImportEndpoints
             else if (title.Length > 200) problems.Add("Title: keep it under 200 characters.");
             int? supplierId = null;
             var supplierName = Text(row, "supplier");
-            if (supplierName is null) problems.Add("Supplier: blank.");
+            if (Text(row, "supplierVendorNumber") is { } number && byVendor.TryGetValue(K(number), out var numbered))
+            {
+                supplierId = numbered.Id;
+                if (supplierName is not null && K(supplierName) != K(numbered.Name)) r.Notes.Add($"Supplier found by SAP vendor number {number}: {numbered.Name}.");
+                supplierName = numbered.Name;
+            }
+            else if (supplierName is null) problems.Add("Supplier: blank.");
             else if (supplierIds.TryGetValue(K(supplierName), out var sid)) supplierId = sid;
             else if (supplierName.Length > 200) problems.Add("Supplier: keep the name under 200 characters.");
             else r.NewSupplier = newSuppliers.TryGetValue(K(supplierName), out var first) ? first : newSuppliers[K(supplierName)] = supplierName;

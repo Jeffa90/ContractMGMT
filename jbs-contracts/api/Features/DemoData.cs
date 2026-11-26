@@ -177,6 +177,9 @@ public static class DemoData
             redgum = await SupplierAsync("Redgum Uniforms (demo)");
             keystone = await SupplierAsync("Keystone Security (demo)");
             wattle = await SupplierAsync("Wattle Pest Control (demo)");
+            // A franchise (D-116): two franchisees in Wattle's group, each its own supplier; Wattle's contracts cover them.
+            foreach (var franchisee in new[] { "Wattle Pest Control Toowoomba (demo)", "Wattle Pest Control Mackay (demo)" })
+                await c.ExecuteAsync("UPDATE contracts.Supplier SET ParentSupplierId = @wattle WHERE Id = @id", new { wattle, id = await SupplierAsync(franchisee) }, tx);
             pool =
             [
                 ("Linehaul freight Melbourne to Brisbane", scf, linehaul, 1_850_000m),

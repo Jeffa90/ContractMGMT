@@ -98,10 +98,18 @@ export function SuppliersPage() {
                       {s.name}
                     </Link>
                     <p className="tabular text-xs text-muted-foreground">
-                      {[s.abn ? `ABN ${formatAbn(s.abn)}` : null, s.vendorNumber ? `Vendor ${s.vendorNumber}` : null].filter(Boolean).join(' · ') || 'No ABN or vendor number yet'}
+                      {[
+                        s.abn ? `ABN ${formatAbn(s.abn)}` : null,
+                        s.vendorNumber ? `Vendor ${s.vendorNumber}` : null,
+                        s.parentSupplierName ? `Part of ${s.parentSupplierName}` : null,
+                        s.memberCount > 0 ? `Group of ${s.memberCount + 1}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || 'No ABN or vendor number yet'}
                     </p>
                   </div>
-                  <Link to={`/contracts?view=all&q=${encodeURIComponent(s.name)}`} className="text-sm text-primary hover:underline">
+                  {/* A group member's contracts are its group's (D-116). */}
+                  <Link to={`/contracts?view=all&q=${encodeURIComponent(s.parentSupplierName ?? s.name)}`} className="text-sm text-primary hover:underline">
                     <Badge tone="brand">
                       {s.contractCount} {s.contractCount === 1 ? 'contract' : 'contracts'}
                     </Badge>

@@ -246,11 +246,17 @@ const topics = {
         <p>
           <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, an admin changes or adds rows in that file
           and uses <strong>Import from Excel</strong> (admins only). You'll see what will be added, changed or not imported (and why) before anything changes.
-          Nothing is deleted, and blank cells leave what's there.
+          Nothing is deleted, and blank cells leave what's there. Rows are matched by SAP vendor number first, then by name; a supplier found by its number
+          keeps the name it has here. <strong>Part of</strong> puts a supplier in a group (the group's name or SAP vendor number).
+        </p>
+        <p>
+          <strong>Groups</strong>, for example a franchise: the head company and each franchisee are their own suppliers, with their own SAP vendor numbers,
+          contacts and documents. Put the franchisees in the head company's group (on its page, or with Part of). The head company's contracts then cover
+          every franchisee, and show on their pages too.
         </p>
         <p>
           <strong>Contacts</strong>: <strong>Export contacts</strong> downloads every supplier's contacts, one row each. Admins can add many at
-          once with <strong>Import contacts</strong>: one row per contact (supplier, name, role, email, phone), several rows for several contacts at a
+          once with <strong>Import contacts</strong>: one row per contact (supplier name or SAP vendor number, name, role, email, phone), several rows for several contacts at a
           supplier. A row with the same supplier and email (or name) updates that contact. Remove a contact on the supplier's page.
         </p>
       </>
@@ -264,8 +270,9 @@ const topics = {
         <ul>
           <li>
             <strong>Overview</strong>: who looks after the supplier (the relationship owner), its tier (automatically the highest tier among the main categories
-            of its current contracts, set by admins on each family or category under Lists, unless Procurement chooses one), its risk and why, when the next business review is due, and
-            its contacts.
+            of its current contracts, set by admins on each family or category under Lists, unless Procurement chooses one), its risk and why, when the next business review is due,
+            its contacts, and its <strong>group</strong>: the suppliers in it (for example a franchise's franchisees), or the group it's part of, whose
+            contracts cover it.
           </li>
           <li>
             <strong>Documents</strong>: the supplier's own documents, such as insurance and certificates, with their expiry dates, and below them every document

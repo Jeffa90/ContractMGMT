@@ -27,6 +27,7 @@ import {
 import { useRef, useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { Combobox } from "@/components/Combobox";
 import { Dialog } from "@/components/Dialog";
 import { DropZone } from "@/components/DropZone";
 import { documentExtensions, documentWhat } from "@/lib/files";
@@ -575,6 +576,7 @@ function Overview({ data }: { data: SupplierPageData }) {
           </ul>
         )}
       </Card>
+      <GroupCard data={data} />
       {editing && (
         <RelationshipDialog data={data} onClose={() => setEditing(false)} />
       )}
@@ -586,6 +588,162 @@ function Overview({ data }: { data: SupplierPageData }) {
         />
       )}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ Group (D-116)
+
+/**
+ * A supplier group, for example a franchise: the head company (the parent) and its franchisees (members), each their own
+ * supplier with its own SAP vendor number. Contracts sit with the parent and cover every member.
+ */
+function GroupCard({ data }: { data: SupplierPageData }) {
+  const s = data.supplier;
+  const queryClient = useQueryClient();
+  const [choosing, setChoosing] = useState<"join" | "member" | null>(null);
+  const move = useMutation({
+    mutationFn: (x: { memberId: number; parentId: number | null; rowVersion?: string }) =>
+      api.put(`/api/suppliers/${x.memberId}/group`, { parentSupplierId: x.parentId, rowVersion: x.rowVersion ?? null }),
+    onSuccess: (_, x) => {
+      void queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      toast.success(x.parentId === null ? "Taken out of the group." : "Added to the group.");
+      setChoosing(null);
+    },
+    onError: (e) => toast.error(errorText(e)),
+  });
+  const isMember = s.parentSupplierId !== null;
+  return (
+    <Card className="p-5">
+      <h2 className="font-display text-lg font-semibold">Group</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        For example a franchise: the head company's contracts cover every supplier in its group.
+      </p>
+      {isMember ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p>
+            Part of{" "}
+            <Link to={`/suppliers/${s.parentSupplierId}`} className="font-medium text-primary hover:underline">
+              {s.parentSupplierName}
+            </Link>
+            . Its contracts cover {s.name}.
+          </p>
+          {data.can.manage && (
+            <Button variant="ghost" loading={move.isPending} onClick={() => move.mutate({ memberId: s.id, parentId: null, rowVersion: s.rowVersion })}>
+              Take out of the group
+            </Button>
+          )}
+        </div>
+      ) : data.members.length > 0 ? (
+        <ul className="mt-3 divide-y divide-border">
+          {data.members.map((m) => (
+            <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <span className="min-w-0">
+                <Link to={`/suppliers/${m.id}`} className="font-medium text-primary hover:underline">
+                  {m.name}
+                </Link>
+                {m.vendorNumber && <span className="tabular text-xs text-muted-foreground"> · Vendor {m.vendorNumber}</span>}
+                {!m.isActive && <Badge> Hidden</Badge>}
+              </span>
+              {data.can.manage && (
+                <Button variant="ghost" aria-label={`Take ${m.name} out of the group`} onClick={() => move.mutate({ memberId: m.id, parentId: null })}>
+                  Take out
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-muted-foreground">Not in a group.</p>
+      )}
+      {data.can.manage && !isMember && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button icon={<Plus aria-hidden className="size-4" />} onClick={() => setChoosing("member")}>
+            Add a supplier to this group
+          </Button>
+          {data.members.length === 0 && <Button onClick={() => setChoosing("join")}>Put in another supplier's group</Button>}
+        </div>
+      )}
+      {choosing && (
+        <GroupDialog
+          supplierId={s.id}
+          supplierName={s.name}
+          mode={choosing}
+          saving={move.isPending}
+          onClose={() => setChoosing(null)}
+          onChoose={(other) =>
+            choosing === "member"
+              ? move.mutate({ memberId: other.id, parentId: s.id, rowVersion: other.rowVersion })
+              : move.mutate({ memberId: s.id, parentId: other.id, rowVersion: s.rowVersion })
+          }
+        />
+      )}
+    </Card>
+  );
+}
+
+function GroupDialog({
+  supplierId,
+  supplierName,
+  mode,
+  saving,
+  onClose,
+  onChoose,
+}: {
+  supplierId: number;
+  supplierName: string;
+  mode: "join" | "member";
+  saving: boolean;
+  onClose: () => void;
+  onChoose: (s: Supplier) => void;
+}) {
+  const suppliers = useQuery({ queryKey: ["suppliers"], queryFn: () => api.get<Supplier[]>("/api/suppliers") });
+  const [chosen, setChosen] = useState("");
+  const [error, setError] = useState<string | undefined>();
+  // Groups go one level: a member comes from suppliers not in a group and without their own; a group to join isn't in one itself.
+  const options = (suppliers.data ?? [])
+    .filter((x) => x.isActive && x.id !== supplierId && x.parentSupplierId === null && (mode === "join" || x.memberCount === 0))
+    .map((x) => ({ value: String(x.id), label: x.name, hint: x.vendorNumber ? `Vendor ${x.vendorNumber}` : undefined }));
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={mode === "member" ? `Add a supplier to ${supplierName}'s group` : `Put ${supplierName} in a group`}
+      description={
+        mode === "member"
+          ? "For example a franchisee. It keeps its own vendor number, contacts and documents; this supplier's contracts cover it."
+          : "Choose the group's head supplier, for example the franchise's head company. Its contracts will cover this supplier."
+      }
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant="primary"
+            loading={saving}
+            onClick={() => {
+              const s = suppliers.data?.find((x) => String(x.id) === chosen);
+              if (!s) setError("Choose a supplier: type its name or SAP vendor number.");
+              else onChoose(s);
+            }}
+          >
+            {mode === "member" ? "Add to the group" : "Put in the group"}
+          </Button>
+        </>
+      }
+    >
+      <Field label="Supplier" required error={error} help="Type its name or SAP vendor number.">
+        {(p) => (
+          <Combobox
+            {...p}
+            options={options}
+            value={chosen}
+            onChange={(v) => {
+              setChosen(v);
+              setError(undefined);
+            }}
+          />
+        )}
+      </Field>
+    </Dialog>
   );
 }
 
@@ -1847,8 +2005,14 @@ function Contracts({ data }: { data: SupplierPageData }) {
         />
       </Card>
     );
+  const parent = data.supplier.parentSupplierName;
   return (
     <Card>
+      {parent && data.contracts.some((k) => k.viaGroup) && (
+        <p className="border-b border-border p-4 text-sm text-muted-foreground">
+          Contracts marked "Through {parent}" are the group's: they cover {data.supplier.name}.
+        </p>
+      )}
       <ul className="divide-y divide-border">
         {data.contracts.map((k) => (
           <li
@@ -1863,6 +2027,7 @@ function Contracts({ data }: { data: SupplierPageData }) {
                 {k.title}
               </Link>
               <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                {k.viaGroup && parent && `Through ${parent} · `}
                 {k.reference} · {k.ownerName}
                 {k.value !== null &&
                   ` · ${formatMoney(k.value, k.currencyCode, true)}`}
@@ -1929,6 +2094,9 @@ export function SupplierPage() {
     notes: s.notes,
     isActive: s.isActive,
     contractCount: d.contracts.length,
+    parentSupplierId: s.parentSupplierId,
+    parentSupplierName: s.parentSupplierName,
+    memberCount: d.members.length,
     rowVersion: s.rowVersion,
   };
   return (

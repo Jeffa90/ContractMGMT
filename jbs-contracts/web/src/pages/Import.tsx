@@ -223,7 +223,8 @@ function TranslateValues({
         </h3>
         <p className="text-sm text-muted-foreground">
           Choose what each old value becomes in JBS Contracts: one of your list values, or blank. Set up your lists under Admin, Lists first
-          (then click Refresh). Values with nothing chosen must already be in your lists, or they're flagged in the check.
+          (then click Refresh). Values with nothing chosen must already be in your lists, or they're flagged in the check. For owners who've
+          left, choose the current contract owner who takes their contracts.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -286,7 +287,7 @@ function TranslateValues({
                       onChange={(e) => choose(field.key, x.value, e.target.value)}
                     >
                       <option value="">Not chosen</option>
-                      <option value={BLANK}>Leave blank</option>
+                      <option value={BLANK}>{field.key === "owner" ? "Use the default owner" : "Leave blank"}</option>
                       {current && !choices.includes(current) && <option value={current}>{current} (not in your lists)</option>}
                       {choices.map((ch) => (
                         <option key={ch} value={ch}>

@@ -338,7 +338,7 @@ public sealed class ImportTests(AppFixture app)
         object?[][] rows =
         [
             [$"T{u}1", "Effective", $"Vendor {u}", "One", ownerName, "2025-01-01", "2027-12-31", "SVC Agreement (old)", "Old Plant A", "LOGISTICS (old)", "Road freight"],
-            [$"T{u}2", "Effective", $"Vendor {u}", "Two", ownerName, "2025-01-01", "2027-12-31", "svc agreement (OLD)", "Old Plant A", "LOGISTICS (old)", "Road freight"],
+            [$"T{u}2", "Effective", $"Vendor {u}", "Two", $"Former Employee {u}", "2025-01-01", "2027-12-31", "svc agreement (OLD)", "Old Plant A", "LOGISTICS (old)", "Road freight"],
         ];
         for (var r = 0; r < rows.Length; r++) for (var c = 0; c < rows[r].Length; c++) sheet.Cell(r + 2, c + 1).Value = rows[r][c]!.ToString();
         using var stream = new MemoryStream();
@@ -364,6 +364,11 @@ public sealed class ImportTests(AppFixture app)
         Assert.Equal(JsonValueKind.Null, cat.GetProperty("to").ValueKind);
         Assert.Equal(2, fields["agreementType"].GetProperty("values").EnumerateArray().Single().GetProperty("count").GetInt32());
         Assert.Contains($"Freight {u} > Road", values.GetProperty("choices").GetProperty("Category").EnumerateArray().Select(x => x.GetString()));
+        // Owners: the current one is chosen by name; the past employee isn't, and is offered the current contract owners.
+        var owners = fields["owner"].GetProperty("values").EnumerateArray().ToDictionary(v => v.GetProperty("value").GetString()!, v => v.GetProperty("to"));
+        Assert.Equal(ownerName, owners[ownerName].GetString());
+        Assert.Equal(JsonValueKind.Null, owners[$"Former Employee {u}"].ValueKind);
+        Assert.Contains(ownerName, values.GetProperty("choices").GetProperty("Owner").EnumerateArray().Select(x => x.GetString()));
 
         // Without translations they're flagged; translated (and the plant left blank), both rows are ready.
         Assert.Equal(2, (await ReadAsync(await admin.PostAsync("/api/import/legacy/preview", F(), Ct))).GetProperty("refused").GetInt32());
@@ -372,6 +377,7 @@ public sealed class ImportTests(AppFixture app)
             ["category"] = new() { ["LOGISTICS (old) > Road freight"] = $"Freight {u} > Road" },
             ["agreementType"] = new() { ["SVC Agreement (old)"] = $"Services {u}" },
             ["site"] = new() { ["Old Plant A"] = "" },
+            ["owner"] = new() { [$"Former Employee {u}"] = ownerName },
         };
         var plan = await ReadAsync(await admin.PostAsync("/api/import/legacy/preview", F(translations), Ct));
         Assert.Equal(2, plan.GetProperty("effective").GetInt32());
@@ -383,11 +389,13 @@ public sealed class ImportTests(AppFixture app)
             Assert.Contains(tbook.Worksheet(1).RowsUsed(), r => r.Cell(1).GetString() == "Site" && r.Cell(2).GetString() == "Old Plant A" && r.Cell(3).GetString() == "(leave blank)");
         await ReadAsync(await admin.PostAsync("/api/import/legacy/import", F(translations), Ct));
         await using var db = await app.OpenAsync();
-        var imported = (await db.QueryAsync<(int CategoryId, int? SiteId, string Type)>("""
-            SELECT k.CategoryId, k.SiteId, t.Value FROM contracts.Contract k JOIN contracts.ListItem t ON t.Id = k.AgreementTypeId WHERE k.LegacyReference LIKE @like
+        var imported = (await db.QueryAsync<(int CategoryId, int? SiteId, string Type, string Owner)>("""
+            SELECT k.CategoryId, k.SiteId, t.Value, o.Name FROM contracts.Contract k JOIN contracts.ListItem t ON t.Id = k.AgreementTypeId
+            JOIN contracts.Person o ON o.Id = k.OwnerId WHERE k.LegacyReference LIKE @like
             """, new { like = $"T{u}%" })).ToList();
         Assert.Equal(2, imported.Count);
-        Assert.All(imported, x => Assert.Equal((road, (int?)null, $"Services {u}"), (x.CategoryId, x.SiteId, x.Type)));
+        Assert.All(imported, x => Assert.Equal((road, (int?)null, $"Services {u}", ownerName), (x.CategoryId, x.SiteId, x.Type, x.Owner)));
+        Assert.Equal(0, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Person WHERE Name = @n", new { n = $"Former Employee {u}" }));
         var again = await ReadAsync(await admin.PostAsync("/api/import/legacy/values", F(), Ct));
         var site = again.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("key").GetString() == "site").GetProperty("values")[0];
         Assert.True(site.GetProperty("remembered").GetBoolean());

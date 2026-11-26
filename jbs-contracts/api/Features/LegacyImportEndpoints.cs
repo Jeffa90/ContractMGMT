@@ -164,6 +164,8 @@ public static class LegacyImportEndpoints
     [
         ("category", "Category", "Category"), ("agreementType", "AgreementType", "Agreement type"), ("businessUnit", "BusinessUnit", "Business unit"),
         ("site", "Site", "Site"), ("entity", "Entity", "Entity"), ("function", "Function", "Function"),
+        // Owners: a past employee's contracts go to a current contract owner (D-113); blank means the default owner.
+        ("owner", "Owner", "Owner"),
     ];
 
     /// <summary>
@@ -268,7 +270,7 @@ public static class LegacyImportEndpoints
             var byAccount = WindowsAccount.TryNormalise(text, settings.DefaultDomain, out var acc) ? owners.FirstOrDefault(x => WindowsAccount.Key(x.WindowsAccount) == WindowsAccount.Key(acc)) : null;
             var byName = owners.Where(x => K(x.Name) == K(text)).ToList();
             var match = byAccount ?? (byName.Count == 1 ? byName[0] : null);
-            if (match is null) problems.Add($"{label}: \"{text}\" isn't an active contract owner. Add them on People (tick Contract owner), or match them to someone who is.");
+            if (match is null) problems.Add($"{label}: \"{text}\" isn't an active contract owner. Choose who takes their contracts under Translate drop-down values, or add them on People (tick Contract owner).");
             return match?.Id;
         }
         int? Item(string list, string? text, string label, List<string> problems)
@@ -365,7 +367,7 @@ public static class LegacyImportEndpoints
             }
             var categoryId = Category(catText, subText, problems);
             if (categoryId is null && catText is null && subText is null) problems.Add("Category: blank, and there's no default category.");
-            var ownerText = Text(row, "owner");
+            var ownerText = Tr("owner", Text(row, "owner"));
             var ownerId = ownerText is null ? o.DefaultOwnerId : Person_(ownerText, "Owner", problems);
             if (ownerId is null && ownerText is null) problems.Add("Owner: blank, and there's no default owner.");
             var backupId = Text(row, "backupOwner") is { } bo ? Person_(bo, "Backup owner", problems) : null;
@@ -593,8 +595,9 @@ public static class LegacyImportEndpoints
             {
                 ["Category"] = cats.Where(x => x.ParentId is null).SelectMany(top => new[] { top.Name }.Concat(cats.Where(s => s.ParentId == top.Id).Select(s => $"{top.Name} > {s.Name}"))).ToList(),
             };
-            foreach (var (_, list, _) in TranslatedFields.Where(f => f.List != "Category"))
+            foreach (var (_, list, _) in TranslatedFields.Where(f => f.List is not ("Category" or "Owner")))
                 choices[list] = items.Where(i => i.ListName == list).Select(i => i.Value).ToList();
+            choices["Owner"] = (await c.QueryAsync<string>("SELECT Name FROM contracts.Person WHERE IsActive = 1 AND IsContractOwner = 1 ORDER BY Name")).ToList();
 
             var counts = TranslatedFields.ToDictionary(f => f.Key, _ => new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
             foreach (var row in rows)

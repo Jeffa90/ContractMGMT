@@ -43,6 +43,7 @@ const tabs = [
   { value: "register", label: "Register" },
   { value: "pipeline", label: "Pipeline" },
   { value: "approvals", label: "Approvals" },
+  { value: "bysupplier", label: "By supplier" },
   { value: "audit", label: "Audit trail" },
   { value: "everything", label: "Download everything" },
 ] as const;
@@ -667,6 +668,150 @@ const periods = [
 ] as const;
 type Period = (typeof periods)[number]["value"];
 
+type BySupplier = {
+  rows: {
+    contractId: number;
+    reference: string;
+    title: string;
+    stageName: string;
+    endDate: string | null;
+    isEvergreen: boolean;
+    ownerName: string;
+    supplierId: number;
+    supplierName: string;
+    vendorNumber: string | null;
+    viaGroup: boolean;
+    groupName: string | null;
+  }[];
+  contracts: number;
+  suppliers: number;
+};
+
+/**
+ * By supplier (D-119): one row per contract per supplier it covers: the supplier it's with and, for a group (a franchise's head
+ * company), every supplier in the group, each with its SAP vendor number. For matching against SAP spend in Excel.
+ */
+function BySupplierReport() {
+  const [scope, setScope] = useParam<Scope>(
+    "scope",
+    scopes.map((s) => s.value),
+    "effective",
+  );
+  const [groups, setGroups] = useParam<"groups" | "all">(
+    "suppliers",
+    ["groups", "all"],
+    "groups",
+  );
+  const query = `scope=${scope}&groupsOnly=${groups === "groups"}`;
+  const data = useQuery({
+    queryKey: ["report", "by-supplier", query],
+    queryFn: () => api.get<BySupplier>(`/api/reports/by-supplier?${query}`),
+    placeholderData: (p) => p,
+  });
+  return (
+    <section aria-label="By supplier" className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        One row for each supplier a contract covers: the supplier it's with, and for a supplier group (for example a franchise), every
+        supplier in the group, with their SAP vendor numbers.
+      </p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <Segmented
+            label="Contracts"
+            value={scope}
+            onChange={setScope}
+            options={scopes.map((s) => ({ value: s.value, label: s.label }))}
+          />
+          <Segmented
+            label="Suppliers"
+            value={groups}
+            onChange={setGroups}
+            options={[
+              { value: "groups", label: "Only supplier groups" },
+              { value: "all", label: "Every contract" },
+            ]}
+          />
+        </div>
+        <Download href={`/api/reports/by-supplier.xlsx?${query}`} />
+      </div>
+      {data.isPending ? (
+        <Loading />
+      ) : data.isError ? (
+        <Failed error={data.error} />
+      ) : data.data.rows.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<BadgeCheck />}
+            title={
+              groups === "groups"
+                ? "No contracts with a supplier group. Put suppliers in a group on a supplier's page."
+                : "No contracts here."
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            {data.data.contracts} {data.data.contracts === 1 ? "contract" : "contracts"}, {data.data.suppliers}{" "}
+            {data.data.suppliers === 1 ? "supplier" : "suppliers"}
+          </p>
+          <Card className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-border text-xs text-muted-foreground">
+                <tr>
+                  {["Contract", "Supplier", "SAP vendor number", "Covered as", "Group", "Ends"].map((h) => (
+                    <th key={h} scope="col" className="px-3 py-2 font-medium first:pl-5 last:pr-5">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.data.rows.map((r, n) => {
+                  const first = n === 0 || data.data.rows[n - 1].contractId !== r.contractId;
+                  return (
+                    <tr key={`${r.contractId}-${r.supplierId}`} className={cn(first && n > 0 && "border-t-2 border-border")}>
+                      <td className="px-3 py-2 pl-5 align-top">
+                        {first ? (
+                          <>
+                            <Link to={`/contracts/${r.contractId}`} className="font-medium text-primary hover:underline">
+                              {r.title}
+                            </Link>
+                            <span className="block text-xs text-muted-foreground">
+                              {r.reference} · {r.stageName}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="sr-only">
+                            {r.reference} {r.title}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <Link to={`/suppliers/${r.supplierId}`} className="text-primary hover:underline">
+                          {r.supplierName}
+                        </Link>
+                      </td>
+                      <td className="tabular px-3 py-2 align-top">{r.vendorNumber}</td>
+                      <td className="px-3 py-2 align-top whitespace-nowrap">
+                        <Badge tone={r.viaGroup ? "info" : "brand"}>{r.viaGroup ? "Group member" : "Signed it"}</Badge>
+                      </td>
+                      <td className="px-3 py-2 align-top">{r.groupName}</td>
+                      <td className="tabular px-3 py-2 pr-5 align-top whitespace-nowrap">
+                        {first ? (r.isEvergreen ? "Evergreen" : r.endDate ? formatDate(r.endDate) : "") : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        </>
+      )}
+    </section>
+  );
+}
+
 function ApprovalsReport() {
   const [days, setDays] = useParam<Period>(
     "days",
@@ -1051,7 +1196,7 @@ export function ReportsPage() {
       <div className="print:hidden">
         <PageHeader
           title="Reports"
-          description="The register, what's on the way, approvals and the audit trail. Download any of them to Excel."
+          description="The register, what's on the way, approvals, contracts by supplier and the audit trail. Download any of them to Excel."
           help={help.reports}
         />
       </div>
@@ -1066,6 +1211,7 @@ export function ReportsPage() {
       {tab === "register" && <RegisterReport />}
       {tab === "pipeline" && <PipelineReport />}
       {tab === "approvals" && <ApprovalsReport />}
+      {tab === "bysupplier" && <BySupplierReport />}
       {full && tab === "audit" && <AuditReport />}
       {full && tab === "everything" && <EverythingDownloads />}
       {full && tab === "audit" && (

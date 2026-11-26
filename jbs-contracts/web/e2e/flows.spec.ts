@@ -240,3 +240,13 @@ test('A franchise group: the head company lists its franchisees, and a franchise
   await page.getByRole('button', { name: 'Take out of the group' }).click()
   await expect(page.getByText('Not in a group.')).toBeVisible()
 })
+
+test('Reports, By supplier: a franchise contract lists every franchisee', async ({ page }) => {
+  await page.goto('/reports?tab=bysupplier')
+  await settled(page)
+  // Wattle Pest Control (demo) heads a group of two; its Effective contract covers both (D-119).
+  await expect(page.getByRole('link', { name: 'Wattle Pest Control Mackay (demo)' }).first()).toBeVisible()
+  await expect(page.getByText('Group member').first()).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Download Excel' })).toHaveAttribute('href', /by-supplier\.xlsx\?scope=effective&groupsOnly=true/)
+  await expectAccessible(page)
+})

@@ -428,6 +428,11 @@ const topics = {
             <strong>Approvals</strong>: what was approved or sent back, by whom, and how long each waited from <em>Send for approval</em> to the decision.
           </li>
           <li>
+            <strong>By supplier</strong>: one row for each supplier a contract covers. That's the supplier it's with and, for a supplier group (for example a
+            franchise), every supplier in the group, marked <em>Group member</em>, each with its SAP vendor number. Show only supplier groups or every contract,
+            and download it to Excel to match against SAP spend.
+          </li>
+          <li>
             <strong>Audit trail</strong>: everything that happened, newest first. Search by person, reference or words. The check at the top confirms no event has
             been changed or removed since it was recorded. The Excel download includes old and new values, and downloading it is itself recorded.
           </li>

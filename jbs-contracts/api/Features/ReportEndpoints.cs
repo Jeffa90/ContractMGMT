@@ -31,6 +31,44 @@ public static class ReportEndpoints
         return me!.IsAdmin || me.IsAuditor ? (me, null) : (null, ApiResults.NotAllowed("The audit trail is for admins and auditors."));
     }
 
+    internal sealed class BySupplierRow
+    {
+        public int ContractId { get; set; }
+        public string Reference { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Stage { get; set; } = "";
+        public DateTime? EndDate { get; set; }
+        public bool IsEvergreen { get; set; }
+        public string OwnerName { get; set; } = "";
+        public int SupplierId { get; set; }
+        public string SupplierName { get; set; } = "";
+        public string? VendorNumber { get; set; }
+        /// <summary>Covered through its group (a franchisee), rather than the supplier the contract is with.</summary>
+        public bool ViaGroup { get; set; }
+        /// <summary>The group, if any: the head supplier's name.</summary>
+        public string? GroupName { get; set; }
+    }
+
+    private static async Task<List<BySupplierRow>> BySupplierAsync(SqlConnection c, Person me, string? scope, bool groupsOnly)
+    {
+        var p = ContractAccess.Params(me);
+        return (await c.QueryAsync<BySupplierRow>($"""
+            SELECT k.Id AS ContractId, k.Reference, k.Title, k.Stage, k.EndDate, k.IsEvergreen, o.Name AS OwnerName,
+                   cov.Id AS SupplierId, cov.Name AS SupplierName, cov.VendorNumber, cov.ViaGroup,
+                   CASE WHEN EXISTS (SELECT 1 FROM contracts.Supplier m WHERE m.ParentSupplierId = s.Id) THEN s.Name ELSE ps.Name END AS GroupName
+            FROM contracts.Contract k
+            JOIN contracts.Supplier s ON s.Id = k.SupplierId
+            LEFT JOIN contracts.Supplier ps ON ps.Id = s.ParentSupplierId
+            JOIN contracts.Person o ON o.Id = k.OwnerId
+            CROSS APPLY (SELECT s.Id, s.Name, s.VendorNumber, CAST(0 AS BIT) AS ViaGroup
+                         UNION ALL
+                         SELECT m.Id, m.Name, m.VendorNumber, CAST(1 AS BIT) FROM contracts.Supplier m WHERE m.ParentSupplierId = s.Id) cov
+            WHERE k.Stage IN ({StagesFor(scope)}) AND {ContractAccess.VisibleSql("k")}
+              {(groupsOnly ? "AND (s.ParentSupplierId IS NOT NULL OR EXISTS (SELECT 1 FROM contracts.Supplier m WHERE m.ParentSupplierId = s.Id))" : "")}
+            ORDER BY k.Reference, cov.ViaGroup, cov.Name
+            """, p)).ToList();
+    }
+
     internal static IResult File(byte[] bytes, string name, TimeProvider clock) =>
         Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             $"jbs-contracts-{name}-{TimeZoneInfo.ConvertTime(clock.GetUtcNow(), Brisbane):yyyy-MM-dd}.xlsx");
@@ -331,6 +369,41 @@ public static class ReportEndpoints
                     o.SupplierName,
                 }),
             });
+        });
+
+        // By supplier (D-119): one row per contract per supplier it covers, the supplier it's with and, when that supplier heads a
+        // group (a franchise's head company), each supplier in the group, with their SAP vendor numbers.
+        group.MapGet("/by-supplier", async (string? scope, bool? groupsOnly, CurrentUser current, Db db) =>
+        {
+            var (me, refusal) = await RequireAsync(current, db);
+            if (refusal is not null) return refusal;
+            await using var c = await db.OpenAsync();
+            var rows = await BySupplierAsync(c, me!, scope, groupsOnly ?? true);
+            return Results.Ok(new
+            {
+                rows = rows.Select(r => new
+                {
+                    r.ContractId, r.Reference, r.Title, StageName = ContractEndpoints.StageNames[r.Stage], EndDate = D(r.EndDate), r.IsEvergreen, r.OwnerName,
+                    r.SupplierId, r.SupplierName, r.VendorNumber, r.ViaGroup, r.GroupName,
+                }),
+                contracts = rows.Select(r => r.ContractId).Distinct().Count(),
+                suppliers = rows.Select(r => r.SupplierId).Distinct().Count(),
+            });
+        });
+
+        group.MapGet("/by-supplier.xlsx", async (string? scope, bool? groupsOnly, CurrentUser current, Db db, TimeProvider clock) =>
+        {
+            var (me, refusal) = await RequireAsync(current, db);
+            if (refusal is not null) return refusal;
+            await using var c = await db.OpenAsync();
+            var rows = await BySupplierAsync(c, me!, scope, groupsOnly ?? true);
+            Excel.Column[] columns = [new("Reference", null, 16), new("Contract", null, 34), new("Stage", null, 12), new("Supplier", null, 32), new("SAP vendor number", null, 18),
+                new("Covered as", null, 14), new("Group", null, 30), new("End date", null, 13), new("Owner", null, 22)];
+            return File(Excel.Write("By supplier", columns, rows.Select(r => new object?[]
+            {
+                r.Reference, r.Title, ContractEndpoints.StageNames[r.Stage], r.SupplierName, r.VendorNumber, r.ViaGroup ? "Group member" : "Signed it", r.GroupName,
+                r.IsEvergreen ? "Evergreen" : D(r.EndDate), r.OwnerName,
+            })), "by-supplier", clock);
         });
 
         group.MapGet("/approvals", async (int? days, CurrentUser current, Db db, TimeProvider clock) =>

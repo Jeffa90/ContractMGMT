@@ -417,6 +417,12 @@ public static class LegacyImportEndpoints
                 if (n is not { } count || unit is "day" or "week") problems.Add($"Renewal term: \"{termText}\" isn't a number of months or years.");
                 else term = unit == "year" ? count * 12 : count;
             }
+            // Medius's "Auto Extension - Monthly" with no extension period renews a month at a time.
+            if (autoRenews && term is null && Text(row, "autoRenews") is { } monthly && monthly.Contains("month", StringComparison.OrdinalIgnoreCase))
+            {
+                term = 1;
+                r.Notes.Add($"\"{monthly}\": renews a month at a time.");
+            }
             if (autoRenews && evergreen) problems.Add("Renews automatically: it's also Evergreen. An evergreen contract has no end date to renew; change one of them.");
             if (autoRenews && term is null) problems.Add("Renewal term: blank, but it renews automatically. Fill in how many months each renewal lasts.");
             if (!autoRenews) term = null;

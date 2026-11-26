@@ -186,6 +186,7 @@ public sealed class StandardFieldsTests(AppFixture app)
             [ContractNumbers.Format(n + 1), "Cartons", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), "60", "Manual", null, null, "Active"],
             [taken, "Clashing number", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), null, "Auto renewal", null, null, "Active"],
             [$"{u}-x", "Unclear renewal", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), null, "Option to extend", "12", null, "Active"],
+            [$"{u}-m", "Monthly", $"Vendor {u}", category, account, Today.AddDays(-300), Today.AddDays(200), null, "Auto Extension - Monthly", null, null, "Active"],
         ];
         using var book = new XLWorkbook();
         var sheet = book.Worksheets.Add("Export");
@@ -218,6 +219,9 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.Equal("Effective", byRow[3].GetProperty("outcome").GetString());
         Assert.Contains(byRow[4].GetProperty("problems").EnumerateArray(), x => x.GetString()!.Contains("Renewal term: blank"));
         Assert.Contains(byRow[5].GetProperty("problems").EnumerateArray(), x => x.GetString()!.Contains("isn't clearly yes or no"));
+        // Medius's "Auto Extension - Monthly" with no period renews a month at a time.
+        Assert.Equal("Effective", byRow[6].GetProperty("outcome").GetString());
+        Assert.Contains(byRow[6].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("a month at a time"));
 
         // Fix the clash row's renewal so it imports: it keeps its old reference only as the old reference, as the number is taken.
         rows[2][8] = "No";
@@ -233,7 +237,7 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.Contains(byRow[4].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("already another contract's number"));
 
         var result = await OkAsync(admin.PostAsync("/api/import/legacy/import", Form(mapping), Ct));
-        Assert.Equal(3, result.GetProperty("imported").GetInt32());
+        Assert.Equal(4, result.GetProperty("imported").GetInt32());
         await using var db = await app.OpenAsync();
         var imported = (await db.QueryAsync<(string Reference, string LegacyReference, bool AutoRenews, int? RenewalTermMonths, int? NoticePeriodDays, string? Entity, DateTime EndDate)>("""
             SELECT k.Reference, k.LegacyReference, k.AutoRenews, k.RenewalTermMonths, k.NoticePeriodDays, e.Value, k.EndDate
@@ -251,6 +255,7 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.Equal(60, imported[ContractNumbers.Format(n + 1)].NoticePeriodDays);
         Assert.Matches(@"^JBSAUS\d{7}$", imported[taken].Reference);
         Assert.NotEqual(taken, imported[taken].Reference);
+        Assert.Equal((true, (int?)1), (imported[$"{u}-m"].AutoRenews, imported[$"{u}-m"].RenewalTermMonths));
 
         // The next new contract carries on after the highest number.
         var next = (await OkAsync(owner.PostAsJsonAsync("/api/contracts", new { title = $"After import {u}" }, Ct))).GetProperty("reference").GetString()!;

@@ -207,7 +207,7 @@ const owner = {
     ]],
     ['Raise a contract', 'Start a new contract.', 'Help › "Raise a contract".', [
       ['**Contracts** › **Add contract**. Give it a title and add a new made-up supplier.', 'The supplier is filled in for you.'],
-      ['Fill in a category, value and dates, then **Save draft**.', 'It gets a reference like JBSAUS-0123.'],
+      ['Fill in a category, value and dates, then **Save draft**.', 'It gets a number like JBSAUS0000412.'],
       ['Drag any file onto the **Documents** box.', 'The file is added.'],
     ]],
     ['Work with Legal', 'Send contracts to Legal and get them back.', 'Help › "Send a contract to Legal".', [

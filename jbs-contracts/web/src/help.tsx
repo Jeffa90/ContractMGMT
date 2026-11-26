@@ -67,7 +67,7 @@ const topics = {
         <p>
           <strong>My contracts</strong> shows the contracts you own or are the backup for. <strong>All</strong> shows every contract you can see.
         </p>
-        <p>Type in the search box to find a contract by its title, reference (for example JBSAUS-0012), supplier or SAP number.</p>
+        <p>Type in the search box to find a contract by its title, reference (for example JBSAUS0000412), supplier or SAP number.</p>
         <p>
           <strong>Filters</strong> narrow the list, for example to one site or supplier. Choosing a category includes its subcategories. Your admin chooses which fields can
           be used, under Admin, Contract fields.
@@ -158,6 +158,10 @@ const topics = {
           changing terms through a Variation. Recording a decision stops the notice and end-date reminders.
         </p>
         <p>
+          A contract that <strong>renews automatically</strong> carries on when its end date passes, unless someone decides to let it end: the end date moves
+          on by its renewal term, the decision is cleared for the new term, and the reminders start again from the new date. It's recorded in its Activity.
+        </p>
+        <p>
           Reminder emails go to the owner and backup before notice deadlines, end dates and review dates. Seven days before a notice deadline with no decision,
           the Group Head is told too.
         </p>
@@ -221,6 +225,11 @@ const topics = {
           <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
           cells leave what's there.
         </p>
+        <p>
+          <strong>Contacts</strong>: <strong>Export contacts</strong> downloads every supplier's contacts, one row each. Procurement and admins can add many at
+          once with <strong>Import contacts</strong>: one row per contact (supplier, name, role, email, phone), several rows for several contacts at a
+          supplier. A row with the same supplier and email (or name) updates that contact. Remove a contact on the supplier's page.
+        </p>
       </>
     ),
   },
@@ -262,15 +271,16 @@ const topics = {
           </li>
           <li>
             <strong>Match the columns</strong>: for each column in the file, choose where it goes. Old reference, title, supplier, category and owner are needed (you
-            can choose a default owner and category for rows without one). Your matching is remembered for next time.
+            can choose a default owner and category for rows without one). A notice period can be in days or months, and Renews automatically can say Yes,
+            No, Automatic or Manual. Your matching is remembered for next time.
           </li>
           <li>
             <strong>Check</strong>: the dry run shows each row: imported as Effective (current, locked, with its original dates), as Ended (expired), already
             imported, or can't be imported and why. Nothing changes yet. Fix problems in the file (or add missing people and categories) and check again.
           </li>
           <li>
-            <strong>Import</strong>: the ready rows go in, in one step. Suppliers that aren't in JBS Contracts yet are added. Each contract keeps its old reference,
-            shown on the contract and searchable, so importing the same file again skips the ones already there.
+            <strong>Import</strong>: the ready rows go in, in one step. Suppliers that aren't in JBS Contracts yet are added. Each contract keeps its old number (for example
+            JBSAUS0000123) as its number here, and new contracts carry on after the highest. Importing the same file again skips the ones already there.
           </li>
           <li>
             <strong>Files</strong>: put the files in ZIPs (up to 25 MB each) with the old reference in each file's name or folder. One ZIP can mix signed

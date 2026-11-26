@@ -16,6 +16,8 @@ public sealed class ContractRow
     public int? AgreementTypeId { get; set; }
     public int? BusinessUnitId { get; set; }
     public int? SiteId { get; set; }
+    public int? EntityId { get; set; }
+    public int? FunctionId { get; set; }
     public int OwnerId { get; set; }
     public int? BackupOwnerId { get; set; }
     public bool IsConfidential { get; set; }
@@ -26,6 +28,8 @@ public sealed class ContractRow
     public DateTime? EffectiveDate { get; set; }
     public DateTime? EndDate { get; set; }
     public bool IsEvergreen { get; set; }
+    public bool AutoRenews { get; set; }
+    public int? RenewalTermMonths { get; set; }
     public int? NoticePeriodDays { get; set; }
     public DateTime? ReviewDate { get; set; }
     public bool NeedsLegalReview { get; set; }
@@ -77,6 +81,8 @@ public sealed class ContractRow
     public string? AgreementTypeName { get; set; }
     public string? BusinessUnitName { get; set; }
     public string? SiteName { get; set; }
+    public string? EntityName { get; set; }
+    public string? FunctionName { get; set; }
     public string OwnerName { get; set; } = "";
     public string? BackupOwnerName { get; set; }
     public string CreatedByName { get; set; } = "";
@@ -101,7 +107,8 @@ public sealed record SaveContract(
     string? Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int? BusinessUnitId, int? SiteId,
     int? OwnerId, int? BackupOwnerId, bool? IsConfidential, decimal? Value, string? CurrencyCode, string? SapOutlineAgreement,
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool? IsEvergreen, int? NoticePeriodDays, DateOnly? ReviewDate,
-    bool? NeedsLegalReview, string? RowVersion, Dictionary<string, System.Text.Json.JsonElement>? Fields = null);
+    bool? NeedsLegalReview, string? RowVersion, Dictionary<string, System.Text.Json.JsonElement>? Fields = null,
+    int? EntityId = null, int? FunctionId = null, bool? AutoRenews = null, int? RenewalTermMonths = null);
 
 public sealed record WithdrawContract(string? Reason, string? RowVersion);
 
@@ -116,6 +123,7 @@ public static class ContractEndpoints
     private const string SelectContract = """
         SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
                at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName,
+               ent.Value AS EntityName, fn.Value AS FunctionName,
                o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName, rb.Name AS RegisteredByName,
                ul.UnlockId, ul.UnlockReason, ul.UnlockExpiresUtc, ul.UnlockByName, ovr.OpenVariationId, ovr.OpenVariationStage,
                rd.Name AS RenewalDecisionByName, eb.Name AS EndedByName, ren.Reference AS RenewsReference, rn.RenewedById, rn.RenewedByReference, rn.RenewedByStage
@@ -126,6 +134,8 @@ public static class ContractEndpoints
         LEFT JOIN contracts.ListItem at ON at.Id = k.AgreementTypeId
         LEFT JOIN contracts.ListItem bu ON bu.Id = k.BusinessUnitId
         LEFT JOIN contracts.ListItem site ON site.Id = k.SiteId
+        LEFT JOIN contracts.ListItem ent ON ent.Id = k.EntityId
+        LEFT JOIN contracts.ListItem fn ON fn.Id = k.FunctionId
         JOIN contracts.Person o ON o.Id = k.OwnerId
         LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId
         JOIN contracts.Person cr ON cr.Id = k.CreatedById
@@ -303,23 +313,25 @@ public static class ContractEndpoints
     }
 
 
-    /// <summary>Creates a draft (from the form or an Excel import). Returns the errors by field when the details don't pass.</summary>
-    public static async Task<(int Id, string Reference, Dictionary<string, string>? Errors)> CreateDraftAsync(SqlConnection c, SqlTransaction tx, AuditLog audit, Person me, SaveContract body, string via = "")
+    /// <summary>
+    /// Creates a draft (from the form or an Excel import). Returns the errors by field when the details don't pass. It gets the next
+    /// contract number, unless it's given one (an old contract keeping its number from the old system, D-102).
+    /// </summary>
+    public static async Task<(int Id, string Reference, Dictionary<string, string>? Errors)> CreateDraftAsync(SqlConnection c, SqlTransaction tx, AuditLog audit, Person me, SaveContract body, string via = "", string? reference = null)
     {
         var (input, errors) = await ValidateAsync(c, tx, body with { OwnerId = body.OwnerId ?? me.Id }, before: null);
         var definitions = await Fields.LoadAsync(c, tx);
         var (fieldValues, fieldErrors) = await Fields.ParseAsync(c, tx, body.Fields, definitions);
         if (errors is not null || fieldErrors.Count > 0) return (0, "", (errors ?? []).Concat(fieldErrors).ToDictionary(e => e.Key, e => e.Value));
-        var number = await c.ExecuteScalarAsync<int>("UPDATE contracts.Counter SET NextValue = NextValue + 1 OUTPUT DELETED.NextValue WHERE Name = N'ContractNumber'", transaction: tx);
-        var reference = $"JBSAUS-{number.ToString("0000", CultureInfo.InvariantCulture)}";
+        reference ??= await ContractNumbers.NextAsync(c, tx);
         var id = await c.ExecuteScalarAsync<int>("""
-            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, EffectiveDate, EndDate, IsEvergreen, NoticePeriodDays, ReviewDate, NeedsLegalReview,
-                CreatedById, UpdatedById)
+            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, EffectiveDate, EndDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewDate,
+                NeedsLegalReview, CreatedById, UpdatedById)
             OUTPUT INSERTED.Id
-            VALUES (@reference, @Title, @Description, @SupplierId, @CategoryId, @AgreementTypeId, @BusinessUnitId, @SiteId, @OwnerId, @BackupOwnerId,
-                @IsConfidential, @Value, @CurrencyCode, @SapOutlineAgreement, @StartDate, @EffectiveDate, @EndDate, @IsEvergreen, @NoticePeriodDays, @ReviewDate, @NeedsLegalReview,
-                @me, @me)
+            VALUES (@reference, @Title, @Description, @SupplierId, @CategoryId, @AgreementTypeId, @BusinessUnitId, @SiteId, @EntityId, @FunctionId, @OwnerId, @BackupOwnerId,
+                @IsConfidential, @Value, @CurrencyCode, @SapOutlineAgreement, @StartDate, @EffectiveDate, @EndDate, @IsEvergreen, @AutoRenews, @RenewalTermMonths, @NoticePeriodDays, @ReviewDate,
+                @NeedsLegalReview, @me, @me)
             """, Params(input!, new { reference, me = me.Id }), tx);
         var saved = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
         var added = await Fields.SaveAsync(c, tx, id, fieldValues, definitions);
@@ -339,10 +351,11 @@ public static class ContractEndpoints
         if (errors is not null || fieldErrors.Count > 0) return ((errors ?? []).Concat(fieldErrors).ToDictionary(e => e.Key, e => e.Value), null);
         await c.ExecuteAsync("""
             UPDATE contracts.Contract SET Title = @Title, Description = @Description, SupplierId = @SupplierId, CategoryId = @CategoryId,
-                AgreementTypeId = @AgreementTypeId, BusinessUnitId = @BusinessUnitId, SiteId = @SiteId, OwnerId = @OwnerId, BackupOwnerId = @BackupOwnerId,
+                AgreementTypeId = @AgreementTypeId, BusinessUnitId = @BusinessUnitId, SiteId = @SiteId, EntityId = @EntityId, FunctionId = @FunctionId,
+                OwnerId = @OwnerId, BackupOwnerId = @BackupOwnerId,
                 IsConfidential = @IsConfidential, Value = @Value, CurrencyCode = @CurrencyCode, SapOutlineAgreement = @SapOutlineAgreement,
-                StartDate = @StartDate, EffectiveDate = @EffectiveDate, EndDate = @EndDate, IsEvergreen = @IsEvergreen, NoticePeriodDays = @NoticePeriodDays,
-                ReviewDate = @ReviewDate, NeedsLegalReview = @NeedsLegalReview, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                StartDate = @StartDate, EffectiveDate = @EffectiveDate, EndDate = @EndDate, IsEvergreen = @IsEvergreen, AutoRenews = @AutoRenews,
+                RenewalTermMonths = @RenewalTermMonths, NoticePeriodDays = @NoticePeriodDays, ReviewDate = @ReviewDate, NeedsLegalReview = @NeedsLegalReview, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
             WHERE Id = @id
             """, Params(input!, new { id, me = me.Id }), tx);
         var after = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
@@ -369,11 +382,13 @@ public static class ContractEndpoints
         void Check(string label, object? a, object? b) { if (!Equals(a, b)) changed.Add(label); }
         Check("title", before.Title, i.Title); Check("description", before.Description, i.Description); Check("supplier", before.SupplierId, i.SupplierId);
         Check("category", before.CategoryId, i.CategoryId); Check("agreement type", before.AgreementTypeId, i.AgreementTypeId);
-        Check("business unit", before.BusinessUnitId, i.BusinessUnitId); Check("site", before.SiteId, i.SiteId); Check("owner", before.OwnerId, i.OwnerId);
+        Check("business unit", before.BusinessUnitId, i.BusinessUnitId); Check("site", before.SiteId, i.SiteId); Check("entity", before.EntityId, i.EntityId); Check("function", before.FunctionId, i.FunctionId);
+        Check("owner", before.OwnerId, i.OwnerId);
         Check("backup owner", before.BackupOwnerId, i.BackupOwnerId); Check("Confidential", before.IsConfidential, i.IsConfidential);
         Check("value", before.Value, i.Value); Check("currency", before.CurrencyCode, i.CurrencyCode); Check("SAP outline agreement number", before.SapOutlineAgreement, i.SapOutlineAgreement);
         Check("start date", D(before.StartDate), i.StartDate); Check("effective date", D(before.EffectiveDate), i.EffectiveDate); Check("end date", D(before.EndDate), i.EndDate);
-        Check("evergreen", before.IsEvergreen, i.IsEvergreen); Check("notice period", before.NoticePeriodDays, i.NoticePeriodDays); Check("review date", D(before.ReviewDate), i.ReviewDate);
+        Check("evergreen", before.IsEvergreen, i.IsEvergreen); Check("renews automatically", before.AutoRenews, i.AutoRenews);
+        Check("renewal term", before.RenewalTermMonths, i.RenewalTermMonths); Check("notice period", before.NoticePeriodDays, i.NoticePeriodDays); Check("review date", D(before.ReviewDate), i.ReviewDate);
         Check("needs Legal review", before.NeedsLegalReview, i.NeedsLegalReview);
         return (changed, null);
     }
@@ -413,9 +428,9 @@ public static class ContractEndpoints
     private static object DetailView(ContractRow r) => new
     {
         r.Id, r.Reference, r.Title, r.Description, r.SupplierId, r.SupplierName, r.CategoryId, r.CategoryDisplay, r.AgreementTypeId, r.AgreementTypeName,
-        r.BusinessUnitId, r.BusinessUnitName, r.SiteId, r.SiteName, r.OwnerId, r.OwnerName, r.BackupOwnerId, r.BackupOwnerName, r.IsConfidential,
+        r.BusinessUnitId, r.BusinessUnitName, r.SiteId, r.SiteName, r.EntityId, r.EntityName, r.FunctionId, r.FunctionName, r.OwnerId, r.OwnerName, r.BackupOwnerId, r.BackupOwnerName, r.IsConfidential,
         r.Value, r.CurrencyCode, r.SapOutlineAgreement, StartDate = D(r.StartDate), EffectiveDate = D(r.EffectiveDate), EndDate = D(r.EndDate), r.IsEvergreen,
-        r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
+        r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
         StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc), r.IsLocked, r.WithdrawnReason,
         RegisteredUtc = Utc(r.RegisteredUtc), r.RegisteredByName, r.RegisteredAsBackup,
         r.LegacyReference, ImportedUtc = Utc(r.ImportedUtc), r.ImportedFrom, r.IsDemo,
@@ -439,6 +454,8 @@ public static class ContractEndpoints
             ["agreement type"] = r.AgreementTypeName,
             ["business unit"] = r.BusinessUnitName,
             ["site"] = r.SiteName,
+            ["entity"] = r.EntityName,
+            ["function"] = r.FunctionName,
             ["owner"] = r.OwnerName,
             ["backup owner"] = r.BackupOwnerName,
             ["Confidential"] = r.IsConfidential ? "yes" : "no",
@@ -448,23 +465,29 @@ public static class ContractEndpoints
             ["effective date"] = Date(r.EffectiveDate),
             ["end date"] = Date(r.EndDate),
             ["evergreen"] = r.IsEvergreen ? "yes" : "no",
+            ["renews automatically"] = r.AutoRenews ? "yes" : "no",
+            ["renewal term"] = r.RenewalTermMonths is { } t ? Months(t) : null,
             ["notice period"] = r.NoticePeriodDays is { } n ? $"{n} days" : null,
             ["review date"] = Date(r.ReviewDate),
             ["needs Legal review"] = r.NeedsLegalReview ? "yes" : "no",
         };
     }
 
+    /// <summary>"12 months", "1 month".</summary>
+    public static string Months(int n) => n == 1 ? "1 month" : $"{n} months";
+
     private sealed record Input(string Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int? BusinessUnitId, int? SiteId,
-        int OwnerId, int? BackupOwnerId, bool IsConfidential, decimal? Value, string CurrencyCode, string? SapOutlineAgreement, DateOnly? StartDate,
-        DateOnly? EffectiveDate, DateOnly? EndDate, bool IsEvergreen, int? NoticePeriodDays, DateOnly? ReviewDate, bool NeedsLegalReview);
+        int? EntityId, int? FunctionId, int OwnerId, int? BackupOwnerId, bool IsConfidential, decimal? Value, string CurrencyCode, string? SapOutlineAgreement,
+        DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool IsEvergreen, bool AutoRenews, int? RenewalTermMonths, int? NoticePeriodDays,
+        DateOnly? ReviewDate, bool NeedsLegalReview);
 
     private static DynamicParameters Params(Input i, object extra)
     {
         var p = new DynamicParameters(extra);
         p.AddDynamicParams(new
         {
-            i.Title, i.Description, i.SupplierId, i.CategoryId, i.AgreementTypeId, i.BusinessUnitId, i.SiteId, i.OwnerId, i.BackupOwnerId, i.IsConfidential,
-            i.Value, i.CurrencyCode, i.SapOutlineAgreement, i.IsEvergreen, i.NoticePeriodDays, i.NeedsLegalReview,
+            i.Title, i.Description, i.SupplierId, i.CategoryId, i.AgreementTypeId, i.BusinessUnitId, i.SiteId, i.EntityId, i.FunctionId, i.OwnerId, i.BackupOwnerId,
+            i.IsConfidential, i.Value, i.CurrencyCode, i.SapOutlineAgreement, i.IsEvergreen, i.AutoRenews, i.RenewalTermMonths, i.NoticePeriodDays, i.NeedsLegalReview,
         });
         p.Add("StartDate", i.StartDate?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
         p.Add("EffectiveDate", i.EffectiveDate?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
@@ -496,6 +519,8 @@ public static class ContractEndpoints
         await CheckAsync("agreementTypeId", b.AgreementTypeId, before?.AgreementTypeId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'AgreementType' AND IsActive = 1", "Choose an agreement type from the list.");
         await CheckAsync("businessUnitId", b.BusinessUnitId, before?.BusinessUnitId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'BusinessUnit' AND IsActive = 1", "Choose a business unit from the list.");
         await CheckAsync("siteId", b.SiteId, before?.SiteId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'Site' AND IsActive = 1", "Choose a site from the list.");
+        await CheckAsync("entityId", b.EntityId, before?.EntityId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'Entity' AND IsActive = 1", "Choose an entity from the list.");
+        await CheckAsync("functionId", b.FunctionId, before?.FunctionId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'Function' AND IsActive = 1", "Choose a function from the list.");
 
         var ownerId = b.OwnerId ?? before?.OwnerId;
         if (ownerId is null) f["ownerId"] = "Choose who owns this contract.";
@@ -518,10 +543,45 @@ public static class ContractEndpoints
         if (evergreen && b.EndDate is not null) f["endDate"] = "An evergreen contract has no end date. Clear the end date, or untick Evergreen.";
         if (b.StartDate is { } s && b.EndDate is { } e && e < s) f["endDate"] = "The end date is before the start date.";
         if (b.NoticePeriodDays is < 0 or > 3650) f["noticePeriodDays"] = "Use a number of days between 0 and 3,650.";
+        // Renews automatically: needs an end date to move on, and a term to move it by (D-102). Unticked, there's no term.
+        var autoRenews = b.AutoRenews ?? false;
+        var term = autoRenews ? b.RenewalTermMonths : null;
+        if (autoRenews && evergreen) f["autoRenews"] = "An evergreen contract has no end date to renew. Untick Evergreen or Renews automatically.";
+        if (term is < 1 or > 120) f["renewalTermMonths"] = "Use a number of months between 1 and 120.";
+        else if (autoRenews && term is null) f["renewalTermMonths"] = "Enter how many months each renewal lasts, for example 12.";
 
         if (f.Count > 0) return (null, f);
-        return (new Input(title, description, b.SupplierId, b.CategoryId, b.AgreementTypeId, b.BusinessUnitId, b.SiteId, ownerId!.Value, b.BackupOwnerId,
-            b.IsConfidential ?? false, b.Value, currency, sap, b.StartDate, b.EffectiveDate, b.EndDate, evergreen, b.NoticePeriodDays, b.ReviewDate,
-            b.NeedsLegalReview ?? true), null);
+        return (new Input(title, description, b.SupplierId, b.CategoryId, b.AgreementTypeId, b.BusinessUnitId, b.SiteId, b.EntityId, b.FunctionId, ownerId!.Value,
+            b.BackupOwnerId, b.IsConfidential ?? false, b.Value, currency, sap, b.StartDate, b.EffectiveDate, b.EndDate, evergreen, autoRenews, term,
+            b.NoticePeriodDays, b.ReviewDate, b.NeedsLegalReview ?? true), null);
     }
+}
+
+/// <summary>
+/// Contract numbers (D-102): JBSAUS and seven digits, carrying on from Medius's numbers (JBSAUS0000409 after JBSAUS0000408). Old
+/// contracts keep their number when imported, and the next new number follows the highest. Numbers given before D-102
+/// (JBSAUS-0012) never change.
+/// </summary>
+public static class ContractNumbers
+{
+    public static string Format(int n) => $"JBSAUS{n.ToString("0000000", CultureInfo.InvariantCulture)}";
+
+    /// <summary>The next free number (one an import already used is skipped).</summary>
+    public static async Task<string> NextAsync(SqlConnection c, SqlTransaction tx)
+    {
+        while (true)
+        {
+            var n = await c.ExecuteScalarAsync<int>("UPDATE contracts.Counter SET NextValue = NextValue + 1 OUTPUT DELETED.NextValue WHERE Name = N'ContractNumber'", transaction: tx);
+            var reference = Format(n);
+            if (await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Contract WHERE Reference = @reference", new { reference }, tx) == 0) return reference;
+        }
+    }
+
+    /// <summary>After an import: new numbers carry on after the highest JBSAUS number in use.</summary>
+    public static Task CatchUpAsync(SqlConnection c, SqlTransaction tx) => c.ExecuteAsync("""
+        UPDATE contracts.Counter SET NextValue = x.Highest + 1
+        FROM (SELECT MAX(CAST(SUBSTRING(Reference, 7, 7) AS INT)) AS Highest FROM contracts.Contract
+              WHERE Reference LIKE N'JBSAUS[0-9][0-9][0-9][0-9][0-9][0-9][0-9]') x
+        WHERE Name = N'ContractNumber' AND x.Highest IS NOT NULL AND x.Highest + 1 > NextValue
+        """, transaction: tx);
 }

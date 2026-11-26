@@ -26,7 +26,7 @@ public static class VariationEndpoints
     private static readonly CultureInfo AU = CultureInfo.GetCultureInfo("en-AU");
 
     /// <summary>Built-in fields a Variation can change (spec section 7). Title, supplier, category and the like never change: start a new contract.</summary>
-    private static readonly string[] BuiltIns = ["endDate", "evergreen", "noticePeriodDays", "reviewDate", "value", "currencyCode", "businessUnit", "site"];
+    private static readonly string[] BuiltIns = ["endDate", "evergreen", "autoRenews", "renewalTermMonths", "noticePeriodDays", "reviewDate", "value", "currencyCode", "businessUnit", "site", "entity", "function"];
 
     public sealed class VariationRow
     {
@@ -92,12 +92,16 @@ public static class VariationEndpoints
         }
         Add("endDate", "Date", "End date");
         Add("evergreen", "YesNo", "Evergreen (no end date)");
+        Add("autoRenews", "YesNo", "Renews automatically");
+        Add("renewalTermMonths", "WholeNumber", "Renewal term (months)");
         Add("noticePeriodDays", "WholeNumber", "Notice period (days)");
         Add("reviewDate", "Date", "Review date");
         Add("value", "Money", "Value");
         Add("currencyCode", "Choice", "Currency", Options("Currency", byValue: true), shownWith: "value");
         Add("businessUnit", "Choice", "Business unit", Options("BusinessUnit"));
         Add("site", "Choice", "Site", Options("Site"));
+        Add("entity", "Choice", "Entity", Options("Entity"));
+        Add("function", "Choice", "Function", Options("Function"));
         result.AddRange(defs.Where(f => !f.IsBuiltIn && !f.IsHidden && f.AfterEffective == "Variation").Select(f => new Allowed(f.Key, f.Label, f.Kind, f.Choices, f)));
         return result;
     }
@@ -107,12 +111,16 @@ public static class VariationEndpoints
     {
         "endDate" => c.EndDate is { } d ? DateOnly.FromDateTime(d).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
         "evergreen" => c.IsEvergreen,
+        "autoRenews" => c.AutoRenews,
+        "renewalTermMonths" => c.RenewalTermMonths,
         "noticePeriodDays" => c.NoticePeriodDays,
         "reviewDate" => c.ReviewDate is { } r ? DateOnly.FromDateTime(r).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
         "value" => c.Value,
         "currencyCode" => c.CurrencyCode,
         "businessUnit" => c.BusinessUnitId?.ToString(CultureInfo.InvariantCulture),
         "site" => c.SiteId?.ToString(CultureInfo.InvariantCulture),
+        "entity" => c.EntityId?.ToString(CultureInfo.InvariantCulture),
+        "function" => c.FunctionId?.ToString(CultureInfo.InvariantCulture),
         _ => null,
     };
 
@@ -172,13 +180,18 @@ public static class VariationEndpoints
         var currency = kept.ContainsKey("currencyCode") ? Get<string>("currencyCode", j => j.GetString(), null) ?? k.CurrencyCode : k.CurrencyCode;
         var businessUnit = kept.ContainsKey("businessUnit") ? Get<int?>("businessUnit", j => int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.BusinessUnitId;
         var site = kept.ContainsKey("site") ? Get<int?>("site", j => int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.SiteId;
+        var entity = kept.ContainsKey("entity") ? Get<int?>("entity", j => int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.EntityId;
+        var function = kept.ContainsKey("function") ? Get<int?>("function", j => int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.FunctionId;
+        var autoRenews = kept.ContainsKey("autoRenews") ? Get<bool?>("autoRenews", j => j.GetBoolean(), null) ?? false : k.AutoRenews;
+        var term = kept.ContainsKey("renewalTermMonths") ? Get<int?>("renewalTermMonths", j => j.ValueKind == JsonValueKind.Number ? j.GetInt32() : int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.RenewalTermMonths;
         var addedChanges = kept.Where(p => !BuiltIns.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value);
 
         var body = new SaveContract(k.Title, k.Description, k.SupplierId, k.CategoryId, k.AgreementTypeId, businessUnit, site, k.OwnerId, k.BackupOwnerId, k.IsConfidential,
-            value, currency, k.SapOutlineAgreement, D(k.StartDate), D(k.EffectiveDate), end, evergreen, notice, review, k.NeedsLegalReview, null, addedChanges);
+            value, currency, k.SapOutlineAgreement, D(k.StartDate), D(k.EffectiveDate), end, evergreen, notice, review, k.NeedsLegalReview, null, addedChanges,
+            entity, function, autoRenews, term);
         if (errors.Count == 0)
         {
-            var map = new Dictionary<string, string> { ["businessUnitId"] = "businessUnit", ["siteId"] = "site" };
+            var map = new Dictionary<string, string> { ["businessUnitId"] = "businessUnit", ["siteId"] = "site", ["entityId"] = "entity", ["functionId"] = "function" };
             foreach (var (key, message) in await ContractEndpoints.CheckAsync(c, tx!, body, k) ?? [])
                 errors[$"change.{map.GetValueOrDefault(key, key)}"] = message;
         }
@@ -198,11 +211,15 @@ public static class VariationEndpoints
                 "endDate" => (Day(D(k.EndDate)), Day(end)),
                 "reviewDate" => (Day(D(k.ReviewDate)), Day(review)),
                 "evergreen" => (k.IsEvergreen ? "Yes" : "No", evergreen ? "Yes" : "No"),
+                "autoRenews" => (k.AutoRenews ? "Yes" : "No", autoRenews ? "Yes" : "No"),
+                "renewalTermMonths" => (k.RenewalTermMonths is { } ot ? ContractEndpoints.Months(ot) : "none", term is { } nt ? ContractEndpoints.Months(nt) : "none"),
                 "noticePeriodDays" => (k.NoticePeriodDays is { } o ? $"{o} days" : "none", notice is { } n ? $"{n} days" : "none"),
                 "value" => (Money(k.Value, k.CurrencyCode), Money(value, currency)),
                 "currencyCode" => (k.CurrencyCode, currency),
                 "businessUnit" => (k.BusinessUnitId is { } b ? names.GetValueOrDefault(b, "") : "none", businessUnit is { } nb ? names.GetValueOrDefault(nb, "") : "none"),
                 "site" => (k.SiteId is { } s ? names.GetValueOrDefault(s, "") : "none", site is { } ns ? names.GetValueOrDefault(ns, "") : "none"),
+                "entity" => (k.EntityId is { } oe ? names.GetValueOrDefault(oe, "") : "none", entity is { } ne ? names.GetValueOrDefault(ne, "") : "none"),
+                "function" => (k.FunctionId is { } of ? names.GetValueOrDefault(of, "") : "none", function is { } nf ? names.GetValueOrDefault(nf, "") : "none"),
                 _ => (addedValues.TryGetValue(key, out var ov) && ov.Display.Length > 0 ? ov.Display : "none",
                       parsed.FirstOrDefault(p => p.Field.Key == key) is { } pv && !pv.IsEmpty ? await Fields.DisplayAsync(c, tx, pv) : "none"),
             };
@@ -314,10 +331,11 @@ public static class VariationEndpoints
                 return a.Key switch
                 {
                     "endDate" or "reviewDate" => cur is string s ? DateOnly.ParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture).ToString("d MMM yyyy", CultureInfo.InvariantCulture) : "",
-                    "evergreen" => cur is true ? "Yes" : "No",
+                    "evergreen" or "autoRenews" => cur is true ? "Yes" : "No",
+                    "renewalTermMonths" => cur is int t ? ContractEndpoints.Months(t) : "",
                     "noticePeriodDays" => cur is int n ? $"{n} days" : "",
                     "value" => cur is decimal m ? $"${m.ToString("N2", AU)}" : "",
-                    "businessUnit" or "site" => cur is string k ? names.GetValueOrDefault(k, "") : "",
+                    "businessUnit" or "site" or "entity" or "function" => cur is string k ? names.GetValueOrDefault(k, "") : "",
                     _ => Convert.ToString(cur, CultureInfo.InvariantCulture) ?? "",
                 };
             }

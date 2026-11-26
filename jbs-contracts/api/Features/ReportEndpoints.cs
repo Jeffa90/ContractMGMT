@@ -51,6 +51,8 @@ public static class ReportEndpoints
         public string? AgreementTypeName { get; set; }
         public string? BusinessUnitName { get; set; }
         public string? SiteName { get; set; }
+        public string? EntityName { get; set; }
+        public string? FunctionName { get; set; }
         public string OwnerName { get; set; } = "";
         public string? BackupOwnerName { get; set; }
         public bool IsConfidential { get; set; }
@@ -62,6 +64,8 @@ public static class ReportEndpoints
         public DateTime? EffectiveDate { get; set; }
         public DateTime? EndDate { get; set; }
         public bool IsEvergreen { get; set; }
+        public bool AutoRenews { get; set; }
+        public int? RenewalTermMonths { get; set; }
         public int? NoticePeriodDays { get; set; }
         public DateTime? ReviewDate { get; set; }
         public DateTime? RegisteredUtc { get; set; }
@@ -90,9 +94,9 @@ public static class ReportEndpoints
     private static readonly Dictionary<string, string> BuiltInTypes = new()
     {
         ["title"] = "text", ["supplier"] = "text", ["category"] = "text", ["agreementType"] = "text", ["description"] = "text", ["owner"] = "text",
-        ["backupOwner"] = "text", ["confidential"] = "yesno", ["businessUnit"] = "text", ["site"] = "text", ["value"] = "money",
+        ["backupOwner"] = "text", ["confidential"] = "yesno", ["businessUnit"] = "text", ["site"] = "text", ["entity"] = "text", ["function"] = "text", ["value"] = "money",
         ["sapOutlineAgreement"] = "text", ["startDate"] = "date", ["effectiveDate"] = "date", ["endDate"] = "date", ["evergreen"] = "yesno",
-        ["noticePeriodDays"] = "number", ["reviewDate"] = "date", ["needsLegalReview"] = "yesno",
+        ["autoRenews"] = "yesno", ["renewalTermMonths"] = "number", ["noticePeriodDays"] = "number", ["reviewDate"] = "date", ["needsLegalReview"] = "yesno",
     };
 
     internal static List<RegisterColumn> RegisterColumnsFor(List<FieldRow> fields, List<SectionRow> sections)
@@ -125,9 +129,9 @@ public static class ReportEndpoints
     internal static object? BuiltInValue(RegisterRow r, string key) => key switch
     {
         "title" => r.Title, "supplier" => r.SupplierName, "supplierVendorNumber" => r.SupplierVendorNumber, "category" => r.Category, "agreementType" => r.AgreementTypeName, "description" => r.Description,
-        "owner" => r.OwnerName, "backupOwner" => r.BackupOwnerName, "confidential" => r.IsConfidential, "businessUnit" => r.BusinessUnitName, "site" => r.SiteName,
+        "owner" => r.OwnerName, "backupOwner" => r.BackupOwnerName, "confidential" => r.IsConfidential, "businessUnit" => r.BusinessUnitName, "site" => r.SiteName, "entity" => r.EntityName, "function" => r.FunctionName,
         "value" => r.Value, "sapOutlineAgreement" => r.SapOutlineAgreement, "startDate" => D(r.StartDate), "effectiveDate" => D(r.EffectiveDate),
-        "endDate" => D(r.EndDate), "evergreen" => r.IsEvergreen, "noticePeriodDays" => r.NoticePeriodDays, "reviewDate" => D(r.ReviewDate),
+        "endDate" => D(r.EndDate), "evergreen" => r.IsEvergreen, "autoRenews" => r.AutoRenews, "renewalTermMonths" => r.RenewalTermMonths, "noticePeriodDays" => r.NoticePeriodDays, "reviewDate" => D(r.ReviewDate),
         "needsLegalReview" => r.NeedsLegalReview, "stage" => ContractEndpoints.StageNames[r.Stage], "noticeDeadline" => D(r.NoticeDeadline),
         "registered" => r.RegisteredUtc is { } ru ? DateOnly.FromDateTime(Local(ru)) : null, "registeredBy" => r.RegisteredByName,
         "renewalDecision" => r.RenewalDecision is { } d ? RenewalEndpoints.DecisionNames[d] : null, "endedOn" => D(r.EndedOn), "endedReason" => r.EndedReason,
@@ -149,13 +153,15 @@ public static class ReportEndpoints
         var filters = Fields.FilterSql(fields, filterValues, p);
         var rows = (await c.QueryAsync<RegisterRow>($"""
             SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, s.VendorNumber AS SupplierVendorNumber, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
-                   at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName, o.Name AS OwnerName, b.Name AS BackupOwnerName,
-                   k.IsConfidential, k.NeedsLegalReview, k.Value, k.CurrencyCode, k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate, k.IsEvergreen,
+                   at.Value AS AgreementTypeName, bu.Value AS BusinessUnitName, site.Value AS SiteName, ent.Value AS EntityName, fn.Value AS FunctionName, o.Name AS OwnerName,
+                   b.Name AS BackupOwnerName, k.IsConfidential, k.NeedsLegalReview, k.Value, k.CurrencyCode, k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate,
+                   k.IsEvergreen, k.AutoRenews, k.RenewalTermMonths,
                    k.NoticePeriodDays, k.ReviewDate, k.RegisteredUtc, rb.Name AS RegisteredByName, k.RenewalDecision, k.EndedOn, k.EndedReason, k.LegalOutcome, k.LegacyReference
             FROM contracts.Contract k
             LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
             LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
             LEFT JOIN contracts.ListItem at ON at.Id = k.AgreementTypeId LEFT JOIN contracts.ListItem bu ON bu.Id = k.BusinessUnitId LEFT JOIN contracts.ListItem site ON site.Id = k.SiteId
+            LEFT JOIN contracts.ListItem ent ON ent.Id = k.EntityId LEFT JOIN contracts.ListItem fn ON fn.Id = k.FunctionId
             JOIN contracts.Person o ON o.Id = k.OwnerId LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId LEFT JOIN contracts.Person rb ON rb.Id = k.RegisteredById
             WHERE k.Stage IN ({StagesFor(scope)}) AND {ContractAccess.VisibleSql("k")}{string.Concat(filters.Select(f => $" AND {f}"))}
             ORDER BY k.Reference

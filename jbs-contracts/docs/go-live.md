@@ -109,7 +109,7 @@ The app folder (`...\app`) doesn't need backing up: every deploy replaces it fro
 
 ## 9. Loading the old contracts (Medius)
 
-Admin, Import old contracts. **Always run it on QA first** with the real export, check the dry run and the imported contracts, then repeat on Production. Imported contracts get a new JBSAUS number and keep the Medius number alongside as the old reference (D-94); running the same file again skips what's already in. Files come as ZIPs named or foldered by the old reference. Every row is audited with the file it came from.
+Admin, Import old contracts. **Always run it on QA first** with the real export, check the dry run and the imported contracts, then repeat on Production. Imported contracts keep their Medius number (for example JBSAUS0000123) and new contracts carry on after the highest (D-102); running the same file again skips what's already in. Files come as ZIPs named or foldered by the old reference. Every row is audited with the file it came from.
 
 ## 10. Help videos (developers)
 

@@ -74,12 +74,16 @@ function builtInDisplay(key: string, c: Contract): ReactNode {
     case 'confidential': return c.isConfidential ? 'Yes: only the owner and backup, Legal, approvers, admins and auditors see it' : 'No'
     case 'businessUnit': return c.businessUnitName
     case 'site': return c.siteName
+    case 'entity': return c.entityName
+    case 'function': return c.functionName
     case 'value': return c.value !== null && <span className="tabular">{formatMoney(c.value, c.currencyCode)}</span>
     case 'sapOutlineAgreement': return c.sapOutlineAgreement
     case 'startDate': return formatDate(c.startDate)
     case 'effectiveDate': return formatDate(c.effectiveDate)
     case 'endDate': return c.isEvergreen ? 'Evergreen (no end date)' : formatDate(c.endDate)
     case 'evergreen': return c.isEvergreen ? 'Yes' : 'No'
+    case 'autoRenews': return c.autoRenews ? 'Yes: if no one gives notice, the end date moves on by the renewal term' : 'No'
+    case 'renewalTermMonths': return c.autoRenews && c.renewalTermMonths !== null ? (c.renewalTermMonths === 1 ? '1 month' : `${c.renewalTermMonths} months`) : ''
     case 'noticePeriodDays': return c.noticePeriodDays !== null ? `${c.noticePeriodDays} days${c.noticeDeadline ? ` (notice by ${formatDate(c.noticeDeadline)})` : ''}` : ''
     case 'reviewDate': return formatDate(c.reviewDate)
     case 'needsLegalReview': return c.needsLegalReview ? 'Yes' : 'No'
@@ -222,7 +226,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
           <div>
             <dt className="text-xs text-muted-foreground">Key dates</dt>
             <dd className="tabular font-medium">
-              {c.isEvergreen ? 'Evergreen' : c.endDate ? `Ends ${formatDate(c.endDate)}` : 'No end date yet'}
+              {c.isEvergreen ? 'Evergreen' : c.endDate ? `${c.autoRenews ? 'Renews' : 'Ends'} ${formatDate(c.endDate)}` : 'No end date yet'}
               {c.noticeDeadline && <span className="block text-xs font-normal text-muted-foreground">Notice by {formatDate(c.noticeDeadline)}</span>}
             </dd>
           </div>

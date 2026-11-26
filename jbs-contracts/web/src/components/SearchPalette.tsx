@@ -119,7 +119,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       <div className="overflow-y-auto p-2">
         {items.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground" role="status">
-            {text.length === 0 ? 'Type a title, reference (JBSAUS-0012), supplier or SAP number.' : results.isFetching ? 'Searching…' : `Nothing matches "${text}".`}
+            {text.length === 0 ? 'Type a title, reference (JBSAUS0000412), supplier or SAP number.' : results.isFetching ? 'Searching…' : `Nothing matches "${text}".`}
           </p>
         ) : (
           <ul id={listId} role="listbox" aria-label="Results" className="flex flex-col">

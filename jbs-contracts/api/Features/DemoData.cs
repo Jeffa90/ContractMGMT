@@ -62,7 +62,8 @@ public static class DemoData
     }
 
     private sealed record Spec(string Title, int? Supplier, int? Category, int? AgreementType, int? BusinessUnit, int? Site, int Owner, int? Backup,
-        decimal? Value, DateTime? Start, DateTime? End, int? Notice, bool Legal, bool Evergreen = false, DateTime? Review = null, bool Confidential = false);
+        decimal? Value, DateTime? Start, DateTime? End, int? Notice, bool Legal, bool Evergreen = false, DateTime? Review = null, bool Confidential = false,
+        int? AutoRenewMonths = null);
 
     private sealed class Seeder(SqlConnection c, SqlTransaction tx, Person me, AuditLog audit, string documents, DateTime today, DateTime now, string domain)
     {
@@ -75,6 +76,7 @@ public static class DemoData
 
         // Filled by ListsAsync.
         private int linehaul, coldChain, packaging, facilities, cleaning, waste, it, peopleServices, services, supply, beef, corporate, north, south, office;
+        private int meatsEntity, foodsEntity, procurementFn, operationsFn, logisticsFn;
         private int scf, bluegum, harbour, ironbark, coastal, redgum, keystone, wattle;
         private int priya, sam, leah, grant;
         private int? groupHead;
@@ -153,6 +155,11 @@ public static class DemoData
             north = await ItemAsync("Site", "North plant");
             south = await ItemAsync("Site", "South plant");
             office = await ItemAsync("Site", "Head office");
+            meatsEntity = await ItemAsync("Entity", "Northern Meats Pty Ltd (demo)");
+            foodsEntity = await ItemAsync("Entity", "Southern Foods Pty Ltd (demo)");
+            procurementFn = await ItemAsync("Function", "Procurement");
+            operationsFn = await ItemAsync("Function", "Operations");
+            logisticsFn = await ItemAsync("Function", "Logistics");
             scf = await SupplierAsync(Marker);
             bluegum = await SupplierAsync("Bluegum Packaging (demo)");
             harbour = await SupplierAsync("Harbourside Cleaning (demo)");
@@ -231,7 +238,7 @@ public static class DemoData
             await StageAsync(wasteId, "Signing", 2);
 
             // Effective: some further out, an evergreen with a review date, a Confidential one, and one unlocked right now by the loader.
-            await EffectiveAsync(new("Forklift servicing", scf, facilities, services, beef, north, owner, null, 74_000m, D(-300), D(40), 20, Legal: false), grant);
+            await EffectiveAsync(new("Forklift servicing", scf, facilities, services, beef, north, owner, null, 74_000m, D(-300), D(40), 20, Legal: false, AutoRenewMonths: 12), grant);
             await EffectiveAsync(new("Software licences", ironbark, it, supply, corporate, office, owner, null, 120_000m, D(-500), null, 30, Legal: false, Evergreen: true, Review: D(25)), grant);
             await EffectiveAsync(new("Executive recruitment services", ironbark, peopleServices, services, corporate, office, owner, null, 300_000m, D(-90), D(275), 30, Legal: true, Confidential: true), grant, sam);
             var securityId = await EffectiveAsync(new("Security patrols", keystone, facilities, services, corporate, office, owner, null, 155_000m, D(-305), D(260), 60, Legal: true), grant, sam);
@@ -252,7 +259,7 @@ public static class DemoData
         {
             // Notice deadlines in 5 days and passed, with no decision (Urgent).
             await EffectiveAsync(new("Pest control", wattle, facilities, services, beef, south, owner, null, 38_000m, D(-355), D(10), 5, Legal: false), grant);
-            await EffectiveAsync(new("Uniform laundering", redgum, peopleServices, services, beef, north, owner, null, 64_000m, D(-700), D(25), 30, Legal: false), grant);
+            await EffectiveAsync(new("Uniform laundering", redgum, peopleServices, services, beef, north, owner, null, 64_000m, D(-700), D(25), 30, Legal: false, AutoRenewMonths: 24), grant);
 
             // Decisions made: let it end, renegotiate, and end early on a later date.
             var letEnd = await EffectiveAsync(new("Fuel cards", scf, linehaul, supply, beef, south, owner, null, 90_000m, D(-700), D(35), 30, Legal: false), grant);
@@ -519,23 +526,27 @@ public static class DemoData
 
         private async Task<int> ContractAsync(Spec s)
         {
-            var number = await c.ExecuteScalarAsync<int>("UPDATE contracts.Counter SET NextValue = NextValue + 1 OUTPUT DELETED.NextValue WHERE Name = N'ContractNumber'", transaction: tx);
-            var reference = $"JBSAUS-{number.ToString("0000", CultureInfo.InvariantCulture)}";
+            var reference = await ContractNumbers.NextAsync(c, tx);
+            var autoRenews = s.AutoRenewMonths is not null && !s.Evergreen && s.End is not null;
             var p = new DynamicParameters(new
             {
                 reference, title = s.Title, description = "Fictional demo contract for trying JBS Contracts on QA.", s.Supplier, s.Category, s.AgreementType, s.BusinessUnit, s.Site,
                 s.Owner, s.Backup, s.Confidential, s.Value, s.Evergreen, s.Notice, s.Legal,
+                entity = s.BusinessUnit == corporate ? foodsEntity : meatsEntity,
+                function = s.Category == linehaul || s.Category == coldChain ? logisticsFn : s.Category == facilities || s.Category == cleaning ? operationsFn : procurementFn,
+                autoRenews, term = autoRenews ? s.AutoRenewMonths : null,
             });
             p.Add("start", s.Start, System.Data.DbType.Date);
             p.Add("end", s.End, System.Data.DbType.Date);
             p.Add("review", s.Review, System.Data.DbType.Date);
             // Raised by its owner (as in real life), so approvers who aren't involved can approve it.
             var id = await c.ExecuteScalarAsync<int>("""
-                INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,
-                    IsConfidential, Value, CurrencyCode, StartDate, EndDate, IsEvergreen, NoticePeriodDays, ReviewDate, NeedsLegalReview, CreatedById, UpdatedById, IsDemo)
+                INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
+                    IsConfidential, Value, CurrencyCode, StartDate, EndDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewDate, NeedsLegalReview,
+                    CreatedById, UpdatedById, IsDemo)
                 OUTPUT INSERTED.Id
-                VALUES (@reference, @title, @description, @Supplier, @Category, @AgreementType, @BusinessUnit, @Site, @Owner, @Backup,
-                    @Confidential, @Value, N'AUD', @start, @end, @Evergreen, @Notice, @review, @Legal, @Owner, @Owner, 1)
+                VALUES (@reference, @title, @description, @Supplier, @Category, @AgreementType, @BusinessUnit, @Site, @entity, @function, @Owner, @Backup,
+                    @Confidential, @Value, N'AUD', @start, @end, @Evergreen, @autoRenews, @term, @Notice, @review, @Legal, @Owner, @Owner, 1)
                 """, p, tx);
             await audit.WriteAsync(c, tx, me.AsActor(), "demo.contract", "Contract", id, $"{me.Name} loaded the demo contract {reference} {s.Title} (fictional; it never sends email).", contractId: id);
             Contracts++;

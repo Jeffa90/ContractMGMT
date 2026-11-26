@@ -2,7 +2,17 @@ import { ApiError } from './api'
 
 export type ListItem = {
   id: number
-  listName: 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier' | 'DocumentKind' | 'SupplierRisk'
+  listName:
+    | 'AgreementType'
+    | 'BusinessUnit'
+    | 'Site'
+    | 'Entity'
+    | 'Function'
+    | 'Currency'
+    | 'SupplierDocumentType'
+    | 'SupplierTier'
+    | 'DocumentKind'
+    | 'SupplierRisk'
   value: string
   sortOrder: number
   isActive: boolean
@@ -68,6 +78,10 @@ export type Contract = {
   businessUnitName: string | null
   siteId: number | null
   siteName: string | null
+  entityId: number | null
+  entityName: string | null
+  functionId: number | null
+  functionName: string | null
   ownerId: number
   ownerName: string
   backupOwnerId: number | null
@@ -80,6 +94,9 @@ export type Contract = {
   effectiveDate: string | null
   endDate: string | null
   isEvergreen: boolean
+  /** Renews automatically (D-102): the daily job moves the end date on by the renewal term unless someone decides to let it end. */
+  autoRenews: boolean
+  renewalTermMonths: number | null
   noticePeriodDays: number | null
   reviewDate: string | null
   noticeDeadline: string | null

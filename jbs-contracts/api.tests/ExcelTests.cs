@@ -186,4 +186,53 @@ public sealed class ExcelTests(AppFixture app)
         Assert.Contains("so it can't be changed by import now. This row would change: title.", refusedRow.GetProperty("notes")[0].GetString());
         Assert.Null(await AuditLog.VerifyAsync(db));
     }
+
+    [Fact]
+    public async Task Supplier_contacts_import_in_bulk_with_several_per_supplier_and_update_on_a_second_run()
+    {
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var ownerUser = Unique("co");
+        await app.AddPersonAsync(ownerUser, $"Cora Owner {ownerUser[^4..]}", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false, procurement = false });
+        using var owner = app.ClientFor($@"TEST\{ownerUser}");
+        var supplier = Unique("Contacts Co ");
+        Assert.True((await admin.PostAsJsonAsync("/api/suppliers", new { name = supplier }, Ct)).IsSuccessStatusCode);
+        string[] headers = ["Supplier", "Name", "Role", "Email", "Phone"];
+        var file = Sheet(headers,
+            [supplier, "Alex Account", "Account manager", "alex@example.com", "07 3000 0001"],
+            [supplier, "Bo Billing", "Accounts", "bo@example.com", null],
+            [supplier, "Cy Nomail", "Driver", null, null],
+            [supplier, "Alex Again", null, "ALEX@example.com", null],
+            ["Nobody Pty Ltd", "Dee Nowhere", null, null, null],
+            [supplier, "Ed Bad", null, "not an email", null]);
+
+        // Procurement and admins only.
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostAsync(owner, "contacts", "preview", file)).Status);
+
+        var (_, first) = await PostAsync(admin, "contacts", "import", file);
+        Assert.Equal(3, Count(first, "added"));
+        Assert.Equal(3, Count(first, "refused"));
+        var notes = first.GetProperty("rows").EnumerateArray().ToDictionary(r => r.GetProperty("row").GetInt32(), r => string.Join(" ", r.GetProperty("notes").EnumerateArray().Select(n => n.GetString())));
+        Assert.Contains("more than once", notes[5]);
+        Assert.Contains("there's no supplier called", notes[6]);
+        Assert.Contains("doesn't look like an email", notes[7]);
+        await using var db = await app.OpenAsync();
+        var id = await db.ExecuteScalarAsync<int>("SELECT Id FROM contracts.Supplier WHERE Name = @supplier", new { supplier });
+        Assert.Equal(3, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.SupplierContact WHERE SupplierId = @id AND IsRemoved = 0", new { id }));
+
+        // A second run matches by email (or name): it changes, and blank cells leave what's there.
+        var (_, second) = await PostAsync(admin, "contacts", "import", Sheet(headers,
+            [supplier, "Alex Account", "Key account manager", "Alex@Example.com", null],
+            [supplier, "Cy Nomail", "Driver", null, "0400 000 000"],
+            [supplier, "Bo Billing", "Accounts", "bo@example.com", null]));
+        Assert.Equal(2, Count(second, "updated"));
+        Assert.Equal(1, Count(second, "unchanged"));
+        Assert.Equal(0, Count(second, "added"));
+        var alex = await db.QuerySingleAsync<(string Role, string Phone)>("SELECT Role, Phone FROM contracts.SupplierContact WHERE SupplierId = @id AND Email = N'alex@example.com'", new { id });
+        Assert.Equal(("Key account manager", "07 3000 0001"), alex);
+        Assert.True(await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.AuditEvent WHERE Action = N'supplier.contact-changed' AND SubjectId = @id", new { id }) >= 2);
+
+        // The export lists them, one row each.
+        var book = new XLWorkbook(await (await owner.GetAsync("/api/excel/contacts", Ct)).Content.ReadAsStreamAsync(Ct));
+        Assert.Equal(3, book.Worksheet(1).RowsUsed().Count(r => r.Cell(1).GetString() == supplier));
+    }
 }

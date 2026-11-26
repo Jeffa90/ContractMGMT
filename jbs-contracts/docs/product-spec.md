@@ -142,10 +142,10 @@ Admins add, move, rename, hide and require fields without code, in **Admin > Con
 
 | Section | Fields (* = rule field: can be renamed and moved, never hidden) |
 |---|---|
-| Basics | Title*, Reference* (JBSAUS-0001, set by the app), Supplier*, Category and subcategory*, Agreement type, Description |
-| Owner and access | Owner*, Backup owner, Confidential*, Business unit, Site |
+| Basics | Title*, Reference* (JBSAUS0000409: Medius's format, set by the app; imported contracts keep their Medius number, D-102), Supplier*, Category and subcategory*, Agreement type, Description |
+| Owner and access | Owner*, Backup owner, Confidential*, Business unit, Site, Entity, Function (D-102) |
 | Value | Value and currency (AUD by default), SAP outline agreement number |
-| Dates and notice | Start date, Effective date*, End date*, Evergreen (no end date)*, Notice period in days*, Review date |
+| Dates and notice | Start date, Effective date*, End date*, Evergreen (no end date)*, Renews automatically* and its renewal term in months* (D-102), Notice period in days*, Review date |
 | Legal | Needs Legal review* |
 
 **Added fields**: the admin picks a kind:
@@ -338,6 +338,7 @@ The new app replaces the old one on QA from slice 0. QA has no real data (confir
 | 1c | Email foundation and "You've been given access" email (JBS relay) | Adds a person and they get an email | Built and tested (queue, background sender with retries, real SMTP conversation tested); deploying to QA |
 | 8b | Suppliers: supplier page with documents (types from a list, versions, expiry, opt-in reminders), documents from contracts, details (relationship owner, tier, risk, contacts, next review), structured business reviews with actions; Procurement tick | Adds an insurance certificate with a reminder; records a business review with actions | Built and tested (D-88, D-90; 69 API tests on SQL Server; browser walkthrough at 1280px and 375px dark; axe clean; three new help guides with videos). On QA (deployed 25 Nov 2026) |
 | 9 | Import: spreadsheet (for example a Medius export, Excel or CSV) with column matching (remembered), dry run row by row, import; current contracts Effective and locked with their original dates, expired ones Ended; ZIPs of files matched by the old reference | Loads a fictional sample | Built and tested on a fictional Medius-style sample (D-91; 70 API tests on SQL Server; browser walkthrough at 1280px and 375px dark; axe clean; help guide with video). The real Medius exports aren't available yet. On QA (deployed 25 Nov 2026) |
+| 9b | Medius field review (D-102, D-103): Entity and Function drop-downs; Renews automatically with a renewal term (the daily job moves the end date on); Medius numbering kept on import, new numbers carry on; supplier contacts in bulk from Excel | Imports a Medius export and sees its numbers kept; ticks Renews automatically | Built and tested (API tests for the fields, the roll-over, the numbering and the contacts sheet; browser suite green); deploying to QA |
 
 Help ("?") ships with each screen, not as a slice of its own. The **help centre** (D-89) adds step-by-step guides with short silent videos; when a screen changes, update its guide and re-record its video (web/help-videos/record.cjs).
 

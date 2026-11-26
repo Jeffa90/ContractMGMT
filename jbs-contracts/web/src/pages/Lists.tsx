@@ -16,12 +16,14 @@ import type { Category, ListItem, Lists } from '@/lib/contracts'
 import { useMe } from '@/lib/me'
 import { help } from '@/help'
 
-type Tab = 'Category' | 'AgreementType' | 'BusinessUnit' | 'Site' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier' | 'DocumentKind' | 'SupplierRisk'
+type Tab = 'Category' | 'AgreementType' | 'BusinessUnit' | 'Site' | 'Entity' | 'Function' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier' | 'DocumentKind' | 'SupplierRisk'
 const tabs: { value: Tab; label: string; single: string; group: 'Contracts' | 'Suppliers'; note?: string }[] = [
   { value: 'Category', group: 'Contracts', label: 'Categories', single: 'category' },
   { value: 'AgreementType', group: 'Contracts', label: 'Agreement types', single: 'agreement type' },
   { value: 'BusinessUnit', group: 'Contracts', label: 'Business units', single: 'business unit' },
   { value: 'Site', group: 'Contracts', label: 'Sites', single: 'site' },
+  { value: 'Entity', group: 'Contracts', label: 'Entities', single: 'entity', note: 'The JBS companies that sign contracts.' },
+  { value: 'Function', group: 'Contracts', label: 'Functions', single: 'function', note: 'The parts of the business contracts are for.' },
   { value: 'Currency', group: 'Contracts', label: 'Currencies', single: 'currency' },
   { value: 'SupplierDocumentType', group: 'Suppliers', label: 'Supplier document types', single: 'supplier document type' },
   { value: 'SupplierTier', group: 'Suppliers', label: 'Supplier tiers', single: 'supplier tier' },

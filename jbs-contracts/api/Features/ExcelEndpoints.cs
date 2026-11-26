@@ -7,7 +7,7 @@ using Microsoft.Data.SqlClient;
 namespace JbsContracts.Api.Features;
 
 /// <summary>
-/// Excel import and export for People, Lists, Suppliers and Contracts (decision D-44).
+/// Excel import and export for People, Lists, Suppliers, supplier contacts (D-103) and Contracts (decision D-44).
 /// An export is the template for an import. An import is always previewed first; it adds new rows and updates existing ones,
 /// never deletes or hides anything, and a blank cell leaves the existing value unchanged. Every row goes through the same
 /// rules as the screens and is audited, plus one summary event per import. All in one transaction: all or nothing.
@@ -37,7 +37,7 @@ public static class ExcelEndpoints
 
     private const string Via = " (from Excel)";
 
-    private static readonly Dictionary<string, Kind> Kinds = new[] { People(), Lists(), Suppliers(), Contracts() }.ToDictionary(k => k.Name);
+    private static readonly Dictionary<string, Kind> Kinds = new[] { People(), Lists(), Suppliers(), SupplierContacts(), Contracts() }.ToDictionary(k => k.Name);
 
     public static void MapExcelEndpoints(this IEndpointRouteBuilder app)
     {
@@ -447,13 +447,115 @@ public static class ExcelEndpoints
             return plan;
         });
 
+    // ---------------------------------------------------------------- Supplier contacts (D-103)
+
+    private sealed class ContactRow
+    {
+        public int Id { get; set; }
+        public int SupplierId { get; set; }
+        public string Supplier { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string? Role { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+    }
+
+    private const string SelectContacts = """
+        SELECT k.Id, k.SupplierId, s.Name AS Supplier, k.Name, k.Role, k.Email, k.Phone FROM contracts.SupplierContact k
+        JOIN contracts.Supplier s ON s.Id = k.SupplierId WHERE k.IsRemoved = 0
+        """;
+
+    /// <summary>
+    /// One row per contact, several rows for several contacts at a supplier. A row matches the supplier's contact with the same email
+    /// (or, without one, the same name) and updates it; otherwise it adds one. Contacts aren't removed by import (that's on the supplier's page).
+    /// </summary>
+    private static Kind SupplierContacts() => new(
+        "contacts", "supplier contacts", "Contacts",
+        [
+            new("Supplier", "Required. The supplier's name, as in JBS Contracts.", 32), new("Name", "Required. The contact's full name.", 26),
+            new("Role", "For example Account manager", 24), new("Email", null, 32), new("Phone", null, 18),
+        ],
+        ["Supplier", "Name"], [],
+        me => true, SupplierPageEndpoints.CanManage, "Only Procurement and admins can import supplier contacts.",
+        async x => (await x.C.QueryAsync<ContactRow>($"{SelectContacts} ORDER BY s.Name, k.Name", transaction: x.Tx))
+            .Select(k => new object?[] { k.Supplier, k.Name, k.Role, k.Email, k.Phone }),
+        async (x, rows) =>
+        {
+            static string K(string s) => s.Trim().ToUpperInvariant();
+            var suppliers = (await x.C.QueryAsync<(int Id, string Name)>("SELECT Id, Name FROM contracts.Supplier", transaction: x.Tx)).ToDictionary(s => K(s.Name));
+            var contacts = (await x.C.QueryAsync<ContactRow>(SelectContacts, transaction: x.Tx)).ToList();
+            var seen = new HashSet<string>();
+            var plan = new List<PlannedRow>();
+            foreach (var row in rows)
+            {
+                var supplierName = Clean(row.Text("Supplier"));
+                var name = Clean(row.Text("Name"));
+                var r = new PlannedRow { Row = row.Number, Label = $"{name ?? "(no name)"}, {supplierName ?? "(no supplier)"}" };
+                plan.Add(r);
+                if (supplierName is null) { r.Refuse("Supplier: add the supplier's name."); continue; }
+                if (!suppliers.TryGetValue(K(supplierName), out var supplier))
+                { r.Refuse($"Supplier: there's no supplier called \"{supplierName}\". Add the supplier first (the suppliers sheet, or Add supplier)."); continue; }
+                r.Label = $"{name ?? "(no name)"}, {supplier.Name}";
+                var problems = new List<string>();
+                if (name is null) problems.Add("Name: add the contact's name.");
+                else if (name.Length > 200) problems.Add("Name: keep it under 200 characters.");
+                var role = Clean(row.Text("Role"));
+                if (role is { Length: > 200 }) problems.Add("Role: keep it under 200 characters.");
+                var email = Clean(row.Text("Email"));
+                if (email is not null && (email.Length > 254 || !System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$")))
+                    problems.Add($"Email: \"{email}\" doesn't look like an email address.");
+                var phone = Clean(row.Text("Phone"));
+                if (phone is { Length: > 50 }) problems.Add("Phone: keep it under 50 characters.");
+                if (problems.Count > 0) { r.Refuse(string.Join(" ", problems)); continue; }
+
+                var key = $"{supplier.Id}|{(email is not null ? "E:" + K(email) : "N:" + K(name!))}";
+                if (!seen.Add(key)) { r.Refuse("This contact is in the sheet more than once; only the first row is used."); continue; }
+                var before = contacts.FirstOrDefault(k => k.SupplierId == supplier.Id && (email is not null
+                    ? k.Email is not null && K(k.Email) == K(email)
+                    : k.Email is null && K(k.Name) == K(name!)));
+                // A blank cell leaves what's there.
+                role ??= before?.Role;
+                phone ??= before?.Phone;
+                var args = new { supplierId = supplier.Id, id = before?.Id, name, role, email = email ?? before?.Email, phone, me = x.Me.Id };
+                if (before is null)
+                {
+                    r.Action = "add";
+                    r.Notes.Add("New contact.");
+                    r.Apply = async () =>
+                    {
+                        await x.C.ExecuteAsync("""
+                            INSERT INTO contracts.SupplierContact (SupplierId, Name, Role, Email, Phone, CreatedById) VALUES (@supplierId, @name, @role, @email, @phone, @me)
+                            """, args, x.Tx);
+                        await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "supplier.contact-added", "Supplier", supplier.Id,
+                            $"{x.Me.Name} added {name} as a contact for {supplier.Name}{Via}.", args);
+                    };
+                    continue;
+                }
+                var changes = new List<string>();
+                if (before.Name != name) changes.Add("name");
+                if (before.Role != role) changes.Add("role");
+                if (before.Phone != phone) changes.Add("phone");
+                if (changes.Count == 0) { r.Action = "same"; continue; }
+                r.Action = "update";
+                r.Notes.Add($"Change: {string.Join(", ", changes)}.");
+                r.Apply = async () =>
+                {
+                    await x.C.ExecuteAsync("UPDATE contracts.SupplierContact SET Name = @name, Role = @role, Phone = @phone, UpdatedUtc = SYSUTCDATETIME() WHERE Id = @id", args, x.Tx);
+                    await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "supplier.contact-changed", "Supplier", supplier.Id,
+                        $"{x.Me.Name} changed {supplier.Name}'s contact {name}: {string.Join(", ", changes)}{Via}.", args);
+                };
+            }
+            return plan;
+        });
+
     // ---------------------------------------------------------------- Contracts
 
     private static readonly Dictionary<string, string> FieldLabels = new()
     {
         ["title"] = "Title", ["description"] = "Description", ["supplierId"] = "Supplier", ["categoryId"] = "Category", ["agreementTypeId"] = "Agreement type",
-        ["businessUnitId"] = "Business unit", ["siteId"] = "Site", ["ownerId"] = "Owner", ["backupOwnerId"] = "Backup owner", ["currencyCode"] = "Currency",
+        ["businessUnitId"] = "Business unit", ["siteId"] = "Site", ["entityId"] = "Entity", ["functionId"] = "Function", ["ownerId"] = "Owner", ["backupOwnerId"] = "Backup owner", ["currencyCode"] = "Currency",
         ["value"] = "Value", ["sapOutlineAgreement"] = "SAP outline agreement number", ["endDate"] = "End date", ["noticePeriodDays"] = "Notice period (days)",
+        ["autoRenews"] = "Renews automatically", ["renewalTermMonths"] = "Renewal term (months)",
     };
 
     /// <summary>The contract sheet's own headings (added fields whose label matches one get their key added, so no two columns share a heading).</summary>
@@ -462,14 +564,17 @@ public static class ExcelEndpoints
     private static Kind Contracts() => new(
         "contracts", "contracts", "Contracts",
         [
-            new("Reference", "Leave blank for a new contract (a JBSAUS reference is given). Fill in to update that contract; only drafts can be updated.", 16),
+            new("Reference", "Leave blank for a new contract (it's given the next JBSAUS number). Fill in to update that contract; only drafts can be updated.", 16),
             new("Title", "Required for a new contract.", 34), new("Supplier", "The supplier's name. A new name adds the supplier.", 28),
             new("Category", "A category, or Category > Subcategory.", 26), new("Agreement type", null, 20),
             new("Owner", "Windows logon or name of an active contract owner. Blank for a new contract: you.", 20), new("Backup owner", null, 20),
             new("Confidential", "Yes or No", 13), new("Business unit", null, 18), new("Site", null, 16),
+            new("Entity", "The JBS company that signs it", 24), new("Function", null, 18),
             new("Value", "Numbers only", 16), new("Currency", "Three letters, for example AUD", 10), new("SAP outline agreement number", null, 22),
             new("Start date", "Day/month/year", 13), new("Effective date", "Day/month/year", 13), new("End date", "Day/month/year. Blank for evergreen.", 13),
-            new("Evergreen", "Yes or No", 11), new("Notice period (days)", "Whole number", 14), new("Review date", "Day/month/year", 13),
+            new("Evergreen", "Yes or No", 11),
+            new("Renews automatically", "Yes or No. Yes moves the end date on by the renewal term unless someone decides to let it end.", 14),
+            new("Renewal term (months)", "Whole number, needed when it renews automatically", 14), new("Notice period (days)", "Whole number", 14), new("Review date", "Day/month/year", 13),
             new("Needs Legal review", "Yes or No (Yes if blank for a new contract)", 15), new("Description", null, 40),
         ],
         [], ["Stage", "Notice deadline"],
@@ -485,8 +590,8 @@ public static class ExcelEndpoints
             return rows.Select(r => new object?[]
             {
                 r.Reference, r.Title, r.SupplierName, r.CategoryDisplay, r.AgreementTypeName, people[r.OwnerId].WindowsAccount,
-                r.BackupOwnerId is { } b ? people[b].WindowsAccount : null, r.IsConfidential, r.BusinessUnitName, r.SiteName, r.Value, r.CurrencyCode,
-                r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.NoticePeriodDays, D(r.ReviewDate), r.NeedsLegalReview,
+                r.BackupOwnerId is { } b ? people[b].WindowsAccount : null, r.IsConfidential, r.BusinessUnitName, r.SiteName, r.EntityName, r.FunctionName,
+                r.Value, r.CurrencyCode, r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, D(r.ReviewDate), r.NeedsLegalReview,
                 r.Description,
             }
             .Concat(added.Select(a => a is not null && values[r.Id].TryGetValue(a.Field.Key, out var v) ? Fields.ExcelValue(a.Field, v, id => people.GetValueOrDefault(id)?.WindowsAccount) : null))
@@ -581,6 +686,8 @@ public static class ExcelEndpoints
                 var agreementTypeId = FindItem("AgreementType", Clean(row.Text("Agreement type")), "Agreement type", problems) ?? before?.AgreementTypeId;
                 var businessUnitId = FindItem("BusinessUnit", Clean(row.Text("Business unit")), "Business unit", problems) ?? before?.BusinessUnitId;
                 var siteId = FindItem("Site", Clean(row.Text("Site")), "Site", problems) ?? before?.SiteId;
+                var entityId = FindItem("Entity", Clean(row.Text("Entity")), "Entity", problems) ?? before?.EntityId;
+                var functionId = FindItem("Function", Clean(row.Text("Function")), "Function", problems) ?? before?.FunctionId;
                 var ownerId = Clean(row.Text("Owner")) is { } o ? FindOwner(o, problems, "Owner") : before?.OwnerId ?? x.Me.Id;
                 var backupId = Clean(row.Text("Backup owner")) is { } bo ? FindOwner(bo, problems, "Backup owner") : before?.BackupOwnerId;
                 string? p;
@@ -594,6 +701,9 @@ public static class ExcelEndpoints
                 var end = row.Date("End date", out p) ?? DO(before?.EndDate); if (p is not null) problems.Add(p);
                 var evergreen = row.YesNo("Evergreen", out p) ?? before?.IsEvergreen ?? false; if (p is not null) problems.Add(p);
                 if (evergreen && row.Date("End date", out _) is null) end = null; // ticking Evergreen clears an old end date
+                var said = row.YesNo("Renews automatically", out p); if (p is not null) problems.Add(p);
+                var autoRenews = said ?? (!evergreen && (before?.AutoRenews ?? false)); // Evergreen without a Yes here stops it renewing
+                var term = row.WholeNumber("Renewal term (months)", out p) ?? before?.RenewalTermMonths; if (p is not null) problems.Add(p);
                 var notice = row.WholeNumber("Notice period (days)", out p) ?? before?.NoticePeriodDays; if (p is not null) problems.Add(p);
                 var review = row.Date("Review date", out p) ?? DO(before?.ReviewDate); if (p is not null) problems.Add(p);
                 var legal = row.YesNo("Needs Legal review", out p) ?? before?.NeedsLegalReview ?? true; if (p is not null) problems.Add(p);
@@ -609,7 +719,7 @@ public static class ExcelEndpoints
                 if (problems.Count > 0) { r.Refuse(string.Join(" ", problems)); continue; }
 
                 var body = new SaveContract(title, description, supplierId, categoryId, agreementTypeId, businessUnitId, siteId, ownerId, backupId, confidential,
-                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues);
+                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityId, functionId, autoRenews, term);
                 var errors = await ContractEndpoints.CheckAsync(x.C, x.Tx, body, before);
                 var (parsed, fieldErrors) = await Fields.ParseAsync(x.C, x.Tx, fieldValues, definitions);
                 var labels = added.ToDictionary(a => $"field.{a.Field.Key}", a => a.Header);

@@ -116,7 +116,7 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
                     if (last is null || DateOnly.FromDateTime(last.Value) < today)
                     {
                         var result = await RunAsync(today, stoppingToken);
-                        logger.LogInformation("Daily reminders for {Today}: {Sent} reminders, {Ended} contracts ended.", today, result.Reminders, result.Ended);
+                        logger.LogInformation("Daily reminders for {Today}: {Sent} reminders, {Ended} contracts ended, {Renewed} renewed automatically.", today, result.Reminders, result.Ended, result.Renewed);
                         // A copy of the audit trail's latest link, kept outside the database (D-93): rewriting history and its hashes
                         // afterwards no longer matches these log lines.
                         var tip = await c.QuerySingleOrDefaultAsync<(long Id, string Hash)>("SELECT TOP (1) Id, Hash FROM contracts.AuditEvent ORDER BY Id DESC");
@@ -133,7 +133,7 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
         }
     }
 
-    public sealed record Result(int Reminders, int Ended);
+    public sealed record Result(int Reminders, int Ended, int Renewed = 0);
 
     private sealed class Row
     {
@@ -188,6 +188,33 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
                 $"{e.Reference} ended on {endedOn.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}, as decided (Let it end).", new { endedOn = DateOnly.FromDateTime(endedOn) }, contractId: e.Id);
         }
 
+        // 1b. Renews automatically (D-102): once the end date has passed and no one decided to let it end, the end date moves on by the
+        // renewal term (as many terms as it takes to pass today), and the renewal decision is cleared for the new term, so its reminders
+        // start again from the new date.
+        var rolling = (await c.QueryAsync<(int Id, string Reference, DateTime EndDate, int Term, string? Decision)>("""
+            SELECT Id, Reference, EndDate, RenewalTermMonths, RenewalDecision FROM contracts.Contract
+            WHERE Stage = N'Effective' AND AutoRenews = 1 AND IsEvergreen = 0 AND RenewalTermMonths IS NOT NULL AND EndDate < @today
+              AND (RenewalDecision IS NULL OR RenewalDecision <> N'LetItEnd')
+            """, new { today = todayDate }, tx)).ToList();
+        foreach (var k in rolling)
+        {
+            var was = DateOnly.FromDateTime(k.EndDate);
+            var terms = 0;
+            var end = was;
+            while (end < today) end = was.AddMonths(k.Term * ++terms); // from the original date, so 31 Jan stays the month's end
+            var p = new DynamicParameters(new { id = k.Id });
+            p.Add("end", end.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
+            await c.ExecuteAsync("""
+                UPDATE contracts.Contract SET EndDate = @end, RenewalDecision = NULL, RenewalDecisionNote = NULL, RenewalDecisionUtc = NULL, RenewalDecisionById = NULL,
+                    UpdatedUtc = SYSUTCDATETIME()
+                WHERE Id = @id
+                """, p, tx);
+            var cleared = k.Decision is { } d ? $" The renewal decision ({RenewalEndpoints.DecisionNames[d]}) was cleared for the new term." : "";
+            await audit.WriteAsync(c, tx, job, "contract.auto-renewed", "Contract", k.Id,
+                $"{k.Reference} renewed automatically for {ContractEndpoints.Months(k.Term * terms)}: its end date moved from {Day(was)} to {Day(end)}.{cleared}",
+                new { endDate = new { before = was, after = end }, months = k.Term * terms, clearedDecision = k.Decision }, contractId: k.Id);
+        }
+
         // 2. Reminders. A reminder an admin switched off has no steps, so nothing is sent for it (D-99).
         var offsets = (await c.QueryAsync<(string Kind, string Days, bool IsOn)>("SELECT Kind, Days, IsOn FROM contracts.ReminderSetting", transaction: tx))
             .ToDictionary(o => o.Kind, o => o.IsOn ? o.Days.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).OrderBy(d => d).ToArray() : []);
@@ -232,7 +259,7 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
             WHEN NOT MATCHED THEN INSERT (Name, LastRunDate, LastRunUtc) VALUES (@JobName, @today, SYSUTCDATETIME());
             """, new { JobName, today = todayDate }, tx);
         await tx.CommitAsync(ct);
-        return new Result(sent, ending.Count);
+        return new Result(sent, ending.Count, rolling.Count);
     }
 
     private async Task<int> SupplierRemindersAsync(SqlConnection c, SqlTransaction tx, DateOnly today, Dictionary<string, int[]> offsets, Dictionary<string, Wording> wording,

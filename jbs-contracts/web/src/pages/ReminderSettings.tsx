@@ -54,7 +54,7 @@ type Data = {
 const sample: Record<string, string> = {
   "First name": "Chris",
   "Contract title": "Linehaul freight Brisbane to Sydney",
-  Reference: "JBSAUS-0142",
+  Reference: "JBSAUS0000412",
   Supplier: "Southern Cross Freight",
   Owner: "Chris Taylor",
   "Due date": "Mon 12 Jan 2027",

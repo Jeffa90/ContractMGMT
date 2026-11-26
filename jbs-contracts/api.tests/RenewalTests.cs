@@ -242,7 +242,7 @@ public sealed class RenewalTests(AppFixture app)
             await using var db = await app.OpenAsync();
             Assert.Equal(45, await db.ExecuteScalarAsync<int>("SELECT DaysBefore FROM contracts.Reminder WHERE ContractId = @id AND Kind = 'Review'", new { id }));
             var email = await db.QuerySingleAsync<(string Subject, string BodyHtml)>("SELECT Subject, BodyHtml FROM contracts.EmailOutbox WHERE ContractId = @id AND Kind = 'reminder-review' AND PersonId = @ownerId", new { id, ownerId });
-            Assert.StartsWith("Review JBSAUS-", email.Subject);
+            Assert.StartsWith("Review JBSAUS", email.Subject);
             Assert.Contains("&lt;b&gt;", email.BodyHtml);
             Assert.DoesNotContain("<b>", email.BodyHtml);
 
@@ -281,7 +281,7 @@ public sealed class RenewalTests(AppFixture app)
             var id = await EffectiveAsync(owner, approver, new { title = "Wording test", endDate = D(400) });
             await using var db = await app.OpenAsync();
             var email = await db.QuerySingleAsync<(string Subject, string BodyText)>("SELECT Subject, BodyText FROM contracts.EmailOutbox WHERE ContractId = @id AND Kind = 'approved' AND PersonId = @ownerId", new { id, ownerId });
-            Assert.StartsWith("Good news: JBSAUS-", email.Subject);
+            Assert.StartsWith("Good news: JBSAUS", email.Subject);
             Assert.StartsWith($"G'day Nina,\n\n{approverName} approved Wording test.", email.BodyText);
         }
         finally

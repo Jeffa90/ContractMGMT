@@ -31,7 +31,7 @@ export function ContractFilters({
   const lists = useQuery({
     queryKey: ['lists'],
     queryFn: () => api.get<Lists>('/api/lists'),
-    enabled: needs(['category', 'agreementType', 'businessUnit', 'site', 'owner', 'backupOwner']),
+    enabled: needs(['category', 'agreementType', 'businessUnit', 'site', 'entity', 'function', 'owner', 'backupOwner']),
   })
   const suppliers = useQuery({ queryKey: ['suppliers'], queryFn: () => api.get<Supplier[]>('/api/suppliers'), enabled: needs(['supplier'], ['Supplier']) })
   const people = useQuery({
@@ -59,10 +59,13 @@ export function ContractFilters({
       agreementType: items('AgreementType'),
       businessUnit: items('BusinessUnit'),
       site: items('Site'),
+      entity: items('Entity'),
+      function: items('Function'),
       owner: owners,
       backupOwner: owners,
       confidential: yesNo,
       evergreen: yesNo,
+      autoRenews: yesNo,
       needsLegalReview: yesNo,
     }
     return (f: LayoutField): Option[] => {

@@ -411,7 +411,7 @@ public static partial class Fields
     // ---------------------------------------------------------------- Filters on the Contracts list
 
     /// <summary>Built-in fields that can be picked from to filter the list. Text, numbers and dates are found with the search box instead.</summary>
-    private static readonly HashSet<string> FilterableBuiltIns = ["supplier", "category", "agreementType", "owner", "backupOwner", "businessUnit", "site", "confidential", "evergreen", "needsLegalReview"];
+    private static readonly HashSet<string> FilterableBuiltIns = ["supplier", "category", "agreementType", "owner", "backupOwner", "businessUnit", "site", "entity", "function", "confidential", "evergreen", "autoRenews", "needsLegalReview"];
 
     public static bool CanFilter(FieldRow f) => f.IsBuiltIn ? FilterableBuiltIns.Contains(f.Key) : f.Kind is "Choice" or "MultiChoice" or "YesNo" or "Person" or "Supplier";
 
@@ -436,7 +436,7 @@ public static partial class Fields
                 string? column = f.Key switch
                 {
                     "supplier" => "k.SupplierId", "agreementType" => "k.AgreementTypeId", "owner" => "k.OwnerId", "backupOwner" => "k.BackupOwnerId",
-                    "businessUnit" => "k.BusinessUnitId", "site" => "k.SiteId", _ => null,
+                    "businessUnit" => "k.BusinessUnitId", "site" => "k.SiteId", "entity" => "k.EntityId", "function" => "k.FunctionId", _ => null,
                 };
                 if (column is not null && id is not null) { sql.Add($"{column} = @{name}"); p.Add(name, id); }
                 else if (f.Key == "category" && id is not null)
@@ -445,9 +445,9 @@ public static partial class Fields
                     sql.Add($"(k.CategoryId = @{name} OR k.CategoryId IN (SELECT Id FROM contracts.Category WHERE ParentId = @{name}))");
                     p.Add(name, id);
                 }
-                else if (yes is not null && f.Key is "confidential" or "evergreen" or "needsLegalReview")
+                else if (yes is not null && f.Key is "confidential" or "evergreen" or "autoRenews" or "needsLegalReview")
                 {
-                    var bit = f.Key switch { "confidential" => "k.IsConfidential", "evergreen" => "k.IsEvergreen", _ => "k.NeedsLegalReview" };
+                    var bit = f.Key switch { "confidential" => "k.IsConfidential", "evergreen" => "k.IsEvergreen", "autoRenews" => "k.AutoRenews", _ => "k.NeedsLegalReview" };
                     sql.Add($"{bit} = @{name}");
                     p.Add(name, yes.Value);
                 }

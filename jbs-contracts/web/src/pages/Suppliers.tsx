@@ -59,7 +59,10 @@ export function SuppliersPage() {
           ]}
         />
       </div>
-        <ExcelButtons kind="suppliers" canImport={canChange} invalidate={[['suppliers']]} />
+        <div className="flex flex-wrap gap-1">
+          <ExcelButtons kind="suppliers" canImport={canChange} invalidate={[['suppliers']]} />
+          <ExcelButtons kind="contacts" noun="contacts" canImport={person.roles.procurement || person.roles.admin} invalidate={[['suppliers']]} />
+        </div>
       </div>
 
       {suppliers.isPending ? (

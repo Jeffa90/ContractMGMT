@@ -20,7 +20,7 @@ public static class LegacyImportEndpoints
 
     private static readonly Target[] BuiltIn =
     [
-        new("legacyReference", "Old reference", "Needed", true, "The contract's number in the old system. Used to match its files, and so a second run skips it.",
+        new("legacyReference", "Old reference", "Needed", true, "The contract's number in the old system. It keeps this number in JBS Contracts. Also used to match its files, and so a second run skips it.",
             ["old reference", "agreement number", "agreement no", "agreement id", "contract number", "contract no", "contract id", "reference", "ref", "id", "medius id"]),
         new("title", "Title", "Needed", true, null, ["title", "contract title", "contract name", "agreement name", "name", "subject"]),
         new("supplier", "Supplier", "Needed", true, "A name that isn't in JBS Contracts yet adds the supplier.", ["supplier", "supplier name", "vendor", "vendor name", "counterparty", "party"]),
@@ -29,8 +29,13 @@ public static class LegacyImportEndpoints
         new("effectiveDate", "Effective date", "Dates", false, "Blank uses the start date, then the registered date.", ["effective date", "effective from"]),
         new("startDate", "Start date", "Dates", false, null, ["start date", "start", "commencement date", "commencement", "valid from"]),
         new("endDate", "End date", "Dates", false, "Blank needs Evergreen to be Yes.", ["end date", "end", "expiry date", "expiry", "expires", "valid to", "termination date"]),
-        new("evergreen", "Evergreen", "Dates", false, "Yes or No: it carries on until someone ends it.", ["evergreen", "auto renew", "auto renewal", "rolling", "perpetual"]),
-        new("noticePeriodDays", "Notice period (days)", "Dates", false, "Without it there are no notice-deadline reminders.", ["notice period", "notice period days", "notice days", "notice"]),
+        new("evergreen", "Evergreen", "Dates", false, "Yes or No: it carries on until someone ends it, with no end date.", ["evergreen", "perpetual", "no end date"]),
+        new("autoRenews", "Renews automatically", "Dates", false, "Yes or No (or Automatic, Manual): yes moves the end date on by the renewal term unless someone decides to let it end.",
+            ["renews automatically", "auto renew", "auto renews", "auto renewal", "automatic renewal", "extension type", "renewal type", "rolling"]),
+        new("renewalTermMonths", "Renewal term (months)", "Dates", false, "How long each automatic renewal lasts: 12, 12 months or 1 year.",
+            ["renewal term", "renewal term months", "renewal period", "extension period", "extension term", "extension length", "renewal length"]),
+        new("noticePeriodDays", "Notice period", "Dates", false, "Days, or for example 3 months (counted back from the end date). Without it there are no notice-deadline reminders.",
+            ["notice period", "notice period days", "notice period months", "notice days", "notice"]),
         new("reviewDate", "Review date", "Dates", false, null, ["review date", "next review"]),
         new("registeredDate", "Registered date", "Dates", false, "When it was approved or registered. Blank uses the effective date.", ["registered date", "registered", "approved date", "approval date", "signed date", "date signed"]),
         new("status", "Status", "Other", false, "Active, current or live loads it as Effective; expired, ended, terminated or cancelled as Ended. Blank: worked out from the end date.",
@@ -38,6 +43,8 @@ public static class LegacyImportEndpoints
         new("agreementType", "Agreement type", "Other", false, null, ["agreement type", "contract type", "type"]),
         new("businessUnit", "Business unit", "Other", false, null, ["business unit", "bu", "division"]),
         new("site", "Site", "Other", false, null, ["site", "location", "plant"]),
+        new("entity", "Entity", "Other", false, "The JBS company that signs it.", ["entity", "entity name", "legal entity", "jbs entity", "contracting entity", "company"]),
+        new("function", "Function", "Other", false, null, ["function", "business function", "department"]),
         new("backupOwner", "Backup owner", "Other", false, null, ["backup owner", "backup", "deputy"]),
         new("value", "Value", "Other", false, null, ["value", "contract value", "total value", "amount", "estimated value"]),
         new("currency", "Currency", "Other", false, "Three letters, for example AUD. Blank is AUD.", ["currency", "currency code"]),
@@ -62,6 +69,36 @@ public static class LegacyImportEndpoints
         var isEnded = words.Any(EndedWords.Contains);
         var isCurrent = words.Any(CurrentWords.Contains) || text.Contains("in force");
         return isEnded == isCurrent ? null : isEnded;
+    }
+
+    /// <summary>"90", "90 days", "3 months", "1 year", "6 wks": the number and its unit (day, week, month or year; a bare number is days).</summary>
+    internal static (int? Number, string Unit) Period(string text)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(text.Trim().ToLowerInvariant(), @"^(\d{1,4})(?:\.0+)?\s*([a-z]*)\.?$");
+        if (!m.Success) return (null, "");
+        var unit = m.Groups[2].Value switch
+        {
+            "" or "d" or "day" or "days" => "day",
+            "w" or "wk" or "wks" or "week" or "weeks" => "week",
+            "m" or "mo" or "mth" or "mths" or "month" or "months" => "month",
+            "y" or "yr" or "yrs" or "year" or "years" => "year",
+            _ => null,
+        };
+        return unit is null ? (null, "") : (int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture), unit);
+    }
+
+    /// <summary>
+    /// Whether an old system's renewal setting means it renews by itself: Yes, Automatic, Auto renewal (true); No, Manual, None, Fixed term,
+    /// or any negative (false); anything else is left for a person (null).
+    /// </summary>
+    internal static bool? RenewsSays(string text)
+    {
+        var words = System.Text.RegularExpressions.Regex.Split(text.ToLowerInvariant(), "[^a-z0-9]+").Where(w => w.Length > 0).ToList();
+        if (words.Count == 0) return null;
+        if (words.Count == 1 && words[0] is "yes" or "y" or "true" or "1" or "x") return true;
+        if (words.Any(w => w is "no" or "n" or "not" or "non" or "never" or "false" or "0" or "none" or "manual" or "manually" or "fixed")) return false;
+        if (words.Any(w => w.StartsWith("auto", StringComparison.Ordinal) || w is "rolling" or "rollover")) return true;
+        return null;
     }
 
     private static async Task<List<Target>> TargetsAsync(SqlConnection c, SqlTransaction? tx) =>
@@ -107,6 +144,8 @@ public static class LegacyImportEndpoints
         internal DateOnly EffectiveOn { get; set; }
         internal DateOnly RegisteredOn { get; set; }
         internal DateOnly? EndedOn { get; set; }
+        /// <summary>Its number in JBS Contracts: the old reference (D-102), or null for the next JBSAUS number.</summary>
+        internal string? Reference { get; set; }
     }
 
     private sealed record Options(Dictionary<string, string> Mapping, int? DefaultOwnerId, int? DefaultCategoryId);
@@ -147,6 +186,7 @@ public static class LegacyImportEndpoints
         var already = (await c.QueryAsync<(string LegacyReference, string Reference)>("SELECT LegacyReference, Reference FROM contracts.Contract WHERE LegacyReference IS NOT NULL", transaction: tx))
             .ToDictionary(x => K(x.LegacyReference), x => x.Reference);
         var definitions = await Fields.LoadAsync(c, tx);
+        var references = (await c.QueryAsync<string>("SELECT Reference FROM contracts.Contract", transaction: tx)).Select(K).ToHashSet();
         var supplierIds = new Dictionary<string, int>(suppliers);
         var newSuppliers = new Dictionary<string, string>();
         var seen = new HashSet<string>();
@@ -224,6 +264,8 @@ public static class LegacyImportEndpoints
             var agreementTypeId = Item("AgreementType", Text(row, "agreementType"), "Agreement type", problems);
             var businessUnitId = Item("BusinessUnit", Text(row, "businessUnit"), "Business unit", problems);
             var siteId = Item("Site", Text(row, "site"), "Site", problems);
+            var entityId = Item("Entity", Text(row, "entity"), "Entity", problems);
+            var functionId = Item("Function", Text(row, "function"), "Function", problems);
 
             string? p = null;
             DateOnly? Date(string key) { if (!source.TryGetValue(key, out var col)) return null; var d = row.Date(col, out var pr); if (pr is not null) problems.Add(pr); return d; }
@@ -237,14 +279,42 @@ public static class LegacyImportEndpoints
             var confidential = YesNo("confidential") ?? false;
             decimal? value = null;
             if (source.TryGetValue("value", out var vcol)) { value = row.Money(vcol, out p); if (p is not null) problems.Add(p); }
+            if (evergreen) end = null;
             int? notice = null;
-            if (source.TryGetValue("noticePeriodDays", out var ncol)) { notice = row.WholeNumber(ncol, out p); if (p is not null) problems.Add(p); }
+            if (Text(row, "noticePeriodDays") is { } noticeText)
+            {
+                var (n, unit) = Period(noticeText);
+                if (n is not { } count || count > 3650) problems.Add($"Notice period: \"{noticeText}\" isn't a number of days, weeks, months or years.");
+                else if (unit is "month" or "year")
+                {
+                    // Months back from the end date, so 3 months before 30 June is 31 March.
+                    var months = unit == "year" ? count * 12 : count;
+                    notice = end is { } anchor ? anchor.DayNumber - anchor.AddMonths(-months).DayNumber : months * 30;
+                    if (end is null) r.Notes.Add($"Notice period {noticeText} is counted as {notice} days (there's no end date to count back from).");
+                }
+                else notice = unit == "week" ? count * 7 : count;
+            }
+            var autoRenews = false;
+            if (Text(row, "autoRenews") is { } renewsText)
+            {
+                if (RenewsSays(renewsText) is { } says) autoRenews = says;
+                else problems.Add($"Renews automatically: \"{renewsText}\" isn't clearly yes or no. Change it to, for example, Yes or No.");
+            }
+            int? term = null;
+            if (Text(row, "renewalTermMonths") is { } termText)
+            {
+                var (n, unit) = Period(termText);
+                if (n is not { } count || unit is "day" or "week") problems.Add($"Renewal term: \"{termText}\" isn't a number of months or years.");
+                else term = unit == "year" ? count * 12 : count;
+            }
+            if (autoRenews && evergreen) problems.Add("Renews automatically: it's also Evergreen. An evergreen contract has no end date to renew; change one of them.");
+            if (autoRenews && term is null) problems.Add("Renewal term: blank, but it renews automatically. Fill in how many months each renewal lasts.");
+            if (!autoRenews) term = null;
             var currency = Text(row, "currency")?.ToUpperInvariant() ?? "AUD";
 
             var effectiveOn = effective ?? start ?? registered;
             if (effectiveOn is null) problems.Add("Effective date: blank, and there's no start or registered date.");
             if (end is null && !evergreen) problems.Add("End date: blank. Fill it in, or set Evergreen to Yes.");
-            if (evergreen) end = null;
 
             // Current or ended: the status column if there is one, otherwise the end date.
             var status = Text(row, "status");
@@ -268,7 +338,8 @@ public static class LegacyImportEndpoints
             if (problems.Count > 0) { r.Outcome = "Refused"; r.Problems.AddRange(problems); continue; }
 
             r.Body = new SaveContract(title, Text(row, "description"), supplierId, categoryId, agreementTypeId, businessUnitId, siteId, ownerId, backupId, confidential,
-                value, currency, Text(row, "sapOutlineAgreement"), start, effectiveOn, end, evergreen, notice, review, false, null, fieldValues);
+                value, currency, Text(row, "sapOutlineAgreement"), start, effectiveOn, end, evergreen, notice, review, false, null, fieldValues,
+                entityId, functionId, autoRenews, term);
             var errors = r.Body.SupplierId is null
                 ? await ContractEndpoints.CheckAsync(c, tx!, r.Body with { SupplierId = suppliers.Values.FirstOrDefault() }, null) // a new supplier is added on import
                 : await ContractEndpoints.CheckAsync(c, tx!, r.Body, null);
@@ -277,6 +348,10 @@ public static class LegacyImportEndpoints
             if (all.Count > 0) { r.Outcome = "Refused"; r.Problems.AddRange(all.Select(x => $"{Label(targets, x.Key)}: {x.Value}")); continue; }
 
             r.Outcome = ended ? "Ended" : "Effective";
+            // It keeps its old number (D-102), unless that's too long or another contract already has it.
+            if (legacy.Length <= 30 && references.Add(K(legacy))) r.Reference = legacy;
+            else r.Notes.Add(legacy.Length > 30 ? "Its old reference is too long to keep as its number, so it gets the next JBSAUS number."
+                : $"{legacy} is already another contract's number, so it gets the next JBSAUS number.");
             r.EffectiveOn = effectiveOn!.Value;
             r.RegisteredOn = registered ?? effectiveOn.Value;
             // It ended on its end date, unless that's still to come (for example terminated early): then it ended by today.
@@ -293,7 +368,8 @@ public static class LegacyImportEndpoints
         var key = errorKey switch
         {
             "supplierId" => "supplier", "categoryId" => "category", "ownerId" => "owner", "backupOwnerId" => "backupOwner", "agreementTypeId" => "agreementType",
-            "businessUnitId" => "businessUnit", "siteId" => "site", "currencyCode" => "currency", "isEvergreen" => "evergreen", _ => errorKey,
+            "businessUnitId" => "businessUnit", "siteId" => "site", "entityId" => "entity", "functionId" => "function", "currencyCode" => "currency",
+            "isEvergreen" => "evergreen", _ => errorKey,
         };
         return targets.FirstOrDefault(t => t.Key == key || t.Key == $"field.{key}")?.Label ?? errorKey;
     }
@@ -394,7 +470,7 @@ public static class LegacyImportEndpoints
             foreach (var r in ready)
             {
                 var body = r.NewSupplier is { } ns ? r.Body! with { SupplierId = supplierIds[ns.Trim().ToUpperInvariant()] } : r.Body!;
-                var (id, reference, errors) = await ContractEndpoints.CreateDraftAsync(c, tx, audit, me, body, $"{via.TrimEnd(')')}, row {r.Row})");
+                var (id, reference, errors) = await ContractEndpoints.CreateDraftAsync(c, tx, audit, me, body, $"{via.TrimEnd(')')}, row {r.Row})", r.Reference);
                 if (errors is not null) throw new InvalidOperationException($"Row {r.Row} failed on import after passing the dry run: {string.Join("; ", errors.Values)}");
                 var registeredUtc = TimeZoneInfo.ConvertTimeToUtc(r.RegisteredOn.ToDateTime(new TimeOnly(12, 0)), brisbane); // midday Brisbane: the same date in UTC
                 var p = new DynamicParameters(new { id, stage = r.Outcome, legacy = r.LegacyReference, file = fileName.Length > 260 ? fileName[..260] : fileName, me = me.Id, registeredUtc,
@@ -408,11 +484,12 @@ public static class LegacyImportEndpoints
                     WHERE Id = @id
                     """, p, tx);
                 await audit.WriteAsync(c, tx, me.AsActor(), "contract.imported", "Contract", id,
-                    $"{me.Name} imported {reference} (old reference {r.LegacyReference}) from {fileName}, row {r.Row}, as {(r.Outcome == "Ended" ? $"Ended on {r.EndedOn:d MMM yyyy}" : "Effective")}; " +
+                    $"{me.Name} imported {reference}{(reference == r.LegacyReference ? "" : $" (old reference {r.LegacyReference})")} from {fileName}, row {r.Row}, as {(r.Outcome == "Ended" ? $"Ended on {r.EndedOn:d MMM yyyy}" : "Effective")}; " +
                     $"effective {r.EffectiveOn:d MMM yyyy}, registered {r.RegisteredOn:d MMM yyyy}.",
                     new { legacyReference = r.LegacyReference, fileName, row = r.Row, stage = r.Outcome, effectiveOn = r.EffectiveOn, registeredOn = r.RegisteredOn, endedOn = r.EndedOn }, contractId: id);
                 created.Add(reference);
             }
+            await ContractNumbers.CatchUpAsync(c, tx); // new contracts carry on after the highest number
             await audit.WriteAsync(c, tx, me.AsActor(), "import.contracts", "Import", null,
                 $"{me.Name} imported {created.Count:N0} old contracts from {fileName} ({plan.Count(x => x.Outcome == "Effective"):N0} Effective, {plan.Count(x => x.Outcome == "Ended"):N0} Ended; " +
                 $"{plan.Count(x => x.Outcome == "Already"):N0} already there, {plan.Count(x => x.Outcome == "Refused"):N0} not imported; {newSuppliers.Count:N0} new suppliers).");

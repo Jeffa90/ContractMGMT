@@ -27,6 +27,8 @@ type FormState = {
   isConfidential: boolean
   businessUnitId: string
   siteId: string
+  entityId: string
+  functionId: string
   value: string
   currencyCode: string
   sapOutlineAgreement: string
@@ -34,6 +36,8 @@ type FormState = {
   effectiveDate: string
   endDate: string
   isEvergreen: boolean
+  autoRenews: boolean
+  renewalTermMonths: string
   noticePeriodDays: string
   reviewDate: string
   needsLegalReview: boolean
@@ -105,6 +109,8 @@ export function ContractForm({
     isConfidential: c?.isConfidential ?? false,
     businessUnitId: toText(c?.businessUnitId),
     siteId: toText(c?.siteId),
+    entityId: toText(c?.entityId),
+    functionId: toText(c?.functionId),
     value: toText(c?.value),
     currencyCode: c?.currencyCode ?? 'AUD',
     sapOutlineAgreement: c?.sapOutlineAgreement ?? '',
@@ -112,6 +118,8 @@ export function ContractForm({
     effectiveDate: c?.effectiveDate ?? '',
     endDate: c?.endDate ?? '',
     isEvergreen: c?.isEvergreen ?? false,
+    autoRenews: c?.autoRenews ?? false,
+    renewalTermMonths: toText(c?.renewalTermMonths),
     noticePeriodDays: toText(c?.noticePeriodDays),
     reviewDate: c?.reviewDate ?? '',
     needsLegalReview: c?.needsLegalReview ?? true,
@@ -154,6 +162,8 @@ export function ContractForm({
         isConfidential: form.isConfidential,
         businessUnitId: toId(form.businessUnitId),
         siteId: toId(form.siteId),
+        entityId: toId(form.entityId),
+        functionId: toId(form.functionId),
         value: form.value.trim() === '' ? null : Number(form.value.replace(/[$,\s]/g, '')),
         currencyCode: form.currencyCode,
         sapOutlineAgreement: form.sapOutlineAgreement || null,
@@ -161,6 +171,8 @@ export function ContractForm({
         effectiveDate: form.effectiveDate || null,
         endDate: form.isEvergreen ? null : form.endDate || null,
         isEvergreen: form.isEvergreen,
+        autoRenews: !form.isEvergreen && form.autoRenews,
+        renewalTermMonths: !form.isEvergreen && form.autoRenews && form.renewalTermMonths.trim() !== '' ? Number(form.renewalTermMonths) : null,
         noticePeriodDays: form.noticePeriodDays.trim() === '' ? null : Number(form.noticePeriodDays),
         reviewDate: form.reviewDate || null,
         needsLegalReview: form.needsLegalReview,
@@ -186,7 +198,7 @@ export function ContractForm({
     },
   })
 
-  const listSelect = (key: 'agreementTypeId' | 'businessUnitId' | 'siteId', listName: string, f: LayoutField, empty: string) => {
+  const listSelect = (key: 'agreementTypeId' | 'businessUnitId' | 'siteId' | 'entityId' | 'functionId', listName: string, f: LayoutField, empty: string) => {
     const items = options(listName, form[key])
     return (
       <Field label={f.label} required={f.isRequired} error={errors[key]} help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : (f.help ?? undefined)}>
@@ -261,6 +273,10 @@ export function ContractForm({
         return listSelect('businessUnitId', 'BusinessUnit', f, 'No business units yet.')
       case 'site':
         return listSelect('siteId', 'Site', f, 'No sites yet.')
+      case 'entity':
+        return listSelect('entityId', 'Entity', f, 'No entities yet.')
+      case 'function':
+        return listSelect('functionId', 'Function', f, 'No functions yet.')
       case 'description':
         return (
           <Field label={f.label} required={f.isRequired} error={errors.description} help={help}>
@@ -343,6 +359,32 @@ export function ContractForm({
         )
       case 'evergreen':
         return <Checkbox label={f.label} description={help} checked={form.isEvergreen} onChange={(v) => set('isEvergreen', v)} />
+      case 'autoRenews':
+        return (
+          <Checkbox
+            label={f.label}
+            description={form.isEvergreen ? 'Evergreen contracts have no end date to renew.' : help}
+            checked={!form.isEvergreen && form.autoRenews}
+            disabled={form.isEvergreen}
+            onChange={(v) => set('autoRenews', v)}
+          />
+        )
+      case 'renewalTermMonths':
+        // Only asked for when it renews automatically.
+        if (form.isEvergreen || !form.autoRenews) return null
+        return (
+          <Field label={f.label} required error={errors.renewalTermMonths} help={help}>
+            {(p) => (
+              <TextInput
+                {...p}
+                inputMode="numeric"
+                className="tabular sm:w-40"
+                value={form.renewalTermMonths}
+                onChange={(e) => set('renewalTermMonths', e.target.value.replace(/\D/g, '').slice(0, 3))}
+              />
+            )}
+          </Field>
+        )
       case 'noticePeriodDays':
         return (
           <Field label={f.label} required={f.isRequired} error={errors.noticePeriodDays} help={help}>

@@ -77,7 +77,7 @@
         "Choose the **Supplier** and **Category**. Supplier not there yet? Click **Add new supplier**.",
         "Add the value, dates and notice period if you know them. Only a title is needed for a draft; the rest is checked when you send it on.",
         "Leave **Needs Legal review** ticked unless Legal has agreed it doesn't need one.",
-        "Click **Save draft**. The contract gets its reference, for example JBSAUS-0016."
+        "Click **Save draft**. The contract gets its reference, for example JBSAUS0000416."
       ]
     },
     {
@@ -114,7 +114,7 @@
       "video": false,
       "steps": [
         "Go to **Contracts**. **My contracts** shows the ones you own or back up; **All** shows every contract you can see.",
-        "Type in the search box: a title, a reference such as JBSAUS-0012, a supplier or an SAP number.",
+        "Type in the search box: a title, a reference such as JBSAUS0000412, a supplier or an SAP number.",
         "Click **Filters** to narrow the list, for example to one site or supplier.",
         "The **Key date** is the notice deadline if there is one, otherwise the end date. It turns amber within 30 days and red once it has passed."
       ]

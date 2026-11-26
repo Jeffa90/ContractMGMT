@@ -9,7 +9,7 @@ import { Dialog } from './Dialog'
 import { DropZone } from './DropZone'
 import { Alert, Badge, Button, Segmented } from './ui'
 
-export type ExcelKind = 'people' | 'lists' | 'suppliers' | 'contracts'
+export type ExcelKind = 'people' | 'lists' | 'suppliers' | 'contacts' | 'contracts'
 
 type Planned = { row: number; label: string; action: 'add' | 'update' | 'same' | 'refused'; notes: string[] }
 type Result = {
@@ -23,6 +23,10 @@ const what: Record<ExcelKind, { plural: string; tip: string }> = {
   people: { plural: 'people', tip: 'Rows are matched by Windows logon. Type just the username; the domain is added for you.' },
   lists: { plural: 'list items', tip: 'One row per item: the list (Category, Agreement type, Business unit, Site or Currency), its name and, for subcategories, the parent category.' },
   suppliers: { plural: 'suppliers', tip: 'Rows are matched by supplier name.' },
+  contacts: {
+    plural: 'supplier contacts',
+    tip: 'One row per contact; several rows give a supplier several contacts. Rows are matched by supplier and email (or name, if there is no email), so importing again updates them. Contacts are removed on the supplier\'s page, not by import.',
+  },
   contracts: { plural: 'contracts', tip: 'Leave Reference blank to add a new draft. Fill it in to update that draft. Suppliers, categories, lists and owners are matched by name.' },
 }
 
@@ -47,16 +51,17 @@ const actionStyle = {
   refused: { tone: 'danger' as const, icon: XCircle, word: 'Not imported' },
 }
 
-export function ExcelButtons({ kind, canImport, invalidate }: { kind: ExcelKind; canImport: boolean; invalidate: string[][] }) {
+/** Export and Import buttons. With noun (for example "contacts"), they say Export contacts and Import contacts. */
+export function ExcelButtons({ kind, canImport, invalidate, noun }: { kind: ExcelKind; canImport: boolean; invalidate: string[][]; noun?: string }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="flex flex-wrap gap-1">
       <a href={`/api/excel/${kind}`} className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-4 font-medium hover:bg-muted">
-        <FileDown aria-hidden className="size-5" /> Export to Excel
+        <FileDown aria-hidden className="size-5" /> {noun ? `Export ${noun}` : 'Export to Excel'}
       </a>
       {canImport && (
         <Button variant="ghost" icon={<FileUp aria-hidden className="size-5" />} onClick={() => setOpen(true)}>
-          Import from Excel
+          {noun ? `Import ${noun}` : 'Import from Excel'}
         </Button>
       )}
       {open && <ImportDialog kind={kind} invalidate={invalidate} onClose={() => setOpen(false)} />}

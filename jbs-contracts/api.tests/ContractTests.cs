@@ -53,7 +53,7 @@ public sealed class ContractTests(AppFixture app)
         var id = await CreateAsync(owner, new { title = "Freight services 2026" });
         var detail = await GetAsync(owner, id);
         var contract = detail.GetProperty("contract");
-        Assert.Matches(@"^JBSAUS-\d{4,}$", contract.GetProperty("reference").GetString());
+        Assert.Matches(@"^JBSAUS\d{7}$", contract.GetProperty("reference").GetString());
         Assert.Equal("Draft", contract.GetProperty("stage").GetString());
         Assert.Equal(ownerId, contract.GetProperty("ownerId").GetInt32());
         Assert.True(contract.GetProperty("needsLegalReview").GetBoolean()); // on by default (D-08)

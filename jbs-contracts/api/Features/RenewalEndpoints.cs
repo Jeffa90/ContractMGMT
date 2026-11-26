@@ -236,17 +236,18 @@ public static class RenewalEndpoints
     private static async Task<int> StartRenewalAsync(Ctx x)
     {
         var c = x.Contract;
-        var number = await x.C.ExecuteScalarAsync<int>("UPDATE contracts.Counter SET NextValue = NextValue + 1 OUTPUT DELETED.NextValue WHERE Name = N'ContractNumber'", transaction: x.Tx);
-        var reference = $"JBSAUS-{number.ToString("0000", CultureInfo.InvariantCulture)}";
+        var reference = await ContractNumbers.NextAsync(x.C, x.Tx);
         var title = c.Title.Length > 190 ? c.Title[..190] : c.Title;
         var p = new DynamicParameters(new { reference, title = $"{title} (renewal)", id = c.Id, me = x.Me.Id });
         p.Add("start", c.EndDate is { } end && !c.IsEvergreen ? end.AddDays(1) : (DateTime?)null, System.Data.DbType.Date);
         var newId = await x.C.ExecuteScalarAsync<int>("""
-            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, NoticePeriodDays, NeedsLegalReview, RenewsContractId, CreatedById, UpdatedById, IsDemo)
+            INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, NeedsLegalReview, RenewsContractId,
+                CreatedById, UpdatedById, IsDemo)
             OUTPUT INSERTED.Id
-            SELECT @reference, @title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, NoticePeriodDays, 1, Id, @me, @me, IsDemo
+            SELECT @reference, @title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, 1, Id,
+                @me, @me, IsDemo
             FROM contracts.Contract WHERE Id = @id
             """, p, x.Tx);
         // Added fields come across too.

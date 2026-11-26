@@ -24,13 +24,13 @@ public sealed class CategoryRow
 public sealed record SaveListItem(string? ListName, string? Value, bool? IsActive);
 public sealed record SaveCategory(string? Name, int? ParentId, bool? IsActive);
 
-/// <summary>Lists an admin manages: categories (with subcategories), agreement types, business units, sites and currencies.</summary>
+/// <summary>Lists an admin manages: categories (with subcategories), agreement types, business units, sites, entities, functions, currencies and more.</summary>
 public static class ListsEndpoints
 {
     public static readonly Dictionary<string, string> ListLabels = new()
     {
         ["AgreementType"] = "agreement type", ["BusinessUnit"] = "business unit", ["Site"] = "site", ["Currency"] = "currency", ["SupplierDocumentType"] = "supplier document type", ["SupplierTier"] = "supplier tier",
-        ["DocumentKind"] = "contract document kind", ["SupplierRisk"] = "supplier risk level",
+        ["DocumentKind"] = "contract document kind", ["SupplierRisk"] = "supplier risk level", ["Entity"] = "entity", ["Function"] = "function",
     };
 
     /// <summary>The built-in document kinds and risk levels aren't in these lists (D-98), so an added one can't take their name.</summary>

@@ -60,8 +60,8 @@ export function SuppliersPage() {
         />
       </div>
         <div className="flex flex-wrap gap-1">
-          <ExcelButtons kind="suppliers" canImport={canChange} invalidate={[['suppliers']]} />
-          <ExcelButtons kind="contacts" noun="contacts" canImport={person.roles.procurement || person.roles.admin} invalidate={[['suppliers']]} />
+          <ExcelButtons kind="suppliers" canImport={person.roles.admin} invalidate={[['suppliers']]} />
+          <ExcelButtons kind="contacts" noun="contacts" canImport={person.roles.admin} invalidate={[['suppliers']]} />
         </div>
       </div>
 

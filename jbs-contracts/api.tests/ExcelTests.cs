@@ -125,25 +125,35 @@ public sealed class ExcelTests(AppFixture app)
     }
 
     [Fact]
-    public async Task Suppliers_import_checks_ABNs_and_only_admins_hide_suppliers()
+    public async Task Suppliers_import_checks_ABNs_and_only_admins_import()
     {
         var user = Unique("sup");
-        await app.AddPersonAsync(user, "Sid Supplier", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        await app.AddPersonAsync(user, "Sid Supplier", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false, procurement = true });
         using var owner = app.ClientFor($@"TEST\{user}");
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
         var (good, bad, hide) = (Unique("Good "), Unique("Bad "), Unique("Hide "));
-        var (_, first) = await PostAsync(owner, "suppliers", "import", Sheet(["Name", "ABN"], [good, "51 824 753 556"], [bad, "12345678901"], [hide, null]));
+        var file = Sheet(["Name", "ABN"], [good, "51 824 753 556"], [bad, "12345678901"], [hide, null]);
+        // Only admins import (Ryan's feedback, D-110); everyone can still export.
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostAsync(owner, "suppliers", "preview", file)).Status);
+        Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync("/api/excel/suppliers", Ct)).StatusCode);
+        var (_, first) = await PostAsync(admin, "suppliers", "import", file);
         Assert.Equal((2, 1), (Count(first, "added"), Count(first, "refused")));
-        var (_, second) = await PostAsync(owner, "suppliers", "preview", Sheet(["Name", "Active"], [hide, "No"]));
-        Assert.Equal(1, Count(second, "refused"));
+        var (_, second) = await PostAsync(admin, "suppliers", "preview", Sheet(["Name", "Active"], [hide, "No"]));
+        Assert.Equal(1, Count(second, "updated"));
     }
 
     [Fact]
     public async Task Contracts_import_adds_drafts_with_lookups_updates_drafts_and_refuses_unknown_values()
     {
+        // Only admins import (D-110); this one is also a contract owner, as JBS's admins are.
         var user = Unique("con");
-        await app.AddPersonAsync(user, "Connie Contracts", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        await app.AddPersonAsync(user, "Connie Contracts", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = true, auditor = false });
         using var owner = app.ClientFor($@"TEST\{user}");
         using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var plainUser = Unique("cop");
+        await app.AddPersonAsync(plainUser, "Pat Plain", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        using var plain = app.ClientFor($@"TEST\{plainUser}");
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostAsync(plain, "contracts", "preview", Sheet(["Title"], ["Not allowed"]))).Status);
         var cat = Unique("Freight");
         await PostAsync(admin, "lists", "import", Sheet(["List", "Name", "Parent category"], ["Category", cat, null], ["Category", "Road", cat]));
         var supplier = Unique("Linfox ");

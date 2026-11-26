@@ -1033,16 +1033,19 @@ export function ReportsPage() {
     tabs.map((t) => t.value),
     "register",
   );
-  if (!person.roles.admin && !person.roles.auditor) {
+  // Admins and auditors see everything; the Reports tick (D-110) gives the register, pipeline and approvals.
+  const full = person.roles.admin || person.roles.auditor;
+  if (!full && !person.roles.reports) {
     return (
       <>
         <PageHeader title="Reports" />
-        <Alert tone="info" title="Reports are for admins and auditors.">
-          Ask an admin if you need one.
+        <Alert tone="info" title="Reports are for admins, auditors and people with the Reports tick.">
+          Ask an admin if you need them.
         </Alert>
       </>
     );
   }
+  const shown = tabs.filter((t) => full || (t.value !== "audit" && t.value !== "everything"));
   return (
     <>
       <div className="print:hidden">
@@ -1057,15 +1060,15 @@ export function ReportsPage() {
           label="Report"
           value={tab}
           onChange={setTab}
-          options={[...tabs]}
+          options={shown}
         />
       </div>
       {tab === "register" && <RegisterReport />}
       {tab === "pipeline" && <PipelineReport />}
       {tab === "approvals" && <ApprovalsReport />}
-      {tab === "audit" && <AuditReport />}
-      {tab === "everything" && <EverythingDownloads />}
-      {tab === "audit" && (
+      {full && tab === "audit" && <AuditReport />}
+      {full && tab === "everything" && <EverythingDownloads />}
+      {full && tab === "audit" && (
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
           <ShieldCheck aria-hidden className="size-4" /> Downloading the audit
           trail is itself recorded in it.

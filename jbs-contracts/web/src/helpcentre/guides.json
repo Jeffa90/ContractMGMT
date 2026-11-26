@@ -383,7 +383,8 @@
       "summary": "Choose your columns and filters, then print to PDF or download Excel.",
       "who": [
         "admin",
-        "auditor"
+        "auditor",
+        "reports"
       ],
       "screens": [
         "reports"
@@ -520,8 +521,7 @@
       "title": "Add or change many at once with Excel",
       "summary": "People, lists, suppliers and contracts, previewed before anything changes.",
       "who": [
-        "admin",
-        "contractOwner"
+        "admin"
       ],
       "screens": [
         "people",

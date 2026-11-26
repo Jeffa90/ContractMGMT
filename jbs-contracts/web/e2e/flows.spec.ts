@@ -149,3 +149,23 @@ test('Send feedback from any screen and find it on the Feedback page', async ({ 
   await expect(page.getByLabel('Reply')).toBeVisible()
   await expectAccessible(page)
 })
+
+test('A Low risk supplier shows Low once when its details are edited', async ({ page, api }, info) => {
+  test.skip(info.project.name.startsWith('phone') || info.project.name.endsWith('dark'), 'one desktop run is enough for this check')
+  const suppliers: { id: number }[] = await (await api.get('/api/suppliers')).json()
+  let lowId: number | null = null
+  for (const s of suppliers) {
+    const detail = await (await api.get(`/api/suppliers/${s.id}`)).json()
+    if (detail.supplier.riskRating === 'Low') {
+      lowId = s.id
+      break
+    }
+  }
+  expect(lowId, 'the demo data has a Low risk supplier').not.toBeNull()
+  await page.goto(`/suppliers/${lowId}`)
+  await settled(page)
+  await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
+  const risk = page.getByRole('dialog').getByRole('radiogroup', { name: 'Risk' })
+  await expect(risk.getByRole('radio', { name: 'Low', exact: true })).toHaveCount(1)
+  await expect(risk.getByRole('radio', { name: 'Low', exact: true })).toBeChecked()
+})

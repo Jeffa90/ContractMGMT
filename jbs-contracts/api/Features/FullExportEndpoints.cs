@@ -130,7 +130,7 @@ public static class FullExportEndpoints
     {
         app.MapGet("/api/reports/everything.xlsx", async (CurrentUser current, Db db, AuditLog audit, TimeProvider clock) =>
         {
-            var (me, refusal) = await ReportEndpoints.RequireAsync(current, db);
+            var (me, refusal) = await ReportEndpoints.RequireAuditAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
             var p = ContractAccess.Params(me!);

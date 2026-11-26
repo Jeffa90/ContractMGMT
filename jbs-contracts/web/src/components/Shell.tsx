@@ -76,7 +76,7 @@ function useNav(): { main: NavItem[]; admin: NavItem[] } {
       ...(person.roles.admin || person.roles.auditor || person.roles.groupHead
         ? [{ to: "/team", label: "Team", icon: <UsersRound aria-hidden className="size-5" /> }]
         : []),
-      ...(person.roles.admin || person.roles.auditor
+      ...(person.roles.admin || person.roles.auditor || person.roles.reports
         ? [{ to: "/reports", label: "Reports", icon: <ChartColumn aria-hidden className="size-5" /> }]
         : []),
     ],

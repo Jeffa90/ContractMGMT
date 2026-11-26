@@ -17,6 +17,7 @@ const roleList: { key: keyof Roles; label: string; description: string }[] = [
   { key: 'legal', label: 'Legal', description: 'Reviews contracts and sends them back and forth with the owner.' },
   { key: 'approver', label: 'Approver', description: 'Approves contracts into the register.' },
   { key: 'procurement', label: 'Procurement', description: 'Looks after suppliers: their documents, details, contacts and business reviews.' },
+  { key: 'reports', label: 'Reports', description: 'Sees Reports (register, pipeline, approvals) for the contracts they may see. Not the audit trail.' },
   { key: 'admin', label: 'Admin', description: 'Manages people and settings.' },
   { key: 'auditor', label: 'Auditor', description: 'Reads everything, including history. Changes nothing.' },
 ]
@@ -27,6 +28,7 @@ function RoleBadges({ roles }: { roles: Roles }) {
     roles.contractOwner ? 'Contract owner' : null,
     roles.legal ? 'Legal' : null,
     roles.procurement ? 'Procurement' : null,
+    roles.reports ? 'Reports' : null,
     roles.admin ? 'Admin' : null,
     roles.auditor ? 'Auditor' : null,
   ].filter((x): x is string => x !== null)
@@ -215,7 +217,7 @@ function PersonDialog({ person, onClose }: { person: Person | null; onClose: () 
     account: person ? stripDomain(person.account) : '',
     name: person?.name ?? '',
     email: person?.email ?? '',
-    roles: person?.roles ?? { contractOwner: false, legal: false, approver: false, groupHead: false, admin: false, auditor: false, procurement: false },
+    roles: person?.roles ?? { contractOwner: false, legal: false, approver: false, groupHead: false, admin: false, auditor: false, procurement: false, reports: false },
   }))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [problem, setProblem] = useState<string | null>(null)

@@ -75,9 +75,9 @@ const topics = {
         <p>The <strong>Key date</strong> is the notice deadline if there is one, otherwise the end date. It turns amber within 30 days and red once it has passed.</p>
         <p>Contracts marked Confidential only show for their owner and backup, Legal, approvers, admins and auditors.</p>
         <p>
-          <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, change or add rows in that file and use{' '}
-          <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
-          cells leave what's there.
+          <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, an admin changes or adds rows in that file
+          and uses <strong>Import from Excel</strong> (admins only). You'll see what will be added, changed or not imported (and why) before anything changes.
+          Nothing is deleted, and blank cells leave what's there.
         </p>
         <p>
           Fields your admin added have their own columns. For a pick-from-a-list field, type the option as it's shown (several are separated by commas); for a person,
@@ -230,12 +230,12 @@ const topics = {
         <p>The ABN is checked for typing mistakes (it doesn't look anything up). The SAP vendor number is optional.</p>
         <p>Click a supplier's name to open its page: its details and contacts, its documents (and those from its contracts), business reviews and contracts.</p>
         <p>
-          <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, change or add rows in that file and use{' '}
-          <strong>Import from Excel</strong>. You'll see what will be added, changed or not imported (and why) before anything changes. Nothing is deleted, and blank
-          cells leave what's there.
+          <strong>Excel</strong>: <strong>Export to Excel</strong> downloads the list. To add or change many at once, an admin changes or adds rows in that file
+          and uses <strong>Import from Excel</strong> (admins only). You'll see what will be added, changed or not imported (and why) before anything changes.
+          Nothing is deleted, and blank cells leave what's there.
         </p>
         <p>
-          <strong>Contacts</strong>: <strong>Export contacts</strong> downloads every supplier's contacts, one row each. Procurement and admins can add many at
+          <strong>Contacts</strong>: <strong>Export contacts</strong> downloads every supplier's contacts, one row each. Admins can add many at
           once with <strong>Import contacts</strong>: one row per contact (supplier, name, role, email, phone), several rows for several contacts at a
           supplier. A row with the same supplier and email (or name) updates that contact. Remove a contact on the supplier's page.
         </p>
@@ -374,7 +374,11 @@ const topics = {
     title: 'Reports',
     body: (
       <>
-        <p>Reports are for admins and auditors. Each one can be downloaded to Excel. Confidential contracts are included and marked.</p>
+        <p>
+          Reports are for admins, auditors and people with the <strong>Reports</strong> tick on People. With the tick you see the Register, Pipeline and
+          Approvals for the contracts you may see; the Audit trail and Download everything stay with admins and auditors. Each one can be downloaded to Excel.
+          Confidential contracts are included (for those allowed to see them) and marked.
+        </p>
         <ul>
           <li>
             <strong>Register</strong>: every Effective contract. Choose whether to include ended and archived ones. <strong>Columns</strong> lets you tick

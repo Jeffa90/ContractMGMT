@@ -6,7 +6,7 @@ import { help } from '@/help'
 import type { Roles } from '@/lib/api'
 import { groups, guides, isFor, plain, rich, search } from './guides'
 
-const none: Roles = { contractOwner: false, legal: false, approver: false, groupHead: false, admin: false, auditor: false, procurement: false }
+const none: Roles = { contractOwner: false, legal: false, approver: false, groupHead: false, admin: false, auditor: false, procurement: false, reports: false }
 const videos = join(process.cwd(), 'public', 'help-videos') // tests run from the web folder
 
 describe('help centre guides', () => {

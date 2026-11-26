@@ -70,6 +70,8 @@ export type Roles = {
   admin: boolean
   auditor: boolean
   procurement: boolean
+  /** Sees Reports (not the audit trail) for the contracts they may see (D-110). */
+  reports: boolean
 }
 
 export type Person = {

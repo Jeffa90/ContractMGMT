@@ -15,6 +15,8 @@ public sealed class Person
     public bool IsAdmin { get; set; }
     public bool IsAuditor { get; set; }
     public bool IsProcurement { get; set; }
+    /// <summary>Sees Reports (not the audit trail) for the contracts they may see (D-110).</summary>
+    public bool IsReports { get; set; }
     /// <summary>Each, Daily or Weekly; null uses the default an admin set (D-99).</summary>
     public string? ReminderDelivery { get; set; }
     public bool IsActive { get; set; }

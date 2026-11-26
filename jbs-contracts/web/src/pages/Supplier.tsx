@@ -283,7 +283,8 @@ function RelationshipDialog({
                 { value: "High", label: "High" },
                 ...addedRisks.map((r) => ({ value: `L${r.id}`, label: r.value })),
                 // A level that has since been hidden stays shown while it's chosen.
-                ...(s.riskRating?.startsWith("L") && !addedRisks.some((r) => `L${r.id}` === s.riskRating)
+                // A level an admin added and has since hidden (stored as L and its id, for example L42; "Low" isn't one).
+                ...(s.riskRating && /^L\d+$/.test(s.riskRating) && !addedRisks.some((r) => `L${r.id}` === s.riskRating)
                   ? [{ value: s.riskRating, label: s.riskName ?? "Other" }]
                   : []),
               ]}

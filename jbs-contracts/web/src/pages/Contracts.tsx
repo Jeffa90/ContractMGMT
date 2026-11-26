@@ -154,7 +154,7 @@ export function ContractsPage() {
             </Button>
           )}
         </div>
-        <ExcelButtons kind="contracts" canImport={person.roles.contractOwner} invalidate={[['contracts'], ['suppliers'], ['contract']]} />
+        <ExcelButtons kind="contracts" canImport={person.roles.admin} invalidate={[['contracts'], ['suppliers'], ['contract']]} />
       </div>
 
       {tile && tileLabel && (

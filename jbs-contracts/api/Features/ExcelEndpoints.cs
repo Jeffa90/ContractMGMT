@@ -128,7 +128,7 @@ public static class ExcelEndpoints
     [
         ("Contract owner", p => p.IsContractOwner, "Contract owner"), ("Legal", p => p.IsLegal, "Legal"), ("Approver", p => p.IsApprover, "Approver"),
         ("Group Head", p => p.IsGroupHead, "Group Head"), ("Admin", p => p.IsAdmin, "Admin"), ("Auditor", p => p.IsAuditor, "Auditor"),
-        ("Procurement", p => p.IsProcurement, "Procurement"),
+        ("Procurement", p => p.IsProcurement, "Procurement"), ("Reports", p => p.IsReports, "Reports"),
     ];
 
     private static Kind People() => new(
@@ -138,14 +138,15 @@ public static class ExcelEndpoints
             new("Name", "Required for someone new.", 26), new("Email", "Required for someone new. Reminders and approvals go here.", 32),
             new("Contract owner", "Yes or No", 15), new("Legal", "Yes or No", 10), new("Approver", "Yes or No", 11),
             new("Group Head", "Yes or No. Only one person can be Group Head; it implies Approver.", 12), new("Admin", "Yes or No", 10),
-            new("Auditor", "Yes or No", 10), new("Procurement", "Yes or No. Adds and looks after supplier documents, details and reviews.", 13), new("Active", "Yes or No. No switches off their access (nothing is deleted).", 10),
+            new("Auditor", "Yes or No", 10), new("Procurement", "Yes or No. Adds and looks after supplier documents, details and reviews.", 13),
+            new("Reports", "Yes or No. Sees Reports for the contracts they may see (not the audit trail).", 10), new("Active", "Yes or No. No switches off their access (nothing is deleted).", 10),
         ],
         ["Windows logon"], ["Last seen"],
         me => me.IsAdmin, me => me.IsAdmin, "Only admins can import or export people.",
         async x =>
         {
             var people = await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person ORDER BY Name", transaction: x.Tx);
-            return people.Select(p => new object?[] { p.WindowsAccount, p.Name, p.Email, p.IsContractOwner, p.IsLegal, p.IsApprover, p.IsGroupHead, p.IsAdmin, p.IsAuditor, p.IsProcurement, p.IsActive });
+            return people.Select(p => new object?[] { p.WindowsAccount, p.Name, p.Email, p.IsContractOwner, p.IsLegal, p.IsApprover, p.IsGroupHead, p.IsAdmin, p.IsAuditor, p.IsProcurement, p.IsReports, p.IsActive });
         },
         async (x, rows) =>
         {
@@ -218,12 +219,12 @@ public static class ExcelEndpoints
                             await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "person.group-head-moved", "Person", previous.Id, $"{x.Me.Name} made {n} the Group Head in place of {previous.Name}, who stays an approver (backup){Via}.");
                         }
                     }
-                    var args = new { acc, n, e, co = ro["Contract owner"], le = ro["Legal"], ap = ro["Approver"], gh = ro["Group Head"], ad = ro["Admin"], au = ro["Auditor"], pr = ro["Procurement"], act, me = x.Me.Id, id = b?.Id };
+                    var args = new { acc, n, e, co = ro["Contract owner"], le = ro["Legal"], ap = ro["Approver"], gh = ro["Group Head"], ad = ro["Admin"], au = ro["Auditor"], pr = ro["Procurement"], rp = ro["Reports"], act, me = x.Me.Id, id = b?.Id };
                     if (b is null)
                     {
                         var id = await x.C.ExecuteScalarAsync<int>("""
-                            INSERT INTO contracts.Person (WindowsAccount, Name, Email, IsContractOwner, IsLegal, IsApprover, IsGroupHead, IsAdmin, IsAuditor, IsProcurement, IsActive, CreatedById, UpdatedById)
-                            OUTPUT INSERTED.Id VALUES (@acc, @n, @e, @co, @le, @ap, @gh, @ad, @au, @pr, @act, @me, @me)
+                            INSERT INTO contracts.Person (WindowsAccount, Name, Email, IsContractOwner, IsLegal, IsApprover, IsGroupHead, IsAdmin, IsAuditor, IsProcurement, IsReports, IsActive, CreatedById, UpdatedById)
+                            OUTPUT INSERTED.Id VALUES (@acc, @n, @e, @co, @le, @ap, @gh, @ad, @au, @pr, @rp, @act, @me, @me)
                             """, args, x.Tx);
                         await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "person.added", "Person", id, $"{x.Me.Name} added {n} ({acc}) as {roleText}{Via}.", args);
                         await PeopleEndpoints.QueueWelcomeAsync(x.C, x.Tx, id, n, e, acc, roleText, x.Me.Name, x.Settings);
@@ -232,7 +233,7 @@ public static class ExcelEndpoints
                     {
                         await x.C.ExecuteAsync("""
                             UPDATE contracts.Person SET Name = @n, Email = @e, IsContractOwner = @co, IsLegal = @le, IsApprover = @ap, IsGroupHead = @gh, IsAdmin = @ad,
-                                IsAuditor = @au, IsProcurement = @pr, IsActive = @act, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id
+                                IsAuditor = @au, IsProcurement = @pr, IsReports = @rp, IsActive = @act, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id
                             """, args, x.Tx);
                         await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "person.changed", "Person", b.Id, $"{x.Me.Name} changed {n}: {string.Join("; ", r.Notes).Replace("Change: ", "")}".TrimEnd('.') + $"{Via}.", args);
                         if (b.IsLegal && b.IsActive && !(ro["Legal"] && act))
@@ -382,7 +383,7 @@ public static class ExcelEndpoints
             new("SAP vendor number", null, 18), new("Notes", null, 40), new("Active", "Yes or No. Only admins can hide or show suppliers.", 10),
         ],
         ["Name"], ["Contracts"],
-        me => true, me => me.IsContractOwner || me.IsAdmin, "Only contract owners and admins can import suppliers.",
+        me => true, me => me.IsAdmin, "Only admins can import suppliers. You can still export them.",
         async x =>
         {
             var rows = await x.C.QueryAsync<SupplierRow>($"""
@@ -476,7 +477,7 @@ public static class ExcelEndpoints
             new("Role", "For example Account manager", 24), new("Email", null, 32), new("Phone", null, 18),
         ],
         ["Supplier", "Name"], [],
-        me => true, SupplierPageEndpoints.CanManage, "Only Procurement and admins can import supplier contacts.",
+        me => true, me => me.IsAdmin, "Only admins can import supplier contacts. You can still export them.",
         async x => (await x.C.QueryAsync<ContactRow>($"{SelectContacts} ORDER BY s.Name, k.Name", transaction: x.Tx))
             .Select(k => new object?[] { k.Supplier, k.Name, k.Role, k.Email, k.Phone }),
         async (x, rows) =>
@@ -579,7 +580,7 @@ public static class ExcelEndpoints
             new("Needs Legal review", "Yes or No (Yes if blank for a new contract)", 15), new("Description", null, 40),
         ],
         [], ["Stage", "Notice deadline"],
-        me => true, me => me.IsContractOwner, "Only contract owners can import contracts.",
+        me => true, me => me.IsAdmin, "Only admins can import contracts. You can still export them.",
         async x =>
         {
             var rows = (await ContractEndpoints.ListVisibleAsync(x.C, x.Tx, x.Me)).Where(r => r.Stage != "Withdrawn").ToList();

@@ -165,7 +165,7 @@ public sealed class LayoutTests(AppFixture app)
         Assert.True(status == HttpStatusCode.OK, saved.ToJsonString());
 
         var user = Unique("xl");
-        await app.AddPersonAsync(user, "Xavier Excel", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        await app.AddPersonAsync(user, "Xavier Excel", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = true, auditor = false });
         using var owner = app.ClientFor($@"TEST\{user}");
 
         // The template has a column per added field offered in Excel, by label, and the information-only columns at the end.

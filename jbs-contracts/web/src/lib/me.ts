@@ -20,6 +20,7 @@ export function roleSummary(roles: Me['person']['roles']): string {
     roles.contractOwner ? 'Contract owner' : null,
     roles.legal ? 'Legal' : null,
     roles.procurement ? 'Procurement' : null,
+    roles.reports ? 'Reports' : null,
     roles.admin ? 'Admin' : null,
     roles.auditor ? 'Auditor' : null,
   ].filter(Boolean)

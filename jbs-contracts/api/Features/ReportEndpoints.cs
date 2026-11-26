@@ -20,7 +20,15 @@ public static class ReportEndpoints
     {
         var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
         if (refusal is not null) return (null, refusal);
-        return me!.IsAdmin || me.IsAuditor ? (me, null) : (null, ApiResults.NotAllowed("Reports are for admins and auditors."));
+        return me!.IsAdmin || me.IsAuditor || me.IsReports ? (me, null) : (null, ApiResults.NotAllowed("Reports are for admins, auditors and people with the Reports tick. Ask an admin."));
+    }
+
+    /// <summary>The audit trail and Download everything: admins and auditors only (the Reports tick doesn't include them, D-110).</summary>
+    internal static async Task<(Person? Me, IResult? Refusal)> RequireAuditAsync(CurrentUser current, Db db)
+    {
+        var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
+        if (refusal is not null) return (null, refusal);
+        return me!.IsAdmin || me.IsAuditor ? (me, null) : (null, ApiResults.NotAllowed("The audit trail is for admins and auditors."));
     }
 
     internal static IResult File(byte[] bytes, string name, TimeProvider clock) =>
@@ -347,7 +355,7 @@ public static class ReportEndpoints
 
         group.MapGet("/audit", async (int? days, string? q, CurrentUser current, Db db, TimeProvider clock) =>
         {
-            var (me, refusal) = await RequireAsync(current, db);
+            var (me, refusal) = await RequireAuditAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
             var rows = await AuditAsync(c, days, q, clock, 500);
@@ -362,7 +370,7 @@ public static class ReportEndpoints
 
         group.MapGet("/audit.xlsx", async (int? days, string? q, CurrentUser current, Db db, AuditLog audit, TimeProvider clock) =>
         {
-            var (me, refusal) = await RequireAsync(current, db);
+            var (me, refusal) = await RequireAuditAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
             var rows = await AuditAsync(c, days, q, clock, 100_000);

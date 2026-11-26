@@ -1,6 +1,6 @@
 // Where a contract is up to and what happens next, with the actions for the person looking (product-spec sections 4, 5 and 13.1),
 // and the Legal conversation: every hand-over, numbered, as it was.
-import { ArrowLeftRight, BadgeCheck, CheckCircle2, Hourglass, Lock, MessagesSquare, Paperclip, Scale, Send, Undo2, UserCheck, X } from 'lucide-react'
+import { ArrowLeftRight, BadgeCheck, CheckCircle2, FileDown, Hourglass, Lock, MessagesSquare, Paperclip, Scale, Send, Undo2, UserCheck, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
@@ -9,6 +9,7 @@ import { ApiError } from '@/lib/api'
 import { errorText, useAction } from '@/lib/actions'
 import { uploadDocument, type ContractAction, type ContractDetail, type LegalEntry } from '@/lib/contracts'
 import { formatBytes, formatDate, formatDateTime, timeAgo } from '@/lib/format'
+import { useMe } from '@/lib/me'
 import { Dialog } from './Dialog'
 import { DropZone } from './DropZone'
 import { documentExtensions } from '@/lib/files'
@@ -641,14 +642,28 @@ const entryText: Record<LegalEntry['action'], (e: LegalEntry) => string> = {
   Cleared: (e) => `${e.byName} cleared it`,
 }
 
-export function ConversationCard({ data }: { data: ContractDetail }) {
+export function ConversationCard({ data, recordHref }: { data: ContractDetail; recordHref?: string }) {
+  const { person } = useMe()
   if (data.conversation.length === 0) return null
+  // The Legal record (D-122): a ZIP of a Word record and the conversation's files, for Legal's matter system. Legal and admins.
+  const canDownload = recordHref && (person.roles.legal || person.roles.admin)
   return (
     <Card className="p-5 md:p-6">
-      <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-        <MessagesSquare aria-hidden className="size-5" /> Legal conversation
-        <span className="tabular text-sm font-normal text-muted-foreground">({data.conversation.length})</span>
-      </h2>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+          <MessagesSquare aria-hidden className="size-5" /> Legal conversation
+          <span className="tabular text-sm font-normal text-muted-foreground">({data.conversation.length})</span>
+        </h2>
+        {canDownload && (
+          <a
+            href={recordHref}
+            className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm font-medium text-primary hover:bg-muted"
+            title="A Word record of the conversation with the contract's basic details, and the attached files, in one ZIP"
+          >
+            <FileDown aria-hidden className="size-4" /> Download for your matter file
+          </a>
+        )}
+      </div>
       <ol className="mt-4 flex flex-col gap-4">
         {data.conversation.map((e) => (
           <li key={e.number} className="flex gap-3">

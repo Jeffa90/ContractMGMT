@@ -254,7 +254,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
         </dl>
       </Card>
 
-      <ConversationCard data={data} />
+      <ConversationCard data={data} recordHref={`/api/contracts/${c.id}/legal-record.zip`} />
 
       <DocumentsCard data={data} />
 

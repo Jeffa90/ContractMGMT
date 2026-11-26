@@ -180,7 +180,7 @@ function Variation({ data }: { data: VariationDetail }) {
 
       <ChangesEditor data={data} />
       <DocumentsCard data={data} />
-      <ConversationCard data={{ conversation: data.conversation } as ContractDetail} />
+      <ConversationCard data={{ conversation: data.conversation } as ContractDetail} recordHref={`/api/contracts/${data.contract.id}/variations/${data.variation.id}/legal-record.zip`} />
 
       {open === 'sendToLegal' && (
         <NoteDialog data={data} onClose={close} title={v.legalClearedUtc ? 'Send back to Legal' : 'Send to Legal'} label="Note for Legal (optional)" path="send-to-legal" submit="Send to Legal" success="Sent to Legal." required={false} />

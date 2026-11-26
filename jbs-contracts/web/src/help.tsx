@@ -117,6 +117,10 @@ const topics = {
           <strong>Legal conversation</strong>.
         </p>
         <p>
+          <strong>Download for your matter file</strong> (Legal and admins, on the Legal conversation): one ZIP with a Word record of the contract's basic
+          details and the whole conversation, and every file attached to it, numbered to match. Downloading it is recorded in the contract's Activity.
+        </p>
+        <p>
           <strong>Documents</strong>: choose the kind, then <strong>Add document</strong>. Use <strong>New version</strong> to replace a document while keeping the earlier ones.
           Files can be PDF, Word, Excel, Outlook email, text or images, up to 25 MB.
         </p>

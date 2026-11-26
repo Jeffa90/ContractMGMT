@@ -168,6 +168,24 @@ public sealed class LegalTests(AppFixture app)
         Assert.Equal("markup.txt", conversation[3].GetProperty("documents")[0].GetProperty("fileName").GetString());
         Assert.Equal(otherName, conversation[4].GetProperty("byName").GetString());
 
+        // The Legal record (D-122): Legal and admins download a ZIP of a Word record and the conversation's files, numbered to match.
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.GetAsync($"/api/contracts/{id}/legal-record.zip", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync($"/api/contracts/{id}/legal-record.zip", Ct)).StatusCode);
+        var record = await sam.GetAsync($"/api/contracts/{id}/legal-record.zip", Ct);
+        Assert.Equal(HttpStatusCode.OK, record.StatusCode);
+        using (var zip = new System.IO.Compression.ZipArchive(await record.Content.ReadAsStreamAsync(Ct)))
+        {
+            var names = zip.Entries.Select(e => e.FullName).ToList();
+            Assert.Contains("Files/4 - markup (v1).txt", names);
+            var docx = zip.Entries.Single(e => e.FullName.StartsWith("Legal record - ") && e.FullName.EndsWith(".docx"));
+            using var word = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(docx.Open(), false);
+            var text = word.MainDocumentPart!.Document.Body!.InnerText;
+            Assert.Contains("Supplier won't accept clause 12, please negotiate.", text);
+            Assert.Contains("in this ZIP as Files/4 - markup (v1).txt", text);
+            Assert.Contains("Cleared by Legal", text);
+        }
+        Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.AuditEvent WHERE ContractId = @id AND Action = N'legal.record-downloaded'", new { id }));
+
         // Entries can't be changed afterwards, even directly in the database.
         await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() => db.ExecuteAsync("UPDATE contracts.LegalTurn SET Note = 'changed' WHERE ContractId = @id", new { id }));
         var activity = await db.QueryAsync<string>("SELECT Summary FROM contracts.AuditEvent WHERE ContractId = @id", new { id });

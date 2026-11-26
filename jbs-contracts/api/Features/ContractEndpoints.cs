@@ -468,6 +468,10 @@ public static class ContractEndpoints
         await c.QueryAsync<ContractRow>($"{SelectContract} WHERE {ContractAccess.VisibleSql("k")} ORDER BY k.Reference", ContractAccess.Params(me), tx);
 
     /// <summary>Locks the contract row for this transaction (so two people can't change it at once), then reads it with its names.</summary>
+    /// <summary>The contract with its names, for reading (no lock).</summary>
+    public static async Task<ContractRow?> LoadAsync(SqlConnection c, int id) =>
+        await c.QuerySingleOrDefaultAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id });
+
     public static async Task<ContractRow?> LoadForUpdateAsync(SqlConnection c, SqlTransaction tx, int id)
     {
         await c.ExecuteAsync("SELECT Id FROM contracts.Contract WITH (UPDLOCK, ROWLOCK) WHERE Id = @id", new { id }, tx);

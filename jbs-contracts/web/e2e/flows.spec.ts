@@ -264,3 +264,29 @@ test('A contract continuing until replaced is its own calm group on Renewals, no
   await expect(page.getByText('Continuing until replaced').first()).toBeVisible()
   await expect(page.getByText(/continues under the same terms until a new agreement replaces it/)).toBeVisible()
 })
+
+test('Legal downloads the Legal record for their matter file; an owner sees no button', async ({ page, api, signInAs }) => {
+  // A demo contract with a Legal conversation.
+  const list = await (await api.get('/api/contracts?view=all')).json()
+  let target: { id: number; title: string } | undefined
+  for (const k of list as { id: number; title: string }[]) {
+    const d = await (await api.get(`/api/contracts/${k.id}`)).json()
+    if (d.conversation.length > 0) {
+      target = k
+      break
+    }
+  }
+  expect(target).toBeTruthy()
+  await signInAs('legal')
+  await page.goto(`/contracts/${target!.id}`)
+  await settled(page, target!.title)
+  const link = page.getByRole('link', { name: 'Download for your matter file' })
+  await expect(link).toHaveAttribute('href', `/api/contracts/${target!.id}/legal-record.zip`)
+  const download = await api.get(`/api/contracts/${target!.id}/legal-record.zip`) // admins may download it too
+  expect(download.headers()['content-type']).toContain('application/zip')
+  await expectAccessible(page)
+  await signInAs('owner')
+  await page.reload()
+  await settled(page, target!.title)
+  await expect(page.getByRole('link', { name: 'Download for your matter file' })).toHaveCount(0)
+})

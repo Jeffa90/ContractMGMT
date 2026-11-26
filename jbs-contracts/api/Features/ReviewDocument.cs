@@ -65,9 +65,9 @@ public static class ReviewDocument
         return stream.ToArray();
     }
 
-    private static Paragraph Heading(string text) => Para(text, size: 26, bold: true, colour: Navy, before: 280, after: 100, keepNext: true);
+    internal static Paragraph Heading(string text) => Para(text, size: 26, bold: true, colour: Navy, before: 280, after: 100, keepNext: true);
 
-    private static Paragraph Para(string text, int size = 22, bool bold = false, string? colour = null, int before = 0, int after = 120, bool keepNext = false)
+    internal static Paragraph Para(string text, int size = 22, bool bold = false, string? colour = null, int before = 0, int after = 120, bool keepNext = false)
     {
         var props = new RunProperties(new RunFonts { Ascii = Font, HighAnsi = Font, ComplexScript = Font }, new FontSize { Val = size.ToString() });
         if (bold) props.Append(new Bold());
@@ -77,7 +77,7 @@ public static class ReviewDocument
         return new Paragraph(pp, new Run(props, new Text(text) { Space = SpaceProcessingModeValues.Preserve }));
     }
 
-    private static Table Table(string[] headers, List<string[]> rows, int[] widths, bool header)
+    internal static Table Table(string[] headers, List<string[]> rows, int[] widths, bool header)
     {
         var border = new TableBorders(
             new TopBorder { Val = BorderValues.Single, Size = 4, Color = "CCCCCC" }, new BottomBorder { Val = BorderValues.Single, Size = 4, Color = "CCCCCC" },

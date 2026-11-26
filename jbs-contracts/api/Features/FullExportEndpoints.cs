@@ -269,7 +269,9 @@ public static class FullExportEndpoints
             sheets.Add(new("Supplier contacts", [C("Supplier", 30), C("Name", 24), C("Role", 24), C("Email", 30), C("Phone", 16), C("Removed", 10)],
                 contacts.Select(x => new object?[] { (string)x.Supplier, (string)x.Name, (string?)x.Role, (string?)x.Email, (string?)x.Phone, (bool)x.IsRemoved }).ToList()));
             var reviewRows = await c.QueryAsync("""
-                SELECT r.Id, s.Name AS Supplier, r.HeldOn, r.Rating, r.QualityScore, r.DeliveryScore, r.ServiceScore, r.CostScore, r.Summary, r.SupplierAttendees, r.IsRemoved,
+                SELECT r.Id, s.Name AS Supplier, r.HeldOn, r.Rating, r.QualityScore, r.DeliveryScore, r.ServiceScore, r.CostScore, r.Summary,
+                       CONCAT_WS(N'; ', (SELECT STRING_AGG(k.Name, N'; ') FROM contracts.BusinessReviewContact x JOIN contracts.SupplierContact k ON k.Id = x.ContactId WHERE x.ReviewId = r.Id),
+                                 r.SupplierAttendees) AS SupplierAttendees, r.IsRemoved,
                        cb.Name AS CreatedBy, r.CreatedUtc,
                        (SELECT STRING_AGG(p.Name, N'; ') FROM contracts.BusinessReviewAttendee a JOIN contracts.Person p ON p.Id = a.PersonId WHERE a.ReviewId = r.Id) AS Attendees
                 FROM contracts.BusinessReview r JOIN contracts.Supplier s ON s.Id = r.SupplierId JOIN contracts.Person cb ON cb.Id = r.CreatedById
@@ -285,9 +287,10 @@ public static class FullExportEndpoints
                     (string)r.Summary, (string?)r.Attendees, (string?)r.SupplierAttendees, (bool)r.IsRemoved, (string)r.CreatedBy, L((DateTime)r.CreatedUtc),
                 }).ToList()));
             var actionRows = await c.QueryAsync("""
-                SELECT s.Name AS Supplier, r.HeldOn, a.Text, o.Name AS Owner, a.DueOn, a.DoneUtc, db.Name AS DoneBy
+                SELECT s.Name AS Supplier, r.HeldOn, a.Text, ISNULL(o.Name, ISNULL(sc.Name + N' (' + s.Name + N')', s.Name)) AS Owner, a.DueOn, a.DoneUtc, db.Name AS DoneBy
                 FROM contracts.BusinessReviewAction a JOIN contracts.BusinessReview r ON r.Id = a.ReviewId JOIN contracts.Supplier s ON s.Id = r.SupplierId
-                JOIN contracts.Person o ON o.Id = a.OwnerId LEFT JOIN contracts.Person db ON db.Id = a.DoneById
+                LEFT JOIN contracts.Person o ON o.Id = a.OwnerId LEFT JOIN contracts.SupplierContact sc ON sc.Id = a.SupplierContactId
+                LEFT JOIN contracts.Person db ON db.Id = a.DoneById
                 ORDER BY s.Name, r.HeldOn, a.DueOn
                 """);
             sheets.Add(new("Review actions", [C("Supplier", 30), C("Review held", 13), C("Action", 50), C("Owner", 22), C("Due", 13), C("Done", 18), C("Done by", 22)],

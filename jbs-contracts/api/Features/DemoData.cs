@@ -488,7 +488,7 @@ public static class DemoData
                 var reviewId = await c.ExecuteScalarAsync<int>("""
                     INSERT INTO contracts.BusinessReview (SupplierId, HeldOn, Summary, SupplierAttendees, Rating, QualityScore, DeliveryScore, ServiceScore, CostScore, CreatedUtc, CreatedById)
                     OUTPUT INSERTED.Id
-                    VALUES (@supplierId, @held, @summary, N'Jordan Lee (demo), account manager', N'NeedsImprovement', 4, 3, 3, 4, @at, @by)
+                    VALUES (@supplierId, @held, @summary, NULL, N'NeedsImprovement', 4, 3, 3, 4, @at, @by)
                     """, new
                 {
                     supplierId, held = D(-85), at = Ago(84), by = p.Id,
@@ -496,6 +496,12 @@ public static class DemoData
                 }, tx);
                 foreach (var who in new[] { p.Id, me.Id }.Distinct())
                     await c.ExecuteAsync("INSERT INTO contracts.BusinessReviewAttendee (ReviewId, PersonId) VALUES (@reviewId, @who)", new { reviewId, who }, tx);
+                // The supplier's account manager attended, and owes an action (D-104).
+                var jordan = await c.ExecuteScalarAsync<int?>("SELECT TOP (1) Id FROM contracts.SupplierContact WHERE SupplierId = @supplierId AND IsRemoved = 0 AND Name = N'Jordan Lee (demo)' ORDER BY Id DESC", new { supplierId }, tx);
+                if (jordan is not null) await c.ExecuteAsync("""
+                    INSERT INTO contracts.BusinessReviewContact (ReviewId, ContactId) VALUES (@reviewId, @jordan);
+                    INSERT INTO contracts.BusinessReviewAction (ReviewId, Text, SupplierContactId, DueOn, CreatedUtc) VALUES (@reviewId, N'Send the written delivery recovery plan', @jordan, @supplierDue, @at);
+                    """, new { reviewId, jordan, supplierDue = D(12), at = Ago(84) }, tx);
                 await c.ExecuteAsync("""
                     INSERT INTO contracts.BusinessReviewAction (ReviewId, Text, OwnerId, DueOn, CreatedUtc) VALUES (@reviewId, N'Check the delivery recovery plan figures with the plant', @owner, @due, @at);
                     INSERT INTO contracts.BusinessReviewAction (ReviewId, Text, OwnerId, DueOn, DoneUtc, DoneById, CreatedUtc) VALUES (@reviewId, N'Send the supplier our forecast volumes', @owner, @past, @done, @owner, @at);

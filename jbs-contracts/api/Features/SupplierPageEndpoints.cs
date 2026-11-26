@@ -106,8 +106,10 @@ public static class SupplierPageEndpoints
         public int Id { get; set; }
         public int ReviewId { get; set; }
         public string Text { get; set; } = "";
-        public int OwnerId { get; set; }
-        public string OwnerName { get; set; } = "";
+        public int? OwnerId { get; set; }
+        public string? OwnerName { get; set; }
+        public int? SupplierContactId { get; set; }
+        public string? ContactName { get; set; }
         public DateTime DueOn { get; set; }
         public DateTime? DoneUtc { get; set; }
         public string? DoneByName { get; set; }
@@ -119,9 +121,10 @@ public static class SupplierPageEndpoints
     public sealed record ContactInput(string? Name, string? Role, string? Email, string? Phone);
     public sealed record DocumentInput(int? TypeId, string? Title, DateOnly? ExpiresOn, bool ClearExpiry = false);
     public sealed record RemindInput(bool On);
-    public sealed record ActionInput(string? Text, int? OwnerId, DateOnly? DueOn);
+    /// <summary>For a JBS person (OwnerId, emailed), or for the supplier (ForSupplier, optionally one of its contacts; not emailed, D-104).</summary>
+    public sealed record ActionInput(string? Text, int? OwnerId, DateOnly? DueOn, bool ForSupplier = false, int? SupplierContactId = null);
     public sealed record ReviewInput(string? RowVersion, DateOnly? HeldOn, string? Summary, string? SupplierAttendees, List<int>? AttendeeIds, string? Rating,
-        int? QualityScore, int? DeliveryScore, int? ServiceScore, int? CostScore, List<ActionInput>? Actions, DateOnly? NextReviewDue);
+        int? QualityScore, int? DeliveryScore, int? ServiceScore, int? CostScore, List<ActionInput>? Actions, DateOnly? NextReviewDue, List<int>? ContactIds = null);
     public sealed record DoneInput(bool Done);
 
     private static string? Clean(string? s, int max) => string.IsNullOrWhiteSpace(s) ? null : s.Trim().Length > max ? s.Trim()[..max] : s.Trim();
@@ -187,11 +190,8 @@ public static class SupplierPageEndpoints
                 SELECT a.ReviewId, a.PersonId, p.Name FROM contracts.BusinessReviewAttendee a JOIN contracts.Person p ON p.Id = a.PersonId
                 JOIN contracts.BusinessReview r ON r.Id = a.ReviewId WHERE r.SupplierId = @id ORDER BY p.Name
                 """, new { id })).ToLookup(a => a.ReviewId);
-            var actions = (await c.QueryAsync<ActionRow>("""
-                SELECT a.Id, a.ReviewId, a.Text, a.OwnerId, o.Name AS OwnerName, a.DueOn, a.DoneUtc, db.Name AS DoneByName
-                FROM contracts.BusinessReviewAction a JOIN contracts.BusinessReview r ON r.Id = a.ReviewId JOIN contracts.Person o ON o.Id = a.OwnerId
-                LEFT JOIN contracts.Person db ON db.Id = a.DoneById WHERE r.SupplierId = @id ORDER BY a.DueOn, a.Id
-                """, new { id })).ToLookup(a => a.ReviewId);
+            var actions = (await ActionsAsync(c, null, id)).ToLookup(a => a.ReviewId);
+            var reviewContacts = (await ReviewContactsAsync(c, null, id)).ToLookup(x => x.ReviewId);
             var canManage = CanManage(me);
             var canReview = CanReview(me, s.RelationshipOwnerId);
             object Doc(IGrouping<int, DocRow> g)
@@ -228,10 +228,11 @@ public static class SupplierPageEndpoints
                     r.Id, HeldOn = DateOnly.FromDateTime(r.HeldOn), r.Summary, r.SupplierAttendees, r.Rating, RatingName = r.Rating is { } rt ? RatingNames[rt] : null,
                     r.QualityScore, r.DeliveryScore, r.ServiceScore, r.CostScore, r.CreatedByName, CreatedUtc = Utc(r.CreatedUtc), RowVersion = Convert.ToBase64String(r.RowVersion),
                     Attendees = attendees[r.Id].Select(a => new { Id = a.PersonId, a.Name }),
+                    Contacts = reviewContacts[r.Id].Select(x => new { Id = x.ContactId, x.Name, x.Role }),
                     Actions = actions[r.Id].Select(a => new
                     {
-                        a.Id, a.Text, a.OwnerId, a.OwnerName, DueOn = DateOnly.FromDateTime(a.DueOn), Done = a.DoneUtc is not null,
-                        DoneUtc = a.DoneUtc is { } du ? Utc(du) : (DateTime?)null, a.DoneByName, CanTick = canReview || a.OwnerId == me.Id,
+                        a.Id, a.Text, a.OwnerId, OwnerName = Who(a, s.Name), ForSupplier = a.OwnerId is null, a.SupplierContactId, DueOn = DateOnly.FromDateTime(a.DueOn),
+                        Done = a.DoneUtc is not null, DoneUtc = a.DoneUtc is { } du ? Utc(du) : (DateTime?)null, a.DoneByName, CanTick = canReview || a.OwnerId == me.Id,
                     }),
                     Documents = docGroups.Where(g => g.First().ReviewId == r.Id).Select(Doc),
                 }),
@@ -287,7 +288,6 @@ public static class SupplierPageEndpoints
         {
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
-            if (!CanManage(me!)) return NotProcurement();
             var errors = new Dictionary<string, string>();
             var name = Clean(body.Name, 200);
             var email = Clean(body.Email, 254);
@@ -298,6 +298,8 @@ public static class SupplierPageEndpoints
             await using var tx = await Db.BeginWriteAsync(c);
             var s = await LoadAsync(c, tx, id);
             if (s is null) return NotFound();
+            // Adding a contact is also open to whoever can add business reviews (from the review form, D-104); changing one isn't.
+            if (!(CanManage(me!) || (contactId is null && CanReview(me!, s.RelationshipOwnerId)))) return NotProcurement();
             var args = new { id, contactId, name, role = Clean(body.Role, 200), email, phone = Clean(body.Phone, 50), me = me!.Id };
             if (contactId is null)
             {
@@ -536,12 +538,16 @@ public static class SupplierPageEndpoints
             var attendees = (body.AttendeeIds ?? []).Distinct().ToList();
             foreach (var a in attendees)
                 if (!await ActivePersonAsync(c, tx, a)) { errors["attendeeIds"] = "Choose people who have access to JBS Contracts."; break; }
+            var supplierContacts = (await c.QueryAsync<(int Id, bool IsRemoved)>("SELECT Id, IsRemoved FROM contracts.SupplierContact WHERE SupplierId = @id", new { id }, tx))
+                .ToDictionary(x => x.Id, x => x.IsRemoved);
+            var contactIds = (body.ContactIds ?? []).Distinct().ToList();
+            if (contactIds.Any(x => !supplierContacts.ContainsKey(x))) errors["contactIds"] = "Choose from this supplier's contacts.";
             var actions = body.Actions ?? [];
             for (var i = 0; i < actions.Count; i++)
             {
                 var a = actions[i];
                 if (Clean(a.Text, 500) is null) errors[$"actions.{i}.text"] = "Say what needs doing.";
-                if (a.OwnerId is not { } o || !await ActivePersonAsync(c, tx, o)) errors[$"actions.{i}.ownerId"] = "Choose who will do it.";
+                if (ActionWhoProblem(a, supplierContacts, await (a.OwnerId is { } o ? ActivePersonAsync(c, tx, o) : Task.FromResult(false))) is { } who) errors[$"actions.{i}.ownerId"] = who;
                 if (a.DueOn is null) errors[$"actions.{i}.dueOn"] = "Choose when it's due.";
             }
             if (errors.Count > 0) return ApiResults.Invalid("Check the review.", errors);
@@ -569,12 +575,15 @@ public static class SupplierPageEndpoints
                         DeliveryScore = @d, ServiceScore = @sv, CostScore = @co, UpdatedUtc = SYSUTCDATETIME() WHERE Id = @reviewId
                     """, args, tx);
                 await c.ExecuteAsync("DELETE FROM contracts.BusinessReviewAttendee WHERE ReviewId = @reviewId", new { reviewId }, tx);
+                await c.ExecuteAsync("DELETE FROM contracts.BusinessReviewContact WHERE ReviewId = @reviewId", new { reviewId }, tx);
             }
             foreach (var a in attendees)
                 await c.ExecuteAsync("INSERT INTO contracts.BusinessReviewAttendee (ReviewId, PersonId) VALUES (@reviewId, @a)", new { reviewId, a }, tx);
+            foreach (var x in contactIds)
+                await c.ExecuteAsync("INSERT INTO contracts.BusinessReviewContact (ReviewId, ContactId) VALUES (@reviewId, @x)", new { reviewId, x }, tx);
             var heldText = Day(args.held);
             foreach (var a in actions)
-                await AddActionAsync(c, tx, audit, settings, me, s, reviewId.Value, args.held, Clean(a.Text, 500)!, a.OwnerId!.Value, a.DueOn!.Value);
+                await AddActionAsync(c, tx, audit, settings, me, s, reviewId.Value, args.held, Clean(a.Text, 500)!, a.ForSupplier ? null : a.OwnerId, a.ForSupplier ? a.SupplierContactId : null, a.DueOn!.Value);
             if (body.NextReviewDue is { } next)
                 await c.ExecuteAsync("UPDATE contracts.Supplier SET NextReviewDue = @next, UpdatedUtc = SYSUTCDATETIME() WHERE Id = @id", new { next = next.ToDateTime(TimeOnly.MinValue), id }, tx);
             var scores = string.Join(", ", new[] { ("quality", body.QualityScore), ("delivery", body.DeliveryScore), ("service", body.ServiceScore), ("cost", body.CostScore) }
@@ -584,7 +593,7 @@ public static class SupplierPageEndpoints
                 $"{(body.Rating is { } rt ? $": {RatingNames[rt]}" : "")}{(scores.Length > 0 ? $" ({scores})" : "")}" +
                 $"{(actions.Count > 0 ? $", with {actions.Count} {(actions.Count == 1 ? "action" : "actions")}" : "")}" +
                 $"{(body.NextReviewDue is { } nx ? $"; next review due {Day(nx.ToDateTime(TimeOnly.MinValue))}" : "")}.",
-                new { reviewId, args.held, summary, attendees, args.attendeesText, body.Rating, body.QualityScore, body.DeliveryScore, body.ServiceScore, body.CostScore, body.NextReviewDue });
+                new { reviewId, args.held, summary, attendees, contactIds, args.attendeesText, body.Rating, body.QualityScore, body.DeliveryScore, body.ServiceScore, body.CostScore, body.NextReviewDue });
             await tx.CommitAsync();
             return Results.Ok(new { id = reviewId });
         }
@@ -609,12 +618,45 @@ public static class SupplierPageEndpoints
             var errors = new Dictionary<string, string>();
             var text = Clean(body.Text, 500);
             if (text is null) errors["text"] = "Say what needs doing.";
-            if (body.OwnerId is not { } o || !await ActivePersonAsync(c, tx, o)) errors["ownerId"] = "Choose who will do it.";
+            var supplierContacts = (await c.QueryAsync<(int Id, bool IsRemoved)>("SELECT Id, IsRemoved FROM contracts.SupplierContact WHERE SupplierId = @id", new { id }, tx))
+                .ToDictionary(x => x.Id, x => x.IsRemoved);
+            if (ActionWhoProblem(body, supplierContacts, await (body.OwnerId is { } o ? ActivePersonAsync(c, tx, o) : Task.FromResult(false))) is { } who) errors["ownerId"] = who;
             if (body.DueOn is null) errors["dueOn"] = "Choose when it's due.";
             if (errors.Count > 0) return ApiResults.Invalid("Check the action.", errors);
-            var actionId = await AddActionAsync(c, tx, audit, settings, me!, s, reviewId, held.Value, text!, body.OwnerId!.Value, body.DueOn!.Value);
+            var actionId = await AddActionAsync(c, tx, audit, settings, me!, s, reviewId, held.Value, text!, body.ForSupplier ? null : body.OwnerId,
+                body.ForSupplier ? body.SupplierContactId : null, body.DueOn!.Value);
             await tx.CommitAsync();
             return Results.Ok(new { id = actionId });
+        });
+
+        // The review as a Word document (D-104), to edit and send as the minutes. Anyone who can see the supplier can download it.
+        app.MapGet("/api/suppliers/{id:int}/reviews/{reviewId:int}/document", async (int id, int reviewId, CurrentUser current, Db db, TimeProvider clock) =>
+        {
+            var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
+            if (refusal is not null) return refusal;
+            await using var c = await db.OpenAsync();
+            var s = await LoadAsync(c, null, id);
+            if (s is null) return NotFound();
+            var r = await c.QuerySingleOrDefaultAsync<ReviewRow>("""
+                SELECT r.Id, r.HeldOn, r.Summary, r.SupplierAttendees, r.Rating, r.QualityScore, r.DeliveryScore, r.ServiceScore, r.CostScore, cb.Name AS CreatedByName, r.CreatedUtc, r.RowVersion
+                FROM contracts.BusinessReview r JOIN contracts.Person cb ON cb.Id = r.CreatedById WHERE r.Id = @reviewId AND r.SupplierId = @id AND r.IsRemoved = 0
+                """, new { reviewId, id });
+            if (r is null) return ApiResults.NotFound("We couldn't find that business review.");
+            var jbs = (await c.QueryAsync<string>("""
+                SELECT p.Name FROM contracts.BusinessReviewAttendee a JOIN contracts.Person p ON p.Id = a.PersonId WHERE a.ReviewId = @reviewId ORDER BY p.Name
+                """, new { reviewId })).ToList();
+            var theirs = (await ReviewContactsAsync(c, null, id, reviewId)).Select(x => x.Role is { } role ? $"{x.Name} ({role})" : x.Name).ToList();
+            if (r.SupplierAttendees is { } typed) theirs.Add(typed); // older reviews: the names as typed
+            var actions = (await ActionsAsync(c, null, id, reviewId))
+                .Select(a => new ReviewDocument.Action(a.Text, Who(a, s.Name), DateOnly.FromDateTime(a.DueOn), a.DoneUtc is not null)).ToList();
+            var now = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), TimeZoneInfo.FindSystemTimeZoneById("Australia/Brisbane")).DateTime;
+            var bytes = ReviewDocument.Build(new ReviewDocument.Content(
+                s.Name, DateOnly.FromDateTime(r.HeldOn), r.Rating is { } rt ? RatingNames[rt] : null,
+                [("Quality", r.QualityScore), ("Delivery", r.DeliveryScore), ("Service", r.ServiceScore), ("Cost", r.CostScore)],
+                r.Summary, jbs, theirs, actions, s.NextReviewDue is { } nd ? DateOnly.FromDateTime(nd) : null, me!.Name, now));
+            var safe = new string(s.Name.Select(ch => char.IsLetterOrDigit(ch) || ch is ' ' or '-' ? ch : ' ').ToArray()).Trim();
+            return Results.File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                $"Business review {safe} {r.HeldOn:yyyy-MM-dd}.docx");
         });
 
         // Tick an action done (or not done): its owner, or anyone who can add reviews for the supplier.
@@ -624,7 +666,7 @@ public static class SupplierPageEndpoints
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
             await using var tx = await Db.BeginWriteAsync(c);
-            var a = await c.QuerySingleOrDefaultAsync<(string Text, int OwnerId, DateTime? DoneUtc, int SupplierId, string Supplier, int? RelationshipOwnerId)>("""
+            var a = await c.QuerySingleOrDefaultAsync<(string Text, int? OwnerId, DateTime? DoneUtc, int SupplierId, string Supplier, int? RelationshipOwnerId)>("""
                 SELECT a.Text, a.OwnerId, a.DoneUtc, s.Id, s.Name, s.RelationshipOwnerId FROM contracts.BusinessReviewAction a WITH (UPDLOCK)
                 JOIN contracts.BusinessReview r ON r.Id = a.ReviewId JOIN contracts.Supplier s ON s.Id = r.SupplierId
                 WHERE a.Id = @actionId AND r.IsRemoved = 0
@@ -642,14 +684,47 @@ public static class SupplierPageEndpoints
         });
     }
 
-    /// <summary>Adds an action to a review, audited, and emails its owner (unless they gave it to themselves).</summary>
+    /// <summary>Why an action's "who" doesn't work, or null: an active JBS person, or the supplier (optionally one of its current contacts).</summary>
+    private static string? ActionWhoProblem(ActionInput a, Dictionary<int, bool> supplierContacts, bool ownerIsActive) =>
+        a.ForSupplier
+            ? a.SupplierContactId is { } sc && (!supplierContacts.TryGetValue(sc, out var removed) || removed) ? "Choose one of this supplier's contacts, or the supplier." : null
+            : ownerIsActive ? null : "Choose who will do it.";
+
+    /// <summary>Who an action is for, in words: the JBS person, or the supplier's contact (or the supplier).</summary>
+    private static string Who(ActionRow a, string supplier) => a.OwnerName ?? (a.ContactName is { } cn ? $"{cn} ({supplier})" : supplier);
+
+    private static Task<IEnumerable<ActionRow>> ActionsAsync(SqlConnection c, SqlTransaction? tx, int supplierId, int? reviewId = null) => c.QueryAsync<ActionRow>("""
+        SELECT a.Id, a.ReviewId, a.Text, a.OwnerId, o.Name AS OwnerName, a.SupplierContactId, sc.Name AS ContactName, a.DueOn, a.DoneUtc, db.Name AS DoneByName
+        FROM contracts.BusinessReviewAction a JOIN contracts.BusinessReview r ON r.Id = a.ReviewId LEFT JOIN contracts.Person o ON o.Id = a.OwnerId
+        LEFT JOIN contracts.SupplierContact sc ON sc.Id = a.SupplierContactId LEFT JOIN contracts.Person db ON db.Id = a.DoneById
+        WHERE r.SupplierId = @supplierId AND (@reviewId IS NULL OR r.Id = @reviewId) ORDER BY a.DueOn, a.Id
+        """, new { supplierId, reviewId }, tx);
+
+    private static Task<IEnumerable<(int ReviewId, int ContactId, string Name, string? Role)>> ReviewContactsAsync(SqlConnection c, SqlTransaction? tx, int supplierId, int? reviewId = null) =>
+        c.QueryAsync<(int, int, string, string?)>("""
+            SELECT x.ReviewId, x.ContactId, k.Name, k.Role FROM contracts.BusinessReviewContact x JOIN contracts.SupplierContact k ON k.Id = x.ContactId
+            JOIN contracts.BusinessReview r ON r.Id = x.ReviewId WHERE r.SupplierId = @supplierId AND (@reviewId IS NULL OR r.Id = @reviewId) ORDER BY k.Name
+            """, new { supplierId, reviewId }, tx);
+
+    /// <summary>
+    /// Adds an action to a review, audited. A JBS person is emailed (unless they gave it to themselves); an action for the supplier
+    /// isn't emailed to anyone (D-104): the relationship owner sees it on Home.
+    /// </summary>
     private static async Task<int> AddActionAsync(SqlConnection c, SqlTransaction tx, AuditLog audit, AppSettings settings, Person me, SupplierInfo s, int reviewId, DateTime heldOn,
-        string text, int ownerId, DateOnly dueOn)
+        string text, int? ownerId, int? contactId, DateOnly dueOn)
     {
         var due = dueOn.ToDateTime(TimeOnly.MinValue);
         var actionId = await c.ExecuteScalarAsync<int>("""
-            INSERT INTO contracts.BusinessReviewAction (ReviewId, Text, OwnerId, DueOn) OUTPUT INSERTED.Id VALUES (@reviewId, @text, @ownerId, @due)
-            """, new { reviewId, text, ownerId, due }, tx);
+            INSERT INTO contracts.BusinessReviewAction (ReviewId, Text, OwnerId, SupplierContactId, DueOn) OUTPUT INSERTED.Id VALUES (@reviewId, @text, @ownerId, @contactId, @due)
+            """, new { reviewId, text, ownerId, contactId, due }, tx);
+        if (ownerId is null)
+        {
+            var contact = contactId is null ? null : await c.ExecuteScalarAsync<string>("SELECT Name FROM contracts.SupplierContact WHERE Id = @contactId", new { contactId }, tx);
+            await audit.WriteAsync(c, tx, me.AsActor(), "supplier.action-added", "Supplier", s.Id,
+                $"{me.Name} gave {(contact is null ? s.Name : $"{contact} at {s.Name}")} an action from the business review: \"{text}\", due {Day(due)}.",
+                new { actionId, reviewId, text, forSupplier = true, contactId, dueOn });
+            return actionId;
+        }
         var owner = await c.QuerySingleAsync<Person>("SELECT * FROM contracts.Person WHERE Id = @ownerId", new { ownerId }, tx);
         await audit.WriteAsync(c, tx, me.AsActor(), "supplier.action-added", "Supplier", s.Id,
             $"{me.Name} gave {owner.Name} an action from the {s.Name} business review: \"{text}\", due {Day(due)}.", new { actionId, reviewId, text, ownerId, dueOn });

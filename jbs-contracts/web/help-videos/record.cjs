@@ -374,7 +374,10 @@ const videos = {
       const d = p.getByRole('dialog')
       await s.step(2)
       await s.select(d.getByLabel('JBS people who attended'), 'Priya Patel (demo)')
-      await s.type(d.getByLabel('Supplier people who attended'), 'Dana Brooks (Account manager)')
+      await s.click(d.getByRole('button', { name: 'Add new contact' }), 500)
+      await s.type(d.getByLabel(/^Name/), 'Dana Brooks')
+      await s.type(d.getByLabel(/^Role/), 'Account manager')
+      await s.click(d.getByRole('button', { name: 'Save contact' }), 1200)
       await s.type(d.getByLabel(/Summary/), 'On-time delivery is back to 96%. Fuel levy stays until June.')
       await s.step(3)
       await s.click(d.getByRole('radio', { name: 'Good' }), 400)
@@ -385,10 +388,15 @@ const videos = {
       await s.type(d.getByLabel(/Action 1/), 'Send the revised Christmas delivery schedule')
       await s.select(d.getByLabel(/^Who/), 'Priya Patel (demo)')
       await s.fill(d.getByLabel(/^Due/), '2026-12-05')
+      await s.click(d.getByRole('button', { name: 'Add an action' }), 500)
+      await s.type(d.getByLabel(/Action 2/), 'Confirm the new delivery windows in writing')
+      await s.select(d.getByLabel(/^Who/).nth(1), 'Dana Brooks (Account manager)')
+      await s.fill(d.getByLabel(/^Due/).nth(1), '2026-12-12')
       await s.fill(d.getByLabel('Next business review due'), '2027-03-10')
       await s.step(5)
       await s.click(d.getByRole('button', { name: 'Add review' }), 1500)
-      await s.upload(p.getByRole('button', { name: 'Attach a file' }), pdf('Quarterly review deck.pdf'), 2200)
+      await s.upload(p.getByRole('button', { name: 'Attach a file' }).first(), pdf('Quarterly review deck.pdf'), 2200)
+      await s.point(p.getByRole('link', { name: /^Word document of the review/ }).first(), 1500)
     }),
 
   'import-old-contracts': (b) =>

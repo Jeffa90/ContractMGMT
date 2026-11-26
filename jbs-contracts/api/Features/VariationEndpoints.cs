@@ -188,7 +188,8 @@ public static class VariationEndpoints
 
         var body = new SaveContract(k.Title, k.Description, k.SupplierId, k.CategoryId, k.AgreementTypeId, businessUnit, site, k.OwnerId, k.BackupOwnerId, k.IsConfidential,
             value, currency, k.SapOutlineAgreement, D(k.StartDate), D(k.EffectiveDate), end, evergreen, notice, review, k.NeedsLegalReview, null, addedChanges,
-            entity, function, autoRenews, term);
+            entity, function, autoRenews, term,
+            kept.ContainsKey("reviewDate") ? null : k.ReviewMonthsBeforeEnd); // a review date chosen here replaces a period; a period follows a new end date
         if (errors.Count == 0)
         {
             var map = new Dictionary<string, string> { ["businessUnitId"] = "businessUnit", ["siteId"] = "site", ["entityId"] = "entity", ["functionId"] = "function" };

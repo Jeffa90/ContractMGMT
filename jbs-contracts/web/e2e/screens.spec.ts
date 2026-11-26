@@ -63,6 +63,35 @@ test('A supplier page, each tab', async ({ page, api }) => {
   }
 })
 
+test('A business review to print, and its form', async ({ page, api }) => {
+  const suppliers: Supplier[] = await (await api.get('/api/suppliers')).json()
+  let found: { supplier: number; review: number } | null = null
+  for (const s of suppliers) {
+    const detail = await (await api.get(`/api/suppliers/${s.id}`)).json()
+    if (detail.reviews.length > 0) {
+      found = { supplier: s.id, review: detail.reviews[0].id }
+      break
+    }
+  }
+  expect(found, 'the demo data has a business review').not.toBeNull()
+  await page.goto(`/suppliers/${found!.supplier}/reviews/${found!.review}/print`)
+  await settled(page)
+  await expect(page.getByRole('heading', { level: 1, name: /^Business review: / })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Print or save as PDF' })).toBeVisible()
+  await expectAccessible(page)
+  await expectNoSideScroll(page)
+
+  // The form: the supplier's contacts to tick, a new contact, and actions for JBS people or the supplier.
+  await page.goto(`/suppliers/${found!.supplier}?tab=reviews`)
+  await settled(page)
+  await page.getByRole('button', { name: 'Add business review' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('button', { name: 'Add new contact' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Add an action' }).click()
+  await expect(dialog.locator('optgroup[label$="(not emailed)"]')).toHaveCount(1)
+  await expectAccessible(page)
+})
+
 test('Reports, each tab', async ({ page }) => {
   await page.goto('/reports')
   await settled(page)

@@ -162,6 +162,10 @@ const topics = {
           on by its renewal term, the decision is cleared for the new term, and the reminders start again from the new date. It's recorded in its Activity.
         </p>
         <p>
+          A <strong>review date</strong> can be a period before the end date (1, 3, 6 or 12 months): it moves when the end date does, including an automatic
+          renewal. Or choose a date.
+        </p>
+        <p>
           Reminder emails go to the owner and backup before notice deadlines, end dates and review dates. Seven days before a notice deadline with no decision,
           the Group Head is told too.
         </p>
@@ -250,7 +254,10 @@ const topics = {
           </li>
           <li>
             <strong>Business reviews</strong>: a log of each review with who attended, a summary, an overall rating, scores from 1 to 5, the actions agreed and the
-            deck. Each action's owner is emailed and sees it on their Home until they tick it done. Procurement, admins and the relationship owner add reviews.
+            deck. Tick the supplier's contacts who attended, or <strong>Add new contact</strong> there and then. Give each action to someone at JBS (they're
+            emailed and see it on Home until it's ticked done) or to the supplier or one of its contacts (not emailed; the relationship owner sees it on Home to
+            follow up). <strong>Word</strong> downloads the review to edit and send as the minutes; <strong>Print</strong> opens it on one page to print or save
+            as PDF. Procurement, admins and the relationship owner add reviews.
           </li>
           <li>
             <strong>Contracts</strong>: this supplier's contracts you can see.

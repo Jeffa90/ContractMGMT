@@ -15,6 +15,15 @@ import { api, ApiError } from '@/lib/api'
 import type { ContractDetail, Lists, Supplier } from '@/lib/contracts'
 import { arrange, type FieldValue, type Layout, type LayoutField } from '@/lib/layout'
 import { useMe } from '@/lib/me'
+import { formatDate } from '@/lib/format'
+
+/** A yyyy-mm-dd date moved by whole months, keeping month ends (31 Mar less 1 month is 28 or 29 Feb), as the server does. */
+function addMonths(iso: string, months: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const first = new Date(Date.UTC(y, m - 1 + months, 1))
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d, last))).toISOString().slice(0, 10)
+}
 
 type FormState = {
   title: string
@@ -40,6 +49,8 @@ type FormState = {
   renewalTermMonths: string
   noticePeriodDays: string
   reviewDate: string
+  /** '' none, 'date' a date, or a number of months before the end date (D-105). */
+  reviewWhen: string
   needsLegalReview: boolean
 }
 
@@ -121,7 +132,8 @@ export function ContractForm({
     autoRenews: c?.autoRenews ?? false,
     renewalTermMonths: toText(c?.renewalTermMonths),
     noticePeriodDays: toText(c?.noticePeriodDays),
-    reviewDate: c?.reviewDate ?? '',
+    reviewDate: c?.reviewMonthsBeforeEnd ? '' : (c?.reviewDate ?? ''),
+    reviewWhen: c?.reviewMonthsBeforeEnd ? String(c.reviewMonthsBeforeEnd) : c?.reviewDate ? 'date' : '',
     needsLegalReview: c?.needsLegalReview ?? true,
   }))
   const [extra, setExtra] = useState<Record<string, FieldValue>>(() =>
@@ -174,7 +186,8 @@ export function ContractForm({
         autoRenews: !form.isEvergreen && form.autoRenews,
         renewalTermMonths: !form.isEvergreen && form.autoRenews && form.renewalTermMonths.trim() !== '' ? Number(form.renewalTermMonths) : null,
         noticePeriodDays: form.noticePeriodDays.trim() === '' ? null : Number(form.noticePeriodDays),
-        reviewDate: form.reviewDate || null,
+        reviewDate: form.reviewWhen === 'date' ? form.reviewDate || null : null,
+        reviewMonthsBeforeEnd: !form.isEvergreen && /^\d+$/.test(form.reviewWhen) ? Number(form.reviewWhen) : null,
         needsLegalReview: form.needsLegalReview,
         rowVersion: c?.rowVersion,
         fields,
@@ -341,10 +354,40 @@ export function ContractForm({
             {(p) => <TextInput {...p} value={form.sapOutlineAgreement} onChange={(e) => set('sapOutlineAgreement', e.target.value)} maxLength={50} />}
           </Field>
         )
-      case 'startDate':
-      case 'effectiveDate':
       case 'reviewDate': {
-        const k = f.key as 'startDate' | 'effectiveDate' | 'reviewDate'
+        // A period before the end date (it moves with the end date), or a date (D-105). Evergreen contracts have no end date.
+        const periods = [...new Set([1, 3, 6, 12, ...(/^\d+$/.test(form.reviewWhen) ? [Number(form.reviewWhen)] : [])])].sort((a, b) => a - b)
+        const when = form.isEvergreen && /^\d+$/.test(form.reviewWhen) ? '' : form.reviewWhen
+        const months = /^\d+$/.test(when) ? Number(when) : null
+        const worked =
+          months === null ? undefined : form.endDate ? `Review on ${formatDate(addMonths(form.endDate, -months))}. It moves if the end date does.` : 'Worked out once there is an end date.'
+        return (
+          <div className="flex flex-col gap-3">
+            <Field label={f.label} required={f.isRequired} error={errors.reviewDate} help={worked ?? help}>
+              {(p) => (
+                <Select {...p} className="sm:w-80" value={when} onChange={(e) => set('reviewWhen', e.target.value)}>
+                  <option value="">No review date</option>
+                  {!form.isEvergreen &&
+                    periods.map((m) => (
+                      <option key={m} value={String(m)}>
+                        {m === 1 ? '1 month' : `${m} months`} before the end date
+                      </option>
+                    ))}
+                  <option value="date">On a date</option>
+                </Select>
+              )}
+            </Field>
+            {when === 'date' && (
+              <Field label="Review on">
+                {(p) => <TextInput {...p} type="date" className="sm:w-60" value={form.reviewDate} onChange={(e) => set('reviewDate', e.target.value)} />}
+              </Field>
+            )}
+          </div>
+        )
+      }
+      case 'startDate':
+      case 'effectiveDate': {
+        const k = f.key as 'startDate' | 'effectiveDate'
         return (
           <Field label={f.label} required={f.isRequired} error={errors[k]} help={help}>
             {(p) => <TextInput {...p} type="date" className="sm:w-60" value={form[k]} onChange={(e) => set(k, e.target.value)} />}

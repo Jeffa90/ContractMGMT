@@ -122,9 +122,9 @@ public static class TeamEndpoints
                 """, new { ids = System.Text.Json.JsonSerializer.Serialize(ids) })).ToDictionary(d => d.Id);
             // Supplier work (D-90): open business review actions, and business reviews due for the suppliers each person looks after.
             var supplierWork = (await c.QueryAsync<(int PersonId, string Kind, int SupplierId, string SupplierName, string What, DateTime Due)>("""
-                SELECT a.OwnerId, N'Action', s.Id, s.Name, a.Text, a.DueOn
+                SELECT ISNULL(a.OwnerId, s.RelationshipOwnerId), N'Action', s.Id, s.Name, a.Text, a.DueOn
                 FROM contracts.BusinessReviewAction a JOIN contracts.BusinessReview r ON r.Id = a.ReviewId JOIN contracts.Supplier s ON s.Id = r.SupplierId
-                WHERE a.DoneUtc IS NULL AND r.IsRemoved = 0 AND a.DueOn <= @until
+                WHERE a.DoneUtc IS NULL AND r.IsRemoved = 0 AND a.DueOn <= @until AND ISNULL(a.OwnerId, s.RelationshipOwnerId) IS NOT NULL
                 UNION ALL
                 SELECT s.RelationshipOwnerId, N'ReviewDue', s.Id, s.Name, N'Business review', s.NextReviewDue FROM contracts.Supplier s
                 WHERE s.IsActive = 1 AND s.RelationshipOwnerId IS NOT NULL AND s.NextReviewDue <= @until

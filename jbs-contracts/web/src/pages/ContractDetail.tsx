@@ -85,7 +85,7 @@ function builtInDisplay(key: string, c: Contract): ReactNode {
     case 'autoRenews': return c.autoRenews ? 'Yes: if no one gives notice, the end date moves on by the renewal term' : 'No'
     case 'renewalTermMonths': return c.autoRenews && c.renewalTermMonths !== null ? (c.renewalTermMonths === 1 ? '1 month' : `${c.renewalTermMonths} months`) : ''
     case 'noticePeriodDays': return c.noticePeriodDays !== null ? `${c.noticePeriodDays} days${c.noticeDeadline ? ` (notice by ${formatDate(c.noticeDeadline)})` : ''}` : ''
-    case 'reviewDate': return formatDate(c.reviewDate)
+    case 'reviewDate': return c.reviewMonthsBeforeEnd ? `${formatDate(c.reviewDate) || 'Once there is an end date'} (${c.reviewMonthsBeforeEnd === 1 ? '1 month' : `${c.reviewMonthsBeforeEnd} months`} before the end date)` : formatDate(c.reviewDate)
     case 'needsLegalReview': return c.needsLegalReview ? 'Yes' : 'No'
     default: return null
   }

@@ -17,6 +17,7 @@ import { RenewalsPage } from './pages/Renewals'
 import { ReportsPage } from './pages/Reports'
 import { TeamPage } from './pages/Team'
 import { SupplierPage } from './pages/Supplier'
+import { ReviewPrintPage } from './pages/ReviewPrint'
 import { ImportPage } from './pages/Import'
 import { FeedbackPage } from './pages/Feedback'
 import { GuidePage, HelpCentrePage } from './helpcentre/HelpCentre'
@@ -69,6 +70,8 @@ const router = createBrowserRouter([
       { path: '*', element: <NotFoundPage /> },
     ],
   },
+  // A business review on its own page, to print or save as PDF (D-104): no menus.
+  { path: 'suppliers/:id/reviews/:reviewId/print', element: <ReviewPrintPage /> },
 ])
 
 function SignedIn() {

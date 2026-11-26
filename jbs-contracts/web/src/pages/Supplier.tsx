@@ -10,12 +10,14 @@ import {
   CheckCircle2,
   Download,
   FilePlus2,
+  FileDown,
   FileText,
   Lock,
   Mail,
   Pencil,
   Phone,
   Plus,
+  Printer,
   ShieldAlert,
   Trash2,
   Upload,
@@ -988,7 +990,108 @@ function Documents({ data }: { data: SupplierPageData }) {
 
 // ------------------------------------------------------------------ Business reviews
 
-type ActionDraft = { text: string; ownerId: string; dueOn: string };
+/** Who an action is for: "p:12" a JBS person (emailed), "s" the supplier, "c:5" one of its contacts (not emailed, D-104). */
+type ActionDraft = { text: string; who: string; dueOn: string };
+
+function whoBody(who: string) {
+  const [kind, id] = who.split(":");
+  return {
+    ownerId: kind === "p" ? Number(id) : null,
+    forSupplier: kind === "s" || kind === "c",
+    supplierContactId: kind === "c" ? Number(id) : null,
+  };
+}
+
+/** Who an action is for: JBS people (they're emailed), or the supplier or one of its contacts (not emailed). */
+function WhoSelect({
+  data,
+  people,
+  value,
+  onChange,
+  fieldProps,
+}: {
+  data: SupplierPageData;
+  people: { id: number; name: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  fieldProps: object;
+}) {
+  return (
+    <Select {...fieldProps} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Choose…</option>
+      <optgroup label="JBS (emailed)">
+        {people.map((x) => (
+          <option key={x.id} value={`p:${x.id}`}>
+            {x.name}
+          </option>
+        ))}
+      </optgroup>
+      <optgroup label={`${data.supplier.name} (not emailed)`}>
+        <option value="s">{data.supplier.name}</option>
+        {data.contacts.map((x) => (
+          <option key={x.id} value={`c:${x.id}`}>
+            {x.name}
+            {x.role ? ` (${x.role})` : ""}
+          </option>
+        ))}
+      </optgroup>
+    </Select>
+  );
+}
+
+/** Add a supplier contact without leaving the review form; it's ticked as attending once saved (D-104). */
+function NewContact({ supplierId, onAdded }: { supplierId: number; onAdded: (id: number) => void }) {
+  const refresh = useSave(supplierId);
+  const [open, setOpen] = useState(false);
+  const [c, setC] = useState({ name: "", role: "", email: "", phone: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const add = useMutation({
+    mutationFn: () => api.post<{ id: number }>(`/api/suppliers/${supplierId}/contacts`, c),
+    onSuccess: async (r) => {
+      await refresh();
+      onAdded(r.id);
+      toast.success(`${c.name} added to the supplier's contacts.`);
+      setC({ name: "", role: "", email: "", phone: "" });
+      setErrors({});
+      setOpen(false);
+    },
+    onError: (e) => setErrors(fieldErrors(e, "name")),
+  });
+  if (!open)
+    return (
+      <div>
+        <Button variant="ghost" icon={<Plus aria-hidden className="size-4" />} onClick={() => setOpen(true)}>
+          Add new contact
+        </Button>
+      </div>
+    );
+  return (
+    <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border p-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Name" required error={errors.name}>
+          {(p) => <TextInput {...p} maxLength={200} value={c.name} onChange={(e) => setC({ ...c, name: e.target.value })} />}
+        </Field>
+        <Field label="Role" error={errors.role}>
+          {(p) => <TextInput {...p} maxLength={200} value={c.role} onChange={(e) => setC({ ...c, role: e.target.value })} />}
+        </Field>
+        <Field label="Email" error={errors.email}>
+          {(p) => <TextInput {...p} type="email" maxLength={254} value={c.email} onChange={(e) => setC({ ...c, email: e.target.value })} />}
+        </Field>
+        <Field label="Phone" error={errors.phone}>
+          {(p) => <TextInput {...p} type="tel" maxLength={50} value={c.phone} onChange={(e) => setC({ ...c, phone: e.target.value })} />}
+        </Field>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button loading={add.isPending} onClick={() => add.mutate()}>
+          Save contact
+        </Button>
+        <Button variant="ghost" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function ScorePicker({
   label,
@@ -1035,8 +1138,9 @@ function ReviewDialog({
   const [form, setForm] = useState({
     heldOn: review?.heldOn ?? today(),
     summary: review?.summary ?? "",
-    supplierAttendees: review?.supplierAttendees ?? "",
+    supplierAttendees: review?.supplierAttendees ?? "", // older reviews: kept as typed
     attendeeIds: review?.attendees.map((a) => a.id) ?? [],
+    contactIds: review?.contacts.map((a) => a.id) ?? [],
     rating: (review?.rating ?? "none") as Rating | "none",
     qualityScore: review?.qualityScore ?? null,
     deliveryScore: review?.deliveryScore ?? null,
@@ -1054,9 +1158,10 @@ function ReviewDialog({
         rowVersion: review?.rowVersion,
         rating: form.rating === "none" ? null : form.rating,
         nextReviewDue: form.nextReviewDue || null,
+        supplierAttendees: form.supplierAttendees || null,
         actions: actions.map((a) => ({
           text: a.text,
-          ownerId: a.ownerId ? Number(a.ownerId) : null,
+          ...whoBody(a.who),
           dueOn: a.dueOn || null,
         })),
       };
@@ -1069,7 +1174,7 @@ function ReviewDialog({
       toast.success(
         review
           ? "Review saved."
-          : "Business review added. Anyone given an action has been emailed.",
+          : "Business review added. JBS people given an action have been emailed.",
       );
       onClose();
     },
@@ -1166,19 +1271,41 @@ function ReviewDialog({
             </div>
           )}
         </Field>
-        <Field label="Supplier people who attended">
-          {(p) => (
-            <TextInput
-              {...p}
-              maxLength={1000}
-              placeholder="For example: Dana Brooks (Account manager), Lee Park (Operations)"
-              value={form.supplierAttendees}
-              onChange={(e) =>
-                setForm({ ...form, supplierAttendees: e.target.value })
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-sm font-medium">{s.name} people who attended</legend>
+          {errors.contactIds && (
+            <p role="alert" className="text-sm text-danger">
+              {errors.contactIds}
+            </p>
+          )}
+          {[
+            ...data.contacts,
+            // A contact removed since the review was held stays ticked on it.
+            ...(review?.contacts ?? []).filter((x) => !data.contacts.some((k) => k.id === x.id)),
+          ].map((x) => (
+            <Checkbox
+              key={x.id}
+              label={x.role ? `${x.name} (${x.role})` : x.name}
+              checked={form.contactIds.includes(x.id)}
+              onChange={(on) =>
+                setForm({
+                  ...form,
+                  contactIds: on ? [...form.contactIds, x.id] : form.contactIds.filter((k) => k !== x.id),
+                })
               }
             />
+          ))}
+          {data.contacts.length === 0 && (
+            <p className="text-sm text-muted-foreground">No contacts yet. Add the people who attended.</p>
           )}
-        </Field>
+          {form.supplierAttendees && (
+            <p className="text-sm text-muted-foreground">Recorded before: {form.supplierAttendees}</p>
+          )}
+          <NewContact
+            supplierId={s.id}
+            onAdded={(id) => setForm((f) => ({ ...f, contactIds: [...f.contactIds, id] }))}
+          />
+        </fieldset>
         <Field label="Summary" required error={errors.summary}>
           {(p) => (
             <Textarea
@@ -1223,6 +1350,10 @@ function ReviewDialog({
         {!review && (
           <fieldset className="flex flex-col gap-3">
             <legend className="text-sm font-medium">Actions</legend>
+            <p className="text-sm text-muted-foreground">
+              Give each action to someone at JBS (they're emailed and see it on Home) or to {s.name} (not emailed; the relationship owner sees it on
+              Home to follow up).
+            </p>
             {actions.map((a, i) => (
               <div
                 key={i}
@@ -1255,24 +1386,13 @@ function ReviewDialog({
                     error={errors[`actions.${i}.ownerId`]}
                   >
                     {(p) => (
-                      <Select
-                        {...p}
-                        value={a.ownerId}
-                        onChange={(e) =>
-                          setActions(
-                            actions.map((x, j) =>
-                              j === i ? { ...x, ownerId: e.target.value } : x,
-                            ),
-                          )
-                        }
-                      >
-                        <option value="">Choose…</option>
-                        {(people.data ?? []).map((x) => (
-                          <option key={x.id} value={x.id}>
-                            {x.name}
-                          </option>
-                        ))}
-                      </Select>
+                      <WhoSelect
+                        data={data}
+                        people={people.data ?? []}
+                        fieldProps={p}
+                        value={a.who}
+                        onChange={(v) => setActions(actions.map((x, j) => (j === i ? { ...x, who: v } : x)))}
+                      />
                     )}
                   </Field>
                   <Field
@@ -1313,7 +1433,7 @@ function ReviewDialog({
               <Button
                 icon={<Plus aria-hidden className="size-4" />}
                 onClick={() =>
-                  setActions([...actions, { text: "", ownerId: "", dueOn: "" }])
+                  setActions([...actions, { text: "", who: "", dueOn: "" }])
                 }
               >
                 Add an action
@@ -1342,28 +1462,29 @@ function ReviewDialog({
 }
 
 function AddActionDialog({
-  supplierId,
+  data,
   reviewId,
   onClose,
 }: {
-  supplierId: number;
+  data: SupplierPageData;
   reviewId: number;
   onClose: () => void;
 }) {
+  const supplierId = data.supplier.id;
   const people = usePeople();
   const refresh = useSave(supplierId);
-  const [a, setA] = useState<ActionDraft>({ text: "", ownerId: "", dueOn: "" });
+  const [a, setA] = useState<ActionDraft>({ text: "", who: "", dueOn: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const save = useMutation({
     mutationFn: () =>
       api.post(`/api/suppliers/${supplierId}/reviews/${reviewId}/actions`, {
         text: a.text,
-        ownerId: a.ownerId ? Number(a.ownerId) : null,
+        ...whoBody(a.who),
         dueOn: a.dueOn || null,
       }),
     onSuccess: () => {
       void refresh();
-      toast.success("Action added. Its owner has been emailed.");
+      toast.success(a.who.startsWith("p:") ? "Action added. Its owner has been emailed." : "Action added. The relationship owner sees it on Home.");
       onClose();
     },
     onError: (e) =>
@@ -1398,21 +1519,8 @@ function AddActionDialog({
             />
           )}
         </Field>
-        <Field label="Who" required error={errors.ownerId}>
-          {(p) => (
-            <Select
-              {...p}
-              value={a.ownerId}
-              onChange={(e) => setA({ ...a, ownerId: e.target.value })}
-            >
-              <option value="">Choose…</option>
-              {(people.data ?? []).map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}
-                </option>
-              ))}
-            </Select>
-          )}
+        <Field label="Who" required error={errors.ownerId} help="JBS people are emailed. Actions for the supplier aren't; the relationship owner sees them on Home.">
+          {(p) => <WhoSelect data={data} people={people.data ?? []} fieldProps={p} value={a.who} onChange={(v) => setA({ ...a, who: v })} />}
         </Field>
         <Field label="Due" required error={errors.dueOn}>
           {(p) => (
@@ -1471,7 +1579,21 @@ function ReviewCard({
             Added by {review.createdByName}, {formatDateTime(review.createdUtc)}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1">
+          <a
+            href={`/api/suppliers/${s.id}/reviews/${review.id}/document`}
+            aria-label={`Word document of the review of ${formatDate(review.heldOn)}`}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-medium hover:bg-muted"
+          >
+            <FileDown aria-hidden className="size-4" /> Word
+          </a>
+          <Link
+            to={`/suppliers/${s.id}/reviews/${review.id}/print`}
+            aria-label={`Print the review of ${formatDate(review.heldOn)}`}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-medium hover:bg-muted"
+          >
+            <Printer aria-hidden className="size-4" /> Print
+          </Link>
           {review.rating && (
             <Badge
               tone={ratingTone[review.rating]}
@@ -1510,12 +1632,13 @@ function ReviewCard({
         </dl>
       )}
       <p className="mt-3 text-sm whitespace-pre-line">{review.summary}</p>
-      {(review.attendees.length > 0 || review.supplierAttendees) && (
+      {(review.attendees.length > 0 || review.contacts.length > 0 || review.supplierAttendees) && (
         <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
           <Users aria-hidden className="mt-0.5 size-3.5 shrink-0" />
           <span>
             {[
               review.attendees.map((a) => a.name).join(", "),
+              review.contacts.map((a) => (a.role ? `${a.name} (${a.role})` : a.name)).join(", "),
               review.supplierAttendees,
             ]
               .filter(Boolean)
@@ -1643,7 +1766,7 @@ function ReviewCard({
       )}
       {addingAction && (
         <AddActionDialog
-          supplierId={s.id}
+          data={data}
           reviewId={review.id}
           onClose={() => setAddingAction(false)}
         />

@@ -23,8 +23,12 @@ export type SupplierDocument = {
 export type ReviewAction = {
   id: number;
   text: string;
-  ownerId: number;
+  /** The JBS person, or null when it's for the supplier (D-104). */
+  ownerId: number | null;
+  /** Who, in words: the JBS person, or the supplier's contact (or the supplier). */
   ownerName: string;
+  forSupplier: boolean;
+  supplierContactId: number | null;
   dueOn: string;
   done: boolean;
   doneUtc: string | null;
@@ -47,6 +51,8 @@ export type BusinessReview = {
   createdUtc: string;
   rowVersion: string;
   attendees: { id: number; name: string }[];
+  /** The supplier's contacts who attended (D-104). */
+  contacts: { id: number; name: string; role: string | null }[];
   actions: ReviewAction[];
   documents: SupplierDocument[];
 };

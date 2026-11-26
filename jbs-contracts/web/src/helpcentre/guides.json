@@ -369,10 +369,10 @@
       "video": true,
       "steps": [
         "Open the supplier and choose **Business reviews**, then **Add business review**. Procurement, admins and the supplier's relationship owner can.",
-        "Enter when it was held, who attended and a short summary.",
+        "Enter when it was held and who attended from JBS. Tick the supplier's people, or click **Add new contact**. Then write a short summary.",
         "Give an overall rating, and score quality, delivery, service and cost from 1 to 5.",
-        "Click **Add an action** for each thing agreed: what, who and when. Then set when the next review is due.",
-        "Click **Add review**, then **Attach a file** for the deck or minutes. Each action's owner is emailed and sees it on Home until they tick it done."
+        "Click **Add an action** for each thing agreed: what, who (someone at JBS, or the supplier) and when. Then set when the next review is due.",
+        "Click **Add review**, then **Attach a file** for the deck or minutes. **Word** and **Print** give you the review as minutes. JBS people with an action are emailed; the supplier's actions show on the relationship owner's Home."
       ]
     },
     {

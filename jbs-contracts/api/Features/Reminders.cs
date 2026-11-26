@@ -205,7 +205,8 @@ public sealed class ReminderJob(Db db, AuditLog audit, AppSettings settings, Tim
             var p = new DynamicParameters(new { id = k.Id });
             p.Add("end", end.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
             await c.ExecuteAsync("""
-                UPDATE contracts.Contract SET EndDate = @end, RenewalDecision = NULL, RenewalDecisionNote = NULL, RenewalDecisionUtc = NULL, RenewalDecisionById = NULL,
+                UPDATE contracts.Contract SET EndDate = @end, ReviewDate = CASE WHEN ReviewMonthsBeforeEnd IS NULL THEN ReviewDate ELSE DATEADD(MONTH, -ReviewMonthsBeforeEnd, @end) END,
+                    RenewalDecision = NULL, RenewalDecisionNote = NULL, RenewalDecisionUtc = NULL, RenewalDecisionById = NULL,
                     UpdatedUtc = SYSUTCDATETIME()
                 WHERE Id = @id
                 """, p, tx);

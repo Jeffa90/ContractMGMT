@@ -128,9 +128,12 @@ public static class HomeEndpoints
 
             // Suppliers (D-90): your open business review actions, reviews due for suppliers you look after, and documents you asked to be reminded about.
             var supplierItems = (await c.QueryAsync<SupplierItemRow>("""
-                SELECT N'Action' AS Kind, s.Id AS SupplierId, s.Name AS SupplierName, a.Text AS What, a.DueOn AS Due
+                -- Your actions, and (as relationship owner) the supplier's own actions to follow up (D-104).
+                SELECT N'Action' AS Kind, s.Id AS SupplierId, s.Name AS SupplierName,
+                       CASE WHEN a.OwnerId IS NULL THEN N'For ' + ISNULL(sc.Name, s.Name) + N': ' + a.Text ELSE a.Text END AS What, a.DueOn AS Due
                 FROM contracts.BusinessReviewAction a JOIN contracts.BusinessReview r ON r.Id = a.ReviewId JOIN contracts.Supplier s ON s.Id = r.SupplierId
-                WHERE a.OwnerId = @me AND a.DoneUtc IS NULL AND r.IsRemoved = 0
+                LEFT JOIN contracts.SupplierContact sc ON sc.Id = a.SupplierContactId
+                WHERE (a.OwnerId = @me OR (a.OwnerId IS NULL AND s.RelationshipOwnerId = @me)) AND a.DoneUtc IS NULL AND r.IsRemoved = 0
                 UNION ALL
                 SELECT N'ReviewDue', s.Id, s.Name, N'Business review', s.NextReviewDue FROM contracts.Supplier s
                 WHERE s.RelationshipOwnerId = @me AND s.IsActive = 1 AND s.NextReviewDue IS NOT NULL AND s.NextReviewDue <= DATEADD(DAY, 30, @today)

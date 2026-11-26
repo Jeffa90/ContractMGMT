@@ -227,4 +227,78 @@ public sealed class SupplierTests(AppFixture app)
         Assert.Contains("supplier.action-added", audit);
         Assert.Contains("supplier.action-done", audit);
     }
+
+    [Fact]
+    public async Task Business_reviews_take_supplier_contacts_as_attendees_give_actions_to_the_supplier_and_export_to_Word()
+    {
+        var (procurement, _, _) = await PersonAsync("Pru Procure", Roles(owner: true, procurement: true));
+        var (relationship, relationshipId, _) = await PersonAsync("Rel Owner", Roles(owner: true));
+        var (other, _, _) = await PersonAsync("Oli Other", Roles(owner: true));
+        var (doer, doerId, doerName) = await PersonAsync("Dee Doer", Roles(owner: true));
+        var supplierName = Unique("Review Co ");
+        var sid = (await ReadAsync(await procurement.PostAsJsonAsync("/api/suppliers", new { name = supplierName }, Ct))).GetProperty("id").GetInt32();
+        var page = await GetAsync(procurement, $"/api/suppliers/{sid}");
+        await ReadAsync(await procurement.PutAsJsonAsync($"/api/suppliers/{sid}/relationship",
+            new { relationshipOwnerId = relationshipId, riskRating = "Low", rowVersion = page.GetProperty("supplier").GetProperty("rowVersion").GetString() }, Ct));
+
+        // The relationship owner adds a contact from the review form; changing contacts stays with Procurement and admins.
+        var dana = (await ReadAsync(await relationship.PostAsJsonAsync($"/api/suppliers/{sid}/contacts", new { name = "Dana Brooks", role = "Account manager", email = "dana@example.com" }, Ct))).GetProperty("id").GetInt32();
+        Assert.Equal(HttpStatusCode.Forbidden, (await relationship.PutAsJsonAsync($"/api/suppliers/{sid}/contacts/{dana}", new { name = "Dana B" }, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await other.PostAsJsonAsync($"/api/suppliers/{sid}/contacts", new { name = "Not allowed" }, Ct)).StatusCode);
+        var lee = (await ReadAsync(await procurement.PostAsJsonAsync($"/api/suppliers/{sid}/contacts", new { name = "Lee Park", role = "Operations" }, Ct))).GetProperty("id").GetInt32();
+        var elsewhere = (await ReadAsync(await procurement.PostAsJsonAsync("/api/suppliers", new { name = Unique("Elsewhere ") }, Ct))).GetProperty("id").GetInt32();
+        var stranger = (await ReadAsync(await procurement.PostAsJsonAsync($"/api/suppliers/{elsewhere}/contacts", new { name = "Stranger" }, Ct))).GetProperty("id").GetInt32();
+
+        object Review(object[] actions, int[] contactIds) => new { heldOn = D(-2), summary = "Quarterly review.\nDeliveries improved.", contactIds, attendeeIds = new[] { doerId },
+            rating = "Good", qualityScore = 4, actions };
+        // Only this supplier's contacts; a supplier action can only name one of its own current contacts.
+        Assert.Equal(HttpStatusCode.BadRequest, (await relationship.PostAsJsonAsync($"/api/suppliers/{sid}/reviews", Review([], [stranger]), Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await relationship.PostAsJsonAsync($"/api/suppliers/{sid}/reviews",
+            Review([new { text = "Wrong contact", forSupplier = true, supplierContactId = stranger, dueOn = D(10) }], [dana]), Ct)).StatusCode);
+
+        var reviewId = (await ReadAsync(await relationship.PostAsJsonAsync($"/api/suppliers/{sid}/reviews", Review(
+        [
+            new { text = "Send the recovery plan", forSupplier = true, supplierContactId = (int?)dana, ownerId = (int?)null, dueOn = D(10) },
+            new { text = "Confirm the new delivery windows", forSupplier = true, supplierContactId = (int?)null, ownerId = (int?)null, dueOn = D(12) },
+            new { text = "Check the plant's figures", forSupplier = false, supplierContactId = (int?)null, ownerId = (int?)doerId, dueOn = D(8) },
+        ], [dana, lee]), Ct))).GetProperty("id").GetInt32();
+
+        var review = (await GetAsync(other, $"/api/suppliers/{sid}")).GetProperty("reviews").EnumerateArray().Single(r => r.GetProperty("id").GetInt32() == reviewId);
+        Assert.Equal(["Dana Brooks", "Lee Park"], review.GetProperty("contacts").EnumerateArray().Select(c => c.GetProperty("name").GetString()));
+        var who = review.GetProperty("actions").EnumerateArray().ToDictionary(a => a.GetProperty("text").GetString()!, a => (a.GetProperty("ownerName").GetString(), a.GetProperty("forSupplier").GetBoolean()));
+        Assert.Equal(($"Dana Brooks ({supplierName})", true), who["Send the recovery plan"]);
+        Assert.Equal((supplierName, true), who["Confirm the new delivery windows"]);
+        Assert.Equal((doerName, false), who["Check the plant's figures"]);
+
+        // Only the JBS person is emailed; the supplier's actions show on the relationship owner's Home to follow up.
+        await using var db = await app.OpenAsync();
+        Assert.Equal(1, await db.ExecuteScalarAsync<int>("""
+            SELECT COUNT(*) FROM contracts.EmailOutbox WHERE Kind = N'review-action'
+              AND DedupeKey IN (SELECT N'review-action:' + CAST(Id AS NVARCHAR(20)) FROM contracts.BusinessReviewAction WHERE ReviewId = @reviewId)
+            """, new { reviewId }));
+        var home = (await GetAsync(relationship, "/api/home")).GetProperty("suppliers").EnumerateArray()
+            .Where(x => x.GetProperty("supplierId").GetInt32() == sid && x.GetProperty("kind").GetString() == "Action").Select(x => x.GetProperty("what").GetString()).ToList();
+        Assert.Contains("For Dana Brooks: Send the recovery plan", home);
+        Assert.Contains($"For {supplierName}: Confirm the new delivery windows", home);
+        Assert.DoesNotContain("Check the plant's figures", home);
+
+        // Another supplier action later; the relationship owner ticks it done.
+        var later = (await ReadAsync(await relationship.PostAsJsonAsync($"/api/suppliers/{sid}/reviews/{reviewId}/actions",
+            new { text = "Share the insurance certificate", forSupplier = true, supplierContactId = lee, dueOn = D(20) }, Ct))).GetProperty("id").GetInt32();
+        await ReadAsync(await relationship.PostAsJsonAsync($"/api/review-actions/{later}/done", new { done = true }, Ct));
+        Assert.Equal(HttpStatusCode.Forbidden, (await other.PostAsJsonAsync($"/api/review-actions/{later}/done", new { done = false }, Ct)).StatusCode);
+
+        // The review as a Word document, for anyone who can see the supplier.
+        var response = await other.GetAsync($"/api/suppliers/{sid}/reviews/{reviewId}/document", Ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", response.Content.Headers.ContentType?.MediaType);
+        using var word = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(new MemoryStream(await response.Content.ReadAsByteArrayAsync(Ct)), false);
+        var text = word.MainDocumentPart!.Document.Body!.InnerText;
+        Assert.Contains($"Business review: {supplierName}", text);
+        Assert.Contains("Dana Brooks (Account manager)", text);
+        Assert.Contains("Deliveries improved.", text);
+        Assert.Contains("Send the recovery plan", text);
+        Assert.Contains("4 out of 5", text);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"/api/suppliers/{elsewhere}/reviews/{reviewId}/document", Ct)).StatusCode);
+    }
 }

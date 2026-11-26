@@ -131,7 +131,7 @@ public sealed class StandardFieldsTests(AppFixture app)
         using var admin = app.ClientFor(AppFixture.AdminAccount);
         var (owner, _, _) = await PersonAsync("Arlo Auto", owner: true);
         var (approver, _, _) = await PersonAsync("Avery Approver", approver: true);
-        var rolls = await EffectiveAsync(owner, approver, admin, new { endDate = D(10), noticePeriodDays = 30, autoRenews = true, renewalTermMonths = 12, decision = "Renegotiate" });
+        var rolls = await EffectiveAsync(owner, approver, admin, new { endDate = D(10), noticePeriodDays = 30, autoRenews = true, renewalTermMonths = 12, reviewMonthsBeforeEnd = 3, decision = "Renegotiate" });
         var ends = await EffectiveAsync(owner, approver, admin, new { endDate = D(5), noticePeriodDays = 30, autoRenews = true, renewalTermMonths = 12, decision = "LetItEnd" });
         await using var db = await app.OpenAsync();
         var job = app.Factory.Services.GetRequiredService<ReminderJob>();
@@ -144,6 +144,8 @@ public sealed class StandardFieldsTests(AppFixture app)
         await job.RunAsync(Today.AddDays(11), Ct);
         var after = await db.QuerySingleAsync<(DateTime EndDate, string Stage, string? RenewalDecision)>("SELECT EndDate, Stage, RenewalDecision FROM contracts.Contract WHERE Id = @rolls", new { rolls });
         Assert.Equal(Today.AddDays(10).AddMonths(12), DateOnly.FromDateTime(after.EndDate));
+        // A review set as 3 months before the end date moves with it (D-105).
+        Assert.Equal(Today.AddDays(10).AddMonths(9), DateOnly.FromDateTime(await db.ExecuteScalarAsync<DateTime>("SELECT ReviewDate FROM contracts.Contract WHERE Id = @rolls", new { rolls })));
         Assert.Equal("Effective", after.Stage);
         Assert.Null(after.RenewalDecision);
         Assert.Equal("Ended", await db.ExecuteScalarAsync<string>("SELECT Stage FROM contracts.Contract WHERE Id = @ends", new { ends }));
@@ -254,6 +256,35 @@ public sealed class StandardFieldsTests(AppFixture app)
         var next = (await OkAsync(owner.PostAsJsonAsync("/api/contracts", new { title = $"After import {u}" }, Ct))).GetProperty("reference").GetString()!;
         Assert.True(int.Parse(next[6..]) > n + 1, next);
         _ = ownerId;
+    }
+
+    [Fact]
+    public async Task A_review_date_can_be_a_period_before_the_end_date_that_moves_with_it()
+    {
+        var (owner, _, _) = await PersonAsync("Remy Review", owner: true);
+        var end = Today.AddDays(400);
+        var created = await OkAsync(owner.PostAsJsonAsync("/api/contracts", new { title = Unique("Review "), endDate = end.ToString("yyyy-MM-dd"), reviewMonthsBeforeEnd = 6 }, Ct));
+        var id = created.GetProperty("id").GetInt32();
+        var c = (await OkAsync(owner.GetAsync($"/api/contracts/{id}", Ct))).GetProperty("contract");
+        Assert.Equal(end.AddMonths(-6).ToString("yyyy-MM-dd"), c.GetProperty("reviewDate").GetString());
+        Assert.Equal(6, c.GetProperty("reviewMonthsBeforeEnd").GetInt32());
+
+        // Moving the end date moves the review; choosing a date replaces the period.
+        var later = end.AddMonths(2);
+        await OkAsync(owner.PutAsJsonAsync($"/api/contracts/{id}", new { title = c.GetProperty("title").GetString(), endDate = later.ToString("yyyy-MM-dd"), reviewMonthsBeforeEnd = 6, rowVersion = c.GetProperty("rowVersion").GetString() }, Ct));
+        c = (await OkAsync(owner.GetAsync($"/api/contracts/{id}", Ct))).GetProperty("contract");
+        Assert.Equal(later.AddMonths(-6).ToString("yyyy-MM-dd"), c.GetProperty("reviewDate").GetString());
+        await OkAsync(owner.PutAsJsonAsync($"/api/contracts/{id}", new { title = c.GetProperty("title").GetString(), endDate = later.ToString("yyyy-MM-dd"), reviewDate = D(30), rowVersion = c.GetProperty("rowVersion").GetString() }, Ct));
+        c = (await OkAsync(owner.GetAsync($"/api/contracts/{id}", Ct))).GetProperty("contract");
+        Assert.Equal(D(30), c.GetProperty("reviewDate").GetString());
+        Assert.Equal(JsonValueKind.Null, c.GetProperty("reviewMonthsBeforeEnd").ValueKind);
+
+        // Evergreen contracts have no end date to count back from; a draft without an end date waits for one.
+        var (s, b) = await SendAsync(owner.PostAsJsonAsync("/api/contracts", new { title = "Evergreen review", isEvergreen = true, reviewMonthsBeforeEnd = 3 }, Ct));
+        Assert.Equal(HttpStatusCode.BadRequest, s);
+        Assert.True(b.GetProperty("fields").TryGetProperty("reviewDate", out _));
+        var waiting = (await OkAsync(owner.PostAsJsonAsync("/api/contracts", new { title = Unique("No end yet "), reviewMonthsBeforeEnd = 3 }, Ct))).GetProperty("id").GetInt32();
+        Assert.Equal(JsonValueKind.Null, (await OkAsync(owner.GetAsync($"/api/contracts/{waiting}", Ct))).GetProperty("contract").GetProperty("reviewDate").ValueKind);
     }
 
     [Theory]

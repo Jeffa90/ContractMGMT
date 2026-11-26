@@ -555,7 +555,7 @@ public static class ExcelEndpoints
         ["title"] = "Title", ["description"] = "Description", ["supplierId"] = "Supplier", ["categoryId"] = "Category", ["agreementTypeId"] = "Agreement type",
         ["businessUnitId"] = "Business unit", ["siteId"] = "Site", ["entityId"] = "Entity", ["functionId"] = "Function", ["ownerId"] = "Owner", ["backupOwnerId"] = "Backup owner", ["currencyCode"] = "Currency",
         ["value"] = "Value", ["sapOutlineAgreement"] = "SAP outline agreement number", ["endDate"] = "End date", ["noticePeriodDays"] = "Notice period (days)",
-        ["autoRenews"] = "Renews automatically", ["renewalTermMonths"] = "Renewal term (months)",
+        ["autoRenews"] = "Renews automatically", ["renewalTermMonths"] = "Renewal term (months)", ["reviewDate"] = "Review date",
     };
 
     /// <summary>The contract sheet's own headings (added fields whose label matches one get their key added, so no two columns share a heading).</summary>
@@ -575,6 +575,7 @@ public static class ExcelEndpoints
             new("Evergreen", "Yes or No", 11),
             new("Renews automatically", "Yes or No. Yes moves the end date on by the renewal term unless someone decides to let it end.", 14),
             new("Renewal term (months)", "Whole number, needed when it renews automatically", 14), new("Notice period (days)", "Whole number", 14), new("Review date", "Day/month/year", 13),
+            new("Review months before end", "1, 3, 6 or 12: the review date is worked out from the end date and moves with it. Blank with a review date: that date.", 14),
             new("Needs Legal review", "Yes or No (Yes if blank for a new contract)", 15), new("Description", null, 40),
         ],
         [], ["Stage", "Notice deadline"],
@@ -591,7 +592,7 @@ public static class ExcelEndpoints
             {
                 r.Reference, r.Title, r.SupplierName, r.CategoryDisplay, r.AgreementTypeName, people[r.OwnerId].WindowsAccount,
                 r.BackupOwnerId is { } b ? people[b].WindowsAccount : null, r.IsConfidential, r.BusinessUnitName, r.SiteName, r.EntityName, r.FunctionName,
-                r.Value, r.CurrencyCode, r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, D(r.ReviewDate), r.NeedsLegalReview,
+                r.Value, r.CurrencyCode, r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, D(r.ReviewDate), r.ReviewMonthsBeforeEnd, r.NeedsLegalReview,
                 r.Description,
             }
             .Concat(added.Select(a => a is not null && values[r.Id].TryGetValue(a.Field.Key, out var v) ? Fields.ExcelValue(a.Field, v, id => people.GetValueOrDefault(id)?.WindowsAccount) : null))
@@ -705,7 +706,10 @@ public static class ExcelEndpoints
                 var autoRenews = said ?? (!evergreen && (before?.AutoRenews ?? false)); // Evergreen without a Yes here stops it renewing
                 var term = row.WholeNumber("Renewal term (months)", out p) ?? before?.RenewalTermMonths; if (p is not null) problems.Add(p);
                 var notice = row.WholeNumber("Notice period (days)", out p) ?? before?.NoticePeriodDays; if (p is not null) problems.Add(p);
-                var review = row.Date("Review date", out p) ?? DO(before?.ReviewDate); if (p is not null) problems.Add(p);
+                var reviewGiven = row.Date("Review date", out p); if (p is not null) problems.Add(p);
+                var review = reviewGiven ?? DO(before?.ReviewDate);
+                var reviewMonths = row.WholeNumber("Review months before end", out p); if (p is not null) problems.Add(p);
+                reviewMonths ??= reviewGiven is null ? before?.ReviewMonthsBeforeEnd : null; // a review date given replaces a period
                 var legal = row.YesNo("Needs Legal review", out p) ?? before?.NeedsLegalReview ?? true; if (p is not null) problems.Add(p);
                 var description = Clean(row.Text("Description")) ?? before?.Description;
                 // Added fields: a blank cell leaves the value as it is.
@@ -719,7 +723,7 @@ public static class ExcelEndpoints
                 if (problems.Count > 0) { r.Refuse(string.Join(" ", problems)); continue; }
 
                 var body = new SaveContract(title, description, supplierId, categoryId, agreementTypeId, businessUnitId, siteId, ownerId, backupId, confidential,
-                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityId, functionId, autoRenews, term);
+                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityId, functionId, autoRenews, term, reviewMonths);
                 var errors = await ContractEndpoints.CheckAsync(x.C, x.Tx, body, before);
                 var (parsed, fieldErrors) = await Fields.ParseAsync(x.C, x.Tx, fieldValues, definitions);
                 var labels = added.ToDictionary(a => $"field.{a.Field.Key}", a => a.Header);

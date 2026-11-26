@@ -149,10 +149,15 @@ public static class RenewalEndpoints
                 p.Add("today", today.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
                 p.Add("next", body.Date?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
                 await x.C.ExecuteAsync("""
-                    UPDATE contracts.Contract SET LastReviewedOn = @today, LastReviewedById = @me, ReviewDate = @next, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                    UPDATE contracts.Contract SET LastReviewedOn = @today, LastReviewedById = @me,
+                        -- A review set as a period before the end date keeps it (the next one comes with the next end date), unless a date is given.
+                        ReviewDate = CASE WHEN @next IS NULL AND ReviewMonthsBeforeEnd IS NOT NULL THEN ReviewDate ELSE @next END,
+                        ReviewMonthsBeforeEnd = CASE WHEN @next IS NULL THEN ReviewMonthsBeforeEnd END,
+                        UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
                     WHERE Id = @id
                     """, p, x.Tx);
-                await x.Audit("contract.review-done", $"{x.Me.Name} marked the review of {c.Reference} done" + (body.Date is { } n ? $"; next review {Day(n)}." : "; no next review date."),
+                await x.Audit("contract.review-done", $"{x.Me.Name} marked the review of {c.Reference} done" + (body.Date is { } n ? $"; next review {Day(n)}."
+                    : c.ReviewMonthsBeforeEnd is { } rm ? $"; the next review is {ContractEndpoints.Months(rm)} before its next end date." : "; no next review date."),
                     new { reviewDate = new { before = D(c.ReviewDate), after = body.Date } });
                 return null;
             }, audit));
@@ -242,11 +247,11 @@ public static class RenewalEndpoints
         p.Add("start", c.EndDate is { } end && !c.IsEvergreen ? end.AddDays(1) : (DateTime?)null, System.Data.DbType.Date);
         var newId = await x.C.ExecuteScalarAsync<int>("""
             INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, NeedsLegalReview, RenewsContractId,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewMonthsBeforeEnd, NeedsLegalReview, RenewsContractId,
                 CreatedById, UpdatedById, IsDemo)
             OUTPUT INSERTED.Id
             SELECT @reference, @title, Description, SupplierId, CategoryId, AgreementTypeId, BusinessUnitId, SiteId, EntityId, FunctionId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, 1, Id,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewMonthsBeforeEnd, 1, Id,
                 @me, @me, IsDemo
             FROM contracts.Contract WHERE Id = @id
             """, p, x.Tx);

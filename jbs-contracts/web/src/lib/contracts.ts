@@ -99,6 +99,8 @@ export type Contract = {
   renewalTermMonths: number | null
   noticePeriodDays: number | null
   reviewDate: string | null
+  /** The review is this many months before the end date and moves with it (D-105). */
+  reviewMonthsBeforeEnd: number | null
   noticeDeadline: string | null
   needsLegalReview: boolean
   stage: Stage

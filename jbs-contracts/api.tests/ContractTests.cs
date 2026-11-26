@@ -159,7 +159,7 @@ public sealed class ContractTests(AppFixture app)
     {
         using var admin = app.ClientFor(AppFixture.AdminAccount);
         var catName = Unique("Freight");
-        var created = await admin.PostAsJsonAsync("/api/categories", new { name = catName }, Ct);
+        var created = await admin.PostAsJsonAsync("/api/categories", new { name = catName, parentId = await app.FamilyAsync() }, Ct);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var catId = (await ReadAsync(created)).GetProperty("id").GetInt32();
         var sub = await admin.PostAsJsonAsync("/api/categories", new { name = "Linehaul", parentId = catId }, Ct);
@@ -171,7 +171,11 @@ public sealed class ContractTests(AppFixture app)
         var (owner, _) = await NewOwnerAsync("Lisa Lists");
         Assert.Equal(HttpStatusCode.Forbidden, (await owner.PostAsJsonAsync("/api/categories", new { name = "Mine" }, Ct)).StatusCode);
         var id = await CreateAsync(owner, new { title = "Linehaul Qld", categoryId = subId });
-        Assert.Equal($"{catName} > Linehaul", (await GetAsync(owner, id)).GetProperty("contract").GetProperty("categoryDisplay").GetString());
+        Assert.Equal($"{AppFixture.TestFamily} > {catName} > Linehaul", (await GetAsync(owner, id)).GetProperty("contract").GetProperty("categoryDisplay").GetString());
+        // A family alone isn't a contract's category (D-115).
+        var familyOnly = await owner.PostAsJsonAsync("/api/contracts", new { title = "Family only", categoryId = await app.FamilyAsync() }, Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, familyOnly.StatusCode);
+        Assert.Contains("not only the family", await familyOnly.Content.ReadAsStringAsync(Ct));
 
         // Hide the subcategory: the contract keeps it and can still be saved; new contracts can't pick it.
         Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/categories/{subId}", new { isActive = false }, Ct)).StatusCode);

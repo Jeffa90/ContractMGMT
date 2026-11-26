@@ -31,7 +31,7 @@ public sealed class PickListTests(AppFixture app)
         HasIdAndName((await GetAsync(client, "/api/people/picker"))[0]);
 
         using var admin = app.ClientFor(AppFixture.AdminAccount);
-        var category = JsonDocument.Parse(await (await admin.PostAsJsonAsync("/api/categories", new { name = $"Cat {user}" }, Ct)).Content.ReadAsStringAsync(Ct)).RootElement;
+        var category = JsonDocument.Parse(await (await admin.PostAsJsonAsync("/api/categories", new { name = $"Cat {user}", parentId = await app.FamilyAsync() }, Ct)).Content.ReadAsStringAsync(Ct)).RootElement;
         var created = JsonDocument.Parse(await (await client.PostAsJsonAsync("/api/contracts", new { title = $"Pick list {user}", categoryId = category.GetProperty("id").GetInt32() }, Ct))
             .Content.ReadAsStringAsync(Ct)).RootElement;
         var detail = await GetAsync(client, $"/api/contracts/{created.GetProperty("id").GetInt32()}");

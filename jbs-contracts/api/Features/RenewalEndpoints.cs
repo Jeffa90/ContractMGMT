@@ -255,8 +255,10 @@ public static class RenewalEndpoints
                 @me, @me, IsDemo
             FROM contracts.Contract WHERE Id = @id
             """, p, x.Tx);
-        // Business units, sites, entities and functions (D-114) and added fields come across too.
+        // Business units, sites, entities and functions (D-114), other categories (D-115) and added fields come across too.
         await x.C.ExecuteAsync("INSERT INTO contracts.ContractListValue (ContractId, ListItemId) SELECT @newId, ListItemId FROM contracts.ContractListValue WHERE ContractId = @id",
+            new { newId, id = c.Id }, x.Tx);
+        await x.C.ExecuteAsync("INSERT INTO contracts.ContractCategory (ContractId, CategoryId) SELECT @newId, CategoryId FROM contracts.ContractCategory WHERE ContractId = @id",
             new { newId, id = c.Id }, x.Tx);
         await x.C.ExecuteAsync("""
             INSERT INTO contracts.ContractFieldValue (ContractId, FieldId, TextValue, NumberValue, DateValue, BoolValue, PersonId, SupplierId)

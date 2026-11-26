@@ -447,8 +447,12 @@ public static partial class Fields
                 }
                 else if (f.Key == "category" && id is not null)
                 {
-                    // A category includes its subcategories.
-                    sql.Add($"(k.CategoryId = @{name} OR k.CategoryId IN (SELECT Id FROM contracts.Category WHERE ParentId = @{name}))");
+                    // A family or category includes everything under it, and a contract is found by its other categories too (D-115).
+                    sql.Add($"""
+                        EXISTS (SELECT 1 FROM contracts.Category fc LEFT JOIN contracts.Category fp ON fp.Id = fc.ParentId
+                                WHERE (fc.Id = @{name} OR fc.ParentId = @{name} OR fp.ParentId = @{name})
+                                  AND (fc.Id = k.CategoryId OR EXISTS (SELECT 1 FROM contracts.ContractCategory fcc WHERE fcc.ContractId = k.Id AND fcc.CategoryId = fc.Id)))
+                        """);
                     p.Add(name, id);
                 }
                 else if (yes is not null && f.Key is "confidential" or "evergreen" or "autoRenews" or "needsLegalReview")

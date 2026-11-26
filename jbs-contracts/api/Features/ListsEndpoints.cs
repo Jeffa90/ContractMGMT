@@ -19,7 +19,7 @@ public sealed class CategoryRow
     public string Name { get; set; } = "";
     public int SortOrder { get; set; }
     public bool IsActive { get; set; }
-    /// <summary>The supplier tier this spend category gives (D-108); a subcategory without one follows its category.</summary>
+    /// <summary>The supplier tier this spend category gives (D-108); one without a tier follows the level above it (D-115).</summary>
     public int? TierId { get; set; }
 }
 
@@ -118,13 +118,20 @@ public static class ListsEndpoints
             if (name.Length == 0 || name.Length > 100) return ApiResults.Invalid("Check the name.", new() { ["name"] = name.Length == 0 ? "Type a name." : "Keep it under 100 characters." });
             await using var c = await db.OpenAsync();
             await using var tx = await Db.BeginWriteAsync(c);
+            // Three levels (D-115): a family, a category in a family, a subcategory in a category.
             string? parentName = null;
+            var level = "family";
             if (body.ParentId is { } parentId)
             {
                 var parent = await c.QuerySingleOrDefaultAsync<CategoryRow>("SELECT * FROM contracts.Category WHERE Id = @parentId", new { parentId }, tx);
-                if (parent is null) return ApiResults.Invalid("Choose a category.", new() { ["parentId"] = "That category no longer exists." });
-                if (parent.ParentId is not null) return ApiResults.Invalid("Subcategories go one level deep.", new() { ["parentId"] = "Choose a top-level category." });
+                if (parent is null) return ApiResults.Invalid("Choose where it goes.", new() { ["parentId"] = "That family or category no longer exists." });
+                var depth = await c.ExecuteScalarAsync<int>("""
+                    SELECT CASE WHEN p.ParentId IS NULL THEN 1 WHEN gp.ParentId IS NULL THEN 2 ELSE 3 END
+                    FROM contracts.Category p LEFT JOIN contracts.Category gp ON gp.Id = p.ParentId WHERE p.Id = @parentId
+                    """, new { parentId }, tx);
+                if (depth >= CategoryTree.MaxDepth) return ApiResults.Invalid("Subcategories are the last level.", new() { ["parentId"] = "Choose a family or a category." });
                 parentName = parent.Name;
+                level = CategoryTree.LevelNames[depth];
             }
             var clash = await c.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Category WITH (UPDLOCK, HOLDLOCK) WHERE ParentKey = ISNULL(@ParentId, 0) AND NameKey = UPPER(@name)", new { body.ParentId, name }, tx);
             if (clash > 0) return ApiResults.Invalid("That's already there.", new() { ["name"] = $"{name} is already there." });
@@ -132,7 +139,7 @@ public static class ListsEndpoints
             var id = await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Category (ParentId, Name, SortOrder) OUTPUT INSERTED.Id VALUES (@ParentId, @name, @order)",
                 new { body.ParentId, name, order }, tx);
             await audit.WriteAsync(c, tx, me!.AsActor(), "category.added", "Category", id,
-                parentName is null ? $"{me.Name} added the category {name}." : $"{me.Name} added the subcategory {name} under {parentName}.");
+                parentName is null ? $"{me.Name} added the family {name}." : $"{me.Name} added the {level} {name} under {parentName}.");
             await tx.CommitAsync();
             return Results.Created($"/api/categories/{id}", new { id });
         });

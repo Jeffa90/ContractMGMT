@@ -103,6 +103,12 @@ public sealed class ContractRow
     public string? SupplierName { get; set; }
     public string? CategoryName { get; set; }
     public string? ParentCategoryName { get; set; }
+    public string? FamilyCategoryName { get; set; }
+    // Other categories besides the main one (D-115): ids comma-separated, paths separated by a unit-separator character.
+    public string? OtherCategoryIdList { get; set; }
+    public string? OtherCategoryPathList { get; set; }
+    public int[] OtherCategoryIds => string.IsNullOrEmpty(OtherCategoryIdList) ? [] : [.. OtherCategoryIdList.Split(',').Select(s => int.Parse(s, CultureInfo.InvariantCulture))];
+    public string[] OtherCategories => string.IsNullOrEmpty(OtherCategoryPathList) ? [] : OtherCategoryPathList.Split(NameSeparator);
     public string? AgreementTypeName { get; set; }
     public string OwnerName { get; set; } = "";
     public string? BackupOwnerName { get; set; }
@@ -121,7 +127,8 @@ public sealed class ContractRow
     public DateTime? NoticeDeadline => NoticePeriodDays is not { } days ? null
         : (IsEvergreen ? ReviewDate : EndDate) is { } anchor ? anchor.AddDays(-days) : null;
 
-    public string? CategoryDisplay => CategoryName is null ? null : ParentCategoryName is null ? CategoryName : $"{ParentCategoryName} > {CategoryName}";
+    /// <summary>The main category as a path: "Family > Category > Subcategory" (D-115).</summary>
+    public string? CategoryDisplay => CategoryName is null ? null : string.Join(" > ", new[] { FamilyCategoryName, ParentCategoryName, CategoryName }.OfType<string>());
 }
 
 public sealed record SaveContract(
@@ -129,7 +136,8 @@ public sealed record SaveContract(
     int? OwnerId, int? BackupOwnerId, bool? IsConfidential, decimal? Value, string? CurrencyCode, string? SapOutlineAgreement,
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool? IsEvergreen, int? NoticePeriodDays, DateOnly? ReviewDate,
     bool? NeedsLegalReview, string? RowVersion, Dictionary<string, System.Text.Json.JsonElement>? Fields = null,
-    int[]? EntityIds = null, int[]? FunctionIds = null, bool? AutoRenews = null, int? RenewalTermMonths = null, int? ReviewMonthsBeforeEnd = null);
+    int[]? EntityIds = null, int[]? FunctionIds = null, bool? AutoRenews = null, int? RenewalTermMonths = null, int? ReviewMonthsBeforeEnd = null,
+    int[]? OtherCategoryIds = null);
 
 public sealed record WithdrawContract(string? Reason, string? RowVersion);
 
@@ -159,8 +167,18 @@ public static class ContractEndpoints
         WHERE clv.ContractId = k.Id
         """;
 
+    /// <summary>A contract's other categories (D-115), for alias k: OtherCategoryIdList and OtherCategoryPathList, by path.</summary>
+    public const string OtherCategoriesSql = """
+        SELECT STRING_AGG(CAST(oc.Id AS NVARCHAR(MAX)), N',') WITHIN GROUP (ORDER BY oc.Path) AS OtherCategoryIdList,
+               STRING_AGG(oc.Path, NCHAR(31)) WITHIN GROUP (ORDER BY oc.Path) AS OtherCategoryPathList
+        FROM (SELECT o.Id, CAST(CONCAT_WS(N' > ', ocf.Name, ocp.Name, o.Name) AS NVARCHAR(MAX)) AS Path
+              FROM contracts.ContractCategory cc JOIN contracts.Category o ON o.Id = cc.CategoryId
+              LEFT JOIN contracts.Category ocp ON ocp.Id = o.ParentId LEFT JOIN contracts.Category ocf ON ocf.Id = ocp.ParentId
+              WHERE cc.ContractId = k.Id) oc
+        """;
+
     private const string SelectContract = $"""
-        SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
+        SELECT k.*, s.Name AS SupplierName, cat.Name AS CategoryName, parent.Name AS ParentCategoryName, family.Name AS FamilyCategoryName, occ.*,
                at.Value AS AgreementTypeName, lv.*,
                o.Name AS OwnerName, b.Name AS BackupOwnerName, cr.Name AS CreatedByName, lp.Name AS LegalPersonName, lc.Name AS LegalClearedByName, rb.Name AS RegisteredByName,
                ul.UnlockId, ul.UnlockReason, ul.UnlockExpiresUtc, ul.UnlockByName, ovr.OpenVariationId, ovr.OpenVariationStage,
@@ -169,6 +187,8 @@ public static class ContractEndpoints
         LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
         LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId
         LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
+        LEFT JOIN contracts.Category family ON family.Id = parent.ParentId
+        OUTER APPLY ({OtherCategoriesSql}) occ
         LEFT JOIN contracts.ListItem at ON at.Id = k.AgreementTypeId
         OUTER APPLY ({ListValuesSql}) lv
         JOIN contracts.Person o ON o.Id = k.OwnerId
@@ -370,6 +390,7 @@ public static class ContractEndpoints
                 @ReviewMonthsBeforeEnd, @NeedsLegalReview, @me, @me)
             """, Params(input!, new { reference, me = me.Id }), tx);
         await SaveListValuesAsync(c, tx, id, input!);
+        await SaveOtherCategoriesAsync(c, tx, id, input!);
         var saved = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
         var added = await Fields.SaveAsync(c, tx, id, fieldValues, definitions);
         await audit.WriteAsync(c, tx, me.AsActor(), "contract.created", "Contract", id,
@@ -396,6 +417,7 @@ public static class ContractEndpoints
             WHERE Id = @id
             """, Params(input!, new { id, me = me.Id }), tx);
         await SaveListValuesAsync(c, tx, id, input!);
+        await SaveOtherCategoriesAsync(c, tx, id, input!);
         var after = await c.QuerySingleAsync<ContractRow>($"{SelectContract} WHERE k.Id = @id", new { id }, tx);
         var (oldValues, newValues) = (Snapshot(before), Snapshot(after));
         var changed = oldValues.Keys.Where(k => oldValues[k] != newValues[k]).ToList();
@@ -419,7 +441,7 @@ public static class ContractEndpoints
         var changed = new List<string>();
         void Check(string label, object? a, object? b) { if (!Equals(a, b)) changed.Add(label); }
         Check("title", before.Title, i.Title); Check("description", before.Description, i.Description); Check("supplier", before.SupplierId, i.SupplierId);
-        Check("category", before.CategoryId, i.CategoryId); Check("agreement type", before.AgreementTypeId, i.AgreementTypeId);
+        Check("category", before.CategoryId, i.CategoryId); Check("other categories", Key(before.OtherCategoryIds), Key(i.OtherCategoryIds)); Check("agreement type", before.AgreementTypeId, i.AgreementTypeId);
         Check("business unit", Key(before.BusinessUnitIds), Key(i.BusinessUnitIds)); Check("site", Key(before.SiteIds), Key(i.SiteIds));
         Check("entity", Key(before.EntityIds), Key(i.EntityIds)); Check("function", Key(before.FunctionIds), Key(i.FunctionIds));
         Check("owner", before.OwnerId, i.OwnerId);
@@ -465,6 +487,17 @@ public static class ContractEndpoints
             """, items.Select(item => new { id, item }), tx);
     }
 
+    /// <summary>Saves the contract's other categories (D-115), replacing what it had.</summary>
+    private static async Task SaveOtherCategoriesAsync(SqlConnection c, SqlTransaction tx, int id, Input i)
+    {
+        var items = i.OtherCategoryIds.ToList();
+        await c.ExecuteAsync("DELETE FROM contracts.ContractCategory WHERE ContractId = @id AND CategoryId NOT IN @items", new { id, items }, tx);
+        await c.ExecuteAsync("""
+            INSERT INTO contracts.ContractCategory (ContractId, CategoryId)
+            SELECT @id, @item WHERE NOT EXISTS (SELECT 1 FROM contracts.ContractCategory WHERE ContractId = @id AND CategoryId = @item)
+            """, items.Select(item => new { id, item }), tx);
+    }
+
     private static DateOnly? D(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
 
     public static object ListView(ContractRow r, Dictionary<string, string>? fields = null) => new
@@ -480,7 +513,7 @@ public static class ContractEndpoints
 
     private static object DetailView(ContractRow r) => new
     {
-        r.Id, r.Reference, r.Title, r.Description, r.SupplierId, r.SupplierName, r.CategoryId, r.CategoryDisplay, r.AgreementTypeId, r.AgreementTypeName,
+        r.Id, r.Reference, r.Title, r.Description, r.SupplierId, r.SupplierName, r.CategoryId, r.CategoryDisplay, r.OtherCategoryIds, r.OtherCategories, r.AgreementTypeId, r.AgreementTypeName,
         r.BusinessUnitIds, r.BusinessUnitName, r.SiteIds, r.SiteName, r.EntityIds, r.EntityName, r.FunctionIds, r.FunctionName, r.OwnerId, r.OwnerName, r.BackupOwnerId, r.BackupOwnerName, r.IsConfidential,
         r.Value, r.CurrencyCode, r.SapOutlineAgreement, StartDate = D(r.StartDate), EffectiveDate = D(r.EffectiveDate), EndDate = D(r.EndDate), r.IsEvergreen,
         r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), r.ReviewMonthsBeforeEnd, NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
@@ -504,6 +537,7 @@ public static class ContractEndpoints
             ["description"] = string.IsNullOrEmpty(r.Description) ? null : "(text)",
             ["supplier"] = r.SupplierName,
             ["category"] = r.CategoryDisplay,
+            ["other categories"] = r.OtherCategories.Length == 0 ? null : string.Join("; ", r.OtherCategories),
             ["agreement type"] = r.AgreementTypeName,
             ["business unit"] = r.BusinessUnitName,
             ["site"] = r.SiteName,
@@ -530,7 +564,7 @@ public static class ContractEndpoints
     public static string Months(int n) => n == 1 ? "1 month" : $"{n} months";
 
     private sealed record Input(string Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int[] BusinessUnitIds, int[] SiteIds,
-        int[] EntityIds, int[] FunctionIds, int OwnerId, int? BackupOwnerId, bool IsConfidential, decimal? Value, string CurrencyCode, string? SapOutlineAgreement,
+        int[] EntityIds, int[] FunctionIds, int[] OtherCategoryIds, int OwnerId, int? BackupOwnerId, bool IsConfidential, decimal? Value, string CurrencyCode, string? SapOutlineAgreement,
         DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool IsEvergreen, bool AutoRenews, int? RenewalTermMonths, int? NoticePeriodDays,
         DateOnly? ReviewDate, int? ReviewMonthsBeforeEnd, bool NeedsLegalReview);
 
@@ -569,6 +603,17 @@ public static class ContractEndpoints
         }
         await CheckAsync("supplierId", b.SupplierId, before?.SupplierId, "SELECT COUNT(*) FROM contracts.Supplier WHERE Id = @id AND IsActive = 1", "Choose a supplier from the list.");
         await CheckAsync("categoryId", b.CategoryId, before?.CategoryId, "SELECT COUNT(*) FROM contracts.Category WHERE Id = @id AND IsActive = 1", "Choose a category from the list.");
+        // A family alone isn't enough (D-115): the main category is a category or a subcategory.
+        if (!f.ContainsKey("categoryId") && b.CategoryId is { } cid && cid != before?.CategoryId)
+            await CheckAsync("categoryId", cid, null, "SELECT COUNT(*) FROM contracts.Category WHERE Id = @id AND ParentId IS NOT NULL", "Choose a category in the family, not only the family.");
+        // Other categories: the same rules, in use unless the contract already had them; the main one isn't repeated.
+        var others = (b.OtherCategoryIds ?? []).Distinct().Where(o => o != b.CategoryId).ToArray();
+        if (others.Length > 0)
+        {
+            var previous = before?.OtherCategoryIds ?? [];
+            var ok = await c.QueryAsync<int>("SELECT Id FROM contracts.Category WHERE Id IN @others AND ParentId IS NOT NULL AND (IsActive = 1 OR Id IN @previous)", new { others, previous }, tx);
+            if (ok.Count() != others.Length) f["otherCategoryIds"] = "Choose other categories from the list (a category or subcategory, not only a family).";
+        }
         await CheckAsync("agreementTypeId", b.AgreementTypeId, before?.AgreementTypeId, "SELECT COUNT(*) FROM contracts.ListItem WHERE Id = @id AND ListName = N'AgreementType' AND IsActive = 1", "Choose an agreement type from the list.");
         // Several values each (D-114). Each must be in its list and in use, unless the contract already had it.
         async Task<int[]> ListAsync(string field, string list, int[]? ids, int[]? previous, string message)
@@ -624,7 +669,7 @@ public static class ContractEndpoints
         }
 
         if (f.Count > 0) return (null, f);
-        return (new Input(title, description, b.SupplierId, b.CategoryId, b.AgreementTypeId, businessUnits, sites, entities, functions, ownerId!.Value,
+        return (new Input(title, description, b.SupplierId, b.CategoryId, b.AgreementTypeId, businessUnits, sites, entities, functions, others, ownerId!.Value,
             b.BackupOwnerId, b.IsConfidential ?? false, b.Value, currency, sap, b.StartDate, b.EffectiveDate, b.EndDate, evergreen, autoRenews, term,
             b.NoticePeriodDays, reviewDate, reviewMonths, b.NeedsLegalReview ?? true), null);
     }

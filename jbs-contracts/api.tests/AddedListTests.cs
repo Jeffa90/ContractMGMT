@@ -35,7 +35,7 @@ public sealed class AddedListTests(AppFixture app)
         var user = $"dk{u}";
         await app.AddPersonAsync(user, $"Dana Kind {u}", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
         using var owner = app.ClientFor($@"TEST\{user}");
-        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Cat {u}" }, Ct));
+        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Cat {u}", parentId = await app.FamilyAsync() }, Ct));
         var id = (await ReadAsync(await owner.PostAsJsonAsync("/api/contracts", new { title = $"Kinds {u}", categoryId = category.GetProperty("id").GetInt32() }, Ct))).GetProperty("id").GetInt32();
 
         Assert.Equal(HttpStatusCode.Created, (await UploadAsync(owner, id, $"L{itemId}")).StatusCode);

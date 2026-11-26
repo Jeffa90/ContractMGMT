@@ -101,16 +101,22 @@ public sealed class ExcelTests(AppFixture app)
     {
         using var admin = app.ClientFor(AppFixture.AdminAccount);
         var top = Unique("Cat");
+        // Family > Category > Subcategory (D-115), the parent given as a path; rows can come before their parents.
         var file = Sheet(["List", "Name", "Parent category", "Active"],
-            ["Category", "Linehaul", top, null],   // subcategory before its parent in the sheet
+            ["Category", "Linehaul", $"{top} > Freight", null],
+            ["Category", "Freight", top, null],
             ["Category", top, null, null],
+            ["Category", "Deeper", $"{top} > Freight > Linehaul", null], // a fourth level: refused
             ["Agreement type", Unique("Type"), null, null],
             ["Currency", "jpy", null, null],
             ["Planet", "Mars", null, null]);
         var (_, result) = await PostAsync(admin, "lists", "import", file);
-        Assert.Equal((4, 1), (Count(result, "added"), Count(result, "refused")));
+        Assert.Equal((5, 2), (Count(result, "added"), Count(result, "refused")));
         await using var db = await app.OpenAsync();
-        Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Category s JOIN contracts.Category p ON p.Id = s.ParentId WHERE p.Name = @top AND s.Name = 'Linehaul'", new { top }));
+        Assert.Equal(1, await db.ExecuteScalarAsync<int>("""
+            SELECT COUNT(*) FROM contracts.Category s JOIN contracts.Category p ON p.Id = s.ParentId JOIN contracts.Category f ON f.Id = p.ParentId
+            WHERE f.Name = @top AND f.ParentId IS NULL AND p.Name = 'Freight' AND s.Name = 'Linehaul'
+            """, new { top }));
         Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.ListItem WHERE ListName = 'Currency' AND Value = 'JPY'"));
 
         // Export, then import the export unchanged: nothing changes.
@@ -120,7 +126,7 @@ public sealed class ExcelTests(AppFixture app)
         Assert.Equal((0, 0), (Count(again, "added"), Count(again, "refused")));
         // Other tests hide and show their own list entries in parallel, so check this test's rows.
         var mine = again.GetProperty("rows").EnumerateArray().Where(r => r.GetProperty("label").GetString()!.Contains(top)).ToList();
-        Assert.Equal(2, mine.Count);
+        Assert.Equal(3, mine.Count); // the family, its category and the subcategory
         Assert.All(mine, r => Assert.Equal("same", r.GetProperty("action").GetString()));
     }
 

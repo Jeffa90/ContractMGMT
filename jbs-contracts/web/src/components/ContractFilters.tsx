@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useMemo } from 'react'
 import { api } from '@/lib/api'
-import type { Lists, Supplier } from '@/lib/contracts'
+import { categoryPaths, type Lists, type Supplier } from '@/lib/contracts'
 import type { LayoutField } from '@/lib/layout'
+import { Combobox } from './Combobox'
 import { Select } from './form'
 import { Button, Field } from './ui'
 
@@ -33,7 +34,11 @@ export function ContractFilters({
     queryFn: () => api.get<Lists>('/api/lists'),
     enabled: needs(['category', 'agreementType', 'businessUnit', 'site', 'entity', 'function', 'owner', 'backupOwner']),
   })
-  const suppliers = useQuery({ queryKey: ['suppliers'], queryFn: () => api.get<Supplier[]>('/api/suppliers'), enabled: needs(['supplier'], ['Supplier']) })
+  const suppliers = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: () => api.get<Supplier[]>('/api/suppliers'),
+    enabled: needs(['supplier'], ['Supplier']),
+  })
   const people = useQuery({
     queryKey: ['people-picker'],
     queryFn: () => api.get<{ id: number; name: string }[]>('/api/people/picker'),
@@ -44,15 +49,14 @@ export function ContractFilters({
     const items = (list: string) =>
       (lists.data?.items ?? []).filter((i) => i.listName === list && i.isActive).map((i) => ({ value: String(i.id), label: i.value }))
     const supplierOptions = (suppliers.data ?? []).filter((s) => s.isActive).map((s) => ({ value: String(s.id), label: s.name }))
-    const owners = (lists.data?.owners ?? []).map((o) => ({ value: String(o.id), label: o.name }))
-    const categories = (lists.data?.categories ?? [])
-      .filter((c) => c.parentId === null && c.isActive)
-      .flatMap((top) => [
-        { value: String(top.id), label: top.name },
-        ...(lists.data?.categories ?? [])
-          .filter((c) => c.parentId === top.id && c.isActive)
-          .map((sub) => ({ value: String(sub.id), label: `${top.name} › ${sub.name}` })),
-      ])
+    const owners = (lists.data?.owners ?? []).map((o) => ({
+      value: String(o.id),
+      label: o.name,
+    }))
+    // Families, categories and subcategories as paths (D-115): each includes what's under it.
+    const categories = categoryPaths(lists.data?.categories ?? [], true)
+      .filter((p) => p.isActive)
+      .map((p) => ({ value: String(p.id), label: p.path }))
     const builtIn: Record<string, Option[]> = {
       supplier: supplierOptions,
       category: categories,
@@ -77,7 +81,10 @@ export function ContractFilters({
         case 'YesNo':
           return yesNo
         case 'Person':
-          return (people.data ?? []).map((p) => ({ value: String(p.id), label: p.name }))
+          return (people.data ?? []).map((p) => ({
+            value: String(p.id),
+            label: p.name,
+          }))
         case 'Supplier':
           return supplierOptions
         default:
@@ -93,16 +100,27 @@ export function ContractFilters({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {fields.map((f) => (
           <Field key={f.key} label={f.label}>
-            {(p) => (
-              <Select {...p} value={chosen[f.key] ?? ''} onChange={(e) => onChange(f.key, e.target.value)}>
-                <option value="">Any</option>
-                {options(f).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </Select>
-            )}
+            {(p) =>
+              // Long lists (the spend taxonomy) are found by typing; the rest are drop-downs.
+              options(f).length > 40 ? (
+                <Combobox
+                  {...p}
+                  placeholder="Any: type to find"
+                  options={[{ value: '', label: 'Any' }, ...options(f)]}
+                  value={chosen[f.key] ?? ''}
+                  onChange={(v) => onChange(f.key, v)}
+                />
+              ) : (
+                <Select {...p} value={chosen[f.key] ?? ''} onChange={(e) => onChange(f.key, e.target.value)}>
+                  <option value="">Any</option>
+                  {options(f).map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+              )
+            }
           </Field>
         ))}
       </div>

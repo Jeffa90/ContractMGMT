@@ -47,9 +47,9 @@ public sealed class StandardFieldsTests(AppFixture app)
     private static async Task<int> ItemAsync(HttpClient admin, string list, string value) =>
         (await OkAsync(admin.PostAsJsonAsync("/api/lists/items", new { listName = list, value }, Ct))).GetProperty("id").GetInt32();
 
-    private static async Task<int> EffectiveAsync(HttpClient owner, HttpClient approver, HttpClient admin, object fields)
+    private async Task<int> EffectiveAsync(HttpClient owner, HttpClient approver, HttpClient admin, object fields)
     {
-        var category = (await OkAsync(admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat") }, Ct))).GetProperty("id").GetInt32();
+        var category = (await OkAsync(admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat"), parentId = await app.FamilyAsync() }, Ct))).GetProperty("id").GetInt32();
         var supplier = (await OkAsync(owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier ") }, Ct))).GetProperty("id").GetInt32();
         var body = JsonSerializer.SerializeToNode(fields)!.AsObject();
         body["title"] = Unique("Contract ");
@@ -172,7 +172,7 @@ public sealed class StandardFieldsTests(AppFixture app)
         using var admin = app.ClientFor(AppFixture.AdminAccount);
         var (owner, ownerId, account) = await PersonAsync("Mia Medius", owner: true);
         var category = $"Freight {u}";
-        await OkAsync(admin.PostAsJsonAsync("/api/categories", new { name = category }, Ct));
+        await OkAsync(admin.PostAsJsonAsync("/api/categories", new { name = category, parentId = await app.FamilyAsync() }, Ct));
         var entity = $"Fictional Foods Pty Ltd {u}";
         await ItemAsync(admin, "Entity", entity);
         // A number well past anything else in the test database, so it becomes the highest.

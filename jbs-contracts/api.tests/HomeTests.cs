@@ -36,7 +36,7 @@ public sealed class HomeTests(AppFixture app)
     private async Task<int> CreateAsync(HttpClient owner, string title, object extra)
     {
         using var admin = app.ClientFor(AppFixture.AdminAccount);
-        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat") }, Ct));
+        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat"), parentId = await app.FamilyAsync() }, Ct));
         var supplier = await ReadAsync(await owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier ") }, Ct));
         var body = JsonSerializer.SerializeToNode(extra)!.AsObject();
         body["title"] = title;

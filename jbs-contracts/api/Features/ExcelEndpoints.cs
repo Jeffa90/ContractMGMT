@@ -260,7 +260,7 @@ public static class ExcelEndpoints
         [
             new("List", "Required: Category, Agreement type, Business unit, Site, Entity, Function, Currency, Supplier document type or Supplier tier.", 22),
             new("Name", "Required. For a currency, the three-letter code (AUD).", 30),
-            new("Parent category", "Only for subcategories: the category it sits under.", 24),
+            new("Parent category", "Categories only. Blank for a family; for a category, its family; for a subcategory, Family > Category.", 34),
             new("Active", "Yes or No. No hides it from the choices; contracts that use it keep it.", 10),
         ],
         ["List", "Name"], [],
@@ -270,9 +270,11 @@ public static class ExcelEndpoints
             var cats = (await x.C.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category", transaction: x.Tx)).ToList();
             var items = await x.C.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem ORDER BY ListName, SortOrder, Value", transaction: x.Tx);
             var labels = ListNames.Values.ToDictionary(v => v.ListName, v => v.Label);
-            var catRows = cats.Where(c => c.ParentId is null).OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
-                .SelectMany(top => new[] { new object?[] { "Category", top.Name, null, top.IsActive } }
-                    .Concat(cats.Where(s => s.ParentId == top.Id).OrderBy(s => s.SortOrder).ThenBy(s => s.Name).Select(s => new object?[] { "Category", s.Name, top.Name, s.IsActive })));
+            // Families, each followed by its categories and their subcategories; the parent as a path (D-115).
+            var tree = new CategoryTree(cats);
+            IEnumerable<object?[]> Under(int? parentId) => tree.Children(parentId).SelectMany(n =>
+                new[] { new object?[] { "Category", n.Name, n.ParentId is { } p ? tree.Path(p) : null, n.IsActive } }.Concat(Under(n.Id)));
+            var catRows = Under(null);
             return catRows.Concat(items.Select(i => new object?[] { labels[i.ListName], i.Value, null, i.IsActive }));
         },
         async (x, rows) =>
@@ -280,9 +282,11 @@ public static class ExcelEndpoints
             var cats = (await x.C.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category", transaction: x.Tx)).ToList();
             var items = (await x.C.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem", transaction: x.Tx)).ToList();
             static string K(string s) => s.Trim().ToUpperInvariant();
-            // New top-level categories anywhere in the sheet, so a subcategory can come before its parent.
-            var newTops = rows.Where(rw => Excel.Normalise(rw.Text("List") ?? "") == "category" && Clean(rw.Text("Parent category")) is null && Clean(rw.Text("Name")) is not null)
-                .Select(rw => K(rw.Text("Name")!)).Where(n => !cats.Any(c => c.ParentId is null && K(c.Name) == n)).ToHashSet();
+            // Every category path in the sheet, so a row can sit under a family or category added in another row (D-115).
+            var tree = new CategoryTree(cats);
+            static string PathKey(IEnumerable<string> parts) => string.Join(">", parts.Select(K));
+            var sheetPaths = rows.Where(rw => Excel.Normalise(rw.Text("List") ?? "") == "category" && Clean(rw.Text("Name")) is not null)
+                .Select(rw => PathKey(CategoryTree.SplitPath(Clean(rw.Text("Parent category")) ?? "").Append(rw.Text("Name")!.Trim()))).ToHashSet();
             var seen = new HashSet<string>();
             var plan = new List<PlannedRow>();
             foreach (var row in rows)
@@ -304,19 +308,22 @@ public static class ExcelEndpoints
                     name = name.ToUpperInvariant();
                 }
                 if (parent is not null && list.ListName != "Category") { r.Refuse("Parent category: only categories have subcategories."); continue; }
-                if (!seen.Add($"{list.ListName}|{K(parent ?? "")}|{K(name)}")) { r.Refuse("This is in the sheet more than once; only the first row is used."); continue; }
+                var parentParts = parent is null ? [] : CategoryTree.SplitPath(parent);
+                if (!seen.Add($"{list.ListName}|{PathKey(parentParts)}|{K(name)}")) { r.Refuse("This is in the sheet more than once; only the first row is used."); continue; }
 
                 if (list.ListName == "Category")
                 {
+                    if (parentParts.Length >= CategoryTree.MaxDepth) { r.Refuse("Parent category: subcategories are the last level. Use a family, or Family > Category."); continue; }
                     CategoryRow? parentRow = null;
-                    if (parent is not null)
+                    if (parentParts.Length > 0)
                     {
-                        parentRow = cats.FirstOrDefault(c => c.ParentId is null && K(c.Name) == K(parent));
-                        if (parentRow is null && !newTops.Contains(K(parent))) { r.Refuse($"Parent category: there's no category called \"{parent}\". Add it in an earlier row or under Admin, Lists."); continue; }
+                        parentRow = tree.FindPath(parentParts);
+                        if (parentRow is null && !sheetPaths.Contains(PathKey(parentParts)))
+                        { r.Refuse($"Parent category: there's no \"{parent}\". Write its full path (Family > Category), and add it in another row or under Admin, Lists."); continue; }
                     }
-                    var match = parent is null
-                        ? cats.FirstOrDefault(c => c.ParentId is null && K(c.Name) == K(name))
-                        : parentRow is null ? null : cats.FirstOrDefault(c => c.ParentId == parentRow.Id && K(c.Name) == K(name));
+                    var match = parentParts.Length == 0
+                        ? tree.Children(null).FirstOrDefault(c => K(c.Name) == K(name))
+                        : parentRow is null ? null : tree.Children(parentRow.Id).FirstOrDefault(c => K(c.Name) == K(name));
                     if (match is not null)
                     {
                         if (active is null || active == match.IsActive) { r.Action = "same"; continue; }
@@ -331,16 +338,20 @@ public static class ExcelEndpoints
                         continue;
                     }
                     r.Action = "add";
-                    r.Notes.Add(parent is null ? "New category." : $"New subcategory under {parent}.");
-                    var (n, pName, act) = (name, parent, active ?? true);
-                    r.Order = parent is null ? 0 : 1; // top-level categories first, so new subcategories find them
+                    var level = CategoryTree.LevelNames[parentParts.Length];
+                    var pName = parentParts.Length == 0 ? null : string.Join(" > ", parentParts);
+                    r.Notes.Add(pName is null ? "New family." : $"New {level} in {pName}.");
+                    var (n, pParts, act) = (name, parentParts, active ?? true);
+                    r.Order = parentParts.Length; // families first, then categories, then subcategories, so each finds its parent
                     r.Apply = async () =>
                     {
-                        int? parentId = pName is null ? null : await x.C.ExecuteScalarAsync<int>("SELECT Id FROM contracts.Category WHERE ParentId IS NULL AND NameKey = UPPER(LTRIM(RTRIM(@pName)))", new { pName }, x.Tx);
+                        int? parentId = null;
+                        foreach (var part in pParts)
+                            parentId = await x.C.ExecuteScalarAsync<int>("SELECT Id FROM contracts.Category WHERE ParentKey = ISNULL(@parentId, 0) AND NameKey = UPPER(LTRIM(RTRIM(@part)))", new { parentId, part }, x.Tx);
                         var order = await x.C.ExecuteScalarAsync<int>("SELECT ISNULL(MAX(SortOrder), -1) + 1 FROM contracts.Category WHERE ParentKey = ISNULL(@parentId, 0)", new { parentId }, x.Tx);
                         var id = await x.C.ExecuteScalarAsync<int>("INSERT INTO contracts.Category (ParentId, Name, SortOrder, IsActive) OUTPUT INSERTED.Id VALUES (@parentId, @n, @order, @act)", new { parentId, n, order, act }, x.Tx);
                         await x.Audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "category.added", "Category", id,
-                            pName is null ? $"{x.Me.Name} added the category {n}{Via}." : $"{x.Me.Name} added the subcategory {n} under {pName}{Via}.");
+                            pName is null ? $"{x.Me.Name} added the family {n}{Via}." : $"{x.Me.Name} added the {level} {n} under {pName}{Via}.");
                     };
                 }
                 else
@@ -553,7 +564,7 @@ public static class ExcelEndpoints
 
     private static readonly Dictionary<string, string> FieldLabels = new()
     {
-        ["title"] = "Title", ["description"] = "Description", ["supplierId"] = "Supplier", ["categoryId"] = "Category", ["agreementTypeId"] = "Agreement type",
+        ["title"] = "Title", ["description"] = "Description", ["supplierId"] = "Supplier", ["categoryId"] = "Category", ["otherCategoryIds"] = "Other categories", ["agreementTypeId"] = "Agreement type",
         ["businessUnitIds"] = "Business unit", ["siteIds"] = "Site", ["entityIds"] = "Entity", ["functionIds"] = "Function", ["ownerId"] = "Owner", ["backupOwnerId"] = "Backup owner", ["currencyCode"] = "Currency",
         ["value"] = "Value", ["sapOutlineAgreement"] = "SAP outline agreement number", ["endDate"] = "End date", ["noticePeriodDays"] = "Notice period (days)",
         ["autoRenews"] = "Renews automatically", ["renewalTermMonths"] = "Renewal term (months)", ["reviewDate"] = "Review date",
@@ -567,7 +578,8 @@ public static class ExcelEndpoints
         [
             new("Reference", "Leave blank for a new contract (it's given the next JBSAUS number). Fill in to update that contract; only drafts can be updated.", 16),
             new("Title", "Required for a new contract.", 34), new("Supplier", "The supplier's name. A new name adds the supplier.", 28),
-            new("Category", "A category, or Category > Subcategory.", 26), new("Agreement type", null, 20),
+            new("Category", "The main category (main spend): Family > Category, or Family > Category > Subcategory.", 30),
+            new("Other categories", "Any others, separated by ;", 30), new("Agreement type", null, 20),
             new("Owner", "Windows logon or name of an active contract owner. Blank for a new contract: you.", 20), new("Backup owner", null, 20),
             new("Confidential", "Yes or No", 13), new("Business unit", "One or more. Separate several with ;", 18), new("Site", "One or more. Separate several with ;", 16),
             new("Entity", "The JBS company that signs it. Separate several with ;", 24), new("Function", "One or more. Separate several with ;", 18),
@@ -592,7 +604,7 @@ public static class ExcelEndpoints
             static string? Several(string[] names) => names.Length == 0 ? null : string.Join("; ", names); // read back by ListCells
             return rows.Select(r => new object?[]
             {
-                r.Reference, r.Title, r.SupplierName, r.CategoryDisplay, r.AgreementTypeName, people[r.OwnerId].WindowsAccount,
+                r.Reference, r.Title, r.SupplierName, r.CategoryDisplay, r.OtherCategories.Length == 0 ? null : string.Join("; ", r.OtherCategories), r.AgreementTypeName, people[r.OwnerId].WindowsAccount,
                 r.BackupOwnerId is { } b ? people[b].WindowsAccount : null, r.IsConfidential, Several(r.BusinessUnitNames), Several(r.SiteNames), Several(r.EntityNames), Several(r.FunctionNames),
                 r.Value, r.CurrencyCode, r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, D(r.ReviewDate), r.ReviewMonthsBeforeEnd, r.NeedsLegalReview,
                 r.Description,
@@ -639,28 +651,27 @@ public static class ExcelEndpoints
                     if (FindItem(list, part, header, problems) is { } id) ids.Add(id);
                 return [.. ids];
             }
+            // A path, or a name found once below the families (D-115).
+            var tree = new CategoryTree(cats);
             int? FindCategory(string? text, List<string> problems)
             {
                 if (text is null) return null;
-                var parts = text.Split(['>', '›'], 2, StringSplitOptions.TrimEntries);
-                CategoryRow? match;
-                if (parts.Length == 2)
-                {
-                    var top = cats.FirstOrDefault(c => c.ParentId is null && K(c.Name) == K(parts[0]));
-                    match = top is null ? null : cats.FirstOrDefault(c => c.ParentId == top.Id && K(c.Name) == K(parts[1]));
-                }
-                else
-                {
-                    match = cats.FirstOrDefault(c => c.ParentId is null && K(c.Name) == K(text));
-                    if (match is null)
-                    {
-                        var subs = cats.Where(c => c.ParentId is not null && K(c.Name) == K(text)).ToList();
-                        if (subs.Count > 1) { problems.Add($"Category: \"{text}\" is a subcategory under more than one category. Write it as Category > Subcategory."); return null; }
-                        match = subs.SingleOrDefault();
-                    }
-                }
-                if (match is null) problems.Add($"Category: there's no category called \"{text}\". Add it under Admin, Lists first.");
+                var match = tree.Resolve(text, out var problem);
+                if (problem is not null) problems.Add(problem);
                 return match?.Id;
+            }
+            // Other categories: several, separated by semicolons. Null for a blank cell (the contract keeps what it has).
+            int[]? FindOtherCategories(string? text, List<string> problems)
+            {
+                if (text is null) return null;
+                var ids = new List<int>();
+                foreach (var part in text.Split([';', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var match = tree.Resolve(part, out var problem);
+                    if (problem is not null) problems.Add("Other categories: " + problem["Category: ".Length..]);
+                    else if (!ids.Contains(match!.Id)) ids.Add(match.Id);
+                }
+                return [.. ids];
             }
 
             foreach (var row in rows)
@@ -695,6 +706,7 @@ public static class ExcelEndpoints
                     else { supplierId = null; addSupplier = newSuppliers.TryGetValue(K(supplierName), out var first) ? first : newSuppliers[K(supplierName)] = supplierName; }
                 }
                 var categoryId = FindCategory(Clean(row.Text("Category")), problems) ?? before?.CategoryId;
+                var otherCategoryIds = FindOtherCategories(Clean(row.Text("Other categories")), problems) ?? before?.OtherCategoryIds;
                 var agreementTypeId = FindItem("AgreementType", Clean(row.Text("Agreement type")), "Agreement type", problems) ?? before?.AgreementTypeId;
                 var businessUnitIds = FindItems("BusinessUnit", Clean(row.Text("Business unit")), "Business unit", problems) ?? before?.BusinessUnitIds;
                 var siteIds = FindItems("Site", Clean(row.Text("Site")), "Site", problems) ?? before?.SiteIds;
@@ -734,7 +746,7 @@ public static class ExcelEndpoints
                 if (problems.Count > 0) { r.Refuse(string.Join(" ", problems)); continue; }
 
                 var body = new SaveContract(title, description, supplierId, categoryId, agreementTypeId, businessUnitIds, siteIds, ownerId, backupId, confidential,
-                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityIds, functionIds, autoRenews, term, reviewMonths);
+                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityIds, functionIds, autoRenews, term, reviewMonths, otherCategoryIds);
                 var errors = await ContractEndpoints.CheckAsync(x.C, x.Tx, body, before);
                 var (parsed, fieldErrors) = await Fields.ParseAsync(x.C, x.Tx, fieldValues, definitions);
                 var labels = added.ToDictionary(a => $"field.{a.Field.Key}", a => a.Header);

@@ -46,7 +46,7 @@ public sealed class LegalTests(AppFixture app)
     private async Task<(int SupplierId, int CategoryId)> SupplierAndCategoryAsync(HttpClient owner)
     {
         using var admin = app.ClientFor(AppFixture.AdminAccount);
-        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat") }, Ct));
+        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat"), parentId = await app.FamilyAsync() }, Ct));
         var supplier = await ReadAsync(await owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier ") }, Ct));
         return (supplier.GetProperty("id").GetInt32(), category.GetProperty("id").GetInt32());
     }

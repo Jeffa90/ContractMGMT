@@ -26,7 +26,19 @@ test('Raise a draft contract, then find it', async ({ page }, info) => {
 
   await page.getByLabel(/^Title/).fill(title)
   await page.getByLabel(/^Supplier/).selectOption({ label: 'Southern Cross Freight (demo)' })
-  await page.getByLabel(/^Category/).selectOption({ label: 'Freight › Linehaul' })
+  // The main category: family, category, subcategory (D-115); another found by typing.
+  await page.getByLabel('Family', { exact: true }).selectOption({ label: 'Services' })
+  await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Freight' })
+  await page.getByLabel('Subcategory (optional)').selectOption({ label: 'Linehaul' })
+  await page.getByRole('button', { name: 'Add another category' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('combobox', { name: 'Find a category by typing' }).fill('cartons')
+  await expect(dialog.getByRole('option', { name: 'Packaging › Cartons and film' })).toBeVisible()
+  await expectAccessible(page)
+  await dialog.getByRole('option', { name: 'Packaging › Cartons and film' }).click()
+  await expect(dialog.getByLabel('Category', { exact: true })).toHaveValue(/\d+/)
+  await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(page.getByText('Packaging › Cartons and film')).toBeVisible()
 
   // Sites: several can be ticked (D-114). Select all, untick one; the drop-down stays open until Done.
   const sites = page.getByLabel(/^Site/)
@@ -46,6 +58,8 @@ test('Raise a draft contract, then find it', async ({ page }, info) => {
   await settled(page, title)
   await expect(page.getByText('Draft', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('North plant, South plant')).toBeVisible()
+  await expect(page.getByText('Services › Freight › Linehaul')).toBeVisible()
+  await expect(page.getByText('Also: Packaging › Cartons and film')).toBeVisible()
   await expectAccessible(page)
 
   await page.goto('/contracts?view=drafts')
@@ -182,4 +196,21 @@ test('A Low risk supplier shows Low once when its details are edited', async ({ 
   const risk = page.getByRole('dialog').getByRole('radiogroup', { name: 'Risk' })
   await expect(risk.getByRole('radio', { name: 'Low', exact: true })).toHaveCount(1)
   await expect(risk.getByRole('radio', { name: 'Low', exact: true })).toBeChecked()
+})
+
+test('Admin, Lists: categories fold by family and Find shows where one sits', async ({ page }) => {
+  await page.goto('/admin/lists')
+  await settled(page)
+  // Families start folded; the arrow opens one (D-115).
+  await expect(page.getByText('Linehaul', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Show what is in Services' }).click()
+  await page.getByRole('button', { name: 'Show what is in Freight' }).click()
+  await expect(page.getByText('Linehaul', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Fold Services' }).click()
+  await expect(page.getByText('Linehaul', { exact: true })).toHaveCount(0)
+  // Find opens whatever matches, with the levels above it.
+  await page.getByLabel('Find a family, category or subcategory').fill('cold')
+  await expect(page.getByText('Cold chain', { exact: true })).toBeVisible()
+  await expect(page.getByText('Packaging', { exact: true })).toHaveCount(0)
+  await expectAccessible(page)
 })

@@ -309,7 +309,8 @@ public static class FullExportEndpoints
                     L(x.LastSignInUtc),
                 }).ToList()));
             var lists = await c.QueryAsync("""
-                SELECT N'Category' AS List, cat.Name AS Value, parent.Name AS Under, cat.IsActive FROM contracts.Category cat LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
+                SELECT N'Category' AS List, cat.Name AS Value, NULLIF(CONCAT_WS(N' > ', family.Name, parent.Name), N'') AS Under, cat.IsActive
+                FROM contracts.Category cat LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId LEFT JOIN contracts.Category family ON family.Id = parent.ParentId
                 UNION ALL SELECT ListName, Value, NULL, IsActive FROM contracts.ListItem
                 ORDER BY List, Under, Value
                 """);

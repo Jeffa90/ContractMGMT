@@ -222,7 +222,8 @@ public static class VariationEndpoints
         var body = new SaveContract(k.Title, k.Description, k.SupplierId, k.CategoryId, k.AgreementTypeId, businessUnit, site, k.OwnerId, k.BackupOwnerId, k.IsConfidential,
             value, currency, k.SapOutlineAgreement, D(k.StartDate), D(k.EffectiveDate), end, evergreen, notice, review, k.NeedsLegalReview, null, addedChanges,
             entity, function, autoRenews, term,
-            kept.ContainsKey("reviewDate") ? null : k.ReviewMonthsBeforeEnd); // a review date chosen here replaces a period; a period follows a new end date
+            kept.ContainsKey("reviewDate") ? null : k.ReviewMonthsBeforeEnd, // a review date chosen here replaces a period; a period follows a new end date
+            k.OtherCategoryIds);
         if (errors.Count == 0)
         {
             var map = new Dictionary<string, string> { ["businessUnitIds"] = "businessUnit", ["siteIds"] = "site", ["entityIds"] = "entity", ["functionIds"] = "function" };
@@ -349,7 +350,7 @@ public static class VariationEndpoints
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
-            var contract = await c.QuerySingleOrDefaultAsync<ContractRow>($"SELECT k.*, o.Name AS OwnerName, b.Name AS BackupOwnerName, s.Name AS SupplierName, lv.* FROM contracts.Contract k JOIN contracts.Person o ON o.Id = k.OwnerId LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId OUTER APPLY ({ContractEndpoints.ListValuesSql}) lv WHERE k.Id = @id", new { id });
+            var contract = await c.QuerySingleOrDefaultAsync<ContractRow>($"SELECT k.*, o.Name AS OwnerName, b.Name AS BackupOwnerName, s.Name AS SupplierName, lv.*, occ.* FROM contracts.Contract k JOIN contracts.Person o ON o.Id = k.OwnerId LEFT JOIN contracts.Person b ON b.Id = k.BackupOwnerId LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId OUTER APPLY ({ContractEndpoints.ListValuesSql}) lv OUTER APPLY ({ContractEndpoints.OtherCategoriesSql}) occ WHERE k.Id = @id", new { id });
             if (contract is null || !ContractAccess.CanSee(me!, contract.IsConfidential, contract.OwnerId, contract.BackupOwnerId))
                 return ApiResults.NotFound("We couldn't find that contract. It may have been removed, or you may not have access.");
             var v = await c.QuerySingleOrDefaultAsync<VariationRow>($"{SelectVariation} WHERE v.Id = @vid AND v.ContractId = @id", new { vid, id });

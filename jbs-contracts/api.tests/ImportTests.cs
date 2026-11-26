@@ -65,7 +65,7 @@ public sealed class ImportTests(AppFixture app)
         var owner = await app.AddPersonAsync(ownerUser, $"Imogen Owner {u}", new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
         var ownerId = owner.GetProperty("id").GetInt32();
         using var ownerClient = app.ClientFor($@"TEST\{ownerUser}");
-        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Freight {u}" }, Ct));
+        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Freight {u}", parentId = await app.FamilyAsync() }, Ct));
         var supplier = await ReadAsync(await admin.PostAsJsonAsync("/api/suppliers", new { name = $"Known Supplier {u}" }, Ct));
         string Ref(int n) => $"MED-{u}-{n}";
         var rows = new List<object?[]>
@@ -327,7 +327,7 @@ public sealed class ImportTests(AppFixture app)
         var ownerName = $"Tess Translate {u}";
         await app.AddPersonAsync(ownerUser, ownerName, new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
         // Your own clean lists: Freight > Road, and the agreement type "Services".
-        var freight = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Freight {u}" }, Ct))).GetProperty("id").GetInt32();
+        var freight = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Freight {u}", parentId = await app.FamilyAsync() }, Ct))).GetProperty("id").GetInt32();
         var road = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = "Road", parentId = freight }, Ct))).GetProperty("id").GetInt32();
         await ReadAsync(await admin.PostAsJsonAsync("/api/lists/items", new { listName = "AgreementType", value = $"Services {u}" }, Ct));
 
@@ -363,7 +363,7 @@ public sealed class ImportTests(AppFixture app)
         Assert.Equal(("LOGISTICS (old) > Road freight", 2), (cat.GetProperty("value").GetString(), cat.GetProperty("count").GetInt32()));
         Assert.Equal(JsonValueKind.Null, cat.GetProperty("to").ValueKind);
         Assert.Equal(2, fields["agreementType"].GetProperty("values").EnumerateArray().Single().GetProperty("count").GetInt32());
-        Assert.Contains($"Freight {u} > Road", values.GetProperty("choices").GetProperty("Category").EnumerateArray().Select(x => x.GetString()));
+        Assert.Contains($"{AppFixture.TestFamily} > Freight {u} > Road", values.GetProperty("choices").GetProperty("Category").EnumerateArray().Select(x => x.GetString()));
         // Owners: the current one is chosen by name; the past employee isn't, and is offered the current contract owners.
         var owners = fields["owner"].GetProperty("values").EnumerateArray().ToDictionary(v => v.GetProperty("value").GetString()!, v => v.GetProperty("to"));
         Assert.Equal(ownerName, owners[ownerName].GetString());

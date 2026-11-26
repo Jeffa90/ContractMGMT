@@ -3,17 +3,18 @@
 // but take their label, help, section, order and visibility from it; added fields are drawn by FieldInput.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BackLink } from '@/components/BackLink'
-import { Plus } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { FieldInput } from '@/components/FieldInput'
 import { MultiSelect } from '@/components/MultiSelect'
+import { CategoryPicker } from '@/components/CategoryPicker'
 import { Select, Textarea } from '@/components/form'
 import { Alert, Button, Card, Checkbox, Field, Skeleton, TextInput } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
-import type { ContractDetail, Lists, Supplier } from '@/lib/contracts'
+import { categoryPaths, type Category, type ContractDetail, type Lists, type Supplier } from '@/lib/contracts'
 import { arrange, type FieldValue, type Layout, type LayoutField } from '@/lib/layout'
 import { useMe } from '@/lib/me'
 import { formatDate } from '@/lib/format'
@@ -31,6 +32,8 @@ type FormState = {
   description: string
   supplierId: string
   categoryId: string
+  /** Other categories besides the main one (D-115). */
+  otherCategoryIds: number[]
   agreementTypeId: string
   ownerId: string
   backupOwnerId: string
@@ -70,11 +73,27 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function ContractFormPage() {
   const { id } = useParams()
   const editing = id !== undefined
-  const lists = useQuery({ queryKey: ['lists'], queryFn: () => api.get<Lists>('/api/lists') })
-  const suppliers = useQuery({ queryKey: ['suppliers'], queryFn: () => api.get<Supplier[]>('/api/suppliers') })
-  const layout = useQuery({ queryKey: ['layout'], queryFn: () => api.get<Layout>('/api/layout') })
-  const people = useQuery({ queryKey: ['people-picker'], queryFn: () => api.get<{ id: number; name: string }[]>('/api/people/picker') })
-  const detail = useQuery({ queryKey: ['contract', Number(id)], queryFn: () => api.get<ContractDetail>(`/api/contracts/${id}`), enabled: editing })
+  const lists = useQuery({
+    queryKey: ['lists'],
+    queryFn: () => api.get<Lists>('/api/lists'),
+  })
+  const suppliers = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: () => api.get<Supplier[]>('/api/suppliers'),
+  })
+  const layout = useQuery({
+    queryKey: ['layout'],
+    queryFn: () => api.get<Layout>('/api/layout'),
+  })
+  const people = useQuery({
+    queryKey: ['people-picker'],
+    queryFn: () => api.get<{ id: number; name: string }[]>('/api/people/picker'),
+  })
+  const detail = useQuery({
+    queryKey: ['contract', Number(id)],
+    queryFn: () => api.get<ContractDetail>(`/api/contracts/${id}`),
+    enabled: editing,
+  })
 
   if (lists.isPending || suppliers.isPending || layout.isPending || people.isPending || (editing && detail.isPending)) {
     return (
@@ -85,7 +104,12 @@ export function ContractFormPage() {
     )
   }
   const error = lists.error ?? suppliers.error ?? layout.error ?? people.error ?? detail.error
-  if (error) return <Alert tone="danger" title="We couldn't open the form.">{(error as Error).message}</Alert>
+  if (error)
+    return (
+      <Alert tone="danger" title="We couldn't open the form.">
+        {(error as Error).message}
+      </Alert>
+    )
   return <ContractForm lists={lists.data!} suppliers={suppliers.data!} layout={layout.data!} people={people.data!} detail={editing ? detail.data! : null} />
 }
 
@@ -115,6 +139,7 @@ export function ContractForm({
     description: c?.description ?? '',
     supplierId: toText(c?.supplierId),
     categoryId: toText(c?.categoryId),
+    otherCategoryIds: c?.otherCategoryIds ?? [],
     agreementTypeId: toText(c?.agreementTypeId),
     ownerId: toText(c?.ownerId ?? person.id),
     backupOwnerId: toText(c?.backupOwnerId),
@@ -144,6 +169,7 @@ export function ContractForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [problem, setProblem] = useState<string | null>(null)
   const [addingSupplier, setAddingSupplier] = useState(false)
+  const [addingCategory, setAddingCategory] = useState(false)
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
   const setField = (key: string, value: FieldValue) => {
     setExtra((x) => ({ ...x, [key]: value }))
@@ -153,10 +179,7 @@ export function ContractForm({
   // Pickers offer items in use, plus whatever this contract already has (a hidden item stays on contracts that use it).
   const keep = (id: number, current: string) => String(id) === current
   const options = (listName: string, current: string) => lists.items.filter((i) => i.listName === listName && (i.isActive || keep(i.id, current)))
-  const categories = useMemo(() => {
-    const tops = lists.categories.filter((x) => x.parentId === null && (x.isActive || keep(x.id, form.categoryId)))
-    return tops.map((top) => ({ top, subs: lists.categories.filter((x) => x.parentId === top.id && (x.isActive || keep(x.id, form.categoryId))) }))
-  }, [lists.categories, form.categoryId])
+  const paths = useMemo(() => new Map(categoryPaths(lists.categories).map((p) => [p.id, p.path])), [lists.categories])
   const activeSuppliers = suppliers.filter((s) => s.isActive || keep(s.id, form.supplierId))
   const owners = lists.owners
 
@@ -169,6 +192,7 @@ export function ContractForm({
         description: form.description || null,
         supplierId: toId(form.supplierId),
         categoryId: toId(form.categoryId),
+        otherCategoryIds: form.otherCategoryIds,
         agreementTypeId: toId(form.agreementTypeId),
         ownerId: toId(form.ownerId),
         backupOwnerId: toId(form.backupOwnerId),
@@ -216,11 +240,20 @@ export function ContractForm({
   const listMulti = (key: 'businessUnitIds' | 'siteIds' | 'entityIds' | 'functionIds', listName: string, f: LayoutField, empty: string) => {
     const items = lists.items.filter((i) => i.listName === listName && (i.isActive || form[key].includes(i.id)))
     return (
-      <Field label={f.label} required={f.isRequired} error={errors[key]} help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : (f.help ?? 'Choose one or more.')}>
+      <Field
+        label={f.label}
+        required={f.isRequired}
+        error={errors[key]}
+        help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : (f.help ?? 'Choose one or more.')}
+      >
         {(p) => (
           <MultiSelect
             {...p}
-            options={items.map((i) => ({ id: i.id, label: i.value, hidden: !i.isActive }))}
+            options={items.map((i) => ({
+              id: i.id,
+              label: i.value,
+              hidden: !i.isActive,
+            }))}
             selected={form[key]}
             onChange={(ids) => set(key, ids)}
             disabled={items.length === 0}
@@ -233,7 +266,12 @@ export function ContractForm({
   const listSelect = (key: 'agreementTypeId', listName: string, f: LayoutField, empty: string) => {
     const items = options(listName, form[key])
     return (
-      <Field label={f.label} required={f.isRequired} error={errors[key]} help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : (f.help ?? undefined)}>
+      <Field
+        label={f.label}
+        required={f.isRequired}
+        error={errors[key]}
+        help={items.length === 0 ? `${empty} An admin adds them under Admin, Lists.` : (f.help ?? undefined)}
+      >
         {(p) => (
           <Select {...p} value={form[key]} onChange={(e) => set(key, e.target.value)} disabled={items.length === 0}>
             <option value="">Not chosen</option>
@@ -272,7 +310,13 @@ export function ContractForm({
                     </option>
                   ))}
                 </Select>
-                <Button type="button" icon={<Plus aria-hidden className="size-4" />} onClick={() => setAddingSupplier(true)} className="shrink-0" disabled={preview}>
+                <Button
+                  type="button"
+                  icon={<Plus aria-hidden className="size-4" />}
+                  onClick={() => setAddingSupplier(true)}
+                  className="shrink-0"
+                  disabled={preview}
+                >
                   Add new supplier
                 </Button>
               </div>
@@ -280,24 +324,53 @@ export function ContractForm({
           </Field>
         )
       case 'category':
+        // The main category (its main spend) and any others (D-115).
         return (
-          <Field label={f.label} required={f.isRequired} error={errors.categoryId} help={categories.length === 0 ? 'No categories yet. An admin adds them under Admin, Lists.' : help}>
-            {(p) => (
-              <Select {...p} value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)} disabled={categories.length === 0}>
-                <option value="">Not chosen</option>
-                {categories.map(({ top, subs }) => (
-                  <optgroup key={top.id} label={top.name}>
-                    <option value={top.id}>{top.name} (all)</option>
-                    {subs.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {top.name} › {s.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </Select>
-            )}
-          </Field>
+          <div className="flex flex-col gap-4">
+            <CategoryPicker
+              categories={lists.categories}
+              value={toId(form.categoryId)}
+              onChange={(id) => set('categoryId', toText(id))}
+              label={`${f.label} (main spend)`}
+              required={f.isRequired}
+              error={errors.categoryId}
+              help={lists.categories.length === 0 ? 'No categories yet. An admin adds them under Admin, Lists.' : help}
+            />
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium">Other categories</p>
+              <p className="text-xs text-muted-foreground">
+                If it also covers other spend, for example casings and premixes. The main category sets the supplier tier.
+              </p>
+              {form.otherCategoryIds.length > 0 && (
+                <ul className="flex flex-wrap gap-2">
+                  {form.otherCategoryIds.map((id) => (
+                    <li key={id} className="flex items-center gap-1 rounded-full bg-muted py-1 pr-1 pl-3 text-sm">
+                      {paths.get(id) ?? 'A removed category'}
+                      <button
+                        type="button"
+                        className="flex size-8 items-center justify-center rounded-full hover:bg-card"
+                        aria-label={`Remove ${paths.get(id) ?? 'this category'}`}
+                        onClick={() =>
+                          set(
+                            'otherCategoryIds',
+                            form.otherCategoryIds.filter((x) => x !== id),
+                          )
+                        }
+                      >
+                        <X aria-hidden className="size-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {errors.otherCategoryIds && <p className="text-xs font-medium text-danger">{errors.otherCategoryIds}</p>}
+              <div>
+                <Button type="button" icon={<Plus aria-hidden className="size-4" />} onClick={() => setAddingCategory(true)} disabled={preview}>
+                  Add another category
+                </Button>
+              </div>
+            </div>
+          </div>
         )
       case 'agreementType':
         return listSelect('agreementTypeId', 'AgreementType', f, 'No agreement types yet.')
@@ -317,7 +390,12 @@ export function ContractForm({
         )
       case 'owner':
         return (
-          <Field label={f.label} required error={errors.ownerId} help={help ?? 'The owner and backup get the reminders and see it under My contracts. Any contract owner can still edit it.'}>
+          <Field
+            label={f.label}
+            required
+            error={errors.ownerId}
+            help={help ?? 'The owner and backup get the reminders and see it under My contracts. Any contract owner can still edit it.'}
+          >
             {(p) => (
               <Select {...p} value={form.ownerId} onChange={(e) => set('ownerId', e.target.value)}>
                 {owners.map((o) => (
@@ -379,7 +457,11 @@ export function ContractForm({
         const when = form.isEvergreen && /^\d+$/.test(form.reviewWhen) ? '' : form.reviewWhen
         const months = /^\d+$/.test(when) ? Number(when) : null
         const worked =
-          months === null ? undefined : form.endDate ? `Review on ${formatDate(addMonths(form.endDate, -months))}. It moves if the end date does.` : 'Worked out once there is an end date.'
+          months === null
+            ? undefined
+            : form.endDate
+              ? `Review on ${formatDate(addMonths(form.endDate, -months))}. It moves if the end date does.`
+              : 'Worked out once there is an end date.'
         return (
           <div className="flex flex-col gap-3">
             <Field label={f.label} required={f.isRequired} error={errors.reviewDate} help={worked ?? help}>
@@ -416,7 +498,16 @@ export function ContractForm({
       case 'endDate':
         return (
           <Field label={f.label} required={f.isRequired} error={errors.endDate} help={form.isEvergreen ? 'Evergreen contracts have no end date.' : help}>
-            {(p) => <TextInput {...p} type="date" className="sm:w-60" value={form.isEvergreen ? '' : form.endDate} disabled={form.isEvergreen} onChange={(e) => set('endDate', e.target.value)} />}
+            {(p) => (
+              <TextInput
+                {...p}
+                type="date"
+                className="sm:w-60"
+                value={form.isEvergreen ? '' : form.endDate}
+                disabled={form.isEvergreen}
+                onChange={(e) => set('endDate', e.target.value)}
+              />
+            )}
           </Field>
         )
       case 'evergreen':
@@ -450,7 +541,15 @@ export function ContractForm({
       case 'noticePeriodDays':
         return (
           <Field label={f.label} required={f.isRequired} error={errors.noticePeriodDays} help={help}>
-            {(p) => <TextInput {...p} inputMode="numeric" className="tabular sm:w-40" value={form.noticePeriodDays} onChange={(e) => set('noticePeriodDays', e.target.value.replace(/\D/g, ''))} />}
+            {(p) => (
+              <TextInput
+                {...p}
+                inputMode="numeric"
+                className="tabular sm:w-40"
+                value={form.noticePeriodDays}
+                onChange={(e) => set('noticePeriodDays', e.target.value.replace(/\D/g, ''))}
+              />
+            )}
           </Field>
         )
       case 'needsLegalReview':
@@ -460,7 +559,10 @@ export function ContractForm({
     }
   }
 
-  const picks = { people, suppliers: activeSuppliers.map((s) => ({ id: s.id, name: s.name })) }
+  const picks = {
+    people,
+    suppliers: activeSuppliers.map((s) => ({ id: s.id, name: s.name })),
+  }
   const groups = arrange(layout)
 
   const body = (
@@ -522,7 +624,68 @@ export function ContractForm({
           }}
         />
       )}
+      {addingCategory && (
+        <AddCategoryDialog
+          categories={lists.categories}
+          taken={[toId(form.categoryId), ...form.otherCategoryIds]}
+          onClose={() => setAddingCategory(false)}
+          onAdd={(id) => {
+            set('otherCategoryIds', [...form.otherCategoryIds, id])
+            setAddingCategory(false)
+          }}
+        />
+      )}
     </form>
+  )
+}
+
+/** Adds one of a contract's other categories (D-115), picked the same way as the main one. */
+function AddCategoryDialog({
+  categories,
+  taken,
+  onClose,
+  onAdd,
+}: {
+  categories: Category[]
+  taken: (number | null)[]
+  onClose: () => void
+  onAdd: (id: number) => void
+}) {
+  const [id, setId] = useState<number | null>(null)
+  const [error, setError] = useState<string | undefined>()
+  const byId = new Map(categories.map((c) => [c.id, c]))
+  const add = () => {
+    if (id === null || byId.get(id)?.parentId === null) setError('Choose a category, and a subcategory if you like.')
+    else if (taken.includes(id)) setError('The contract already has that one.')
+    else onAdd(id)
+  }
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="Add another category"
+      description="Type to find it, or choose its family, then its category."
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={add}>
+            Add
+          </Button>
+        </>
+      }
+    >
+      <CategoryPicker
+        categories={categories}
+        value={id}
+        onChange={(v) => {
+          setId(v)
+          setError(undefined)
+        }}
+        label="Category"
+        required
+        error={error}
+      />
+    </Dialog>
   )
 }
 
@@ -530,12 +693,21 @@ export function ContractForm({
 export function SupplierDialog({ supplier, onClose, onSaved }: { supplier: Supplier | null; onClose: () => void; onSaved: (s: Supplier) => void }) {
   const { person } = useMe()
   const queryClient = useQueryClient()
-  const [form, setForm] = useState({ name: supplier?.name ?? '', abn: supplier?.abn ?? '', vendorNumber: supplier?.vendorNumber ?? '', notes: supplier?.notes ?? '' })
+  const [form, setForm] = useState({
+    name: supplier?.name ?? '',
+    abn: supplier?.abn ?? '',
+    vendorNumber: supplier?.vendorNumber ?? '',
+    notes: supplier?.notes ?? '',
+  })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [problem, setProblem] = useState<string | null>(null)
   const save = useMutation({
     mutationFn: (isActive?: boolean) => {
-      const body = { ...form, isActive: isActive ?? supplier?.isActive ?? true, rowVersion: supplier?.rowVersion }
+      const body = {
+        ...form,
+        isActive: isActive ?? supplier?.isActive ?? true,
+        rowVersion: supplier?.rowVersion,
+      }
       return supplier ? api.put<Supplier>(`/api/suppliers/${supplier.id}`, body) : api.post<Supplier>('/api/suppliers', body)
     },
     onSuccess: (saved) => {

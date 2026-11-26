@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Dialog } from "@/components/Dialog";
 import { DropZone } from "@/components/DropZone";
 import { PageHeader } from "@/components/Help";
+import { Combobox } from "@/components/Combobox";
 import { Select } from "@/components/form";
 import {
   Alert,
@@ -29,7 +30,12 @@ import {
 } from "@/components/ui";
 import { errorText } from "@/lib/actions";
 import { api, ApiError } from "@/lib/api";
-import { allDocumentKinds, withAddedKinds, type Lists } from "@/lib/contracts";
+import {
+  allDocumentKinds,
+  categoryPaths,
+  withAddedKinds,
+  type Lists,
+} from "@/lib/contracts";
 import { formatBytes } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { help } from "@/help";
@@ -150,7 +156,17 @@ const outcomeBadge: Record<
 
 /** Old values in each drop-down column and what they become (D-112). */
 type Values = {
-  fields: { key: string; label: string; list: string; values: { value: string; count: number; to: string | null; remembered: boolean }[] }[];
+  fields: {
+    key: string;
+    label: string;
+    list: string;
+    values: {
+      value: string;
+      count: number;
+      to: string | null;
+      remembered: boolean;
+    }[];
+  }[];
   choices: Record<string, string[]>;
 };
 type TranslationMap = Record<string, Record<string, string>>;
@@ -204,13 +220,17 @@ function TranslateValues({
       // What's remembered, on screen or already the same name in your lists starts chosen.
       const next: TranslationMap = {};
       for (const field of v.fields)
-        for (const x of field.values) if (x.to !== null) (next[field.key] ??= {})[x.value] = x.to;
+        for (const x of field.values)
+          if (x.to !== null) (next[field.key] ??= {})[x.value] = x.to;
       setTranslations(next);
     },
     onError: (e) => setError(errorText(e)),
   });
   const choose = (field: string, value: string, to: string) => {
-    const next = { ...translations, [field]: { ...(translations[field] ?? {}) } };
+    const next = {
+      ...translations,
+      [field]: { ...(translations[field] ?? {}) },
+    };
     if (to === "") delete next[field][value];
     else next[field][value] = to === BLANK ? "" : to;
     setTranslations(next);
@@ -222,9 +242,11 @@ function TranslateValues({
           Translate drop-down values
         </h3>
         <p className="text-sm text-muted-foreground">
-          Choose what each old value becomes in JBS Contracts: one of your list values, or blank. Set up your lists under Admin, Lists first
-          (then click Refresh). Values with nothing chosen must already be in your lists, or they're flagged in the check. For owners who've
-          left, choose the current contract owner who takes their contracts.
+          Choose what each old value becomes in JBS Contracts: one of your list
+          values, or blank. Set up your lists under Admin, Lists first (then
+          click Refresh). Values with nothing chosen must already be in your
+          lists, or they're flagged in the check. For owners who've left, choose
+          the current contract owner who takes their contracts.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -255,7 +277,11 @@ function TranslateValues({
                 e.target.value = "";
               }}
             />
-            <Button variant="ghost" icon={<FileSpreadsheet aria-hidden className="size-4" />} onClick={() => fileInput.current?.click()}>
+            <Button
+              variant="ghost"
+              icon={<FileSpreadsheet aria-hidden className="size-4" />}
+              onClick={() => fileInput.current?.click()}
+            >
               Use translations from a file
             </Button>
           </>
@@ -263,13 +289,21 @@ function TranslateValues({
       </div>
       {error && <Alert tone="danger" title={error} />}
       {values?.fields.map((field) => {
-        const chosen = field.values.filter((x) => translations[field.key]?.[x.value] !== undefined).length;
+        const chosen = field.values.filter(
+          (x) => translations[field.key]?.[x.value] !== undefined,
+        ).length;
         const choices = values.choices[field.list] ?? [];
         return (
-          <details key={field.key} className="rounded-[var(--radius-card)] border border-border" open={chosen < field.values.length}>
+          <details
+            key={field.key}
+            className="rounded-[var(--radius-card)] border border-border"
+            open={chosen < field.values.length}
+          >
             <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2">
               <span className="font-medium">{field.label}</span>
-              <Badge tone={chosen === field.values.length ? "success" : "warning"}>
+              <Badge
+                tone={chosen === field.values.length ? "success" : "warning"}
+              >
                 {chosen} of {field.values.length} chosen
               </Badge>
             </summary>
@@ -277,24 +311,76 @@ function TranslateValues({
               {field.values.map((x) => {
                 const current = translations[field.key]?.[x.value];
                 return (
-                  <li key={x.value} className="grid gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,1fr)] sm:items-center">
+                  <li
+                    key={x.value}
+                    className="grid gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,1fr)] sm:items-center"
+                  >
                     <span className="min-w-0 break-words text-sm">
-                      {x.value} <span className="text-muted-foreground">({x.count})</span>
+                      {x.value}{" "}
+                      <span className="text-muted-foreground">({x.count})</span>
                     </span>
-                    <Select
-                      aria-label={`${field.label}: what "${x.value}" becomes`}
-                      value={current === undefined ? "" : current === "" ? BLANK : current}
-                      onChange={(e) => choose(field.key, x.value, e.target.value)}
-                    >
-                      <option value="">Not chosen</option>
-                      <option value={BLANK}>{field.key === "owner" ? "Use the default owner" : "Leave blank"}</option>
-                      {current && !choices.includes(current) && <option value={current}>{current} (not in your lists)</option>}
-                      {choices.map((ch) => (
-                        <option key={ch} value={ch}>
-                          {ch.replace(" > ", " › ")}
+                    {field.list === "Category" ? (
+                      // The spend taxonomy is long (D-115): found by typing.
+                      <Combobox
+                        aria-label={`${field.label}: what "${x.value}" becomes`}
+                        placeholder="Not chosen: type to find"
+                        options={[
+                          { value: "", label: "Not chosen" },
+                          { value: BLANK, label: "Leave blank" },
+                          ...(current && !choices.includes(current)
+                            ? [
+                                {
+                                  value: current,
+                                  label: `${current} (not in your lists)`,
+                                },
+                              ]
+                            : []),
+                          ...choices.map((ch) => ({
+                            value: ch,
+                            label: ch.replaceAll(" > ", " › "),
+                          })),
+                        ]}
+                        value={
+                          current === undefined
+                            ? ""
+                            : current === ""
+                              ? BLANK
+                              : current
+                        }
+                        onChange={(v) => choose(field.key, x.value, v)}
+                      />
+                    ) : (
+                      <Select
+                        aria-label={`${field.label}: what "${x.value}" becomes`}
+                        value={
+                          current === undefined
+                            ? ""
+                            : current === ""
+                              ? BLANK
+                              : current
+                        }
+                        onChange={(e) =>
+                          choose(field.key, x.value, e.target.value)
+                        }
+                      >
+                        <option value="">Not chosen</option>
+                        <option value={BLANK}>
+                          {field.key === "owner"
+                            ? "Use the default owner"
+                            : "Leave blank"}
                         </option>
-                      ))}
-                    </Select>
+                        {current && !choices.includes(current) && (
+                          <option value={current}>
+                            {current} (not in your lists)
+                          </option>
+                        )}
+                        {choices.map((ch) => (
+                          <option key={ch} value={ch}>
+                            {ch.replaceAll(" > ", " › ")}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
                   </li>
                 );
               })}
@@ -387,7 +473,8 @@ function ContractsStep() {
     if (defaultOwnerId) f.append("defaultOwnerId", defaultOwnerId);
     if (defaultCategoryId) f.append("defaultCategoryId", defaultCategoryId);
     if (leaveOutArchived) f.append("leaveOutArchived", "true");
-    if (Object.keys(translations).length > 0) f.append("translations", JSON.stringify(translations));
+    if (Object.keys(translations).length > 0)
+      f.append("translations", JSON.stringify(translations));
     return f;
   };
   const read = useMutation({
@@ -462,9 +549,9 @@ function ContractsStep() {
         ? r.outcome === "Refused"
         : r.outcome === "Effective" || r.outcome === "Ended"),
   );
-  const categories = (lists.data?.categories ?? []).filter((c) => c.isActive);
-  const parents = new Map(
-    categories.filter((c) => !c.parentId).map((c) => [c.id, c.name]),
+  // Categories and subcategories as paths (D-115), found by typing.
+  const categories = categoryPaths(lists.data?.categories ?? []).filter(
+    (p) => p.isActive,
   );
 
   return (
@@ -628,23 +715,22 @@ function ContractsStep() {
               help="Optional. Otherwise a row without a category can't be imported."
             >
               {(p) => (
-                <Select
+                <Combobox
                   {...p}
+                  placeholder="None: flag it"
+                  options={[
+                    { value: "", label: "None: flag it" },
+                    ...categories.map((c) => ({
+                      value: String(c.id),
+                      label: c.path,
+                    })),
+                  ]}
                   value={defaultCategoryId}
-                  onChange={(e) => {
-                    setDefaultCategoryId(e.target.value);
+                  onChange={(v) => {
+                    setDefaultCategoryId(v);
                     setPlan(null);
                   }}
-                >
-                  <option value="">None: flag it</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.parentId
-                        ? `${parents.get(c.parentId) ?? ""} › ${c.name}`
-                        : c.name}
-                    </option>
-                  ))}
-                </Select>
+                />
               )}
             </Field>
           </div>
@@ -694,7 +780,8 @@ function ContractsStep() {
           </div>
           {plan.leftOut > 0 && (
             <p className="text-sm text-muted-foreground">
-              {plan.leftOut} archived {plan.leftOut === 1 ? "contract" : "contracts"} left out.
+              {plan.leftOut} archived{" "}
+              {plan.leftOut === 1 ? "contract" : "contracts"} left out.
             </p>
           )}
           {plan.missing.length > 0 && (
@@ -704,19 +791,33 @@ function ContractsStep() {
                   {plan.missing.map((m) => (
                     <li key={m.list}>
                       <strong>
-                        {m.list === "Category" ? "Categories and subcategories" : m.list} ({m.names.length}):
+                        {m.list === "Category"
+                          ? "Categories and subcategories"
+                          : m.list}{" "}
+                        ({m.names.length}):
                       </strong>{" "}
                       {m.names.slice(0, 8).join(", ")}
-                      {m.names.length > 8 ? ` and ${m.names.length - 8} more` : ""}
+                      {m.names.length > 8
+                        ? ` and ${m.names.length - 8} more`
+                        : ""}
                     </li>
                   ))}
                 </ul>
                 <p>
-                  Download them as a sheet, check it, then use <Link to="/admin/lists" className="font-medium text-primary underline">Lists</Link>, Import from
-                  Excel. Then check again here.
+                  Download them as a sheet, check it, then use{" "}
+                  <Link
+                    to="/admin/lists"
+                    className="font-medium text-primary underline"
+                  >
+                    Lists
+                  </Link>
+                  , Import from Excel. Then check again here.
                 </p>
                 <div>
-                  <Button icon={<FileDown aria-hidden className="size-4" />} onClick={() => void downloadMissing(form())}>
+                  <Button
+                    icon={<FileDown aria-hidden className="size-4" />}
+                    onClick={() => void downloadMissing(form())}
+                  >
                     Download the lists to add
                   </Button>
                 </div>
@@ -867,7 +968,10 @@ function ContractsStep() {
             {plan.already + plan.refused + plan.leftOut > 0 && (
               <li>
                 {plan.already + plan.refused + plan.leftOut}{" "}
-                {plan.already + plan.refused + plan.leftOut === 1 ? "row" : "rows"} left out.
+                {plan.already + plan.refused + plan.leftOut === 1
+                  ? "row"
+                  : "rows"}{" "}
+                left out.
               </li>
             )}
           </ul>
@@ -931,7 +1035,10 @@ function FilesStep() {
   const kindOf = (f: FilesPlan["files"][number]) => chosen[f.path] ?? f.kind;
   const matchedFiles = (plan?.files ?? []).filter((f) => f.outcome === "Match");
   const kindCounts = kinds
-    .map((k) => ({ ...k, count: matchedFiles.filter((f) => kindOf(f) === k.value).length }))
+    .map((k) => ({
+      ...k,
+      count: matchedFiles.filter((f) => kindOf(f) === k.value).length,
+    }))
     .filter((k) => k.count > 0);
   const changeAll = () => {
     if (!from || !to || from === to) return;
@@ -1047,13 +1154,18 @@ function FilesStep() {
           {done === null && kindCounts.length > 0 && (
             <div className="flex flex-col gap-2 rounded-[var(--radius-card)] bg-muted p-3 text-sm">
               <p>
-                <span className="font-medium">What the matched files are: </span>
+                <span className="font-medium">
+                  What the matched files are:{" "}
+                </span>
                 {kindCounts.map((k) => `${k.label} (${k.count})`).join(", ")}.
               </p>
               <div className="flex flex-wrap items-end gap-2">
                 <label className="flex flex-col gap-1">
                   <span>Change every</span>
-                  <Select value={from} onChange={(e) => setFrom(e.target.value)}>
+                  <Select
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                  >
                     <option value="">Choose a kind</option>
                     {kindCounts.map((k) => (
                       <option key={k.value} value={k.value}>
@@ -1073,7 +1185,10 @@ function FilesStep() {
                     ))}
                   </Select>
                 </label>
-                <Button disabled={!from || !to || from === to} onClick={changeAll}>
+                <Button
+                  disabled={!from || !to || from === to}
+                  onClick={changeAll}
+                >
                   Change
                 </Button>
               </div>
@@ -1105,7 +1220,9 @@ function FilesStep() {
                         <Select
                           aria-label={`What ${f.path.split("/").pop()} is`}
                           value={kindOf(f)}
-                          onChange={(e) => setChosen({ ...chosen, [f.path]: e.target.value })}
+                          onChange={(e) =>
+                            setChosen({ ...chosen, [f.path]: e.target.value })
+                          }
                           className="min-h-9 sm:w-72"
                         >
                           {kinds.map((k) => (
@@ -1115,12 +1232,16 @@ function FilesStep() {
                           ))}
                         </Select>
                         <span className="text-xs text-muted-foreground">
-                          {chosen[f.path] ? "You chose" : `From ${f.kindWhy ?? "your default"}`}
+                          {chosen[f.path]
+                            ? "You chose"
+                            : `From ${f.kindWhy ?? "your default"}`}
                         </span>
                       </>
                     )}
                     {f.outcome === "Match" && done !== null && (
-                      <span className="text-xs text-muted-foreground">{kindLabel(kindOf(f))}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {kindLabel(kindOf(f))}
+                      </span>
                     )}
                   </div>
                 </li>

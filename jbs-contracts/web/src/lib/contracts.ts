@@ -23,10 +23,33 @@ export type Category = {
   name: string
   sortOrder: number
   isActive: boolean
-  /** The supplier tier this spend category gives (D-108); a subcategory without one follows its category. */
+  /** The supplier tier this spend category gives (D-108); one without a tier follows the level above it (D-115). */
   tierId: number | null
 }
 export type Lists = { items: ListItem[]; categories: Category[]; owners: { id: number; name: string }[] }
+
+/** The spend taxonomy's levels (D-115): Family > Category > Subcategory. */
+export const categoryLevels = ['Family', 'Category', 'Subcategory'] as const
+
+export type CategoryPath = { id: number; path: string; depth: 1 | 2 | 3; isActive: boolean }
+
+/**
+ * Every node as a path ("Packaging › Casings › Collagen casing"), families' order then names. isActive is false when it or a level
+ * above it is hidden. Families are left out unless asked for (a contract's category is never a family alone).
+ */
+export function categoryPaths(categories: Category[], includeFamilies = false): CategoryPath[] {
+  const out: CategoryPath[] = []
+  const walk = (parentId: number | null, prefix: string, depth: 1 | 2 | 3, active: boolean) => {
+    for (const c of categories.filter((x) => x.parentId === parentId)) {
+      const path = prefix ? `${prefix} › ${c.name}` : c.name
+      const isActive = active && c.isActive
+      if (depth > 1 || includeFamilies) out.push({ id: c.id, path, depth, isActive })
+      if (depth < 3) walk(c.id, path, (depth + 1) as 2 | 3, isActive)
+    }
+  }
+  walk(null, '', 1, true)
+  return out
+}
 
 export type Supplier = {
   id: number
@@ -80,6 +103,9 @@ export type Contract = {
   supplierName: string | null
   categoryId: number | null
   categoryDisplay: string | null
+  /** Other categories besides the main one (D-115), with their paths. */
+  otherCategoryIds: number[]
+  otherCategories: string[]
   agreementTypeId: number | null
   agreementTypeName: string | null
   /** Several each (D-114); the names joined for reading, or null when none. */

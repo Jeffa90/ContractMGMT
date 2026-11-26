@@ -67,7 +67,16 @@ function builtInDisplay(key: string, c: Contract): ReactNode {
   switch (key) {
     case 'title': return c.title
     case 'supplier': return c.supplierName
-    case 'category': return c.categoryDisplay
+    case 'category':
+      // The main category, then any others (D-115).
+      return c.categoryDisplay && (
+        <>
+          {c.categoryDisplay.replaceAll(' > ', ' › ')}
+          {c.otherCategories.length > 0 && (
+            <span className="mt-1 block text-muted-foreground">Also: {c.otherCategories.map((o) => o.replaceAll(' > ', ' › ')).join('; ')}</span>
+          )}
+        </>
+      )
     case 'agreementType': return c.agreementTypeName
     case 'description': return c.description && <span className="whitespace-pre-wrap">{c.description}</span>
     case 'owner': return c.ownerName

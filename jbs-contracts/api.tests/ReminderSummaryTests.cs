@@ -39,7 +39,7 @@ public sealed class ReminderSummaryTests(AppFixture app)
         var approverUser = $"ra{Guid.NewGuid():N}"[..12];
         await app.AddPersonAsync(approverUser, $"Rae Approver {approverUser[^4..]}", new { contractOwner = false, legal = false, approver = true, groupHead = false, admin = false, auditor = false });
         using var approver = app.ClientFor($@"TEST\{approverUser}");
-        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Cat {approverUser}" }, Ct));
+        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Cat {approverUser}", parentId = await app.FamilyAsync() }, Ct));
         var supplier = await ReadAsync(await owner.PostAsJsonAsync("/api/suppliers", new { name = $"Supplier {approverUser}" }, Ct));
         var id = (await ReadAsync(await owner.PostAsJsonAsync("/api/contracts", new
         {

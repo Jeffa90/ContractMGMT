@@ -45,7 +45,7 @@ public sealed class ApprovalTests(AppFixture app)
     private async Task<int> InSigningAsync(HttpClient owner, string endDate = "2028-06-30")
     {
         using var admin = app.ClientFor(AppFixture.AdminAccount);
-        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat") }, Ct));
+        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat"), parentId = await app.FamilyAsync() }, Ct));
         var supplier = await ReadAsync(await owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier ") }, Ct));
         var created = await owner.PostAsJsonAsync("/api/contracts", new
         {

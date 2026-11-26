@@ -156,7 +156,7 @@ public sealed class MultiChoiceListsTests(AppFixture app)
         var owner = await PersonAsync("Vic Variation", owner: true);
         var approver = await PersonAsync("Val Approver", approver: true);
         var (a, b) = (await ItemAsync(admin, "Site", $"Alpha {u}"), await ItemAsync(admin, "Site", $"Bravo {u}"));
-        var category = (await OkAsync(admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat") }, Ct))).GetProperty("id").GetInt32();
+        var category = (await OkAsync(admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat"), parentId = await app.FamilyAsync() }, Ct))).GetProperty("id").GetInt32();
         var supplier = (await OkAsync(owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier ") }, Ct))).GetProperty("id").GetInt32();
         var id = (await OkAsync(owner.PostAsJsonAsync("/api/contracts", new
         {

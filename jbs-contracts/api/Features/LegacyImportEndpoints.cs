@@ -284,47 +284,31 @@ public static class LegacyImportEndpoints
             }
             return match?.Id;
         }
+        // Categories go Family > Category > Subcategory (D-115); a family alone isn't enough.
+        var tree = new CategoryTree(cats);
         int? Category(string? text, string? sub, List<string> problems)
         {
             if (text is null && sub is null) return o.DefaultCategoryId;
             if (text is not null && sub is not null)
             {
-                // Category and subcategory in their own columns (Medius): names may contain "/" so they aren't split.
-                var parent = cats.FirstOrDefault(x => x.ParentId is null && K(x.Name) == K(text));
-                var child = parent is null ? null : cats.FirstOrDefault(x => x.ParentId == parent.Id && K(x.Name) == K(sub));
-                if (parent is null) extras.Missing.Add(("Category", text, ""));
-                if (child is null)
-                {
-                    extras.Missing.Add(("Category", sub, text));
-                    problems.Add(parent is null ? $"Category: there's no category called \"{text}\" (with the subcategory \"{sub}\"). Add them on the Lists page first."
-                        : $"Subcategory: there's no subcategory \"{sub}\" under {parent.Name}. Add it on the Lists page first.");
-                }
-                return child?.Id;
+                // Category and subcategory in their own columns (Medius): the subcategory sits directly under the category. Names
+                // may contain "/" so they aren't split.
+                var found = tree.All.Where(x => K(x.Name) == K(sub) && x.ParentId is { } p && K(tree.Get(p)!.Name) == K(text)).ToList();
+                if (found.Count == 1) return found[0].Id;
+                if (found.Count > 1) { problems.Add($"Category: \"{text} > {sub}\" is in more than one family. Translate it to the one you mean."); return null; }
+                extras.Missing.Add(("Category", text, ""));
+                extras.Missing.Add(("Category", sub, text));
+                problems.Add($"Category: there's no \"{text} > {sub}\". Translate it to one of your categories, or add it on the Lists page first.");
+                return null;
             }
             text ??= sub!;
-            var parts = text.Split(['>', '›', '/'], 2, StringSplitOptions.TrimEntries);
-            CategoryRow? match;
-            if (cats.FirstOrDefault(x => x.ParentId is null && K(x.Name) == K(text)) is { } exact) { parts = [text]; match = exact; }
-            else if (parts.Length == 2)
-            {
-                var top = cats.FirstOrDefault(x => x.ParentId is null && K(x.Name) == K(parts[0]));
-                match = top is null ? null : cats.FirstOrDefault(x => x.ParentId == top.Id && K(x.Name) == K(parts[1]));
-            }
-            else
-            {
-                match = cats.FirstOrDefault(x => x.ParentId is null && K(x.Name) == K(text));
-                if (match is null)
-                {
-                    var subs = cats.Where(x => x.ParentId is not null && K(x.Name) == K(text)).ToList();
-                    if (subs.Count > 1) { problems.Add($"Category: \"{text}\" is a subcategory under more than one category. Write it as Category > Subcategory."); return null; }
-                    match = subs.SingleOrDefault();
-                }
-            }
+            var match = tree.Resolve(text, out var problem);
             if (match is null)
             {
-                problems.Add($"Category: there's no category called \"{text}\". Add it on the Lists page first, or change the cell.");
-                if (parts.Length == 2) { extras.Missing.Add(("Category", parts[0], "")); extras.Missing.Add(("Category", parts[1], parts[0])); }
-                else extras.Missing.Add(("Category", text, ""));
+                problems.Add(problem!.Replace("Add it under Admin, Lists first.", "Translate it to one of your categories, or add it on the Lists page first."));
+                var parts = CategoryTree.SplitPath(text);
+                if (tree.FindPath(parts) is null)
+                    for (var i = 0; i < parts.Length; i++) extras.Missing.Add(("Category", parts[i], string.Join(" > ", parts.Take(i))));
             }
             return match?.Id;
         }
@@ -359,10 +343,10 @@ public static class LegacyImportEndpoints
             // Translated values (D-112): the old value's chosen JBS Contracts value, or blank.
             string? Tr(string field, string? text) => text is not null && o.Translations is { } tr && tr.TryGet(field, text, out var to) ? (to.Length == 0 ? null : to) : text;
             var (catText, subText) = (Text(row, "category"), Text(row, "subcategory"));
+            // Translated to a path in your categories (D-115), or left blank.
             if (o.Translations is { } trs && (catText ?? subText) is not null && trs.TryGet("category", CategoryKey(catText, subText), out var catTo))
             {
-                var split = catTo.Split(" > ", 2, StringSplitOptions.TrimEntries);
-                (catText, subText) = catTo.Length == 0 ? (null, null) : split.Length == 2 ? (split[0], split[1]) : (catTo, null);
+                (catText, subText) = (catTo.Length == 0 ? null : catTo, null);
                 if (catTo.Length == 0) r.Notes.Add("Category left blank (translation).");
             }
             var categoryId = Category(catText, subText, problems);
@@ -616,7 +600,8 @@ public static class LegacyImportEndpoints
             var items = (await c.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem WHERE IsActive = 1 ORDER BY SortOrder, Value")).ToList();
             var choices = new Dictionary<string, List<string>>
             {
-                ["Category"] = cats.Where(x => x.ParentId is null).SelectMany(top => new[] { top.Name }.Concat(cats.Where(s => s.ParentId == top.Id).Select(s => $"{top.Name} > {s.Name}"))).ToList(),
+                // Every category and subcategory, as Family > Category (> Subcategory), D-115.
+                ["Category"] = new CategoryTree(cats).Pickable().Where(p => p.IsActive).Select(p => p.Path).ToList(),
             };
             foreach (var (_, list, _) in TranslatedFields.Where(f => f.List is not ("Category" or "Owner")))
                 choices[list] = items.Where(i => i.ListName == list).Select(i => i.Value).ToList();

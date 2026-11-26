@@ -85,7 +85,11 @@ public static class ReportEndpoints
         public string? LegacyReference { get; set; }
 
         public DateTime? NoticeDeadline => NoticePeriodDays is not { } n ? null : (IsEvergreen ? ReviewDate : EndDate) is { } a ? a.AddDays(-n) : null;
-        public string? Category => CategoryName is null ? null : ParentCategoryName is null ? CategoryName : $"{ParentCategoryName} > {CategoryName}";
+        public string? FamilyCategoryName { get; set; }
+        public string? OtherCategories { get; set; }
+        public string? Category => CategoryName is null ? null : string.Join(" > ", new[] { FamilyCategoryName, ParentCategoryName, CategoryName }.OfType<string>());
+        /// <summary>The main category's family (D-115), for reporting by family.</summary>
+        public string? Family => CategoryName is null ? null : FamilyCategoryName ?? ParentCategoryName ?? CategoryName;
     }
 
     /// <summary>
@@ -120,6 +124,12 @@ public static class ReportEndpoints
             if (f.IsBuiltIn)
             {
                 if (BuiltInTypes.TryGetValue(f.Key, out var type)) columns.Add(new(f.Key, Unique(f.Label, f.Key), group, type));
+                // The main category's family and the other categories sit next to the category (D-115).
+                if (f.Key == "category")
+                {
+                    columns.Add(new("family", Unique("Family", "family"), group, "text"));
+                    columns.Add(new("otherCategories", Unique("Other categories", "otherCategories"), group, "text"));
+                }
                 // The supplier's SAP vendor number lives on the supplier; it sits next to the supplier (Jeff, 25 Nov).
                 if (f.Key == "supplier") columns.Add(new("supplierVendorNumber", Unique("Supplier SAP vendor number", "supplierVendorNumber"), group, "text"));
             }
@@ -136,7 +146,7 @@ public static class ReportEndpoints
 
     internal static object? BuiltInValue(RegisterRow r, string key) => key switch
     {
-        "title" => r.Title, "supplier" => r.SupplierName, "supplierVendorNumber" => r.SupplierVendorNumber, "category" => r.Category, "agreementType" => r.AgreementTypeName, "description" => r.Description,
+        "title" => r.Title, "supplier" => r.SupplierName, "supplierVendorNumber" => r.SupplierVendorNumber, "category" => r.Category, "family" => r.Family, "otherCategories" => r.OtherCategories, "agreementType" => r.AgreementTypeName, "description" => r.Description,
         "owner" => r.OwnerName, "backupOwner" => r.BackupOwnerName, "confidential" => r.IsConfidential, "businessUnit" => r.BusinessUnitName, "site" => r.SiteName, "entity" => r.EntityName, "function" => r.FunctionName,
         "value" => r.Value, "sapOutlineAgreement" => r.SapOutlineAgreement, "startDate" => D(r.StartDate), "effectiveDate" => D(r.EffectiveDate),
         "endDate" => D(r.EndDate), "evergreen" => r.IsEvergreen, "autoRenews" => r.AutoRenews, "renewalTermMonths" => r.RenewalTermMonths, "noticePeriodDays" => r.NoticePeriodDays, "reviewDate" => D(r.ReviewDate),
@@ -160,7 +170,7 @@ public static class ReportEndpoints
         // The same filters as the Contracts list: f.{field key}={value}, for the fields an admin made filterable.
         var filters = Fields.FilterSql(fields, filterValues, p);
         var rows = (await c.QueryAsync<RegisterRow>($"""
-            SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, s.VendorNumber AS SupplierVendorNumber, cat.Name AS CategoryName, parent.Name AS ParentCategoryName,
+            SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, s.VendorNumber AS SupplierVendorNumber, cat.Name AS CategoryName, parent.Name AS ParentCategoryName, family.Name AS FamilyCategoryName, occ.OtherCategories,
                    at.Value AS AgreementTypeName, lv.BusinessUnitName, lv.SiteName, lv.EntityName, lv.FunctionName, o.Name AS OwnerName,
                    b.Name AS BackupOwnerName, k.IsConfidential, k.NeedsLegalReview, k.Value, k.CurrencyCode, k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate,
                    k.IsEvergreen, k.AutoRenews, k.RenewalTermMonths,
@@ -168,6 +178,10 @@ public static class ReportEndpoints
             FROM contracts.Contract k
             LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
             LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
+            LEFT JOIN contracts.Category family ON family.Id = parent.ParentId
+            OUTER APPLY (SELECT STRING_AGG(CAST(CONCAT_WS(N' > ', ocf.Name, ocp.Name, oc.Name) AS NVARCHAR(MAX)), N'; ') WITHIN GROUP (ORDER BY CONCAT_WS(N' > ', ocf.Name, ocp.Name, oc.Name)) AS OtherCategories
+                FROM contracts.ContractCategory cc JOIN contracts.Category oc ON oc.Id = cc.CategoryId
+                LEFT JOIN contracts.Category ocp ON ocp.Id = oc.ParentId LEFT JOIN contracts.Category ocf ON ocf.Id = ocp.ParentId WHERE cc.ContractId = k.Id) occ
             LEFT JOIN contracts.ListItem at ON at.Id = k.AgreementTypeId
             OUTER APPLY (SELECT
                     STRING_AGG(CASE WHEN li.ListName = N'BusinessUnit' THEN CAST(li.Value AS NVARCHAR(MAX)) END, N', ') WITHIN GROUP (ORDER BY li.SortOrder, li.Value) AS BusinessUnitName,

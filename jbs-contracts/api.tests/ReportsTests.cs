@@ -43,7 +43,7 @@ public sealed class ReportsTests(AppFixture app)
     private async Task<(int Id, string Reference)> DraftAsync(HttpClient owner, object fields)
     {
         using var admin = app.ClientFor(AppFixture.AdminAccount);
-        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat") }, Ct));
+        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat"), parentId = await app.FamilyAsync() }, Ct));
         var supplier = await ReadAsync(await owner.PostAsJsonAsync("/api/suppliers", new { name = Unique("Supplier "), vendorNumber = "4000123" }, Ct));
         var body = JsonSerializer.SerializeToNode(fields)!.AsObject();
         body["title"] ??= Unique("Contract ");

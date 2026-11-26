@@ -107,5 +107,24 @@ public sealed class AppFixture : IAsyncLifetime
         return JsonDocument.Parse(body).RootElement;
     }
 
+    public const string TestFamily = "Test family";
+
+    /// <summary>
+    /// The family tests put their categories in (D-115: a contract's category sits in a family). Looked up each time, as clearing QA
+    /// removes it; made if it isn't there.
+    /// </summary>
+    public async Task<int> FamilyAsync()
+    {
+        await using var c = await OpenAsync();
+        return await c.ExecuteScalarAsync<int>("""
+            SET XACT_ABORT ON;
+            BEGIN TRAN;
+            DECLARE @id INT = (SELECT Id FROM contracts.Category WITH (UPDLOCK, HOLDLOCK) WHERE ParentId IS NULL AND NameKey = UPPER(@name));
+            IF @id IS NULL BEGIN INSERT INTO contracts.Category (ParentId, Name, SortOrder) VALUES (NULL, @name, 0); SET @id = SCOPE_IDENTITY(); END
+            COMMIT;
+            SELECT @id;
+            """, new { name = TestFamily });
+    }
+
     public static object NoRoles => new { contractOwner = false, legal = false, approver = false, groupHead = false, admin = false, auditor = false };
 }

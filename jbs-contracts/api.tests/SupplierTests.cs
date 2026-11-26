@@ -116,7 +116,7 @@ public sealed class SupplierTests(AppFixture app)
 
         // Documents from its contracts, respecting Confidential.
         using var admin = app.ClientFor(AppFixture.AdminAccount);
-        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat") }, Ct));
+        var category = await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = Unique("Cat"), parentId = await app.FamilyAsync() }, Ct));
         async Task<int> ContractWithDocAsync(bool confidential, string file)
         {
             var created = await ReadAsync(await owner.PostAsJsonAsync("/api/contracts", new { title = Unique("Contract "), supplierId = sid, categoryId = category.GetProperty("id").GetInt32(), isConfidential = confidential }, Ct));
@@ -310,8 +310,8 @@ public sealed class SupplierTests(AppFixture app)
         var lists = await GetAsync(admin, "/api/lists");
         int Tier(string name) => lists.GetProperty("items").EnumerateArray().First(x => x.GetProperty("listName").GetString() == "SupplierTier" && x.GetProperty("value").GetString() == name).GetProperty("id").GetInt32();
         var u = Unique("t");
-        var approvedCat = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Cleaning {u}" }, Ct))).GetProperty("id").GetInt32();
-        var strategicCat = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Freight {u}" }, Ct))).GetProperty("id").GetInt32();
+        var approvedCat = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Cleaning {u}", parentId = await app.FamilyAsync() }, Ct))).GetProperty("id").GetInt32();
+        var strategicCat = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Freight {u}", parentId = await app.FamilyAsync() }, Ct))).GetProperty("id").GetInt32();
         var sub = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = "Linehaul", parentId = strategicCat }, Ct))).GetProperty("id").GetInt32();
 
         // Only admins set a category's tier.

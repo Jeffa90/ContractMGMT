@@ -1,9 +1,9 @@
-// Admin, Lists: the choices on contracts (categories with subcategories, agreement types, business units, sites, currencies, document
+// Admin, Lists: the choices on contracts (the spend taxonomy: families, categories and subcategories, agreement types, business units, sites, currencies, document
 // kinds) and on suppliers (document types, tiers, risk levels).
 // Nothing is deleted: an item is hidden and stays on contracts that already use it.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Eye, EyeOff, Pencil, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { ChevronRight, Eye, EyeOff, Pencil, Plus, Search } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { ExcelButtons } from '@/components/ExcelImport'
@@ -22,8 +22,8 @@ const tabs: { value: Tab; label: string; single: string; group: 'Contracts' | 'S
     value: 'Category',
     group: 'Contracts',
     label: 'Categories',
-    single: 'category',
-    note: "Give each category a supplier tier: a supplier's tier is then the highest tier among its current contracts' categories, unless Procurement sets one by hand. A subcategory without a tier follows its category. The higher a tier is in Supplier tiers, the higher it counts.",
+    single: 'family',
+    note: "Three levels: a family, its categories, and their subcategories. A contract picks a category (and a subcategory if you like). Give a family or category a supplier tier: a supplier's tier is then the highest tier among its current contracts' main categories, unless Procurement sets one by hand. A level without a tier follows the one above it. The higher a tier is in Supplier tiers, the higher it counts. To load a whole taxonomy, use Import from Excel.",
   },
   { value: 'AgreementType', group: 'Contracts', label: 'Agreement types', single: 'agreement type' },
   { value: 'BusinessUnit', group: 'Contracts', label: 'Business units', single: 'business unit' },
@@ -49,13 +49,17 @@ const tabs: { value: Tab; label: string; single: string; group: 'Contracts' | 'S
   },
 ]
 
-type Editing = { kind: 'add'; parent: Category | null } | { kind: 'rename'; item: ListItem | Category }
+type Editing = { kind: 'add'; parent: Category | null; level?: string } | { kind: 'rename'; item: ListItem | Category }
+const levelName = ['family', 'category', 'subcategory'] as const
 
 export function ListsPage() {
   const { person } = useMe()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('Category')
   const [editing, setEditing] = useState<Editing | null>(null)
+  // Families start folded (a taxonomy has hundreds of entries); Find opens whatever matches.
+  const [open, setOpen] = useState<Set<number>>(new Set())
+  const [find, setFind] = useState('')
   const lists = useQuery({ queryKey: ['lists'], queryFn: () => api.get<Lists>('/api/lists') })
   const setTier = useMutation({
     mutationFn: (x: { cat: Category; tierId: number | null }) => api.put(`/api/categories/${x.cat.id}/tier`, { tierId: x.tierId }),
@@ -77,6 +81,19 @@ export function ListsPage() {
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'That didn\'t work. Try again.'),
   })
 
+  const categories = useMemo(() => lists.data?.categories ?? [], [lists.data])
+  // With Find: the ones whose name matches, and the levels above them (to show where they sit).
+  const shown = useMemo(() => {
+    const words = find.toLowerCase().split(/\s+/).filter(Boolean)
+    if (words.length === 0) return null
+    const byId = new Map(categories.map((c) => [c.id, c]))
+    const keep = new Set<number>()
+    for (const c of categories) {
+      if (!words.every((w) => c.name.toLowerCase().includes(w))) continue
+      for (let at: Category | undefined = c; at; at = at.parentId === null ? undefined : byId.get(at.parentId)) keep.add(at.id)
+    }
+    return keep
+  }, [categories, find])
   if (!person.roles.admin) return <Alert tone="warning" title="Only admins can change the lists.">Ask your admin.</Alert>
   const current = tabs.find((t) => t.value === tab)!
 
@@ -178,42 +195,35 @@ export function ListsPage() {
           </div>
           {current.note && <p className="mt-2 text-sm text-muted-foreground">{current.note}</p>}
           {tab === 'Category' ? (
-            <ul className="mt-4 divide-y divide-border">
-              {lists.data.categories.filter((c) => c.parentId === null).length === 0 && <li className="py-6 text-muted-foreground">No categories yet. Add your first one, for example Freight.</li>}
-              {lists.data.categories
-                .filter((c) => c.parentId === null)
-                .map((top) => (
-                  <li key={top.id} className="py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-medium">
-                        {top.name} {!top.isActive && <Badge>Hidden</Badge>}
-                      </span>
-                      <span className="flex flex-wrap items-center gap-1">
-                        {tierPick(top, null)}
-                        <Button variant="ghost" icon={<Plus aria-hidden className="size-4" />} onClick={() => setEditing({ kind: 'add', parent: top })}>
-                          Subcategory
-                        </Button>
-                        {rowActions(top, top.name)}
-                      </span>
-                    </div>
-                    <ul className="mt-1 ml-5 flex flex-col">
-                      {lists.data.categories
-                        .filter((s) => s.parentId === top.id)
-                        .map((sub) => (
-                          <li key={sub.id} className="flex flex-wrap items-center justify-between gap-2 border-l border-border py-1 pl-3">
-                            <span>
-                              {sub.name} {!sub.isActive && <Badge>Hidden</Badge>}
-                            </span>
-                            <span className="flex flex-wrap items-center gap-1">
-                              {tierPick(sub, top)}
-                              {rowActions(sub, sub.name)}
-                            </span>
-                          </li>
-                        ))}
-                    </ul>
-                  </li>
-                ))}
-            </ul>
+            <>
+              <div className="relative mt-4">
+                <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <TextInput aria-label="Find a family, category or subcategory" placeholder="Find: type a word" className="pl-9" value={find} onChange={(e) => setFind(e.target.value)} />
+              </div>
+              {shown?.size === 0 && <p className="py-6 text-muted-foreground">Nothing matches "{find}".</p>}
+              <ul className="mt-2 divide-y divide-border">
+                {categories.filter((c) => c.parentId === null).length === 0 && (
+                  <li className="py-6 text-muted-foreground">No categories yet. Add your first family, for example Packaging, or load a whole taxonomy with Import from Excel.</li>
+                )}
+                {categories
+                  .filter((c) => c.parentId === null && (!shown || shown.has(c.id)))
+                  .map((family) => (
+                    <CategoryNode
+                      key={family.id}
+                      node={family}
+                      parent={null}
+                      depth={1}
+                      categories={categories}
+                      shown={shown}
+                      open={open}
+                      setOpen={setOpen}
+                      tierPick={tierPick}
+                      rowActions={rowActions}
+                      onAdd={(parent, level) => setEditing({ kind: 'add', parent, level })}
+                    />
+                  ))}
+              </ul>
+            </>
           ) : (
             <ul className="mt-4 divide-y divide-border">
               {lists.data.items.filter((i) => i.listName === tab).length === 0 && <li className="py-6 text-muted-foreground">Nothing here yet. Add the first {current.single}.</li>}
@@ -258,7 +268,11 @@ function ListItemDialog({ tab, single, editing, onClose }: { tab: Tab; single: s
     onError: (e) => setError(e instanceof ApiError ? (Object.values(e.fields)[0] ?? e.message) : 'That didn\'t work. Try again.'),
   })
   const title =
-    editing.kind === 'rename' ? `Rename ${initial}` : editing.parent ? `Add a subcategory under ${editing.parent.name}` : `Add ${/^[aeiou]/i.test(single) ? 'an' : 'a'} ${single}`
+    editing.kind === 'rename'
+      ? `Rename ${initial}`
+      : editing.parent
+        ? `Add a ${editing.level ?? 'subcategory'} in ${editing.parent.name}`
+        : `Add ${/^[aeiou]/i.test(single) ? 'an' : 'a'} ${single}`
   return (
     <Dialog
       open
@@ -285,5 +299,96 @@ function ListItemDialog({ tab, single, editing, onClose }: { tab: Tab; single: s
         </Field>
       </form>
     </Dialog>
+  )
+}
+
+/** One family, category or subcategory, with the levels under it (D-115). Families and categories fold. */
+function CategoryNode({
+  node,
+  parent,
+  depth,
+  categories,
+  shown,
+  open,
+  setOpen,
+  tierPick,
+  rowActions,
+  onAdd,
+}: {
+  node: Category
+  parent: Category | null
+  depth: 1 | 2 | 3
+  categories: Category[]
+  shown: Set<number> | null
+  open: Set<number>
+  setOpen: (s: Set<number>) => void
+  tierPick: (cat: Category, parent: Category | null) => React.ReactNode
+  rowActions: (item: Category, name: string) => React.ReactNode
+  onAdd: (parent: Category, level: string) => void
+}) {
+  const children = depth < 3 ? categories.filter((c) => c.parentId === node.id && (!shown || shown.has(c.id))) : []
+  const isOpen = shown !== null || open.has(node.id)
+  const childLevel: string = levelName[Math.min(depth, 2)]
+  return (
+    <li className={cn(depth === 1 ? 'py-3' : 'border-l border-border py-1 pl-3')}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-1">
+          {depth < 3 && (
+            <Button
+              variant="ghost"
+              className="size-9 min-h-9 shrink-0 p-0"
+              aria-expanded={isOpen}
+              aria-label={`${isOpen ? 'Fold' : 'Show what is in'} ${node.name}`}
+              disabled={shown !== null}
+              onClick={() => {
+                const next = new Set(open)
+                if (next.has(node.id)) next.delete(node.id)
+                else next.add(node.id)
+                setOpen(next)
+              }}
+            >
+              <ChevronRight aria-hidden className={cn('size-4 transition-transform', isOpen && 'rotate-90')} />
+            </Button>
+          )}
+          <span className={cn('min-w-0 break-words', depth === 1 && 'font-medium')}>
+            {node.name} {!node.isActive && <Badge>Hidden</Badge>}
+            {depth < 3 && (
+              <span className="text-xs text-muted-foreground">
+                {' '}
+                ({categories.filter((c) => c.parentId === node.id).length})
+              </span>
+            )}
+          </span>
+        </span>
+        <span className="flex flex-wrap items-center gap-1">
+          {tierPick(node, parent)}
+          {depth < 3 && (
+            <Button variant="ghost" icon={<Plus aria-hidden className="size-4" />} onClick={() => onAdd(node, childLevel)} aria-label={`Add a ${childLevel} in ${node.name}`}>
+              {childLevel === 'category' ? 'Category' : 'Subcategory'}
+            </Button>
+          )}
+          {rowActions(node, node.name)}
+        </span>
+      </div>
+      {isOpen && children.length > 0 && (
+        <ul className="mt-1 ml-5 flex flex-col">
+          {children.map((c) => (
+            <CategoryNode
+              key={c.id}
+              node={c}
+              parent={node}
+              depth={(depth + 1) as 2 | 3}
+              categories={categories}
+              shown={shown}
+              open={open}
+              setOpen={setOpen}
+              tierPick={tierPick}
+              rowActions={rowActions}
+              onAdd={onAdd}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
   )
 }

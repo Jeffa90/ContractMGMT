@@ -114,10 +114,11 @@ public static class TeamEndpoints
             // Each contract's supplier, value, category and end date, so a lead can see what it is at a glance.
             var ids = items.Select(i => i.ContractId).Distinct().ToList();
             var details = ids.Count == 0 ? [] : (await c.QueryAsync<Detail>("""
-                SELECT k.Id, s.Name AS SupplierName, k.Value, k.CurrencyCode, CASE WHEN parent.Name IS NULL THEN cat.Name ELSE parent.Name + N' > ' + cat.Name END AS Category,
+                SELECT k.Id, s.Name AS SupplierName, k.Value, k.CurrencyCode, CONCAT_WS(N' > ', family.Name, parent.Name, cat.Name) AS Category,
                        k.EndDate, k.IsEvergreen
                 FROM contracts.Contract k LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
                 LEFT JOIN contracts.Category cat ON cat.Id = k.CategoryId LEFT JOIN contracts.Category parent ON parent.Id = cat.ParentId
+                LEFT JOIN contracts.Category family ON family.Id = parent.ParentId
                 WHERE k.Id IN (SELECT value FROM OPENJSON(@ids))
                 """, new { ids = System.Text.Json.JsonSerializer.Serialize(ids) })).ToDictionary(d => d.Id);
             // Supplier work (D-90): open business review actions, and business reviews due for the suppliers each person looks after.

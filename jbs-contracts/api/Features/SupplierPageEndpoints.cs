@@ -47,12 +47,14 @@ public static class SupplierPageEndpoints
 
     /// <summary>
     /// The tier from a supplier's contracts (alias s; gives AutoTierId and AutoTierName, D-108): the highest tier (nearest the top of
-    /// the Supplier tiers list) among the categories of its current contracts. A subcategory without a tier follows its category.
+    /// the Supplier tiers list) among the main categories of its current contracts. A category without a tier follows the one above it
+    /// (subcategory, category, family; D-115).
     /// </summary>
     public const string AutoTier = """
         OUTER APPLY (SELECT TOP (1) atl.Id AS AutoTierId, atl.Value AS AutoTierName
                      FROM contracts.Contract ak JOIN contracts.Category akc ON akc.Id = ak.CategoryId LEFT JOIN contracts.Category akp ON akp.Id = akc.ParentId
-                     JOIN contracts.ListItem atl ON atl.Id = ISNULL(akc.TierId, akp.TierId)
+                     LEFT JOIN contracts.Category akf ON akf.Id = akp.ParentId
+                     JOIN contracts.ListItem atl ON atl.Id = COALESCE(akc.TierId, akp.TierId, akf.TierId)
                      WHERE ak.SupplierId = s.Id AND ak.Stage NOT IN (N'Withdrawn', N'Ended', N'Archived') AND atl.IsActive = 1
                      ORDER BY atl.SortOrder, atl.Id) auto
         """;

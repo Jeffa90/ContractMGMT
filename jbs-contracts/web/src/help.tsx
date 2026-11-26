@@ -69,7 +69,7 @@ const topics = {
         </p>
         <p>Type in the search box to find a contract by its title, reference (for example JBSAUS0000412), supplier or SAP number.</p>
         <p>
-          <strong>Filters</strong> narrow the list, for example to one site or supplier. Choosing a category includes its subcategories. Your admin chooses which fields can
+          <strong>Filters</strong> narrow the list, for example to one site or supplier. Choosing a family or category includes everything in it, and finds contracts where it's one of the other categories too. A long list, like categories, is found by typing. Your admin chooses which fields can
           be used, under Admin, Contract fields.
         </p>
         <p>The <strong>Key date</strong> is the notice deadline if there is one, otherwise the end date. It turns amber within 30 days and red once it has passed.</p>
@@ -81,7 +81,8 @@ const topics = {
         </p>
         <p>
           A contract can have several business units, sites, entities and functions. In Excel they share one cell, separated by semicolons (for example
-          Dinmore; Riverina). A blank cell leaves them as they are.
+          Dinmore; Riverina). A blank cell leaves them as they are. <strong>Category</strong> is written as Family &gt; Category &gt; Subcategory (just
+          Category &gt; Subcategory, or a name found only once, also works), and <strong>Other categories</strong> share one cell, separated by semicolons.
         </p>
         <p>
           Fields your admin added have their own columns. For a pick-from-a-list field, type the option as it's shown (several are separated by commas); for a person,
@@ -98,6 +99,11 @@ const topics = {
         <p>
           <strong>While it is a draft</strong>, click <strong>Edit details</strong> to fill in or change anything. Only a title is needed to start; the rest can wait
           until you send it on, when the required fields are checked.
+        </p>
+        <p>
+          <strong>Category</strong> is the main spend: choose its family, then the category, and a subcategory if you like, or type a word in the box above them to
+          find it. If the contract covers other spend too (for example casings and premixes), click <strong>Add another category</strong>. The main
+          category sets the supplier's tier.
         </p>
         <p>
           <strong>Business unit, site, entity and function</strong> can each have several. Open the drop-down and tick each one that applies; it stays open until
@@ -257,8 +263,8 @@ const topics = {
         <p>Everything about one supplier in one place. Everyone can read it; people ticked Procurement (and admins) look after it.</p>
         <ul>
           <li>
-            <strong>Overview</strong>: who looks after the supplier (the relationship owner), its tier (automatically the highest tier among the categories
-            of its current contracts, set by admins on each category under Lists, unless Procurement chooses one), its risk and why, when the next business review is due, and
+            <strong>Overview</strong>: who looks after the supplier (the relationship owner), its tier (automatically the highest tier among the main categories
+            of its current contracts, set by admins on each family or category under Lists, unless Procurement chooses one), its risk and why, when the next business review is due, and
             its contacts.
           </li>
           <li>
@@ -298,7 +304,7 @@ const topics = {
           <li>
             <strong>Translate drop-down values</strong>: set up your own lists under Admin, Lists first. Then <strong>Show the values</strong> lists every
             old category (with subcategory), agreement type, site, business unit, entity, function and owner in the file, with how many contracts use it.
-            Choose what each becomes: one of your list values, or <strong>Leave blank</strong>. For an owner who has left, choose the current contract
+            Choose what each becomes: one of your list values (for a category, type a word to find it in your families), or <strong>Leave blank</strong>. For an owner who has left, choose the current contract
             owner who takes their contracts (past employees aren't added as people). Same names are chosen for you. Translations are remembered after an
             import; <strong>Download translations</strong> keeps them in a file, and <strong>Use translations from a file</strong> brings them back (for
             example on Production).
@@ -345,8 +351,14 @@ const topics = {
     body: (
       <>
         <p>
-          These are the choices people pick from: categories (with subcategories), agreement types, business units, sites and currencies on a contract; supplier
+          These are the choices people pick from: categories, agreement types, business units, sites and currencies on a contract; supplier
           document types, tiers and risk levels on a supplier; and the kinds of contract document.
+        </p>
+        <p>
+          <strong>Categories</strong> have three levels: a <strong>family</strong> (for example Packaging), its <strong>categories</strong> (Casings) and their{' '}
+          <strong>subcategories</strong> (Collagen casing). Click the arrow beside one to see what's in it, or type in <strong>Find</strong>. To load a whole
+          taxonomy at once, use <strong>Import from Excel</strong>: one row per family, category and subcategory, with the <strong>Parent category</strong> column
+          blank for a family, the family's name for a category, and Family &gt; Category for a subcategory.
         </p>
         <p>
           <strong>Contract document kinds</strong> and <strong>supplier risk levels</strong> have built-in choices the app relies on (for example Signed copy, which

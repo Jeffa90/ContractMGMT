@@ -52,6 +52,7 @@ public static class QaClearEndpoints
                     DELETE FROM contracts.Unlock;
                     DELETE FROM contracts.ContractFieldValue;
                     DELETE FROM contracts.ContractListValue;
+                    DELETE FROM contracts.ContractCategory;
                     DELETE FROM contracts.LegalTurnDocument;
                     DELETE FROM contracts.LegalTurn;
                     DELETE FROM contracts.Approval;
@@ -73,6 +74,7 @@ public static class QaClearEndpoints
                     DELETE FROM contracts.SupplierReviewReminder;
                     DELETE FROM contracts.Supplier;
 
+                    DELETE FROM contracts.Category WHERE ParentId IN (SELECT Id FROM contracts.Category WHERE ParentId IS NOT NULL);
                     DELETE FROM contracts.Category WHERE ParentId IS NOT NULL;
                     DELETE FROM contracts.Category;
                     DELETE FROM contracts.ListItem WHERE ListName IN @ClearedLists;

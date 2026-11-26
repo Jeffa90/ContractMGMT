@@ -139,15 +139,18 @@ public static class DemoData
 
         private async Task ListsAsync()
         {
-            var freight = await CategoryAsync("Freight", null);
+            // Three levels, Family > Category > Subcategory (D-115).
+            var servicesFamily = await CategoryAsync("Services", null);
+            var packagingFamily = await CategoryAsync("Packaging", null);
+            var freight = await CategoryAsync("Freight", servicesFamily);
             linehaul = await CategoryAsync("Linehaul", freight);
             coldChain = await CategoryAsync("Cold chain", freight);
-            packaging = await CategoryAsync("Packaging", null);
-            facilities = await CategoryAsync("Facilities", null);
+            packaging = await CategoryAsync("Cartons and film", packagingFamily);
+            facilities = await CategoryAsync("Facilities", servicesFamily);
             cleaning = await CategoryAsync("Cleaning", facilities);
             waste = await CategoryAsync("Waste", facilities);
-            it = await CategoryAsync("IT services", null);
-            peopleServices = await CategoryAsync("People services", null);
+            it = await CategoryAsync("IT services", servicesFamily);
+            peopleServices = await CategoryAsync("People services", servicesFamily);
             // Supplier tiers from spend categories (D-108): suppliers get the highest tier among their contracts' categories.
             foreach (var (category, tierName) in new[] { (freight, "Strategic"), (packaging, "Preferred"), (it, "Preferred"), (facilities, "Approved"), (peopleServices, "Transactional") })
                 await c.ExecuteAsync("""

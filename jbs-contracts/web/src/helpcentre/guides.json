@@ -74,7 +74,7 @@
       "steps": [
         "Go to **Contracts** and click **Add contract**.",
         "Type a **Title**, for example \"Linen hire 2027\".",
-        "Choose the **Supplier** and **Category**. Supplier not there yet? Click **Add new supplier**.",
+        "Choose the **Supplier**, then the **Category**: its **Family**, then **Category**, and a **Subcategory** if you like (or type a word to find it). Supplier not there yet? Click **Add new supplier**.",
         "Add the value, dates and notice period if you know them. Only a title is needed for a draft; the rest is checked when you send it on.",
         "Leave **Needs Legal review** ticked unless Legal has agreed it doesn't need one.",
         "Click **Save draft**. The contract gets its reference, for example JBSAUS0000416."

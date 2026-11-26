@@ -34,7 +34,7 @@ public static class LegacyImportEndpoints
         new("startDate", "Start date", "Dates", false, null, ["start date", "start", "commencement date", "commencement", "valid from"]),
         new("endDate", "End date", "Dates", false, "Blank needs Evergreen to be Yes.", ["end date", "end", "expiry date", "expiry", "expires", "valid to", "termination date"]),
         new("evergreen", "Evergreen", "Dates", false, "Yes or No: it carries on until someone ends it, with no end date.", ["evergreen", "perpetual", "no end date"]),
-        new("autoRenews", "Renews automatically", "Dates", false, "Yes or No (or Automatic, Manual): yes moves the end date on by the renewal term unless someone decides to let it end. Medius's Extension Type goes here: In Full comes in as Evergreen, Monthly renews a month at a time.",
+        new("autoRenews", "Renews automatically", "Dates", false, "Yes or No (or Automatic, Manual): yes moves the end date on by the renewal term unless someone decides to let it end. Medius's Extension Type goes here: In Full keeps its end date and carries on after it until replaced (it doesn't renew by itself), Monthly renews a month at a time.",
             ["renews automatically", "auto renew", "auto renews", "auto renewal", "automatic renewal", "extension type", "renewal type", "rolling"]),
         new("renewalTermMonths", "Renewal term (months)", "Dates", false, "How long each automatic renewal lasts: 12, 12 months or 1 year.",
             ["renewal term", "renewal term months", "renewal period", "extension period", "extension term", "extension length", "renewal length"]),
@@ -112,9 +112,10 @@ public static class LegacyImportEndpoints
             .Where(w => w.Length > 0).ToList();
 
     /// <summary>
-    /// Medius's "Auto Extension - In Full" (AutoExtensionFull): it carries on until a party ends it, so it's Evergreen (Jeff, 27 Nov).
+    /// Medius's "Auto Extension - In Full" (AutoExtensionFull): after its end date it carries on under the same terms until a new
+    /// agreement replaces it (Jeff, 27 Nov). It keeps its end date and doesn't renew by itself.
     /// </summary>
-    internal static bool MeansEvergreen(string text)
+    internal static bool MeansCarriesOn(string text)
     {
         var words = WordList(text);
         return words.Any(w => w.StartsWith("auto", StringComparison.Ordinal)) && words.Contains("full");
@@ -443,14 +444,13 @@ public static class LegacyImportEndpoints
                 term = 1;
                 r.Notes.Add($"\"{monthly}\": renews a month at a time.");
             }
-            // "In Full" carries on until someone ends it: Evergreen, with no end date to renew (Jeff, 27 Nov).
-            if (Text(row, "autoRenews") is { } full && MeansEvergreen(full))
+            // "In Full": after its end date it carries on under the same terms until a new agreement replaces it (Jeff, 27 Nov). It keeps
+            // its end date and doesn't move it on; past the end date it stays Effective and asks for a renewal decision.
+            if (Text(row, "autoRenews") is { } full && MeansCarriesOn(full))
             {
                 autoRenews = false;
                 term = null;
-                if (!evergreen) r.Notes.Add($"\"{full}\": carries on until someone ends it, so Evergreen{(end is { } was ? $"; its end date ({was:d MMM yyyy}) isn't kept" : "")}.");
-                evergreen = true;
-                end = null;
+                r.Notes.Add($"\"{full}\": keeps its end date and carries on under the same terms after it, until replaced; it doesn't renew by itself.");
             }
             if (autoRenews && evergreen) problems.Add("Renews automatically: it's also Evergreen. An evergreen contract has no end date to renew; change one of them.");
             if (autoRenews && term is null) problems.Add("Renewal term: blank, but it renews automatically. Fill in how many months each renewal lasts.");

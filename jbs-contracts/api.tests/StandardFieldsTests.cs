@@ -224,9 +224,9 @@ public sealed class StandardFieldsTests(AppFixture app)
         // Medius's "Auto Extension - Monthly" with no period renews a month at a time.
         Assert.Equal("Effective", byRow[6].GetProperty("outcome").GetString());
         Assert.Contains(byRow[6].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("a month at a time"));
-        // "In Full" carries on until someone ends it: Evergreen, its end date not kept (Jeff, 27 Nov). "NoExtension" doesn't renew.
+        // "In Full" keeps its end date and carries on under the same terms after it until replaced (Jeff, 27 Nov). "NoExtension" doesn't renew.
         Assert.Equal("Effective", byRow[7].GetProperty("outcome").GetString());
-        Assert.Contains(byRow[7].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("so Evergreen") && x.GetString()!.Contains("isn't kept"));
+        Assert.Contains(byRow[7].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("keeps its end date"));
         Assert.Equal("Effective", byRow[8].GetProperty("outcome").GetString());
         // Matched to Evergreen by mistake, the Extension Type says where it belongs.
         var wrong = new Dictionary<string, string>(mapping) { ["Extension Type"] = "evergreen" };
@@ -269,7 +269,8 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.Equal((true, (int?)1), (imported[$"{u}-m"].AutoRenews, imported[$"{u}-m"].RenewalTermMonths));
         Assert.False(imported[$"{u}-f"].AutoRenews);
         Assert.False(imported[$"{u}-n"].AutoRenews);
-        Assert.True(await db.ExecuteScalarAsync<bool>("SELECT IsEvergreen FROM contracts.Contract WHERE LegacyReference = @r AND EndDate IS NULL", new { r = $"{u}-f" }));
+        Assert.Equal(Today.AddDays(200), DateOnly.FromDateTime(imported[$"{u}-f"].EndDate!.Value));
+        Assert.False(await db.ExecuteScalarAsync<bool>("SELECT IsEvergreen FROM contracts.Contract WHERE LegacyReference = @r", new { r = $"{u}-f" }));
 
         // The next new contract carries on after the highest number.
         var next = (await OkAsync(owner.PostAsJsonAsync("/api/contracts", new { title = $"After import {u}" }, Ct))).GetProperty("reference").GetString()!;

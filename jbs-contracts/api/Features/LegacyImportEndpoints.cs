@@ -153,7 +153,43 @@ public static class LegacyImportEndpoints
         internal string? Reference { get; set; }
     }
 
-    private sealed record Options(Dictionary<string, string> Mapping, int? DefaultOwnerId, int? DefaultCategoryId, bool LeaveOutArchived = false);
+    private sealed record Options(Dictionary<string, string> Mapping, int? DefaultOwnerId, int? DefaultCategoryId, bool LeaveOutArchived = false,
+        Translations? Translations = null);
+
+    /// <summary>
+    /// The drop-down fields whose old values can be translated (D-112): field key, its list (for the choices) and label. Category takes
+    /// "Category > Subcategory" when the file has a subcategory column.
+    /// </summary>
+    internal static readonly (string Key, string List, string Label)[] TranslatedFields =
+    [
+        ("category", "Category", "Category"), ("agreementType", "AgreementType", "Agreement type"), ("businessUnit", "BusinessUnit", "Business unit"),
+        ("site", "Site", "Site"), ("entity", "Entity", "Entity"), ("function", "Function", "Function"),
+    ];
+
+    /// <summary>
+    /// Old values translated to JBS Contracts list values, by field and old value (any case). The new value is a list value's name
+    /// ("Category > Subcategory" for categories), or empty for "leave it blank". Names, not ids, so a downloaded set works on Production.
+    /// </summary>
+    internal sealed class Translations
+    {
+        private readonly Dictionary<string, Dictionary<string, string>> byField = new(StringComparer.OrdinalIgnoreCase);
+        public void Set(string field, string old, string target) =>
+            (byField.TryGetValue(field, out var m) ? m : byField[field] = new(StringComparer.OrdinalIgnoreCase))[old.Trim()] = target.Trim();
+        public bool TryGet(string field, string? old, out string target)
+        {
+            target = "";
+            return old is not null && byField.TryGetValue(field, out var m) && m.TryGetValue(old.Trim(), out target!);
+        }
+        public Dictionary<string, Dictionary<string, string>> ToDictionary() => byField.ToDictionary(f => f.Key, f => new Dictionary<string, string>(f.Value));
+        public static Translations From(Dictionary<string, Dictionary<string, string>>? raw)
+        {
+            var t = new Translations();
+            foreach (var (field, values) in raw ?? [])
+                if (TranslatedFields.Any(f => f.Key == field))
+                    foreach (var (old, target) in values) if (!string.IsNullOrWhiteSpace(old)) t.Set(field, old, target ?? "");
+            return t;
+        }
+    }
 
     /// <summary>
     /// What the plan found besides its rows: list items that aren't in JBS Contracts yet (as rows for the Lists import: list, name,
@@ -179,8 +215,15 @@ public static class LegacyImportEndpoints
             foreach (var (column, key) in raw) if (!string.IsNullOrWhiteSpace(key)) mapping[column] = key!;
         }
         catch (JsonException) { }
+        Translations? translations = null;
+        try
+        {
+            if (form["translations"].ToString() is { Length: > 0 } t)
+                translations = Translations.From(JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(t));
+        }
+        catch (JsonException) { }
         return new(mapping, int.TryParse(form["defaultOwnerId"], out var o) ? o : null, int.TryParse(form["defaultCategoryId"], out var cat) ? cat : null,
-            form["leaveOutArchived"] == "true");
+            form["leaveOutArchived"] == "true", translations);
     }
 
     private static async Task<(List<PlanRow> Rows, Dictionary<string, string> NewSuppliers, string? Problem)> PlanAsync(
@@ -259,7 +302,8 @@ public static class LegacyImportEndpoints
             text ??= sub!;
             var parts = text.Split(['>', '›', '/'], 2, StringSplitOptions.TrimEntries);
             CategoryRow? match;
-            if (parts.Length == 2)
+            if (cats.FirstOrDefault(x => x.ParentId is null && K(x.Name) == K(text)) is { } exact) { parts = [text]; match = exact; }
+            else if (parts.Length == 2)
             {
                 var top = cats.FirstOrDefault(x => x.ParentId is null && K(x.Name) == K(parts[0]));
                 match = top is null ? null : cats.FirstOrDefault(x => x.ParentId == top.Id && K(x.Name) == K(parts[1]));
@@ -310,17 +354,26 @@ public static class LegacyImportEndpoints
                 if (vendor.Length > 50) problems.Add("Supplier's SAP vendor number: keep it under 50 characters.");
                 else if (extras.VendorNumbers.TryAdd(supplierName.Trim(), vendor)) r.Notes.Add($"Saves SAP vendor number {vendor} on {supplierName.Trim()}.");
             }
-            var categoryId = Category(Text(row, "category"), Text(row, "subcategory"), problems);
-            if (categoryId is null && Text(row, "category") is null && Text(row, "subcategory") is null) problems.Add("Category: blank, and there's no default category.");
+            // Translated values (D-112): the old value's chosen JBS Contracts value, or blank.
+            string? Tr(string field, string? text) => text is not null && o.Translations is { } tr && tr.TryGet(field, text, out var to) ? (to.Length == 0 ? null : to) : text;
+            var (catText, subText) = (Text(row, "category"), Text(row, "subcategory"));
+            if (o.Translations is { } trs && (catText ?? subText) is not null && trs.TryGet("category", CategoryKey(catText, subText), out var catTo))
+            {
+                var split = catTo.Split(" > ", 2, StringSplitOptions.TrimEntries);
+                (catText, subText) = catTo.Length == 0 ? (null, null) : split.Length == 2 ? (split[0], split[1]) : (catTo, null);
+                if (catTo.Length == 0) r.Notes.Add("Category left blank (translation).");
+            }
+            var categoryId = Category(catText, subText, problems);
+            if (categoryId is null && catText is null && subText is null) problems.Add("Category: blank, and there's no default category.");
             var ownerText = Text(row, "owner");
             var ownerId = ownerText is null ? o.DefaultOwnerId : Person_(ownerText, "Owner", problems);
             if (ownerId is null && ownerText is null) problems.Add("Owner: blank, and there's no default owner.");
             var backupId = Text(row, "backupOwner") is { } bo ? Person_(bo, "Backup owner", problems) : null;
-            var agreementTypeId = Item("AgreementType", Text(row, "agreementType"), "Agreement type", problems);
-            var businessUnitId = Item("BusinessUnit", Text(row, "businessUnit"), "Business unit", problems);
-            var siteId = Item("Site", Text(row, "site"), "Site", problems);
-            var entityId = Item("Entity", Text(row, "entity"), "Entity", problems);
-            var functionId = Item("Function", Text(row, "function"), "Function", problems);
+            var agreementTypeId = Item("AgreementType", Tr("agreementType", Text(row, "agreementType")), "Agreement type", problems);
+            var businessUnitId = Item("BusinessUnit", Tr("businessUnit", Text(row, "businessUnit")), "Business unit", problems);
+            var siteId = Item("Site", Tr("site", Text(row, "site")), "Site", problems);
+            var entityId = Item("Entity", Tr("entity", Text(row, "entity")), "Entity", problems);
+            var functionId = Item("Function", Tr("function", Text(row, "function")), "Function", problems);
 
             string? p = null;
             DateOnly? Date(string key) { if (!source.TryGetValue(key, out var col)) return null; var d = row.Date(col, out var pr); if (pr is not null) problems.Add(pr); return d; }
@@ -418,6 +471,16 @@ public static class LegacyImportEndpoints
         return (plan, newSuppliers, null);
     }
 
+    private const string LeaveBlank = "(leave blank)";
+
+    private static async Task<Dictionary<string, Dictionary<string, string>>?> SavedTranslationsAsync(SqlConnection c, SqlTransaction? tx) =>
+        await c.ExecuteScalarAsync<string?>("SELECT MappingJson FROM contracts.ImportMapping WHERE Name = N'legacy-values'", transaction: tx) is { } json
+            ? JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(json) : null;
+
+    /// <summary>How a row's category reads for translating: "Category > Subcategory" when there's a subcategory.</summary>
+    internal static string CategoryKey(string? category, string? sub) =>
+        category is not null && sub is not null ? $"{category} > {sub}" : (category ?? sub ?? "");
+
     private static string Label(List<Target> targets, string errorKey)
     {
         var key = errorKey switch
@@ -475,6 +538,90 @@ public static class LegacyImportEndpoints
             });
         }));
 
+        // Step 1a: the old values in each drop-down column, to translate to JBS Contracts list values (D-112). Nothing changes.
+        // With download=translations it gives the translations as a sheet (to use again on Production); a translations sheet sent
+        // as translationsFile is read back in.
+        app.MapPost("/api/import/legacy/values", async (HttpRequest request, CurrentUser current, Db db) => await AdminAsync(current, db, async me =>
+        {
+            if (!request.HasFormContentType) return ApiResults.Invalid("Choose the spreadsheet to import.", new() { ["file"] = "Choose the spreadsheet to import." });
+            var form = await request.ReadFormAsync();
+            var options = ReadOptions(form);
+            await using var c = await db.OpenAsync();
+            var saved = Translations.From(await SavedTranslationsAsync(c, null));
+            // A translations sheet (from Download translations) adds to what's remembered.
+            if (form.Files.GetFile("translationsFile") is { Length: > 0 } tf)
+            {
+                await using var ts = tf.OpenReadStream();
+                var mem = new MemoryStream();
+                await ts.CopyToAsync(mem);
+                mem.Position = 0;
+                var (trRows, _, trProblem) = Excel.Read(mem, ["Field", "Old value", "JBS Contracts value"], ["Field", "Old value"]);
+                if (trProblem is not null) return ApiResults.Invalid(trProblem, new() { ["translationsFile"] = trProblem });
+                foreach (var row in trRows)
+                {
+                    var field = TranslatedFields.FirstOrDefault(f => string.Equals(f.Label, Clean(row.Text("Field")), StringComparison.OrdinalIgnoreCase));
+                    if (field.Key is null || Clean(row.Text("Old value")) is not { } old) continue;
+                    var to = Clean(row.Text("JBS Contracts value")) ?? "";
+                    saved.Set(field.Key, old, string.Equals(to, LeaveBlank, StringComparison.OrdinalIgnoreCase) ? "" : to);
+                }
+            }
+            // What's on screen wins over what's remembered.
+            foreach (var (field, values) in options.Translations?.ToDictionary() ?? [])
+                foreach (var (old, to) in values) saved.Set(field, old, to);
+
+            if (form["download"] == "translations")
+            {
+                var rowsOut = saved.ToDictionary().SelectMany(f => f.Value.Select(v => new object?[]
+                    { TranslatedFields.First(t => t.Key == f.Key).Label, v.Key, v.Value.Length == 0 ? LeaveBlank : v.Value }))
+                    .OrderBy(r => (string)r[0]!).ThenBy(r => (string)r[1]!);
+                var bytes = Excel.Write("Translations", [new("Field", null, 18), new("Old value", null, 40), new("JBS Contracts value", "A list value's name, Category > Subcategory, or (leave blank).", 40)], rowsOut);
+                return Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "jbs-contracts-import-translations.xlsx");
+            }
+
+            var (book, _, problem) = await SheetAsync(form);
+            if (problem is not null) return ApiResults.Invalid(problem, new() { ["file"] = problem });
+            string? Column(string key) => options.Mapping.FirstOrDefault(m => m.Value == key).Key;
+            var wanted = TranslatedFields.Select(f => f.Key).Append("subcategory").Append("status").Select(k => (k, col: Column(k))).Where(x => x.col is not null).ToDictionary(x => x.k, x => x.col!);
+            var (rows, _, readProblem) = Excel.Read(book!, wanted.Values.Distinct().ToList(), []);
+            if (readProblem is not null) return ApiResults.Invalid(readProblem, new() { ["file"] = readProblem });
+            string? Cell(Excel.Row row, string key) => wanted.TryGetValue(key, out var col) ? Clean(row.Text(col)) : null;
+
+            static string K(string s) => s.Trim().ToUpperInvariant();
+            var cats = (await c.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category WHERE IsActive = 1 ORDER BY SortOrder, Name")).ToList();
+            var items = (await c.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem WHERE IsActive = 1 ORDER BY SortOrder, Value")).ToList();
+            var choices = new Dictionary<string, List<string>>
+            {
+                ["Category"] = cats.Where(x => x.ParentId is null).SelectMany(top => new[] { top.Name }.Concat(cats.Where(s => s.ParentId == top.Id).Select(s => $"{top.Name} > {s.Name}"))).ToList(),
+            };
+            foreach (var (_, list, _) in TranslatedFields.Where(f => f.List != "Category"))
+                choices[list] = items.Where(i => i.ListName == list).Select(i => i.Value).ToList();
+
+            var counts = TranslatedFields.ToDictionary(f => f.Key, _ => new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+            foreach (var row in rows)
+            {
+                if (options.LeaveOutArchived && Cell(row, "status") is { } st && System.Text.RegularExpressions.Regex.IsMatch(st, @"\barchived\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) continue;
+                foreach (var (key, _, _) in TranslatedFields)
+                {
+                    var value = key == "category" ? (Cell(row, "category") ?? Cell(row, "subcategory")) is null ? null : CategoryKey(Cell(row, "category"), Cell(row, "subcategory")) : Cell(row, key);
+                    if (value is not null) counts[key][value] = counts[key].GetValueOrDefault(value) + 1;
+                }
+            }
+            return Results.Ok(new
+            {
+                fields = TranslatedFields.Where(f => wanted.ContainsKey(f.Key)).Select(f => new
+                {
+                    key = f.Key, label = f.Key == "category" && wanted.ContainsKey("subcategory") ? "Category > Subcategory" : f.Label, list = f.List,
+                    values = counts[f.Key].OrderBy(v => v.Key, StringComparer.OrdinalIgnoreCase).Select(v =>
+                    {
+                        // Remembered (or on screen), else the same name already in the list, else not chosen yet.
+                        string? to = saved.TryGet(f.Key, v.Key, out var t) ? t : choices[f.List].FirstOrDefault(ch => K(ch) == K(v.Key));
+                        return new { value = v.Key, count = v.Value, to, remembered = saved.TryGet(f.Key, v.Key, out _) };
+                    }),
+                }),
+                choices,
+            });
+        }));
+
         // Step 1b: the dry run. Nothing changes.
         app.MapPost("/api/import/legacy/preview", async (HttpRequest request, CurrentUser current, Db db, AppSettings settings, TimeProvider clock) => await AdminAsync(current, db, async me =>
         {
@@ -522,6 +669,17 @@ public static class LegacyImportEndpoints
                 WHEN MATCHED THEN UPDATE SET MappingJson = @mapping, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
                 WHEN NOT MATCHED THEN INSERT (Name, MappingJson, UpdatedById) VALUES (N'legacy', @mapping, @me);
                 """, new { mapping, me = me.Id }, tx);
+            // And the translations (D-112), added to what was remembered.
+            if (options.Translations is { } chosen)
+            {
+                var all = Translations.From(await SavedTranslationsAsync(c, tx));
+                foreach (var (field, values) in chosen.ToDictionary()) foreach (var (old, to) in values) all.Set(field, old, to);
+                await c.ExecuteAsync("""
+                    MERGE contracts.ImportMapping AS t USING (SELECT N'legacy-values' AS Name) AS s ON t.Name = s.Name
+                    WHEN MATCHED THEN UPDATE SET MappingJson = @json, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                    WHEN NOT MATCHED THEN INSERT (Name, MappingJson, UpdatedById) VALUES (N'legacy-values', @json, @me);
+                    """, new { json = JsonSerializer.Serialize(all.ToDictionary()), me = me.Id }, tx);
+            }
 
             var via = $" (imported from {fileName})";
             var supplierIds = new Dictionary<string, int>();

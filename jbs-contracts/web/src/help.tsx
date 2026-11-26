@@ -288,6 +288,13 @@ const topics = {
             No, Automatic or Manual. Your matching is remembered for next time.
           </li>
           <li>
+            <strong>Translate drop-down values</strong>: set up your own lists under Admin, Lists first. Then <strong>Show the values</strong> lists every
+            old category (with subcategory), agreement type, site, business unit, entity and function in the file, with how many contracts use it. Choose
+            what each becomes: one of your list values, or <strong>Leave blank</strong>. Same names are chosen for you. Translations are remembered after an
+            import; <strong>Download translations</strong> keeps them in a file, and <strong>Use translations from a file</strong> brings them back (for
+            example on Production).
+          </li>
+          <li>
             <strong>Check</strong>: the dry run shows each row: imported as Effective (current, locked, with its original dates), as Ended (expired), already
             imported, left out (archived, while <strong>Leave out archived contracts</strong> is ticked), or can't be imported and why. Nothing changes yet.
             Categories, subcategories, sites and other list values that aren't in JBS Contracts yet are listed together: <strong>Download the lists to

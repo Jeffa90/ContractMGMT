@@ -317,4 +317,82 @@ public sealed class ImportTests(AppFixture app)
         Assert.NotNull(imported[Ref(1)].Notice);
         Assert.Equal(0, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Contract WHERE LegacyReference = @r", new { r = Ref(3) }));
     }
+
+    [Fact]
+    public async Task Old_drop_down_values_translate_to_your_own_list_values_and_the_translations_are_remembered_and_downloadable()
+    {
+        var u = Unique("tr");
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var ownerUser = Unique("to");
+        var ownerName = $"Tess Translate {u}";
+        await app.AddPersonAsync(ownerUser, ownerName, new { contractOwner = true, legal = false, approver = false, groupHead = false, admin = false, auditor = false });
+        // Your own clean lists: Freight > Road, and the agreement type "Services".
+        var freight = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Freight {u}" }, Ct))).GetProperty("id").GetInt32();
+        var road = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = "Road", parentId = freight }, Ct))).GetProperty("id").GetInt32();
+        await ReadAsync(await admin.PostAsJsonAsync("/api/lists/items", new { listName = "AgreementType", value = $"Services {u}" }, Ct));
+
+        string[] headers = ["Agreement Reference", "Agreement Status", "Vendor Name", "Title", "Agreement Owner", "Start Date", "End Date", "Agreement Type", "Plant", "PORTFOLIO/CATEGORY", "SUB-CATEGORY"];
+        using var book = new XLWorkbook();
+        var sheet = book.Worksheets.Add("Export");
+        for (var c = 0; c < headers.Length; c++) sheet.Cell(1, c + 1).Value = headers[c];
+        object?[][] rows =
+        [
+            [$"T{u}1", "Effective", $"Vendor {u}", "One", ownerName, "2025-01-01", "2027-12-31", "SVC Agreement (old)", "Old Plant A", "LOGISTICS (old)", "Road freight"],
+            [$"T{u}2", "Effective", $"Vendor {u}", "Two", ownerName, "2025-01-01", "2027-12-31", "svc agreement (OLD)", "Old Plant A", "LOGISTICS (old)", "Road freight"],
+        ];
+        for (var r = 0; r < rows.Length; r++) for (var c = 0; c < rows[r].Length; c++) sheet.Cell(r + 2, c + 1).Value = rows[r][c]!.ToString();
+        using var stream = new MemoryStream();
+        book.SaveAs(stream);
+        var file = stream.ToArray();
+        var columns = await ReadAsync(await admin.PostAsync("/api/import/legacy/columns", Form(file, "export.xlsx"), Ct));
+        var mapping = columns.GetProperty("columns").EnumerateArray().Where(c => c.GetProperty("suggested").GetString() is not null)
+            .ToDictionary(c => c.GetProperty("header").GetString()!, c => c.GetProperty("suggested").GetString()!);
+        MultipartFormDataContent F(object? translations = null, string? download = null, byte[]? translationsFile = null)
+        {
+            var form = Form(file, "export.xlsx", mapping);
+            if (translations is not null) form.Add(new StringContent(JsonSerializer.Serialize(translations)), "translations");
+            if (download is not null) form.Add(new StringContent(download), "download");
+            if (translationsFile is not null) form.Add(new ByteArrayContent(translationsFile), "translationsFile", "translations.xlsx");
+            return form;
+        }
+
+        // The old values, with how many contracts use each (values that differ only in case count as one).
+        var values = await ReadAsync(await admin.PostAsync("/api/import/legacy/values", F(), Ct));
+        var fields = values.GetProperty("fields").EnumerateArray().ToDictionary(f => f.GetProperty("key").GetString()!);
+        var cat = fields["category"].GetProperty("values").EnumerateArray().Single();
+        Assert.Equal(("LOGISTICS (old) > Road freight", 2), (cat.GetProperty("value").GetString(), cat.GetProperty("count").GetInt32()));
+        Assert.Equal(JsonValueKind.Null, cat.GetProperty("to").ValueKind);
+        Assert.Equal(2, fields["agreementType"].GetProperty("values").EnumerateArray().Single().GetProperty("count").GetInt32());
+        Assert.Contains($"Freight {u} > Road", values.GetProperty("choices").GetProperty("Category").EnumerateArray().Select(x => x.GetString()));
+
+        // Without translations they're flagged; translated (and the plant left blank), both rows are ready.
+        Assert.Equal(2, (await ReadAsync(await admin.PostAsync("/api/import/legacy/preview", F(), Ct))).GetProperty("refused").GetInt32());
+        var translations = new Dictionary<string, Dictionary<string, string>>
+        {
+            ["category"] = new() { ["LOGISTICS (old) > Road freight"] = $"Freight {u} > Road" },
+            ["agreementType"] = new() { ["SVC Agreement (old)"] = $"Services {u}" },
+            ["site"] = new() { ["Old Plant A"] = "" },
+        };
+        var plan = await ReadAsync(await admin.PostAsync("/api/import/legacy/preview", F(translations), Ct));
+        Assert.Equal(2, plan.GetProperty("effective").GetInt32());
+        Assert.Empty(plan.GetProperty("missing").EnumerateArray());
+
+        // Download the translations; import (which remembers them); they come back next time, and from the file.
+        var sheetBytes = await (await admin.PostAsync("/api/import/legacy/values", F(translations, download: "translations"), Ct)).Content.ReadAsByteArrayAsync(Ct);
+        using (var tbook = new XLWorkbook(new MemoryStream(sheetBytes)))
+            Assert.Contains(tbook.Worksheet(1).RowsUsed(), r => r.Cell(1).GetString() == "Site" && r.Cell(2).GetString() == "Old Plant A" && r.Cell(3).GetString() == "(leave blank)");
+        await ReadAsync(await admin.PostAsync("/api/import/legacy/import", F(translations), Ct));
+        await using var db = await app.OpenAsync();
+        var imported = (await db.QueryAsync<(int CategoryId, int? SiteId, string Type)>("""
+            SELECT k.CategoryId, k.SiteId, t.Value FROM contracts.Contract k JOIN contracts.ListItem t ON t.Id = k.AgreementTypeId WHERE k.LegacyReference LIKE @like
+            """, new { like = $"T{u}%" })).ToList();
+        Assert.Equal(2, imported.Count);
+        Assert.All(imported, x => Assert.Equal((road, (int?)null, $"Services {u}"), (x.CategoryId, x.SiteId, x.Type)));
+        var again = await ReadAsync(await admin.PostAsync("/api/import/legacy/values", F(), Ct));
+        var site = again.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("key").GetString() == "site").GetProperty("values")[0];
+        Assert.True(site.GetProperty("remembered").GetBoolean());
+        Assert.Equal("", site.GetProperty("to").GetString());
+        var fromFile = await ReadAsync(await admin.PostAsync("/api/import/legacy/values", F(translationsFile: sheetBytes), Ct));
+        Assert.Equal($"Services {u}", fromFile.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("key").GetString() == "agreementType").GetProperty("values")[0].GetProperty("to").GetString());
+    }
 }

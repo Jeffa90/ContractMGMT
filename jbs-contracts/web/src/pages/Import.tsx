@@ -10,7 +10,7 @@ import {
   MinusCircle,
   XCircle,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Dialog } from "@/components/Dialog";
@@ -148,6 +148,163 @@ const outcomeBadge: Record<
   },
 };
 
+/** Old values in each drop-down column and what they become (D-112). */
+type Values = {
+  fields: { key: string; label: string; list: string; values: { value: string; count: number; to: string | null; remembered: boolean }[] }[];
+  choices: Record<string, string[]>;
+};
+type TranslationMap = Record<string, Record<string, string>>;
+const BLANK = "__blank__";
+
+async function downloadForm(form: FormData, name: string) {
+  try {
+    const response = await fetch("/api/import/legacy/values", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-JBS-Contracts": "1" },
+      body: form,
+    });
+    if (!response.ok) throw new Error();
+    const url = URL.createObjectURL(await response.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error("That didn't download. Try again.");
+  }
+}
+
+/**
+ * Translate values (D-112): every old value in each drop-down column, with how many contracts use it, becomes one of your list
+ * values or is left blank. Remembered after an import; download them to use again on Production.
+ */
+function TranslateValues({
+  form,
+  translations,
+  setTranslations,
+}: {
+  form: () => FormData;
+  translations: TranslationMap;
+  setTranslations: (t: TranslationMap) => void;
+}) {
+  const [values, setValues] = useState<Values | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const load = useMutation({
+    mutationFn: (extra?: File) => {
+      const f = form();
+      if (extra) f.append("translationsFile", extra);
+      return postForm<Values>("/api/import/legacy/values", f);
+    },
+    onSuccess: (v) => {
+      setValues(v);
+      setError(null);
+      // What's remembered, on screen or already the same name in your lists starts chosen.
+      const next: TranslationMap = {};
+      for (const field of v.fields)
+        for (const x of field.values) if (x.to !== null) (next[field.key] ??= {})[x.value] = x.to;
+      setTranslations(next);
+    },
+    onError: (e) => setError(errorText(e)),
+  });
+  const choose = (field: string, value: string, to: string) => {
+    const next = { ...translations, [field]: { ...(translations[field] ?? {}) } };
+    if (to === "") delete next[field][value];
+    else next[field][value] = to === BLANK ? "" : to;
+    setTranslations(next);
+  };
+  return (
+    <section aria-labelledby="translate" className="flex flex-col gap-3">
+      <div>
+        <h3 id="translate" className="font-semibold">
+          Translate drop-down values
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Choose what each old value becomes in JBS Contracts: one of your list values, or blank. Set up your lists under Admin, Lists first
+          (then click Refresh). Values with nothing chosen must already be in your lists, or they're flagged in the check.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button loading={load.isPending} onClick={() => load.mutate(undefined)}>
+          {values ? "Refresh" : "Show the values"}
+        </Button>
+        {values && (
+          <>
+            <Button
+              variant="ghost"
+              icon={<FileDown aria-hidden className="size-4" />}
+              onClick={() => {
+                const f = form();
+                f.append("download", "translations");
+                void downloadForm(f, "jbs-contracts-import-translations.xlsx");
+              }}
+            >
+              Download translations
+            </Button>
+            <input
+              ref={fileInput}
+              type="file"
+              hidden
+              accept=".xlsx"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) load.mutate(f);
+                e.target.value = "";
+              }}
+            />
+            <Button variant="ghost" icon={<FileSpreadsheet aria-hidden className="size-4" />} onClick={() => fileInput.current?.click()}>
+              Use translations from a file
+            </Button>
+          </>
+        )}
+      </div>
+      {error && <Alert tone="danger" title={error} />}
+      {values?.fields.map((field) => {
+        const chosen = field.values.filter((x) => translations[field.key]?.[x.value] !== undefined).length;
+        const choices = values.choices[field.list] ?? [];
+        return (
+          <details key={field.key} className="rounded-[var(--radius-card)] border border-border" open={chosen < field.values.length}>
+            <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2">
+              <span className="font-medium">{field.label}</span>
+              <Badge tone={chosen === field.values.length ? "success" : "warning"}>
+                {chosen} of {field.values.length} chosen
+              </Badge>
+            </summary>
+            <ul className="divide-y divide-border border-t border-border">
+              {field.values.map((x) => {
+                const current = translations[field.key]?.[x.value];
+                return (
+                  <li key={x.value} className="grid gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,1fr)] sm:items-center">
+                    <span className="min-w-0 break-words text-sm">
+                      {x.value} <span className="text-muted-foreground">({x.count})</span>
+                    </span>
+                    <Select
+                      aria-label={`${field.label}: what "${x.value}" becomes`}
+                      value={current === undefined ? "" : current === "" ? BLANK : current}
+                      onChange={(e) => choose(field.key, x.value, e.target.value)}
+                    >
+                      <option value="">Not chosen</option>
+                      <option value={BLANK}>Leave blank</option>
+                      {current && !choices.includes(current) && <option value={current}>{current} (not in your lists)</option>}
+                      {choices.map((ch) => (
+                        <option key={ch} value={ch}>
+                          {ch.replace(" > ", " › ")}
+                        </option>
+                      ))}
+                    </Select>
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        );
+      })}
+    </section>
+  );
+}
+
 /** The missing list items as a sheet for Admin, Lists, Import from Excel (D-109). */
 async function downloadMissing(form: FormData) {
   form.append("download", "missing");
@@ -211,6 +368,7 @@ function ContractsStep() {
   const [defaultOwnerId, setDefaultOwnerId] = useState("");
   const [defaultCategoryId, setDefaultCategoryId] = useState("");
   const [leaveOutArchived, setLeaveOutArchived] = useState(true);
+  const [translations, setTranslations] = useState<TranslationMap>({});
   const [plan, setPlan] = useState<Plan | null>(null);
   const [show, setShow] = useState<"problems" | "ready" | "all">("problems");
   const [confirming, setConfirming] = useState(false);
@@ -228,6 +386,7 @@ function ContractsStep() {
     if (defaultOwnerId) f.append("defaultOwnerId", defaultOwnerId);
     if (defaultCategoryId) f.append("defaultCategoryId", defaultCategoryId);
     if (leaveOutArchived) f.append("leaveOutArchived", "true");
+    if (Object.keys(translations).length > 0) f.append("translations", JSON.stringify(translations));
     return f;
   };
   const read = useMutation({
@@ -494,6 +653,14 @@ function ContractsStep() {
             checked={leaveOutArchived}
             onChange={(v) => {
               setLeaveOutArchived(v);
+              setPlan(null);
+            }}
+          />
+          <TranslateValues
+            form={form}
+            translations={translations}
+            setTranslations={(t) => {
+              setTranslations(t);
               setPlan(null);
             }}
           />

@@ -312,7 +312,7 @@ const topics = {
             <strong>Translate drop-down values</strong>: set up your own lists under Admin, Lists first. Then <strong>Show the values</strong> lists every
             old category (with subcategory), agreement type, site, business unit, entity, function and owner in the file, with how many contracts use it.
             Choose what each becomes: one of your list values (for a category, type a word to find it in your families), or <strong>Leave blank</strong>. For an owner who has left, choose the current contract
-            owner who takes their contracts (past employees aren't added as people). Same names are chosen for you. Translations are remembered after an
+            owner who takes their contracts (past employees aren't added as people). Values that are clearly the same are chosen for you: the same name ignoring capitals, spaces and punctuation, or the same code at the start (like a plant code). Translations are remembered after an
             import; <strong>Download translations</strong> keeps them in a file, and <strong>Use translations from a file</strong> brings them back (for
             example on Production).
           </li>

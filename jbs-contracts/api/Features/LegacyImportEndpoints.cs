@@ -481,6 +481,29 @@ public static class LegacyImportEndpoints
 
     private const string LeaveBlank = "(leave blank)";
 
+    /// <summary>Letters and digits only, lower case: "1220 - DINMORE PROCESSING" and "1220 Dinmore Processing" read the same.</summary>
+    private static string Plain(string s) => new string(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    /// <summary>A code at the start of a value, when it has a digit in it ("1220" in "1220 - DINMORE PROCESSING").</summary>
+    private static string? LeadingCode(string s)
+    {
+        var first = new string(s.TrimStart().TakeWhile(char.IsLetterOrDigit).ToArray());
+        return first.Any(char.IsDigit) ? first.ToLowerInvariant() : null;
+    }
+
+    /// <summary>
+    /// The list value an old value most likely is (D-118): the same once case, spaces and punctuation are ignored; else the only one
+    /// starting with the same code. Null when there's no clear match, so a person chooses.
+    /// </summary>
+    internal static string? Similar(string old, IReadOnlyList<string> choices)
+    {
+        var plain = Plain(old);
+        if (choices.FirstOrDefault(ch => Plain(ch) == plain) is { } same) return same;
+        if (LeadingCode(old) is not { } code) return null;
+        var byCode = choices.Where(ch => LeadingCode(ch) == code).ToList();
+        return byCode.Count == 1 ? byCode[0] : null;
+    }
+
     /// <summary>The fields whose cells can hold several values (D-114).</summary>
     private static readonly HashSet<string> SeveralFields = ["businessUnit", "site", "entity", "function"];
 
@@ -609,7 +632,6 @@ public static class LegacyImportEndpoints
             if (readProblem is not null) return ApiResults.Invalid(readProblem, new() { ["file"] = readProblem });
             string? Cell(Excel.Row row, string key) => wanted.TryGetValue(key, out var col) ? Clean(row.Text(col)) : null;
 
-            static string K(string s) => s.Trim().ToUpperInvariant();
             var cats = (await c.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category WHERE IsActive = 1 ORDER BY SortOrder, Name")).ToList();
             var items = (await c.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem WHERE IsActive = 1 ORDER BY SortOrder, Value")).ToList();
             var choices = new Dictionary<string, List<string>>
@@ -638,8 +660,9 @@ public static class LegacyImportEndpoints
                     key = f.Key, label = f.Key == "category" && wanted.ContainsKey("subcategory") ? "Category > Subcategory" : f.Label, list = f.List,
                     values = counts[f.Key].OrderBy(v => v.Key, StringComparer.OrdinalIgnoreCase).Select(v =>
                     {
-                        // Remembered (or on screen), else the same name already in the list, else not chosen yet.
-                        string? to = saved.TryGet(f.Key, v.Key, out var t) ? t : choices[f.List].FirstOrDefault(ch => K(ch) == K(v.Key));
+                        // Remembered (or on screen), else the same name already in the list (D-118: ignoring case, spaces and
+                        // punctuation, or by the same code at the start, as with plants), else not chosen yet.
+                        string? to = saved.TryGet(f.Key, v.Key, out var t) ? t : Similar(v.Key, choices[f.List]);
                         return new { value = v.Key, count = v.Value, to, remembered = saved.TryGet(f.Key, v.Key, out _) };
                     }),
                 }),

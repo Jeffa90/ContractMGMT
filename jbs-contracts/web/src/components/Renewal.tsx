@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { errorText, fieldErrors, useAction } from '@/lib/actions'
 import { ApiError } from '@/lib/api'
-import type { ContractDetail, RenewalDecision } from '@/lib/contracts'
+import { isContinuing, type ContractDetail, type RenewalDecision } from '@/lib/contracts'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { Dialog } from './Dialog'
 import { StartVariationButton } from './LockedChanges'
@@ -84,7 +84,13 @@ export function RenewalCard({ data, openDecision }: { data: ContractDetail; open
       ) : (
         <p className="text-sm">
           No decision yet.{' '}
-          {c.noticeDeadline ? `Decide before the notice deadline, ${formatDate(c.noticeDeadline)}.` : c.endDate ? `It ends on ${formatDate(c.endDate)}.` : ''}
+          {isContinuing(c)
+            ? `Its original term ended on ${formatDate(c.endDate!)}. It continues under the same terms until a new agreement replaces it: renew or renegotiate when you're ready.`
+            : c.noticeDeadline
+              ? `Decide before the notice deadline, ${formatDate(c.noticeDeadline)}.`
+              : c.endDate
+                ? `It ends on ${formatDate(c.endDate)}${c.continuesUntilReplaced ? ', then continues under the same terms until replaced' : ''}.`
+                : ''}
         </p>
       )}
       {c.stage === 'Effective' && (c.reviewDate || c.lastReviewedOn) && (

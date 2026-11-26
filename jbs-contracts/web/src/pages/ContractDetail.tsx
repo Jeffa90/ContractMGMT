@@ -14,7 +14,7 @@ import { RenewalCard } from '@/components/Renewal'
 import { Alert, Button, Card, EmptyState, Field, Skeleton } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { documentKinds, journey, uploadDocument, withAddedKinds, type Contract, type ContractDetail, type ContractDocument, type Lists } from '@/lib/contracts'
+import { documentKinds, isContinuing, journey, uploadDocument, withAddedKinds, type Contract, type ContractDetail, type ContractDocument, type Lists } from '@/lib/contracts'
 import { daysUntil, formatBytes, formatDate, formatDateTime, formatMoney, timeAgo } from '@/lib/format'
 import { arrange, type Layout, type LayoutField } from '@/lib/layout'
 import { useMe } from '@/lib/me'
@@ -93,6 +93,7 @@ function builtInDisplay(key: string, c: Contract): ReactNode {
     case 'endDate': return c.isEvergreen ? 'Evergreen (no end date)' : formatDate(c.endDate)
     case 'evergreen': return c.isEvergreen ? 'Yes' : 'No'
     case 'autoRenews': return c.autoRenews ? 'Yes: if no one gives notice, the end date moves on by the renewal term' : 'No'
+    case 'continuesUntilReplaced': return c.continuesUntilReplaced ? 'Yes: after its end date it carries on under the same terms until replaced' : 'No'
     case 'renewalTermMonths': return c.autoRenews && c.renewalTermMonths !== null ? (c.renewalTermMonths === 1 ? '1 month' : `${c.renewalTermMonths} months`) : ''
     case 'noticePeriodDays': return c.noticePeriodDays !== null ? `${c.noticePeriodDays} days${c.noticeDeadline ? ` (notice by ${formatDate(c.noticeDeadline)})` : ''}` : ''
     case 'reviewDate': return c.reviewMonthsBeforeEnd ? `${formatDate(c.reviewDate) || 'Once there is an end date'} (${c.reviewMonthsBeforeEnd === 1 ? '1 month' : `${c.reviewMonthsBeforeEnd} months`} before the end date)` : formatDate(c.reviewDate)
@@ -153,6 +154,8 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
   const openDecision = params.get('decide') === '1'
   const [withdrawing, setWithdrawing] = useState(false)
   const notice = c.noticeDeadline ? daysUntil(c.noticeDeadline) : null
+  // Past its end date and carrying on until replaced (D-121): not overdue.
+  const continuing = isContinuing(c, !!data.renewal.decision)
 
   return (
     <>
@@ -206,7 +209,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
           {data.sentBack.reason}
         </Alert>
       )}
-      {notice !== null && c.stage === 'Effective' && !data.renewal.decision && notice <= 30 && (
+      {notice !== null && c.stage === 'Effective' && !data.renewal.decision && notice <= 30 && !continuing && (
         <Alert tone={notice < 0 ? 'danger' : 'warning'} title={notice < 0 ? `The notice deadline passed ${-notice} days ago (${formatDate(c.noticeDeadline)}).` : `The notice deadline is in ${notice} days (${formatDate(c.noticeDeadline)}).`} />
       )}
 
@@ -237,7 +240,14 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
           <div>
             <dt className="text-xs text-muted-foreground">Key dates</dt>
             <dd className="tabular font-medium">
-              {c.isEvergreen ? 'Evergreen' : c.endDate ? `${c.autoRenews ? 'Renews' : 'Ends'} ${formatDate(c.endDate)}` : 'No end date yet'}
+              {c.isEvergreen
+                ? 'Evergreen'
+                : continuing
+                  ? 'Continuing until replaced'
+                  : c.endDate
+                    ? `${c.autoRenews ? 'Renews' : 'Ends'} ${formatDate(c.endDate)}`
+                    : 'No end date yet'}
+              {continuing && c.endDate && <span className="block text-xs font-normal text-muted-foreground">Original term ended {formatDate(c.endDate)}</span>}
               {c.noticeDeadline && <span className="block text-xs font-normal text-muted-foreground">Notice by {formatDate(c.noticeDeadline)}</span>}
             </dd>
           </div>

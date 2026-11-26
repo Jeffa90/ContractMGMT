@@ -26,7 +26,7 @@ public static class VariationEndpoints
     private static readonly CultureInfo AU = CultureInfo.GetCultureInfo("en-AU");
 
     /// <summary>Built-in fields a Variation can change (spec section 7). Title, supplier, category and the like never change: start a new contract.</summary>
-    private static readonly string[] BuiltIns = ["endDate", "evergreen", "autoRenews", "renewalTermMonths", "noticePeriodDays", "reviewDate", "value", "currencyCode", "businessUnit", "site", "entity", "function"];
+    private static readonly string[] BuiltIns = ["endDate", "evergreen", "autoRenews", "renewalTermMonths", "continuesUntilReplaced", "noticePeriodDays", "reviewDate", "value", "currencyCode", "businessUnit", "site", "entity", "function"];
 
     public sealed class VariationRow
     {
@@ -93,6 +93,7 @@ public static class VariationEndpoints
         Add("endDate", "Date", "End date");
         Add("evergreen", "YesNo", "Evergreen (no end date)");
         Add("autoRenews", "YesNo", "Renews automatically");
+        Add("continuesUntilReplaced", "YesNo", "Continues until replaced");
         Add("renewalTermMonths", "WholeNumber", "Renewal term (months)");
         Add("noticePeriodDays", "WholeNumber", "Notice period (days)");
         Add("reviewDate", "Date", "Review date");
@@ -112,6 +113,7 @@ public static class VariationEndpoints
         "endDate" => c.EndDate is { } d ? DateOnly.FromDateTime(d).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
         "evergreen" => c.IsEvergreen,
         "autoRenews" => c.AutoRenews,
+        "continuesUntilReplaced" => c.ContinuesUntilReplaced,
         "renewalTermMonths" => c.RenewalTermMonths,
         "noticePeriodDays" => c.NoticePeriodDays,
         "reviewDate" => c.ReviewDate is { } r ? DateOnly.FromDateTime(r).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
@@ -216,6 +218,7 @@ public static class VariationEndpoints
         var entity = List("entity", k.EntityIds);
         var function = List("function", k.FunctionIds);
         var autoRenews = kept.ContainsKey("autoRenews") ? Get<bool?>("autoRenews", j => j.GetBoolean(), null) ?? false : k.AutoRenews;
+        var continues = kept.ContainsKey("continuesUntilReplaced") ? Get<bool?>("continuesUntilReplaced", j => j.GetBoolean(), null) ?? false : k.ContinuesUntilReplaced;
         var term = kept.ContainsKey("renewalTermMonths") ? Get<int?>("renewalTermMonths", j => j.ValueKind == JsonValueKind.Number ? j.GetInt32() : int.Parse(j.GetString()!, CultureInfo.InvariantCulture), null) : k.RenewalTermMonths;
         var addedChanges = kept.Where(p => !BuiltIns.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value);
 
@@ -223,7 +226,7 @@ public static class VariationEndpoints
             value, currency, k.SapOutlineAgreement, D(k.StartDate), D(k.EffectiveDate), end, evergreen, notice, review, k.NeedsLegalReview, null, addedChanges,
             entity, function, autoRenews, term,
             kept.ContainsKey("reviewDate") ? null : k.ReviewMonthsBeforeEnd, // a review date chosen here replaces a period; a period follows a new end date
-            k.OtherCategoryIds);
+            k.OtherCategoryIds, continues);
         if (errors.Count == 0)
         {
             var map = new Dictionary<string, string> { ["businessUnitIds"] = "businessUnit", ["siteIds"] = "site", ["entityIds"] = "entity", ["functionIds"] = "function" };
@@ -250,6 +253,7 @@ public static class VariationEndpoints
                 "reviewDate" => (Day(D(k.ReviewDate)), Day(review)),
                 "evergreen" => (k.IsEvergreen ? "Yes" : "No", evergreen ? "Yes" : "No"),
                 "autoRenews" => (k.AutoRenews ? "Yes" : "No", autoRenews ? "Yes" : "No"),
+                "continuesUntilReplaced" => (k.ContinuesUntilReplaced ? "Yes" : "No", continues ? "Yes" : "No"),
                 "renewalTermMonths" => (k.RenewalTermMonths is { } ot ? ContractEndpoints.Months(ot) : "none", term is { } nt ? ContractEndpoints.Months(nt) : "none"),
                 "noticePeriodDays" => (k.NoticePeriodDays is { } o ? $"{o} days" : "none", notice is { } n ? $"{n} days" : "none"),
                 "value" => (Money(k.Value, k.CurrencyCode), Money(value, currency)),
@@ -367,7 +371,7 @@ public static class VariationEndpoints
                 return a.Key switch
                 {
                     "endDate" or "reviewDate" => cur is string s ? DateOnly.ParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture).ToString("d MMM yyyy", CultureInfo.InvariantCulture) : "",
-                    "evergreen" or "autoRenews" => cur is true ? "Yes" : "No",
+                    "evergreen" or "autoRenews" or "continuesUntilReplaced" => cur is true ? "Yes" : "No",
                     "renewalTermMonths" => cur is int t ? ContractEndpoints.Months(t) : "",
                     "noticePeriodDays" => cur is int n ? $"{n} days" : "",
                     "value" => cur is decimal m ? $"${m.ToString("N2", AU)}" : "",

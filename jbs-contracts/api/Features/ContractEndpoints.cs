@@ -52,6 +52,8 @@ public sealed class ContractRow
     public DateTime? EndDate { get; set; }
     public bool IsEvergreen { get; set; }
     public bool AutoRenews { get; set; }
+    /// <summary>After its end date it carries on under the same terms until replaced (D-121): past it, "Continuing until replaced", not overdue.</summary>
+    public bool ContinuesUntilReplaced { get; set; }
     public int? RenewalTermMonths { get; set; }
     public int? NoticePeriodDays { get; set; }
     public DateTime? ReviewDate { get; set; }
@@ -137,7 +139,7 @@ public sealed record SaveContract(
     DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool? IsEvergreen, int? NoticePeriodDays, DateOnly? ReviewDate,
     bool? NeedsLegalReview, string? RowVersion, Dictionary<string, System.Text.Json.JsonElement>? Fields = null,
     int[]? EntityIds = null, int[]? FunctionIds = null, bool? AutoRenews = null, int? RenewalTermMonths = null, int? ReviewMonthsBeforeEnd = null,
-    int[]? OtherCategoryIds = null);
+    int[]? OtherCategoryIds = null, bool? ContinuesUntilReplaced = null);
 
 public sealed record WithdrawContract(string? Reason, string? RowVersion);
 
@@ -382,11 +384,11 @@ public static class ContractEndpoints
         reference ??= await ContractNumbers.NextAsync(c, tx);
         var id = await c.ExecuteScalarAsync<int>("""
             INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, EffectiveDate, EndDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewDate,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, EffectiveDate, EndDate, IsEvergreen, AutoRenews, RenewalTermMonths, ContinuesUntilReplaced, NoticePeriodDays, ReviewDate,
                 ReviewMonthsBeforeEnd, NeedsLegalReview, CreatedById, UpdatedById)
             OUTPUT INSERTED.Id
             VALUES (@reference, @Title, @Description, @SupplierId, @CategoryId, @AgreementTypeId, @OwnerId, @BackupOwnerId,
-                @IsConfidential, @Value, @CurrencyCode, @SapOutlineAgreement, @StartDate, @EffectiveDate, @EndDate, @IsEvergreen, @AutoRenews, @RenewalTermMonths, @NoticePeriodDays, @ReviewDate,
+                @IsConfidential, @Value, @CurrencyCode, @SapOutlineAgreement, @StartDate, @EffectiveDate, @EndDate, @IsEvergreen, @AutoRenews, @RenewalTermMonths, @ContinuesUntilReplaced, @NoticePeriodDays, @ReviewDate,
                 @ReviewMonthsBeforeEnd, @NeedsLegalReview, @me, @me)
             """, Params(input!, new { reference, me = me.Id }), tx);
         await SaveListValuesAsync(c, tx, id, input!);
@@ -412,7 +414,7 @@ public static class ContractEndpoints
                 AgreementTypeId = @AgreementTypeId,
                 OwnerId = @OwnerId, BackupOwnerId = @BackupOwnerId,
                 IsConfidential = @IsConfidential, Value = @Value, CurrencyCode = @CurrencyCode, SapOutlineAgreement = @SapOutlineAgreement,
-                StartDate = @StartDate, EffectiveDate = @EffectiveDate, EndDate = @EndDate, IsEvergreen = @IsEvergreen, AutoRenews = @AutoRenews,
+                StartDate = @StartDate, EffectiveDate = @EffectiveDate, EndDate = @EndDate, IsEvergreen = @IsEvergreen, AutoRenews = @AutoRenews, ContinuesUntilReplaced = @ContinuesUntilReplaced,
                 RenewalTermMonths = @RenewalTermMonths, NoticePeriodDays = @NoticePeriodDays, ReviewMonthsBeforeEnd = @ReviewMonthsBeforeEnd, ReviewDate = @ReviewDate, NeedsLegalReview = @NeedsLegalReview, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
             WHERE Id = @id
             """, Params(input!, new { id, me = me.Id }), tx);
@@ -449,6 +451,7 @@ public static class ContractEndpoints
         Check("value", before.Value, i.Value); Check("currency", before.CurrencyCode, i.CurrencyCode); Check("SAP outline agreement number", before.SapOutlineAgreement, i.SapOutlineAgreement);
         Check("start date", D(before.StartDate), i.StartDate); Check("effective date", D(before.EffectiveDate), i.EffectiveDate); Check("end date", D(before.EndDate), i.EndDate);
         Check("evergreen", before.IsEvergreen, i.IsEvergreen); Check("renews automatically", before.AutoRenews, i.AutoRenews);
+        Check("continues until replaced", before.ContinuesUntilReplaced, i.ContinuesUntilReplaced);
         Check("renewal term", before.RenewalTermMonths, i.RenewalTermMonths); Check("notice period", before.NoticePeriodDays, i.NoticePeriodDays); Check("review date", D(before.ReviewDate), i.ReviewDate); Check("review period", before.ReviewMonthsBeforeEnd, i.ReviewMonthsBeforeEnd);
         Check("needs Legal review", before.NeedsLegalReview, i.NeedsLegalReview);
         return (changed, null);
@@ -505,7 +508,7 @@ public static class ContractEndpoints
         Fields = fields ?? [],
         r.Id, r.Reference, r.Title, r.SupplierName, r.Stage, StageName = StageNames[r.Stage], StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc),
         r.OwnerId, r.OwnerName, r.BackupOwnerId, r.IsConfidential, r.CategoryDisplay, r.Value, r.CurrencyCode,
-        EndDate = D(r.EndDate), r.IsEvergreen, NoticeDeadline = D(r.NoticeDeadline), UpdatedUtc = DateTime.SpecifyKind(r.UpdatedUtc, DateTimeKind.Utc),
+        EndDate = D(r.EndDate), r.IsEvergreen, r.ContinuesUntilReplaced, NoticeDeadline = D(r.NoticeDeadline), UpdatedUtc = DateTime.SpecifyKind(r.UpdatedUtc, DateTimeKind.Utc),
         r.WhoseTurn, r.LegalPersonName, TurnSinceUtc = Utc(r.TurnSinceUtc),
     };
 
@@ -516,7 +519,7 @@ public static class ContractEndpoints
         r.Id, r.Reference, r.Title, r.Description, r.SupplierId, r.SupplierName, r.CategoryId, r.CategoryDisplay, r.OtherCategoryIds, r.OtherCategories, r.AgreementTypeId, r.AgreementTypeName,
         r.BusinessUnitIds, r.BusinessUnitName, r.SiteIds, r.SiteName, r.EntityIds, r.EntityName, r.FunctionIds, r.FunctionName, r.OwnerId, r.OwnerName, r.BackupOwnerId, r.BackupOwnerName, r.IsConfidential,
         r.Value, r.CurrencyCode, r.SapOutlineAgreement, StartDate = D(r.StartDate), EffectiveDate = D(r.EffectiveDate), EndDate = D(r.EndDate), r.IsEvergreen,
-        r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), r.ReviewMonthsBeforeEnd, NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
+        r.AutoRenews, r.RenewalTermMonths, r.ContinuesUntilReplaced, r.NoticePeriodDays, ReviewDate = D(r.ReviewDate), r.ReviewMonthsBeforeEnd, NoticeDeadline = D(r.NoticeDeadline), r.NeedsLegalReview, r.Stage, StageName = StageNames[r.Stage],
         StageSinceUtc = DateTime.SpecifyKind(r.StageSinceUtc, DateTimeKind.Utc), r.IsLocked, r.WithdrawnReason,
         RegisteredUtc = Utc(r.RegisteredUtc), r.RegisteredByName, r.RegisteredAsBackup,
         r.LegacyReference, ImportedUtc = Utc(r.ImportedUtc), r.ImportedFrom, r.IsDemo,
@@ -553,6 +556,7 @@ public static class ContractEndpoints
             ["end date"] = Date(r.EndDate),
             ["evergreen"] = r.IsEvergreen ? "yes" : "no",
             ["renews automatically"] = r.AutoRenews ? "yes" : "no",
+            ["continues until replaced"] = r.ContinuesUntilReplaced ? "yes" : "no",
             ["renewal term"] = r.RenewalTermMonths is { } t ? Months(t) : null,
             ["notice period"] = r.NoticePeriodDays is { } n ? $"{n} days" : null,
             ["review date"] = Date(r.ReviewDate) is { } rd && r.ReviewMonthsBeforeEnd is { } rm ? $"{rd} ({Months(rm)} before the end date)" : Date(r.ReviewDate),
@@ -566,7 +570,7 @@ public static class ContractEndpoints
     private sealed record Input(string Title, string? Description, int? SupplierId, int? CategoryId, int? AgreementTypeId, int[] BusinessUnitIds, int[] SiteIds,
         int[] EntityIds, int[] FunctionIds, int[] OtherCategoryIds, int OwnerId, int? BackupOwnerId, bool IsConfidential, decimal? Value, string CurrencyCode, string? SapOutlineAgreement,
         DateOnly? StartDate, DateOnly? EffectiveDate, DateOnly? EndDate, bool IsEvergreen, bool AutoRenews, int? RenewalTermMonths, int? NoticePeriodDays,
-        DateOnly? ReviewDate, int? ReviewMonthsBeforeEnd, bool NeedsLegalReview);
+        DateOnly? ReviewDate, int? ReviewMonthsBeforeEnd, bool NeedsLegalReview, bool ContinuesUntilReplaced);
 
     private static DynamicParameters Params(Input i, object extra)
     {
@@ -574,7 +578,7 @@ public static class ContractEndpoints
         p.AddDynamicParams(new
         {
             i.Title, i.Description, i.SupplierId, i.CategoryId, i.AgreementTypeId, i.OwnerId, i.BackupOwnerId,
-            i.IsConfidential, i.Value, i.CurrencyCode, i.SapOutlineAgreement, i.IsEvergreen, i.AutoRenews, i.RenewalTermMonths, i.NoticePeriodDays, i.ReviewMonthsBeforeEnd, i.NeedsLegalReview,
+            i.IsConfidential, i.Value, i.CurrencyCode, i.SapOutlineAgreement, i.IsEvergreen, i.AutoRenews, i.RenewalTermMonths, i.ContinuesUntilReplaced, i.NoticePeriodDays, i.ReviewMonthsBeforeEnd, i.NeedsLegalReview,
         });
         p.Add("StartDate", i.StartDate?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
         p.Add("EffectiveDate", i.EffectiveDate?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
@@ -657,6 +661,10 @@ public static class ContractEndpoints
         if (autoRenews && evergreen) f["autoRenews"] = "An evergreen contract has no end date to renew. Untick Evergreen or Renews automatically.";
         if (term is < 1 or > 120) f["renewalTermMonths"] = "Use a number of months between 1 and 120.";
         else if (autoRenews && term is null) f["renewalTermMonths"] = "Enter how many months each renewal lasts, for example 12.";
+        // Continues until replaced (D-121): keeps its end date and doesn't move it on, so neither evergreen nor renewing automatically.
+        var continues = b.ContinuesUntilReplaced ?? false;
+        if (continues && evergreen) f["continuesUntilReplaced"] = "An evergreen contract has no end date to carry on past. Untick Evergreen or Continues until replaced.";
+        else if (continues && autoRenews) f["continuesUntilReplaced"] = "It can't both renew automatically and carry on until replaced. Untick one of them.";
 
         // Review: a period before the end date works the date out (and it moves with the end date), or a date as given (D-105).
         var reviewMonths = b.ReviewMonthsBeforeEnd;
@@ -671,7 +679,7 @@ public static class ContractEndpoints
         if (f.Count > 0) return (null, f);
         return (new Input(title, description, b.SupplierId, b.CategoryId, b.AgreementTypeId, businessUnits, sites, entities, functions, others, ownerId!.Value,
             b.BackupOwnerId, b.IsConfidential ?? false, b.Value, currency, sap, b.StartDate, b.EffectiveDate, b.EndDate, evergreen, autoRenews, term,
-            b.NoticePeriodDays, reviewDate, reviewMonths, b.NeedsLegalReview ?? true), null);
+            b.NoticePeriodDays, reviewDate, reviewMonths, b.NeedsLegalReview ?? true, continues), null);
     }
 }
 

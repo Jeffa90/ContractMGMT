@@ -17,7 +17,7 @@ type Item = {
   supplierName: string | null
   ownerName: string
   isConfidential: boolean
-  keyKind: 'Notice' | 'End' | 'Ends'
+  keyKind: 'Notice' | 'End' | 'Ends' | 'Continuing'
   keyDate: string
   days: number
   decision: 'Renew' | 'LetItEnd' | 'Renegotiate' | null
@@ -29,6 +29,7 @@ type Data = { days: number; today: string; items: Item[] }
 const windows = ['30', '60', '90', '180'] as const
 
 function keyText(i: Item) {
+  if (i.keyKind === 'Continuing') return `Original term ended ${formatDate(i.keyDate)}; continuing under the same terms until replaced`
   const when = i.days < 0 ? `${-i.days === 1 ? '1 day' : `${-i.days} days`} ago` : i.days === 0 ? 'today' : `in ${i.days === 1 ? '1 day' : `${i.days} days`}`
   const what = i.keyKind === 'Notice' ? 'Notice deadline' : 'Ends'
   return `${what} ${formatDate(i.keyDate)}, ${when}`
@@ -47,7 +48,7 @@ function Radar({ items, days }: { items: Item[]; days: number }) {
           {t === 0 ? 'Today' : `${t}d`}
         </span>
       ))}
-      {items.map((i, n) => {
+      {items.filter((i) => i.keyKind !== 'Continuing').map((i, n) => {
         const left = i.days < 0 ? `${0.5 + (n % 6) * 0.7}rem` : `calc(6rem + (100% - 7rem) * ${Math.min(i.days, days) / days})`
         const tone = i.days < 0 ? 'bg-danger border-danger' : i.days <= 30 ? 'bg-warning border-warning' : 'bg-primary border-primary'
         return (
@@ -81,12 +82,15 @@ export function RenewalsPage() {
   })
   const items = data.data?.items ?? []
   const n = Number(days)
+  // Continuing until replaced (D-121) is its own calm group, not overdue.
+  const continuing = (i: Item) => i.keyKind === 'Continuing'
   const groups = [
-    { title: 'Overdue', test: (i: Item) => i.days < 0 },
+    { title: 'Overdue', test: (i: Item) => i.days < 0 && !continuing(i) },
     { title: 'Next 30 days', test: (i: Item) => i.days >= 0 && i.days <= 30 },
     { title: '31 to 60 days', test: (i: Item) => i.days > 30 && i.days <= 60 },
     { title: '61 to 90 days', test: (i: Item) => i.days > 60 && i.days <= 90 },
     { title: '91 to 180 days', test: (i: Item) => i.days > 90 },
+    { title: 'Continuing until replaced', test: continuing },
   ]
     .map((g) => ({ ...g, items: items.filter(g.test) }))
     .filter((g) => g.items.length > 0)
@@ -121,14 +125,14 @@ export function RenewalsPage() {
         <>
           <Card className="px-5 pt-4 md:px-6">
             <p className="text-sm text-muted-foreground">
-              {items.length} {items.length === 1 ? 'contract' : 'contracts'}: {items.filter((i) => i.days < 0).length} overdue, {items.filter((i) => !i.decision).length} with no decision yet.
+              {items.length} {items.length === 1 ? 'contract' : 'contracts'}: {items.filter((i) => i.days < 0 && !continuing(i)).length} overdue, {items.filter((i) => !i.decision).length} with no decision yet.
               Hollow dots have a decision.
             </p>
             <Radar items={items} days={n} />
           </Card>
           {groups.map((g) => (
-            <section key={g.title} aria-labelledby={`g-${g.title}`} className="flex flex-col gap-2">
-              <h2 id={`g-${g.title}`} className={cn('font-display text-lg font-semibold', g.title === 'Overdue' && 'text-danger')}>
+            <section key={g.title} aria-labelledby={`g-${g.title.replace(/\W+/g, '-')}`} className="flex flex-col gap-2">
+              <h2 id={`g-${g.title.replace(/\W+/g, '-')}`} className={cn('font-display text-lg font-semibold', g.title === 'Overdue' && 'text-danger')}>
                 {g.title} <span className="tabular text-sm font-normal text-muted-foreground">({g.items.length})</span>
               </h2>
               <Card>
@@ -148,7 +152,9 @@ export function RenewalsPage() {
                             </>
                           )}
                         </p>
-                        <p className={cn('mt-1 text-sm font-medium', i.days < 0 ? 'text-danger' : i.days <= 30 ? 'text-warning' : undefined)}>{keyText(i)}</p>
+                        <p className={cn('mt-1 text-sm', continuing(i) ? 'text-muted-foreground' : ['font-medium', i.days < 0 ? 'text-danger' : i.days <= 30 ? 'text-warning' : undefined])}>
+                          {keyText(i)}
+                        </p>
                       </div>
                       {i.decision ? (
                         <Badge tone={i.decision === 'LetItEnd' ? 'warning' : 'success'}>{i.decisionName}</Badge>

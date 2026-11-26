@@ -70,13 +70,13 @@ public static class TeamEndpoints
 
             // Effective contracts: what's coming up, and how many each person owns or backs up.
             var effective = (await c.QueryAsync<RenewalEndpoints.RenewalRow>($"""
-                SELECT k.Id, k.Reference, k.Title, k.OwnerId, k.BackupOwnerId, k.EndDate, k.IsEvergreen, k.ReviewDate, k.NoticePeriodDays, k.RenewalDecision, k.PlannedEndDate
+                SELECT k.Id, k.Reference, k.Title, k.OwnerId, k.BackupOwnerId, k.EndDate, k.IsEvergreen, k.ReviewDate, k.NoticePeriodDays, k.RenewalDecision, k.PlannedEndDate, k.ContinuesUntilReplaced
                 FROM contracts.Contract k WHERE k.Stage = N'Effective' AND {ContractAccess.VisibleSql("k")}
                 """, p)).ToList();
             foreach (var r in effective.Where(r => r.RenewalDecision is null))
             {
-                var (kind, date) = RenewalEndpoints.KeyDate(r);
-                if (date is not { } d) continue;
+                var (kind, date) = RenewalEndpoints.KeyDate(r, today);
+                if (date is not { } d || kind == "Continuing") continue; // continuing until replaced isn't overdue (D-121)
                 var daysAway = d.DayNumber - today.DayNumber;
                 if (daysAway > window) continue;
                 items.Add(new(r.OwnerId, r.Id, r.Reference, r.Title, daysAway < 0 ? What.Overdue : What.ComingUp, d, daysAway, null, null, kind));

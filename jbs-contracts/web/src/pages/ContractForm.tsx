@@ -50,6 +50,7 @@ type FormState = {
   endDate: string
   isEvergreen: boolean
   autoRenews: boolean
+  continuesUntilReplaced: boolean
   renewalTermMonths: string
   noticePeriodDays: string
   reviewDate: string
@@ -156,6 +157,7 @@ export function ContractForm({
     endDate: c?.endDate ?? '',
     isEvergreen: c?.isEvergreen ?? false,
     autoRenews: c?.autoRenews ?? false,
+    continuesUntilReplaced: c?.continuesUntilReplaced ?? false,
     renewalTermMonths: toText(c?.renewalTermMonths),
     noticePeriodDays: toText(c?.noticePeriodDays),
     reviewDate: c?.reviewMonthsBeforeEnd ? '' : (c?.reviewDate ?? ''),
@@ -209,6 +211,7 @@ export function ContractForm({
         endDate: form.isEvergreen ? null : form.endDate || null,
         isEvergreen: form.isEvergreen,
         autoRenews: !form.isEvergreen && form.autoRenews,
+        continuesUntilReplaced: !form.isEvergreen && !form.autoRenews && form.continuesUntilReplaced,
         renewalTermMonths: !form.isEvergreen && form.autoRenews && form.renewalTermMonths.trim() !== '' ? Number(form.renewalTermMonths) : null,
         noticePeriodDays: form.noticePeriodDays.trim() === '' ? null : Number(form.noticePeriodDays),
         reviewDate: form.reviewWhen === 'date' ? form.reviewDate || null : null,
@@ -519,7 +522,24 @@ export function ContractForm({
             description={form.isEvergreen ? 'Evergreen contracts have no end date to renew.' : help}
             checked={!form.isEvergreen && form.autoRenews}
             disabled={form.isEvergreen}
-            onChange={(v) => set('autoRenews', v)}
+            onChange={(v) => {
+              set('autoRenews', v)
+              if (v) set('continuesUntilReplaced', false) // one or the other
+            }}
+          />
+        )
+      case 'continuesUntilReplaced':
+        // Keeps its end date and carries on after it until replaced (D-121): not with Evergreen or Renews automatically.
+        return (
+          <Checkbox
+            label={f.label}
+            description={form.isEvergreen ? 'Evergreen contracts have no end date to carry on past.' : help}
+            checked={!form.isEvergreen && form.continuesUntilReplaced}
+            disabled={form.isEvergreen}
+            onChange={(v) => {
+              set('continuesUntilReplaced', v)
+              if (v) set('autoRenews', false)
+            }}
           />
         )
       case 'renewalTermMonths':

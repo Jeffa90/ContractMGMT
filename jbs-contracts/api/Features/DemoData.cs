@@ -272,6 +272,9 @@ public static class DemoData
             // Notice deadlines in 5 days and passed, with no decision (Urgent).
             await EffectiveAsync(new("Pest control", wattle, facilities, services, beef, south, owner, null, 38_000m, D(-355), D(10), 5, Legal: false), grant);
             await EffectiveAsync(new("Uniform laundering", redgum, peopleServices, services, beef, north, owner, null, 64_000m, D(-700), D(25), 30, Legal: false, AutoRenewMonths: 24), grant);
+            // Its original term ended two months ago; it carries on under the same terms until replaced (D-121): not overdue.
+            var continuing = await EffectiveAsync(new("Waste removal", harbour, waste, services, beef, north, owner, null, 48_000m, D(-800), D(-60), 30, Legal: false), grant);
+            await c.ExecuteAsync("UPDATE contracts.Contract SET ContinuesUntilReplaced = 1 WHERE Id = @continuing", new { continuing }, tx);
 
             // Decisions made: let it end, renegotiate, and end early on a later date.
             var letEnd = await EffectiveAsync(new("Fuel cards", scf, linehaul, supply, beef, south, owner, null, 90_000m, D(-700), D(35), 30, Legal: false), grant);

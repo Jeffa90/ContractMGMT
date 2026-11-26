@@ -184,11 +184,11 @@ public static class RenewalEndpoints
             await using var c = await db.OpenAsync();
             var rows = await c.QueryAsync<RenewalRow>($"""
                 SELECT k.Id, k.Reference, k.Title, s.Name AS SupplierName, o.Name AS OwnerName, k.OwnerId, k.BackupOwnerId, k.EndDate, k.IsEvergreen, k.ReviewDate,
-                       k.NoticePeriodDays, k.RenewalDecision, k.PlannedEndDate, k.Value, k.CurrencyCode, k.IsConfidential
+                       k.NoticePeriodDays, k.RenewalDecision, k.PlannedEndDate, k.Value, k.CurrencyCode, k.IsConfidential, k.ContinuesUntilReplaced
                 FROM contracts.Contract k LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId JOIN contracts.Person o ON o.Id = k.OwnerId
                 WHERE k.Stage = N'Effective' AND {ContractAccess.VisibleSql("k")} {(mine == true ? "AND (k.OwnerId = @meId OR k.BackupOwnerId = @meId)" : "")}
                 """, ContractAccess.Params(me!));
-            var items = rows.Select(r => (Row: r, Key: KeyDate(r))).Where(x => x.Key.Date is { } d && d <= today.AddDays(window)
+            var items = rows.Select(r => (Row: r, Key: KeyDate(r, today))).Where(x => x.Key.Date is { } d && d <= today.AddDays(window)
                 && (d >= today || x.Row.RenewalDecision is null || x.Row.PlannedEndDate is not null))
                 .OrderBy(x => x.Key.Date)
                 .Select(x => new
@@ -221,12 +221,17 @@ public static class RenewalEndpoints
         public decimal? Value { get; set; }
         public string CurrencyCode { get; set; } = "AUD";
         public bool IsConfidential { get; set; }
+        public bool ContinuesUntilReplaced { get; set; }
     }
 
-    /// <summary>The date that matters for renewing: a planned end date, else the notice deadline, else the end date.</summary>
-    internal static (string Kind, DateOnly? Date) KeyDate(RenewalRow r)
+    /// <summary>
+    /// The date that matters for renewing: a planned end date, else the notice deadline, else the end date. A contract that continues
+    /// until replaced and is past its end date gives "Continuing" and its end date (D-121): it isn't overdue.
+    /// </summary>
+    internal static (string Kind, DateOnly? Date) KeyDate(RenewalRow r, DateOnly today)
     {
         if (r.PlannedEndDate is { } planned) return ("Ends", DateOnly.FromDateTime(planned));
+        if (r.ContinuesUntilReplaced && !r.IsEvergreen && r.EndDate is { } ended && DateOnly.FromDateTime(ended) < today) return ("Continuing", DateOnly.FromDateTime(ended));
         var anchor = r.IsEvergreen ? r.ReviewDate : r.EndDate;
         if (r.NoticePeriodDays is { } n && anchor is { } a) return ("Notice", DateOnly.FromDateTime(a.AddDays(-n)));
         return r.IsEvergreen || r.EndDate is null ? ("End", null) : ("End", DateOnly.FromDateTime(r.EndDate.Value));
@@ -247,11 +252,11 @@ public static class RenewalEndpoints
         p.Add("start", c.EndDate is { } end && !c.IsEvergreen ? end.AddDays(1) : (DateTime?)null, System.Data.DbType.Date);
         var newId = await x.C.ExecuteScalarAsync<int>("""
             INSERT INTO contracts.Contract (Reference, Title, Description, SupplierId, CategoryId, AgreementTypeId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewMonthsBeforeEnd, NeedsLegalReview, RenewsContractId,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, StartDate, IsEvergreen, AutoRenews, RenewalTermMonths, ContinuesUntilReplaced, NoticePeriodDays, ReviewMonthsBeforeEnd, NeedsLegalReview, RenewsContractId,
                 CreatedById, UpdatedById, IsDemo)
             OUTPUT INSERTED.Id
             SELECT @reference, @title, Description, SupplierId, CategoryId, AgreementTypeId, OwnerId, BackupOwnerId,
-                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, AutoRenews, RenewalTermMonths, NoticePeriodDays, ReviewMonthsBeforeEnd, 1, Id,
+                IsConfidential, Value, CurrencyCode, SapOutlineAgreement, @start, IsEvergreen, AutoRenews, RenewalTermMonths, ContinuesUntilReplaced, NoticePeriodDays, ReviewMonthsBeforeEnd, 1, Id,
                 @me, @me, IsDemo
             FROM contracts.Contract WHERE Id = @id
             """, p, x.Tx);

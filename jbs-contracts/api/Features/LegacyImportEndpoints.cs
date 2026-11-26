@@ -446,11 +446,13 @@ public static class LegacyImportEndpoints
             }
             // "In Full": after its end date it carries on under the same terms until a new agreement replaces it (Jeff, 27 Nov). It keeps
             // its end date and doesn't move it on; past the end date it stays Effective and asks for a renewal decision.
+            var continues = false;
             if (Text(row, "autoRenews") is { } full && MeansCarriesOn(full))
             {
                 autoRenews = false;
                 term = null;
-                r.Notes.Add($"\"{full}\": keeps its end date and carries on under the same terms after it, until replaced; it doesn't renew by itself.");
+                continues = !evergreen;
+                r.Notes.Add($"\"{full}\": keeps its end date and continues until replaced: after its end date it carries on under the same terms, shown as Continuing until replaced, not overdue.");
             }
             if (autoRenews && evergreen) problems.Add("Renews automatically: it's also Evergreen. An evergreen contract has no end date to renew; change one of them.");
             if (autoRenews && term is null) problems.Add("Renewal term: blank, but it renews automatically. Fill in how many months each renewal lasts.");
@@ -484,7 +486,7 @@ public static class LegacyImportEndpoints
 
             r.Body = new SaveContract(title, Text(row, "description"), supplierId, categoryId, agreementTypeId, businessUnitIds, siteIds, ownerId, backupId, confidential,
                 value, currency, Text(row, "sapOutlineAgreement"), start, effectiveOn, end, evergreen, notice, review, false, null, fieldValues,
-                entityIds, functionIds, autoRenews, term);
+                entityIds, functionIds, autoRenews, term, ContinuesUntilReplaced: continues);
             var errors = r.Body.SupplierId is null
                 ? await ContractEndpoints.CheckAsync(c, tx!, r.Body with { SupplierId = suppliers.Values.FirstOrDefault() }, null) // a new supplier is added on import
                 : await ContractEndpoints.CheckAsync(c, tx!, r.Body, null);

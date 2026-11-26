@@ -176,6 +176,11 @@ const topics = {
           on by its renewal term, the decision is cleared for the new term, and the reminders start again from the new date. It's recorded in its Activity.
         </p>
         <p>
+          A contract that <strong>continues until replaced</strong> keeps its end date, and after it carries on under the same terms until a new agreement
+          replaces it. Once past its end date it's listed under <strong>Continuing until replaced</strong>, not overdue. When you're ready, renew or
+          renegotiate it as usual.
+        </p>
+        <p>
           A <strong>review date</strong> can be a period before the end date (1, 3, 6 or 12 months): it moves when the end date does, including an automatic
           renewal. Or choose a date.
         </p>

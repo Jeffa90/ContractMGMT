@@ -659,7 +659,7 @@ public static class ExcelEndpoints
         ["title"] = "Title", ["description"] = "Description", ["supplierId"] = "Supplier", ["categoryId"] = "Category", ["otherCategoryIds"] = "Other categories", ["agreementTypeId"] = "Agreement type",
         ["businessUnitIds"] = "Business unit", ["siteIds"] = "Site", ["entityIds"] = "Entity", ["functionIds"] = "Function", ["ownerId"] = "Owner", ["backupOwnerId"] = "Backup owner", ["currencyCode"] = "Currency",
         ["value"] = "Value", ["sapOutlineAgreement"] = "SAP outline agreement number", ["endDate"] = "End date", ["noticePeriodDays"] = "Notice period (days)",
-        ["autoRenews"] = "Renews automatically", ["renewalTermMonths"] = "Renewal term (months)", ["reviewDate"] = "Review date",
+        ["autoRenews"] = "Renews automatically", ["continuesUntilReplaced"] = "Continues until replaced", ["renewalTermMonths"] = "Renewal term (months)", ["reviewDate"] = "Review date",
     };
 
     /// <summary>The contract sheet's own headings (added fields whose label matches one get their key added, so no two columns share a heading).</summary>
@@ -679,7 +679,9 @@ public static class ExcelEndpoints
             new("Start date", "Day/month/year", 13), new("Effective date", "Day/month/year", 13), new("End date", "Day/month/year. Blank for evergreen.", 13),
             new("Evergreen", "Yes or No", 11),
             new("Renews automatically", "Yes or No. Yes moves the end date on by the renewal term unless someone decides to let it end.", 14),
-            new("Renewal term (months)", "Whole number, needed when it renews automatically", 14), new("Notice period (days)", "Whole number", 14), new("Review date", "Day/month/year", 13),
+            new("Renewal term (months)", "Whole number, needed when it renews automatically", 14),
+            new("Continues until replaced", "Yes or No. Yes: after its end date it carries on under the same terms until replaced, and isn't shown as overdue.", 14),
+            new("Notice period (days)", "Whole number", 14), new("Review date", "Day/month/year", 13),
             new("Review months before end", "1, 3, 6 or 12: the review date is worked out from the end date and moves with it. Blank with a review date: that date.", 14),
             new("Needs Legal review", "Yes or No (Yes if blank for a new contract)", 15), new("Description", null, 40),
         ],
@@ -698,7 +700,7 @@ public static class ExcelEndpoints
             {
                 r.Reference, r.Title, r.SupplierName, r.CategoryDisplay, r.OtherCategories.Length == 0 ? null : string.Join("; ", r.OtherCategories), r.AgreementTypeName, people[r.OwnerId].WindowsAccount,
                 r.BackupOwnerId is { } b ? people[b].WindowsAccount : null, r.IsConfidential, Several(r.BusinessUnitNames), Several(r.SiteNames), Several(r.EntityNames), Several(r.FunctionNames),
-                r.Value, r.CurrencyCode, r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.AutoRenews, r.RenewalTermMonths, r.NoticePeriodDays, D(r.ReviewDate), r.ReviewMonthsBeforeEnd, r.NeedsLegalReview,
+                r.Value, r.CurrencyCode, r.SapOutlineAgreement, D(r.StartDate), D(r.EffectiveDate), D(r.EndDate), r.IsEvergreen, r.AutoRenews, r.RenewalTermMonths, r.ContinuesUntilReplaced, r.NoticePeriodDays, D(r.ReviewDate), r.ReviewMonthsBeforeEnd, r.NeedsLegalReview,
                 r.Description,
             }
             .Concat(added.Select(a => a is not null && values[r.Id].TryGetValue(a.Field.Key, out var v) ? Fields.ExcelValue(a.Field, v, id => people.GetValueOrDefault(id)?.WindowsAccount) : null))
@@ -819,6 +821,8 @@ public static class ExcelEndpoints
                 if (evergreen && row.Date("End date", out _) is null) end = null; // ticking Evergreen clears an old end date
                 var said = row.YesNo("Renews automatically", out p); if (p is not null) problems.Add(p);
                 var autoRenews = said ?? (!evergreen && (before?.AutoRenews ?? false)); // Evergreen without a Yes here stops it renewing
+                var continuesSaid = row.YesNo("Continues until replaced", out p); if (p is not null) problems.Add(p);
+                var continues = continuesSaid ?? (!evergreen && !autoRenews && (before?.ContinuesUntilReplaced ?? false)); // Evergreen or renewing stops it
                 var term = row.WholeNumber("Renewal term (months)", out p) ?? before?.RenewalTermMonths; if (p is not null) problems.Add(p);
                 var notice = row.WholeNumber("Notice period (days)", out p) ?? before?.NoticePeriodDays; if (p is not null) problems.Add(p);
                 var reviewGiven = row.Date("Review date", out p); if (p is not null) problems.Add(p);
@@ -838,7 +842,7 @@ public static class ExcelEndpoints
                 if (problems.Count > 0) { r.Refuse(string.Join(" ", problems)); continue; }
 
                 var body = new SaveContract(title, description, supplierId, categoryId, agreementTypeId, businessUnitIds, siteIds, ownerId, backupId, confidential,
-                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityIds, functionIds, autoRenews, term, reviewMonths, otherCategoryIds);
+                    value, currency, sap, start, effective, end, evergreen, notice, review, legal, null, fieldValues, entityIds, functionIds, autoRenews, term, reviewMonths, otherCategoryIds, continues);
                 var errors = await ContractEndpoints.CheckAsync(x.C, x.Tx, body, before);
                 var (parsed, fieldErrors) = await Fields.ParseAsync(x.C, x.Tx, fieldValues, definitions);
                 var labels = added.ToDictionary(a => $"field.{a.Field.Key}", a => a.Header);

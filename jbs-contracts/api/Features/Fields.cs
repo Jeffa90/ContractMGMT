@@ -411,7 +411,7 @@ public static partial class Fields
     // ---------------------------------------------------------------- Filters on the Contracts list
 
     /// <summary>Built-in fields that can be picked from to filter the list. Text, numbers and dates are found with the search box instead.</summary>
-    private static readonly HashSet<string> FilterableBuiltIns = ["supplier", "category", "agreementType", "owner", "backupOwner", "businessUnit", "site", "entity", "function", "confidential", "evergreen", "autoRenews", "needsLegalReview"];
+    private static readonly HashSet<string> FilterableBuiltIns = ["supplier", "category", "agreementType", "owner", "backupOwner", "businessUnit", "site", "entity", "function", "confidential", "evergreen", "autoRenews", "continuesUntilReplaced", "needsLegalReview"];
 
     public static bool CanFilter(FieldRow f) => f.IsBuiltIn ? FilterableBuiltIns.Contains(f.Key) : f.Kind is "Choice" or "MultiChoice" or "YesNo" or "Person" or "Supplier";
 
@@ -455,9 +455,9 @@ public static partial class Fields
                         """);
                     p.Add(name, id);
                 }
-                else if (yes is not null && f.Key is "confidential" or "evergreen" or "autoRenews" or "needsLegalReview")
+                else if (yes is not null && f.Key is "confidential" or "evergreen" or "autoRenews" or "continuesUntilReplaced" or "needsLegalReview")
                 {
-                    var bit = f.Key switch { "confidential" => "k.IsConfidential", "evergreen" => "k.IsEvergreen", "autoRenews" => "k.AutoRenews", _ => "k.NeedsLegalReview" };
+                    var bit = f.Key switch { "confidential" => "k.IsConfidential", "evergreen" => "k.IsEvergreen", "autoRenews" => "k.AutoRenews", "continuesUntilReplaced" => "k.ContinuesUntilReplaced", _ => "k.NeedsLegalReview" };
                     sql.Add($"{bit} = @{name}");
                     p.Add(name, yes.Value);
                 }

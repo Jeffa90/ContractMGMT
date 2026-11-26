@@ -89,6 +89,8 @@ export type ContractListItem = {
   currencyCode: string
   endDate: string | null
   isEvergreen: boolean
+  /** After its end date it carries on under the same terms until replaced (D-121). */
+  continuesUntilReplaced: boolean
   noticeDeadline: string | null
   updatedUtc: string
   whoseTurn: WhoseTurn | null
@@ -135,6 +137,8 @@ export type Contract = {
   isEvergreen: boolean
   /** Renews automatically (D-102): the daily job moves the end date on by the renewal term unless someone decides to let it end. */
   autoRenews: boolean
+  /** After its end date it carries on under the same terms until replaced (D-121). */
+  continuesUntilReplaced: boolean
   renewalTermMonths: number | null
   noticePeriodDays: number | null
   reviewDate: string | null
@@ -376,4 +380,13 @@ export type VariationDetail = {
   approvals: ApprovalDecision[]
   actions: VariationAction[]
   cannotApproveReason: string | null
+}
+
+/**
+ * Past its end date, still Effective, no renewal decision, and set to continue until replaced (D-121): it reads "Continuing until
+ * replaced", not overdue.
+ */
+export function isContinuing(c: { stage: string; continuesUntilReplaced: boolean; isEvergreen: boolean; endDate: string | null }, decided = false): boolean {
+  if (c.stage !== 'Effective' || !c.continuesUntilReplaced || c.isEvergreen || !c.endDate || decided) return false
+  return c.endDate < new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Brisbane' })
 }

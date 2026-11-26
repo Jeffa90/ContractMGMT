@@ -11,7 +11,7 @@ import { api } from '@/lib/api'
 import { chosenFilters, filterFields, filterPrefix } from '@/lib/filters'
 import type { HomeData } from '@/lib/home'
 import type { Layout } from '@/lib/layout'
-import type { ContractListItem } from '@/lib/contracts'
+import { isContinuing, type ContractListItem } from '@/lib/contracts'
 import { daysUntil, formatDate, waited } from '@/lib/format'
 import { useMe } from '@/lib/me'
 import { help } from '@/help'
@@ -33,6 +33,8 @@ function Turn({ c }: { c: ContractListItem }) {
 /** The one date that matters most: the notice deadline, else the end date. */
 function KeyDate({ c }: { c: ContractListItem }) {
   if (c.stage === 'Withdrawn') return <span className="text-muted-foreground">Withdrawn</span>
+  // Past its end date and carrying on under the same terms (D-121): not overdue. (Contracts with a decision drop out of the overdue look on Renewals.)
+  if (isContinuing(c)) return <span>Continuing until replaced</span>
   const [label, value] = c.noticeDeadline ? ['Notice', c.noticeDeadline] : c.endDate ? ['Ends', c.endDate] : c.isEvergreen ? ['Evergreen', null] : [null, null]
   if (!label) return <span className="text-muted-foreground">No dates yet</span>
   if (!value) return <span>{label}</span>

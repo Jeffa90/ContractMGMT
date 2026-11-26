@@ -111,6 +111,7 @@ public static class ReportEndpoints
         public DateTime? EndDate { get; set; }
         public bool IsEvergreen { get; set; }
         public bool AutoRenews { get; set; }
+        public bool ContinuesUntilReplaced { get; set; }
         public int? RenewalTermMonths { get; set; }
         public int? NoticePeriodDays { get; set; }
         public DateTime? ReviewDate { get; set; }
@@ -146,7 +147,7 @@ public static class ReportEndpoints
         ["title"] = "text", ["supplier"] = "text", ["category"] = "text", ["agreementType"] = "text", ["description"] = "text", ["owner"] = "text",
         ["backupOwner"] = "text", ["confidential"] = "yesno", ["businessUnit"] = "text", ["site"] = "text", ["entity"] = "text", ["function"] = "text", ["value"] = "money",
         ["sapOutlineAgreement"] = "text", ["startDate"] = "date", ["effectiveDate"] = "date", ["endDate"] = "date", ["evergreen"] = "yesno",
-        ["autoRenews"] = "yesno", ["renewalTermMonths"] = "number", ["noticePeriodDays"] = "number", ["reviewDate"] = "date", ["needsLegalReview"] = "yesno",
+        ["autoRenews"] = "yesno", ["continuesUntilReplaced"] = "yesno", ["renewalTermMonths"] = "number", ["noticePeriodDays"] = "number", ["reviewDate"] = "date", ["needsLegalReview"] = "yesno",
     };
 
     internal static List<RegisterColumn> RegisterColumnsFor(List<FieldRow> fields, List<SectionRow> sections)
@@ -187,7 +188,7 @@ public static class ReportEndpoints
         "title" => r.Title, "supplier" => r.SupplierName, "supplierVendorNumber" => r.SupplierVendorNumber, "category" => r.Category, "family" => r.Family, "otherCategories" => r.OtherCategories, "agreementType" => r.AgreementTypeName, "description" => r.Description,
         "owner" => r.OwnerName, "backupOwner" => r.BackupOwnerName, "confidential" => r.IsConfidential, "businessUnit" => r.BusinessUnitName, "site" => r.SiteName, "entity" => r.EntityName, "function" => r.FunctionName,
         "value" => r.Value, "sapOutlineAgreement" => r.SapOutlineAgreement, "startDate" => D(r.StartDate), "effectiveDate" => D(r.EffectiveDate),
-        "endDate" => D(r.EndDate), "evergreen" => r.IsEvergreen, "autoRenews" => r.AutoRenews, "renewalTermMonths" => r.RenewalTermMonths, "noticePeriodDays" => r.NoticePeriodDays, "reviewDate" => D(r.ReviewDate),
+        "endDate" => D(r.EndDate), "evergreen" => r.IsEvergreen, "autoRenews" => r.AutoRenews, "continuesUntilReplaced" => r.ContinuesUntilReplaced, "renewalTermMonths" => r.RenewalTermMonths, "noticePeriodDays" => r.NoticePeriodDays, "reviewDate" => D(r.ReviewDate),
         "needsLegalReview" => r.NeedsLegalReview, "stage" => ContractEndpoints.StageNames[r.Stage], "noticeDeadline" => D(r.NoticeDeadline),
         "registered" => r.RegisteredUtc is { } ru ? DateOnly.FromDateTime(Local(ru)) : null, "registeredBy" => r.RegisteredByName,
         "renewalDecision" => r.RenewalDecision is { } d ? RenewalEndpoints.DecisionNames[d] : null, "endedOn" => D(r.EndedOn), "endedReason" => r.EndedReason,
@@ -211,7 +212,7 @@ public static class ReportEndpoints
             SELECT k.Id, k.Reference, k.Title, k.Stage, k.Description, s.Name AS SupplierName, s.VendorNumber AS SupplierVendorNumber, cat.Name AS CategoryName, parent.Name AS ParentCategoryName, family.Name AS FamilyCategoryName, occ.OtherCategories,
                    at.Value AS AgreementTypeName, lv.BusinessUnitName, lv.SiteName, lv.EntityName, lv.FunctionName, o.Name AS OwnerName,
                    b.Name AS BackupOwnerName, k.IsConfidential, k.NeedsLegalReview, k.Value, k.CurrencyCode, k.SapOutlineAgreement, k.StartDate, k.EffectiveDate, k.EndDate,
-                   k.IsEvergreen, k.AutoRenews, k.RenewalTermMonths,
+                   k.IsEvergreen, k.AutoRenews, k.RenewalTermMonths, k.ContinuesUntilReplaced,
                    k.NoticePeriodDays, k.ReviewDate, k.RegisteredUtc, rb.Name AS RegisteredByName, k.RenewalDecision, k.EndedOn, k.EndedReason, k.LegalOutcome, k.LegacyReference
             FROM contracts.Contract k
             LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId

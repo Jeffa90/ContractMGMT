@@ -119,9 +119,10 @@ public static class HomeEndpoints
                     WHERE {ContractAccess.VisibleSql("k")} AND k.Stage = N'Effective' AND {Mine} AND k.NoticePeriodDays IS NOT NULL
                       AND k.RenewalDecision IS NULL AND {NoticeDeadline} <= DATEADD(DAY, 7, @today) AND (k.IsEvergreen = 1 OR k.EndDate >= @today)
                     UNION ALL
-                    -- Its end date has passed, it's still Effective and nobody decided anything.
+                    -- Its end date has passed, it's still Effective and nobody decided anything (unless it continues until replaced, D-121).
                     SELECT N'Ended' AS Kind, k.Id, k.Reference, k.Title, s.Name AS SupplierName, k.EndDate AS Deadline FROM contracts.Contract k LEFT JOIN contracts.Supplier s ON s.Id = k.SupplierId
                     WHERE {ContractAccess.VisibleSql("k")} AND k.Stage = N'Effective' AND {Mine} AND k.RenewalDecision IS NULL AND k.IsEvergreen = 0 AND k.EndDate < @today
+                      AND k.ContinuesUntilReplaced = 0
                     ORDER BY Deadline
                     """, parameters)).ToList()
                 : [];

@@ -250,3 +250,17 @@ test('Reports, By supplier: a franchise contract lists every franchisee', async 
   await expect(page.getByRole('link', { name: 'Download Excel' })).toHaveAttribute('href', /by-supplier\.xlsx\?scope=effective&groupsOnly=true/)
   await expectAccessible(page)
 })
+
+test('A contract continuing until replaced is its own calm group on Renewals, not overdue', async ({ page }) => {
+  await page.goto('/renewals?whose=all')
+  await settled(page)
+  // Waste removal (demo): its original term ended two months ago and it carries on under the same terms (D-121).
+  const group = page.getByRole('region', { name: /Continuing until replaced/ })
+  await expect(group.getByRole('link', { name: 'Waste removal' })).toBeVisible()
+  await expect(page.getByRole('region', { name: /^Overdue/ }).getByRole('link', { name: 'Waste removal' })).toHaveCount(0)
+  await expectAccessible(page)
+  await group.getByRole('link', { name: 'Waste removal' }).click()
+  await settled(page, 'Waste removal')
+  await expect(page.getByText('Continuing until replaced').first()).toBeVisible()
+  await expect(page.getByText(/continues under the same terms until a new agreement replaces it/)).toBeVisible()
+})

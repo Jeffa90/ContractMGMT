@@ -271,6 +271,8 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.False(imported[$"{u}-n"].AutoRenews);
         Assert.Equal(Today.AddDays(200), DateOnly.FromDateTime(imported[$"{u}-f"].EndDate!.Value));
         Assert.False(await db.ExecuteScalarAsync<bool>("SELECT IsEvergreen FROM contracts.Contract WHERE LegacyReference = @r", new { r = $"{u}-f" }));
+        Assert.True(await db.ExecuteScalarAsync<bool>("SELECT ContinuesUntilReplaced FROM contracts.Contract WHERE LegacyReference = @r", new { r = $"{u}-f" }));
+        Assert.False(await db.ExecuteScalarAsync<bool>("SELECT ContinuesUntilReplaced FROM contracts.Contract WHERE LegacyReference = @r", new { r = $"{u}-n" }));
 
         // The next new contract carries on after the highest number.
         var next = (await OkAsync(owner.PostAsJsonAsync("/api/contracts", new { title = $"After import {u}" }, Ct))).GetProperty("reference").GetString()!;

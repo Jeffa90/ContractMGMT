@@ -395,18 +395,22 @@ public static class LegacyImportEndpoints
             string? p = null;
             DateOnly? Date(string key) { if (!source.TryGetValue(key, out var col)) return null; var d = row.Date(col, out var pr); if (pr is not null) problems.Add(pr); return d; }
             bool? YesNo(string key) { if (!source.TryGetValue(key, out var col)) return null; var v = row.YesNo(col, out var pr); if (pr is not null) problems.Add(pr); return v; }
-            string Header(string key) => source.TryGetValue(key, out var col) ? col : key;
-            bool Fail(string problem) { problems.Add(problem); return false; }
             var start = Date("startDate");
             var effective = Date("effectiveDate");
             var end = Date("endDate");
             var review = Date("reviewDate");
             var registered = Date("registeredDate");
             // Medius's Extension Type matched to Evergreen by mistake: say which field it belongs to.
+            // Medius's Extension Type matched to Evergreen (it was, once): its values are the renewal setting, so read them as that.
             var evergreenText = Text(row, "evergreen");
-            var evergreen = evergreenText is not null && WordList(evergreenText).Contains("extension")
-                ? Fail($"{Header("evergreen")}: this is Medius's renewal setting (\"{evergreenText}\"). On the column-matching step, choose Renews automatically for this column.")
-                : YesNo("evergreen") ?? false;
+            var renewalText = Text(row, "autoRenews");
+            bool evergreen;
+            if (evergreenText is not null && WordList(evergreenText).Contains("extension"))
+            {
+                evergreen = false;
+                renewalText ??= evergreenText;
+            }
+            else evergreen = YesNo("evergreen") ?? false;
             var confidential = YesNo("confidential") ?? false;
             decimal? value = null;
             if (source.TryGetValue("value", out var vcol)) { value = row.Money(vcol, out p); if (p is not null) problems.Add(p); }
@@ -426,7 +430,7 @@ public static class LegacyImportEndpoints
                 else notice = unit == "week" ? count * 7 : count;
             }
             var autoRenews = false;
-            if (Text(row, "autoRenews") is { } renewsText)
+            if (renewalText is { } renewsText)
             {
                 if (RenewsSays(renewsText) is { } says) autoRenews = says;
                 else problems.Add($"Renews automatically: \"{renewsText}\" isn't clearly yes or no. Change it to, for example, Yes or No.");
@@ -439,7 +443,7 @@ public static class LegacyImportEndpoints
                 else term = unit == "year" ? count * 12 : count;
             }
             // Medius's "Auto Extension - Monthly" with no extension period renews a month at a time.
-            if (autoRenews && term is null && Text(row, "autoRenews") is { } monthly && monthly.Contains("month", StringComparison.OrdinalIgnoreCase))
+            if (autoRenews && term is null && renewalText is { } monthly && monthly.Contains("month", StringComparison.OrdinalIgnoreCase))
             {
                 term = 1;
                 r.Notes.Add($"\"{monthly}\": renews a month at a time.");
@@ -447,7 +451,7 @@ public static class LegacyImportEndpoints
             // "In Full": after its end date it carries on under the same terms until a new agreement replaces it (Jeff, 27 Nov). It keeps
             // its end date and doesn't move it on; past the end date it stays Effective and asks for a renewal decision.
             var continues = false;
-            if (Text(row, "autoRenews") is { } full && MeansCarriesOn(full))
+            if (renewalText is { } full && MeansCarriesOn(full))
             {
                 autoRenews = false;
                 term = null;
@@ -601,7 +605,8 @@ public static class LegacyImportEndpoints
             string? Suggest(string header)
             {
                 var n = Excel.Normalise(header);
-                if (saved.TryGetValue(n, out var key) && targets.Any(t => t.Key == key) && used.Add(key)) return key;
+                // A remembered match of Medius's Extension Type to Evergreen was a mistake (D-120): suggest Renews automatically instead.
+                if (saved.TryGetValue(n, out var key) && !(key == "evergreen" && n.Contains("extension")) && targets.Any(t => t.Key == key) && used.Add(key)) return key;
                 var match = targets.FirstOrDefault(t => !used.Contains(t.Key) && (Excel.Normalise(t.Label) == n || t.Aliases.Any(a => Excel.Normalise(a) == n)));
                 if (match is null) return null;
                 used.Add(match.Key);

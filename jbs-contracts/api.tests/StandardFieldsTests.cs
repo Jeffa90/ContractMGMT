@@ -228,11 +228,12 @@ public sealed class StandardFieldsTests(AppFixture app)
         Assert.Equal("Effective", byRow[7].GetProperty("outcome").GetString());
         Assert.Contains(byRow[7].GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("keeps its end date"));
         Assert.Equal("Effective", byRow[8].GetProperty("outcome").GetString());
-        // Matched to Evergreen by mistake, the Extension Type says where it belongs.
+        // Matched to Evergreen by mistake (Jeff's import remembered that), Medius's values are still read as the renewal setting.
         var wrong = new Dictionary<string, string>(mapping) { ["Extension Type"] = "evergreen" };
         var misplaced = await OkAsync(admin.PostAsync("/api/import/legacy/preview", Form(wrong), Ct));
         var row7 = misplaced.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("row").GetInt32() == 7);
-        Assert.Contains(row7.GetProperty("problems").EnumerateArray(), x => x.GetString()!.Contains("choose Renews automatically"));
+        Assert.Equal("Effective", row7.GetProperty("outcome").GetString());
+        Assert.Contains(row7.GetProperty("notes").EnumerateArray(), x => x.GetString()!.Contains("keeps its end date"));
 
         // Fix the clash row's renewal so it imports: it keeps its old reference only as the old reference, as the number is taken.
         rows[2][8] = "No";

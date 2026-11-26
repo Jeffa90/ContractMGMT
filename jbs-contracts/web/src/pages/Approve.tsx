@@ -1,15 +1,16 @@
 // Approve (works on a phone): a one-page summary for the Group Head or a backup approver (product-spec section 11; D-59).
 // The contract was approved and signed in DocuSign; this confirms it and puts it on the register.
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BadgeCheck, ChevronLeft, Download, FileWarning, Lock, Undo2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { StageBadge } from '@/components/form'
 import { PageHeader } from '@/components/Help'
+import { Dialog } from '@/components/Dialog'
 import { ReasonDialog } from '@/components/LegalReview'
 import { Alert, Button, Card, Skeleton } from '@/components/ui'
-import { errorText, useAction } from '@/lib/actions'
+import { errorText, toastApproved } from '@/lib/actions'
 import { api, ApiError } from '@/lib/api'
 import type { ContractDetail } from '@/lib/contracts'
 import { formatDate, formatDateTime, formatMoney } from '@/lib/format'
@@ -52,8 +53,24 @@ export function ApprovePage() {
 function Approve({ data, back }: { data: ContractDetail; back: ReactNode }) {
   const c = data.contract
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [sendingBack, setSendingBack] = useState(false)
-  const approve = useAction(data, () => navigate(`/contracts/${c.id}`))
+  const [confirming, setConfirming] = useState(false)
+  // Approve after an "are you sure", then back to Home with Undo in the message (Ellisha's feedback, D-106).
+  const approve = useMutation({
+    mutationFn: () => api.post<{ rowVersion: string }>(`/api/contracts/${c.id}/approval/approve`, { rowVersion: c.rowVersion }),
+    onSuccess: (r) => {
+      void queryClient.invalidateQueries({ queryKey: ['contract', c.id] })
+      void queryClient.invalidateQueries({ queryKey: ['contracts'] })
+      setConfirming(false)
+      navigate('/')
+      toastApproved(queryClient, c, r.rowVersion)
+    },
+    onError: (e) => {
+      setConfirming(false)
+      toast.error(errorText(e))
+    },
+  })
   const signed = data.documents.filter((d) => d.kind === 'SignedCopy')
   const canAct = data.actions.includes('approve')
   const earlier = data.approvals.filter((a) => a.decision === 'SentBack')
@@ -154,8 +171,7 @@ function Approve({ data, back }: { data: ContractDetail; back: ReactNode }) {
             variant="primary"
             size="lg"
             icon={<BadgeCheck aria-hidden className="size-5" />}
-            loading={approve.isPending}
-            onClick={() => approve.mutate({ path: 'approval/approve', success: `${c.reference} is approved and Effective.` }, { onError: (e) => toast.error(errorText(e)) })}
+            onClick={() => setConfirming(true)}
           >
             Approve and register
           </Button>
@@ -163,6 +179,24 @@ function Approve({ data, back }: { data: ContractDetail; back: ReactNode }) {
             Send back
           </Button>
         </div>
+      )}
+      {confirming && (
+        <Dialog
+          open
+          onOpenChange={(o) => !o && setConfirming(false)}
+          title={`Approve ${c.reference}?`}
+          description={`${c.title} becomes Effective and locked, and ${c.ownerName} is emailed. If it's a mistake, you can undo it for 24 hours.`}
+          footer={
+            <>
+              <Button onClick={() => setConfirming(false)}>Cancel</Button>
+              <Button variant="primary" icon={<BadgeCheck aria-hidden className="size-4" />} loading={approve.isPending} onClick={() => approve.mutate()}>
+                Approve and register
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm">Check the signed copy and the details first. Approving puts it on the register.</p>
+        </Dialog>
       )}
       {sendingBack && (
         <ReasonDialog

@@ -161,4 +161,62 @@ public sealed class ApprovalTests(AppFixture app)
         Assert.Equal("Draft", Stage(draft));
         Assert.True(draft.GetProperty("canEdit").GetBoolean());
     }
+
+    [Fact]
+    public async Task An_approval_made_by_mistake_can_be_undone_by_its_approver_until_anything_else_happens()
+    {
+        var (owner, _) = await PersonAsync("Uma Owner", Roles(owner: true));
+        var (approver, _) = await PersonAsync("Udo Approver", Roles(approver: true));
+        var (other, _) = await PersonAsync("Una Approver", Roles(approver: true));
+        await using var db = await app.OpenAsync();
+
+        async Task<int> EffectiveAsync(int id)
+        {
+            await UploadSignedCopyAsync(owner, id);
+            Assert.Equal(HttpStatusCode.OK, (await ActAsync(owner, id, "send-for-approval", new { effectiveDate = "2026-12-01" })).Status);
+            Assert.Equal(HttpStatusCode.OK, (await ActAsync(approver, id, "approval/approve")).Status);
+            return id;
+        }
+        var id = await EffectiveAsync(await InSigningAsync(owner));
+
+        // Only the approver who approved sees and can use Undo.
+        Assert.NotEqual(JsonValueKind.Null, (await DetailAsync(approver, id)).GetProperty("undoApprovalUntilUtc").ValueKind);
+        Assert.Equal(JsonValueKind.Null, (await DetailAsync(other, id)).GetProperty("undoApprovalUntilUtc").ValueKind);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ActAsync(other, id, "approval/undo")).Status);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ActAsync(owner, id, "approval/undo")).Status);
+
+        var (status, body) = await ActAsync(approver, id, "approval/undo");
+        Assert.True(status == HttpStatusCode.OK, body.ToString());
+        var back = await DetailAsync(approver, id);
+        Assert.Equal("Approval", Stage(back));
+        Assert.False(back.GetProperty("contract").GetProperty("isLocked").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, back.GetProperty("contract").GetProperty("registeredUtc").ValueKind);
+        Assert.Equal(["Undone", "Approved"], back.GetProperty("approvals").EnumerateArray().Take(2).Select(a => a.GetProperty("decision").GetString()));
+        Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.EmailOutbox WHERE ContractId = @id AND Kind = N'approval-undone'", new { id }));
+        // Undoing twice isn't possible; it can be approved again.
+        Assert.Equal(HttpStatusCode.Forbidden, (await ActAsync(approver, id, "approval/undo")).Status);
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(other, id, "approval/approve")).Status);
+        Assert.Equal("Effective", Stage(await DetailAsync(other, id)));
+
+        // Once anything else happens to it (here a renewal decision), it can't be undone.
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(owner, id, "renewal-decision", new { decision = "Renegotiate" })).Status);
+        Assert.Equal(JsonValueKind.Null, (await DetailAsync(other, id)).GetProperty("undoApprovalUntilUtc").ValueKind);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ActAsync(other, id, "approval/undo")).Status);
+
+        // A renewal: undoing its approval makes the contract it renewed Effective again.
+        var old = await EffectiveAsync(await InSigningAsync(owner));
+        var (renewStatus, renewBody) = await ActAsync(owner, old, "renewal-decision", new { decision = "Renew" });
+        Assert.True(renewStatus == HttpStatusCode.OK, renewBody.ToString());
+        var renewal = renewBody.GetProperty("result").GetProperty("renewalId").GetInt32();
+        await db.ExecuteAsync("UPDATE contracts.Contract SET NeedsLegalReview = 0, EndDate = '2030-06-30' WHERE Id = @renewal", new { renewal });
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(owner, renewal, "ready-for-signing")).Status);
+        await EffectiveAsync(renewal);
+        Assert.Equal("Ended", Stage(await DetailAsync(owner, old)));
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(approver, renewal, "approval/undo")).Status);
+        var oldAgain = await DetailAsync(owner, old);
+        Assert.Equal("Effective", Stage(oldAgain));
+        Assert.Equal(JsonValueKind.Null, oldAgain.GetProperty("contract").GetProperty("endedOn").ValueKind);
+        Assert.Equal("Approval", Stage(await DetailAsync(owner, renewal)));
+        Assert.Null(await AuditLog.VerifyAsync(db));
+    }
 }

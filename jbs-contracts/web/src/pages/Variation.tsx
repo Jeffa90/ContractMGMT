@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BackLink } from '@/components/BackLink'
 import { ArrowLeftRight, BadgeCheck, Check, FileText, Paperclip, Send, Undo2, Upload, UserCheck, X } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/Dialog'
 import { DropTarget } from '@/components/DropZone'
@@ -57,6 +57,7 @@ function Variation({ data }: { data: VariationDetail }) {
   const v = data.variation
   const c = data.contract
   const [open, setOpen] = useState<Dialogs>(null)
+  const navigate = useNavigate()
   const take = useVAction(data)
   const has = (a: VariationAction) => data.actions.includes(a)
   const close = () => setOpen(null)
@@ -191,7 +192,7 @@ function Variation({ data }: { data: VariationDetail }) {
       {open === 'sendForApproval' && (
         <ConfirmDialog data={data} onClose={close} title="Send for approval?" path="send-for-approval" submit="Send for approval" success="Sent for approval. The Group Head has been emailed." />
       )}
-      {open === 'approve' && <ConfirmDialog data={data} onClose={close} title="Approve this Variation?" path="approve" submit="Approve" success="Approved. The changes now apply to the contract." />}
+      {open === 'approve' && <ConfirmDialog data={data} onClose={close} title="Approve this Variation?" path="approve" submit="Approve" success="Approved. The changes now apply to the contract." then={() => navigate('/')} />}
     </>
   )
 }
@@ -406,9 +407,12 @@ function NoteDialog(props: { data: VariationDetail; onClose: () => void; title: 
   )
 }
 
-function ConfirmDialog(props: { data: VariationDetail; onClose: () => void; title: string; path: string; submit: string; success: string }) {
+function ConfirmDialog(props: { data: VariationDetail; onClose: () => void; title: string; path: string; submit: string; success: string; then?: () => void }) {
   const [error, setError] = useState<string | undefined>()
-  const action = useVAction(props.data, props.onClose)
+  const action = useVAction(props.data, () => {
+    props.onClose()
+    props.then?.()
+  })
   return (
     <Dialog
       open

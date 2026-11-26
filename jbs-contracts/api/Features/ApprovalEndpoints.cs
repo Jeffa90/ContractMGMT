@@ -127,6 +127,36 @@ public static class ApprovalEndpoints
                 return null;
             }));
 
+        // Approver: undo their own approval within 24 hours, before anything else happens to the contract (D-106). It goes back to
+        // waiting for approval; a renewal's old contract, ended by the approval, is Effective again.
+        group.MapPost("/approval/undo", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings, TimeProvider clock) =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
+            {
+                var c = x.Contract;
+                if (await UndoUntilAsync(x.C, x.Tx, x.Me, c, clock.GetUtcNow().UtcDateTime) is null)
+                    return ApiResults.NotAllowed("You can only undo your own approval, within 24 hours, and before anything else happens to the contract. Ask an admin.");
+                await x.C.ExecuteAsync("""
+                    UPDATE contracts.Contract SET Stage = N'Approval', StageSinceUtc = SYSUTCDATETIME(), IsLocked = 0, RegisteredUtc = NULL, RegisteredById = NULL,
+                        RegisteredAsBackup = NULL, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                    WHERE Id = @id
+                    """, new { me = x.Me.Id, id }, x.Tx);
+                var undoId = await x.C.ExecuteScalarAsync<int>(
+                    "INSERT INTO contracts.Approval (ContractId, Decision, ById) OUTPUT INSERTED.Id VALUES (@id, N'Undone', @me)", new { id, me = x.Me.Id }, x.Tx);
+                await x.Audit("contract.approval-undone", $"{x.Me.Name} undid their approval of {c.Reference}. It isn't Effective; it's waiting for approval again.", null);
+                if (await RenewedOldAsync(x.C, x.Tx, c) is { } old)
+                {
+                    await x.C.ExecuteAsync("""
+                        UPDATE contracts.Contract SET Stage = N'Effective', StageSinceUtc = SYSUTCDATETIME(), EndedOn = NULL, EndedReason = NULL, EndedById = NULL,
+                            UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                        WHERE Id = @oldId
+                        """, new { me = x.Me.Id, oldId = old.Id }, x.Tx);
+                    await x.AuditFor(old.Id, "contract.end-undone", $"{old.Reference} is Effective again: {x.Me.Name} undid the approval of its renewal {c.Reference}.", new { renewal = id });
+                }
+                await EmailOwnersAsync(x, $"approval:{id}:{undoId}", "approval-undone",
+                    p => EmailWording.RenderAsync(x.C, x.Tx, "ApprovalUndone", With(EmailWording.For(p.Name, c), "Approver", x.Me.Name), Link(settings, id)));
+                return null;
+            }, audit));
+
         // Approver: something isn't right; back to Signing with the reason (D-62).
         group.MapPost("/approval/send-back", (int id, LegalAction body, CurrentUser current, Db db, AuditLog audit, AppSettings settings) =>
             ActAsync(id, body.RowVersion, current, db, async x =>
@@ -188,6 +218,40 @@ public static class ApprovalEndpoints
                     $"{x.Me.Name} took {c.Reference} back to Draft from Signing" + Quote(reason) + Stop(reason), new { reason }, contractId: id);
                 return null;
             }));
+    }
+
+    public static readonly TimeSpan UndoWindow = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// Until when this person can undo the contract's approval (D-106), or null: it's Effective through their approval, within
+    /// 24 hours, and nothing else has happened to it since (the approval is its latest event; for a renewal, the old contract's
+    /// ending is that one's latest).
+    /// </summary>
+    public static async Task<DateTime?> UndoUntilAsync(SqlConnection c, SqlTransaction? tx, Person me, ContractRow k, DateTime nowUtc)
+    {
+        if (k.Stage != "Effective" || !me.IsApprover) return null;
+        var last = await c.QuerySingleOrDefaultAsync<(string Decision, int ById, DateTime AtUtc)>(
+            "SELECT TOP (1) Decision, ById, AtUtc FROM contracts.Approval WHERE ContractId = @id AND VariationId IS NULL ORDER BY Id DESC", new { id = k.Id }, tx);
+        if (last == default || last.Decision != "Approved" || last.ById != me.Id) return null;
+        var until = DateTime.SpecifyKind(last.AtUtc, DateTimeKind.Utc) + UndoWindow;
+        if (nowUtc >= until) return null;
+        var latest = await c.ExecuteScalarAsync<string?>("SELECT TOP (1) Action FROM contracts.AuditEvent WHERE ContractId = @id ORDER BY Id DESC", new { id = k.Id }, tx);
+        if (latest != "contract.approved") return null;
+        if (k.RenewsContractId is { } oldId && await RenewedOldAsync(c, tx, k) is null
+            && await c.ExecuteScalarAsync<string?>("SELECT EndedReason FROM contracts.Contract WHERE Id = @oldId", new { oldId }, tx) == $"Renewed by {k.Reference}.")
+            return null; // the old contract was ended by this approval and something has happened to it since
+        return until;
+    }
+
+    /// <summary>The contract this one renews, when this approval ended it and nothing has happened to it since.</summary>
+    private static async Task<(int Id, string Reference)?> RenewedOldAsync(SqlConnection c, SqlTransaction? tx, ContractRow k)
+    {
+        if (k.RenewsContractId is not { } oldId) return null;
+        var old = await c.QuerySingleOrDefaultAsync<(int Id, string Reference, string Stage, string? EndedReason)>(
+            "SELECT Id, Reference, Stage, EndedReason FROM contracts.Contract WHERE Id = @oldId", new { oldId }, tx);
+        if (old == default || old.Stage != "Ended" || old.EndedReason != $"Renewed by {k.Reference}.") return null;
+        var latest = await c.ExecuteScalarAsync<string?>("SELECT TOP (1) Action FROM contracts.AuditEvent WHERE ContractId = @oldId ORDER BY Id DESC", new { oldId }, tx);
+        return latest == "contract.ended" ? (old.Id, old.Reference) : null;
     }
 
     private static IResult? ApproverOnly(Ctx x) =>

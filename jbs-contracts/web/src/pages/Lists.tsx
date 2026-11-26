@@ -18,7 +18,13 @@ import { help } from '@/help'
 
 type Tab = 'Category' | 'AgreementType' | 'BusinessUnit' | 'Site' | 'Entity' | 'Function' | 'Currency' | 'SupplierDocumentType' | 'SupplierTier' | 'DocumentKind' | 'SupplierRisk'
 const tabs: { value: Tab; label: string; single: string; group: 'Contracts' | 'Suppliers'; note?: string }[] = [
-  { value: 'Category', group: 'Contracts', label: 'Categories', single: 'category' },
+  {
+    value: 'Category',
+    group: 'Contracts',
+    label: 'Categories',
+    single: 'category',
+    note: "Give each category a supplier tier: a supplier's tier is then the highest tier among its current contracts' categories, unless Procurement sets one by hand. A subcategory without a tier follows its category. The higher a tier is in Supplier tiers, the higher it counts.",
+  },
   { value: 'AgreementType', group: 'Contracts', label: 'Agreement types', single: 'agreement type' },
   { value: 'BusinessUnit', group: 'Contracts', label: 'Business units', single: 'business unit' },
   { value: 'Site', group: 'Contracts', label: 'Sites', single: 'site' },
@@ -51,6 +57,15 @@ export function ListsPage() {
   const [tab, setTab] = useState<Tab>('Category')
   const [editing, setEditing] = useState<Editing | null>(null)
   const lists = useQuery({ queryKey: ['lists'], queryFn: () => api.get<Lists>('/api/lists') })
+  const setTier = useMutation({
+    mutationFn: (x: { cat: Category; tierId: number | null }) => api.put(`/api/categories/${x.cat.id}/tier`, { tierId: x.tierId }),
+    onSuccess: (_, x) => {
+      queryClient.invalidateQueries({ queryKey: ['lists'] })
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+      toast.success(`Tier for ${x.cat.name} saved.`)
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "That didn't save. Try again."),
+  })
   const toggle = useMutation({
     mutationFn: (x: { item: ListItem | Category }) =>
       'listName' in x.item ? api.put(`/api/lists/items/${x.item.id}`, { isActive: !x.item.isActive }) : api.put(`/api/categories/${x.item.id}`, { isActive: !x.item.isActive }),
@@ -64,6 +79,24 @@ export function ListsPage() {
 
   if (!person.roles.admin) return <Alert tone="warning" title="Only admins can change the lists.">Ask your admin.</Alert>
   const current = tabs.find((t) => t.value === tab)!
+
+  // The supplier tier each spend category gives (D-108): a supplier's tier is the highest among its current contracts' categories.
+  const tiers = lists.data?.items.filter((i) => i.listName === 'SupplierTier' && i.isActive) ?? []
+  const tierPick = (cat: Category, parent: Category | null) => (
+    <Select
+      aria-label={`Supplier tier for ${cat.name}`}
+      className="h-9 min-h-9 w-44 text-sm"
+      value={cat.tierId ? String(cat.tierId) : ''}
+      onChange={(e) => setTier.mutate({ cat, tierId: e.target.value ? Number(e.target.value) : null })}
+    >
+      <option value="">{parent ? `Tier: as ${parent.name}` : 'Tier: none'}</option>
+      {tiers.map((t) => (
+        <option key={t.id} value={t.id}>
+          Tier: {t.value}
+        </option>
+      ))}
+    </Select>
+  )
 
   const rowActions = (item: ListItem | Category, name: string) => (
     <span className="flex shrink-0 gap-1">
@@ -155,7 +188,8 @@ export function ListsPage() {
                       <span className="font-medium">
                         {top.name} {!top.isActive && <Badge>Hidden</Badge>}
                       </span>
-                      <span className="flex flex-wrap gap-1">
+                      <span className="flex flex-wrap items-center gap-1">
+                        {tierPick(top, null)}
                         <Button variant="ghost" icon={<Plus aria-hidden className="size-4" />} onClick={() => setEditing({ kind: 'add', parent: top })}>
                           Subcategory
                         </Button>
@@ -170,7 +204,10 @@ export function ListsPage() {
                             <span>
                               {sub.name} {!sub.isActive && <Badge>Hidden</Badge>}
                             </span>
-                            {rowActions(sub, sub.name)}
+                            <span className="flex flex-wrap items-center gap-1">
+                              {tierPick(sub, top)}
+                              {rowActions(sub, sub.name)}
+                            </span>
                           </li>
                         ))}
                     </ul>

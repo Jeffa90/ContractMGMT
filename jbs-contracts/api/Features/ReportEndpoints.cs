@@ -414,6 +414,10 @@ public static class ReportEndpoints
                              OR (a.VariationId IS NOT NULL AND e.Action = N'variation.sent-for-approval' AND e.SubjectId = a.VariationId))
                          ORDER BY e.Id DESC) sent
             WHERE a.AtUtc >= @since AND {ContractAccess.VisibleSql("k")}
+              -- An approval undone by mistake (D-106) didn't happen, for this report: leave out the undo and the approval it undid.
+              AND a.Decision <> N'Undone'
+              AND NOT EXISTS (SELECT 1 FROM contracts.Approval u WHERE u.Decision = N'Undone' AND u.ContractId = a.ContractId AND a.VariationId IS NULL
+                              AND u.Id = (SELECT MIN(n.Id) FROM contracts.Approval n WHERE n.ContractId = a.ContractId AND n.VariationId IS NULL AND n.Id > a.Id))
             ORDER BY a.AtUtc DESC
             """, p)).ToList();
     }

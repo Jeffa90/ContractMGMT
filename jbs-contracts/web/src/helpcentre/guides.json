@@ -214,7 +214,8 @@
         "Open the link in the email, or **To approve** on Home, and choose the contract.",
         "Check the details, then open the signed copy and check it matches.",
         "Something not right? Click **Send back** and say what needs fixing. It goes back to the owner.",
-        "All good? Click **Approve and register**. The contract becomes Effective and is locked."
+        "All good? Click **Approve and register**, then confirm. It becomes Effective and locked, and you're back on Home.",
+        "Approved by mistake? Click **Undo** in the message, or **Undo approval** on the contract, within 24 hours."
       ]
     },
     {

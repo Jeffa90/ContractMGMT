@@ -213,6 +213,11 @@ const topics = {
           Open the signed copy and check it matches the details. If something isn't right, choose <strong>Send back</strong> and say what needs fixing; it goes back
           to Signing and the owner gets an email.
         </p>
+        <p>
+          <strong>Approve and register</strong> asks you to confirm, then takes you back to Home. <strong>Approved by mistake?</strong> Click{' '}
+          <strong>Undo</strong> in the message, or <strong>Undo approval</strong> on the contract, within 24 hours and before anything else happens to it. It
+          goes back to waiting for approval and the owner is emailed. After that, ask an admin.
+        </p>
         <p>You can't approve a contract you raised, own or are the backup for. Another approver can.</p>
       </>
     ),
@@ -244,7 +249,8 @@ const topics = {
         <p>Everything about one supplier in one place. Everyone can read it; people ticked Procurement (and admins) look after it.</p>
         <ul>
           <li>
-            <strong>Overview</strong>: who looks after the supplier (the relationship owner), its tier, its risk and why, when the next business review is due, and
+            <strong>Overview</strong>: who looks after the supplier (the relationship owner), its tier (automatically the highest tier among the categories
+            of its current contracts, set by admins on each category under Lists, unless Procurement chooses one), its risk and why, when the next business review is due, and
             its contacts.
           </li>
           <li>
@@ -400,6 +406,10 @@ const topics = {
         <p>
           See at a glance who has what on their plate, so you can help people focus. It's for admins, auditors and Group Heads, and it only shows: nothing is
           changed or sent from here. The daily reminders already email owners.
+        </p>
+        <p>
+          Find a person by name, show one <strong>role</strong> (contract owners, Legal or Procurement), <strong>sort</strong> by most overdue, most to do or
+          name, and tick <strong>Only people with work due</strong> to hide people with nothing outstanding.
         </p>
         <ul>
           <li>

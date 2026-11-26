@@ -190,7 +190,7 @@ public static class ContractEndpoints
             return Results.Ok(list.Select(r => ListView(r, values[r.Id].ToDictionary(v => v.Key, v => v.Value.Display))));
         });
 
-        contracts.MapGet("/{id:int}", async (int id, CurrentUser current, Db db) =>
+        contracts.MapGet("/{id:int}", async (int id, CurrentUser current, Db db, TimeProvider clock) =>
         {
             var (me, refusal) = await ApiResults.RequirePersonAsync(current, db);
             if (refusal is not null) return refusal;
@@ -220,6 +220,7 @@ public static class ContractEndpoints
                 hasSignedCopy = await c.ExecuteScalarAsync<bool>("SELECT CASE WHEN EXISTS (SELECT 1 FROM contracts.Document WHERE ContractId = @id AND Kind = N'SignedCopy' AND IsRemoved = 0) THEN 1 ELSE 0 END", new { id }),
                 missingRequired = row.Stage == "Draft" ? (await LegalEndpoints.MissingRequiredAsync(c, null, row, definitions)).Select(m => m.Label) : [],
                 legalPeople = me!.IsLegal ? await c.QueryAsync<IdName>("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 AND IsLegal = 1 ORDER BY Name") : [],
+                undoApprovalUntilUtc = await ApprovalEndpoints.UndoUntilAsync(c, null, me!, row, clock.GetUtcNow().UtcDateTime),
                 canEdit = ContractAccess.CanEdit(me!, row),
                 canWithdraw = ContractAccess.CanWithdraw(me!, row),
                 canUpload = DocumentEndpoints.CanUpload(me, row),

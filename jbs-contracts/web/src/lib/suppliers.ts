@@ -67,8 +67,13 @@ export type SupplierPageData = {
     isActive: boolean;
     relationshipOwnerId: number | null;
     relationshipOwnerName: string | null;
+    /** The tier set by hand; null: worked out from its contracts' categories (D-108). */
     tierId: number | null;
+    /** The tier that applies. */
     tierName: string | null;
+    /** The tier its contracts' categories give, if any. */
+    autoTierName: string | null;
+    tierSetByHand: boolean;
     /** Low, Medium, High, or L and the id of a level an admin added (D-98). */
     riskRating: string | null;
     /** What to show: Low, Medium, High or the added level's name. */

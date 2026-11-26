@@ -64,8 +64,8 @@ public static class TeamEndpoints
             await using var c = await db.OpenAsync();
             var p = ContractAccess.Params(me);
 
-            var people = (await c.QueryAsync<(int Id, string Name, bool IsContractOwner, bool IsLegal)>(
-                "SELECT Id, Name, IsContractOwner, IsLegal FROM contracts.Person WHERE IsActive = 1")).ToList();
+            var people = (await c.QueryAsync<(int Id, string Name, bool IsContractOwner, bool IsLegal, bool IsProcurement)>(
+                "SELECT Id, Name, IsContractOwner, IsLegal, IsProcurement FROM contracts.Person WHERE IsActive = 1")).ToList();
             var items = new List<Item>();
 
             // Effective contracts: what's coming up, and how many each person owns or backs up.
@@ -135,7 +135,7 @@ public static class TeamEndpoints
             var rows = people
                 .Select(person => new
                 {
-                    person.Id, person.Name, person.IsContractOwner, person.IsLegal,
+                    person.Id, person.Name, person.IsContractOwner, person.IsLegal, person.IsProcurement,
                     Overdue = Count(person.Id, What.Overdue),
                     ComingUp = Count(person.Id, What.ComingUp),
                     TheirTurn = byPerson[person.Id].Count(i => i.What is What.Draft or What.BackFromLegal or What.Signing or What.Variation),
@@ -163,8 +163,8 @@ public static class TeamEndpoints
                             };
                         }),
                 })
-                // Only people with something to show: contract owners, Legal, and anyone who still owns or has work.
-                .Where(r => r.IsContractOwner || r.IsLegal || r.Owns > 0 || r.BacksUp > 0 || r.Items.Any() || r.SupplierWork > 0)
+                // Only people with something to show: contract owners, Legal, Procurement, and anyone who still owns or has work.
+                .Where(r => r.IsContractOwner || r.IsLegal || r.IsProcurement || r.Owns > 0 || r.BacksUp > 0 || r.Items.Any() || r.SupplierWork > 0)
                 .OrderByDescending(r => r.Overdue).ThenByDescending(r => r.ComingUp + r.TheirTurn + r.LegalTurn + r.SupplierWork).ThenBy(r => r.Name)
                 .ToList();
 

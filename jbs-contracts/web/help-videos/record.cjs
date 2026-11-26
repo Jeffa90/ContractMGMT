@@ -253,7 +253,7 @@ const videos = {
       await s.click(p.getByRole('button', { name: 'Send for approval', exact: true }), 900)
       const d = p.getByRole('dialog')
       await s.step(3)
-      await s.upload(d.getByLabel(/Signed copy/), pdf('Uniform supply 2027 signed.pdf'), 1000)
+      await s.upload(d.getByRole('button', { name: 'Choose the signed copy' }), pdf('Uniform supply 2027 signed.pdf'), 1000)
       await s.fill(d.getByLabel(/Effective date/), '2026-12-01', 900)
       await s.step(4)
       await s.click(d.getByRole('button', { name: 'Send for approval' }), 2500)
@@ -274,7 +274,10 @@ const videos = {
       await s.point(p.getByRole('dialog').getByRole('textbox').first(), 1000)
       await s.click(p.getByRole('dialog').getByRole('button', { name: 'Cancel' }), 800)
       await s.step(4)
-      await s.click(p.getByRole('button', { name: 'Approve and register' }), 2500)
+      await s.click(p.getByRole('button', { name: 'Approve and register' }), 1200)
+      await s.click(p.getByRole('dialog').getByRole('button', { name: 'Approve and register' }), 1500)
+      await s.step(5)
+      await s.point(p.getByRole('button', { name: 'Undo' }), 2500)
     }),
 
   'renewal-decision': (b) =>

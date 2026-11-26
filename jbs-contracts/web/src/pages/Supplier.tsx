@@ -249,7 +249,7 @@ function RelationshipDialog({
         </Field>
         <Field
           label="Tier"
-          help="Admins change the tiers on the Lists page."
+          help="Automatic: the highest tier among the categories of its current contracts (admins set a tier on each category under Lists). Or choose one."
           error={errors.tierId}
         >
           {(p) => (
@@ -258,7 +258,9 @@ function RelationshipDialog({
               value={form.tierId}
               onChange={(e) => setForm({ ...form, tierId: e.target.value })}
             >
-              <option value="">Not set</option>
+              <option value="">
+                Automatic{s.autoTierName ? `: ${s.autoTierName}` : " (none yet)"}
+              </option>
               {tiers.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.value}
@@ -449,7 +451,14 @@ function Overview({ data }: { data: SupplierPageData }) {
             )}
           </DetailRow>
           <DetailRow label="Tier">
-            {s.tierName ?? (
+            {s.tierName ? (
+              <span>
+                {s.tierName}{" "}
+                <span className="text-sm text-muted-foreground">
+                  {s.tierSetByHand ? "(set by hand)" : "(from its contracts' categories)"}
+                </span>
+              </span>
+            ) : (
               <span className="text-muted-foreground">Not set</span>
             )}
           </DetailRow>

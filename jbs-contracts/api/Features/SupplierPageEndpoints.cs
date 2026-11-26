@@ -32,8 +32,11 @@ public static class SupplierPageEndpoints
         public bool IsActive { get; set; }
         public int? RelationshipOwnerId { get; set; }
         public string? RelationshipOwnerName { get; set; }
+        /// <summary>The tier set by hand, or null: worked out from its contracts' categories (D-108).</summary>
         public int? TierId { get; set; }
+        /// <summary>The tier that applies: set by hand, else from its contracts' categories.</summary>
         public string? TierName { get; set; }
+        public string? AutoTierName { get; set; }
         public string? RiskRating { get; set; }
         /// <summary>Low, Medium, High, or the name of a level an admin added (D-98).</summary>
         public string? RiskName { get; set; }
@@ -42,12 +45,26 @@ public static class SupplierPageEndpoints
         public byte[] RowVersion { get; set; } = [];
     }
 
+    /// <summary>
+    /// The tier from a supplier's contracts (alias s; gives AutoTierId and AutoTierName, D-108): the highest tier (nearest the top of
+    /// the Supplier tiers list) among the categories of its current contracts. A subcategory without a tier follows its category.
+    /// </summary>
+    public const string AutoTier = """
+        OUTER APPLY (SELECT TOP (1) atl.Id AS AutoTierId, atl.Value AS AutoTierName
+                     FROM contracts.Contract ak JOIN contracts.Category akc ON akc.Id = ak.CategoryId LEFT JOIN contracts.Category akp ON akp.Id = akc.ParentId
+                     JOIN contracts.ListItem atl ON atl.Id = ISNULL(akc.TierId, akp.TierId)
+                     WHERE ak.SupplierId = s.Id AND ak.Stage NOT IN (N'Withdrawn', N'Ended', N'Archived') AND atl.IsActive = 1
+                     ORDER BY atl.SortOrder, atl.Id) auto
+        """;
+
     private static Task<SupplierInfo?> LoadAsync(SqlConnection c, SqlTransaction? tx, int id, bool forUpdate = false) =>
         c.QuerySingleOrDefaultAsync<SupplierInfo>($"""
-            SELECT s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, ro.Name AS RelationshipOwnerName, s.TierId, t.Value AS TierName,
+            SELECT s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, ro.Name AS RelationshipOwnerName, s.TierId,
+                   ISNULL(t.Value, auto.AutoTierName) AS TierName, auto.AutoTierName,
                    s.RiskRating, COALESCE(rk.Value, s.RiskRating) AS RiskName, s.RiskReason, s.NextReviewDue, s.RowVersion
             FROM contracts.Supplier s {(forUpdate ? "WITH (UPDLOCK, HOLDLOCK)" : "")}
             LEFT JOIN contracts.Person ro ON ro.Id = s.RelationshipOwnerId LEFT JOIN contracts.ListItem t ON t.Id = s.TierId
+            {AutoTier}
             LEFT JOIN contracts.ListItem rk ON rk.ListName = N'SupplierRisk' AND s.RiskRating = N'L' + CAST(rk.Id AS NVARCHAR(10))
             WHERE s.Id = @id
             """, new { id }, tx);
@@ -208,7 +225,8 @@ public static class SupplierPageEndpoints
             {
                 supplier = new
                 {
-                    s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, s.RelationshipOwnerName, s.TierId, s.TierName, s.RiskRating, s.RiskName, s.RiskReason,
+                    s.Id, s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, s.RelationshipOwnerId, s.RelationshipOwnerName, s.TierId, s.TierName, s.AutoTierName,
+                    TierSetByHand = s.TierId is not null, s.RiskRating, s.RiskName, s.RiskReason,
                     NextReviewDue = D(s.NextReviewDue), RowVersion = Convert.ToBase64String(s.RowVersion),
                 },
                 can = new { manage = canManage, review = canReview },
@@ -271,7 +289,8 @@ public static class SupplierPageEndpoints
             var after = await LoadAsync(c, tx, id);
             var changes = new List<string>();
             if (before.RelationshipOwnerName != after!.RelationshipOwnerName) changes.Add($"relationship owner to {after.RelationshipOwnerName ?? "nobody"}");
-            if (before.TierName != after.TierName) changes.Add($"tier to {after.TierName ?? "none"}");
+            if (before.TierId != after.TierId)
+                changes.Add(after.TierId is null ? $"tier to automatic, from its contracts ({after.AutoTierName ?? "none yet"})" : $"tier to {after.TierName}");
             if (before.RiskRating != after.RiskRating || before.RiskReason != after.RiskReason) changes.Add($"risk to {after.RiskName ?? "not rated"}{(after.RiskReason is { } r ? $" (\"{r}\")" : "")}");
             if (before.NextReviewDue != after.NextReviewDue) changes.Add($"next business review due to {(after.NextReviewDue is { } n ? Day(n) : "not set")}");
             if (changes.Count > 0)

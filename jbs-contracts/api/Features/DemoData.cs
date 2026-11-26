@@ -148,6 +148,12 @@ public static class DemoData
             waste = await CategoryAsync("Waste", facilities);
             it = await CategoryAsync("IT services", null);
             peopleServices = await CategoryAsync("People services", null);
+            // Supplier tiers from spend categories (D-108): suppliers get the highest tier among their contracts' categories.
+            foreach (var (category, tierName) in new[] { (freight, "Strategic"), (packaging, "Preferred"), (it, "Preferred"), (facilities, "Approved"), (peopleServices, "Transactional") })
+                await c.ExecuteAsync("""
+                    UPDATE contracts.Category SET TierId = (SELECT TOP (1) Id FROM contracts.ListItem WHERE ListName = N'SupplierTier' AND ValueKey = UPPER(@tierName) AND IsActive = 1)
+                    WHERE Id = @category AND TierId IS NULL
+                    """, new { category, tierName }, tx);
             services = await ItemAsync("AgreementType", "Services agreement");
             supply = await ItemAsync("AgreementType", "Supply agreement");
             beef = await ItemAsync("BusinessUnit", "Beef");
@@ -461,7 +467,8 @@ public static class DemoData
             {
                 var risk = i switch { 1 => "High", 4 => "Medium", _ => "Low" };
                 var reason = risk switch { "High" => "Single cold storage provider for the North plant; no backup site.", "Medium" => "Key systems depend on them; contract up for tender next year.", _ => null };
-                var p = new DynamicParameters(new { id = order[i], tierId = await tier(tiers[i]), risk, reason });
+                // Tiers come from their contracts' categories (D-108); one is set by hand, to show both.
+                var p = new DynamicParameters(new { id = order[i], tierId = i == 6 ? await tier(tiers[i]) : null, risk, reason });
                 p.Add("next", i < looking.Count ? D(20 + i * 5) : (DateTime?)null, System.Data.DbType.Date);
                 await c.ExecuteAsync("""
                     UPDATE contracts.Supplier SET TierId = @tierId, RiskRating = @risk, RiskReason = @reason, NextReviewDue = @next, RelationshipOwnerId = NULL, IsDemo = 1 WHERE Id = @id

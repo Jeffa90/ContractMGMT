@@ -301,4 +301,49 @@ public sealed class SupplierTests(AppFixture app)
         Assert.Contains("4 out of 5", text);
         Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"/api/suppliers/{elsewhere}/reviews/{reviewId}/document", Ct)).StatusCode);
     }
+
+    [Fact]
+    public async Task A_suppliers_tier_comes_from_its_contracts_categories_unless_set_by_hand()
+    {
+        using var admin = app.ClientFor(AppFixture.AdminAccount);
+        var (procurement, _, _) = await PersonAsync("Tia Tier", Roles(owner: true, procurement: true));
+        var lists = await GetAsync(admin, "/api/lists");
+        int Tier(string name) => lists.GetProperty("items").EnumerateArray().First(x => x.GetProperty("listName").GetString() == "SupplierTier" && x.GetProperty("value").GetString() == name).GetProperty("id").GetInt32();
+        var u = Unique("t");
+        var approvedCat = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Cleaning {u}" }, Ct))).GetProperty("id").GetInt32();
+        var strategicCat = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = $"Freight {u}" }, Ct))).GetProperty("id").GetInt32();
+        var sub = (await ReadAsync(await admin.PostAsJsonAsync("/api/categories", new { name = "Linehaul", parentId = strategicCat }, Ct))).GetProperty("id").GetInt32();
+
+        // Only admins set a category's tier.
+        Assert.Equal(HttpStatusCode.Forbidden, (await procurement.PutAsJsonAsync($"/api/categories/{approvedCat}/tier", new { tierId = Tier("Approved") }, Ct)).StatusCode);
+        await ReadAsync(await admin.PutAsJsonAsync($"/api/categories/{approvedCat}/tier", new { tierId = Tier("Approved") }, Ct));
+        await ReadAsync(await admin.PutAsJsonAsync($"/api/categories/{strategicCat}/tier", new { tierId = Tier("Strategic") }, Ct));
+
+        var sid = (await ReadAsync(await procurement.PostAsJsonAsync("/api/suppliers", new { name = Unique("Tiered ") }, Ct))).GetProperty("id").GetInt32();
+        async Task<JsonElement> Supplier() => (await GetAsync(procurement, $"/api/suppliers/{sid}")).GetProperty("supplier");
+        Assert.Equal(JsonValueKind.Null, (await Supplier()).GetProperty("tierName").ValueKind);
+
+        // A contract in Cleaning gives Approved; one in Freight > Linehaul (following Freight) gives Strategic, the higher.
+        await ReadAsync(await procurement.PostAsJsonAsync("/api/contracts", new { title = "Office cleaning", supplierId = sid, categoryId = approvedCat }, Ct));
+        Assert.Equal("Approved", (await Supplier()).GetProperty("tierName").GetString());
+        var freight = (await ReadAsync(await procurement.PostAsJsonAsync("/api/contracts", new { title = "Linehaul", supplierId = sid, categoryId = sub }, Ct))).GetProperty("id").GetInt32();
+        var s = await Supplier();
+        Assert.Equal("Strategic", s.GetProperty("tierName").GetString());
+        Assert.False(s.GetProperty("tierSetByHand").GetBoolean());
+
+        // Withdrawn contracts don't count.
+        var row = (await GetAsync(procurement, $"/api/contracts/{freight}")).GetProperty("contract").GetProperty("rowVersion").GetString();
+        await ReadAsync(await procurement.PostAsJsonAsync($"/api/contracts/{freight}/withdraw", new { reason = "Not going ahead", rowVersion = row }, Ct));
+        Assert.Equal("Approved", (await Supplier()).GetProperty("tierName").GetString());
+
+        // Procurement can set one by hand, and go back to automatic.
+        s = await Supplier();
+        await ReadAsync(await procurement.PutAsJsonAsync($"/api/suppliers/{sid}/relationship", new { tierId = Tier("Transactional"), riskRating = "Low", rowVersion = s.GetProperty("rowVersion").GetString() }, Ct));
+        s = await Supplier();
+        Assert.Equal("Transactional", s.GetProperty("tierName").GetString());
+        Assert.True(s.GetProperty("tierSetByHand").GetBoolean());
+        Assert.Equal("Approved", s.GetProperty("autoTierName").GetString());
+        await ReadAsync(await procurement.PutAsJsonAsync($"/api/suppliers/{sid}/relationship", new { tierId = (int?)null, riskRating = "Low", rowVersion = s.GetProperty("rowVersion").GetString() }, Ct));
+        Assert.Equal("Approved", (await Supplier()).GetProperty("tierName").GetString());
+    }
 }

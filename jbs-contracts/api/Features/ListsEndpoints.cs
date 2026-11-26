@@ -19,7 +19,11 @@ public sealed class CategoryRow
     public string Name { get; set; } = "";
     public int SortOrder { get; set; }
     public bool IsActive { get; set; }
+    /// <summary>The supplier tier this spend category gives (D-108); a subcategory without one follows its category.</summary>
+    public int? TierId { get; set; }
 }
+
+public sealed record CategoryTier(int? TierId);
 
 public sealed record SaveListItem(string? ListName, string? Value, bool? IsActive);
 public sealed record SaveCategory(string? Name, int? ParentId, bool? IsActive);
@@ -50,7 +54,7 @@ public static class ListsEndpoints
             if (refusal is not null) return refusal;
             await using var c = await db.OpenAsync();
             var items = await c.QueryAsync<ListItemRow>("SELECT * FROM contracts.ListItem ORDER BY ListName, SortOrder, Value");
-            var categories = await c.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive FROM contracts.Category ORDER BY SortOrder, Name");
+            var categories = await c.QueryAsync<CategoryRow>("SELECT Id, ParentId, Name, SortOrder, IsActive, TierId FROM contracts.Category ORDER BY SortOrder, Name");
             var owners = await c.QueryAsync<IdName>("SELECT Id, Name FROM contracts.Person WHERE IsActive = 1 AND IsContractOwner = 1 ORDER BY Name");
             return Results.Ok(new { items, categories, owners });
         });
@@ -151,6 +155,33 @@ public static class ListsEndpoints
                 : !before.IsActive && active ? $"{me!.Name} showed the category {name} again."
                 : $"{me!.Name} renamed the category {before.Name} to {name}.";
             await audit.WriteAsync(c, tx, me.AsActor(), "category.changed", "Category", id, summary, new { before = new { before.Name, before.IsActive }, after = new { name, active } });
+            await tx.CommitAsync();
+            return Results.Ok(new { id });
+        });
+
+        // Set or clear the supplier tier a category gives (D-108).
+        app.MapPut("/api/categories/{id:int}/tier", async (int id, CategoryTier body, CurrentUser current, Db db, AuditLog audit) =>
+        {
+            var (me, refusal) = await RequireAdminAsync(current, db);
+            if (refusal is not null) return refusal;
+            await using var c = await db.OpenAsync();
+            await using var tx = await Db.BeginWriteAsync(c);
+            var before = await c.QuerySingleOrDefaultAsync<(string Name, int? TierId, string? TierName)>("""
+                SELECT k.Name, k.TierId, t.Value FROM contracts.Category k WITH (UPDLOCK) LEFT JOIN contracts.ListItem t ON t.Id = k.TierId WHERE k.Id = @id
+                """, new { id }, tx);
+            if (before == default) return ApiResults.NotFound("We couldn't find that category.");
+            string? tierName = null;
+            if (body.TierId is { } tierId)
+            {
+                tierName = await c.ExecuteScalarAsync<string?>("SELECT Value FROM contracts.ListItem WHERE Id = @tierId AND ListName = N'SupplierTier' AND IsActive = 1", new { tierId }, tx);
+                if (tierName is null) return ApiResults.Invalid("Choose a tier from the list.", new() { ["tierId"] = "Choose a supplier tier from the list." });
+            }
+            if (before.TierId == body.TierId) return Results.Ok(new { id });
+            await c.ExecuteAsync("UPDATE contracts.Category SET TierId = @tierId WHERE Id = @id", new { tierId = body.TierId, id }, tx);
+            await audit.WriteAsync(c, tx, me!.AsActor(), "category.tier", "Category", id,
+                tierName is null ? $"{me.Name} cleared the supplier tier of the category {before.Name} (was {before.TierName})."
+                    : $"{me.Name} set the supplier tier of the category {before.Name} to {tierName}{(before.TierName is { } was ? $" (was {was})" : "")}.",
+                new { before = before.TierId, after = body.TierId });
             await tx.CommitAsync();
             return Results.Ok(new { id });
         });

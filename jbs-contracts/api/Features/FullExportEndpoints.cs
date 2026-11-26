@@ -209,7 +209,7 @@ public static class FullExportEndpoints
             sheets.Add(new("Approvals", [C("Reference", 16), C("Variation", 12), C("Decision", 12), C("By", 22), C("As backup for", 22), C("When", 18), C("Reason", 50)],
                 approvals.Select(a => new object?[]
                 {
-                    (string)a.Reference, a.VariationNumber is int n ? $"Variation {n}" : null, (string)a.Decision == "Approved" ? "Approved" : "Sent back",
+                    (string)a.Reference, a.VariationNumber is int n ? $"Variation {n}" : null, (string)a.Decision switch { "Approved" => "Approved", "Undone" => "Approval undone", _ => "Sent back" },
                     (string)a.ByName, (string?)a.AsBackupForName, L((DateTime)a.AtUtc), (string?)a.Reason,
                 }).ToList()));
 
@@ -245,11 +245,12 @@ public static class FullExportEndpoints
                 }).ToList()));
 
             // 7. Suppliers, people and lists.
-            var suppliers = await c.QueryAsync("""
-                SELECT s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, ro.Name AS RelationshipOwner, t.Value AS Tier, COALESCE(rk.Value, s.RiskRating) AS RiskRating, s.RiskReason, s.NextReviewDue,
+            var suppliers = await c.QueryAsync($"""
+                SELECT s.Name, s.Abn, s.VendorNumber, s.Notes, s.IsActive, ro.Name AS RelationshipOwner, ISNULL(t.Value, auto.AutoTierName) AS Tier, COALESCE(rk.Value, s.RiskRating) AS RiskRating, s.RiskReason, s.NextReviewDue,
                        (SELECT COUNT(*) FROM contracts.Contract k WHERE k.SupplierId = s.Id) AS Contracts
                 FROM contracts.Supplier s LEFT JOIN contracts.Person ro ON ro.Id = s.RelationshipOwnerId LEFT JOIN contracts.ListItem t ON t.Id = s.TierId
                 LEFT JOIN contracts.ListItem rk ON rk.ListName = N'SupplierRisk' AND s.RiskRating = N'L' + CAST(rk.Id AS NVARCHAR(10))
+                {SupplierPageEndpoints.AutoTier}
                 ORDER BY s.Name
                 """);
             sheets.Add(new("Suppliers",

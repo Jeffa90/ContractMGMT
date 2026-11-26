@@ -1,17 +1,21 @@
 // The Team page (D-85): who has what coming up and outstanding, so a lead can see where people need to focus.
 // For admins, auditors and Group Heads. It only shows; the daily reminders already email owners.
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, UsersRound } from "lucide-react";
+import { ChevronDown, Search, UsersRound } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
+import { Select } from "@/components/form";
 import { PageHeader } from "@/components/Help";
 import {
   Alert,
   Avatar,
   Card,
+  Checkbox,
   EmptyState,
+  Field,
   Segmented,
   Skeleton,
+  TextInput,
 } from "@/components/ui";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -51,6 +55,7 @@ type Person = {
   name: string;
   isContractOwner: boolean;
   isLegal: boolean;
+  isProcurement: boolean;
   overdue: number;
   comingUp: number;
   theirTurn: number;
@@ -87,6 +92,27 @@ const n = (count: number, one: string, many = `${one}s`) =>
 const dayCount = (d: number) => (d === 1 ? "1 day" : `${d} days`);
 const ago = (d: number) => (d === 0 ? "today" : `${dayCount(d)} ago`);
 const waiting = (d: number) => (d === 0 ? "since today" : `for ${dayCount(d)}`);
+
+// Sorting and filters (Jeff's feedback, D-107), kept in the address so Back returns to the same view.
+type Sort = "overdue" | "todo" | "name";
+type Role = "" | "owner" | "legal" | "procurement";
+const toDo = (p: Person) => p.overdue + p.comingUp + p.theirTurn + p.legalTurn + p.supplierWork;
+
+function shown(people: Person[], q: string, role: Role, sort: Sort, onlyDue: boolean): Person[] {
+  const text = q.trim().toLowerCase();
+  const list = people.filter(
+    (p) =>
+      (!text || p.name.toLowerCase().includes(text)) &&
+      (role === "" ||
+        (role === "owner" && p.isContractOwner) ||
+        (role === "legal" && p.isLegal) ||
+        (role === "procurement" && p.isProcurement)) &&
+      (!onlyDue || toDo(p) > 0),
+  );
+  if (sort === "name") return [...list].sort((a, b) => a.name.localeCompare(b.name));
+  if (sort === "todo") return [...list].sort((a, b) => toDo(b) - toDo(a) || a.name.localeCompare(b.name));
+  return list; // the server's order: most overdue first, then most to do
+}
 
 const groups: { title: string; whats: What[] }[] = [
   { title: "Overdue: no decision and the date has passed", whats: ["Overdue"] },
@@ -154,7 +180,7 @@ function Pill({
 function PersonCard({ p }: { p: Person }) {
   const [open, setOpen] = useState(false);
   const nothing = p.items.length === 0 && p.supplierWork === 0;
-  const roles = [p.isContractOwner && "Contract owner", p.isLegal && "Legal"]
+  const roles = [p.isContractOwner && "Contract owner", p.isLegal && "Legal", p.isProcurement && "Procurement"]
     .filter(Boolean)
     .join(" · ");
   return (
@@ -315,6 +341,20 @@ export function TeamPage() {
     : "90";
   const allowed =
     person.roles.admin || person.roles.auditor || person.roles.groupHead;
+  const q = params.get("q") ?? "";
+  const role = (["owner", "legal", "procurement"].includes(params.get("role") ?? "") ? params.get("role") : "") as Role;
+  const sort = (["todo", "name"].includes(params.get("sort") ?? "") ? params.get("sort") : "overdue") as Sort;
+  const onlyDue = params.get("due") === "1";
+  const setParam = (key: string, value: string) =>
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
   const data = useQuery({
     queryKey: ["team", days],
     queryFn: () => api.get<Data>(`/api/team?days=${days}`),
@@ -421,13 +461,57 @@ export function TeamPage() {
               </p>
             </Card>
           </div>
-          <Card>
-            <ul className="divide-y divide-border">
-              {data.data.people.map((p) => (
-                <PersonCard key={p.id} p={p} />
-              ))}
-            </ul>
-          </Card>
+          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
+            <Field label="Find a person">
+              {(p) => (
+                <div className="relative md:w-64">
+                  <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <TextInput {...p} type="search" className="pl-9" value={q} onChange={(e) => setParam("q", e.target.value)} />
+                </div>
+              )}
+            </Field>
+            <Field label="Role">
+              {(p) => (
+                <Select {...p} className="md:w-48" value={role} onChange={(e) => setParam("role", e.target.value)}>
+                  <option value="">Everyone</option>
+                  <option value="owner">Contract owners</option>
+                  <option value="legal">Legal</option>
+                  <option value="procurement">Procurement</option>
+                </Select>
+              )}
+            </Field>
+            <Field label="Sort by">
+              {(p) => (
+                <Select {...p} className="md:w-48" value={sort} onChange={(e) => setParam("sort", e.target.value === "overdue" ? "" : e.target.value)}>
+                  <option value="overdue">Most overdue first</option>
+                  <option value="todo">Most to do</option>
+                  <option value="name">Name, A to Z</option>
+                </Select>
+              )}
+            </Field>
+            <div className="md:pb-2">
+              <Checkbox label="Only people with work due" checked={onlyDue} onChange={(v) => setParam("due", v ? "1" : "")} />
+            </div>
+          </div>
+          {(() => {
+            const list = shown(data.data.people, q, role, sort, onlyDue);
+            return list.length === 0 ? (
+              <Card>
+                <EmptyState icon={<Search />} title="Nobody matches. Try other filters." />
+              </Card>
+            ) : (
+              <Card>
+                <p className="border-b border-border px-4 py-2 text-sm text-muted-foreground" aria-live="polite">
+                  {n(list.length, "person", "people")}
+                </p>
+                <ul className="divide-y divide-border">
+                  {list.map((p) => (
+                    <PersonCard key={p.id} p={p} />
+                  ))}
+                </ul>
+              </Card>
+            );
+          })()}
         </>
       )}
     </>

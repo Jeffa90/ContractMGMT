@@ -1,5 +1,5 @@
 // Contract actions (Send to Legal, approve, ...): post with the page's row version, then refresh what shows the contract.
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, ApiError } from './api'
 import type { ContractDetail } from './contracts'
@@ -17,6 +17,27 @@ export function useAction(data: ContractDetail, onDone?: () => void) {
       toast.success(v.success)
       onDone?.()
     },
+  })
+}
+
+/** Undoes the person's own approval (D-106): back to waiting for approval. */
+export async function undoApproval(queryClient: QueryClient, contractId: number, rowVersion: string) {
+  try {
+    await api.post(`/api/contracts/${contractId}/approval/undo`, { rowVersion })
+    void queryClient.invalidateQueries({ queryKey: ['contract', contractId] })
+    void queryClient.invalidateQueries({ queryKey: ['contracts'] })
+    toast.success("Approval undone. It's waiting for approval again.")
+  } catch (e) {
+    toast.error(errorText(e))
+  }
+}
+
+/** The message after approving, with Undo for when it was a mistake (D-106). */
+export function toastApproved(queryClient: QueryClient, contract: { id: number; reference: string }, rowVersion: string) {
+  toast.success(`${contract.reference} is approved and Effective.`, {
+    duration: 20_000,
+    description: 'Approved by mistake? Undo it here, or on the contract for 24 hours.',
+    action: { label: 'Undo', onClick: () => void undoApproval(queryClient, contract.id, rowVersion) },
   })
 }
 

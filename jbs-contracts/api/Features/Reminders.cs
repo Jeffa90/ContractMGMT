@@ -30,6 +30,7 @@ public static partial class EmailWording
         new("LegalCleared", "Cleared by Legal", "Legal review", "To the owner and backup when Legal clears it.", [.. ContractFields, "Legal person", "Outcome"]),
         new("ApprovalWaiting", "Waiting for approval", "Approval", "To the Group Head when a contract is sent for approval.", [.. ContractFields, "Sent by", "Effective date"]),
         new("Approved", "Approved and Effective", "Approval", "To the owner and backup when it's approved.", [.. ContractFields, "Approver"]),
+        new("ApprovalUndone", "Approval undone", "Approval", "To the owner and backup when the approver undoes an approval made by mistake.", [.. ContractFields, "Approver"]),
         new("ApprovalSentBack", "Sent back from approval", "Approval", "To the owner and backup when an approver sends it back.", [.. ContractFields, "Approver", "Reason"]),
         new("HandedOver", "Contract handed over to you", "Variations and hand-overs", "To the new owner or backup when a contract owner hands a contract over.", [.. ContractFields, "Handed over by", "Role"]),
         new("VariationCleared", "Variation cleared by Legal", "Variations and hand-overs", "To the owner and backup when Legal clears a Variation.", [.. ContractFields, "Variation", "Legal person", "Outcome"]),

@@ -18,6 +18,7 @@ import { documentKinds, journey, uploadDocument, withAddedKinds, type Contract, 
 import { daysUntil, formatBytes, formatDate, formatDateTime, formatMoney, timeAgo } from '@/lib/format'
 import { arrange, type Layout, type LayoutField } from '@/lib/layout'
 import { useMe } from '@/lib/me'
+import { undoApproval } from '@/lib/actions'
 import { help } from '@/help'
 
 function Tracker({ c }: { c: Contract }) {
@@ -189,6 +190,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
       </header>
 
       <UnlockBanner data={data} />
+      {data.undoApprovalUntilUtc && <UndoApproval data={data} until={data.undoApprovalUntilUtc} />}
       {c.stage === 'Withdrawn' && <Alert tone="info" title="This contract was withdrawn.">{c.withdrawnReason}</Alert>}
       {data.sentBack && (
         <Alert tone="warning" title={`${data.sentBack.byName} sent it back from approval, ${formatDateTime(data.sentBack.atUtc)}`}>
@@ -466,5 +468,28 @@ function WithdrawDialog({ c, onClose }: { c: Contract; onClose: () => void }) {
         {(p) => <Textarea {...p} autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="For example: the supplier pulled out" />}
       </Field>
     </Dialog>
+  )
+}
+
+/** For the approver who approved it, for 24 hours and before anything else happens to it (D-106). */
+function UndoApproval({ data, until }: { data: ContractDetail; until: string }) {
+  const queryClient = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  return (
+    <Alert tone="info" title="You approved this. Approved by mistake?">
+      <div className="flex flex-col items-start gap-2">
+        <p>You can undo your approval until {formatDateTime(until)}, as long as nothing else happens to it first. It goes back to waiting for approval.</p>
+        <Button
+          loading={busy}
+          onClick={async () => {
+            setBusy(true)
+            await undoApproval(queryClient, data.contract.id, data.contract.rowVersion)
+            setBusy(false)
+          }}
+        >
+          Undo approval
+        </Button>
+      </div>
+    </Alert>
   )
 }

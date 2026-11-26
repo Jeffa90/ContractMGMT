@@ -17,7 +17,15 @@ export type ListItem = {
   sortOrder: number
   isActive: boolean
 }
-export type Category = { id: number; parentId: number | null; name: string; sortOrder: number; isActive: boolean }
+export type Category = {
+  id: number
+  parentId: number | null
+  name: string
+  sortOrder: number
+  isActive: boolean
+  /** The supplier tier this spend category gives (D-108); a subcategory without one follows its category. */
+  tierId: number | null
+}
 export type Lists = { items: ListItem[]; categories: Category[]; owners: { id: number; name: string }[] }
 
 export type Supplier = {
@@ -186,7 +194,7 @@ export type ContractAction =
   | 'closeUnlock'
   | 'startVariation'
 
-export type ApprovalDecision = { decision: 'Approved' | 'SentBack'; byName: string; asBackupForName: string | null; atUtc: string; reason: string | null }
+export type ApprovalDecision = { decision: 'Approved' | 'SentBack' | 'Undone'; byName: string; asBackupForName: string | null; atUtc: string; reason: string | null }
 
 export type ContractDetail = {
   contract: Contract
@@ -210,6 +218,8 @@ export type ContractDetail = {
   sentBack: ApprovalDecision | null
   /** For an approver who raised, owns or backs up this contract. */
   cannotApproveReason: string | null
+  /** The approver who approved it can undo that until then (D-106): within 24 hours, before anything else happens. */
+  undoApprovalUntilUtc: string | null
   hasSignedCopy: boolean
   /** Required fields still empty (Draft only): checked when it is sent on. */
   missingRequired: string[]

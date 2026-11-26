@@ -41,8 +41,15 @@ public sealed class FeedbackTests(AppFixture app)
         Assert.Equal("Other", item.GetProperty("kind").GetString());
         Assert.Equal("Open", item.GetProperty("status").GetString());
         Assert.False(mine.GetProperty("canSeeAll").GetBoolean());
+        // Every admin is emailed (other tests add admins at the same time, so count them as they were when it was sent: at least the first admin).
         await using (var db = await app.OpenAsync())
-            Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.EmailOutbox WHERE Kind = N'feedback-new' AND DedupeKey LIKE @key", new { key = $"feedback-new:{id}:%" }));
+        {
+            var emailed = await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.EmailOutbox WHERE Kind = N'feedback-new' AND DedupeKey LIKE @key", new { key = $"feedback-new:{id}:%" });
+            var admins = await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.Person WHERE IsAdmin = 1 AND IsActive = 1");
+            Assert.InRange(emailed, 1, admins);
+            Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.EmailOutbox e JOIN contracts.Person p ON p.Id = e.PersonId WHERE e.Kind = N'feedback-new' AND e.DedupeKey LIKE @key AND p.WindowsAccount = @admin",
+                new { key = $"feedback-new:{id}:%", admin = AppFixture.AdminAccount }));
+        }
 
         // Someone else can't see, reply to, change or archive it; asking for everyone's just gives their own.
         Assert.DoesNotContain((await ReadAsync(await other.GetAsync("/api/feedback?all=true", Ct))).GetProperty("items").EnumerateArray(), i => i.GetProperty("id").GetInt32() == id);

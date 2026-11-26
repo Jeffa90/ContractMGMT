@@ -336,7 +336,7 @@ const topics = {
             JBSAUS0000123) as its number here, and new contracts carry on after the highest. Importing the same file again skips the ones already there.
           </li>
           <li>
-            <strong>Files</strong>: put the files in ZIPs (up to 25 MB each) with the old reference in each file's name or folder. One ZIP can mix signed
+            <strong>Files</strong>: put the files in ZIPs (up to 25 MB each) with the old reference in each file's name or folder, or in the ZIP's own name (Medius exports one ZIP per contract, named with its number). One ZIP can mix signed
             copies, drafts, variations, cover pages and other files: words like <em>signed</em>, <em>executed</em>, <em>draft</em>, <em>variation</em>,{' '}
             <em>amendment</em>, <em>cover page</em> or <em>sign off</em> in a folder or file name say what it is, and the rest get the kind you choose. Check the
             list, change any that are wrong (one at a time, or every file of a kind at once), then add them. A file already on its contract is skipped.

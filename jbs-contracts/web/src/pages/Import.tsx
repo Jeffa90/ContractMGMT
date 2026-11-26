@@ -1068,7 +1068,8 @@ function FilesStep() {
           <p className="text-sm text-muted-foreground">
             Each file is matched to a contract by the old reference (or JBSAUS
             reference) in its name or folder, for example MED-1042 Signed.pdf or
-            MED-1042/agreement.pdf. One ZIP can mix signed copies, drafts,
+            MED-1042/agreement.pdf, or else in the ZIP's own name (Medius's
+            one ZIP per contract, for example JBSAUS0000300_Supply_agreement.zip). One ZIP can mix signed copies, drafts,
             variations, cover pages and other files: what each one is comes from
             words in its folder or name, and you can change any of them before
             adding. Up to 25 MB per ZIP: use several ZIPs for more. A file

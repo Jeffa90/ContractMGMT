@@ -899,8 +899,11 @@ public static class LegacyImportEndpoints
         internal ZipArchiveEntry? Entry { get; set; }
     }
 
-    /// <summary>The ZIP, the kind for files whose kind can't be worked out, and the admin's own choices (file path to kind).</summary>
-    private sealed record ZipUpload(ZipArchive Zip, string DefaultKind, Dictionary<string, string> Chosen) : IDisposable
+    /// <summary>
+    /// The ZIP, the kind for files whose kind can't be worked out, the admin's own choices (file path to kind), and the ZIP's own name
+    /// (Medius exports one ZIP per contract, named with its number, D-123).
+    /// </summary>
+    private sealed record ZipUpload(ZipArchive Zip, string DefaultKind, Dictionary<string, string> Chosen, string ZipName = "") : IDisposable
     {
         public void Dispose() => Zip.Dispose();
     }
@@ -925,7 +928,7 @@ public static class LegacyImportEndpoints
         var memory = new MemoryStream();
         await file.CopyToAsync(memory);
         memory.Position = 0;
-        try { return (new ZipUpload(new ZipArchive(memory, ZipArchiveMode.Read), kind, chosen), null); }
+        try { return (new ZipUpload(new ZipArchive(memory, ZipArchiveMode.Read), kind, chosen, System.IO.Path.GetFileNameWithoutExtension(file.FileName)), null); }
         catch (InvalidDataException) { return (null, "That file isn't a ZIP that can be opened."); }
     }
 
@@ -1020,9 +1023,12 @@ public static class LegacyImportEndpoints
             if (entry.Length > DocumentEndpoints.MaxBytes) { f.Outcome = "Refused"; f.Reason = "Over 25 MB."; continue; }
             if (unpacked > MaxUnpacked) { f.Outcome = "Refused"; f.Reason = "The ZIP unpacks to more than 1 GB; split it."; continue; }
 
+            // A reference in the file's own name or folders, else in the ZIP's name (Medius: one ZIP per contract, D-123).
             var path = entry.FullName.ToUpperInvariant();
+            var zipName = upload.ZipName.ToUpperInvariant();
             var match = keys.FirstOrDefault(k => Contains(path, k.Key));
-            if (match.Key is null) { f.Outcome = "Unmatched"; f.Reason = "No old or JBSAUS reference found in its name or folders."; continue; }
+            if (match.Key is null && zipName.Length > 0) match = keys.FirstOrDefault(k => Contains(zipName, k.Key));
+            if (match.Key is null) { f.Outcome = "Unmatched"; f.Reason = "No old or JBSAUS reference found in its name, its folders or the ZIP's name."; continue; }
             if (match.Ids.Count > 1) { f.Outcome = "Unmatched"; f.Reason = $"{match.Key} matches more than one contract."; continue; }
             var k = byId[match.Ids[0]];
             f.ContractId = k.Id;

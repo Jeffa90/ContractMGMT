@@ -208,6 +208,23 @@ public sealed class ImportTests(AppFixture app)
         Assert.Contains(("InternalSignOff", $"{Ref(3)} Cover page - sign off"), saved);
         Assert.Contains(("Correspondence", $"{Ref(3)} notes"), saved);
         Assert.Equal(6, saved.Count);
+
+        // Medius exports one ZIP per contract, its number in the ZIP's name and the files in a "General" folder (D-123).
+        byte[] PerContract()
+        {
+            using var stream = new MemoryStream();
+            using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, true))
+            {
+                void Add(string path, string content) { using var w = new StreamWriter(zip.CreateEntry(path).Open()); w.Write(content); }
+                Add("General/Supply Agreement Final.pdf", "%PDF medius final");
+                Add("General/Contract Review Routing Form.docx.pdf", "%PDF routing form");
+            }
+            return stream.ToArray();
+        }
+        MultipartFormDataContent PerContractForm() => new() { { new ByteArrayContent(PerContract()), "file", $"{Ref(2)}_Cartons_supply_agreement.zip" }, { new StringContent("Supporting"), "kind" } };
+        var perContract = await ReadAsync(await admin.PostAsync("/api/import/files/preview", PerContractForm(), Ct));
+        Assert.Equal(2, perContract.GetProperty("matched").GetInt32());
+        Assert.All(perContract.GetProperty("files").EnumerateArray(), f => Assert.Equal(imported[Ref(2)].Reference, f.GetProperty("reference").GetString()));
     }
 
     [Theory]

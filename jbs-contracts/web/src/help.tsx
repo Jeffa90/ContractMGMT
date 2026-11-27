@@ -14,6 +14,11 @@ const topics = {
           <strong>Urgent</strong> lists your Effective contracts whose notice deadline has passed (while the contract is still running) or is within 7 days.
         </p>
         <p>
+          <strong>Suppliers</strong>, further down, lists your actions from business reviews (and, for suppliers you look after, the supplier's own
+          actions to follow up), reviews coming due and documents expiring. While you have supplier actions, a <strong>Supplier actions</strong> tile in
+          Your turn takes you straight to them.
+        </p>
+        <p>
           <strong>Choose what I see</strong> hides tiles you don't want and picks which group comes first. It only changes your own Home.
         </p>
         <p>

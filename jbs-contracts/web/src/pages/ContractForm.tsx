@@ -772,7 +772,7 @@ export function SupplierDialog({ supplier, onClose, onSaved }: { supplier: Suppl
         <Field label="Name" required error={errors.name}>
           {(p) => <TextInput {...p} autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />}
         </Field>
-        <Field label="ABN" error={errors.abn} help="11 digits. Spaces are fine.">
+        <Field label="ABN (Australian suppliers)" error={errors.abn} help="11 digits; spaces are fine. Leave it blank for an overseas supplier, and put its own company number in Notes if you like.">
           {(p) => <TextInput {...p} inputMode="numeric" value={form.abn} onChange={(e) => setForm({ ...form, abn: e.target.value })} />}
         </Field>
         <Field label="SAP vendor number" error={errors.vendorNumber}>

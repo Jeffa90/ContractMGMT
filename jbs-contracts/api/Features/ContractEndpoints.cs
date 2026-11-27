@@ -691,10 +691,13 @@ public static class ContractEndpoints
 /// <summary>
 /// Contract numbers (D-102): JBSAUS and seven digits, carrying on from Medius's numbers (JBSAUS0000409 after JBSAUS0000408). Old
 /// contracts keep their number when imported, and the next new number follows the highest. Numbers given before D-102
-/// (JBSAUS-0012) never change.
+/// (JBSAUS-0012) never change. New numbers start at JBSAUS0001001 (D-128), clear of Medius's.
 /// </summary>
 public static class ContractNumbers
 {
+    /// <summary>The first number the app gives (D-128).</summary>
+    public const int First = 1001;
+
     public static string Format(int n) => $"JBSAUS{n.ToString("0000000", CultureInfo.InvariantCulture)}";
 
     /// <summary>The next free number (one an import already used is skipped).</summary>

@@ -387,3 +387,33 @@ test('Files from many ZIPs at once: one per contract, matched by the ZIP name, a
   await page.getByRole('button', { name: 'Add 2 files' }).click()
   await expect(page.getByText('2 files added to their contracts.')).toBeVisible()
 })
+
+test('Your supplier actions show as a tile in Your turn, and it takes you to them', async ({ page, api }, info) => {
+  const me = (await (await api.get('/api/me')).json()).person as { id: number }
+  const name = `Tile Supplier ${info.project.name} ${Date.now()}`
+  const supplier = (await (await api.post('/api/suppliers', { data: { name } })).json()) as { id: number }
+  const today = new Date().toISOString().slice(0, 10)
+  const due = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10)
+  const review = await api.post(`/api/suppliers/${supplier.id}/reviews`, {
+    data: {
+      heldOn: today,
+      summary: 'Fictional review for the Home tile.',
+      attendeeIds: [me.id],
+      rating: 'Good',
+      qualityScore: 4,
+      deliveryScore: 4,
+      serviceScore: 4,
+      costScore: 4,
+      actions: [{ text: `Send the price list ${name}`, ownerId: me.id, dueOn: due }],
+    },
+  })
+  expect(review.ok(), await review.text()).toBeTruthy()
+  await page.goto('/')
+  await settled(page)
+  const tile = page.getByRole('link', { name: /Supplier actions/ })
+  await expect(tile).toBeVisible()
+  await tile.click()
+  await expect(page.locator('#supplier-items')).toBeFocused()
+  await expect(page.getByText(`Send the price list ${name}`)).toBeVisible()
+  await expectAccessible(page)
+})

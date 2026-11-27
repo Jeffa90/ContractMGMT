@@ -391,7 +391,7 @@ public static class ExcelEndpoints
         "suppliers", "suppliers", "Suppliers",
         [
             new("Name", "Required. Rows are matched to suppliers by SAP vendor number, then by name. A supplier found by its number keeps its name here.", 34),
-            new("ABN", "11 digits; spaces are fine.", 16),
+            new("ABN", "11 digits; spaces are fine. Leave blank for overseas suppliers.", 16),
             new("SAP vendor number", null, 18),
             new("Part of", "The group it's in, for example a franchise's head company: its name or SAP vendor number. Blank leaves it as it is.", 30),
             new("Notes", null, 40), new("Active", "Yes or No. Only admins can hide or show suppliers.", 10),

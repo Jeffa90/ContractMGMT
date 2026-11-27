@@ -55,7 +55,7 @@ public sealed class QaClearTests(AppFixture app)
 
         // Numbering starts again, and the append-only rules are back.
         var next = await (await owner.PostAsJsonAsync("/api/contracts", new { title = "After the clear" }, Ct)).Content.ReadFromJsonAsync<JsonElement>(Ct);
-        Assert.Equal("JBSAUS0000001", next.GetProperty("reference").GetString());
+        Assert.Equal("JBSAUS0001001", next.GetProperty("reference").GetString());
         var newId = next.GetProperty("id").GetInt32();
         await db.ExecuteAsync("INSERT INTO contracts.Approval (ContractId, Decision, ById, Reason) VALUES (@newId, N'SentBack', (SELECT TOP 1 Id FROM contracts.Person), N'test')", new { newId });
         await Assert.ThrowsAnyAsync<Microsoft.Data.SqlClient.SqlException>(() => db.ExecuteAsync("DELETE FROM contracts.Approval WHERE ContractId = @newId", new { newId }));

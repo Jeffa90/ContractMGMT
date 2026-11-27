@@ -7,6 +7,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Circle,
+  ClipboardList,
   FileEdit,
   FilePen,
   FilePlus2,
@@ -89,6 +90,34 @@ function TileCard({ tile }: { tile: Tile }) {
   );
 }
 
+/**
+ * "Your turn" also counts your supplier actions (Ryan's feedback, D-129): the ones from business reviews that are yours, and, as
+ * the relationship owner, the supplier's own to follow up. It takes you down to them in Suppliers, below.
+ */
+function SupplierActionsTile({ count }: { count: number }) {
+  return (
+    <a
+      href="#supplier-items"
+      onClick={(e) => {
+        e.preventDefault();
+        const to = document.getElementById("supplier-items");
+        to?.scrollIntoView({ behavior: "smooth", block: "start" });
+        to?.focus({ preventScroll: true });
+      }}
+      className="group flex flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-muted/40"
+    >
+      <ClipboardList aria-hidden className="size-5 text-muted-foreground" />
+      <span className="tabular font-display text-3xl font-semibold">
+        {count}
+      </span>
+      <span className="font-medium">Supplier actions</span>
+      <span className="text-xs text-muted-foreground">
+        From business reviews: yours, and the supplier's to follow up
+      </span>
+    </a>
+  );
+}
+
 function SupplierItems({ items }: { items: HomeData["suppliers"] }) {
   if (items.length === 0) return null;
   const when = (d: number) =>
@@ -107,7 +136,11 @@ function SupplierItems({ items }: { items: HomeData["suppliers"] }) {
     i.kind === "Expiring" ? "documents" : "reviews";
   return (
     <section aria-labelledby="supplier-items" className="flex flex-col gap-3">
-      <h2 id="supplier-items" className="font-display text-lg font-semibold">
+      <h2
+        id="supplier-items"
+        tabIndex={-1}
+        className="scroll-mt-4 font-display text-lg font-semibold outline-none"
+      >
         Suppliers
       </h2>
       <Card>
@@ -240,8 +273,8 @@ function DemoDataCard() {
           </h2>
           <p className="text-sm text-muted-foreground">
             Fills QA with made-up contracts and suppliers, shared out across
-            everyone by role, so every screen has something to show. Demo
-            items never send email.
+            everyone by role, so every screen has something to show. Demo items
+            never send email.
           </p>
         </div>
       </div>
@@ -457,6 +490,9 @@ export function HomePage() {
     data?.preferences.firstGroup === "coming"
       ? ["coming", "turn", "admin"]
       : ["turn", "coming", "admin"];
+  const supplierActions = (data?.suppliers ?? []).filter(
+    (s) => s.kind === "Action",
+  ).length;
   const groups = order
     .map((g) => ({
       group: g,
@@ -464,7 +500,9 @@ export function HomePage() {
         (t) => t.group === g && t.count > 0 && !hidden.has(t.key),
       ),
     }))
-    .filter((g) => g.tiles.length > 0);
+    .filter(
+      (g) => g.tiles.length > 0 || (g.group === "turn" && supplierActions > 0),
+    );
   const nothing =
     data !== undefined &&
     groups.length === 0 &&
@@ -543,6 +581,9 @@ export function HomePage() {
                 {tiles.map((t) => (
                   <TileCard key={t.key} tile={t} />
                 ))}
+                {group === "turn" && supplierActions > 0 && (
+                  <SupplierActionsTile count={supplierActions} />
+                )}
               </div>
             </section>
           ))}

@@ -79,8 +79,8 @@ public static class QaClearEndpoints
                     DELETE FROM contracts.Category WHERE ParentId IS NOT NULL;
                     DELETE FROM contracts.Category;
                     DELETE FROM contracts.ListItem WHERE ListName IN @ClearedLists;
-                    UPDATE contracts.Counter SET NextValue = 1 WHERE Name = N'ContractNumber';
-                    """, new { ClearedLists }, tx, commandTimeout: 300);
+                    UPDATE contracts.Counter SET NextValue = @First WHERE Name = N'ContractNumber';
+                    """, new { ClearedLists, ContractNumbers.First }, tx, commandTimeout: 300);
             }
             finally
             {

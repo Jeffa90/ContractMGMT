@@ -116,7 +116,7 @@ public static class SupplierEndpoints
         if (!string.IsNullOrWhiteSpace(body.Abn))
         {
             abn = new string(body.Abn.Where(ch => !char.IsWhiteSpace(ch)).ToArray());
-            if (!Abn.IsValid(abn)) fields["abn"] = "That ABN doesn't check out. It has 11 digits, for example 51 824 753 556.";
+            if (!Abn.IsValid(abn)) fields["abn"] = "That ABN doesn't check out. It has 11 digits, for example 51 824 753 556. Leave it blank for an overseas supplier.";
         }
         var vendor = string.IsNullOrWhiteSpace(body.VendorNumber) ? null : body.VendorNumber.Trim();
         if (vendor is { Length: > 50 }) fields["vendorNumber"] = "Keep the vendor number under 50 characters.";

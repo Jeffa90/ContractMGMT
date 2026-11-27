@@ -8,14 +8,34 @@ public sealed record HandOverAction(string? RowVersion, int? OwnerId, int? Backu
 public sealed record ConfidentialAction(string? RowVersion, bool IsConfidential, string? Note);
 public sealed record AnyTimeFieldsAction(string? RowVersion, Dictionary<string, System.Text.Json.JsonElement>? Fields);
 public sealed record UnlockAction(string? RowVersion, string? Note, int? Hours);
+public sealed record SapNumberAction(string? RowVersion, string? SapOutlineAgreement);
 
 /// <summary>
 /// What can change on a locked contract without a Variation (product-spec section 7; A-05, D-17, D-76 to D-79): handing it over, the
-/// Confidential tick (admins, with a reason), added fields an admin marked "any time", and an admin's emergency unlock.
+/// Confidential tick (admins, with a reason), added fields an admin marked "any time", the SAP outline agreement number (D-124), and an
+/// admin's emergency unlock.
 /// </summary>
 public static class LockedChangeEndpoints
 {
-    public static List<string> Actions(Person me, ContractRow c, bool hasAnyTimeFields)
+    /// <summary>
+    /// The SAP outline agreement number often only exists once the contract is signed (D-124), so from Signing on it changes by itself,
+    /// without a Variation: it's a reference, not a term. Contract owners, Procurement and admins. Drafts change it on the form.
+    /// </summary>
+    public static bool CanChangeSapNumber(Person me, ContractRow c) =>
+        (me.IsContractOwner || me.IsProcurement || me.IsAdmin) && c.Stage is "Signing" or "Approval" or "Effective" or "Ended";
+
+    /// <summary>The SAP number's label as the admin named it, or null when the admin has hidden it.</summary>
+    public static string? SapLabel(IEnumerable<FieldRow> definitions) =>
+        definitions.FirstOrDefault(f => f.Key == "sapOutlineAgreement") is { } f ? f.IsHidden ? null : f.Label : "SAP outline agreement number";
+
+    /// <summary>The Activity sentence for a change to the SAP number, or null when it hasn't changed.</summary>
+    public static string? SapChange(string label, string? before, string? after) =>
+        before == after ? null
+        : before is null ? $"added the {label} {after}"
+        : after is null ? $"cleared the {label} (was {before})"
+        : $"changed the {label} from {before} to {after}";
+
+    public static List<string> Actions(Person me, ContractRow c, bool hasAnyTimeFields, bool sapShown = true)
     {
         var actions = new List<string>();
         var open = c.Stage is not ("Withdrawn" or "Archived");
@@ -23,6 +43,7 @@ public static class LockedChangeEndpoints
         if (me.IsContractOwner && open && c.IsLocked && c.OpenVariationStage != "Approval") actions.Add("handOver");
         if (me.IsAdmin && open && c.IsLocked) actions.Add("confidential");
         if (me.IsContractOwner && c.Stage == "Effective" && hasAnyTimeFields) actions.Add("anyTimeFields");
+        if (sapShown && CanChangeSapNumber(me, c) && c.UnlockId is null) actions.Add("sapNumber");
         if (me.IsAdmin && c.Stage is "Effective" or "Ended") actions.Add(c.UnlockId is null ? "unlock" : "closeUnlock");
         if (me.IsContractOwner && c.Stage == "Effective" && c.OpenVariationId is null) actions.Add("startVariation");
         return actions;
@@ -106,6 +127,29 @@ public static class LockedChangeEndpoints
                     await x.C.ExecuteAsync("UPDATE contracts.Contract SET UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id", new { me = x.Me.Id, id }, x.Tx);
                     await x.Audit("contract.changed", $"{x.Me.Name} changed {string.Join("; ", changes)} (any-time fields).", new { added = changes });
                 }
+                return null;
+            }, audit));
+
+        // The SAP outline agreement number, from Signing on (D-124).
+        group.MapPost("/sap-number", (int id, SapNumberAction body, CurrentUser current, Db db, AuditLog audit) =>
+            ActAsync(id, body.RowVersion, current, db, async x =>
+            {
+                var c = x.Contract;
+                if (!(x.Me.IsContractOwner || x.Me.IsProcurement || x.Me.IsAdmin))
+                    return ApiResults.NotAllowed("Only contract owners, Procurement and admins can change the SAP outline agreement number.");
+                if (!CanChangeSapNumber(x.Me, c))
+                    return ApiResults.NotAllowed(c.Stage is "Draft" or "LegalReview"
+                        ? "Change it with Edit details while it's in " + ContractEndpoints.StageNames[c.Stage] + "."
+                        : $"It's {ContractEndpoints.StageNames[c.Stage]}, so it can't be changed.");
+                var label = SapLabel(await Fields.LoadAsync(x.C, x.Tx));
+                if (label is null) return ApiResults.NotAllowed("The SAP outline agreement number isn't used. An admin can show it again under Contract fields.");
+                var sap = Clean(body.SapOutlineAgreement);
+                if (sap is { Length: > 50 }) return ApiResults.Invalid("Keep the SAP number under 50 characters.", new() { ["sapOutlineAgreement"] = "Keep the SAP number under 50 characters." });
+                if (SapChange(label, c.SapOutlineAgreement, sap) is not { } said)
+                    return ApiResults.Invalid("Nothing has changed.", new() { ["sapOutlineAgreement"] = "It's already that number." });
+                await x.C.ExecuteAsync("UPDATE contracts.Contract SET SapOutlineAgreement = @sap, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @id",
+                    new { sap, me = x.Me.Id, id }, x.Tx);
+                await x.Audit("contract.changed", $"{x.Me.Name} {said} on {c.Reference}.", new { sapOutlineAgreement = new { before = c.SapOutlineAgreement, after = sap } });
                 return null;
             }, audit));
 

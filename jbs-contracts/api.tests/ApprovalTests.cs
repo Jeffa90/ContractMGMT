@@ -73,7 +73,7 @@ public sealed class ApprovalTests(AppFixture app)
         var (ownerApprover, _) = await PersonAsync("Owen OwnerApprover", Roles(owner: true, approver: true));
         var id = await InSigningAsync(owner);
         var signing = await DetailAsync(owner, id);
-        Assert.Equal(["sendForApproval", "backToDraft"], Actions(signing));
+        Assert.Equal(["sendForApproval", "backToDraft", "sapNumber"], Actions(signing));
 
         // The signed copy and the effective date are both needed; the date is never filled in (D-61).
         var (status, body) = await ActAsync(owner, id, "send-for-approval");
@@ -103,7 +103,7 @@ public sealed class ApprovalTests(AppFixture app)
         await UploadSignedCopyAsync(ownerApprover, raised);
         Assert.Equal(HttpStatusCode.OK, (await ActAsync(ownerApprover, raised, "send-for-approval", new { effectiveDate = "2026-12-01" })).Status);
         var own = await DetailAsync(ownerApprover, raised);
-        Assert.Empty(Actions(own));
+        Assert.Equal(["sapNumber"], Actions(own)); // only the SAP number (D-124)
         Assert.Contains("raised it", own.GetProperty("cannotApproveReason").GetString());
         Assert.Equal(HttpStatusCode.Forbidden, (await ActAsync(ownerApprover, raised, "approval/approve")).Status);
         Assert.Equal(HttpStatusCode.BadRequest, (await ActAsync(approver, id, "approval/send-back")).Status);
@@ -130,7 +130,7 @@ public sealed class ApprovalTests(AppFixture app)
         Assert.False(effective.GetProperty("canUpload").GetBoolean());
         Assert.False(effective.GetProperty("canWithdraw").GetBoolean());
         // Only its renewal actions (slice 6) and locked-contract changes (slice 7). "anyTimeFields" depends on the shared layout, which LayoutTests changes.
-        Assert.Equal(["recordDecision", "endEarly", "reviewDone", "handOver", "startVariation"], Actions(effective).Where(a => a != "anyTimeFields"));
+        Assert.Equal(["recordDecision", "endEarly", "reviewDone", "handOver", "sapNumber", "startVariation"], Actions(effective).Where(a => a != "anyTimeFields"));
         Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM contracts.EmailOutbox WHERE ContractId = @id AND Kind = 'approved' AND PersonId = @ownerId", new { id, ownerId }));
 
         // Locked means locked: edits, documents and withdrawal are refused on the server.
@@ -217,6 +217,55 @@ public sealed class ApprovalTests(AppFixture app)
         Assert.Equal("Effective", Stage(oldAgain));
         Assert.Equal(JsonValueKind.Null, oldAgain.GetProperty("contract").GetProperty("endedOn").ValueKind);
         Assert.Equal("Approval", Stage(await DetailAsync(owner, renewal)));
+        Assert.Null(await AuditLog.VerifyAsync(db));
+    }
+    [Fact]
+    public async Task The_SAP_number_can_be_added_when_sending_for_approval_and_changed_after_without_a_Variation()
+    {
+        // D-124: the SAP outline agreement number often only exists once it's signed. Optional at Send for approval; from Signing on it
+        // changes by itself (contract owners, Procurement, admins), audited; drafts change it on the form.
+        var (owner, _) = await PersonAsync("Sid Sap", Roles(owner: true));
+        var (approver, _) = await PersonAsync("Ada SapApprover", Roles(approver: true));
+        var (legal, _) = await PersonAsync("Lee SapLegal", Roles(legal: true));
+        var user = Unique("sp");
+        await app.AddPersonAsync(user, $"Pia Procure {user[^4..]}", new { contractOwner = false, legal = false, approver = false, groupHead = false, admin = false, auditor = false, procurement = true });
+        using var procurement = app.ClientFor($@"TEST\{user}");
+
+        var draft = (await ReadAsync(await owner.PostAsJsonAsync("/api/contracts", new { title = "SAP draft" }, Ct))).GetProperty("id").GetInt32();
+        Assert.DoesNotContain("sapNumber", Actions(await DetailAsync(owner, draft)));
+        Assert.Equal(HttpStatusCode.Forbidden, (await ActAsync(owner, draft, "sap-number", new { sapOutlineAgreement = "4600000001" })).Status);
+
+        var id = await InSigningAsync(owner);
+        var signing = await DetailAsync(owner, id);
+        Assert.Contains("sapNumber", Actions(signing));
+        var label = signing.GetProperty("sapLabel").GetString()!; // LayoutTests renames it, so read it
+        Assert.StartsWith("SAP outline agreement", label);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ActAsync(legal, id, "sap-number", new { sapOutlineAgreement = "4600000001" })).Status);
+
+        // Sent for approval with the number: saved, and Activity says so.
+        await UploadSignedCopyAsync(owner, id);
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(owner, id, "send-for-approval", new { effectiveDate = "2026-12-01", sapOutlineAgreement = " 4600012345 " })).Status);
+        var sent = await DetailAsync(owner, id);
+        Assert.Equal("4600012345", sent.GetProperty("contract").GetProperty("sapOutlineAgreement").GetString());
+        Assert.Contains($"added the {label} 4600012345", sent.GetProperty("activity")[0].GetProperty("summary").GetString());
+
+        // Effective and locked, yet the number still changes by itself.
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(approver, id, "approval/approve")).Status);
+        var effective = await DetailAsync(owner, id);
+        Assert.Equal("Effective", Stage(effective));
+        Assert.Contains("sapNumber", Actions(effective));
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(owner, id, "sap-number", new { sapOutlineAgreement = "4600099999" })).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ActAsync(owner, id, "sap-number", new { sapOutlineAgreement = "4600099999" })).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ActAsync(owner, id, "sap-number", new { sapOutlineAgreement = new string('9', 51) })).Status);
+        Assert.Equal(HttpStatusCode.OK, (await ActAsync(procurement, id, "sap-number", new { sapOutlineAgreement = "" })).Status);
+        var after = await DetailAsync(owner, id);
+        Assert.Equal(JsonValueKind.Null, after.GetProperty("contract").GetProperty("sapOutlineAgreement").ValueKind);
+        Assert.True(after.GetProperty("contract").GetProperty("isLocked").GetBoolean());
+
+        await using var db = await app.OpenAsync();
+        var said = (await db.QueryAsync<string>("SELECT Summary FROM contracts.AuditEvent WHERE ContractId = @id AND Action = N'contract.changed' ORDER BY Id", new { id })).ToList();
+        Assert.Contains(said, s => s.Contains($"changed the {label} from 4600012345 to 4600099999"));
+        Assert.Contains(said, s => s.Contains($"cleared the {label} (was 4600099999)"));
         Assert.Null(await AuditLog.VerifyAsync(db));
     }
 }

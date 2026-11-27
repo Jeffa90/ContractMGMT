@@ -62,18 +62,24 @@ public static class ApprovalEndpoints
                 if (signed == 0) problems["signedCopy"] = "Add the signed copy first: under Documents, choose the kind Signed copy, then Add document.";
                 if (body.EffectiveDate is not { } effective) problems["effectiveDate"] = "Enter the date the contract takes effect.";
                 else if (c.EndDate is { } end && effective > DateOnly.FromDateTime(end)) problems["effectiveDate"] = $"The effective date is after the end date ({end.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}).";
-                if (problems.Count > 0) return ApiResults.Invalid(problems.Count == 2 ? "Add the signed copy and the effective date first." : problems.Values.First(), problems);
+                // The SAP number often arrives with the signed copy (D-124): optional, and only when sent.
+                var sapLabel = LockedChangeEndpoints.SapLabel(await Fields.LoadAsync(x.C, x.Tx));
+                var sap = body.SapOutlineAgreement is null || sapLabel is null ? c.SapOutlineAgreement : Clean(body.SapOutlineAgreement);
+                if (sap is { Length: > 50 }) problems["sapOutlineAgreement"] = "Keep the SAP number under 50 characters.";
+                if (problems.Count > 0) return ApiResults.Invalid(problems.Count == 2 && !problems.ContainsKey("sapOutlineAgreement") ? "Add the signed copy and the effective date first." : problems.Values.First(), problems);
+                var sapSaid = sapLabel is null ? null : LockedChangeEndpoints.SapChange(sapLabel, c.SapOutlineAgreement, sap);
 
-                var p = new DynamicParameters(new { me = x.Me.Id, id });
+                var p = new DynamicParameters(new { me = x.Me.Id, id, sap });
                 p.Add("effective", body.EffectiveDate!.Value.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
                 await x.C.ExecuteAsync("""
-                    UPDATE contracts.Contract SET Stage = N'Approval', StageSinceUtc = SYSUTCDATETIME(), EffectiveDate = @effective, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                    UPDATE contracts.Contract SET Stage = N'Approval', StageSinceUtc = SYSUTCDATETIME(), EffectiveDate = @effective, SapOutlineAgreement = @sap, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
                     WHERE Id = @id
                     """, p, x.Tx);
                 var date = body.EffectiveDate.Value.ToString("d MMM yyyy", CultureInfo.InvariantCulture);
                 await audit.WriteAsync(x.C, x.Tx, x.Me.AsActor(), "contract.sent-for-approval", "Contract", id,
-                    $"{x.Me.Name} sent {c.Reference} for approval, effective {date}" + (c.EffectiveDate is { } was && DateOnly.FromDateTime(was) != body.EffectiveDate ? $" (was {was.ToString("d MMM yyyy", CultureInfo.InvariantCulture)})" : "") + ".",
-                    new { effectiveDate = body.EffectiveDate }, contractId: id);
+                    $"{x.Me.Name} sent {c.Reference} for approval, effective {date}" + (c.EffectiveDate is { } was && DateOnly.FromDateTime(was) != body.EffectiveDate ? $" (was {was.ToString("d MMM yyyy", CultureInfo.InvariantCulture)})" : "")
+                    + (sapSaid is null ? "" : $", and {sapSaid}") + ".",
+                    new { effectiveDate = body.EffectiveDate, sapOutlineAgreement = sapSaid is null ? null : new { before = c.SapOutlineAgreement, after = sap } }, contractId: id);
 
                 // The Group Head only (D-60); everyone who can act if the Group Head can't, or there isn't one.
                 var approvers = (await x.C.QueryAsync<Person>("SELECT * FROM contracts.Person WHERE IsActive = 1 AND IsApprover = 1", transaction: x.Tx))

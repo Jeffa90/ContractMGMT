@@ -266,12 +266,12 @@ test('A contract continuing until replaced is its own calm group on Renewals, no
 })
 
 test('Legal downloads the Legal record for their matter file; an owner sees no button', async ({ page, api, signInAs }) => {
-  // A demo contract with a Legal conversation.
+  // A demo contract with a Legal conversation, not Confidential (the owner checks it too).
   const list = await (await api.get('/api/contracts?view=all')).json()
   let target: { id: number; title: string } | undefined
   for (const k of list as { id: number; title: string }[]) {
     const d = await (await api.get(`/api/contracts/${k.id}`)).json()
-    if (d.conversation.length > 0) {
+    if (d.conversation.length > 0 && !d.contract.isConfidential) {
       target = k
       break
     }
@@ -289,4 +289,30 @@ test('Legal downloads the Legal record for their matter file; an owner sees no b
   await page.reload()
   await settled(page, target!.title)
   await expect(page.getByRole('link', { name: 'Download for your matter file' })).toHaveCount(0)
+})
+
+test('The SAP outline agreement number is added on an Effective contract without a Variation', async ({ page, api }, info) => {
+  const list = (await (await api.get('/api/contracts?view=all')).json()) as { id: number; title: string; stage: string }[]
+  // Each project its own contract, as they run at the same time.
+  const at = ['phone-light', 'phone-dark', 'desktop-light', 'desktop-dark'].indexOf(info.project.name)
+  // Not one with an emergency unlock open: admins use Edit details then.
+  const open: typeof list = []
+  for (const k of list.filter((x) => x.stage === 'Effective')) {
+    const d = await (await api.get(`/api/contracts/${k.id}`)).json()
+    if (d.actions.includes('sapNumber')) open.push(k)
+    if (open.length > 3) break
+  }
+  const target = open[Math.max(at, 0)]
+  expect(target).toBeTruthy()
+  const number = `46${Date.now() % 100000000}`
+  await page.goto(`/contracts/${target.id}`)
+  await settled(page, target.title)
+  await page.getByRole('button', { name: /^(Add|Change) SAP outline agreement number$/ }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('SAP outline agreement number').fill(number)
+  await expectAccessible(page)
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('definition').filter({ hasText: number }).getByRole('button', { name: 'Change SAP outline agreement number' })).toBeVisible()
+  await expect(page.getByText(new RegExp(`SAP outline agreement number .*${number}`)).first()).toBeVisible() // in Activity
 })

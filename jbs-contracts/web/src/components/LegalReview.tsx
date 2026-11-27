@@ -520,6 +520,8 @@ function SendForApprovalDialog({ data, onClose }: { data: ContractDetail; onClos
   const c = data.contract
   // Required and never filled in for you (D-61): only what's already on the contract.
   const [effectiveDate, setEffectiveDate] = useState(c.effectiveDate ?? '')
+  // Optional: the SAP number often only exists once it's signed (D-124).
+  const [sap, setSap] = useState(c.sapOutlineAgreement ?? '')
   const [file, setFile] = useState<File | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [uploading, setUploading] = useState(false)
@@ -545,7 +547,7 @@ function SendForApprovalDialog({ data, onClose }: { data: ContractDetail; onClos
       }
     }
     action.mutate(
-      { path: 'send-for-approval', body: { effectiveDate }, rowVersion: uploaded.current?.rowVersion, success: 'Sent for approval. The Group Head has been emailed.' },
+      { path: 'send-for-approval', body: { effectiveDate, ...(data.sapLabel ? { sapOutlineAgreement: sap } : {}) }, rowVersion: uploaded.current?.rowVersion, success: 'Sent for approval. The Group Head has been emailed.' },
       { onError: (e) => setErrors(e instanceof ApiError && Object.keys(e.fields).length > 0 ? e.fields : { form: errorText(e) }) },
     )
   }
@@ -580,6 +582,11 @@ function SendForApprovalDialog({ data, onClose }: { data: ContractDetail; onClos
         <Field label="Effective date" required error={errors.effectiveDate} help="The date the contract takes effect, as signed.">
           {(p) => <TextInput {...p} type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className="max-w-56" />}
         </Field>
+        {data.sapLabel && (
+          <Field label={`${data.sapLabel} (optional)`} error={errors.sapOutlineAgreement} help="Add it now if you have it, or later on the contract's page.">
+            {(p) => <TextInput {...p} value={sap} onChange={(e) => setSap(e.target.value)} maxLength={50} className="max-w-72" />}
+          </Field>
+        )}
       </div>
     </Dialog>
   )

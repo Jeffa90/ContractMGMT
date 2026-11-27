@@ -225,6 +225,7 @@ export type ContractAction =
   | 'handOver'
   | 'confidential'
   | 'anyTimeFields'
+  | 'sapNumber'
   | 'unlock'
   | 'closeUnlock'
   | 'startVariation'
@@ -256,6 +257,8 @@ export type ContractDetail = {
   /** The approver who approved it can undo that until then (D-106): within 24 hours, before anything else happens. */
   undoApprovalUntilUtc: string | null
   hasSignedCopy: boolean
+  /** The SAP outline agreement number's label as the admin named it; null when hidden. */
+  sapLabel: string | null
   /** Required fields still empty (Draft only): checked when it is sent on. */
   missingRequired: string[]
   /** People in Legal (only sent to Legal people, for "Give to"). */

@@ -1,7 +1,7 @@
 // Changing a locked contract (product-spec section 7): Variations, hand-over, Confidential (admins), any-time fields and the admin's
 // emergency unlock, with its banner.
 import { useQuery } from '@tanstack/react-query'
-import { FilePen, Lock, LockOpen, ShieldAlert, UserRoundCog } from 'lucide-react'
+import { FilePen, Lock, LockOpen, Pencil, ShieldAlert, UserRoundCog } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -13,7 +13,7 @@ import type { FieldValue, Layout, LayoutField } from '@/lib/layout'
 import { Dialog } from './Dialog'
 import { FieldInput } from './FieldInput'
 import { Select, StageBadge, Textarea } from './form'
-import { Alert, Badge, Button, Card, Checkbox, Field } from './ui'
+import { Alert, Badge, Button, Card, Checkbox, Field, TextInput } from './ui'
 
 export function UnlockBanner({ data }: { data: ContractDetail }) {
   const u = data.contract.unlock
@@ -35,6 +35,56 @@ export function UnlockBanner({ data }: { data: ContractDetail }) {
         </div>
       )}
     </Alert>
+  )
+}
+
+/**
+ * The SAP outline agreement number on the contract page, with Add or Change from Signing on (D-124): it often only exists once the
+ * contract is signed, and it's a reference, not a term, so it changes without a Variation.
+ */
+export function SapNumberValue({ data }: { data: ContractDetail }) {
+  const value = data.contract.sapOutlineAgreement
+  const [open, setOpen] = useState(false)
+  return (
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {value ?? <span className="text-muted-foreground">Not filled in yet</span>}
+      <Button variant="ghost" className="min-h-9 px-2 text-primary" icon={<Pencil aria-hidden className="size-4" />} onClick={() => setOpen(true)}>
+        {value ? 'Change' : 'Add'}
+        <span className="sr-only"> {data.sapLabel}</span>
+      </Button>
+      {open && <SapNumberDialog data={data} onClose={() => setOpen(false)} />}
+    </span>
+  )
+}
+
+function SapNumberDialog({ data, onClose }: { data: ContractDetail; onClose: () => void }) {
+  const label = data.sapLabel ?? 'SAP outline agreement number'
+  const [value, setValue] = useState(data.contract.sapOutlineAgreement ?? '')
+  const [error, setError] = useState<string | undefined>()
+  const action = useAction(data, onClose)
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={data.contract.sapOutlineAgreement ? `Change the ${label}` : `Add the ${label}`}
+      description="It's a reference, so it changes without a Variation. The change shows in Activity."
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant="primary"
+            loading={action.isPending}
+            onClick={() => action.mutate({ path: 'sap-number', body: { sapOutlineAgreement: value }, success: 'Saved.' }, { onError: (e) => setError(errorText(e, 'sapOutlineAgreement')) })}
+          >
+            Save
+          </Button>
+        </>
+      }
+    >
+      <Field label={label} error={error} help="Leave it empty to clear it.">
+        {(p) => <TextInput {...p} autoFocus value={value} onChange={(e) => setValue(e.target.value)} maxLength={50} />}
+      </Field>
+    </Dialog>
   )
 }
 

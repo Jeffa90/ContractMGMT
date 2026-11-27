@@ -9,7 +9,7 @@ import { DropTarget } from '@/components/DropZone'
 import { Select, StageBadge, Textarea } from '@/components/form'
 import { HelpButton } from '@/components/Help'
 import { ConversationCard, ProgressPanel } from '@/components/LegalReview'
-import { ChangesCard, UnlockBanner } from '@/components/LockedChanges'
+import { ChangesCard, SapNumberValue, UnlockBanner } from '@/components/LockedChanges'
 import { RenewalCard } from '@/components/Renewal'
 import { Alert, Button, Card, EmptyState, Field, Skeleton } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
@@ -262,7 +262,7 @@ function Detail({ data, layout }: { data: ContractDetail; layout: Layout }) {
         <DetailSection key={section.key} title={section.title}>
           {fields.map((f) => (
             <Row key={f.key} label={f.label}>
-              {f.isBuiltIn ? builtInDisplay(f.key, c) : data.fieldValues[f.key]?.display ? <FieldDisplay field={f} display={data.fieldValues[f.key].display} /> : null}
+              {f.key === 'sapOutlineAgreement' && data.actions.includes('sapNumber') ? <SapNumberValue data={data} /> : f.isBuiltIn ? builtInDisplay(f.key, c) : data.fieldValues[f.key]?.display ? <FieldDisplay field={f} display={data.fieldValues[f.key].display} /> : null}
             </Row>
           ))}
         </DetailSection>

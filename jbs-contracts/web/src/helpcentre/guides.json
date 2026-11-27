@@ -197,6 +197,27 @@
       ]
     },
     {
+      "id": "sap-number",
+      "group": "signing",
+      "title": "Add the SAP outline agreement number",
+      "summary": "Add it when you send for approval, or any time after, without a Variation.",
+      "who": [
+        "contractOwner",
+        "procurement",
+        "admin"
+      ],
+      "screens": [
+        "contract"
+      ],
+      "video": false,
+      "steps": [
+        "If you have the number when you send for approval, type it in the **SAP outline agreement number** box there. It's optional.",
+        "Otherwise open the contract once it's signed: in **Value**, click **Add** next to SAP outline agreement number.",
+        "Type the number and click **Save**. To fix one, click **Change**; leave it empty to clear it.",
+        "It's a reference, not a term, so it changes even on an Effective contract without a Variation. Each change shows in Activity."
+      ]
+    },
+    {
       "id": "approve",
       "group": "signing",
       "title": "Approve a contract (on your phone or computer)",

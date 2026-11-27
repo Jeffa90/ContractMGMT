@@ -6,7 +6,8 @@ using Microsoft.Data.SqlClient;
 namespace JbsContracts.Api.Features;
 
 /// <summary>The body of a contract action: the page's row version plus whatever that action uses.</summary>
-public sealed record LegalAction(string? RowVersion, string? Note = null, int[]? DocumentVersionIds = null, int? PersonId = null, string? Status = null, DateOnly? EffectiveDate = null);
+public sealed record LegalAction(string? RowVersion, string? Note = null, int[]? DocumentVersionIds = null, int? PersonId = null, string? Status = null, DateOnly? EffectiveDate = null,
+    string? SapOutlineAgreement = null);
 
 /// <summary>
 /// Sending a contract on from Draft, and the Legal review back-and-forth (product-spec sections 4 and 5; D-09, D-55 to D-58).
@@ -33,10 +34,10 @@ public static class LegalEndpoints
     };
 
     /// <summary>The actions this person can take on the contract now, by name (the page shows a button for each; the server checks again).</summary>
-    public static List<string> Actions(Person me, ContractRow c, bool hasAnyTimeFields = false)
+    public static List<string> Actions(Person me, ContractRow c, bool hasAnyTimeFields = false, bool sapShown = true)
     {
         var actions = new List<string>();
-        if (c.IsLocked) return [.. RenewalEndpoints.Actions(me, c), .. LockedChangeEndpoints.Actions(me, c, hasAnyTimeFields)]; // locked: only their own actions
+        if (c.IsLocked) return [.. RenewalEndpoints.Actions(me, c), .. LockedChangeEndpoints.Actions(me, c, hasAnyTimeFields, sapShown)]; // locked: only their own actions
         if (c.Stage == "Draft" && me.IsContractOwner) actions.Add(c.NeedsLegalReview ? "sendToLegal" : "readyForSigning");
         if (c.Stage == "LegalReview")
         {
@@ -55,7 +56,7 @@ public static class LegalEndpoints
             actions.AddRange(["sendForApproval", c.LegalClearedUtc is not null ? "sendBackToLegal" : "backToDraft"]);
         if (c.Stage == "Approval" && me.IsApprover && !ApprovalEndpoints.IsInvolved(me, c)) actions.AddRange(["approve", "sendBack"]);
         actions.AddRange(RenewalEndpoints.Actions(me, c));
-        actions.AddRange(LockedChangeEndpoints.Actions(me, c, hasAnyTimeFields));
+        actions.AddRange(LockedChangeEndpoints.Actions(me, c, hasAnyTimeFields, sapShown));
         return actions;
     }
 

@@ -153,7 +153,7 @@ public sealed class LegalTests(AppFixture app)
 
 
         // From Signing, the owner can send it back to Legal with a reason when something must change; it goes to Lee, who cleared it.
-        Assert.Equal(["sendForApproval", "sendBackToLegal"], Actions(cleared));
+        Assert.Equal(["sendForApproval", "sendBackToLegal", "sapNumber"], Actions(cleared));
         Assert.Equal(HttpStatusCode.BadRequest, (await ActAsync(owner, id, "send-back-to-legal")).Status);
         Assert.Equal(HttpStatusCode.OK, (await ActAsync(owner, id, "send-back-to-legal", new { note = "Supplier wants to change the start date." })).Status);
         var reopened = await DetailAsync(lee, id);

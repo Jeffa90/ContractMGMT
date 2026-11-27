@@ -419,5 +419,9 @@ public sealed class ImportTests(AppFixture app)
         Assert.Equal("", site.GetProperty("to").GetString());
         var fromFile = await ReadAsync(await admin.PostAsync("/api/import/legacy/values", F(translationsFile: sheetBytes), Ct));
         Assert.Equal($"Services {u}", fromFile.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("key").GetString() == "agreementType").GetProperty("values")[0].GetProperty("to").GetString());
+        // A file someone chooses to use wins over what's already chosen on screen.
+        var onScreen = new Dictionary<string, Dictionary<string, string>> { ["agreementType"] = new() { ["SVC Agreement (old)"] = "" } };
+        var fileWins = await ReadAsync(await admin.PostAsync("/api/import/legacy/values", F(onScreen, translationsFile: sheetBytes), Ct));
+        Assert.Equal($"Services {u}", fileWins.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("key").GetString() == "agreementType").GetProperty("values")[0].GetProperty("to").GetString());
     }
 }

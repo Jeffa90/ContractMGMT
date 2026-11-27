@@ -630,7 +630,10 @@ public static class LegacyImportEndpoints
             var options = ReadOptions(form);
             await using var c = await db.OpenAsync();
             var saved = Translations.From(await SavedTranslationsAsync(c, null));
-            // A translations sheet (from Download translations) adds to what's remembered.
+            // What's on screen wins over what's remembered.
+            foreach (var (field, values) in options.Translations?.ToDictionary() ?? [])
+                foreach (var (old, to) in values) saved.Set(field, old, to);
+            // A translations sheet (Download translations, edited) wins over both: the person chose to use it.
             if (form.Files.GetFile("translationsFile") is { Length: > 0 } tf)
             {
                 await using var ts = tf.OpenReadStream();
@@ -647,10 +650,6 @@ public static class LegacyImportEndpoints
                     saved.Set(field.Key, old, string.Equals(to, LeaveBlank, StringComparison.OrdinalIgnoreCase) ? "" : to);
                 }
             }
-            // What's on screen wins over what's remembered.
-            foreach (var (field, values) in options.Translations?.ToDictionary() ?? [])
-                foreach (var (old, to) in values) saved.Set(field, old, to);
-
             if (form["download"] == "translations")
             {
                 var rowsOut = saved.ToDictionary().SelectMany(f => f.Value.Select(v => new object?[]

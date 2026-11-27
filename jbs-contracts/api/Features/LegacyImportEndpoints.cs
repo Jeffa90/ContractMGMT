@@ -560,6 +560,16 @@ public static class LegacyImportEndpoints
             ? JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(json) : null;
 
     /// <summary>How a row's category reads for translating: "Category > Subcategory" when there's a subcategory.</summary>
+    /// <summary>A database refusal in plain words, with SQL Server's own detail (admins only see this; it names the table and column).</summary>
+    internal static string SaveProblem(Exception ex) => ex switch
+    {
+        SqlException { Number: 2627 or 2601 } e => $"It would repeat something that must be unique. ({e.Message})",
+        SqlException { Number: 547 } e => $"A value isn't allowed. ({e.Message})",
+        SqlException { Number: 2628 or 8152 } e => $"A value is too long. ({e.Message})",
+        SqlException e => $"The database refused it. ({e.Message})",
+        _ => ex.Message.EndsWith('.') ? ex.Message : ex.Message + ".",
+    };
+
     internal static string CategoryKey(string? category, string? sub) =>
         category is not null && sub is not null ? $"{category} > {sub}" : (category ?? sub ?? "");
 
@@ -731,7 +741,7 @@ public static class LegacyImportEndpoints
         }));
 
         // Step 1c: the import. The rows that are ready go in, in one step; refused and already-imported rows are left out.
-        app.MapPost("/api/import/legacy/import", async (HttpRequest request, CurrentUser current, Db db, AuditLog audit, AppSettings settings, TimeProvider clock) => await AdminAsync(current, db, async me =>
+        app.MapPost("/api/import/legacy/import", async (HttpRequest request, CurrentUser current, Db db, AuditLog audit, AppSettings settings, TimeProvider clock, ILoggerFactory logs) => await AdminAsync(current, db, async me =>
         {
             if (!request.HasFormContentType) return ApiResults.Invalid("Choose the spreadsheet to import.", new() { ["file"] = "Choose the spreadsheet to import." });
             var form = await request.ReadFormAsync();
@@ -766,55 +776,71 @@ public static class LegacyImportEndpoints
             }
 
             var via = $" (imported from {fileName})";
-            var supplierIds = new Dictionary<string, int>();
-            foreach (var name in newSuppliers.Values)
+            // What's being saved, so a failure can say where (D-130). Nothing is kept unless everything saves.
+            var saving = "the import";
+            try
             {
-                var vendor = extras.VendorNumbers.GetValueOrDefault(name.Trim());
-                var id = await c.ExecuteScalarAsync<int?>("SELECT Id FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@name)))", new { name }, tx)
-                    ?? await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Supplier (Name, VendorNumber, CreatedById, UpdatedById) OUTPUT INSERTED.Id VALUES (@name, @vendor, @me, @me)",
-                        new { name, vendor, me = me.Id }, tx);
-                await audit.WriteAsync(c, tx, me.AsActor(), "supplier.added", "Supplier", id,
-                    $"{me.Name} added the supplier {name}{(vendor is null ? "" : $" (SAP vendor number {vendor})")}{via}.");
-                supplierIds[name.Trim().ToUpperInvariant()] = id;
+                var supplierIds = new Dictionary<string, int>();
+                foreach (var name in newSuppliers.Values)
+                {
+                    saving = $"the new supplier \"{name}\"";
+                    var vendor = extras.VendorNumbers.GetValueOrDefault(name.Trim());
+                    var id = await c.ExecuteScalarAsync<int?>("SELECT Id FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@name)))", new { name }, tx)
+                        ?? await c.ExecuteScalarAsync<int>("INSERT INTO contracts.Supplier (Name, VendorNumber, CreatedById, UpdatedById) OUTPUT INSERTED.Id VALUES (@name, @vendor, @me, @me)",
+                            new { name, vendor, me = me.Id }, tx);
+                    await audit.WriteAsync(c, tx, me.AsActor(), "supplier.added", "Supplier", id,
+                        $"{me.Name} added the supplier {name}{(vendor is null ? "" : $" (SAP vendor number {vendor})")}{via}.");
+                    supplierIds[name.Trim().ToUpperInvariant()] = id;
+                }
+                // Existing suppliers without an SAP vendor number get the one from the file (D-109).
+                foreach (var (name, vendor) in extras.VendorNumbers.Where(v => !newSuppliers.ContainsKey(v.Key.ToUpperInvariant())))
+                {
+                    var sid = await c.ExecuteScalarAsync<int?>("SELECT Id FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@name))) AND VendorNumber IS NULL", new { name }, tx);
+                    if (sid is null) continue;
+                    await c.ExecuteAsync("UPDATE contracts.Supplier SET VendorNumber = @vendor, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @sid", new { vendor, me = me.Id, sid }, tx);
+                    await audit.WriteAsync(c, tx, me.AsActor(), "supplier.changed", "Supplier", sid, $"{me.Name} set {name}'s SAP vendor number to {vendor}{via}.");
+                }
+                var brisbane = TimeZoneInfo.FindSystemTimeZoneById("Australia/Brisbane");
+                var created = new List<string>();
+                foreach (var r in ready)
+                {
+                    saving = $"row {r.Row} ({r.LegacyReference})";
+                    var body = r.NewSupplier is { } ns ? r.Body! with { SupplierId = supplierIds[ns.Trim().ToUpperInvariant()] } : r.Body!;
+                    var (id, reference, errors) = await ContractEndpoints.CreateDraftAsync(c, tx, audit, me, body, $"{via.TrimEnd(')')}, row {r.Row})", r.Reference);
+                    if (errors is not null) throw new InvalidOperationException($"Row {r.Row} failed on import after passing the dry run: {string.Join("; ", errors.Values)}");
+                    var registeredUtc = TimeZoneInfo.ConvertTimeToUtc(r.RegisteredOn.ToDateTime(new TimeOnly(12, 0)), brisbane); // midday Brisbane: the same date in UTC
+                    var p = new DynamicParameters(new { id, stage = r.Outcome, legacy = r.LegacyReference, file = fileName.Length > 260 ? fileName[..260] : fileName, me = me.Id, registeredUtc,
+                        reason = $"Ended before it came into JBS Contracts (imported from {fileName})." });
+                    p.Add("endedOn", r.EndedOn?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
+                    await c.ExecuteAsync("""
+                        UPDATE contracts.Contract SET Stage = @stage, StageSinceUtc = @registeredUtc, IsLocked = 1, RegisteredUtc = @registeredUtc, RegisteredById = @me,
+                            LegacyReference = @legacy, ImportedUtc = SYSUTCDATETIME(), ImportedFrom = @file,
+                            EndedOn = CASE WHEN @stage = N'Ended' THEN @endedOn END, EndedReason = CASE WHEN @stage = N'Ended' THEN @reason END,
+                            UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
+                        WHERE Id = @id
+                        """, p, tx);
+                    await audit.WriteAsync(c, tx, me.AsActor(), "contract.imported", "Contract", id,
+                        $"{me.Name} imported {reference}{(reference == r.LegacyReference ? "" : $" (old reference {r.LegacyReference})")} from {fileName}, row {r.Row}, as {(r.Outcome == "Ended" ? $"Ended on {r.EndedOn:d MMM yyyy}" : "Effective")}; " +
+                        $"effective {r.EffectiveOn:d MMM yyyy}, registered {r.RegisteredOn:d MMM yyyy}.",
+                        new { legacyReference = r.LegacyReference, fileName, row = r.Row, stage = r.Outcome, effectiveOn = r.EffectiveOn, registeredOn = r.RegisteredOn, endedOn = r.EndedOn }, contractId: id);
+                    created.Add(reference);
+                }
+                await ContractNumbers.CatchUpAsync(c, tx); // new contracts carry on after the highest number
+                await audit.WriteAsync(c, tx, me.AsActor(), "import.contracts", "Import", null,
+                    $"{me.Name} imported {created.Count:N0} old contracts from {fileName} ({plan.Count(x => x.Outcome == "Effective"):N0} Effective, {plan.Count(x => x.Outcome == "Ended"):N0} Ended; " +
+                    $"{plan.Count(x => x.Outcome == "Already"):N0} already there, {plan.Count(x => x.Outcome == "Refused"):N0} not imported; {newSuppliers.Count:N0} new suppliers).");
+                saving = "the import";
+                await tx.CommitAsync();
+                return Results.Ok(new { imported = created.Count, first = created.FirstOrDefault(), last = created.LastOrDefault(), summary = Summary(plan, newSuppliers, extras) });
             }
-            // Existing suppliers without an SAP vendor number get the one from the file (D-109).
-            foreach (var (name, vendor) in extras.VendorNumbers.Where(v => !newSuppliers.ContainsKey(v.Key.ToUpperInvariant())))
+            catch (Exception ex) when (ex is not BusyException && ex is not SqlException { Number: -2 })
             {
-                var sid = await c.ExecuteScalarAsync<int?>("SELECT Id FROM contracts.Supplier WHERE NameKey = UPPER(LTRIM(RTRIM(@name))) AND VendorNumber IS NULL", new { name }, tx);
-                if (sid is null) continue;
-                await c.ExecuteAsync("UPDATE contracts.Supplier SET VendorNumber = @vendor, UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me WHERE Id = @sid", new { vendor, me = me.Id, sid }, tx);
-                await audit.WriteAsync(c, tx, me.AsActor(), "supplier.changed", "Supplier", sid, $"{me.Name} set {name}'s SAP vendor number to {vendor}{via}.");
+                // Rolled back (the transaction isn't committed): say which row and why, instead of a bare "That didn't work".
+                logs.CreateLogger("Import").LogError(ex, "The import failed saving {Saving}.", saving);
+                var why = SaveProblem(ex);
+                return ApiResults.Invalid($"Nothing was imported: {saving} couldn't be saved. {why} Fix it in the file (or leave that row out) and import again.",
+                    new() { ["file"] = why });
             }
-            var brisbane = TimeZoneInfo.FindSystemTimeZoneById("Australia/Brisbane");
-            var created = new List<string>();
-            foreach (var r in ready)
-            {
-                var body = r.NewSupplier is { } ns ? r.Body! with { SupplierId = supplierIds[ns.Trim().ToUpperInvariant()] } : r.Body!;
-                var (id, reference, errors) = await ContractEndpoints.CreateDraftAsync(c, tx, audit, me, body, $"{via.TrimEnd(')')}, row {r.Row})", r.Reference);
-                if (errors is not null) throw new InvalidOperationException($"Row {r.Row} failed on import after passing the dry run: {string.Join("; ", errors.Values)}");
-                var registeredUtc = TimeZoneInfo.ConvertTimeToUtc(r.RegisteredOn.ToDateTime(new TimeOnly(12, 0)), brisbane); // midday Brisbane: the same date in UTC
-                var p = new DynamicParameters(new { id, stage = r.Outcome, legacy = r.LegacyReference, file = fileName.Length > 260 ? fileName[..260] : fileName, me = me.Id, registeredUtc,
-                    reason = $"Ended before it came into JBS Contracts (imported from {fileName})." });
-                p.Add("endedOn", r.EndedOn?.ToDateTime(TimeOnly.MinValue), System.Data.DbType.Date);
-                await c.ExecuteAsync("""
-                    UPDATE contracts.Contract SET Stage = @stage, StageSinceUtc = @registeredUtc, IsLocked = 1, RegisteredUtc = @registeredUtc, RegisteredById = @me,
-                        LegacyReference = @legacy, ImportedUtc = SYSUTCDATETIME(), ImportedFrom = @file,
-                        EndedOn = CASE WHEN @stage = N'Ended' THEN @endedOn END, EndedReason = CASE WHEN @stage = N'Ended' THEN @reason END,
-                        UpdatedUtc = SYSUTCDATETIME(), UpdatedById = @me
-                    WHERE Id = @id
-                    """, p, tx);
-                await audit.WriteAsync(c, tx, me.AsActor(), "contract.imported", "Contract", id,
-                    $"{me.Name} imported {reference}{(reference == r.LegacyReference ? "" : $" (old reference {r.LegacyReference})")} from {fileName}, row {r.Row}, as {(r.Outcome == "Ended" ? $"Ended on {r.EndedOn:d MMM yyyy}" : "Effective")}; " +
-                    $"effective {r.EffectiveOn:d MMM yyyy}, registered {r.RegisteredOn:d MMM yyyy}.",
-                    new { legacyReference = r.LegacyReference, fileName, row = r.Row, stage = r.Outcome, effectiveOn = r.EffectiveOn, registeredOn = r.RegisteredOn, endedOn = r.EndedOn }, contractId: id);
-                created.Add(reference);
-            }
-            await ContractNumbers.CatchUpAsync(c, tx); // new contracts carry on after the highest number
-            await audit.WriteAsync(c, tx, me.AsActor(), "import.contracts", "Import", null,
-                $"{me.Name} imported {created.Count:N0} old contracts from {fileName} ({plan.Count(x => x.Outcome == "Effective"):N0} Effective, {plan.Count(x => x.Outcome == "Ended"):N0} Ended; " +
-                $"{plan.Count(x => x.Outcome == "Already"):N0} already there, {plan.Count(x => x.Outcome == "Refused"):N0} not imported; {newSuppliers.Count:N0} new suppliers).");
-            await tx.CommitAsync();
-            return Results.Ok(new { imported = created.Count, first = created.FirstOrDefault(), last = created.LastOrDefault(), summary = Summary(plan, newSuppliers, extras) });
         }));
 
         // Step 2: files from a ZIP, matched to contracts by the old (or JBSAUS) reference in the file's name or folders.

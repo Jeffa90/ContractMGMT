@@ -107,7 +107,8 @@ const topics = {
         </p>
         <p>
           <strong>The title</strong> is filled in for you as Supplier_Agreement type_What it covers (the lowest category level you picked), for example
-          Acme Casings_Supply Agreement_Collagen Casing. Type over it to use your own; <strong>Use the suggestion</strong> puts it back.
+          Acme Casings_Supply Agreement_Collagen Casing. Your admin chooses (under Contract fields) whether it's always made this way or people
+          can type their own; when they can, <strong>Use the suggestion</strong> puts it back.
         </p>
         <p>
           <strong>Category</strong> is the main spend: choose its family, then the category, and a subcategory if you like, or type a word in the box above them to
@@ -420,6 +421,11 @@ const topics = {
           </li>
         </ul>
         <p>A field's kind can't change once contracts have values in it. Add a new field instead and remove the old one.</p>
+        <p>
+          <strong>Contract titles</strong>: with <strong>Make the title from the details</strong> ticked, every title reads Supplier_Agreement type_What it covers
+          and people can't type their own. Untick it to let them; the form still suggests one. It saves straight away (not with Save changes) and shows in
+          Activity. Imported titles never change.
+        </p>
       </>
     ),
   },

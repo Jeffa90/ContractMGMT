@@ -193,7 +193,9 @@ export function ContractForm({
     toId(form.categoryId),
     lists.categories,
   )
-  const title = titleAuto ? suggestion : form.title
+  // While the admin has titles made from the details (D-132), it's always the suggestion; the server makes it the same way.
+  const titleLocked = layout.titleFromDetails === true
+  const title = titleLocked || titleAuto ? suggestion : form.title
   const owners = lists.owners
 
   const save = useMutation({
@@ -314,11 +316,16 @@ export function ContractForm({
               error={errors.title}
               help={
                 [
-                  titleAuto &&
+                  titleLocked &&
+                    (suggestion
+                      ? 'Made from the supplier, agreement type and category, so every title follows the same pattern.'
+                      : 'Made from the supplier, agreement type and category once you choose them below (Supplier_Agreement type_What it covers).'),
+                  !titleLocked &&
+                    titleAuto &&
                     (suggestion
                       ? 'Filled in from the supplier, agreement type and category. Type over it to change it.'
                       : 'Filled in as Supplier_Agreement type_What it covers once you choose them below, or type your own.'),
-                  help,
+                  !titleLocked && help, // the field's own help (for example how to word a title) doesn't apply while it's made for them
                 ]
                   .filter(Boolean)
                   .join(' ') || undefined
@@ -328,16 +335,19 @@ export function ContractForm({
                 <TextInput
                   {...p}
                   value={title}
+                  readOnly={titleLocked}
+                  placeholder={titleLocked ? 'Filled in from the details below' : undefined}
+                  className={titleLocked ? 'bg-muted' : undefined}
                   onChange={(e) => {
                     setTitleAuto(false)
                     set('title', e.target.value)
                   }}
                   maxLength={200}
-                  autoFocus={!c && !preview}
+                  autoFocus={!c && !preview && !titleLocked}
                 />
               )}
             </Field>
-            {!titleAuto && suggestion && suggestion !== form.title && (
+            {!titleLocked && !titleAuto && suggestion && suggestion !== form.title && (
               <button type="button" className="self-start text-left text-sm text-primary hover:underline" onClick={() => setTitleAuto(true)}>
                 Use the suggestion: {suggestion}
               </button>
@@ -662,7 +672,11 @@ export function ContractForm({
       <header>
         <h1 className="font-display text-xl font-semibold md:text-2xl">{c ? `Edit ${c.reference}` : 'Add a contract'}</h1>
         <p className="mt-1 text-muted-foreground">
-          {c ? 'Change the details while it is a draft.' : 'Only a title is needed to save a draft. Fill in the rest as you go.'}
+          {c
+            ? 'Change the details while it is a draft.'
+            : titleLocked
+              ? 'Choose the supplier, agreement type and category: the title is made from them. Fill in the rest as you go.'
+              : 'Only a title is needed to save a draft. Fill in the rest as you go.'}
         </p>
       </header>
       {body}

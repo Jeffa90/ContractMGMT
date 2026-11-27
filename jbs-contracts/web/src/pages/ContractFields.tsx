@@ -40,6 +40,34 @@ export function ContractFieldsPage() {
   return <Designer key={layout.data.versionId} saved={layout.data} />
 }
 
+/**
+ * Whether contract titles are made from the details (D-132): Supplier_Agreement type_What it covers, so every title follows the
+ * same pattern, or people can type their own (the form still suggests one). Saved straight away and recorded in Activity.
+ */
+function TitleSetting({ on }: { on: boolean }) {
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: (fromDetails: boolean) => api.put('/api/settings/title-from-details', { fromDetails }),
+    onSuccess: (_, fromDetails) => {
+      void queryClient.invalidateQueries({ queryKey: ['layout'] })
+      toast.success(fromDetails ? 'Titles are made from the details now.' : 'People can type their own titles now.')
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'That didn\'t save. Try again.'),
+  })
+  return (
+    <Card className="p-4">
+      <h2 className="font-display text-lg font-semibold">Contract titles</h2>
+      <Checkbox
+        label="Make the title from the details"
+        description="Every title reads Supplier_Agreement type_What it covers (the lowest category level picked), for example Acme Casings_Supply Agreement_Collagen Casing, and people can't type their own. Untick to let them type their own; the form still suggests one. Saved straight away. Imported titles never change."
+        checked={on}
+        disabled={save.isPending}
+        onChange={(v) => save.mutate(v)}
+      />
+    </Card>
+  )
+}
+
 function Designer({ saved }: { saved: Layout }) {
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<Draft>(() => structuredClone(saved))
@@ -52,7 +80,11 @@ function Designer({ saved }: { saved: Layout }) {
   const suppliers = useQuery({ queryKey: ['suppliers'], queryFn: () => api.get<Supplier[]>('/api/suppliers') })
   const people = useQuery({ queryKey: ['people-picker'], queryFn: () => api.get<{ id: number; name: string }[]>('/api/people/picker') })
 
-  const unsaved = useMemo(() => JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved])
+  // The title setting saves on its own (D-132), so it isn't part of the layout's unsaved changes.
+  const unsaved = useMemo(
+    () => JSON.stringify({ ...draft, titleFromDetails: undefined }) !== JSON.stringify({ ...saved, titleFromDetails: undefined }),
+    [draft, saved],
+  )
   useEffect(() => {
     if (!unsaved) return
     const warn = (e: BeforeUnloadEvent) => e.preventDefault()
@@ -108,7 +140,7 @@ function Designer({ saved }: { saved: Layout }) {
     })
   const moveSection = (index: number, by: number) => setDraft((d) => ({ ...d, sections: move(d.sections, index, by) }))
 
-  const previewLayout: Layout = { ...draft }
+  const previewLayout: Layout = { ...draft, titleFromDetails: saved.titleFromDetails }
   const ready = lists.data && suppliers.data && people.data
 
   return (
@@ -145,6 +177,7 @@ function Designer({ saved }: { saved: Layout }) {
           </ul>
         </Alert>
       )}
+      <TitleSetting on={saved.titleFromDetails === true} />
       <div className="lg:hidden">
         <Segmented label="Show" value={view} onChange={setView} options={[{ value: 'edit', label: 'Arrange' }, { value: 'preview', label: 'Preview' }]} />
       </div>

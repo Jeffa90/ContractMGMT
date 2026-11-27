@@ -441,3 +441,29 @@ test('The title is suggested as Supplier_Agreement type_What it covers, and can 
   await page.getByRole('button', { name: `Use the suggestion: ${suggested}` }).click()
   await expect(title).toHaveValue(suggested)
 })
+
+test('While titles are made from the details, the title can\'t be typed and fills in from the choices', async ({ page }) => {
+  // The setting is shared, so it's shown "on" to this page only; the server's side is checked in the API tests.
+  await page.route('**/api/layout', async (route) => {
+    const response = await route.fetch()
+    await route.fulfill({ response, json: { ...(await response.json()), titleFromDetails: true } })
+  })
+  await page.goto('/contracts/new')
+  await settled(page)
+  const title = page.getByLabel(/^Title/)
+  await expect(title).toHaveAttribute('readonly', '')
+  await expect(title).toHaveValue('')
+  await page.getByLabel(/^Supplier/).selectOption({ label: 'Southern Cross Freight (demo)' })
+  await page.getByLabel('Family', { exact: true }).selectOption({ label: 'Services' })
+  await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Freight' })
+  await expect(title).toHaveValue('Southern Cross Freight (demo)_Freight')
+  await expect(page.getByText('Made from the supplier, agreement type and category, so every title follows the same pattern.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Use the suggestion/ })).toHaveCount(0)
+  await expectAccessible(page)
+
+  // Admins switch it under Contract fields.
+  await page.goto('/admin/fields')
+  await settled(page, 'Contract fields')
+  await expect(page.getByRole('checkbox', { name: 'Make the title from the details' })).toBeChecked()
+  await expectAccessible(page)
+})

@@ -40,6 +40,7 @@ public static partial class LayoutEndpoints
         return new
         {
             versionId,
+            titleFromDetails = await ContractTitles.FromDetailsAsync(c, tx), // D-132
             sections = sections.Select(s => new { s.Key, s.Title, s.IsHidden }),
             fields = fields.Select(f => new
             {

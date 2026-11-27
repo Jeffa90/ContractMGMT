@@ -67,6 +67,7 @@ app.MapSupplierEndpoints();
 app.MapContractEndpoints();
 app.MapLegalEndpoints();
 app.MapLegalRecordEndpoints();
+app.MapContractTitleEndpoints();
 app.MapApprovalEndpoints();
 app.MapHomeEndpoints();
 app.MapDemoDataEndpoints();

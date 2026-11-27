@@ -43,7 +43,13 @@ export type LayoutField = {
   hasValues: boolean
 }
 
-export type Layout = { versionId: number; sections: LayoutSection[]; fields: LayoutField[] }
+export type Layout = {
+  versionId: number
+  sections: LayoutSection[]
+  fields: LayoutField[]
+  /** D-132: titles are made from the details and people can't type their own (an admin setting, saved on its own). */
+  titleFromDetails?: boolean
+}
 
 export const addedKinds: { kind: FieldKind; label: string; description: string }[] = [
   { kind: 'ShortText', label: 'Short text', description: 'A line of text, for example a policy number.' },

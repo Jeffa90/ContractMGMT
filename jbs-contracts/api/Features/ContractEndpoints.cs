@@ -292,6 +292,9 @@ public static class ContractEndpoints
             if (!me!.IsContractOwner) return ApiResults.NotAllowed("Only contract owners can add contracts. Ask your admin if you need to.");
             await using var c = await db.OpenAsync();
             await using var tx = await Db.BeginWriteAsync(c);
+            // The title is made from the details while the admin setting is on (D-132).
+            (body, var titleErrors) = await ContractTitles.ApplyAsync(c, tx, body);
+            if (titleErrors is not null) return ApiResults.Invalid(titleErrors["title"], titleErrors);
             var (id, reference, errors) = await CreateDraftAsync(c, tx, audit, me, body);
             if (errors is not null) return ApiResults.Invalid("Check the highlighted details.", errors);
             await tx.CommitAsync();
@@ -318,6 +321,12 @@ public static class ContractEndpoints
                 return ApiResults.Changed("Someone else changed this contract while you were editing. Your changes weren't saved. Reload to see the latest, then make your changes again.");
             // During an emergency unlock every change carries the unlock and its reason (D-79).
             var via = ContractAccess.IsUnlockedFor(me, before) ? $" (emergency unlock by {before.UnlockByName}: {before.UnlockReason})" : "";
+            // A draft's title follows its details while the setting is on (D-132); an admin's emergency correction keeps the title as sent.
+            if (!ContractAccess.IsUnlockedFor(me, before))
+            {
+                (body, var titleErrors) = await ContractTitles.ApplyAsync(c, tx, body);
+                if (titleErrors is not null) return ApiResults.Invalid(titleErrors["title"], titleErrors);
+            }
             var (errors2, after) = await UpdateDraftAsync(c, tx, audit, me, before, body, via);
             if (errors2 is not null) return ApiResults.Invalid("Check the highlighted details.", errors2);
             await tx.CommitAsync();

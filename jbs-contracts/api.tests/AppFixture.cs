@@ -58,6 +58,8 @@ public sealed class AppFixture : IAsyncLifetime
         // Reminders one email each by default in tests (their counts are checked); summaries are tested with people who choose them (D-99).
         await using var c = new SqlConnection(ConnectionString);
         await c.ExecuteAsync("UPDATE contracts.AppSetting SET Value = N'Each' WHERE Name = N'ReminderDelivery'");
+        // Tests raise contracts with their own titles; titles made from the details (D-132, on in a new database) are tested on their own.
+        await c.ExecuteAsync("UPDATE contracts.AppSetting SET Value = N'No' WHERE Name = N'TitleFromDetails'");
     }
 
     public async ValueTask DisposeAsync()

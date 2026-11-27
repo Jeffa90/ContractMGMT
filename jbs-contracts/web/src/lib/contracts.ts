@@ -28,6 +28,21 @@ export type Category = {
 }
 export type Lists = { items: ListItem[]; categories: Category[]; owners: { id: number; name: string }[] }
 
+/**
+ * The title the form suggests (D-131): Supplier_Agreement type_What it covers, where what it covers is the main category's lowest
+ * level picked (a subcategory, else the category; a subcategory called just "Other" uses its category). Missing parts are left out.
+ */
+export function suggestedTitle(supplier: string | null | undefined, agreementType: string | null | undefined, categoryId: number | null, categories: Category[]) {
+  const byId = new Map(categories.map((c) => [c.id, c]))
+  let covers = categoryId === null ? undefined : byId.get(categoryId)
+  if (covers && /^other$/i.test(covers.name.trim()) && covers.parentId !== null) covers = byId.get(covers.parentId)
+  return [supplier, agreementType, covers?.name]
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join('_')
+    .slice(0, 200)
+}
+
 /** The spend taxonomy's levels (D-115): Family > Category > Subcategory. */
 export const categoryLevels = ['Family', 'Category', 'Subcategory'] as const
 

@@ -14,7 +14,7 @@ import { CategoryPicker } from '@/components/CategoryPicker'
 import { Select, Textarea } from '@/components/form'
 import { Alert, Button, Card, Checkbox, Field, Skeleton, TextInput } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
-import { categoryPaths, type Category, type ContractDetail, type Lists, type Supplier } from '@/lib/contracts'
+import { categoryPaths, suggestedTitle, type Category, type ContractDetail, type Lists, type Supplier } from '@/lib/contracts'
 import { arrange, type FieldValue, type Layout, type LayoutField } from '@/lib/layout'
 import { useMe } from '@/lib/me'
 import { formatDate } from '@/lib/format'
@@ -167,6 +167,10 @@ export function ContractForm({
   const [extra, setExtra] = useState<Record<string, FieldValue>>(() =>
     Object.fromEntries(Object.entries(detail?.fieldValues ?? {}).map(([k, v]) => [k, v.value])),
   )
+  // The suggested title (D-131) fills the title until someone types their own; a draft keeps following it while its title still matches.
+  const [titleAuto, setTitleAuto] = useState(
+    () => !c || c.title === suggestedTitle(c.supplierName, c.agreementTypeName, c.categoryId ?? null, lists.categories),
+  )
   const [touched, setTouched] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [problem, setProblem] = useState<string | null>(null)
@@ -183,6 +187,13 @@ export function ContractForm({
   const options = (listName: string, current: string) => lists.items.filter((i) => i.listName === listName && (i.isActive || keep(i.id, current)))
   const paths = useMemo(() => new Map(categoryPaths(lists.categories).map((p) => [p.id, p.path])), [lists.categories])
   const activeSuppliers = suppliers.filter((s) => s.isActive || keep(s.id, form.supplierId))
+  const suggestion = suggestedTitle(
+    suppliers.find((s) => String(s.id) === form.supplierId)?.name,
+    lists.items.find((i) => String(i.id) === form.agreementTypeId)?.value,
+    toId(form.categoryId),
+    lists.categories,
+  )
+  const title = titleAuto ? suggestion : form.title
   const owners = lists.owners
 
   const save = useMutation({
@@ -190,7 +201,7 @@ export function ContractForm({
       // Only added fields someone changed are sent, so a hidden field's value is never touched.
       const fields = Object.fromEntries([...touched].map((k) => [k, extra[k] === '' ? null : extra[k]]))
       const body = {
-        title: form.title,
+        title,
         description: form.description || null,
         supplierId: toId(form.supplierId),
         categoryId: toId(form.categoryId),
@@ -296,9 +307,42 @@ export function ContractForm({
     switch (f.key) {
       case 'title':
         return (
-          <Field label={f.label} required error={errors.title} help={help}>
-            {(p) => <TextInput {...p} value={form.title} onChange={(e) => set('title', e.target.value)} maxLength={200} autoFocus={!c && !preview} />}
-          </Field>
+          <div className="flex flex-col gap-1">
+            <Field
+              label={f.label}
+              required
+              error={errors.title}
+              help={
+                [
+                  titleAuto &&
+                    (suggestion
+                      ? 'Filled in from the supplier, agreement type and category. Type over it to change it.'
+                      : 'Filled in as Supplier_Agreement type_What it covers once you choose them below, or type your own.'),
+                  help,
+                ]
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }
+            >
+              {(p) => (
+                <TextInput
+                  {...p}
+                  value={title}
+                  onChange={(e) => {
+                    setTitleAuto(false)
+                    set('title', e.target.value)
+                  }}
+                  maxLength={200}
+                  autoFocus={!c && !preview}
+                />
+              )}
+            </Field>
+            {!titleAuto && suggestion && suggestion !== form.title && (
+              <button type="button" className="self-start text-left text-sm text-primary hover:underline" onClick={() => setTitleAuto(true)}>
+                Use the suggestion: {suggestion}
+              </button>
+            )}
+          </div>
         )
       case 'supplier':
         return (

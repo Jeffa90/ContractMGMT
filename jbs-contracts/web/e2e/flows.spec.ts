@@ -417,3 +417,27 @@ test('Your supplier actions show as a tile in Your turn, and it takes you to the
   await expect(page.getByText(`Send the price list ${name}`)).toBeVisible()
   await expectAccessible(page)
 })
+
+test('The title is suggested as Supplier_Agreement type_What it covers, and can be typed over', async ({ page }) => {
+  await page.goto('/contracts/new')
+  await settled(page)
+  const title = page.getByLabel(/^Title/)
+  await page.getByLabel(/^Supplier/).selectOption({ label: 'Southern Cross Freight (demo)' })
+  await expect(title).toHaveValue('Southern Cross Freight (demo)')
+  await page.getByLabel(/^Agreement type/).selectOption({ index: 1 })
+  await page.getByLabel('Family', { exact: true }).selectOption({ label: 'Services' })
+  await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Freight' })
+  await expect(title).toHaveValue(/^Southern Cross Freight \(demo\)_.+_Freight$/)
+  await page.getByLabel('Subcategory (optional)').selectOption({ label: 'Linehaul' })
+  await expect(title).toHaveValue(/^Southern Cross Freight \(demo\)_.+_Linehaul$/)
+  const suggested = await title.inputValue()
+  await expectAccessible(page)
+
+  // Typed over, it stays; the suggestion can be put back.
+  await title.fill('Linehaul to Townsville')
+  await page.getByLabel('Subcategory (optional)').selectOption({ index: 0 })
+  await expect(title).toHaveValue('Linehaul to Townsville')
+  await page.getByLabel('Subcategory (optional)').selectOption({ label: 'Linehaul' })
+  await page.getByRole('button', { name: `Use the suggestion: ${suggested}` }).click()
+  await expect(title).toHaveValue(suggested)
+})

@@ -106,6 +106,10 @@ const topics = {
           until you send it on, when the required fields are checked.
         </p>
         <p>
+          <strong>The title</strong> is filled in for you as Supplier_Agreement type_What it covers (the lowest category level you picked), for example
+          Acme Casings_Supply Agreement_Collagen Casing. Type over it to use your own; <strong>Use the suggestion</strong> puts it back.
+        </p>
+        <p>
           <strong>Category</strong> is the main spend: choose its family, then the category, and a subcategory if you like, or type a word in the box above them to
           find it. If the contract covers other spend too (for example casings and premixes), click <strong>Add another category</strong>. The main
           category sets the supplier's tier.

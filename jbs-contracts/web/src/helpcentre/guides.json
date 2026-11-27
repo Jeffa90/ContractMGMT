@@ -533,7 +533,7 @@
         "Check where each column goes. Old reference, title, supplier, category and owner are needed; you can choose a default owner and category for rows without one.",
         "Click **Check (nothing changes yet)**. Each row shows whether it goes in as Effective or Ended, is already there, or can't be imported and why.",
         "Click **Import** and confirm. Current contracts become Effective and locked with their original dates; expired ones Ended.",
-        "Then add their files: choose (or drag in) a ZIP with the old reference in each file's name or folder. What each file is (signed copy, draft, variation, cover page) comes from words in its folder or name; change any that are wrong, then click **Add files**."
+        "Then add their files: choose (or drag in) the ZIPs, as many as you like, or drag in the whole folder of them. Each file is matched by the old or JBSAUS reference in its name, its folder or the ZIP's name. What each file is (signed copy, draft, variation, cover page) comes from words in its folder or name; change any that are wrong, then click **Add files**."
       ]
     },
     {

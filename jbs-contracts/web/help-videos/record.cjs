@@ -430,7 +430,7 @@ const videos = {
       await s.click(p.getByRole('button', { name: /^Import \d+ contracts/ }), 900)
       await s.click(p.getByRole('dialog').getByRole('button', { name: /^Import \d+/ }), 2200)
       await s.step(5)
-      await s.upload(p.getByRole('button', { name: 'Choose a ZIP' }), zip, 1800)
+      await s.upload(p.getByRole('button', { name: 'Choose ZIPs' }), zip, 1800)
       await s.point(p.getByText('What the matched files are:'), 1600)
       await s.point(p.getByLabel('What MED-1001 Cover page - sign off.pdf is'), 1400)
       await s.click(p.getByRole('button', { name: /^Add \d+ files?/ }), 2200)

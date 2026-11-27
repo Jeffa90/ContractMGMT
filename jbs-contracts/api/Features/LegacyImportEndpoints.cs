@@ -64,7 +64,8 @@ public static class LegacyImportEndpoints
 
     /// <summary>
     /// True for ended, false for current, null when the status isn't clear. Whole words only, so "Invalid" isn't read as "valid",
-    /// and a negative ("Not renewed", "Not active") or anything with words for both is left for a person to decide.
+    /// and a negative ("Not renewed", "Not active") or anything with words for both is left for a person to decide. Medius's
+    /// "Ended (Renewed)" and "Terminated (Renewed)" ended and were replaced by a renewal, so they're ended (D-126).
     /// </summary>
     internal static bool? StatusSays(string status)
     {
@@ -72,7 +73,7 @@ public static class LegacyImportEndpoints
         var text = string.Join(' ', words);
         if (words.Any(NotWords.Contains)) return null;
         var isEnded = words.Any(EndedWords.Contains);
-        var isCurrent = words.Any(CurrentWords.Contains) || text.Contains("in force");
+        var isCurrent = words.Any(w => CurrentWords.Contains(w) && !(isEnded && w == "renewed")) || text.Contains("in force");
         return isEnded == isCurrent ? null : isEnded;
     }
 

@@ -316,3 +316,74 @@ test('The SAP outline agreement number is added on an Effective contract without
   await expect(page.getByRole('definition').filter({ hasText: number }).getByRole('button', { name: 'Change SAP outline agreement number' })).toBeVisible()
   await expect(page.getByText(new RegExp(`SAP outline agreement number .*${number}`)).first()).toBeVisible() // in Activity
 })
+
+/** A ZIP of the given files, stored without compression (enough for the import, with no zip library). */
+function zipOf(files: Record<string, string>): Buffer {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    return c >>> 0
+  })
+  const crc32 = (b: Buffer) => {
+    let c = 0xffffffff
+    for (const x of b) c = crcTable[(c ^ x) & 0xff] ^ (c >>> 8)
+    return (c ^ 0xffffffff) >>> 0
+  }
+  const local: Buffer[] = []
+  const central: Buffer[] = []
+  let offset = 0
+  for (const [name, text] of Object.entries(files)) {
+    const data = Buffer.from(text)
+    const fileName = Buffer.from(name)
+    const crc = crc32(data)
+    const head = Buffer.alloc(30)
+    head.writeUInt32LE(0x04034b50, 0)
+    head.writeUInt16LE(20, 4)
+    head.writeUInt32LE(crc, 14)
+    head.writeUInt32LE(data.length, 18)
+    head.writeUInt32LE(data.length, 22)
+    head.writeUInt16LE(fileName.length, 26)
+    local.push(head, fileName, data)
+    const dir = Buffer.alloc(46)
+    dir.writeUInt32LE(0x02014b50, 0)
+    dir.writeUInt16LE(20, 4)
+    dir.writeUInt16LE(20, 6)
+    dir.writeUInt32LE(crc, 16)
+    dir.writeUInt32LE(data.length, 20)
+    dir.writeUInt32LE(data.length, 24)
+    dir.writeUInt16LE(fileName.length, 28)
+    dir.writeUInt32LE(offset, 42)
+    central.push(dir, fileName)
+    offset += 30 + fileName.length + data.length
+  }
+  const size = central.reduce((s, b) => s + b.length, 0)
+  const end = Buffer.alloc(22)
+  end.writeUInt32LE(0x06054b50, 0)
+  end.writeUInt16LE(central.length / 2, 8)
+  end.writeUInt16LE(central.length / 2, 10)
+  end.writeUInt32LE(size, 12)
+  end.writeUInt32LE(offset, 16)
+  return Buffer.concat([...local, ...central, end])
+}
+
+test('Files from many ZIPs at once: one per contract, matched by the ZIP name, added one after another', async ({ page, api }, info) => {
+  const list = (await (await api.get('/api/contracts?view=all')).json()) as { reference: string; stage: string }[]
+  const [a, b] = list.filter((k) => k.stage === 'Effective').slice(-2)
+  const stamp = `${info.project.name}-${Date.now()}`
+  const zips = [a, b].map((k) => ({
+    name: `${k.reference}_Supply_agreement.zip`,
+    mimeType: 'application/zip',
+    buffer: zipOf({ [`General/signed agreement ${stamp}.pdf`]: `%PDF-1.4 ${k.reference} ${stamp}` }),
+  }))
+  await page.goto('/admin/import')
+  await settled(page, 'Import old contracts')
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Choose ZIPs' }).click()
+  await (await chooser).setFiles(zips)
+  await expect(page.getByText('2 ZIPs (')).toBeVisible()
+  await expect(page.getByText('Matched (2 contracts)')).toBeVisible()
+  await expect(page.getByText(`In ${zips[0].name}`)).toBeVisible()
+  await expectAccessible(page)
+  await page.getByRole('button', { name: 'Add 2 files' }).click()
+  await expect(page.getByText('2 files added to their contracts.')).toBeVisible()
+})

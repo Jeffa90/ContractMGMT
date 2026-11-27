@@ -236,7 +236,12 @@ public sealed class HardeningTests(AppFixture app)
     [InlineData("Not active", null)]
     [InlineData("Invalid", null)]
     [InlineData("Pending", null)]
-    [InlineData("Expired, renewed", null)]
+    [InlineData("Expired, renewed", true)]        // ended and replaced by a renewal (D-126)
+    [InlineData("Ended (Renewed)", true)]
+    [InlineData("Terminated (Renewed)", true)]
+    [InlineData("Active, expired", null)]
+    [InlineData("Draft", null)]
+    [InlineData("Awaiting Approval", null)]
     public void Import_status_words_are_read_whole_and_negatives_are_left_for_a_person(string status, bool? ended) =>
         Assert.Equal(ended, LegacyImportEndpoints.StatusSays(status));
 }

@@ -12,8 +12,40 @@ import { Button } from './ui'
 const hasFiles = (e: { dataTransfer: DataTransfer | null }) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
 const allowed = (f: File, extensions: string[]) => extensions.some((x) => f.name.toLowerCase().endsWith(x.toLowerCase()))
 
+/**
+ * The files in a drop, including those inside dropped folders (and their folders), for dropping a whole export folder at once.
+ * The entries are taken straight away: the browser empties the drop once the handler returns.
+ */
+async function droppedFiles(data: DataTransfer): Promise<{ files: File[]; fromFolder: boolean }> {
+  const entries = Array.from(data.items ?? [])
+    .map((i) => i.webkitGetAsEntry?.() ?? null)
+    .filter((e): e is FileSystemEntry => e !== null)
+  if (!entries.some((e) => e.isDirectory)) return { files: Array.from(data.files), fromFolder: false }
+  const files: File[] = []
+  const walk = async (entry: FileSystemEntry): Promise<void> => {
+    if (entry.isFile) files.push(await new Promise<File>((ok, fail) => (entry as FileSystemFileEntry).file(ok, fail)))
+    else if (entry.isDirectory) {
+      const reader = (entry as FileSystemDirectoryEntry).createReader()
+      for (;;) {
+        const batch = await new Promise<FileSystemEntry[]>((ok, fail) => reader.readEntries(ok, fail))
+        if (batch.length === 0) break
+        for (const child of batch) await walk(child)
+      }
+    }
+  }
+  for (const entry of entries) await walk(entry)
+  return { files, fromFolder: true }
+}
+
 /** Dragging files over an area: highlights it while files are over it and hands over the allowed ones when dropped. */
-function useFileDrop(extensions: string[], what: string, onFiles: (files: File[]) => void, onRefused: (message: string) => void, enabled = true) {
+function useFileDrop(
+  extensions: string[],
+  what: string,
+  onFiles: (files: File[]) => void,
+  onRefused: (message: string) => void,
+  enabled = true,
+  folders = false,
+) {
   const [over, setOver] = useState(false)
 
   // A file dropped just outside the area would make the browser leave the page to show it. Stop that while this is on screen.
@@ -30,10 +62,13 @@ function useFileDrop(extensions: string[], what: string, onFiles: (files: File[]
     }
   }, [enabled])
 
-  const take = (files: File[]) => {
+  // From a dropped folder, other kinds of file are passed over quietly; only an empty result is a problem.
+  const take = (files: File[], fromFolder = false) => {
     const ok = files.filter((f) => allowed(f, extensions))
     const refused = files.filter((f) => !allowed(f, extensions))
-    if (refused.length > 0) onRefused(`${refused.map((f) => f.name).join(', ')} ${refused.length === 1 ? "isn't" : "aren't"} ${what}. Choose ${what}.`)
+    if (fromFolder) {
+      if (ok.length === 0) onRefused(`There's no ${what} in that folder.`)
+    } else if (refused.length > 0) onRefused(`${refused.map((f) => f.name).join(', ')} ${refused.length === 1 ? "isn't" : "aren't"} ${what}. Choose ${what}.`)
     if (ok.length > 0) onFiles(ok)
   }
 
@@ -53,7 +88,11 @@ function useFileDrop(extensions: string[], what: string, onFiles: (files: File[]
       if (!enabled || !hasFiles(e)) return
       e.preventDefault()
       setOver(false)
-      take(Array.from(e.dataTransfer.files))
+      if (!folders) return take(Array.from(e.dataTransfer.files))
+      droppedFiles(e.dataTransfer).then(
+        ({ files, fromFolder }) => take(files, fromFolder),
+        () => onRefused("That folder couldn't be read. Choose the files instead."),
+      )
     },
   }
   return { over, handlers, take }
@@ -98,7 +137,8 @@ export function DropZone({
     if (multiple) onFiles?.(list)
     else onFile?.(list[0])
   }
-  const { over, handlers, take } = useFileDrop(extensions, what, give, setProblem)
+  // With multiple, a dropped folder gives the allowed files inside it.
+  const { over, handlers, take } = useFileDrop(extensions, what, give, setProblem, true, multiple)
 
   return (
     <div

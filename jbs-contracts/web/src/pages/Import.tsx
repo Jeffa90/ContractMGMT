@@ -983,6 +983,29 @@ function ContractsStep() {
 
 // ------------------------------------------------------------------ Step 2: files
 
+type FileRow = FilesPlan["files"][number] & {
+  key: string;
+  zip: string;
+  at: number;
+};
+type ZipResult = { zip: File; plan: FilesPlan | null; error: string | null };
+
+/** Runs the work for each item, a few at a time, in order of the list, reporting each one as it finishes. */
+async function eachOf<T>(
+  items: T[],
+  at: number,
+  work: (item: T, index: number) => Promise<void>,
+) {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      await work(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(at, items.length) }, worker));
+}
+
 function FilesStep() {
   const lists = useQuery({
     queryKey: ["lists"],
@@ -990,50 +1013,121 @@ function FilesStep() {
   });
   const kinds = withAddedKinds(allDocumentKinds, lists.data);
   const kindLabel = (k: string) => kinds.find((x) => x.value === k)?.label ?? k;
-  const [file, setFile] = useState<File | null>(null);
+  // Any number of ZIPs (D-127): Medius gives one per contract. Each is checked and added on its own, one after another,
+  // so each stays within the size limit and a problem with one doesn't stop the rest.
+  const [results, setResults] = useState<ZipResult[]>([]);
   const [kind, setKind] = useState("Supporting");
-  // The admin's own choice of kind for a file (by its path in the ZIP), over what was worked out from its name.
+  // The admin's own choice of kind for a file (by its ZIP and path), over what was worked out from its name.
   const [chosen, setChosen] = useState<Record<string, string>>({});
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [plan, setPlan] = useState<FilesPlan | null>(null);
   const [show, setShow] = useState<"problems" | "matched" | "all">("matched");
+  const [progress, setProgress] = useState<{
+    verb: string;
+    done: number;
+    total: number;
+  } | null>(null);
   const [done, setDone] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const form = (f: File) => {
+  const form = (f: File, kinds: Record<string, string>, defaultKind = kind) => {
     const data = new FormData();
     data.append("file", f);
-    data.append("kind", kind);
-    data.append("kinds", JSON.stringify(chosen));
+    data.append("kind", defaultKind);
+    data.append("kinds", JSON.stringify(kinds));
     return data;
   };
-  const check = useMutation({
-    mutationFn: (f: File) =>
-      postForm<FilesPlan>("/api/import/files/preview", form(f)),
-    onSuccess: (p) => {
-      setPlan(p);
-      setChosen({});
-      setDone(null);
-      setError(null);
-      setShow(p.unmatched + p.refused > 0 ? "problems" : "matched");
-    },
-    onError: (e) => setError(errorText(e)),
-  });
-  const run = useMutation({
-    mutationFn: () =>
-      postForm<{ imported: number; summary: FilesPlan }>(
-        "/api/import/files/import",
-        form(file!),
-      ),
-    onSuccess: (r) => {
-      setDone(r.imported);
-      setPlan(r.summary);
-      toast.success(`${r.imported} files added.`);
-    },
-    onError: (e) => setError(errorText(e)),
-  });
-  const kindOf = (f: FilesPlan["files"][number]) => chosen[f.path] ?? f.kind;
-  const matchedFiles = (plan?.files ?? []).filter((f) => f.outcome === "Match");
+
+  const check = async (zips: File[], defaultKind = kind) => {
+    const out: ZipResult[] = zips.map((zip) => ({
+      zip,
+      plan: null,
+      error: null,
+    }));
+    setResults(out);
+    setChosen({});
+    setDone(null);
+    setProgress({ verb: "Checking", done: 0, total: zips.length });
+    let count = 0;
+    await eachOf(zips, 3, async (zip, i) => {
+      try {
+        out[i] = {
+          zip,
+          plan: await postForm<FilesPlan>(
+            "/api/import/files/preview",
+            form(zip, {}, defaultKind),
+          ),
+          error: null,
+        };
+      } catch (e) {
+        out[i] = { zip, plan: null, error: errorText(e) };
+      }
+      setProgress({ verb: "Checking", done: ++count, total: zips.length });
+    });
+    setProgress(null);
+    setResults([...out]);
+    const plans = out.flatMap((r) => (r.plan ? [r.plan] : []));
+    setShow(
+      plans.some((p) => p.unmatched + p.refused > 0) ? "problems" : "matched",
+    );
+  };
+
+  const rows: FileRow[] = results.flatMap((r, at) =>
+    (r.plan?.files ?? []).map((f) => ({
+      ...f,
+      key: `${at}|${f.path}`,
+      zip: r.zip.name,
+      at,
+    })),
+  );
+  const kindOf = (f: FileRow) => chosen[f.key] ?? f.kind;
+  const matchedFiles = rows.filter((f) => f.outcome === "Match");
+  const count = (o: FileOutcome) => rows.filter((f) => f.outcome === o).length;
+  const stats = {
+    matched: matchedFiles.length,
+    already: count("Already"),
+    unmatched: count("Unmatched"),
+    refused: count("Refused"),
+    contracts: new Set(matchedFiles.map((f) => f.reference)).size,
+  };
+  const failed = results.filter((r) => r.error);
+  const checked = results.length > 0 && !progress;
+
+  const run = async () => {
+    const todo = results
+      .map((r, at) => ({ r, at }))
+      .filter(({ r }) => r.plan && r.plan.matched > 0);
+    const out = [...results];
+    let added = 0;
+    let finished = 0;
+    setProgress({ verb: "Adding files from", done: 0, total: todo.length });
+    // One at a time: each ZIP's files go onto their contracts before the next.
+    await eachOf(todo, 1, async ({ r, at }) => {
+      const mine = Object.fromEntries(
+        Object.entries(chosen)
+          .filter(([k]) => k.startsWith(`${at}|`))
+          .map(([k, v]) => [k.slice(k.indexOf("|") + 1), v]),
+      );
+      try {
+        const result = await postForm<{ imported: number; summary: FilesPlan }>(
+          "/api/import/files/import",
+          form(r.zip, mine),
+        );
+        added += result.imported;
+        out[at] = { zip: r.zip, plan: result.summary, error: null };
+      } catch (e) {
+        out[at] = { zip: r.zip, plan: r.plan, error: errorText(e) };
+      }
+      setProgress({
+        verb: "Adding files from",
+        done: ++finished,
+        total: todo.length,
+      });
+    });
+    setProgress(null);
+    setResults(out);
+    setDone(added);
+    toast.success(`${added} files added.`);
+  };
+
   const kindCounts = kinds
     .map((k) => ({
       ...k,
@@ -1043,17 +1137,18 @@ function FilesStep() {
   const changeAll = () => {
     if (!from || !to || from === to) return;
     const next = { ...chosen };
-    for (const f of matchedFiles) if (kindOf(f) === from) next[f.path] = to;
+    for (const f of matchedFiles) if (kindOf(f) === from) next[f.key] = to;
     setChosen(next);
     setFrom("");
   };
-  const files = (plan?.files ?? []).filter(
+  const files = rows.filter(
     (f) =>
       show === "all" ||
       (show === "matched"
         ? f.outcome === "Match"
         : f.outcome === "Unmatched" || f.outcome === "Refused"),
   );
+  const many = results.length > 1;
   return (
     <Card className="flex flex-col gap-4 p-5">
       <div className="flex items-start gap-3">
@@ -1066,14 +1161,16 @@ function FilesStep() {
             2. Their files from ZIPs
           </h2>
           <p className="text-sm text-muted-foreground">
-            Each file is matched to a contract by the old reference (or JBSAUS
-            reference) in its name or folder, for example MED-1042 Signed.pdf or
-            MED-1042/agreement.pdf, or else in the ZIP's own name (Medius's
-            one ZIP per contract, for example JBSAUS0000300_Supply_agreement.zip). One ZIP can mix signed copies, drafts,
-            variations, cover pages and other files: what each one is comes from
-            words in its folder or name, and you can change any of them before
-            adding. Up to 25 MB per ZIP: use several ZIPs for more. A file
-            already on its contract is skipped, so a ZIP can be imported twice
+            Choose as many ZIPs as you like, or drag the whole folder of them
+            here: they're checked and added one after another. Each file is
+            matched to a contract by the old reference (or JBSAUS reference) in
+            its name or folder, for example MED-1042 Signed.pdf or
+            MED-1042/agreement.pdf, or else in the ZIP's own name (Medius's one
+            ZIP per contract, for example JBSAUS0000300_Supply_agreement.zip). A
+            ZIP can mix signed copies, drafts, variations, cover pages and other
+            files: what each one is comes from words in its folder or name, and
+            you can change any of them before adding. Up to 25 MB per ZIP. A
+            file already on its contract is skipped, so ZIPs can be added twice
             safely.
           </p>
         </div>
@@ -1087,9 +1184,14 @@ function FilesStep() {
             <Select
               {...p}
               value={kind}
+              disabled={!!progress}
               onChange={(e) => {
                 setKind(e.target.value);
-                setPlan(null);
+                if (results.length > 0)
+                  void check(
+                    results.map((r) => r.zip),
+                    e.target.value,
+                  );
               }}
             >
               {kinds.map((k) => (
@@ -1103,22 +1205,58 @@ function FilesStep() {
       </div>
       <DropZone
         extensions={[".zip"]}
-        what="a ZIP"
-        label="Choose a ZIP"
-        file={file}
-        busy={check.isPending}
-        onFile={(f) => {
-          setFile(f);
-          setPlan(null);
-          setDone(null);
-          if (f) check.mutate(f);
+        what="ZIPs"
+        label="Choose ZIPs"
+        multiple
+        files={results.map((r) => r.zip)}
+        busy={!!progress}
+        onFiles={(list) => {
+          if (!progress) void check(list);
         }}
       />
-      {check.isPending && (
-        <p className="text-sm text-muted-foreground">Checking the files…</p>
+      {results.length > 0 && !progress && (
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {results.length === 1
+            ? `${results[0].zip.name} (${formatBytes(results[0].zip.size)})`
+            : `${results.length} ZIPs (${formatBytes(results.reduce((s, r) => s + r.zip.size, 0))})`}
+        </p>
       )}
-      {error && <Alert tone="danger" title={error} />}
-      {plan && (
+      {progress && (
+        <div className="flex flex-col gap-1" aria-live="polite">
+          <p className="text-sm">
+            {progress.verb}{" "}
+            {progress.total === 1
+              ? "the ZIP"
+              : `ZIP ${Math.min(progress.done + 1, progress.total)} of ${progress.total}`}
+            …
+          </p>
+          <progress
+            value={progress.done}
+            max={Math.max(progress.total, 1)}
+            aria-label={`${progress.verb} ZIPs`}
+            className="h-2 w-full accent-primary"
+          />
+        </div>
+      )}
+      {checked && failed.length > 0 && (
+        <Alert
+          tone="danger"
+          title={`${failed.length} ${failed.length === 1 ? "ZIP" : "ZIPs"} couldn't be ${done !== null ? "added" : "checked"}`}
+        >
+          <ul className="list-disc pl-5">
+            {failed.slice(0, 20).map((r) => (
+              <li key={r.zip.name}>
+                {r.zip.name}: {r.error}
+              </li>
+            ))}
+          </ul>
+          {failed.length > 20 && <p>And {failed.length - 20} more.</p>}
+          <p className="mt-1">
+            The others aren't affected. Fix these and choose them again.
+          </p>
+        </Alert>
+      )}
+      {checked && results.some((r) => r.plan) && (
         <section
           aria-labelledby="files-dry-run"
           className="flex flex-col gap-3"
@@ -1128,13 +1266,13 @@ function FilesStep() {
           </h3>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat
-              label={`Matched (${plan.contracts} contracts)`}
-              value={plan.matched}
+              label={`Matched (${stats.contracts} contracts)`}
+              value={stats.matched}
               tone="success"
             />
-            <Stat label="Already there" value={plan.already} />
-            <Stat label="Not matched" value={plan.unmatched} tone="danger" />
-            <Stat label="Can't add" value={plan.refused} tone="danger" />
+            <Stat label="Already there" value={stats.already} />
+            <Stat label="Not matched" value={stats.unmatched} tone="danger" />
+            <Stat label="Can't add" value={stats.refused} tone="danger" />
           </div>
           <div>
             <Segmented
@@ -1142,13 +1280,13 @@ function FilesStep() {
               value={show}
               onChange={setShow}
               options={[
-                { value: "matched", label: "Matched", count: plan.matched },
+                { value: "matched", label: "Matched", count: stats.matched },
                 {
                   value: "problems",
                   label: "Not matched or not allowed",
-                  count: plan.unmatched + plan.refused,
+                  count: stats.unmatched + stats.refused,
                 },
-                { value: "all", label: "All files", count: plan.files.length },
+                { value: "all", label: "All files", count: rows.length },
               ]}
             />
           </div>
@@ -1201,12 +1339,13 @@ function FilesStep() {
             <ul className="max-h-[24rem] divide-y divide-border overflow-y-auto rounded-[var(--radius-card)] border border-border">
               {files.slice(0, 500).map((f) => (
                 <li
-                  key={f.path}
+                  key={f.key}
                   className="flex flex-col gap-1 p-3 text-sm sm:flex-row sm:items-start sm:justify-between"
                 >
                   <div className="min-w-0">
                     <p className="font-medium break-all">{f.path}</p>
                     <p className="text-muted-foreground">
+                      {many && <span className="break-all">In {f.zip} · </span>}
                       {formatBytes(f.size)}
                       {f.reference && ` · to ${f.reference} ${f.title ?? ""}`}
                       {f.reason && ` · ${f.reason}`}
@@ -1222,7 +1361,7 @@ function FilesStep() {
                           aria-label={`What ${f.path.split("/").pop()} is`}
                           value={kindOf(f)}
                           onChange={(e) =>
-                            setChosen({ ...chosen, [f.path]: e.target.value })
+                            setChosen({ ...chosen, [f.key]: e.target.value })
                           }
                           className="min-h-9 sm:w-72"
                         >
@@ -1233,7 +1372,7 @@ function FilesStep() {
                           ))}
                         </Select>
                         <span className="text-xs text-muted-foreground">
-                          {chosen[f.path]
+                          {chosen[f.key]
                             ? "You chose"
                             : `From ${f.kindWhy ?? "your default"}`}
                         </span>
@@ -1247,6 +1386,12 @@ function FilesStep() {
                   </div>
                 </li>
               ))}
+              {files.length > 500 && (
+                <li className="p-3 text-sm text-muted-foreground">
+                  Showing the first 500 of {files.length}. All of them are
+                  added.
+                </li>
+              )}
             </ul>
           )}
           {done !== null ? (
@@ -1254,19 +1399,19 @@ function FilesStep() {
               tone="success"
               title={`${done} files added to their contracts.`}
             >
-              Choose the next ZIP to carry on.
+              Choose more ZIPs to carry on.
             </Alert>
           ) : (
             <div>
               <Button
                 variant="primary"
-                disabled={plan.matched === 0}
-                loading={run.isPending}
-                onClick={() => run.mutate()}
+                disabled={stats.matched === 0}
+                loading={!!progress}
+                onClick={() => void run()}
               >
-                {plan.matched === 0
+                {stats.matched === 0
                   ? "No files to add"
-                  : `Add ${plan.matched} ${plan.matched === 1 ? "file" : "files"}`}
+                  : `Add ${stats.matched} ${stats.matched === 1 ? "file" : "files"}`}
               </Button>
             </div>
           )}

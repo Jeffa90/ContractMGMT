@@ -1,21 +1,21 @@
 WEBVTT
 
 1
-00:00:00.031 --> 00:00:03.258
+00:00:00.053 --> 00:00:03.298
 1. Go to Import old contracts under Admin and click Choose the spreadsheet (or drag it onto the box): Excel or CSV, one contract per row.
 
 2
-00:00:03.258 --> 00:00:07.840
+00:00:03.298 --> 00:00:07.904
 2. Check where each column goes. Old reference, title, supplier, category and owner are needed; you can choose a default owner and category for rows without one.
 
 3
-00:00:07.840 --> 00:00:14.067
+00:00:07.904 --> 00:00:14.165
 3. Click Check (nothing changes yet). Each row shows whether it goes in as Effective or Ended, is already there, or can't be imported and why.
 
 4
-00:00:14.067 --> 00:00:19.413
+00:00:14.165 --> 00:00:19.544
 4. Click Import and confirm. Current contracts become Effective and locked with their original dates; expired ones Ended.
 
 5
-00:00:19.413 --> 00:00:32.182
-5. Then add their files: choose (or drag in) a ZIP with the old reference in each file's name or folder. What each file is (signed copy, draft, variation, cover page) comes from words in its folder or name; change any that are wrong, then click Add files.
+00:00:19.544 --> 00:00:32.315
+5. Then add their files: choose (or drag in) the ZIPs, as many as you like, or drag in the whole folder of them. Each file is matched by the old or JBSAUS reference in its name, its folder or the ZIP's name. What each file is (signed copy, draft, variation, cover page) comes from words in its folder or name; change any that are wrong, then click Add files.
